@@ -1,0 +1,6 @@
+/vendor/
+/.idea/
+/config/yaml/dbconfig.yaml
+/tests/Benchmark/*
+/tests/App/*
+```
