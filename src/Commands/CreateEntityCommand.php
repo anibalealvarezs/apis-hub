@@ -3,6 +3,7 @@
 namespace Commands;
 
 use Classes\Crud;
+use Doctrine\ORM\Exception\NotSupported;
 use Enums\CrudMethods;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -32,13 +33,14 @@ class CreateEntityCommand extends Command
             ->setDescription('Create entity record')
             ->setHelp('This command allows you to get create a new entity record')
             ->addOption('entity', 'e', InputOption::VALUE_REQUIRED, 'The entity which the record will be created in')
-            ->addOption('data', 'f', InputOption::VALUE_OPTIONAL, 'The data which will be used to create the record');
+            ->addOption('data', 'd', InputOption::VALUE_OPTIONAL, 'The data which will be used to create the record');
     }
 
     /**
      * @param InputInterface $input
      * @param OutputInterface $output
      * @return int
+     * @throws NotSupported
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {

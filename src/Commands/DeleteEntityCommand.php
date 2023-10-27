@@ -3,6 +3,7 @@
 namespace Commands;
 
 use Classes\Crud;
+use Doctrine\ORM\Exception\NotSupported;
 use Enums\CrudMethods;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -39,6 +40,7 @@ class DeleteEntityCommand extends Command
      * @param InputInterface $input
      * @param OutputInterface $output
      * @return int
+     * @throws NotSupported
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {

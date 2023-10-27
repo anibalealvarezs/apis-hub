@@ -3,6 +3,7 @@
 namespace Commands;
 
 use Classes\Crud;
+use Doctrine\ORM\Exception\NotSupported;
 use Enums\CrudMethods;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -32,13 +33,14 @@ class UpdateEntityCommand extends Command
             ->setHelp('This command allows you to get update an entity record')
             ->addOption('entity', 'e', InputOption::VALUE_REQUIRED, 'The entity which the record will be updated in')
             ->addOption('id', 'i', InputOption::VALUE_REQUIRED, 'The id of the entity record')
-            ->addOption('data', 'f', InputOption::VALUE_OPTIONAL, 'The data which will be used to update the record');
+            ->addOption('data', 'd', InputOption::VALUE_OPTIONAL, 'The data which will be used to update the record');
     }
 
     /**
      * @param InputInterface $input
      * @param OutputInterface $output
      * @return int
+     * @throws NotSupported
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
