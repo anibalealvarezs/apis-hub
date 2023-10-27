@@ -70,7 +70,7 @@ class Helpers
      */
     public static function getManager(): EntityManager
     {
-        $connectionParams = Yaml::parseFile(__DIR__ . "/../../config/dbconfig.yaml");
+        $connectionParams = Yaml::parseFile(__DIR__ . "/../../config/yaml/dbconfig.yaml");
         $conn = DriverManager::getConnection($connectionParams);
         $config = ORMSetup::createAttributeMetadataConfiguration(paths: array(__DIR__."/src"), isDevMode: true);
         return EntityManager::create($conn, $config);
@@ -133,7 +133,6 @@ class Helpers
     public static function dataToObject(string $data = null): object
     {
         if ($data) {
-            // $data = json_decode(base64_decode($data));
             return json_decode(base64_decode($data));
         }
         return (object)[];
