@@ -65,7 +65,7 @@ class Crud
             case 'create':
                 return json_encode($repository->create(Helpers::dataToObject($data)));
             case 'update':
-                return $repository->update($id, Helpers::dataToObject($data));
+                return json_encode($repository->update($id, Helpers::dataToObject($data)));
             case 'delete':
                 if ($repository->delete($id)) {
                     return 'Entity (' . $entity . ') with id (' . $id . ') deleted';
