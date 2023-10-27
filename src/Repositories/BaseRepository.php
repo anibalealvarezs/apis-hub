@@ -168,6 +168,8 @@ class BaseRepository extends EntityRepository
                 }
             }
         }
+
+        $entity->onPreUpdate();
     
         $this->em->persist($entity);
         $this->em->flush();
