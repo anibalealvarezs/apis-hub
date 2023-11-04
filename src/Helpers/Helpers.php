@@ -64,16 +64,40 @@ class Helpers
     }
 
     /**
+     * @return array
+     */
+    public static function getConfig(): array
+    {
+        return Yaml::parseFile(__DIR__ . "/../../config/yaml/dbconfig.yaml");
+    }
+
+    /**
+     * @return array
+     */
+    public static function getConnectionParams(): array
+    {
+        return self::getConfig()['connection_params'];
+    }
+
+    /**
      * @return EntityManager
      * @throws Exception
      * @throws ORMException
      */
     public static function getManager(): EntityManager
     {
-        $connectionParams = Yaml::parseFile(__DIR__ . "/../../config/yaml/dbconfig.yaml");
+        $connectionParams = self::getConnectionParams();
         $conn = DriverManager::getConnection($connectionParams);
-        $config = ORMSetup::createAttributeMetadataConfiguration(paths: array(__DIR__."/src"), isDevMode: true);
+        $config = ORMSetup::createAttributeMetadataConfiguration(paths: array(__DIR__."/.."), isDevMode: true);
         return EntityManager::create($conn, $config);
+    }
+
+    /**
+     * @return array
+     */
+    public static function getCrudEntities(): array
+    {
+        return self::getConfig()['crud_entities'];
     }
 
     /**
