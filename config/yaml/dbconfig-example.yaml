@@ -1,5 +1,28 @@
-dbname: dbname
-user: user
-password: password
-host: localhost
-driver: pdo_mysql
+connection_params:
+  dbname: dbname
+  user: user
+  password: password
+  host: localhost
+  driver: pdo_mysql
+crud_entities:
+  job:
+    class: \Entities\Job
+    enabled: true
+  customer:
+    class: \Entities\Analytics\Customer
+    enabled: true
+  discount:
+    class: \Entities\Analytics\Discount
+    enabled: true
+  order:
+    class: \Entities\Analytics\Order
+    enabled: true
+  product:
+    class: \Entities\Analytics\Product
+    enabled: true
+  product_category:
+    class: \Entities\Analytics\ProductCategory
+    enabled: true
+  vendor:
+    class: \Entities\Analytics\Vendor
+    enabled: true
