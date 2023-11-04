@@ -1,8 +1,6 @@
 <?php
 
-declare(strict_types=1);
-
-namespace Classes;
+namespace Controllers;
 
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
@@ -11,9 +9,7 @@ use Doctrine\ORM\Exception\ORMException;
 use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\Response;
 
-require_once  __DIR__ . '/../../vendor/autoload.php';
-
-class Crud
+class CrudController
 {
     /**
      * @var EntityManager
@@ -60,19 +56,28 @@ class Crud
     /**
      * @param string $entity
      * @param int|null $id
-     * @param string|null $data
      * @return Response
      * @throws NotSupported
      */
-    protected function read(string $entity, int $id = null, string $data = null): Response
+    protected function read(string $entity, int $id = null): Response
     {
         $repository = $this->em->getRepository(
             Helpers::getCrudEntities()[strtolower($entity)]['class']
         );
+        return new Response(json_encode($repository->read($id)));
+    }
 
-        if ($id) {
-            return new Response(json_encode($repository->read($id)));
-        }
+    /**
+     * @param string $entity
+     * @param string|null $data
+     * @return Response
+     * @throws NotSupported
+     */
+    protected function list(string $entity, string $data = null): Response
+    {
+        $repository = $this->em->getRepository(
+            Helpers::getCrudEntities()[strtolower($entity)]['class']
+        );
 
         if ($collection = $repository->readMultiple(filters: Helpers::dataToObject($data))) {
             return new Response(

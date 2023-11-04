@@ -68,4 +68,14 @@ class Core implements HttpKernelInterface
             array('controller' => $controller)
         ));
     }
+
+    /**
+     * @param array $routes
+     */
+    public function multiMap(array $routes): void
+    {
+        foreach ($routes as $path => $callable) {
+            $this->map($path, $callable);
+        }
+    }
 }
