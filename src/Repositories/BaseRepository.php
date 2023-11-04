@@ -2,9 +2,7 @@
 
 namespace Repositories;
 
-use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
-use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\Persistence\Mapping\MappingException;
@@ -14,18 +12,6 @@ use stdClass;
 
 class BaseRepository extends EntityRepository
 {
-    /**
-     * @param EntityManagerInterface $em
-     * @param ClassMetadata $class
-     */
-    public function __construct(EntityManagerInterface $em, ClassMetadata $class)
-    {
-        parent::__construct($em, $class);
-        $this->entityName = $this->getEntityName();
-        $this->em         = $this->getEntityManager();
-        $this->class      = $this->getClassMetadata();
-    }
-
     /**
      * @param stdClass|null $data
      * @return array|null
@@ -40,7 +26,7 @@ class BaseRepository extends EntityRepository
 
         if ((array) $data) {
             foreach ($data as $key => $value) {
-                if (isset($this->class->associationMappings[$key]) && isset($this->class->associationMappings[$key]['joinTable'])) {
+                if (isset($this->_class->associationMappings[$key]['joinTable'])) {
                     if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
                         $entity->{'add' . Helpers::toCamelcase($key)}($value);
                     }
@@ -52,8 +38,8 @@ class BaseRepository extends EntityRepository
             }
         }
     
-        $this->em->persist($entity);
-        $this->em->flush();
+        $this->_em->persist($entity);
+        $this->_em->flush();
 
         return $this->read($entity->getId());
     }
@@ -68,9 +54,9 @@ class BaseRepository extends EntityRepository
      */
     public function read(int $id, bool $withAssociations = true): ?array
     {
-        $entity = $this->em->createQueryBuilder()
+        $entity = $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->entityName, 'e')
+            ->from($this->_entityName, 'e')
             ->where('e.id = :id')
             ->setParameter('id', $id)
             ->getQuery()
@@ -80,8 +66,8 @@ class BaseRepository extends EntityRepository
             return null;
         }
 
-        $fields = array_keys($this->class->fieldMappings);
-        $associated = $this->class->associationMappings;
+        $fields = array_keys($this->_class->fieldMappings);
+        $associated = $this->_class->associationMappings;
 
         $data = [];
         foreach ($fields as $field) {
@@ -97,7 +83,7 @@ class BaseRepository extends EntityRepository
                 if (!$element) {
                     continue;
                 }
-                if (Helpers::isEntity($this->em, $element)) {
+                if (Helpers::isEntity($this->_em, $element)) {
                     $data[$fieldName] = Helpers::jsonSerialize($element);
                     continue;
                 }
@@ -106,7 +92,7 @@ class BaseRepository extends EntityRepository
                 }
                 $data[$fieldName] = [];
                 foreach ($element as $el) {
-                    $data[$fieldName][] = $this->em->getRepository($className)->read($el->getId(), false);
+                    $data[$fieldName][] = $this->_em->getRepository($className)->read($el->getId(), false);
                 }
             }
         }
@@ -121,18 +107,18 @@ class BaseRepository extends EntityRepository
      */
     public function getCount(): int
     {
-        return $this->em->createQueryBuilder()
+        return $this->_em->createQueryBuilder()
             ->select('COUNT(e)')
-            ->from($this->entityName, 'e')
+            ->from($this->_entityName, 'e')
             ->getQuery()
             ->getSingleScalarResult();
     }
 
     public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null)
     {
-        return $this->em->createQueryBuilder()
+        return $this->_em->createQueryBuilder()
                 ->select('e')
-                ->from($this->entityName, 'e')
+                ->from($this->_entityName, 'e')
                 ->setMaxResults($limit)
                 ->setFirstResult($limit * $pagination)
                 ->getQuery()
@@ -149,7 +135,7 @@ class BaseRepository extends EntityRepository
      */
     public function update(int $id, stdClass $data = null): bool|array|null
     {
-        $entity = $this->em->find($this->entityName, $id);
+        $entity = $this->_em->find($this->_entityName, $id);
 
         if (!$entity) {
             return false;
@@ -157,7 +143,7 @@ class BaseRepository extends EntityRepository
 
         if ((array) $data) {
             foreach ($data as $key => $value) {
-                if (isset($this->class->associationMappings[$key]) && isset($this->class->associationMappings[$key]['joinTable'])) {
+                if (isset($this->_class->associationMappings[$key]['joinTable'])) {
                     if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
                         $entity->{'add' . Helpers::toCamelcase($key)}($value);
                     }
@@ -171,8 +157,8 @@ class BaseRepository extends EntityRepository
 
         $entity->onPreUpdate();
     
-        $this->em->persist($entity);
-        $this->em->flush();
+        $this->_em->persist($entity);
+        $this->_em->flush();
 
         return $this->read($entity->getId());
     }
@@ -183,13 +169,13 @@ class BaseRepository extends EntityRepository
      */
     public function delete(int $id): bool
     {
-        $entity = $this->em->find($this->entityName, $id);
+        $entity = $this->_em->find($this->_entityName, $id);
 
         if (!$entity) {
             return false;
         }
 
-        $props = $this->class->fieldMappings;
+        $props = $this->_class->fieldMappings;
 
         foreach ($props as $key => $value) {
             if (is_a($entity->{'get' . Helpers::toCamelcase($key)}(), 'Collection')) {
@@ -197,8 +183,8 @@ class BaseRepository extends EntityRepository
             }
         }
 
-        $this->em->remove($entity);
-        $this->em->flush();
+        $this->_em->remove($entity);
+        $this->_em->flush();
 
         return true;
     }
