@@ -5,6 +5,7 @@ namespace Repositories;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
 use Enums\JobStatus;
+use Faker\Factory;
 use ReflectionException;
 use stdClass;
 
@@ -75,6 +76,12 @@ class JobRepository extends BaseRepository
     {
         if (isset($data->status) && $data->status && $job = JobStatus::from($data->status)) {
             $data->status = $job->value;
+        } else {
+            $data->status = JobStatus::processing->value;
+        }
+
+        if (!isset($data->filename)) {
+            $data->filename = Factory::create()->uuid;
         }
 
         return parent::create($data);
