@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-$loader = require_once __DIR__ . "/../vendor/autoload.php";
-$loader->register();
+require_once __DIR__ . "/../app/bootstrap.php";
 
+use Classes\Analytics;
 use Symfony\Component\HttpFoundation\Request;
 use Classes\Core;
 use Classes\Crud;
@@ -13,37 +13,52 @@ $request = Request::createFromGlobals();
 
 $app = new Core();
 
-$app->map('/bin/{entities}/create/{data?}', function (string $entities, string $data = null) {
+$app->map('/{entity}/create/{data?}', function (string $entity, string $data = null) {
     return (new Crud())(
-        entity: $entities,
+        entity: $entity,
         method: 'create',
         data: $data
     );
 });
 
-$app->map('/bin/{entities}/{id}/update/{data?}', function (string $entities, int $id, string $data = null) {
+$app->map('/{entity}/{id}', function (string $entity, int $id) {
     return (new Crud())(
-        entity: $entities,
+        entity: $entity,
+        method: 'read',
+        id: $id
+    );
+});
+
+$app->map('/{entity}/{data?}', function (string $entity, string $data = null) {
+    return (new Crud())(
+        entity: $entity,
+        method: 'read',
+        data: $data
+    );
+});
+
+$app->map('/{entity}/{id}/update/{data?}', function (string $entity, int $id, string $data = null) {
+    return (new Crud())(
+        entity: $entity,
         method: 'update',
         id: $id,
         data: $data
     );
 });
 
-$app->map('/bin/{entities}/{id}/delete', function (string $entities, int $id) {
+$app->map('/{entity}/{id}/delete', function (string $entity, int $id) {
     return (new Crud())(
-        entity: $entities,
+        entity: $entity,
         method: 'delete',
         id: $id
     );
 });
 
-$app->map('/bin/{entities}/{id?}/{data?}', function (string $entities, int $id = null, string $data = null) {
-    return (new Crud())(
-        entity: $entities,
-        method: 'read',
-        id: $id,
-        data: $data
+$app->map('/analytics/{channel}/{entity}', function (string $entity, int $id) {
+    return (new Analytics())(
+        entity: $entity,
+        method: 'delete',
+        id: $id
     );
 });
 

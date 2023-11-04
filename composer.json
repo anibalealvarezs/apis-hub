@@ -24,6 +24,9 @@
         "nesbot/carbon": "^2.61",
         "symfony/yaml": "^5.4.10",
         "symfony/config": "^6.1",
+        "symfony/routing": "^6.1",
+        "symfony/http-foundation": "^6.1",
+        "symfony/http-kernel": "^6.1",
         "symfony/cache": "^6.1"
     },
     "autoload": {
