@@ -12,30 +12,11 @@ class Entity
     #[ORM\Id, ORM\Column(type: 'integer'), ORM\GeneratedValue]
     protected int $id;
 
-    /* #[ORM\Column(type: 'string')]
-    protected string $name; */
-
     #[ORM\Column(name: 'created_at', type: 'datetime', options: ['default' => 'CURRENT_TIMESTAMP'])]
     protected DateTime $createdAt;
 
     #[ORM\Column(name: 'updated_at', type: 'datetime', options: ['default' => 'CURRENT_TIMESTAMP'])]
     protected DateTime $updatedAt;
-
-    /**
-     * @return string|null
-     */
-    /* public function getName(): ?string
-    {
-        return $this->name;
-    } */
-    /**
-     * @param string $name
-     * @return void
-     */
-    /* public function addName(string $name): void
-    {
-        $this->name = $name;
-    } */
 
     /**
      * @return int|null
@@ -79,16 +60,18 @@ class Entity
         $this->updatedAt = $updatedAt;
     }
 
-    #[ORM\PrePersist]
-    public function onPrePersist(): void
-    {
-        $this->createdAt = new DateTime('now');
-        $this->updatedAt = new DateTime('now');
-    }
-
     #[ORM\PreUpdate]
     public function onPreUpdate(): void
     {
         $this->updatedAt = new DateTime('now');
+    }
+
+    #[ORM\PrePersist]
+    public function onPrePersist(): void
+    {
+        if (!isset($this->createdAt)) {
+            $this->createdAt = new DateTime('now');
+            $this->updatedAt = new DateTime('now');
+        }
     }
 }
