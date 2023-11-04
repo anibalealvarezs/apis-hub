@@ -1,9 +1,9 @@
 <?php
 
-use Commands\CreateEntityCommand;
-use Commands\DeleteEntityCommand;
-use Commands\ReadEntityCommand;
-use Commands\UpdateEntityCommand;
+use Commands\Crud\CreateEntityCommand;
+use Commands\Crud\DeleteEntityCommand;
+use Commands\Crud\ReadEntityCommand;
+use Commands\Crud\UpdateEntityCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use Doctrine\ORM\Version;
 use Symfony\Component\Console\Application;

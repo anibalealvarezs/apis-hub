@@ -1,6 +1,6 @@
 <?php
 
-namespace Commands;
+namespace Commands\Crud;
 
 use Classes\Crud;
 use Doctrine\ORM\Exception\NotSupported;
@@ -48,14 +48,10 @@ class CreateEntityCommand extends Command
             entity: $input->getOption('entity'),
             method: $this->method->getName(),
             data: $input->getOption('data'),
+            cli: true,
         );
 
-        if ($result) {
-            $output->writeln('<info>' . $result . '</info>');
-            return Command::SUCCESS;
-        } else {
-            $output->writeln('<error>' . $result . '</error>');
-            return Command::FAILURE;
-        }
+        $output->writeln('<info>' . $result . '</info>');
+        return Command::SUCCESS;
     }
 }

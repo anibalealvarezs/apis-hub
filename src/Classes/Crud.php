@@ -8,8 +8,8 @@ use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
-use Entities\Job;
 use Helpers\Helpers;
+use Symfony\Component\HttpFoundation\Response;
 
 require_once  __DIR__ . '/../../vendor/autoload.php';
 
@@ -34,45 +34,56 @@ class Crud
      * @param string $method
      * @param int|null $id
      * @param string|null $data
-     * @return string
+     * @param bool $cli
+     * @return Response
      * @throws NotSupported
      */
-    public function __invoke(string $entity, string $method, int $id = null, string $data = null): string
+    public function __invoke(string $entity, string $method, int $id = null, string $data = null, bool $cli = false): Response
     {
-        $entity = match ($entity) {
-            'job' => Job::class,
-            default => null,
-        };
+        $crudEntities = Helpers::getCrudEntities();
 
-        if (!$entity) {
-            return 'Entity not found';
+        if (!isset($crudEntities[strtolower($entity)])) {
+            return new Response('Invalid crudable entity', 404);
         }
 
-        $repository = $this->em->getRepository($entity);
+        $entityEnabled = $crudEntities[strtolower($entity)]['enabled'];
+        if (!$entityEnabled) {
+            return new Response('CRUD disabled for this entity', 403);
+        }
+
+        $entityClass = $crudEntities[strtolower($entity)]['class'];
+
+        if (!$cli) {
+            header('Content-Type: application/json');
+        }
+
+        $repository = $this->em->getRepository($entityClass);
         switch ($method) {
             case 'read':
                 if ($id) {
-                    return json_encode($repository->read($id));
+                    return new Response(json_encode($repository->read($id)));
                 }
                 if ($collection = $repository->readMultiple(filters: Helpers::dataToObject($data))) {
-                    $response = [];
-                    foreach ($collection as $element) {
-                        $response[] = $repository->read($element->getId());
-                    }
-                    return json_encode($response);
+                    return new Response(
+                        json_encode(array_map(
+                            function ($element) use ($repository) {
+                                return $repository->read($element->getId());
+                            }, $collection
+                        ))
+                    );
                 }
-                return 'No results';
+                return new Response(json_encode([]));
             case 'create':
-                return json_encode($repository->create(Helpers::dataToObject($data)));
+                return new Response(json_encode($repository->create(Helpers::dataToObject($data))));
             case 'update':
-                return json_encode($repository->update($id, Helpers::dataToObject($data)));
+                return new Response(json_encode($repository->update($id, Helpers::dataToObject($data))));
             case 'delete':
                 if ($repository->delete($id)) {
-                    return 'Entity (' . $entity . ') with id (' . $id . ') deleted';
+                    return new Response('Entity (' . $entityClass . ') with id (' . $id . ') deleted');
                 }
-                return 'Entity (' . $entity . ') with id (' . $id . ') could not be deleted';
+                return new Response('Entity (' . $entityClass . ') with id (' . $id . ') could not be deleted');
             default:
-                return 'Method not found';
+                return new Response('Method not found', 404);
         }
     }
 }

@@ -1,6 +1,6 @@
 <?php
 
-namespace Commands;
+namespace Commands\Crud;
 
 use Classes\Crud;
 use Doctrine\ORM\Exception\NotSupported;
@@ -14,6 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(
     name: 'app:update',
     description: 'Updates an entity record.',
+    aliases: ['app:edit'],
     hidden: false
 )]
 class UpdateEntityCommand extends Command
@@ -49,14 +50,10 @@ class UpdateEntityCommand extends Command
             method: $this->method->getName(),
             id: $input->getOption('id'),
             data: $input->getOption('data'),
+            cli: true,
         );
 
-        if ($result) {
-            $output->writeln('<info>' . $result . '</info>');
-            return Command::SUCCESS;
-        } else {
-            $output->writeln('<error>' . $result . '</error>');
-            return Command::FAILURE;
-        }
+        $output->writeln('<info>' . $result . '</info>');
+        return Command::SUCCESS;
     }
 }
