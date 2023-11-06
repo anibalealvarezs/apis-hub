@@ -6,6 +6,8 @@ use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
 use Enums\JobStatus;
 use Faker\Factory;
+use Helpers\Helpers;
+use ReflectionEnum;
 use ReflectionException;
 use stdClass;
 
@@ -74,7 +76,7 @@ class JobRepository extends BaseRepository
      */
     public function create(stdClass $data = null): ?array
     {
-        if (isset($data->status) && $data->status && $job = JobStatus::from($data->status)) {
+        if (isset($data->status) && is_int($data->status) && $job = JobStatus::from($data->status)) {
             $data->status = $job->value;
         } else {
             $data->status = JobStatus::processing->value;
@@ -88,32 +90,47 @@ class JobRepository extends BaseRepository
     }
 
     /**
-     * @param int $id
-     * @param bool $withAssociations
-     * @return array|null
-     * @throws NonUniqueResultException
-     * @throws ReflectionException
+     * @param int $limit
+     * @param int $pagination
+     * @param object|null $filters
+     * @return array
      * @throws MappingException
+     * @throws ReflectionException
      */
-    public function read(int $id, bool $withAssociations = true): ?array
+    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null): array
     {
-        $job = parent::read($id, false);
-        $job['status'] = $this->getStatusName($job['status']);
+        $query = $this->_em->createQueryBuilder()
+            ->select('e')
+            ->from($this->_entityName, 'e');
+        foreach($filters as $key => $value) {
+            $query->andWhere('e.' . $key . ' = :' . $key)
+                ->setParameter($key, $key == 'status' && !is_int($value) ? (new ReflectionEnum(JobStatus::class))->getConstant($value) : $value);
+        }
+        $list = $query->setMaxResults($limit)
+            ->setFirstResult($limit * $pagination)
+            ->getQuery()
+            ->getResult();
 
-        return $job;
+        return array_map(function ($element) {
+            return $this->mapEntityData($element);
+        }, $list);
     }
 
     /**
      * @param int $id
      * @param stdClass|null $data
      * @return array|null
+     * @throws MappingException
      * @throws NonUniqueResultException
      * @throws ReflectionException
-     * @throws MappingException
      */
     public function update(int $id, stdClass $data = null): ?array
     {
-        if (isset($data->status) && $data->status && $job = JobStatus::from($data->status)) {
+        if (!isset($data->status) || !$data->status) {
+            return parent::update($id, $data);
+        }
+
+        if ($job = is_int($data->status) ? JobStatus::from($data->status) : (new ReflectionEnum(JobStatus::class))->getConstant($data->status)) {
             $data->status = $job->value;
         }
 

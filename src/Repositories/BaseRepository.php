@@ -2,6 +2,7 @@
 
 namespace Repositories;
 
+use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
@@ -60,40 +61,50 @@ class BaseRepository extends EntityRepository
             ->where('e.id = :id')
             ->setParameter('id', $id)
             ->getQuery()
-            ->getOneOrNullResult();
+            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
 
         if (!$entity) {
             return null;
         }
 
+        return $this->mapEntityData($entity, $withAssociations);
+    }
+
+    /**
+     * @throws ReflectionException
+     * @throws MappingException
+     */
+    protected function mapEntityData(object $entity, bool $withAssociations = true): array
+    {
         $fields = array_keys($this->_class->fieldMappings);
         $associated = $this->_class->associationMappings;
 
         $data = [];
         foreach ($fields as $field) {
-            if (method_exists($entity, 'get' . Helpers::toCamelcase($field))) {
+            if (method_exists($this->_entityName, 'get' . Helpers::toCamelcase($field))) {
                 $data[$field] = $entity->{'get' . Helpers::toCamelcase($field)}();
             }
         }
         foreach ($associated as $association) {
             $fieldName = $association['fieldName'];
             $className = $association['targetEntity'];
-            if (method_exists($entity, 'get' . Helpers::toCamelcase($fieldName))) {
-                $element = $entity->{'get' . Helpers::toCamelcase($fieldName)}();
-                if (!$element) {
-                    continue;
-                }
-                if (Helpers::isEntity($this->_em, $element)) {
-                    $data[$fieldName] = Helpers::jsonSerialize($element);
-                    continue;
-                }
-                if (!$withAssociations) {
-                    continue;
-                }
-                $data[$fieldName] = [];
-                foreach ($element as $el) {
-                    $data[$fieldName][] = $this->_em->getRepository($className)->read($el->getId(), false);
-                }
+            if (!method_exists($this->_entityName, 'get' . Helpers::toCamelcase($fieldName))) {
+                continue;
+            }
+            $element = $entity->{'get' . Helpers::toCamelcase($fieldName)}();
+            if (!$element) {
+                continue;
+            }
+            if (Helpers::isEntity($this->_em, $element)) {
+                $data[$fieldName] = Helpers::jsonSerialize($element);
+                continue;
+            }
+            if (!$withAssociations) {
+                continue;
+            }
+            $data[$fieldName] = [];
+            foreach ($element as $el) {
+                $data[$fieldName][] = $this->_em->getRepository($className)->read($el->getId(), false);
             }
         }
 
@@ -114,15 +125,31 @@ class BaseRepository extends EntityRepository
             ->getSingleScalarResult();
     }
 
-    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null)
+    /**
+     * @param int $limit
+     * @param int $pagination
+     * @param object|null $filters
+     * @return array
+     * @throws MappingException
+     * @throws ReflectionException
+     */
+    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null): array
     {
-        return $this->_em->createQueryBuilder()
-                ->select('e')
-                ->from($this->_entityName, 'e')
-                ->setMaxResults($limit)
-                ->setFirstResult($limit * $pagination)
-                ->getQuery()
-                ->getResult();
+        $query = $this->_em->createQueryBuilder()
+            ->select('e')
+            ->from($this->_entityName, 'e');
+        foreach($filters as $key => $value) {
+            $query->andWhere('e.' . $key . ' = :' . $key)
+                ->setParameter($key, $value);
+        }
+        $list = $query->setMaxResults($limit)
+            ->setFirstResult($limit * $pagination)
+            ->getQuery()
+            ->getResult();
+
+        return array_map(function ($element) {
+            return $this->mapEntityData($element);
+        }, $list);
     }
 
     /**
