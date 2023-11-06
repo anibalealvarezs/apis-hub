@@ -5,5 +5,3 @@
 /tests/App/*
 /src/Entities/Analytics/Lead.php
 /src/Entities/Analytics/Accounts/*
-/src/Classes/Crud.php
-/src/Classes/Analytics.php
