@@ -97,7 +97,20 @@ class Helpers
      */
     public static function getCrudEntities(): array
     {
-        return self::getConfig()['crud_entities'];
+        return self::getConfig()['entities'];
+    }
+
+    /**
+     * @return array
+     */
+    public static function getEnabledCrudEntities(): array
+    {
+        return array_filter(self::getConfig()['entities'], function ($entity) {
+            if ($entity['crud_enabled']) {
+                return $entity;
+            };
+            return false;
+        });
     }
 
     /**
