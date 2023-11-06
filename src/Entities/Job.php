@@ -3,6 +3,7 @@
 namespace Entities;
 
 use Doctrine\ORM\Mapping as ORM;
+use Enums\JobStatus;
 use Repositories\JobRepository;
 
 #[ORM\Entity(repositoryClass: JobRepository::class)]
@@ -21,7 +22,7 @@ class Job extends Entity
      */
     public function getStatus(): string
     {
-        return $this->status;
+        return JobStatus::from($this->status)->getName();
     }
 
     /**
