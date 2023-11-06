@@ -2,9 +2,8 @@
 
 namespace Commands\Crud;
 
-use Classes\Crud;
+use Controllers\CrudController;
 use Doctrine\ORM\Exception\NotSupported;
-use Enums\CrudMethods;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,11 +18,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 )]
 class ReadEntityCommand extends Command
 {
-    /**
-     * @var CrudMethods
-     */
-    protected CrudMethods $method = CrudMethods::read;
-
     /**
      * @return void
      */
@@ -45,13 +39,19 @@ class ReadEntityCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $result = (new Crud())(
-            entity: $input->getOption('entity'),
-            method: $this->method->getName(),
-            id: $input->getOption('id'),
-            data: $input->getOption('filters'),
-            cli: true,
-        );
+        if ($input->getOption('id')) {
+            $result = (new CrudController())(
+                entity: $input->getOption('entity'),
+                method: 'read',
+                id: $input->getOption('id'),
+            );
+        } else {
+            $result = (new CrudController())(
+                entity: $input->getOption('entity'),
+                method: 'list',
+                data: $input->getOption('filters'),
+            );
+        }
 
         $output->writeln('<info>' . $result->getContent() . '</info>');
         return Command::SUCCESS;

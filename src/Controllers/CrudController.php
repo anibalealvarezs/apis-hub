@@ -30,26 +30,22 @@ class CrudController
      * @param string $method
      * @param int|null $id
      * @param string|null $data
-     * @param bool $cli
      * @return Response
      * @throws NotSupported
      */
-    public function __invoke(string $entity, string $method, int $id = null, string $data = null, bool $cli = false): Response
+    public function __invoke(string $entity, string $method, int $id = null, string $data = null): Response
     {
         if (!$this->isValidCrudableEntity($entity)) {
-            return new Response('Invalid crudable entity', 404);
-        }
-
-        if (!$cli) {
-            header('Content-Type: application/json');
+            return new Response('Invalid crudable entity', Response::HTTP_NOT_FOUND);
         }
 
         return match ($method) {
-            'read' => $this->read($entity, $id, $data),
+            'read' => $this->read($entity, $id),
+            'list' => $this->list($entity, $data),
             'create' => $this->create($entity, $data),
             'update' => $this->update($entity, $id, $data),
             'delete' => $this->delete($entity, $id),
-            default => new Response('Method not found', 404),
+            default => new Response('Method not found', Response::HTTP_NOT_FOUND),
         };
     }
 
@@ -64,7 +60,8 @@ class CrudController
         $repository = $this->em->getRepository(
             Helpers::getCrudEntities()[strtolower($entity)]['class']
         );
-        return new Response(json_encode($repository->read($id)));
+
+        return new Response(json_encode($repository->read($id) ?: []));
     }
 
     /**
@@ -79,17 +76,7 @@ class CrudController
             Helpers::getCrudEntities()[strtolower($entity)]['class']
         );
 
-        if ($collection = $repository->readMultiple(filters: Helpers::dataToObject($data))) {
-            return new Response(
-                json_encode(array_map(
-                    function ($element) use ($repository) {
-                        return $repository->read($element->getId());
-                    }, $collection
-                ))
-            );
-        }
-
-        return new Response(json_encode([]));
+        return new Response(json_encode($repository->readMultiple(filters: Helpers::dataToObject($data))));
     }
 
     /**
@@ -148,12 +135,8 @@ class CrudController
      */
     protected function isValidCrudableEntity(string $entity): bool
     {
-        $crudEntities = Helpers::getCrudEntities();
+        $crudEntities = Helpers::getEnabledCrudEntities();
 
-        if (!isset($crudEntities[strtolower($entity)])) {
-            return false;
-        }
-
-        return $crudEntities[strtolower($entity)]['enabled'];
+        return in_array(strtolower($entity), array_keys($crudEntities));
     }
 }

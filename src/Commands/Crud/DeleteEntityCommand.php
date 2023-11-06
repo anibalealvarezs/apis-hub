@@ -2,9 +2,8 @@
 
 namespace Commands\Crud;
 
-use Classes\Crud;
+use Controllers\CrudController;
 use Doctrine\ORM\Exception\NotSupported;
-use Enums\CrudMethods;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,11 +18,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 )]
 class DeleteEntityCommand extends Command
 {
-    /**
-     * @var CrudMethods
-     */
-    protected CrudMethods $method = CrudMethods::delete;
-
     /**
      * @return void
      */
@@ -44,11 +38,10 @@ class DeleteEntityCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $result = (new Crud())(
+        $result = (new CrudController())(
             entity: $input->getOption('entity'),
-            method: $this->method->getName(),
+            method: 'delete',
             id: $input->getOption('id'),
-            cli: true,
         );
 
         $output->writeln('<info>' . $result . '</info>');
