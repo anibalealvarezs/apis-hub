@@ -48,7 +48,7 @@ class Core implements HttpKernelInterface
             unset($attributes['_route']);
             $response = call_user_func_array($controller, $attributes);
         } catch (ResourceNotFoundException $e) {
-            $response = new Response('Not found!', Response::HTTP_NOT_FOUND);
+            $response = new Response('Route not found!', Response::HTTP_NOT_FOUND);
         } catch (Exception $e) {
             $response = new Response('An error occurred', Response::HTTP_INTERNAL_SERVER_ERROR);
         }
