@@ -74,6 +74,14 @@ class Helpers
     /**
      * @return array
      */
+    public static function getChannelsConfig(): array
+    {
+        return self::getConfig()['channels'];
+    }
+
+    /**
+     * @return array
+     */
     public static function getConnectionParams(): array
     {
         return self::getConfig()['connection_params'];
