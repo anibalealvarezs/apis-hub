@@ -22,7 +22,7 @@ class Vendor extends Entity implements ChannelInterface
     #[ORM\Column(type: 'json')]
     protected string $data;
 
-    #[ORM\OneToMany(mappedBy: 'Vendor', targetEntity: 'Product', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'vendor', targetEntity: 'Product', cascade: ['persist', 'remove'], orphanRemoval: true)]
     protected Collection $products;
 
     /**

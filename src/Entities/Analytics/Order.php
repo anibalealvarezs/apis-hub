@@ -32,7 +32,7 @@ class Order extends Entity implements ChannelInterface
     #[ORM\JoinTable(name: 'order_products')]
     protected ArrayCollection $products;
 
-    #[ORM\OneToMany(mappedBy: 'Order', targetEntity: 'Discount', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'order', targetEntity: 'Discount', cascade: ['persist', 'remove'], orphanRemoval: true)]
     protected Collection $discounts;
 
     public function __construct()

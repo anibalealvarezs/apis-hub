@@ -22,7 +22,7 @@ class Customer extends Entity implements ChannelInterface
     #[ORM\Column(type: 'json')]
     protected string $data;
 
-    #[ORM\OneToMany(mappedBy: 'Customer', targetEntity: 'Order', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'customer', targetEntity: 'Order', cascade: ['persist', 'remove'], orphanRemoval: true)]
     protected Collection $orders;
 
     /**
