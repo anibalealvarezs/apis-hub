@@ -41,4 +41,19 @@ enum Channels: int
     {
         return $this->name;
     }
+
+    /**
+     * @return string
+     */
+    public function getCommonName(): string
+    {
+        return match($this) {
+            self::shopify => 'Shopify',
+            self::klaviyo => 'Klaviyo',
+            self::facebook => 'Facebook',
+            self::bigcommerce => 'BigCommerce',
+            self::netsuite => 'Netsuite',
+            self::amazon => 'Amazon',
+        };
+    }
 }

@@ -3,19 +3,32 @@
 namespace Classes\Requests;
 
 use Chmw\ShopifyApi\ShopifyApi;
+use Classes\Conversions\ShopifyConvert;
+use Doctrine\DBAL\Exception;
+use Doctrine\ORM\Exception\NotSupported;
+use Doctrine\ORM\Exception\ORMException;
+use Entities\Analytics\Customer;
+use Enums\Channels;
+use Enums\JobStatus;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
+use ReflectionEnum;
+use Symfony\Component\HttpFoundation\Response;
 
 class CustomerRequests
 {
     /**
-     * @param int|null $sinceId
+     * @param string|null $createdAtMin
+     * @param string|null $createdAtMax
      * @param array|null $fields
      * @param object|null $filters
-     * @return array
+     * @return Response
      * @throws GuzzleException
+     * @throws Exception
+     * @throws NotSupported
+     * @throws ORMException
      */
-    public static function getListFromShopify(int $sinceId = null, array $fields = null, object $filters = null): array
+    public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, array $fields = null, object $filters = null): Response
     {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
@@ -23,15 +36,23 @@ class CustomerRequests
             shopName: $config['shopify_shop_name'],
             version: $config['shopify_last_stable_revision'],
         );
-        return $shopifyClient->getAllCustomers(
-            createdAtMin: $filters->createdAtMin ?? null,
-            createdAtMax: $filters->createdAtMax ?? null,
+        $customers = $shopifyClient->getAllCustomers(
+            createdAtMin: $createdAtMin,
+            createdAtMax: $createdAtMax,
             fields: $fields,
             ids: $filters->ids ?? null,
-            sinceId: $sinceId,
+            sinceId: $filters->sinceId ?? null,
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
         );
+        $customersCollection = ShopifyConvert::customers($customers['customers']);
+        $repository = Helpers::getManager()->getRepository(Customer::class);
+        foreach ($customersCollection as $customer) {
+            if (!$repository->getCustomerByPlatformAndChannel($customer->platformId, $customer->channel)) {
+                $repository->create($customer);
+            }
+        }
+        return new Response(json_encode($customers));
     }
 
     /**

@@ -182,4 +182,16 @@ class Helpers
         }
         return (object)[];
     }
+
+    /**
+     * @param string|null $data
+     * @return object
+     */
+    public static function bodyToObject(string $data = null): object
+    {
+        if ($data) {
+            return json_decode($data);
+        }
+        return (object)[];
+    }
 }
