@@ -12,7 +12,7 @@ use Symfony\Component\Routing\RequestContext;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
 
-class Core implements HttpKernelInterface
+class RoutingCore implements HttpKernelInterface
 {
     /**
      * @var RouteCollection
@@ -20,7 +20,7 @@ class Core implements HttpKernelInterface
     protected RouteCollection $routes;
 
     /**
-     * Core constructor.
+     * RoutingCore constructor.
      */
     public function __construct()
     {
@@ -46,6 +46,8 @@ class Core implements HttpKernelInterface
             $controller = $attributes['controller'];
             unset($attributes['controller']);
             unset($attributes['_route']);
+            $attributes['body'] = $request->getContent() ?: null;
+            $attributes['params'] = $request->query->all() ?: null;
             $response = call_user_func_array($controller, $attributes);
         } catch (ResourceNotFoundException $e) {
             $response = new Response('Route not found!', Response::HTTP_NOT_FOUND);

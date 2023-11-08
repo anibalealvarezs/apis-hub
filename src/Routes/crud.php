@@ -3,36 +3,37 @@
 use Controllers\CrudController;
 
 return [
-    '/{entity}/create/{data?}' => function (string $entity, string $data = null) {
+    '/{entity}/create' => function (string $entity, ?string $body = null, ?array $params = null) {
         return (new CrudController())(
             entity: $entity,
             method: 'create',
-            data: $data
+            body: $body
         );
     },
-    '/{entity}/{id}' => function (string $entity, int $id) {
+    '/{entity}/{id}' => function (string $entity, int $id, ?string $body = null, ?array $params = null) {
         return (new CrudController())(
             entity: $entity,
             method: 'read',
             id: $id
         );
     },
-    '/{entity}/{data?}' => function (string $entity, string $data = null) {
+    '/{entity}' => function (string $entity, ?string $body = null, ?array $params = null) {
         return (new CrudController())(
             entity: $entity,
             method: 'list',
-            data: $data
+            body: $body,
+            params: $params,
         );
     },
-    '/{entity}/{id}/update/{data?}' => function (string $entity, int $id, string $data = null) {
+    '/{entity}/{id}/update' => function (string $entity, int $id, ?string $body = null, ?array $params = null) {
         return (new CrudController())(
             entity: $entity,
             method: 'update',
             id: $id,
-            data: $data
+            body: $body
         );
     },
-    '/{entity}/{id}/delete' => function (string $entity, int $id) {
+    '/{entity}/{id}/delete' => function (string $entity, int $id, ?string $body = null, ?array $params = null) {
         return (new CrudController())(
             entity: $entity,
             method: 'delete',

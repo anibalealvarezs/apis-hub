@@ -5,15 +5,15 @@ declare(strict_types=1);
 require_once __DIR__ . "/../app/bootstrap.php";
 
 use Symfony\Component\HttpFoundation\Request;
-use Classes\Core;
+use Classes\RoutingCore;
 
 $request = Request::createFromGlobals();
 
-$app = new Core();
+$app = new RoutingCore();
 
 // Custom routes first
-$analyticsRoutes = require_once __DIR__ . "/../src/Routes/analytics.php";
-$app->multiMap($analyticsRoutes);
+$cacheRoutes = require_once __DIR__ . "/../src/Routes/cache.php";
+$app->multiMap($cacheRoutes);
 
 // CRUD routes last
 $crudRoutes = require_once __DIR__ . "/../src/Routes/crud.php";

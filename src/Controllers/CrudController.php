@@ -7,6 +7,8 @@ use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Helpers\Helpers;
+use ReflectionException;
+use ReflectionMethod;
 use Symfony\Component\HttpFoundation\Response;
 
 class CrudController
@@ -29,11 +31,12 @@ class CrudController
      * @param string $entity
      * @param string $method
      * @param int|null $id
-     * @param string|null $data
+     * @param string|null $body
+     * @param array|null $params
      * @return Response
-     * @throws NotSupported
+     * @throws NotSupported|ReflectionException
      */
-    public function __invoke(string $entity, string $method, int $id = null, string $data = null): Response
+    public function __invoke(string $entity, string $method, int $id = null, string $body = null, ?array $params = null): Response
     {
         if (!$this->isValidCrudableEntity($entity)) {
             return new Response('Invalid crudable entity', Response::HTTP_NOT_FOUND);
@@ -41,9 +44,9 @@ class CrudController
 
         return match ($method) {
             'read' => $this->read($entity, $id),
-            'list' => $this->list($entity, $data),
-            'create' => $this->create($entity, $data),
-            'update' => $this->update($entity, $id, $data),
+            'list' => $this->list($entity, $body, $params),
+            'create' => $this->create($entity, $body),
+            'update' => $this->update($entity, $id, $body),
             'delete' => $this->delete($entity, $id),
             default => new Response('Method not found', Response::HTTP_NOT_FOUND),
         };
@@ -66,48 +69,55 @@ class CrudController
 
     /**
      * @param string $entity
-     * @param string|null $data
+     * @param string|null $body
+     * @param array|null $params
      * @return Response
-     * @throws NotSupported
+     * @throws NotSupported|ReflectionException
      */
-    protected function list(string $entity, string $data = null): Response
+    protected function list(string $entity, string $body = null, ?array $params = null): Response
     {
         $repository = $this->em->getRepository(
             Helpers::getCrudEntities()[strtolower($entity)]['class']
         );
 
-        return new Response(json_encode($repository->readMultiple(filters: Helpers::dataToObject($data))));
+        if (!empty($params) && !$this->validateParams(array_keys($params), $repository::class, 'readMultiple')) {
+            return new Response('Invalid parameters', Response::HTTP_BAD_REQUEST);
+        }
+
+        $params['filters'] = Helpers::bodyToObject($body);
+
+        return new Response(json_encode($repository->readMultiple(...$params)));
     }
 
     /**
      * @param string $entity
-     * @param string|null $data
+     * @param string|null $body
      * @return Response
      * @throws NotSupported
      */
-    protected function create(string $entity, string $data = null): Response
+    protected function create(string $entity, string $body = null): Response
     {
         $repository = $this->em->getRepository(
             Helpers::getCrudEntities()[strtolower($entity)]['class']
         );
 
-        return new Response(json_encode($repository->create(Helpers::dataToObject($data))));
+        return new Response(json_encode($repository->create(Helpers::bodyToObject($body))));
     }
 
     /**
      * @param string $entity
      * @param int|null $id
-     * @param string|null $data
+     * @param string|null $body
      * @return Response
      * @throws NotSupported
      */
-    protected function update(string $entity, int $id = null, string $data = null): Response
+    protected function update(string $entity, int $id = null, string $body = null): Response
     {
         $repository = $this->em->getRepository(
             Helpers::getCrudEntities()[strtolower($entity)]['class']
         );
 
-        return new Response(json_encode($repository->update($id, Helpers::dataToObject($data))));
+        return new Response(json_encode($repository->update($id, Helpers::bodyToObject($body))));
     }
 
     /**
@@ -138,5 +148,21 @@ class CrudController
         $crudEntities = Helpers::getEnabledCrudEntities();
 
         return in_array(strtolower($entity), array_keys($crudEntities));
+    }
+
+    /**
+     * @param array $params
+     * @param string $class
+     * @param string $method
+     * @return bool
+     * @throws ReflectionException
+     */
+    protected function validateParams(array $params, string $class, string $method): bool
+    {
+        $r = new ReflectionMethod($class, $method);
+        $methodParams = $r->getParameters();
+        return empty(array_diff($params, array_map(function($param) {
+            return $param->getName();
+        }, $methodParams)));
     }
 }
