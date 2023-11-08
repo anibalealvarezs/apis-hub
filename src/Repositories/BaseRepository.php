@@ -42,7 +42,7 @@ class BaseRepository extends EntityRepository
         $this->_em->persist($entity);
         $this->_em->flush();
 
-        return $this->read($entity->getId());
+        return $this->read(id: $entity->getId(), withAssociations: false);
     }
 
     /**
@@ -85,6 +85,9 @@ class BaseRepository extends EntityRepository
                 $data[$field] = $entity->{'get' . Helpers::toCamelcase($field)}();
             }
         }
+        if (!$withAssociations) {
+            return $data;
+        }
         foreach ($associated as $association) {
             $fieldName = $association['fieldName'];
             $className = $association['targetEntity'];
@@ -97,9 +100,6 @@ class BaseRepository extends EntityRepository
             }
             if (Helpers::isEntity($this->_em, $element)) {
                 $data[$fieldName] = Helpers::jsonSerialize($element);
-                continue;
-            }
-            if (!$withAssociations) {
                 continue;
             }
             $data[$fieldName] = [];
