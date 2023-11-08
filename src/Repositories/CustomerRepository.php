@@ -4,9 +4,12 @@ namespace Repositories;
 
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Analytics\Customer;
 use Enums\Channels;
+use Enums\JobStatus;
 use ReflectionEnum;
+use ReflectionException;
 
 class CustomerRepository extends BaseRepository
 {
@@ -31,5 +34,56 @@ class CustomerRepository extends BaseRepository
             ->setParameter('channel', $channel)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+    }
+
+    /**
+     * @param int $limit
+     * @param int $pagination
+     * @param object|null $filters
+     * @return array
+     * @throws MappingException
+     * @throws ReflectionException
+     */
+    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null): array
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('e')
+            ->from($this->_entityName, 'e');
+        foreach($filters as $key => $value) {
+            if ($key == 'channel' && !is_int($value)) {
+                $value = (new ReflectionEnum(Channels::class))->getConstant($value);
+            }
+            $query->andWhere('e.' . $key . ' = :' . $key)
+                ->setParameter($key, $value);
+        }
+        $list = $query->setMaxResults($limit)
+            ->setFirstResult($limit * $pagination)
+            ->getQuery()
+            ->getResult();
+
+        return array_map(function ($element) {
+            return $this->mapEntityData($element);
+        }, $list);
+    }
+
+    /**
+     * @throws ReflectionException
+     * @throws MappingException
+     */
+    protected function mapEntityData(object $entity, bool $withAssociations = true): array
+    {
+        $data = parent::mapEntityData($entity, $withAssociations);
+        $data['channel'] = $this->getChannelName($data['channel']);
+
+        return $data;
+    }
+
+    /**
+     * @param int $channel
+     * @return string
+     */
+    public function getChannelName(int $channel): string
+    {
+        return Channels::from($channel)->getName();
     }
 }

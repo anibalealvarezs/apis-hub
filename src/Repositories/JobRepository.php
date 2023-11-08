@@ -103,8 +103,11 @@ class JobRepository extends BaseRepository
             ->select('e')
             ->from($this->_entityName, 'e');
         foreach($filters as $key => $value) {
+            if ($key == 'status' && !is_int($value)) {
+                $value = (new ReflectionEnum(JobStatus::class))->getConstant($value);
+            }
             $query->andWhere('e.' . $key . ' = :' . $key)
-                ->setParameter($key, $key == 'status' && !is_int($value) ? (new ReflectionEnum(JobStatus::class))->getConstant($value) : $value);
+                ->setParameter($key, $value);
         }
         $list = $query->setMaxResults($limit)
             ->setFirstResult($limit * $pagination)
@@ -135,5 +138,17 @@ class JobRepository extends BaseRepository
         }
 
         return parent::update($id, $data);
+    }
+
+    /**
+     * @throws ReflectionException
+     * @throws MappingException
+     */
+    protected function mapEntityData(object $entity, bool $withAssociations = true): array
+    {
+        $data = parent::mapEntityData($entity, $withAssociations);
+        $data['status'] = $this->getStatusName($data['status']);
+
+        return $data;
     }
 }
