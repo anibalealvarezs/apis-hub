@@ -32,8 +32,13 @@ class Order extends Entity implements ChannelInterface
     #[ORM\JoinTable(name: 'order_products')]
     protected ArrayCollection $products;
 
-    #[ORM\OneToMany(mappedBy: 'order', targetEntity: 'Discount', cascade: ['persist', 'remove'], orphanRemoval: true)]
-    protected Collection $discounts;
+    #[ORM\ManyToMany(targetEntity: 'PriceRule', inversedBy: 'orders', cascade: ['persist'])]
+    #[ORM\JoinTable(name: 'order_price_rules')]
+    protected ArrayCollection $priceRules;
+
+    #[ORM\ManyToMany(targetEntity: 'Discount', inversedBy: 'orders', cascade: ['persist'])]
+    #[ORM\JoinTable(name: 'order_discounts')]
+    protected ArrayCollection $discounts;
 
     public function __construct()
     {
@@ -184,6 +189,39 @@ class Order extends Entity implements ChannelInterface
     {
         foreach ($discounts as $discount) {
             $this->removeDiscount($discount);
+        }
+    }
+
+    public function getPriceRules(): ?Collection
+    {
+        return $this->priceRules;
+    }
+
+    public function addPriceRule(PriceRule $priceRule): self
+    {
+        $this->priceRules->add($priceRule);
+
+        return $this;
+    }
+
+    public function addPriceRules(Collection $priceRules): self
+    {
+        foreach ($priceRules as $priceRule) {
+            $this->addDiscount($priceRule);
+        }
+
+        return $this;
+    }
+
+    public function removePriceRule(PriceRule $priceRule): void
+    {
+        $this->priceRules->removeElement($priceRule);
+    }
+
+    public function removePriceRules(Collection $priceRules): void
+    {
+        foreach ($priceRules as $priceRule) {
+            $this->removeDiscount($priceRule);
         }
     }
 }

@@ -6,12 +6,12 @@ use Doctrine\Common\Collections\Collection;
 use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Interfaces\ChannelInterface;
-use Repositories\DiscountRepository;
+use Repositories\PriceRuleRepository;
 
-#[ORM\Entity(repositoryClass: DiscountRepository::class)]
-#[ORM\Table(name: 'discounts')]
+#[ORM\Entity(repositoryClass: PriceRuleRepository::class)]
+#[ORM\Table(name: 'price_rules')]
 #[ORM\HasLifecycleCallbacks]
-class Discount extends Entity implements ChannelInterface
+class PriceRule extends Entity implements ChannelInterface
 {
     #[ORM\Column]
     protected int|string $platformId;
@@ -22,13 +22,11 @@ class Discount extends Entity implements ChannelInterface
     #[ORM\Column(type: 'json')]
     protected string $data;
 
-    // Many Products have Many Orders.
-    #[ORM\ManyToMany(targetEntity: 'Order', mappedBy: 'discounts')]
+    #[ORM\ManyToMany(targetEntity: 'Order', mappedBy: 'priceRules')]
     protected Collection $orders;
 
-    #[ORM\ManyToOne(targetEntity:"PriceRule", inversedBy: 'priceRules')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
-    protected PriceRule $priceRule;
+    #[ORM\OneToMany(mappedBy: 'priceRule', targetEntity: 'Discount', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    protected Collection $discounts;
 
     /**
      * @return int|string
@@ -88,7 +86,7 @@ class Discount extends Entity implements ChannelInterface
 
     /**
      * @param Order $order
-     * @return Discount
+     * @return PriceRule
      */
     public function addOrder(Order $order): self
     {
@@ -99,7 +97,7 @@ class Discount extends Entity implements ChannelInterface
 
     /**
      * @param Collection $orders
-     * @return Discount
+     * @return PriceRule
      */
     public function addOrders(Collection $orders): self
     {
@@ -128,13 +126,36 @@ class Discount extends Entity implements ChannelInterface
         }
     }
 
-    public function getPriceRule(): PriceRule
+    public function getDiscounts(): ?Collection
     {
-        return $this->priceRule;
+        return $this->discounts;
     }
 
-    public function addPriceRule(PriceRule $priceRule): void
+    public function addDiscount(Discount $discount): self
     {
-        $this->priceRule = $priceRule;
+        $this->discounts->add($discount);
+
+        return $this;
+    }
+
+    public function addDiscounts(Collection $discounts): self
+    {
+        foreach ($discounts as $discount) {
+            $this->addDiscount($discount);
+        }
+
+        return $this;
+    }
+
+    public function removeDiscount(Discount $discount): void
+    {
+        $this->discounts->removeElement($discount);
+    }
+
+    public function removeDiscounts(Collection $discounts): void
+    {
+        foreach ($discounts as $discount) {
+            $this->removeDiscount($discount);
+        }
     }
 }
