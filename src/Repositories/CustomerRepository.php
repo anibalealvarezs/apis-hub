@@ -2,12 +2,10 @@
 
 namespace Repositories;
 
-use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Analytics\Customer;
 use Enums\Channels;
-use Enums\JobStatus;
 use ReflectionEnum;
 use ReflectionException;
 
@@ -19,21 +17,13 @@ class CustomerRepository extends BaseRepository
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function getCustomerByPlatformAndChannel(int $platformId, int $channel): ?Customer
+    public function getByPlatformIdAndChannel(int $platformId, int $channel): ?Customer
     {
         if ((new ReflectionEnum(Channels::class))->getConstant($channel)) {
             die ('Invalid channel');
         }
 
-        return $this->_em->createQueryBuilder()
-            ->select('e')
-            ->from($this->_entityName, 'e')
-            ->where('e.platformId = :platformId')
-            ->setParameter('platformId', $platformId)
-            ->andWhere('e.channel = :channel')
-            ->setParameter('channel', $channel)
-            ->getQuery()
-            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+        return parent::getByPlatformIdAndChannel(platformId: $platformId, channel: $channel);
     }
 
     /**

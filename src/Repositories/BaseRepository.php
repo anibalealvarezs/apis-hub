@@ -7,6 +7,8 @@ use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\Persistence\Mapping\MappingException;
+use Entities\Analytics\Customer;
+use Entities\Entity;
 use Helpers\Helpers;
 use ReflectionException;
 use stdClass;
@@ -214,5 +216,24 @@ class BaseRepository extends EntityRepository
         $this->_em->flush();
 
         return true;
+    }
+
+    /**
+     * @param int $platformId
+     * @param int $channel
+     * @return array|null
+     * @throws NonUniqueResultException
+     */
+    public function getByPlatformIdAndChannel(int $platformId, int $channel): ?Entity
+    {
+        return $this->_em->createQueryBuilder()
+            ->select('e')
+            ->from($this->_entityName, 'e')
+            ->where('e.platformId = :platformId')
+            ->setParameter('platformId', $platformId)
+            ->andWhere('e.channel = :channel')
+            ->setParameter('channel', $channel)
+            ->getQuery()
+            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }
 }

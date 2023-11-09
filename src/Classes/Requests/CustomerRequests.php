@@ -48,7 +48,7 @@ class CustomerRequests
         $customersCollection = ShopifyConvert::customers($customers['customers']);
         $repository = Helpers::getManager()->getRepository(Customer::class);
         foreach ($customersCollection as $customer) {
-            if (!$repository->getCustomerByPlatformAndChannel($customer->platformId, $customer->channel)) {
+            if (!$repository->getByPlatformIdAndChannel($customer->platformId, $customer->channel)) {
                 $repository->create($customer);
             }
         }
