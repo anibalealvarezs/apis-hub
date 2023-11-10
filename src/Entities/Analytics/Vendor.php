@@ -2,6 +2,7 @@
 
 namespace Entities\Analytics;
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
@@ -24,6 +25,11 @@ class Vendor extends Entity implements ChannelInterface
 
     #[ORM\OneToMany(mappedBy: 'vendor', targetEntity: 'Product', cascade: ['persist', 'remove'], orphanRemoval: true)]
     protected Collection $products;
+
+    public function __construct()
+    {
+        $this->products = new ArrayCollection();
+    }
 
     /**
      * @return int|string

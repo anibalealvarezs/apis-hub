@@ -2,6 +2,7 @@
 
 namespace Entities\Analytics;
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
@@ -27,6 +28,12 @@ class PriceRule extends Entity implements ChannelInterface
 
     #[ORM\OneToMany(mappedBy: 'priceRule', targetEntity: 'Discount', cascade: ['persist', 'remove'], orphanRemoval: true)]
     protected Collection $discounts;
+
+    public function __construct()
+    {
+        $this->orders = new ArrayCollection();
+        $this->discounts = new ArrayCollection();
+    }
 
     /**
      * @return int|string

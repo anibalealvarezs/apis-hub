@@ -2,6 +2,7 @@
 
 namespace Entities\Analytics;
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
@@ -26,9 +27,14 @@ class Discount extends Entity implements ChannelInterface
     #[ORM\ManyToMany(targetEntity: 'Order', mappedBy: 'discounts')]
     protected Collection $orders;
 
-    #[ORM\ManyToOne(targetEntity:"PriceRule", inversedBy: 'priceRules')]
+    #[ORM\ManyToOne(targetEntity: "PriceRule", cascade: ['persist'], inversedBy: 'priceRules')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected PriceRule $priceRule;
+
+    public function __construct()
+    {
+        $this->orders = new ArrayCollection();
+    }
 
     /**
      * @return int|string

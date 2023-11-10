@@ -23,7 +23,7 @@ class Order extends Entity implements ChannelInterface
     #[ORM\Column(type: 'json')]
     protected string $data;
 
-    #[ORM\ManyToOne(targetEntity:"Customer", inversedBy: 'orders')]
+    #[ORM\ManyToOne(targetEntity:"Customer", cascade: ['persist'], inversedBy: 'orders')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected Customer $customer;
 
@@ -43,6 +43,8 @@ class Order extends Entity implements ChannelInterface
     public function __construct()
     {
         $this->products = new ArrayCollection();
+        $this->priceRules = new ArrayCollection();
+        $this->discounts = new ArrayCollection();
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace Entities\Analytics;
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
@@ -24,6 +25,11 @@ class Customer extends Entity implements ChannelInterface
 
     #[ORM\OneToMany(mappedBy: 'customer', targetEntity: 'Order', cascade: ['persist', 'remove'], orphanRemoval: true)]
     protected Collection $orders;
+
+    public function __construct()
+    {
+        $this->orders = new ArrayCollection();
+    }
 
     /**
      * @return int|string
