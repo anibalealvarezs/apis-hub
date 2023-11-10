@@ -4,7 +4,6 @@ namespace Classes\Requests;
 
 use Chmw\ShopifyApi\ShopifyApi;
 use Classes\Conversions\ShopifyConvert;
-use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
@@ -13,7 +12,6 @@ use Entities\Analytics\PriceRule;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\Response;
-use Doctrine\Common\Collections\Collection;
 
 class DiscountRequests
 {

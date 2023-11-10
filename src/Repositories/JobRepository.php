@@ -6,7 +6,6 @@ use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
 use Enums\JobStatus;
 use Faker\Factory;
-use Helpers\Helpers;
 use ReflectionEnum;
 use ReflectionException;
 use stdClass;
@@ -93,6 +92,7 @@ class JobRepository extends BaseRepository
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param bool $withAssociations
      * @return array
      * @throws MappingException
      * @throws ReflectionException

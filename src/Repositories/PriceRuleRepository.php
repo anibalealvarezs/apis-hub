@@ -2,7 +2,7 @@
 
 namespace Repositories;
 
-class PriceRuleRepository extends BaseRepository
+class PriceRuleRepository extends ChannelableBaseRepository
 {
     //
 }

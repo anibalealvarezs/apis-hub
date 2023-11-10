@@ -2,7 +2,7 @@
 
 namespace Repositories;
 
-class OrderRepository extends BaseRepository
+class OrderRepository extends ChannelableBaseRepository
 {
     //
 }
