@@ -123,7 +123,7 @@
             "source": {
                 "type": "git",
                 "url": "git@gitlab.com:chmw/pod-beta/api-skeleton.git",
-                "reference": "f009d663e921d6c0bc8e9d2d96f4fea4c97ec442"
+                "reference": "e542efb143ed79aeefcb7d450c9bbe5f41e856f5"
             },
             "require": {
                 "ext-json": "*",
@@ -156,7 +156,7 @@
                 }
             ],
             "description": "description",
-            "time": "2023-09-22T01:42:49+00:00"
+            "time": "2023-11-08T23:56:51+00:00"
         },
         {
             "name": "chmw/google-api",
@@ -207,7 +207,7 @@
             "source": {
                 "type": "git",
                 "url": "git@gitlab.com:chmw/pod-beta/klaviyo-api.git",
-                "reference": "8b0204cd6b8d0bfd283a1f9d1cd892cc60387dda"
+                "reference": "8c6630df5db3b63717edc00351079e5fa3a4db1b"
             },
             "require": {
                 "chmw/api-skeleton": "@dev",
@@ -241,7 +241,7 @@
                 }
             ],
             "description": "description",
-            "time": "2023-09-22T01:50:12+00:00"
+            "time": "2023-11-09T02:01:40+00:00"
         },
         {
             "name": "chmw/netsuite-api",
@@ -292,7 +292,7 @@
             "source": {
                 "type": "git",
                 "url": "git@gitlab.com:chmw/pod-beta/shopify-api.git",
-                "reference": "c264ddb7bbeeac0053ff266a0844dd96abe83738"
+                "reference": "d1df0366b89dfc0618a19e2ffc3a870a34965306"
             },
             "require": {
                 "chmw/api-skeleton": "@dev",
@@ -326,7 +326,7 @@
                 }
             ],
             "description": "description",
-            "time": "2023-11-07T01:16:34+00:00"
+            "time": "2023-11-09T02:34:06+00:00"
         },
         {
             "name": "chmw/triple-whale-api",
@@ -2380,12 +2380,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/cache.git",
-                "reference": "1930cba76a1f275db8f5a7aad3c23ea5ad58304d"
+                "reference": "045f2b274012d11c24aa0228b2daec36a40b6ca2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/cache/zipball/1930cba76a1f275db8f5a7aad3c23ea5ad58304d",
-                "reference": "1930cba76a1f275db8f5a7aad3c23ea5ad58304d",
+                "url": "https://api.github.com/repos/symfony/cache/zipball/045f2b274012d11c24aa0228b2daec36a40b6ca2",
+                "reference": "045f2b274012d11c24aa0228b2daec36a40b6ca2",
                 "shasum": ""
             },
             "require": {
@@ -2468,7 +2468,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-11-05T17:48:27+00:00"
+            "time": "2023-11-07T10:18:57+00:00"
         },
         {
             "name": "symfony/cache-contracts",
@@ -3085,12 +3085,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-foundation.git",
-                "reference": "59e265807eb5d8964e8db2267ff2df8d32aa6e95"
+                "reference": "e0905cd41cb5b8fec3c9cb59ea6cc032c8ba0e09"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-foundation/zipball/59e265807eb5d8964e8db2267ff2df8d32aa6e95",
-                "reference": "59e265807eb5d8964e8db2267ff2df8d32aa6e95",
+                "url": "https://api.github.com/repos/symfony/http-foundation/zipball/e0905cd41cb5b8fec3c9cb59ea6cc032c8ba0e09",
+                "reference": "e0905cd41cb5b8fec3c9cb59ea6cc032c8ba0e09",
                 "shasum": ""
             },
             "require": {
@@ -3154,7 +3154,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-11-02T20:44:50+00:00"
+            "time": "2023-11-07T15:07:26+00:00"
         },
         {
             "name": "symfony/http-kernel",
@@ -3162,12 +3162,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-kernel.git",
-                "reference": "f6366804fc2779994978f8e3e33c4d7360d3673e"
+                "reference": "8c25056827fcf7ba51cc960cf94e796097852c52"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/f6366804fc2779994978f8e3e33c4d7360d3673e",
-                "reference": "f6366804fc2779994978f8e3e33c4d7360d3673e",
+                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/8c25056827fcf7ba51cc960cf94e796097852c52",
+                "reference": "8c25056827fcf7ba51cc960cf94e796097852c52",
                 "shasum": ""
             },
             "require": {
@@ -3267,7 +3267,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2023-11-06T11:00:25+00:00"
+            "time": "2023-11-07T15:05:05+00:00"
         },
         {
             "name": "symfony/polyfill-ctype",
