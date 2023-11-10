@@ -4,7 +4,7 @@ namespace Repositories;
 
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\Persistence\Mapping\MappingException;
-use Entities\Analytics\Customer;
+use Entities\Entity;
 use Enums\Channels;
 use ReflectionEnum;
 use ReflectionException;
@@ -14,10 +14,10 @@ class ChannelableBaseRepository extends BaseRepository
     /**
      * @param int $platformId
      * @param int $channel
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
-    public function getByPlatformIdAndChannel(int $platformId, int $channel): ?Customer
+    public function getByPlatformIdAndChannel(int $platformId, int $channel): ?Entity
     {
         if ((new ReflectionEnum(Channels::class))->getConstant($channel)) {
             die ('Invalid channel');
