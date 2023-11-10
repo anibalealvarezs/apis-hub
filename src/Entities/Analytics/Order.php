@@ -23,7 +23,7 @@ class Order extends Entity implements ChannelInterface
     #[ORM\Column(type: 'json')]
     protected string $data;
 
-    #[ORM\ManyToOne(targetEntity:"Customer", cascade: ['persist'], inversedBy: 'orders')]
+    #[ORM\ManyToOne(targetEntity:"Customer", inversedBy: 'orders')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected Customer $customer;
 

@@ -27,7 +27,7 @@ class Discount extends Entity implements ChannelInterface
     #[ORM\ManyToMany(targetEntity: 'Order', mappedBy: 'discounts')]
     protected Collection $orders;
 
-    #[ORM\ManyToOne(targetEntity: "PriceRule", cascade: ['persist'], inversedBy: 'priceRules')]
+    #[ORM\ManyToOne(targetEntity: "PriceRule", inversedBy: 'priceRules')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected PriceRule $priceRule;
 

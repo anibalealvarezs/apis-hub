@@ -31,7 +31,7 @@ class Product extends Entity implements ChannelInterface
     #[ORM\ManyToMany(targetEntity: 'Order', mappedBy: 'products')]
     protected Collection $orders;
 
-    #[ORM\ManyToOne(targetEntity:"Vendor", cascade: ['persist'], inversedBy: 'products')]
+    #[ORM\ManyToOne(targetEntity:"Vendor", inversedBy: 'products')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected Vendor $vendor;
 
