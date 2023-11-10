@@ -97,7 +97,7 @@ class JobRepository extends BaseRepository
      * @throws MappingException
      * @throws ReflectionException
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null, bool $withAssociations = false): array
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
@@ -114,8 +114,8 @@ class JobRepository extends BaseRepository
             ->getQuery()
             ->getResult();
 
-        return array_map(function ($element) {
-            return $this->mapEntityData($element);
+        return array_map(function ($element) use ($withAssociations) {
+            return $this->mapEntityData($element, $withAssociations);
         }, $list);
     }
 
@@ -144,7 +144,7 @@ class JobRepository extends BaseRepository
      * @throws ReflectionException
      * @throws MappingException
      */
-    protected function mapEntityData(object $entity, bool $withAssociations = true): array
+    protected function mapEntityData(object $entity, bool $withAssociations = false): array
     {
         $data = parent::mapEntityData($entity, $withAssociations);
         $data['status'] = $this->getStatusName($data['status']);

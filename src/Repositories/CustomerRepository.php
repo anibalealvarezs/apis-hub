@@ -30,11 +30,12 @@ class CustomerRepository extends BaseRepository
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param bool $withAssociations
      * @return array
      * @throws MappingException
      * @throws ReflectionException
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null, bool $withAssociations = false): array
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
@@ -51,8 +52,8 @@ class CustomerRepository extends BaseRepository
             ->getQuery()
             ->getResult();
 
-        return array_map(function ($element) {
-            return $this->mapEntityData($element);
+        return array_map(function ($element) use ($withAssociations) {
+            return $this->mapEntityData($element, $withAssociations);
         }, $list);
     }
 
@@ -60,7 +61,7 @@ class CustomerRepository extends BaseRepository
      * @throws ReflectionException
      * @throws MappingException
      */
-    protected function mapEntityData(object $entity, bool $withAssociations = true): array
+    protected function mapEntityData(object $entity, bool $withAssociations = false): array
     {
         $data = parent::mapEntityData($entity, $withAssociations);
         $data['channel'] = $this->getChannelName($data['channel']);

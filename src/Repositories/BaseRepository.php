@@ -7,7 +7,6 @@ use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\Persistence\Mapping\MappingException;
-use Entities\Analytics\Customer;
 use Entities\Entity;
 use Helpers\Helpers;
 use ReflectionException;
@@ -29,14 +28,8 @@ class BaseRepository extends EntityRepository
 
         if ((array) $data) {
             foreach ($data as $key => $value) {
-                if (isset($this->_class->associationMappings[$key]['joinTable'])) {
-                    if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
-                        $entity->{'add' . Helpers::toCamelcase($key)}($value);
-                    }
-                } else {
-                    if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
-                        $entity->{'add' . Helpers::toCamelcase($key)}($value);
-                    }
+                if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
+                    $entity->{'add' . Helpers::toCamelcase($key)}($value);
                 }
             }
         }
@@ -44,7 +37,7 @@ class BaseRepository extends EntityRepository
         $this->_em->persist($entity);
         $this->_em->flush();
 
-        return $this->read(id: $entity->getId(), withAssociations: false);
+        return $this->read(id: $entity->getId());
     }
 
     /**
@@ -55,7 +48,7 @@ class BaseRepository extends EntityRepository
      * @throws NonUniqueResultException
      * @throws ReflectionException
      */
-    public function read(int $id, bool $withAssociations = true): ?array
+    public function read(int $id, bool $withAssociations = false): ?array
     {
         $entity = $this->_em->createQueryBuilder()
             ->select('e')
@@ -76,7 +69,7 @@ class BaseRepository extends EntityRepository
      * @throws ReflectionException
      * @throws MappingException
      */
-    protected function mapEntityData(object $entity, bool $withAssociations = true): array
+    protected function mapEntityData(object $entity, bool $withAssociations = false): array
     {
         $fields = array_keys($this->_class->fieldMappings);
         $associated = $this->_class->associationMappings;
@@ -106,7 +99,7 @@ class BaseRepository extends EntityRepository
             }
             $data[$fieldName] = [];
             foreach ($element as $el) {
-                $data[$fieldName][] = $this->_em->getRepository($className)->read($el->getId(), false);
+                $data[$fieldName][] = $this->_em->getRepository($className)->read($el->getId());
             }
         }
 
@@ -131,11 +124,12 @@ class BaseRepository extends EntityRepository
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param bool $withAssociations
      * @return array
      * @throws MappingException
      * @throws ReflectionException
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null, bool $withAssociations = false): array
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
@@ -149,8 +143,8 @@ class BaseRepository extends EntityRepository
             ->getQuery()
             ->getResult();
 
-        return array_map(function ($element) {
-            return $this->mapEntityData($element);
+        return array_map(function ($element) use ($withAssociations) {
+            return $this->mapEntityData($element, $withAssociations);
         }, $list);
     }
 
@@ -172,14 +166,8 @@ class BaseRepository extends EntityRepository
 
         if ((array) $data) {
             foreach ($data as $key => $value) {
-                if (isset($this->_class->associationMappings[$key]['joinTable'])) {
-                    if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
-                        $entity->{'add' . Helpers::toCamelcase($key)}($value);
-                    }
-                } else {
-                    if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
-                        $entity->{'add' . Helpers::toCamelcase($key)}($value);
-                    }
+                if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
+                    $entity->{'add' . Helpers::toCamelcase($key)}($value);
                 }
             }
         }
