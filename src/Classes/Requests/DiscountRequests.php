@@ -4,6 +4,7 @@ namespace Classes\Requests;
 
 use Chmw\ShopifyApi\ShopifyApi;
 use Classes\Conversions\ShopifyConvert;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
@@ -56,13 +57,21 @@ class DiscountRequests
                 );
                 $discountsCollection = ShopifyConvert::discounts($discountCodes['discount_codes']);
                 $discountsRepository = Helpers::getManager()->getRepository(Discount::class);
+                $discountEntitiesCollection = new ArrayCollection();
                 foreach ($discountsCollection as $discount) {
-                    if (!$discountsRepository->getByPlatformIdAndChannel($discount->platformId, $discount->channel)) {
-                        $createdDiscount = (object) $discountsRepository->create($discount);
-                        $createdDiscount->priceRule = $priceRuleEntity;
-                        $discountsRepository->update($createdDiscount->id, $createdDiscount);
+                    if (!$discountEntity = $discountsRepository->getByPlatformIdAndChannel($discount->platformId, $discount->channel)) {
+                        // $discountsRepository->create($discount);
+                        $discountEntity = new Discount();
+                        $discountEntity->addPlatformId($discount->platformId);
+                        $discountEntity->addChannel($discount->channel);
+                        $discountEntity->addData($discount->data);
+                        $discountEntity->addPriceRule($priceRuleEntity);
                     }
+                    $discountEntitiesCollection->add($discountEntity);
                 }
+                $priceRuleEntity->addDiscounts($discountEntitiesCollection);
+                Helpers::getManager()->persist($priceRuleEntity);
+                Helpers::getManager()->flush();
             }
         }
         return new Response(json_encode($priceRules));
