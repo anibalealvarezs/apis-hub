@@ -52,7 +52,7 @@ class RoutingCore implements HttpKernelInterface
         } catch (ResourceNotFoundException $e) {
             $response = new Response('Route not found!', Response::HTTP_NOT_FOUND);
         } catch (Exception $e) {
-            $response = new Response('An error occurred', Response::HTTP_INTERNAL_SERVER_ERROR);
+            $response = new Response($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         return $response;
