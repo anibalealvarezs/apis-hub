@@ -4,111 +4,74 @@ namespace Entities\Analytics;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
-use Interfaces\ChannelInterface;
+use Entities\Analytics\Channeled\ChanneledCustomer;
+use Entities\Entity;
 use Repositories\CustomerRepository;
 
 #[ORM\Entity(repositoryClass: CustomerRepository::class)]
 #[ORM\Table(name: 'customers')]
+#[ORM\Index(columns: ['email'])]
 #[ORM\HasLifecycleCallbacks]
-class Customer extends Entity implements ChannelInterface
+class Customer extends Entity
 {
-    #[ORM\Column]
-    protected int|string $platformId;
+    #[ORM\Column(type: 'string')]
+    protected int $email;
 
-    #[ORM\Column(type: 'integer')]
-    protected int $channel;
-
-    #[ORM\Column(type: 'json')]
-    protected string $data;
-
-    #[ORM\OneToMany(mappedBy: 'customer', targetEntity: 'Order', cascade: ['persist', 'remove'], orphanRemoval: true)]
-    protected Collection $orders;
+    #[ORM\OneToMany(mappedBy: 'customer', targetEntity: '\Entities\Analytics\Channeled\ChanneledCustomer', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    protected Collection $channeledCustomers;
 
     public function __construct()
     {
-        $this->orders = new ArrayCollection();
-    }
-
-    /**
-     * @return int|string
-     */
-    public function getPlatformId(): int|string
-    {
-        return $this->platformId;
-    }
-
-    /**
-     * @param int|string $platformId
-     */
-    public function addPlatformId(int|string $platformId): void
-    {
-        $this->platformId = $platformId;
+        $this->channeledCustomers = new ArrayCollection();
     }
 
     /**
      * @return string
      */
-    public function getChannel(): string
+    public function getEmail(): string
     {
-        return $this->channel;
+        return $this->email;
     }
 
     /**
-     * @param int $channel
+     * @param string $email
      */
-    public function addChannel(int $channel): void
+    public function addEmail(string $email): void
     {
-        $this->channel = $channel;
+        $this->email = $email;
     }
 
-    /**
-     * @return string
-     */
-    public function getData(): string
+    public function getChanneledCustomers(): ?Collection
     {
-        return $this->data;
+        return $this->channeledCustomers;
     }
 
-    /**
-     * @param string $data
-     */
-    public function addData(string $data): void
+    public function addChanneledCustomer(ChanneledCustomer $channeledCustomer): self
     {
-        $this->data = $data;
-    }
-
-    public function getOrders(): ?Collection
-    {
-        return $this->orders;
-    }
-
-    public function addOrder(Order $order): self
-    {
-        $this->orders->add($order);
+        $this->channeledCustomers->add($channeledCustomer);
 
         return $this;
     }
 
-    public function addOrders(Collection $orders): self
+    public function addChanneledCustomers(Collection $channeledCustomers): self
     {
-        foreach ($orders as $order) {
-            $this->addOrder($order);
+        foreach ($channeledCustomers as $channeledCustomer) {
+            $this->addChanneledCustomer($channeledCustomer);
         }
 
         return $this;
     }
 
-    public function removeOrder(Order $order): void
+    public function removeChanneledCustomer(ChanneledCustomer $channeledCustomer): void
     {
-        $this->orders->removeElement($order);
+        $this->channeledCustomers->removeElement($channeledCustomer);
     }
 
-    public function removeOrders(Collection $orders): void
+    public function removeChanneledCustomers(Collection $channeledCustomers): void
     {
-        foreach ($orders as $order) {
-            $this->removeOrder($order);
+        foreach ($channeledCustomers as $channeledCustomer) {
+            $this->removeChanneledCustomer($channeledCustomer);
         }
     }
 }

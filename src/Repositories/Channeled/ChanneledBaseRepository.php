@@ -1,6 +1,6 @@
 <?php
 
-namespace Repositories;
+namespace Repositories\Channeled;
 
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\Persistence\Mapping\MappingException;
@@ -8,8 +8,9 @@ use Entities\Entity;
 use Enums\Channels;
 use ReflectionEnum;
 use ReflectionException;
+use Repositories\BaseRepository;
 
-class ChannelableBaseRepository extends BaseRepository
+class ChanneledBaseRepository extends BaseRepository
 {
     /**
      * @param int $platformId

@@ -7,12 +7,9 @@ use Classes\Conversions\ShopifyConvert;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
-use Entities\Analytics\Customer;
-use Enums\Channels;
-use Enums\JobStatus;
+use Entities\Analytics\Channeled\ChanneledCustomer;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
-use ReflectionEnum;
 use Symfony\Component\HttpFoundation\Response;
 
 class CustomerRequests
@@ -46,7 +43,7 @@ class CustomerRequests
             updatedAtMax: $filters->updatedAtMax ?? null,
         );
         $customersCollection = ShopifyConvert::customers($customers['customers']);
-        $repository = Helpers::getManager()->getRepository(Customer::class);
+        $repository = Helpers::getManager()->getRepository(ChanneledCustomer::class);
         foreach ($customersCollection as $customer) {
             if (!$repository->getByPlatformIdAndChannel($customer->platformId, $customer->channel)) {
                 $repository->create($customer);

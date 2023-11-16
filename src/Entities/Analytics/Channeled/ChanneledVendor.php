@@ -1,21 +1,28 @@
 <?php
 
-namespace Entities\Analytics;
+namespace Entities\Analytics\Channeled;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Entities\Analytics\Channeled\ChanneledProduct;
-use Entities\Entity;
-use Repositories\ProductRepository;
+use Entities\Analytics\Vendor;
+use Repositories\Channeled\ChanneledVendorRepository;
 
-#[ORM\Entity(repositoryClass: ProductRepository::class)]
-#[ORM\Table(name: 'products')]
+#[ORM\Entity(repositoryClass: ChanneledVendorRepository::class)]
+#[ORM\Table(name: 'channeled_vendors')]
 #[ORM\HasLifecycleCallbacks]
-class Product extends Entity
+class ChanneledVendor extends ChanneledEntity
 {
-    #[ORM\OneToMany(mappedBy: 'product', targetEntity: '\Entities\Analytics\Channeled\ChanneledProduct', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    // Relationships with channeled entities
+
+    #[ORM\OneToMany(mappedBy: 'channeledVendor', targetEntity: 'ChanneledProduct', cascade: ['persist', 'remove'], orphanRemoval: true)]
     protected Collection $channeledProducts;
+
+    // Relationships with non-channeled entities
+
+    #[ORM\ManyToOne(targetEntity:"\Entities\Analytics\Vendor", inversedBy: 'channeledVendors')]
+    #[ORM\JoinColumn(onDelete: 'cascade')]
+    protected Vendor $vendor;
 
     public function __construct()
     {
@@ -53,5 +60,15 @@ class Product extends Entity
         foreach ($channeledProducts as $channeledProduct) {
             $this->removeChanneledProduct($channeledProduct);
         }
+    }
+
+    public function getVendor(): Vendor
+    {
+        return $this->vendor;
+    }
+
+    public function addVendor(Vendor $vendor): void
+    {
+        $this->vendor = $vendor;
     }
 }

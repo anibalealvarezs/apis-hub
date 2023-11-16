@@ -2,7 +2,7 @@
 
 namespace Repositories;
 
-class DiscountRepository extends ChannelableBaseRepository
+class DiscountRepository extends BaseRepository
 {
-    //
+
 }

@@ -4,111 +4,54 @@ namespace Entities\Analytics;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
-use Interfaces\ChannelInterface;
+use Entities\Analytics\Channeled\ChanneledVendor;
+use Entities\Entity;
 use Repositories\VendorRepository;
 
 #[ORM\Entity(repositoryClass: VendorRepository::class)]
 #[ORM\Table(name: 'vendors')]
 #[ORM\HasLifecycleCallbacks]
-class Vendor extends Entity implements ChannelInterface
+class Vendor extends Entity
 {
-    #[ORM\Column]
-    protected int|string $platformId;
-
-    #[ORM\Column(type: 'integer')]
-    protected int $channel;
-
-    #[ORM\Column(type: 'json')]
-    protected string $data;
-
-    #[ORM\OneToMany(mappedBy: 'vendor', targetEntity: 'Product', cascade: ['persist', 'remove'], orphanRemoval: true)]
-    protected Collection $products;
+    #[ORM\OneToMany(mappedBy: 'vendor', targetEntity: '\Entities\Analytics\Channeled\ChanneledVendor', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    protected Collection $channeledVendors;
 
     public function __construct()
     {
-        $this->products = new ArrayCollection();
+        $this->channeledVendors = new ArrayCollection();
     }
 
-    /**
-     * @return int|string
-     */
-    public function getPlatformId(): int|string
+    public function getChanneledVendors(): ?Collection
     {
-        return $this->platformId;
+        return $this->channeledVendors;
     }
 
-    /**
-     * @param int|string $platformId
-     */
-    public function addPlatformId(int|string $platformId): void
+    public function addChanneledVendor(ChanneledVendor $channeledVendor): self
     {
-        $this->platformId = $platformId;
-    }
-
-    /**
-     * @return string
-     */
-    public function getChannel(): string
-    {
-        return $this->channel;
-    }
-
-    /**
-     * @param int $channel
-     */
-    public function addChannel(int $channel): void
-    {
-        $this->channel = $channel;
-    }
-
-    /**
-     * @return string
-     */
-    public function getData(): string
-    {
-        return $this->data;
-    }
-
-    /**
-     * @param string $data
-     */
-    public function addData(string $data): void
-    {
-        $this->data = $data;
-    }
-
-    public function getProducts(): ?Collection
-    {
-        return $this->products;
-    }
-
-    public function addProduct(Product $product): self
-    {
-        $this->products->add($product);
+        $this->channeledVendors->add($channeledVendor);
 
         return $this;
     }
 
-    public function addProducts(Collection $products): self
+    public function addChanneledVendors(Collection $channeledVendors): self
     {
-        foreach ($products as $product) {
-            $this->addProduct($product);
+        foreach ($channeledVendors as $channeledVendor) {
+            $this->addChanneledVendor($channeledVendor);
         }
 
         return $this;
     }
 
-    public function removeProduct(Product $product): void
+    public function removeChanneledVendor(ChanneledVendor $channeledVendor): void
     {
-        $this->products->removeElement($product);
+        $this->channeledVendors->removeElement($channeledVendor);
     }
 
-    public function removeProducts(Collection $products): void
+    public function removeChanneledVendors(Collection $channeledVendors): void
     {
-        foreach ($products as $product) {
-            $this->removeProduct($product);
+        foreach ($channeledVendors as $channeledVendor) {
+            $this->removeChanneledVendor($channeledVendor);
         }
     }
 }

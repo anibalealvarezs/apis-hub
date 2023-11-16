@@ -12,12 +12,13 @@ class ShopifyConvert
         $convertedCustomers = new ArrayCollection();
 
         foreach ($customers as $customer) {
-            $customerEntity = (object) [
+            $customerObject = (object) [
                 'platformId' => $customer['id'],
                 'channel' => Channels::shopify->value,
+                'email' => $customer['email'],
                 'data' => json_encode($customer),
             ];
-            $convertedCustomers->add($customerEntity);
+            $convertedCustomers->add($customerObject);
         }
 
         return $convertedCustomers;
@@ -28,12 +29,12 @@ class ShopifyConvert
         $convertedDiscounts = new ArrayCollection();
 
         foreach ($discounts as $discount) {
-            $discountEntity = (object) [
+            $discountObject = (object) [
                 'platformId' => $discount['id'],
                 'channel' => Channels::shopify->value,
                 'data' => json_encode($discount),
             ];
-            $convertedDiscounts->add($discountEntity);
+            $convertedDiscounts->add($discountObject);
         }
 
         return $convertedDiscounts;
@@ -44,14 +45,32 @@ class ShopifyConvert
         $convertedPriceRules = new ArrayCollection();
 
         foreach ($priceRules as $priceRule) {
-            $priceRuleEntity = (object) [
+            $priceRuleObject = (object) [
                 'platformId' => $priceRule['id'],
                 'channel' => Channels::shopify->value,
                 'data' => json_encode($priceRule),
             ];
-            $convertedPriceRules->add($priceRuleEntity);
+            $convertedPriceRules->add($priceRuleObject);
         }
 
         return $convertedPriceRules;
+    }
+
+    public static function orders(array $orders): ArrayCollection
+    {
+        $convertedOrders = new ArrayCollection();
+
+        foreach ($orders as $order) {
+            $orderObject = (object) [
+                'platformId' => $order['id'],
+                'channel' => Channels::shopify->value,
+                'data' => json_encode($order),
+                'discountCodes' => $order['discount_codes'] ?? '',
+                'lineItems' => $order['line_items'] ?? '',
+            ];
+            $convertedOrders->add($orderObject);
+        }
+
+        return $convertedOrders;
     }
 }

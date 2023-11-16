@@ -2,7 +2,7 @@
 
 namespace Repositories;
 
-class CustomerRepository extends ChannelableBaseRepository
+class CustomerRepository extends BaseRepository
 {
-    //
+
 }

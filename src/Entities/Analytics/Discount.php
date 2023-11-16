@@ -4,143 +4,54 @@ namespace Entities\Analytics;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
-use Interfaces\ChannelInterface;
+use Entities\Analytics\Channeled\ChanneledDiscount;
+use Entities\Entity;
 use Repositories\DiscountRepository;
 
 #[ORM\Entity(repositoryClass: DiscountRepository::class)]
 #[ORM\Table(name: 'discounts')]
 #[ORM\HasLifecycleCallbacks]
-class Discount extends Entity implements ChannelInterface
+class Discount extends Entity
 {
-    #[ORM\Column]
-    protected int|string $platformId;
-
-    #[ORM\Column(type: 'integer')]
-    protected int $channel;
-
-    #[ORM\Column(type: 'json')]
-    protected string $data;
-
-    // Many Products have Many Orders.
-    #[ORM\ManyToMany(targetEntity: 'Order', mappedBy: 'discounts')]
-    protected Collection $orders;
-
-    #[ORM\ManyToOne(targetEntity: "PriceRule", inversedBy: 'priceRules')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
-    protected PriceRule $priceRule;
+    #[ORM\OneToMany(mappedBy: 'discount', targetEntity: '\Entities\Analytics\Channeled\ChanneledDiscount', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    protected Collection $channeledDiscounts;
 
     public function __construct()
     {
-        $this->orders = new ArrayCollection();
+        $this->channeledDiscounts = new ArrayCollection();
     }
 
-    /**
-     * @return int|string
-     */
-    public function getPlatformId(): int|string
+    public function getChanneledDiscounts(): ?Collection
     {
-        return $this->platformId;
+        return $this->channeledDiscounts;
     }
 
-    /**
-     * @param int|string $platformId
-     */
-    public function addPlatformId(int|string $platformId): void
+    public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
-        $this->platformId = $platformId;
-    }
-
-    /**
-     * @return string
-     */
-    public function getChannel(): string
-    {
-        return $this->channel;
-    }
-
-    /**
-     * @param int $channel
-     */
-    public function addChannel(int $channel): void
-    {
-        $this->channel = $channel;
-    }
-
-    /**
-     * @return string
-     */
-    public function getData(): string
-    {
-        return $this->data;
-    }
-
-    /**
-     * @param string $data
-     */
-    public function addData(string $data): void
-    {
-        $this->data = $data;
-    }
-
-    /**
-     * @return Collection|null
-     */
-    public function getOrders(): ?Collection
-    {
-        return $this->orders;
-    }
-
-    /**
-     * @param Order $order
-     * @return Discount
-     */
-    public function addOrder(Order $order): self
-    {
-        $this->orders->add($order);
+        $this->channeledDiscounts->add($channeledDiscount);
 
         return $this;
     }
 
-    /**
-     * @param Collection $orders
-     * @return Discount
-     */
-    public function addOrders(Collection $orders): self
+    public function addChanneledDiscounts(Collection $channeledDiscounts): self
     {
-        foreach ($orders as $order) {
-            $this->addOrder($order);
+        foreach ($channeledDiscounts as $channeledDiscount) {
+            $this->addChanneledDiscount($channeledDiscount);
         }
 
         return $this;
     }
 
-    /**
-     * @param Order $order
-     */
-    public function removeOrder(Order $order): void
+    public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): void
     {
-        $this->orders->removeElement($order);
+        $this->channeledDiscounts->removeElement($channeledDiscount);
     }
 
-    /**
-     * @param Collection $orders
-     */
-    public function removeOrders(Collection $orders): void
+    public function removeChanneledDiscounts(Collection $channeledDiscounts): void
     {
-        foreach ($orders as $order) {
-            $this->removeOrder($order);
+        foreach ($channeledDiscounts as $channeledDiscount) {
+            $this->removeChanneledDiscount($channeledDiscount);
         }
-    }
-
-    public function getPriceRule(): PriceRule
-    {
-        return $this->priceRule;
-    }
-
-    public function addPriceRule(PriceRule $priceRule): void
-    {
-        $this->priceRule = $priceRule;
     }
 }

@@ -8,8 +8,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
-use Entities\Analytics\Discount;
-use Entities\Analytics\PriceRule;
+use Entities\Analytics\Channeled\ChanneledDiscount;
+use Entities\Analytics\Channeled\ChanneledPriceRule;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\Response;
@@ -47,7 +47,7 @@ class DiscountRequests
             updatedAtMax: $filters->updatedAtMax ?? null,
         );
         $priceRulesCollection = ShopifyConvert::priceRules($priceRules['price_rules']);
-        $priceRulesRepository = Helpers::getManager()->getRepository(PriceRule::class);
+        $priceRulesRepository = Helpers::getManager()->getRepository(ChanneledPriceRule::class);
         foreach ($priceRulesCollection as $priceRule) {
             if (!$priceRulesRepository->getByPlatformIdAndChannel($priceRule->platformId, $priceRule->channel)) {
                 $priceRulesRepository->create($priceRule);
@@ -56,20 +56,20 @@ class DiscountRequests
                     priceRuleId: $priceRuleEntity->getPlatformId(),
                 );
                 $discountsCollection = ShopifyConvert::discounts($discountCodes['discount_codes']);
-                $discountsRepository = Helpers::getManager()->getRepository(Discount::class);
+                $discountsRepository = Helpers::getManager()->getRepository(ChanneledDiscount::class);
                 $discountEntitiesCollection = new ArrayCollection();
                 foreach ($discountsCollection as $discount) {
                     if (!$discountEntity = $discountsRepository->getByPlatformIdAndChannel($discount->platformId, $discount->channel)) {
                         // $discountsRepository->create($discount);
-                        $discountEntity = new Discount();
+                        $discountEntity = new ChanneledDiscount();
                         $discountEntity->addPlatformId($discount->platformId);
                         $discountEntity->addChannel($discount->channel);
                         $discountEntity->addData($discount->data);
-                        $discountEntity->addPriceRule($priceRuleEntity);
+                        $discountEntity->addChanneledPriceRule($priceRuleEntity);
                     }
                     $discountEntitiesCollection->add($discountEntity);
                 }
-                $priceRuleEntity->addDiscounts($discountEntitiesCollection);
+                $priceRuleEntity->addChanneledDiscounts($discountEntitiesCollection);
                 Helpers::getManager()->persist($priceRuleEntity);
                 Helpers::getManager()->flush();
             }
