@@ -7,7 +7,7 @@
 2. Run the following command in order to create the table in the database
 
     ```bash
-    vendor/bin/doctrine orm:schema-tool:update --force
+    vendor/bin/doctrine orm:schema-tool:update --force --complete
     ```
 
 3. Execute the corresponding command in order to interact with jobs in the database
