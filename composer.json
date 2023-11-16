@@ -1,0 +1,79 @@
+{
+    "name": "chmw/apis-hub",
+    "type": "project",
+    "authors": [
+        {
+            "name": "Aníbal Álvarez",
+            "email": "aalvarez@chmw.co"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "chmw/api-skeleton": "@dev",
+        "chmw/amazon-api": "@dev",
+        "chmw/google-api": "@dev",
+        "chmw/klaviyo-api": "@dev",
+        "chmw/netsuite-api": "@dev",
+        "chmw/shopify-api": "@dev",
+        "chmw/triple-whale-api": "@dev",
+        "doctrine/orm": "^2.12.3",
+        "doctrine/dbal": "^3.3.7",
+        "doctrine/annotations": "1.13.2",
+        "fakerphp/faker": "^1.20",
+        "nesbot/carbon": "^2.61",
+        "symfony/yaml": "^5.4.10",
+        "symfony/config": "^6.1",
+        "symfony/routing": "^6.1",
+        "symfony/http-foundation": "^6.1",
+        "symfony/http-kernel": "^6.1",
+        "symfony/cache": "^6.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "require-dev": {
+        "doctrine/data-fixtures": "^1.5.3",
+        "phpbench/phpbench": "^1.2.6",
+        "phpunit/phpunit": "^9"
+    },
+    "repositories": [
+        {
+            "type": "git",
+            "url": "git@gitlab.com:chmw/pod-beta/api-skeleton.git"
+        },
+        {
+            "type": "git",
+            "url": "git@gitlab.com:chmw/pod-beta/amazon-api.git"
+        },
+        {
+            "type": "git",
+            "url": "git@gitlab.com:chmw/pod-beta/google-api.git"
+        },
+        {
+            "type": "git",
+            "url": "git@gitlab.com:chmw/pod-beta/klaviyo-api.git"
+        },
+        {
+            "type": "git",
+            "url": "git@gitlab.com:chmw/pod-beta/netsuite-api.git"
+        },
+        {
+            "type": "git",
+            "url": "git@gitlab.com:chmw/pod-beta/shopify-api.git"
+        },
+        {
+            "type": "git",
+            "url": "git@gitlab.com:chmw/pod-beta/triple-whale-api.git"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": false
+}

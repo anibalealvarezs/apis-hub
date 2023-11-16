@@ -1,0 +1,7 @@
+/vendor/
+/.idea/
+/config/yaml/dbconfig.yaml
+/tests/Benchmark/*
+/tests/App/*
+/src/Entities/Analytics/Lead.php
+/src/Entities/Analytics/Accounts/*
