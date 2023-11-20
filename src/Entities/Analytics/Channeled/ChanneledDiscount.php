@@ -10,9 +10,13 @@ use Repositories\Channeled\ChanneledDiscountRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledDiscountRepository::class)]
 #[ORM\Table(name: 'channeled_discounts')]
+#[ORM\Index(columns: ['code', 'platformId', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledDiscount extends ChanneledEntity
 {
+    #[ORM\Column(type: 'string')]
+    protected string $code;
+
     // Relationships with channeled entities
 
     #[ORM\ManyToMany(targetEntity: 'ChanneledOrder', mappedBy: 'channeledDiscounts')]
@@ -24,13 +28,29 @@ class ChanneledDiscount extends ChanneledEntity
 
     // Relationships with non-channeled entities
 
-    #[ORM\ManyToOne(targetEntity:"\Entities\Analytics\Discount", inversedBy: 'channeledDiscounts')]
+    #[ORM\ManyToOne(targetEntity: Discount::class, inversedBy: 'channeledDiscounts')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected Discount $discount;
 
     public function __construct()
     {
         $this->channeledOrders = new ArrayCollection();
+    }
+
+    /**
+     * @return string
+     */
+    public function getCode(): string
+    {
+        return $this->code;
+    }
+
+    /**
+     * @param string $code
+     */
+    public function addCode(string $code): void
+    {
+        $this->code = $code;
     }
 
     /**
