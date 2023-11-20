@@ -34,14 +34,14 @@ class CreateEntityCommand extends Command
      * @param InputInterface $input
      * @param OutputInterface $output
      * @return int
-     * @throws NotSupported
+     * @throws NotSupported|\ReflectionException
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $result = (new CrudController())(
             entity: $input->getOption('entity'),
             method: 'create',
-            data: $input->getOption('data'),
+            body: $input->getOption('data'),
         );
 
         $output->writeln('<info>' . $result . '</info>');
