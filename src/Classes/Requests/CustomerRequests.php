@@ -8,6 +8,7 @@ use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Entities\Analytics\Channeled\ChanneledCustomer;
+use Entities\Analytics\Customer;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,12 +29,13 @@ class CustomerRequests
     public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, array $fields = null, object $filters = null): Response
     {
         $config = Helpers::getChannelsConfig()['shopify'];
+        $manager = Helpers::getManager();
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
             shopName: $config['shopify_shop_name'],
             version: $config['shopify_last_stable_revision'],
         );
-        $customers = $shopifyClient->getAllCustomers(
+        $sourceCustomers = $shopifyClient->getAllCustomers(
             createdAtMin: $createdAtMin,
             createdAtMax: $createdAtMax,
             fields: $fields,
@@ -42,73 +44,85 @@ class CustomerRequests
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
         );
-        $customersCollection = ShopifyConvert::customers($customers['customers']);
-        $repository = Helpers::getManager()->getRepository(ChanneledCustomer::class);
-        foreach ($customersCollection as $customer) {
-            if (!$repository->getByPlatformIdAndChannel($customer->platformId, $customer->channel)) {
-                $repository->create($customer);
+        $channeledCustomersCollection = ShopifyConvert::customers($sourceCustomers['customers']);
+        $customerRepository = $manager->getRepository(Customer::class);
+        $channeledCustomerRepository = $manager->getRepository(ChanneledCustomer::class);
+        foreach ($channeledCustomersCollection as $channeledCustomer) {
+            if (!$channeledCustomer->email) {
+                continue;
             }
+            if (!$customerEntity = $customerRepository->getByEmail($channeledCustomer->email)) {
+                $customerEntity = $customerRepository->create(
+                    data: (object) ['email' => $channeledCustomer->email,],
+                    returnEntity: true,
+                );
+            }
+            if (!$channeledCustomerEntity = $channeledCustomerRepository->getByPlatformIdAndChannel($channeledCustomer->platformId, $channeledCustomer->channel)) {
+                $channeledCustomerEntity = $channeledCustomerRepository->create(
+                    data: $channeledCustomer,
+                    returnEntity: true,
+                );
+            }
+            $channeledCustomerEntity->addCustomer($customerEntity);
+            $manager->persist($customerEntity);
+            $manager->persist($channeledCustomerEntity);
+            $manager->flush();
         }
-        return new Response(json_encode($customers));
+        return new Response(json_encode($sourceCustomers));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromKlaviyo(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromKlaviyo(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromFacebook(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromFacebook(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 }

@@ -2,9 +2,12 @@
 
 namespace Repositories\Channeled;
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Entity;
+use ReflectionException;
 
 class ChanneledCustomerRepository extends ChanneledBaseRepository
 {
@@ -25,5 +28,22 @@ class ChanneledCustomerRepository extends ChanneledBaseRepository
             ->setParameter('channel', $channel)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+    }
+
+    /**
+     * @param string $email
+     * @return ArrayCollection
+     */
+    public function getListByEmail(string $email): ArrayCollection
+    {
+        $list = $this->_em->createQueryBuilder()
+            ->select('e')
+            ->from($this->_entityName, 'e')
+            ->where('e.email = :email')
+            ->setParameter('email', $email)
+            ->getQuery()
+            ->getResult(AbstractQuery::HYDRATE_ARRAY);
+
+        return new ArrayCollection($list);
     }
 }
