@@ -24,6 +24,10 @@ class ShopifyConvert
         return $convertedCustomers;
     }
 
+    /**
+     * @param array $discounts
+     * @return ArrayCollection
+     */
     public static function discounts(array $discounts): ArrayCollection
     {
         $convertedDiscounts = new ArrayCollection();
@@ -32,6 +36,7 @@ class ShopifyConvert
             $discountObject = (object) [
                 'platformId' => $discount['id'],
                 'channel' => Channels::shopify->value,
+                'code' => $discount['code'],
                 'data' => json_encode($discount),
             ];
             $convertedDiscounts->add($discountObject);
