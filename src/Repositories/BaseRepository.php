@@ -2,6 +2,7 @@
 
 namespace Repositories;
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\NonUniqueResultException;
@@ -16,12 +17,13 @@ class BaseRepository extends EntityRepository
 {
     /**
      * @param stdClass|null $data
-     * @return array|null
+     * @param bool $returnEntity
+     * @return Entity|array|null
      * @throws MappingException
      * @throws NonUniqueResultException
      * @throws ReflectionException
      */
-    public function create(stdClass $data = null): ?array
+    public function create(stdClass $data = null, bool $returnEntity = false): Entity|array|null
     {
         $entityName = $this->getEntityName();
         $entity = new $entityName();
@@ -37,18 +39,22 @@ class BaseRepository extends EntityRepository
         $this->_em->persist($entity);
         $this->_em->flush();
 
-        return $this->read(id: $entity->getId());
+        return $this->read(
+            id: $entity->getId(),
+            returnEntity: $returnEntity,
+        );
     }
 
     /**
      * @param int $id
      * @param bool $withAssociations
-     * @return array|null
+     * @param bool $returnEntity
+     * @return Entity|array|null
      * @throws MappingException
      * @throws NonUniqueResultException
      * @throws ReflectionException
      */
-    public function read(int $id, bool $withAssociations = false): ?array
+    public function read(int $id, bool $withAssociations = false, bool $returnEntity = false): Entity|array|null
     {
         $entity = $this->_em->createQueryBuilder()
             ->select('e')
@@ -60,6 +66,10 @@ class BaseRepository extends EntityRepository
 
         if (!$entity) {
             return null;
+        }
+
+        if ($returnEntity) {
+            return $entity;
         }
 
         return $this->mapEntityData($entity, $withAssociations);
@@ -123,17 +133,20 @@ class BaseRepository extends EntityRepository
     /**
      * @param int $limit
      * @param int $pagination
+     * @param array|null $ids
      * @param object|null $filters
      * @param bool $withAssociations
-     * @return array
-     * @throws MappingException
-     * @throws ReflectionException
+     * @return ArrayCollection
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null, bool $withAssociations = false): array
+    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null, bool $withAssociations = false): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
             ->from($this->_entityName, 'e');
+        if ($ids) {
+            $query->where('e.id IN (:ids)')
+                ->setParameter('ids', $ids);
+        }
         foreach($filters as $key => $value) {
             $query->andWhere('e.' . $key . ' = :' . $key)
                 ->setParameter($key, $value);
@@ -141,22 +154,21 @@ class BaseRepository extends EntityRepository
         $list = $query->setMaxResults($limit)
             ->setFirstResult($limit * $pagination)
             ->getQuery()
-            ->getResult();
+            ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
-        return array_map(function ($element) use ($withAssociations) {
-            return $this->mapEntityData($element, $withAssociations);
-        }, $list);
+        return new ArrayCollection($list);
     }
 
     /**
      * @param int $id
      * @param stdClass|null $data
-     * @return bool|array|null
+     * @param bool $returnEntity
+     * @return bool|array|Entity|null
      * @throws MappingException
      * @throws NonUniqueResultException
      * @throws ReflectionException
      */
-    public function update(int $id, stdClass $data = null): bool|array|null
+    public function update(int $id, stdClass $data = null, bool $returnEntity = false): bool|array|null|Entity
     {
         $entity = $this->_em->find($this->_entityName, $id);
 
@@ -177,7 +189,10 @@ class BaseRepository extends EntityRepository
         $this->_em->persist($entity);
         $this->_em->flush();
 
-        return $this->read($entity->getId());
+        return $this->read(
+            id: $entity->getId(),
+            returnEntity: $returnEntity,
+        );
     }
 
     /**

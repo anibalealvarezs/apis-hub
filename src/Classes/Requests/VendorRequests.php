@@ -2,52 +2,51 @@
 
 namespace Classes\Requests;
 
+use Symfony\Component\HttpFoundation\Response;
+
 class VendorRequests
 {
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        return ['Vendors are not supported in Shopify. They\'re retrieved along with Products.'];
+        return new Response(json_encode(['Vendors are not supported in Shopify. They\'re retrieved along with Products.']));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 }

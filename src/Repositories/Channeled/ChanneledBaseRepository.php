@@ -2,6 +2,8 @@
 
 namespace Repositories\Channeled;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Entity;
@@ -30,13 +32,14 @@ class ChanneledBaseRepository extends BaseRepository
     /**
      * @param int $limit
      * @param int $pagination
+     * @param array|null $ids
      * @param object|null $filters
      * @param bool $withAssociations
-     * @return array
+     * @return ArrayCollection
      * @throws MappingException
      * @throws ReflectionException
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null, bool $withAssociations = false): array
+    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null, bool $withAssociations = false): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
@@ -51,11 +54,10 @@ class ChanneledBaseRepository extends BaseRepository
         $list = $query->setMaxResults($limit)
             ->setFirstResult($limit * $pagination)
             ->getQuery()
-            ->getResult();
+            ->getResult()
+            ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
-        return array_map(function ($element) use ($withAssociations) {
-            return $this->mapEntityData($element, $withAssociations);
-        }, $list);
+        return new ArrayCollection($list);
     }
 
     /**

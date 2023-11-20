@@ -87,7 +87,7 @@ class CrudController
         $params['filters'] = Helpers::bodyToObject($body);
         $params['withAssociations'] = true;
 
-        return new Response(json_encode($repository->readMultiple(...$params)));
+        return new Response(json_encode($repository->readMultiple(...$params)->toArray()));
     }
 
     /**

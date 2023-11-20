@@ -2,6 +2,8 @@
 
 namespace Repositories;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\AbstractQuery;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
 use Enums\JobStatus;
@@ -68,12 +70,13 @@ class JobRepository extends BaseRepository
 
     /**
      * @param stdClass|null $data
+     * @param bool $returnEntity
      * @return array|null
      * @throws NonUniqueResultException
      * @throws ReflectionException
      * @throws MappingException
      */
-    public function create(stdClass $data = null): ?array
+    public function create(stdClass $data = null, bool $returnEntity = false): ?array
     {
         if (isset($data->status) && is_int($data->status) && $job = JobStatus::from($data->status)) {
             $data->status = $job->value;
@@ -91,13 +94,14 @@ class JobRepository extends BaseRepository
     /**
      * @param int $limit
      * @param int $pagination
+     * @param array|null $ids
      * @param object|null $filters
      * @param bool $withAssociations
-     * @return array
+     * @return ArrayCollection
      * @throws MappingException
      * @throws ReflectionException
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null, bool $withAssociations = false): array
+    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null, bool $withAssociations = false): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
@@ -112,22 +116,22 @@ class JobRepository extends BaseRepository
         $list = $query->setMaxResults($limit)
             ->setFirstResult($limit * $pagination)
             ->getQuery()
-            ->getResult();
+            ->getResult()
+            ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
-        return array_map(function ($element) use ($withAssociations) {
-            return $this->mapEntityData($element, $withAssociations);
-        }, $list);
+        return new ArrayCollection($list);
     }
 
     /**
      * @param int $id
      * @param stdClass|null $data
+     * @param bool $returnEntity
      * @return array|null
      * @throws MappingException
      * @throws NonUniqueResultException
      * @throws ReflectionException
      */
-    public function update(int $id, stdClass $data = null): ?array
+    public function update(int $id, stdClass $data = null, bool $returnEntity = false): ?array
     {
         if (!isset($data->status) || !$data->status) {
             return parent::update($id, $data);

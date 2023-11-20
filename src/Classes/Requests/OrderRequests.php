@@ -90,35 +90,32 @@ class OrderRequests
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 }
