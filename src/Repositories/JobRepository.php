@@ -6,6 +6,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
+use Entities\Entity;
 use Enums\JobStatus;
 use Faker\Factory;
 use ReflectionEnum;
@@ -69,6 +70,23 @@ class JobRepository extends BaseRepository
     }
 
     /**
+     * @param int $id
+     * @param bool $returnEntity
+     * @return Entity|array|null
+     * @throws NonUniqueResultException
+     */
+    public function read(int $id, bool $returnEntity = false): Entity|array|null
+    {
+        $entity = parent::read($id, $returnEntity);
+
+        if (!$returnEntity) {
+            $entity['status'] = $this->getStatusName($entity['status']);
+        }
+
+        return $entity;
+    }
+
+    /**
      * @param stdClass|null $data
      * @param bool $returnEntity
      * @return array|null
@@ -96,12 +114,9 @@ class JobRepository extends BaseRepository
      * @param int $pagination
      * @param array|null $ids
      * @param object|null $filters
-     * @param bool $withAssociations
      * @return ArrayCollection
-     * @throws MappingException
-     * @throws ReflectionException
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null, bool $withAssociations = false): ArrayCollection
+    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
@@ -116,10 +131,12 @@ class JobRepository extends BaseRepository
         $list = $query->setMaxResults($limit)
             ->setFirstResult($limit * $pagination)
             ->getQuery()
-            ->getResult()
             ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
-        return new ArrayCollection($list);
+        return new ArrayCollection(array_map(function ($job) {
+            $job['status'] = $this->getStatusName($job['status']);
+            return $job;
+        }, $list));
     }
 
     /**
@@ -127,9 +144,7 @@ class JobRepository extends BaseRepository
      * @param stdClass|null $data
      * @param bool $returnEntity
      * @return array|null
-     * @throws MappingException
      * @throws NonUniqueResultException
-     * @throws ReflectionException
      */
     public function update(int $id, stdClass $data = null, bool $returnEntity = false): ?array
     {
@@ -142,17 +157,5 @@ class JobRepository extends BaseRepository
         }
 
         return parent::update($id, $data);
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws MappingException
-     */
-    protected function mapEntityData(object $entity, bool $withAssociations = false): array
-    {
-        $data = parent::mapEntityData($entity, $withAssociations);
-        $data['status'] = $this->getStatusName($data['status']);
-
-        return $data;
     }
 }

@@ -64,7 +64,7 @@ class CrudController
             Helpers::getCrudEntities()[strtolower($entity)]['class']
         );
 
-        return new Response(json_encode($repository->read(id: $id, withAssociations: true) ?: []));
+        return new Response(json_encode($repository->read(id: $id) ?: []));
     }
 
     /**
@@ -85,7 +85,6 @@ class CrudController
         }
 
         $params['filters'] = Helpers::bodyToObject($body);
-        $params['withAssociations'] = true;
 
         return new Response(json_encode($repository->readMultiple(...$params)->toArray()));
     }

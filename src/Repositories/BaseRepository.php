@@ -47,73 +47,30 @@ class BaseRepository extends EntityRepository
 
     /**
      * @param int $id
-     * @param bool $withAssociations
      * @param bool $returnEntity
      * @return Entity|array|null
-     * @throws MappingException
      * @throws NonUniqueResultException
-     * @throws ReflectionException
      */
-    public function read(int $id, bool $withAssociations = false, bool $returnEntity = false): Entity|array|null
+    public function read(int $id, bool $returnEntity = false): Entity|array|null
     {
-        $entity = $this->_em->createQueryBuilder()
+        $query = $this->_em->createQueryBuilder()
             ->select('e')
             ->from($this->_entityName, 'e')
             ->where('e.id = :id')
             ->setParameter('id', $id)
-            ->getQuery()
-            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+            ->getQuery();
+
+        if ($returnEntity) {
+            $entity = $query->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+        } else {
+            $entity = $query->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
+        }
 
         if (!$entity) {
             return null;
         }
 
-        if ($returnEntity) {
-            return $entity;
-        }
-
-        return $this->mapEntityData($entity, $withAssociations);
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws MappingException
-     */
-    protected function mapEntityData(object $entity, bool $withAssociations = false): array
-    {
-        $fields = array_keys($this->_class->fieldMappings);
-        $associated = $this->_class->associationMappings;
-
-        $data = [];
-        foreach ($fields as $field) {
-            if (method_exists($this->_entityName, 'get' . Helpers::toCamelcase($field))) {
-                $data[$field] = $entity->{'get' . Helpers::toCamelcase($field)}();
-            }
-        }
-        if (!$withAssociations) {
-            return $data;
-        }
-        foreach ($associated as $association) {
-            $fieldName = $association['fieldName'];
-            $className = $association['targetEntity'];
-            if (!method_exists($this->_entityName, 'get' . Helpers::toCamelcase($fieldName))) {
-                continue;
-            }
-            $element = $entity->{'get' . Helpers::toCamelcase($fieldName)}();
-            if (!$element) {
-                continue;
-            }
-            if (Helpers::isEntity($this->_em, $element)) {
-                $data[$fieldName] = Helpers::jsonSerialize($element);
-                continue;
-            }
-            $data[$fieldName] = [];
-            foreach ($element as $el) {
-                $data[$fieldName][] = $this->_em->getRepository($className)->read($el->getId());
-            }
-        }
-
-        return $data;
+        return $entity;
     }
 
     /**
@@ -135,10 +92,9 @@ class BaseRepository extends EntityRepository
      * @param int $pagination
      * @param array|null $ids
      * @param object|null $filters
-     * @param bool $withAssociations
      * @return ArrayCollection
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null, bool $withAssociations = false): ArrayCollection
+    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
@@ -164,9 +120,7 @@ class BaseRepository extends EntityRepository
      * @param stdClass|null $data
      * @param bool $returnEntity
      * @return bool|array|Entity|null
-     * @throws MappingException
      * @throws NonUniqueResultException
-     * @throws ReflectionException
      */
     public function update(int $id, stdClass $data = null, bool $returnEntity = false): bool|array|null|Entity
     {

@@ -34,12 +34,11 @@ class ChanneledBaseRepository extends BaseRepository
      * @param int $pagination
      * @param array|null $ids
      * @param object|null $filters
-     * @param bool $withAssociations
      * @return ArrayCollection
      * @throws MappingException
      * @throws ReflectionException
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null, bool $withAssociations = false): ArrayCollection
+    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
@@ -58,18 +57,6 @@ class ChanneledBaseRepository extends BaseRepository
             ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
         return new ArrayCollection($list);
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws MappingException
-     */
-    protected function mapEntityData(object $entity, bool $withAssociations = false): array
-    {
-        $data = parent::mapEntityData($entity, $withAssociations);
-        $data['channel'] = $this->getChannelName($data['channel']);
-
-        return $data;
     }
 
     /**

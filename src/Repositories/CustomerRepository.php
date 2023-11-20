@@ -34,10 +34,9 @@ class CustomerRepository extends BaseRepository
      * @param int $pagination
      * @param array|null $ids
      * @param object|null $filters
-     * @param bool $withAssociations
      * @return ArrayCollection
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null, bool $withAssociations = false): ArrayCollection
+    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
