@@ -10,12 +10,12 @@ use Repositories\Channeled\ChanneledCustomerRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledCustomerRepository::class)]
 #[ORM\Table(name: 'channeled_customers')]
-#[ORM\Index(columns: ['email'])]
+#[ORM\Index(columns: ['email', 'platformId', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledCustomer extends ChanneledEntity
 {
     #[ORM\Column(type: 'string')]
-    protected int $email;
+    protected string $email;
 
     // Relationships with channeled entities
 
@@ -24,7 +24,7 @@ class ChanneledCustomer extends ChanneledEntity
 
     // Relationships with non-channeled entities
 
-    #[ORM\ManyToOne(targetEntity:"\Entities\Analytics\Customer", inversedBy: 'channeledCustomers')]
+    #[ORM\ManyToOne(targetEntity: Customer::class, inversedBy: 'channeledCustomers')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected Customer $customer;
 
@@ -87,8 +87,10 @@ class ChanneledCustomer extends ChanneledEntity
         return $this->customer;
     }
 
-    public function addCustomer(Customer $customer): void
+    public function addCustomer(?Customer $customer): self
     {
         $this->customer = $customer;
+
+        return $this;
     }
 }

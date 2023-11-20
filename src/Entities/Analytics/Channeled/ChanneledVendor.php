@@ -10,6 +10,7 @@ use Repositories\Channeled\ChanneledVendorRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledVendorRepository::class)]
 #[ORM\Table(name: 'channeled_vendors')]
+#[ORM\Index(columns: ['platformId', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledVendor extends ChanneledEntity
 {
@@ -20,7 +21,7 @@ class ChanneledVendor extends ChanneledEntity
 
     // Relationships with non-channeled entities
 
-    #[ORM\ManyToOne(targetEntity:"\Entities\Analytics\Vendor", inversedBy: 'channeledVendors')]
+    #[ORM\ManyToOne(targetEntity: Vendor::class, inversedBy: 'channeledVendors')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected Vendor $vendor;
 

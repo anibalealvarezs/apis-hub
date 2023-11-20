@@ -14,7 +14,7 @@ use Repositories\PriceRuleRepository;
 #[ORM\HasLifecycleCallbacks]
 class PriceRule extends Entity
 {
-    #[ORM\OneToMany(mappedBy: 'priceRule', targetEntity: '\Entities\Analytics\Channeled\ChanneledPriceRule', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'priceRule', targetEntity: ChanneledPriceRule::class, orphanRemoval: true)]
     protected Collection $channeledPriceRules;
 
     public function __construct()

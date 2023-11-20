@@ -5,12 +5,12 @@ namespace Entities\Analytics\Channeled;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Entities\Analytics\Order;
 use Entities\Analytics\PriceRule;
 use Repositories\Channeled\ChanneledPriceRuleRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledPriceRuleRepository::class)]
 #[ORM\Table(name: 'channeled_price_rules')]
+#[ORM\Index(columns: ['platformId', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledPriceRule extends ChanneledEntity
 {
@@ -24,7 +24,7 @@ class ChanneledPriceRule extends ChanneledEntity
 
     // Relationships with non-channeled entities
 
-    #[ORM\ManyToOne(targetEntity:"\Entities\Analytics\PriceRule", inversedBy: 'channeledPriceRules')]
+    #[ORM\ManyToOne(targetEntity: PriceRule::class, inversedBy: 'channeledPriceRules')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected PriceRule $priceRule;
 

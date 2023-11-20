@@ -10,6 +10,7 @@ use Repositories\Channeled\ChanneledOrderRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledOrderRepository::class)]
 #[ORM\Table(name: 'channeled_orders')]
+#[ORM\Index(columns: ['platformId', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledOrder extends ChanneledEntity
 {
@@ -33,7 +34,7 @@ class ChanneledOrder extends ChanneledEntity
 
     // Relationships with non-channeled entities
 
-    #[ORM\ManyToOne(targetEntity:"\Entities\Analytics\Order", inversedBy: 'channeledOrders')]
+    #[ORM\ManyToOne(targetEntity: Order::class, inversedBy: 'channeledOrders')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected Order $order;
 

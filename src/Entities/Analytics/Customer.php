@@ -15,10 +15,10 @@ use Repositories\CustomerRepository;
 #[ORM\HasLifecycleCallbacks]
 class Customer extends Entity
 {
-    #[ORM\Column(type: 'string')]
-    protected int $email;
+    #[ORM\Column(type: 'string', unique: true)]
+    protected string $email;
 
-    #[ORM\OneToMany(mappedBy: 'customer', targetEntity: '\Entities\Analytics\Channeled\ChanneledCustomer', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'customer', targetEntity: ChanneledCustomer::class, orphanRemoval: true)]
     protected Collection $channeledCustomers;
 
     public function __construct()
@@ -49,7 +49,10 @@ class Customer extends Entity
 
     public function addChanneledCustomer(ChanneledCustomer $channeledCustomer): self
     {
-        $this->channeledCustomers->add($channeledCustomer);
+        if (!$this->channeledCustomers->contains($channeledCustomer)) {
+            $this->channeledCustomers->add($channeledCustomer);
+            $channeledCustomer->addCustomer($this);
+        }
 
         return $this;
     }
@@ -63,15 +66,24 @@ class Customer extends Entity
         return $this;
     }
 
-    public function removeChanneledCustomer(ChanneledCustomer $channeledCustomer): void
+    public function removeChanneledCustomer(ChanneledCustomer $channeledCustomer): self
     {
-        $this->channeledCustomers->removeElement($channeledCustomer);
+        if ($this->channeledCustomers->contains($channeledCustomer)) {
+            $this->channeledCustomers->removeElement($channeledCustomer);
+            if ($channeledCustomer->getCustomer() === $this) {
+                $channeledCustomer->addCustomer(null);
+            }
+        }
+
+        return $this;
     }
 
-    public function removeChanneledCustomers(Collection $channeledCustomers): void
+    public function removeChanneledCustomers(Collection $channeledCustomers): self
     {
         foreach ($channeledCustomers as $channeledCustomer) {
             $this->removeChanneledCustomer($channeledCustomer);
         }
+
+        return $this;
     }
 }

@@ -14,7 +14,7 @@ use Repositories\VendorRepository;
 #[ORM\HasLifecycleCallbacks]
 class Vendor extends Entity
 {
-    #[ORM\OneToMany(mappedBy: 'vendor', targetEntity: '\Entities\Analytics\Channeled\ChanneledVendor', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'vendor', targetEntity: ChanneledVendor::class, orphanRemoval: true)]
     protected Collection $channeledVendors;
 
     public function __construct()

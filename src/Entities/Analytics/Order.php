@@ -14,7 +14,7 @@ use Repositories\OrderRepository;
 #[ORM\HasLifecycleCallbacks]
 class Order extends Entity
 {
-    #[ORM\OneToMany(mappedBy: 'order', targetEntity: '\Entities\Analytics\Channeled\ChanneledOrder', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'order', targetEntity: ChanneledOrder::class, orphanRemoval: true)]
     protected Collection $channeledOrders;
 
     public function __construct()

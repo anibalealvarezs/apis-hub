@@ -14,7 +14,7 @@ use Repositories\ProductRepository;
 #[ORM\HasLifecycleCallbacks]
 class Product extends Entity
 {
-    #[ORM\OneToMany(mappedBy: 'product', targetEntity: '\Entities\Analytics\Channeled\ChanneledProduct', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'product', targetEntity: ChanneledProduct::class, orphanRemoval: true)]
     protected Collection $channeledProducts;
 
     public function __construct()
