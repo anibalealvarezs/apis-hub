@@ -7,6 +7,7 @@ use Repositories\JobRepository;
 
 #[ORM\Entity(repositoryClass: JobRepository::class)]
 #[ORM\Table(name: 'jobs')]
+#[ORM\Index(columns: ['status'])]
 #[ORM\HasLifecycleCallbacks]
 class Job extends Entity
 {
