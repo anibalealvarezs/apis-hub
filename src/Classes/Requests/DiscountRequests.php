@@ -10,6 +10,8 @@ use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Entities\Analytics\Channeled\ChanneledDiscount;
 use Entities\Analytics\Channeled\ChanneledPriceRule;
+use Entities\Analytics\Discount;
+use Entities\Analytics\PriceRule;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,12 +31,13 @@ class DiscountRequests
     public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, object $filters = null): Response
     {
         $config = Helpers::getChannelsConfig()['shopify'];
+        $manager = Helpers::getManager();
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
             shopName: $config['shopify_shop_name'],
             version: $config['shopify_last_stable_revision'],
         );
-        $priceRules = $shopifyClient->getAllPriceRules(
+        $sourcePriceRules = $shopifyClient->getAllPriceRules(
             createdAtMin: $createdAtMin,
             createdAtMax: $createdAtMax,
             endsAtMin: $filters->endsAtMin ?? null,
@@ -46,58 +49,72 @@ class DiscountRequests
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
         );
-        $priceRulesCollection = ShopifyConvert::priceRules($priceRules['price_rules']);
-        $priceRulesRepository = Helpers::getManager()->getRepository(ChanneledPriceRule::class);
-        foreach ($priceRulesCollection as $priceRule) {
-            if (!$priceRulesRepository->getByPlatformIdAndChannel($priceRule->platformId, $priceRule->channel)) {
-                $priceRulesRepository->create($priceRule);
-                $priceRuleEntity = $priceRulesRepository->getByPlatformIdAndChannel($priceRule->platformId, $priceRule->channel);
-                $discountCodes = $shopifyClient->getAllDiscountCodes(
-                    priceRuleId: $priceRuleEntity->getPlatformId(),
+        $priceRulesCollection = ShopifyConvert::priceRules($sourcePriceRules['price_rules']);
+        $channeledPriceRulesRepository = $manager->getRepository(ChanneledPriceRule::class);
+        $channeledDiscountsRepository = $manager->getRepository(ChanneledDiscount::class);
+        $discountRepository = $manager->getRepository(Discount::class);
+        $priceRuleRepository = $manager->getRepository(PriceRule::class);
+        foreach ($priceRulesCollection as $channeledPriceRule) {
+            if (!$channeledPriceRulesRepository->getByPlatformIdAndChannel($channeledPriceRule->platformId, $channeledPriceRule->channel)) {
+                $priceRuleEntity = $priceRuleRepository->create(
+                    data: (object) [],
+                    returnEntity: true,
                 );
-                $discountsCollection = ShopifyConvert::discounts($discountCodes['discount_codes']);
-                $discountsRepository = Helpers::getManager()->getRepository(ChanneledDiscount::class);
-                $discountEntitiesCollection = new ArrayCollection();
-                foreach ($discountsCollection as $discount) {
-                    if (!$discountEntity = $discountsRepository->getByPlatformIdAndChannel($discount->platformId, $discount->channel)) {
-                        // $discountsRepository->create($discount);
-                        $discountEntity = new ChanneledDiscount();
-                        $discountEntity->addPlatformId($discount->platformId);
-                        $discountEntity->addChannel($discount->channel);
-                        $discountEntity->addData($discount->data);
-                        $discountEntity->addChanneledPriceRule($priceRuleEntity);
+                $channeledPriceRuleEntity = $channeledPriceRulesRepository->create(
+                    data: $channeledPriceRule,
+                    returnEntity: true,
+                );
+                $channeledPriceRuleEntity->addPriceRule($priceRuleEntity);
+                $manager->persist($priceRuleEntity);
+                $manager->flush();
+                $sourceDiscountCodes = $shopifyClient->getAllDiscountCodes(
+                    priceRuleId: $channeledPriceRule->platformId,
+                );
+                $discountsCollection = ShopifyConvert::discounts($sourceDiscountCodes['discount_codes']);
+                foreach ($discountsCollection as $channeledDiscount) {
+                    if (!$discountEntity = $discountRepository->getByCode($channeledDiscount->code)) {
+                        $discountEntity = $discountRepository->create(
+                            data: (object) ['code' => $channeledDiscount->code,],
+                            returnEntity: true,
+                        );
                     }
-                    $discountEntitiesCollection->add($discountEntity);
+                    if (!$channeledDiscountEntity = $channeledDiscountsRepository->getByPlatformIdAndChannel($channeledDiscount->platformId, $channeledDiscount->channel)) {
+                        $channeledDiscountEntity = $channeledDiscountsRepository->create(
+                            data: $channeledDiscount,
+                            returnEntity: true,
+                        );
+                    }
+                    $channeledDiscountEntity->addDiscount($discountEntity);
+                    $channeledDiscountEntity->addChanneledPriceRule($channeledPriceRuleEntity);
+                    $manager->persist($discountEntity);
+                    $manager->persist($channeledPriceRuleEntity);
+                    $manager->persist($channeledDiscountEntity);
+                    $manager->flush();
                 }
-                $priceRuleEntity->addChanneledDiscounts($discountEntitiesCollection);
-                Helpers::getManager()->persist($priceRuleEntity);
-                Helpers::getManager()->flush();
             }
         }
-        return new Response(json_encode($priceRules));
+        return new Response(json_encode($sourcePriceRules));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
-     * @return array
+     * @return Response
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): array
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        //
-        return [];
+        return new Response(json_encode([]));
     }
 }

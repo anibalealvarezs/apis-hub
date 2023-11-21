@@ -8,7 +8,9 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\Query;
 use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Entity;
+use Enums\Channels;
 use Helpers\Helpers;
+use ReflectionEnum;
 use ReflectionException;
 
 class CustomerRepository extends BaseRepository
@@ -56,6 +58,12 @@ class CustomerRepository extends BaseRepository
             ->getQuery()
             ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
-        return new ArrayCollection($list);
+        return new ArrayCollection(array_map(function($item) {
+            $item['channeledCustomers'] = array_map(function($channelCustomer) {
+                $channelCustomer['channel'] = Channels::from($channelCustomer['channel'])->getName();
+                return $channelCustomer;
+            }, $item['channeledCustomers']);
+            return $item;
+        }, $list));
     }
 }
