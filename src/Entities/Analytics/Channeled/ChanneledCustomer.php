@@ -19,7 +19,7 @@ class ChanneledCustomer extends ChanneledEntity
 
     // Relationships with channeled entities
 
-    #[ORM\OneToMany(mappedBy: 'channeledCustomer', targetEntity: 'ChanneledOrder', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'channeledCustomer', targetEntity: 'ChanneledOrder', orphanRemoval: true)]
     protected Collection $channeledOrders;
 
     // Relationships with non-channeled entities
@@ -56,7 +56,10 @@ class ChanneledCustomer extends ChanneledEntity
 
     public function addChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        $this->channeledOrders->add($channeledOrder);
+        if (!$this->channeledOrders->contains($channeledOrder)) {
+            $this->channeledOrders->add($channeledOrder);
+            $channeledOrder->addChanneledCustomer($this);
+        }
 
         return $this;
     }
@@ -70,9 +73,16 @@ class ChanneledCustomer extends ChanneledEntity
         return $this;
     }
 
-    public function removeChanneledOrder(ChanneledOrder $channeledOrder): void
+    public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        $this->channeledOrders->removeElement($channeledOrder);
+        if ($this->channeledOrders->contains($channeledOrder)) {
+            $this->channeledOrders->removeElement($channeledOrder);
+            if ($channeledOrder->getChanneledCustomer() === $this) {
+                $channeledOrder->addChanneledCustomer(null);
+            }
+        }
+
+        return $this;
     }
 
     public function removeChanneledOrders(Collection $channeledOrders): void

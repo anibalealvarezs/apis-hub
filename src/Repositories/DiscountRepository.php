@@ -7,7 +7,6 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Entities\Entity;
 use Enums\Channels;
-use ReflectionEnum;
 
 class DiscountRepository extends BaseRepository
 {
@@ -38,11 +37,11 @@ class DiscountRepository extends BaseRepository
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
-            ->addSelect('c')
-            ->addSelect('p')
+            ->addSelect('d')
+            ->addSelect('pr')
             ->from($this->_entityName, 'e');
-        $query->leftJoin('e.channeledDiscounts', 'c');
-        $query->leftJoin('c.channeledPriceRule', 'p');
+        $query->leftJoin('e.channeledDiscounts', 'd');
+        $query->leftJoin('d.channeledPriceRule', 'pr');
         if ($ids) {
             $query->where('e.id IN (:ids)')
                 ->setParameter('ids', $ids);

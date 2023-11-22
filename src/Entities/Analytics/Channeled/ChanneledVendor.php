@@ -16,7 +16,7 @@ class ChanneledVendor extends ChanneledEntity
 {
     // Relationships with channeled entities
 
-    #[ORM\OneToMany(mappedBy: 'channeledVendor', targetEntity: 'ChanneledProduct', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'channeledVendor', targetEntity: 'ChanneledProduct', orphanRemoval: true)]
     protected Collection $channeledProducts;
 
     // Relationships with non-channeled entities
@@ -37,7 +37,10 @@ class ChanneledVendor extends ChanneledEntity
 
     public function addChanneledProduct(ChanneledProduct $channeledProduct): self
     {
-        $this->channeledProducts->add($channeledProduct);
+        if (!$this->channeledProducts->contains($channeledProduct)) {
+            $this->channeledProducts->add($channeledProduct);
+            $channeledProduct->addChanneledVendor($this);
+        }
 
         return $this;
     }
@@ -51,9 +54,16 @@ class ChanneledVendor extends ChanneledEntity
         return $this;
     }
 
-    public function removeChanneledProduct(ChanneledProduct $channeledProduct): void
+    public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
     {
-        $this->channeledProducts->removeElement($channeledProduct);
+        if ($this->channeledProducts->contains($channeledProduct)) {
+            $this->channeledProducts->removeElement($channeledProduct);
+            if ($channeledProduct->getChanneledVendor() === $this) {
+                $channeledProduct->addChanneledVendor(null);
+            }
+        }
+
+        return $this;
     }
 
     public function removeChanneledProducts(Collection $channeledProducts): void
@@ -68,8 +78,10 @@ class ChanneledVendor extends ChanneledEntity
         return $this->vendor;
     }
 
-    public function addVendor(Vendor $vendor): void
+    public function addVendor(?Vendor $vendor): self
     {
         $this->vendor = $vendor;
+
+        return $this;
     }
 }

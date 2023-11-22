@@ -20,13 +20,13 @@ class ChanneledOrder extends ChanneledEntity
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected ChanneledCustomer $channeledCustomer;
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledProduct', inversedBy: 'channeledOrders', cascade: ['persist'])]
+    #[ORM\ManyToMany(targetEntity: 'ChanneledProduct', inversedBy: 'channeledOrders')]
     #[ORM\JoinTable(name: 'channeled_order_channeled_products')]
-    protected ArrayCollection $channeledProducts;
+    protected Collection $channeledProducts;
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledDiscount', inversedBy: 'channeledOrders', cascade: ['persist'])]
+    #[ORM\ManyToMany(targetEntity: 'ChanneledDiscount', inversedBy: 'channeledOrders')]
     #[ORM\JoinTable(name: 'channeled_order_channeled_discounts')]
-    protected ArrayCollection $channeledDiscounts;
+    protected Collection $channeledDiscounts;
 
     // Relationships with non-channeled entities
 
@@ -49,11 +49,14 @@ class ChanneledOrder extends ChanneledEntity
     }
 
     /**
-     * @param ChanneledCustomer $channeledCustomer
+     * @param ChanneledCustomer|null $channeledCustomer
+     * @return ChanneledOrder
      */
-    public function addChanneledCustomer(ChanneledCustomer $channeledCustomer): void
+    public function addChanneledCustomer(?ChanneledCustomer $channeledCustomer): self
     {
         $this->channeledCustomer = $channeledCustomer;
+
+        return $this;
     }
 
     /**
@@ -65,12 +68,15 @@ class ChanneledOrder extends ChanneledEntity
     }
 
     /**
-     * @param ChanneledProduct $channeledProducts
+     * @param ChanneledProduct $channeledProduct
      * @return ChanneledOrder
      */
-    public function addChanneledProduct(ChanneledProduct $channeledProducts): self
+    public function addChanneledProduct(ChanneledProduct $channeledProduct): self
     {
-        $this->channeledProducts->add($channeledProducts);
+        if (!$this->channeledProducts->contains($channeledProduct)) {
+            $this->channeledProducts->add($channeledProduct);
+            $channeledProduct->addChanneledOrder($this);
+        }
 
         return $this;
     }
@@ -79,7 +85,7 @@ class ChanneledOrder extends ChanneledEntity
      * @param Collection $channeledProducts
      * @return ChanneledOrder
      */
-    public function addProducts(Collection $channeledProducts): self
+    public function addChanneledProducts(Collection $channeledProducts): self
     {
         foreach ($channeledProducts as $channeledProduct) {
             $this->addChanneledProduct($channeledProduct);
@@ -90,10 +96,18 @@ class ChanneledOrder extends ChanneledEntity
 
     /**
      * @param ChanneledProduct $channeledProduct
+     * @return ChanneledOrder
      */
-    public function removeChanneledProduct(ChanneledProduct $channeledProduct): void
+    public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
     {
-        $this->channeledProducts->removeElement($channeledProduct);
+        if ($this->channeledProducts->contains($channeledProduct)) {
+            $this->channeledProducts->removeElement($channeledProduct);
+            if ($channeledProduct->getChanneledOrders()->contains($this)) {
+                $channeledProduct->removeChanneledOrder($this);
+            }
+        }
+
+        return $this;
     }
 
     /**
@@ -113,7 +127,10 @@ class ChanneledOrder extends ChanneledEntity
 
     public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
-        $this->channeledDiscounts->add($channeledDiscount);
+        if (!$this->channeledDiscounts->contains($channeledDiscount)) {
+            $this->channeledDiscounts->add($channeledDiscount);
+            $channeledDiscount->addChanneledOrder($this);
+        }
 
         return $this;
     }
@@ -129,7 +146,12 @@ class ChanneledOrder extends ChanneledEntity
 
     public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): void
     {
-        $this->channeledDiscounts->removeElement($channeledDiscount);
+        if ($this->channeledDiscounts->contains($channeledDiscount)) {
+            $this->channeledDiscounts->removeElement($channeledDiscount);
+            if ($channeledDiscount->getChanneledOrders()->contains($this)) {
+                $channeledDiscount->removeChanneledOrder($this);
+            }
+        }
     }
 
     public function removeDiscounts(Collection $channeledDiscounts): void
@@ -144,8 +166,10 @@ class ChanneledOrder extends ChanneledEntity
         return $this->order;
     }
 
-    public function addOrder(Order $order): void
+    public function addOrder(?Order $order): self
     {
         $this->order = $order;
+
+        return $this;
     }
 }

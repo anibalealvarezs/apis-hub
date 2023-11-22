@@ -49,7 +49,10 @@ class Discount extends Entity
 
     public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
-        $this->channeledDiscounts->add($channeledDiscount);
+        if (!$this->channeledDiscounts->contains($channeledDiscount)) {
+            $this->channeledDiscounts->add($channeledDiscount);
+            $channeledDiscount->addDiscount($this);
+        }
 
         return $this;
     }
@@ -63,9 +66,16 @@ class Discount extends Entity
         return $this;
     }
 
-    public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): void
+    public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
-        $this->channeledDiscounts->removeElement($channeledDiscount);
+        if ($this->channeledDiscounts->contains($channeledDiscount)) {
+            $this->channeledDiscounts->removeElement($channeledDiscount);
+            if ($channeledDiscount->getDiscount() === $this) {
+                $channeledDiscount->addDiscount(null);
+            }
+        }
+
+        return $this;
     }
 
     public function removeChanneledDiscounts(Collection $channeledDiscounts): void

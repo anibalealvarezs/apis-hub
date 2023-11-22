@@ -16,10 +16,7 @@ class ChanneledPriceRule extends ChanneledEntity
 {
     // Relationships with channeled entities
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledOrder', mappedBy: 'channeledPriceRules')]
-    protected Collection $channeledOrders;
-
-    #[ORM\OneToMany(mappedBy: 'channeledPriceRule', targetEntity: 'ChanneledDiscount', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'channeledPriceRule', targetEntity: 'ChanneledDiscount', orphanRemoval: true)]
     protected Collection $channeledDiscounts;
 
     // Relationships with non-channeled entities
@@ -30,58 +27,7 @@ class ChanneledPriceRule extends ChanneledEntity
 
     public function __construct()
     {
-        $this->channeledOrders = new ArrayCollection();
         $this->channeledDiscounts = new ArrayCollection();
-    }
-
-    /**
-     * @return Collection|null
-     */
-    public function getChanneledOrders(): ?Collection
-    {
-        return $this->channeledOrders;
-    }
-
-    /**
-     * @param ChanneledOrder $channeledOrder
-     * @return ChanneledPriceRule
-     */
-    public function addChanneledOrder(ChanneledOrder $channeledOrder): self
-    {
-        $this->channeledOrders->add($channeledOrder);
-
-        return $this;
-    }
-
-    /**
-     * @param Collection $channeledOrders
-     * @return ChanneledPriceRule
-     */
-    public function addChanneledOrders(Collection $channeledOrders): self
-    {
-        foreach ($channeledOrders as $channeledOrder) {
-            $this->addChanneledOrder($channeledOrder);
-        }
-
-        return $this;
-    }
-
-    /**
-     * @param ChanneledOrder $channeledOrder
-     */
-    public function removeChanneledOrder(ChanneledOrder $channeledOrder): void
-    {
-        $this->channeledOrders->removeElement($channeledOrder);
-    }
-
-    /**
-     * @param Collection $channeledOrders
-     */
-    public function removeChanneledOrders(Collection $channeledOrders): void
-    {
-        foreach ($channeledOrders as $channeledOrder) {
-            $this->removeChanneledOrder($channeledOrder);
-        }
     }
 
     public function getChanneledDiscounts(): ?Collection
@@ -91,7 +37,10 @@ class ChanneledPriceRule extends ChanneledEntity
 
     public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
-        $this->channeledDiscounts->add($channeledDiscount);
+        if (!$this->channeledDiscounts->contains($channeledDiscount)) {
+            $this->channeledDiscounts->add($channeledDiscount);
+            $channeledDiscount->addChanneledPriceRule($this);
+        }
 
         return $this;
     }
@@ -105,9 +54,16 @@ class ChanneledPriceRule extends ChanneledEntity
         return $this;
     }
 
-    public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): void
+    public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
-        $this->channeledDiscounts->removeElement($channeledDiscount);
+        if ($this->channeledDiscounts->contains($channeledDiscount)) {
+            $this->channeledDiscounts->removeElement($channeledDiscount);
+            if ($channeledDiscount->getChanneledPriceRule() === $this) {
+                $channeledDiscount->addChanneledPriceRule(null);
+            }
+        }
+
+        return $this;
     }
 
     public function removeChanneledDiscounts(Collection $channeledDiscounts): void
@@ -122,8 +78,10 @@ class ChanneledPriceRule extends ChanneledEntity
         return $this->priceRule;
     }
 
-    public function addPriceRule(PriceRule $priceRule): void
+    public function addPriceRule(?PriceRule $priceRule): self
     {
         $this->priceRule = $priceRule;
+
+        return $this;
     }
 }

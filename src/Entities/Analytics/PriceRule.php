@@ -29,7 +29,10 @@ class PriceRule extends Entity
 
     public function addChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): self
     {
-        $this->channeledPriceRules->add($channeledPriceRule);
+        if (!$this->channeledPriceRules->contains($channeledPriceRule)) {
+            $this->channeledPriceRules->add($channeledPriceRule);
+            $channeledPriceRule->addPriceRule($this);
+        }
 
         return $this;
     }
@@ -45,7 +48,12 @@ class PriceRule extends Entity
 
     public function removeChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): void
     {
-        $this->channeledPriceRules->removeElement($channeledPriceRule);
+        if ($this->channeledPriceRules->contains($channeledPriceRule)) {
+            $this->channeledPriceRules->removeElement($channeledPriceRule);
+            if ($channeledPriceRule->getPriceRule() === $this) {
+                $channeledPriceRule->addPriceRule(null);
+            }
+        }
     }
 
     public function removeChanneledPriceRules(Collection $channeledPriceRules): void

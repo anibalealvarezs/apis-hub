@@ -29,7 +29,10 @@ class Product extends Entity
 
     public function addChanneledProduct(ChanneledProduct $channeledProduct): self
     {
-        $this->channeledProducts->add($channeledProduct);
+        if (!$this->channeledProducts->contains($channeledProduct)) {
+            $this->channeledProducts->add($channeledProduct);
+            $channeledProduct->addProduct($this);
+        }
 
         return $this;
     }
@@ -45,7 +48,12 @@ class Product extends Entity
 
     public function removeChanneledProduct(ChanneledProduct $channeledProduct): void
     {
-        $this->channeledProducts->removeElement($channeledProduct);
+        if ($this->channeledProducts->contains($channeledProduct)) {
+            $this->channeledProducts->removeElement($channeledProduct);
+            if ($channeledProduct->getProduct() === $this) {
+                $channeledProduct->addProduct(null);
+            }
+        }
     }
 
     public function removeChanneledProducts(Collection $channeledProducts): void

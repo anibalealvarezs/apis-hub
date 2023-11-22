@@ -67,7 +67,7 @@ class CustomerRequests
                 $channeledCustomerEntity->addPlatformId($channeledCustomer->platformId);
                 $channeledCustomerEntity->addData($channeledCustomer->data);
             }
-            $channeledCustomerEntity->addCustomer($customerEntity);
+            $customerEntity->addChanneledCustomer($channeledCustomerEntity);
             $manager->persist($customerEntity);
             $manager->persist($channeledCustomerEntity);
             $manager->flush();

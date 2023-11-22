@@ -91,7 +91,7 @@ class OrderRequests
                 }
                 $channeledOrderEntity->addChanneledDiscount($channeledDiscountEntity);
                 $manager->persist($channeledDiscountEntity);
-                $manager->flush();
+                $manager->persist($channeledOrderEntity);
             }
             foreach($order->lineItems as $lineItem) {
                 if (!$channeledProductEntity = $channeledProductRepository->getByPlatformIdAndChannel($lineItem['product_id'], $order->channel)) {
@@ -106,9 +106,9 @@ class OrderRequests
                 }
                 $channeledOrderEntity->addChanneledProduct($channeledProductEntity);
                 $manager->persist($channeledProductEntity);
-                $manager->flush();
+                $manager->persist($channeledOrderEntity);
             }
-            if (!$channeledCustomerEntity = $channeledCustomerRepository->getByPlatformIdAndChannel($order->customer->platformId, $order->channel)) {
+            if (!$channeledCustomerEntity = $channeledCustomerRepository->getByEmailAndChannel($order->customer->email, $order->channel)) {
                 $channeledCustomerEntity = $channeledCustomerRepository->create(
                     data: (object) [
                         'channel' => $order->channel,
@@ -119,8 +119,8 @@ class OrderRequests
                     returnEntity: true,
                 );
             }
-            $channeledOrderEntity->addChanneledCustomer($channeledCustomerEntity);
-            $channeledOrderEntity->addOrder($orderEntity);
+            $channeledCustomerEntity->addChanneledOrder($channeledOrderEntity);
+            $orderEntity->addChanneledOrder($channeledOrderEntity);
             $manager->persist($orderEntity);
             $manager->persist($channeledCustomerEntity);
             $manager->persist($channeledOrderEntity);

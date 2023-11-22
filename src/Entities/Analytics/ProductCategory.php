@@ -29,7 +29,10 @@ class ProductCategory extends Entity
 
     public function addChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
-        $this->channeledProductCategories->add($channeledProductCategory);
+        if (!$this->channeledProductCategories->contains($channeledProductCategory)) {
+            $this->channeledProductCategories->add($channeledProductCategory);
+            $channeledProductCategory->addProductCategory($this);
+        }
 
         return $this;
     }
@@ -43,9 +46,16 @@ class ProductCategory extends Entity
         return $this;
     }
 
-    public function removeChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): void
+    public function removeChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
-        $this->channeledProductCategories->removeElement($channeledProductCategory);
+        if ($this->channeledProductCategories->contains($channeledProductCategory)) {
+            $this->channeledProductCategories->removeElement($channeledProductCategory);
+            if ($channeledProductCategory->getProductCategory() === $this) {
+                $channeledProductCategory->addProductCategory(null);
+            }
+        }
+
+        return $this;
     }
 
     public function removeChanneledProductCategories(Collection $channeledProductCategories): void

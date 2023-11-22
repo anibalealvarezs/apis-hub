@@ -55,7 +55,9 @@ class ChanneledProduct extends ChanneledEntity
      */
     public function addChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
-        $this->channeledProductCategories->add($channeledProductCategory);
+        if (!$this->channeledProductCategories->contains($channeledProductCategory)) {
+            $this->channeledProductCategories->add($channeledProductCategory);
+        }
 
         return $this;
     }
@@ -75,10 +77,15 @@ class ChanneledProduct extends ChanneledEntity
 
     /**
      * @param ChanneledProductCategory $channeledProductCategory
+     * @return ChanneledProduct
      */
-    public function removeChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): void
+    public function removeChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
-        $this->channeledProductCategories->removeElement($channeledProductCategory);
+        if ($this->channeledProductCategories->contains($channeledProductCategory)) {
+            $this->channeledProductCategories->removeElement($channeledProductCategory);
+        }
+
+        return $this;
     }
 
     /**
@@ -105,7 +112,9 @@ class ChanneledProduct extends ChanneledEntity
      */
     public function addChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        $this->channeledOrders->add($channeledOrder);
+        if (!$this->channeledOrders->contains($channeledOrder)) {
+            $this->channeledOrders->add($channeledOrder);
+        }
 
         return $this;
     }
@@ -125,10 +134,15 @@ class ChanneledProduct extends ChanneledEntity
 
     /**
      * @param ChanneledOrder $channeledOrder
+     * @return ChanneledProduct
      */
-    public function removeChanneledOrder(ChanneledOrder $channeledOrder): void
+    public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        $this->channeledOrders->removeElement($channeledOrder);
+        if ($this->channeledOrders->contains($channeledOrder)) {
+            $this->channeledOrders->removeElement($channeledOrder);
+        }
+
+        return $this;
     }
 
     /**
@@ -146,9 +160,11 @@ class ChanneledProduct extends ChanneledEntity
         return $this->channeledVendor;
     }
 
-    public function addChanneledVendor(ChanneledVendor $channeledVendor): void
+    public function addChanneledVendor(?ChanneledVendor $channeledVendor): self
     {
         $this->channeledVendor = $channeledVendor;
+
+        return $this;
     }
 
     public function getProduct(): Product
@@ -156,8 +172,10 @@ class ChanneledProduct extends ChanneledEntity
         return $this->product;
     }
 
-    public function addProduct(Product $product): void
+    public function addProduct(?Product $product): self
     {
         $this->product = $product;
+
+        return $this;
     }
 }

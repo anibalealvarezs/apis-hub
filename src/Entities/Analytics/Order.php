@@ -14,7 +14,7 @@ use Repositories\OrderRepository;
 #[ORM\HasLifecycleCallbacks]
 class Order extends Entity
 {
-    #[ORM\Column(type: 'int', unique: true)]
+    #[ORM\Column(type: 'string', unique: true)]
     protected string $orderId;
 
     #[ORM\OneToMany(mappedBy: 'order', targetEntity: ChanneledOrder::class, orphanRemoval: true)]
@@ -48,7 +48,10 @@ class Order extends Entity
 
     public function addChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        $this->channeledOrders->add($channeledOrder);
+        if (!$this->channeledOrders->contains($channeledOrder)) {
+            $this->channeledOrders->add($channeledOrder);
+            $channeledOrder->addOrder($this);
+        }
 
         return $this;
     }
@@ -62,9 +65,16 @@ class Order extends Entity
         return $this;
     }
 
-    public function removeChanneledOrder(ChanneledOrder $channeledOrder): void
+    public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        $this->channeledOrders->removeElement($channeledOrder);
+        if ($this->channeledOrders->contains($channeledOrder)) {
+            $this->channeledOrders->removeElement($channeledOrder);
+            if ($channeledOrder->getOrder() === $this) {
+                $channeledOrder->addOrder(null);
+            }
+        }
+
+        return $this;
     }
 
     public function removeChanneledOrders(Collection $channeledOrders): void

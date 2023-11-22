@@ -29,7 +29,10 @@ class Vendor extends Entity
 
     public function addChanneledVendor(ChanneledVendor $channeledVendor): self
     {
-        $this->channeledVendors->add($channeledVendor);
+        if (!$this->channeledVendors->contains($channeledVendor)) {
+            $this->channeledVendors->add($channeledVendor);
+            $channeledVendor->addVendor($this);
+        }
 
         return $this;
     }
@@ -43,9 +46,16 @@ class Vendor extends Entity
         return $this;
     }
 
-    public function removeChanneledVendor(ChanneledVendor $channeledVendor): void
+    public function removeChanneledVendor(ChanneledVendor $channeledVendor): self
     {
-        $this->channeledVendors->removeElement($channeledVendor);
+        if ($this->channeledVendors->contains($channeledVendor)) {
+            $this->channeledVendors->removeElement($channeledVendor);
+            if ($channeledVendor->getVendor() === $this) {
+                $channeledVendor->addVendor(null);
+            }
+        }
+
+        return $this;
     }
 
     public function removeChanneledVendors(Collection $channeledVendors): void

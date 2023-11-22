@@ -67,7 +67,9 @@ class ChanneledDiscount extends ChanneledEntity
      */
     public function addChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        $this->channeledOrders->add($channeledOrder);
+        if (!$this->channeledOrders->contains($channeledOrder)) {
+            $this->channeledOrders->add($channeledOrder);
+        }
 
         return $this;
     }
@@ -76,7 +78,7 @@ class ChanneledDiscount extends ChanneledEntity
      * @param Collection $channeledOrders
      * @return ChanneledDiscount
      */
-    public function addOrders(Collection $channeledOrders): self
+    public function addChanneledOrders(Collection $channeledOrders): self
     {
         foreach ($channeledOrders as $channeledOrder) {
             $this->addChanneledOrder($channeledOrder);
@@ -87,10 +89,15 @@ class ChanneledDiscount extends ChanneledEntity
 
     /**
      * @param ChanneledOrder $channeledOrder
+     * @return ChanneledDiscount
      */
-    public function removeChanneledOrder(ChanneledOrder $channeledOrder): void
+    public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        $this->channeledOrders->removeElement($channeledOrder);
+        if ($this->channeledOrders->contains($channeledOrder)) {
+            $this->channeledOrders->removeElement($channeledOrder);
+        }
+
+        return $this;
     }
 
     /**
@@ -108,9 +115,11 @@ class ChanneledDiscount extends ChanneledEntity
         return $this->channeledPriceRule;
     }
 
-    public function addChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): void
+    public function addChanneledPriceRule(?ChanneledPriceRule $channeledPriceRule): self
     {
         $this->channeledPriceRule = $channeledPriceRule;
+
+        return $this;
     }
 
     public function getDiscount(): Discount
@@ -118,8 +127,10 @@ class ChanneledDiscount extends ChanneledEntity
         return $this->discount;
     }
 
-    public function addDiscount(Discount $discount): void
+    public function addDiscount(?Discount $discount): self
     {
         $this->discount = $discount;
+
+        return $this;
     }
 }

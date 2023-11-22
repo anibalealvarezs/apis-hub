@@ -69,9 +69,13 @@ class ShopifyConvert
             $orderObject = (object) [
                 'platformId' => $order['id'],
                 'channel' => Channels::shopify->value,
-                'email' => $order['email'],
                 'data' => $order,
-                'discountCodes' => $order['discount_codes'] ?? '',
+                'customer' => (object) $order['customer'],
+                'discountCodes' => !empty($order['discount_codes']) ?
+                    array_map(function($discountCode) {
+                        return $discountCode['code'];
+                    }, $order['discount_codes']) :
+                    [],
                 'lineItems' => $order['line_items'] ?? '',
             ];
             $convertedOrders->add($orderObject);
