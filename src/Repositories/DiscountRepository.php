@@ -39,9 +39,11 @@ class DiscountRepository extends BaseRepository
             ->select('e')
             ->addSelect('d')
             ->addSelect('pr')
+            ->addSelect('o')
             ->from($this->_entityName, 'e');
         $query->leftJoin('e.channeledDiscounts', 'd');
         $query->leftJoin('d.channeledPriceRule', 'pr');
+        $query->leftJoin('d.channeledOrders', 'o');
         if ($ids) {
             $query->where('e.id IN (:ids)')
                 ->setParameter('ids', $ids);
@@ -59,6 +61,10 @@ class DiscountRepository extends BaseRepository
             $item['channeledDiscounts'] = array_map(function($channelDiscount) {
                 $channelDiscount['channel'] = Channels::from($channelDiscount['channel'])->getName();
                 unset($channelDiscount['channeledPriceRule']['channel']);
+                $channelDiscount['channeledOrders'] = array_map(function($channeledOrder) {
+                    unset($channeledOrder['channel']);
+                    return $channeledOrder;
+                }, $channelDiscount['channeledOrders']);
                 return $channelDiscount;
             }, $item['channeledDiscounts']);
             return $item;
