@@ -16,7 +16,7 @@ class ShopifyConvert
                 'platformId' => $customer['id'],
                 'channel' => Channels::shopify->value,
                 'email' => $customer['email'],
-                'data' => json_encode($customer),
+                'data' => $customer,
             ];
             $convertedCustomers->add($customerObject);
         }
@@ -37,7 +37,7 @@ class ShopifyConvert
                 'platformId' => $discount['id'],
                 'channel' => Channels::shopify->value,
                 'code' => $discount['code'],
-                'data' => json_encode($discount),
+                'data' => $discount,
             ];
             $convertedDiscounts->add($discountObject);
         }
@@ -53,7 +53,7 @@ class ShopifyConvert
             $priceRuleObject = (object) [
                 'platformId' => $priceRule['id'],
                 'channel' => Channels::shopify->value,
-                'data' => json_encode($priceRule),
+                'data' => $priceRule,
             ];
             $convertedPriceRules->add($priceRuleObject);
         }
@@ -69,7 +69,8 @@ class ShopifyConvert
             $orderObject = (object) [
                 'platformId' => $order['id'],
                 'channel' => Channels::shopify->value,
-                'data' => json_encode($order),
+                'email' => $order['email'],
+                'data' => $order,
                 'discountCodes' => $order['discount_codes'] ?? '',
                 'lineItems' => $order['line_items'] ?? '',
             ];
