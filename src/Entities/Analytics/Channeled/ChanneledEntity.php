@@ -15,7 +15,7 @@ class ChanneledEntity extends Entity implements ChannelInterface
     protected int $channel;
 
     #[ORM\Column(type: 'json')]
-    protected string $data;
+    protected array $data;
 
     /**
      * @return int|string
@@ -50,17 +50,17 @@ class ChanneledEntity extends Entity implements ChannelInterface
     }
 
     /**
-     * @return string
+     * @return array
      */
-    public function getData(): string
+    public function getData(): array
     {
         return $this->data;
     }
 
     /**
-     * @param string $data
+     * @param mixed $data
      */
-    public function addData(string $data): void
+    public function addData(array $data): void
     {
         $this->data = $data;
     }

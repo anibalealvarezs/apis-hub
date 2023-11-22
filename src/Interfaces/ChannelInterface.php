@@ -25,12 +25,12 @@ interface ChannelInterface
     public function addChannel(int $channel): void;
 
     /**
-     * @return object
+     * @return array
      */
-    public function getData(): string;
+    public function getData(): array;
 
     /**
-     * @param string $data
+     * @param array $data
      */
-    public function addData(string $data): void;
+    public function addData(array $data): void;
 }

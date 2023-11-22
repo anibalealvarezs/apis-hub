@@ -26,7 +26,15 @@ class ChanneledBaseRepository extends BaseRepository
             die ('Invalid channel');
         }
 
-        return parent::getByPlatformIdAndChannel(platformId: $platformId, channel: $channel);
+        return $this->_em->createQueryBuilder()
+            ->select('e')
+            ->from($this->_entityName, 'e')
+            ->where('e.platformId = :platformId')
+            ->setParameter('platformId', $platformId)
+            ->andWhere('e.channel = :channel')
+            ->setParameter('channel', $channel)
+            ->getQuery()
+            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }
 
     /**
