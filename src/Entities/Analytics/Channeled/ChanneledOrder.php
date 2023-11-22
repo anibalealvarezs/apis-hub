@@ -24,10 +24,6 @@ class ChanneledOrder extends ChanneledEntity
     #[ORM\JoinTable(name: 'channeled_order_channeled_products')]
     protected ArrayCollection $channeledProducts;
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledPriceRule', inversedBy: 'channeledOrders', cascade: ['persist'])]
-    #[ORM\JoinTable(name: 'channeled_order_channeled_price_rules')]
-    protected ArrayCollection $channeledPriceRules;
-
     #[ORM\ManyToMany(targetEntity: 'ChanneledDiscount', inversedBy: 'channeledOrders', cascade: ['persist'])]
     #[ORM\JoinTable(name: 'channeled_order_channeled_discounts')]
     protected ArrayCollection $channeledDiscounts;
@@ -41,7 +37,6 @@ class ChanneledOrder extends ChanneledEntity
     public function __construct()
     {
         $this->channeledProducts = new ArrayCollection();
-        $this->channeledPriceRules = new ArrayCollection();
         $this->channeledDiscounts = new ArrayCollection();
     }
 
@@ -141,39 +136,6 @@ class ChanneledOrder extends ChanneledEntity
     {
         foreach ($channeledDiscounts as $channeledDiscount) {
             $this->removeChanneledDiscount($channeledDiscount);
-        }
-    }
-
-    public function getChanneledPriceRules(): ?Collection
-    {
-        return $this->channeledPriceRules;
-    }
-
-    public function addChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): self
-    {
-        $this->channeledPriceRules->add($channeledPriceRule);
-
-        return $this;
-    }
-
-    public function addChanneledPriceRules(Collection $channeledPriceRules): self
-    {
-        foreach ($channeledPriceRules as $channeledPriceRule) {
-            $this->addChanneledPriceRule($channeledPriceRule);
-        }
-
-        return $this;
-    }
-
-    public function removeChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): void
-    {
-        $this->channeledPriceRules->removeElement($channeledPriceRule);
-    }
-
-    public function removeChanneledPriceRules(Collection $channeledPriceRules): void
-    {
-        foreach ($channeledPriceRules as $channeledPriceRule) {
-            $this->removeChanneledPriceRule($channeledPriceRule);
         }
     }
 

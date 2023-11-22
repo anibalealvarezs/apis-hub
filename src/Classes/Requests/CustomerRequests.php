@@ -63,6 +63,10 @@ class CustomerRequests
                     returnEntity: true,
                 );
             }
+            if (empty($channeledCustomerEntity->getData())) {
+                $channeledCustomerEntity->addPlatformId($channeledCustomer->platformId);
+                $channeledCustomerEntity->addData($channeledCustomer->data);
+            }
             $channeledCustomerEntity->addCustomer($customerEntity);
             $manager->persist($customerEntity);
             $manager->persist($channeledCustomerEntity);

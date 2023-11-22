@@ -14,12 +14,31 @@ use Repositories\OrderRepository;
 #[ORM\HasLifecycleCallbacks]
 class Order extends Entity
 {
+    #[ORM\Column(type: 'int', unique: true)]
+    protected string $orderId;
+
     #[ORM\OneToMany(mappedBy: 'order', targetEntity: ChanneledOrder::class, orphanRemoval: true)]
     protected Collection $channeledOrders;
 
     public function __construct()
     {
         $this->channeledOrders = new ArrayCollection();
+    }
+
+    /**
+     * @return string
+     */
+    public function getOrderId(): string
+    {
+        return $this->orderId;
+    }
+
+    /**
+     * @param string $orderId
+     */
+    public function addOrderId(string $orderId): void
+    {
+        $this->orderId = $orderId;
     }
 
     public function getChanneledOrders(): ?Collection

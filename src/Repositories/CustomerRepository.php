@@ -5,13 +5,8 @@ namespace Repositories;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
-use Doctrine\ORM\Query;
-use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Entity;
 use Enums\Channels;
-use Helpers\Helpers;
-use ReflectionEnum;
-use ReflectionException;
 
 class CustomerRepository extends BaseRepository
 {

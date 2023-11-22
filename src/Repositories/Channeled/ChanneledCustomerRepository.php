@@ -5,9 +5,7 @@ namespace Repositories\Channeled;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
-use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Entity;
-use ReflectionException;
 
 class ChanneledCustomerRepository extends ChanneledBaseRepository
 {
