@@ -37,9 +37,11 @@ class Discount extends Entity
     /**
      * @param string $code
      */
-    public function addCode(string $code): void
+    public function addCode(string $code): self
     {
         $this->code = $code;
+
+        return $this;
     }
 
     public function getChanneledDiscounts(): ?Collection
@@ -78,10 +80,12 @@ class Discount extends Entity
         return $this;
     }
 
-    public function removeChanneledDiscounts(Collection $channeledDiscounts): void
+    public function removeChanneledDiscounts(Collection $channeledDiscounts): self
     {
         foreach ($channeledDiscounts as $channeledDiscount) {
             $this->removeChanneledDiscount($channeledDiscount);
         }
+
+        return $this;
     }
 }

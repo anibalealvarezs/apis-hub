@@ -47,10 +47,13 @@ class ChanneledDiscount extends ChanneledEntity
 
     /**
      * @param string $code
+     * @return ChanneledDiscount
      */
-    public function addCode(string $code): void
+    public function addCode(string $code): self
     {
         $this->code = $code;
+
+        return $this;
     }
 
     /**
@@ -102,19 +105,29 @@ class ChanneledDiscount extends ChanneledEntity
 
     /**
      * @param Collection $channeledOrders
+     * @return ChanneledDiscount
      */
-    public function removeChanneledOrders(Collection $channeledOrders): void
+    public function removeChanneledOrders(Collection $channeledOrders): self
     {
         foreach ($channeledOrders as $channeledOrder) {
             $this->removeChanneledOrder($channeledOrder);
         }
+
+        return $this;
     }
 
+    /**
+     * @return ChanneledPriceRule
+     */
     public function getChanneledPriceRule(): ChanneledPriceRule
     {
         return $this->channeledPriceRule;
     }
 
+    /**
+     * @param ChanneledPriceRule|null $channeledPriceRule
+     * @return ChanneledDiscount
+     */
     public function addChanneledPriceRule(?ChanneledPriceRule $channeledPriceRule): self
     {
         $this->channeledPriceRule = $channeledPriceRule;
@@ -122,11 +135,18 @@ class ChanneledDiscount extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return Discount
+     */
     public function getDiscount(): Discount
     {
         return $this->discount;
     }
 
+    /**
+     * @param Discount|null $discount
+     * @return ChanneledDiscount
+     */
     public function addDiscount(?Discount $discount): self
     {
         $this->discount = $discount;

@@ -64,8 +64,9 @@ class CustomerRequests
                 );
             }
             if (empty($channeledCustomerEntity->getData())) {
-                $channeledCustomerEntity->addPlatformId($channeledCustomer->platformId);
-                $channeledCustomerEntity->addData($channeledCustomer->data);
+                $channeledCustomerEntity
+                    ->addPlatformId($channeledCustomer->platformId)
+                    ->addData($channeledCustomer->data);
             }
             $customerEntity->addChanneledCustomer($channeledCustomerEntity);
             $manager->persist($customerEntity);

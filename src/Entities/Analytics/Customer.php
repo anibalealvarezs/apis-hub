@@ -36,10 +36,13 @@ class Customer extends Entity
 
     /**
      * @param string $email
+     * @return Customer
      */
-    public function addEmail(string $email): void
+    public function addEmail(string $email): self
     {
         $this->email = $email;
+
+        return $this;
     }
 
     public function getChanneledCustomers(): ?Collection

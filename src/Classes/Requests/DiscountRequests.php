@@ -85,8 +85,9 @@ class DiscountRequests
                         );
                     }
                     if (empty($channeledDiscountEntity->getData())) {
-                        $channeledDiscountEntity->addPlatformId($channeledDiscount->platformId);
-                        $channeledDiscountEntity->addData($channeledDiscount->data);
+                        $channeledDiscountEntity
+                            ->addPlatformId($channeledDiscount->platformId)
+                            ->addData($channeledDiscount->data);
                     }
                     $discountEntity->addChanneledDiscount($channeledDiscountEntity);
                     $channeledPriceRuleEntity->addChanneledDiscount($channeledDiscountEntity);

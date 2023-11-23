@@ -8,7 +8,7 @@ use Interfaces\ChannelInterface;
 
 class ChanneledEntity extends Entity implements ChannelInterface
 {
-    #[ORM\Column]
+    #[ORM\Column(type: 'bigint')]
     protected int|string $platformId;
 
     #[ORM\Column(type: 'integer')]
@@ -27,10 +27,13 @@ class ChanneledEntity extends Entity implements ChannelInterface
 
     /**
      * @param int|string $platformId
+     * @return ChanneledEntity
      */
-    public function addPlatformId(int|string $platformId): void
+    public function addPlatformId(int|string $platformId): self
     {
         $this->platformId = $platformId;
+
+        return $this;
     }
 
     /**
@@ -43,10 +46,13 @@ class ChanneledEntity extends Entity implements ChannelInterface
 
     /**
      * @param int $channel
+     * @return ChanneledEntity
      */
-    public function addChannel(int $channel): void
+    public function addChannel(int $channel): self
     {
         $this->channel = $channel;
+
+        return $this;
     }
 
     /**
@@ -60,8 +66,10 @@ class ChanneledEntity extends Entity implements ChannelInterface
     /**
      * @param mixed $data
      */
-    public function addData(array $data): void
+    public function addData(array $data): self
     {
         $this->data = $data;
+
+        return $this;
     }
 }

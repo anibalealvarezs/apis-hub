@@ -66,11 +66,13 @@ class ChanneledPriceRule extends ChanneledEntity
         return $this;
     }
 
-    public function removeChanneledDiscounts(Collection $channeledDiscounts): void
+    public function removeChanneledDiscounts(Collection $channeledDiscounts): self
     {
         foreach ($channeledDiscounts as $channeledDiscount) {
             $this->removeChanneledDiscount($channeledDiscount);
         }
+
+        return $this;
     }
 
     public function getPriceRule(): PriceRule

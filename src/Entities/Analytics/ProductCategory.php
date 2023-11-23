@@ -58,10 +58,12 @@ class ProductCategory extends Entity
         return $this;
     }
 
-    public function removeChanneledProductCategories(Collection $channeledProductCategories): void
+    public function removeChanneledProductCategories(Collection $channeledProductCategories): self
     {
         foreach ($channeledProductCategories as $channeledProductCategory) {
             $this->removeChanneledProductCategory($channeledProductCategory);
         }
+
+        return $this;
     }
 }

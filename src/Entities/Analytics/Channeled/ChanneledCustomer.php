@@ -43,10 +43,13 @@ class ChanneledCustomer extends ChanneledEntity
 
     /**
      * @param string $email
+     * @return ChanneledCustomer
      */
-    public function addEmail(string $email): void
+    public function addEmail(string $email): self
     {
         $this->email = $email;
+
+        return $this;
     }
 
     public function getChanneledOrders(): ?Collection
@@ -85,11 +88,13 @@ class ChanneledCustomer extends ChanneledEntity
         return $this;
     }
 
-    public function removeChanneledOrders(Collection $channeledOrders): void
+    public function removeChanneledOrders(Collection $channeledOrders): self
     {
         foreach ($channeledOrders as $channeledOrder) {
             $this->removeChanneledOrder($channeledOrder);
         }
+
+        return $this;
     }
 
     public function getCustomer(): Customer

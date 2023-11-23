@@ -14,6 +14,9 @@ use Repositories\Channeled\ChanneledProductRepository;
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProduct extends ChanneledEntity
 {
+    #[ORM\Column(type: 'bigint')]
+    protected int|string $platformId;
+
     // Relationships with channeled entities
 
     #[ORM\ManyToMany(targetEntity: 'ChanneledProductCategory', mappedBy: 'channeledProducts')]
@@ -91,11 +94,13 @@ class ChanneledProduct extends ChanneledEntity
     /**
      * @param Collection $channeledProductCategories
      */
-    public function removeChanneledProductCategories(Collection $channeledProductCategories): void
+    public function removeChanneledProductCategories(Collection $channeledProductCategories): self
     {
         foreach ($channeledProductCategories as $channeledProductCategory) {
             $this->removeChanneledProductCategory($channeledProductCategory);
         }
+
+        return $this;
     }
 
     /**
@@ -148,11 +153,13 @@ class ChanneledProduct extends ChanneledEntity
     /**
      * @param Collection $channeledOrders
      */
-    public function removeChanneledOrders(Collection $channeledOrders): void
+    public function removeChanneledOrders(Collection $channeledOrders): self
     {
         foreach ($channeledOrders as $channeledOrder) {
             $this->removeChanneledOrder($channeledOrder);
         }
+
+        return $this;
     }
 
     public function getChanneledVendor(): ChanneledVendor

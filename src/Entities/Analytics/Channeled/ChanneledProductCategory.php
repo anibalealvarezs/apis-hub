@@ -85,11 +85,13 @@ class ChanneledProductCategory extends ChanneledEntity
     /**
      * @param Collection $channeledProducts
      */
-    public function removeChanneledProducts(Collection $channeledProducts): void
+    public function removeChanneledProducts(Collection $channeledProducts): self
     {
         foreach ($channeledProducts as $channeledProduct) {
             $this->removeChanneledProduct($channeledProduct);
         }
+
+        return $this;
     }
 
     public function getProductCategory(): ProductCategory

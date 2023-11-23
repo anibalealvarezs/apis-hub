@@ -113,11 +113,13 @@ class ChanneledOrder extends ChanneledEntity
     /**
      * @param Collection $channeledProducts
      */
-    public function removeChanneledProducts(Collection $channeledProducts): void
+    public function removeChanneledProducts(Collection $channeledProducts): self
     {
         foreach ($channeledProducts as $channeledProduct) {
             $this->removeChanneledProduct($channeledProduct);
         }
+
+        return $this;
     }
 
     public function getChanneledDiscounts(): ?Collection
@@ -144,7 +146,7 @@ class ChanneledOrder extends ChanneledEntity
         return $this;
     }
 
-    public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): void
+    public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
         if ($this->channeledDiscounts->contains($channeledDiscount)) {
             $this->channeledDiscounts->removeElement($channeledDiscount);
@@ -152,13 +154,17 @@ class ChanneledOrder extends ChanneledEntity
                 $channeledDiscount->removeChanneledOrder($this);
             }
         }
+
+        return $this;
     }
 
-    public function removeDiscounts(Collection $channeledDiscounts): void
+    public function removeDiscounts(Collection $channeledDiscounts): self
     {
         foreach ($channeledDiscounts as $channeledDiscount) {
             $this->removeChanneledDiscount($channeledDiscount);
         }
+
+        return $this;
     }
 
     public function getOrder(): Order
