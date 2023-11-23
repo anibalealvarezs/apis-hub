@@ -14,6 +14,9 @@ entities:
   discount:
     class: \Entities\Analytics\Discount
     crud_enabled: true
+  price_rule:
+    class: \Entities\Analytics\PriceRule
+    crud_enabled: true
   order:
     class: \Entities\Analytics\Order
     crud_enabled: true
