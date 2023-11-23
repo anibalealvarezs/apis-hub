@@ -14,12 +14,33 @@ use Repositories\ProductRepository;
 #[ORM\HasLifecycleCallbacks]
 class Product extends Entity
 {
+    #[ORM\Column(type: 'bigint', unique: true)]
+    protected int|string $productId;
+
     #[ORM\OneToMany(mappedBy: 'product', targetEntity: ChanneledProduct::class, orphanRemoval: true)]
     protected Collection $channeledProducts;
 
     public function __construct()
     {
         $this->channeledProducts = new ArrayCollection();
+    }
+
+    /**
+     * @return string
+     */
+    public function getProductId(): string
+    {
+        return $this->productId;
+    }
+
+    /**
+     * @param string $productId
+     */
+    public function addProductId(string $productId): self
+    {
+        $this->productId = $productId;
+
+        return $this;
     }
 
     public function getChanneledProducts(): ?Collection
@@ -46,7 +67,7 @@ class Product extends Entity
         return $this;
     }
 
-    public function removeChanneledProduct(ChanneledProduct $channeledProduct): void
+    public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
     {
         if ($this->channeledProducts->contains($channeledProduct)) {
             $this->channeledProducts->removeElement($channeledProduct);
@@ -54,12 +75,16 @@ class Product extends Entity
                 $channeledProduct->addProduct(null);
             }
         }
+
+        return $this;
     }
 
-    public function removeChanneledProducts(Collection $channeledProducts): void
+    public function removeChanneledProducts(Collection $channeledProducts): self
     {
         foreach ($channeledProducts as $channeledProduct) {
             $this->removeChanneledProduct($channeledProduct);
         }
+
+        return $this;
     }
 }

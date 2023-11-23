@@ -11,15 +11,38 @@ use Repositories\VendorRepository;
 
 #[ORM\Entity(repositoryClass: VendorRepository::class)]
 #[ORM\Table(name: 'vendors')]
+#[ORM\Index(columns: ['name'])]
 #[ORM\HasLifecycleCallbacks]
 class Vendor extends Entity
 {
+    #[ORM\Column(type: 'string')]
+    protected string $name;
+
     #[ORM\OneToMany(mappedBy: 'vendor', targetEntity: ChanneledVendor::class, orphanRemoval: true)]
     protected Collection $channeledVendors;
 
     public function __construct()
     {
         $this->channeledVendors = new ArrayCollection();
+    }
+
+    /**
+     * @return string
+     */
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    /**
+     * @param string $name
+     * @return Vendor
+     */
+    public function addName(string $name): self
+    {
+        $this->name = $name;
+
+        return $this;
     }
 
     public function getChanneledVendors(): ?Collection
@@ -58,10 +81,12 @@ class Vendor extends Entity
         return $this;
     }
 
-    public function removeChanneledVendors(Collection $channeledVendors): void
+    public function removeChanneledVendors(Collection $channeledVendors): self
     {
         foreach ($channeledVendors as $channeledVendor) {
             $this->removeChanneledVendor($channeledVendor);
         }
+
+        return $this;
     }
 }

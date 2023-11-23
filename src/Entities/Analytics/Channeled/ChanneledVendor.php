@@ -10,10 +10,13 @@ use Repositories\Channeled\ChanneledVendorRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledVendorRepository::class)]
 #[ORM\Table(name: 'channeled_vendors')]
-#[ORM\Index(columns: ['platformId', 'channel'])]
+#[ORM\Index(columns: ['name', 'platformId', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledVendor extends ChanneledEntity
 {
+    #[ORM\Column(type: 'string')]
+    protected string $name;
+
     // Relationships with channeled entities
 
     #[ORM\OneToMany(mappedBy: 'channeledVendor', targetEntity: 'ChanneledProduct', orphanRemoval: true)]
@@ -28,6 +31,25 @@ class ChanneledVendor extends ChanneledEntity
     public function __construct()
     {
         $this->channeledProducts = new ArrayCollection();
+    }
+
+    /**
+     * @return string
+     */
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    /**
+     * @param string $name
+     * @return ChanneledVendor
+     */
+    public function addName(string $name): self
+    {
+        $this->name = $name;
+
+        return $this;
     }
 
     public function getChanneledProducts(): ?Collection
@@ -66,11 +88,13 @@ class ChanneledVendor extends ChanneledEntity
         return $this;
     }
 
-    public function removeChanneledProducts(Collection $channeledProducts): void
+    public function removeChanneledProducts(Collection $channeledProducts): self
     {
         foreach ($channeledProducts as $channeledProduct) {
             $this->removeChanneledProduct($channeledProduct);
         }
+
+        return $this;
     }
 
     public function getVendor(): Vendor

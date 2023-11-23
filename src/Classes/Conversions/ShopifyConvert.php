@@ -9,19 +9,14 @@ class ShopifyConvert
 {
     public static function customers(array $customers): ArrayCollection
     {
-        $convertedCustomers = new ArrayCollection();
-
-        foreach ($customers as $customer) {
-            $customerObject = (object) [
+        return new ArrayCollection(array_map(function($customer) {
+            return (object) [
                 'platformId' => $customer['id'],
                 'channel' => Channels::shopify->value,
                 'email' => $customer['email'],
                 'data' => $customer,
             ];
-            $convertedCustomers->add($customerObject);
-        }
-
-        return $convertedCustomers;
+        }, $customers));
     }
 
     /**
@@ -30,43 +25,31 @@ class ShopifyConvert
      */
     public static function discounts(array $discounts): ArrayCollection
     {
-        $convertedDiscounts = new ArrayCollection();
-
-        foreach ($discounts as $discount) {
-            $discountObject = (object) [
+        return new ArrayCollection(array_map(function($discount) {
+            return (object) [
                 'platformId' => $discount['id'],
                 'channel' => Channels::shopify->value,
                 'code' => $discount['code'],
                 'data' => $discount,
             ];
-            $convertedDiscounts->add($discountObject);
-        }
-
-        return $convertedDiscounts;
+        }, $discounts));
     }
 
     public static function priceRules(array $priceRules): ArrayCollection
     {
-        $convertedPriceRules = new ArrayCollection();
-
-        foreach ($priceRules as $priceRule) {
-            $priceRuleObject = (object) [
+        return new ArrayCollection(array_map(function($priceRule) {
+            return (object) [
                 'platformId' => $priceRule['id'],
                 'channel' => Channels::shopify->value,
                 'data' => $priceRule,
             ];
-            $convertedPriceRules->add($priceRuleObject);
-        }
-
-        return $convertedPriceRules;
+        }, $priceRules));
     }
 
     public static function orders(array $orders): ArrayCollection
     {
-        $convertedOrders = new ArrayCollection();
-
-        foreach ($orders as $order) {
-            $orderObject = (object) [
+        return new ArrayCollection(array_map(function($order) {
+            return (object) [
                 'platformId' => $order['id'],
                 'channel' => Channels::shopify->value,
                 'data' => $order,
@@ -78,9 +61,18 @@ class ShopifyConvert
                     [],
                 'lineItems' => $order['line_items'] ?? '',
             ];
-            $convertedOrders->add($orderObject);
-        }
+        }, $orders));
+    }
 
-        return $convertedOrders;
+    public static function products(array $products): ArrayCollection
+    {
+        return new ArrayCollection(array_map(function($product) {
+            return (object) [
+                'platformId' => $product['id'],
+                'channel' => Channels::shopify->value,
+                'data' => $product,
+                'vendor' => $product['vendor'],
+            ];
+        }, $products));
     }
 }
