@@ -72,7 +72,19 @@ class ShopifyConvert
                 'channel' => Channels::shopify->value,
                 'data' => $product,
                 'vendor' => $product['vendor'],
+                'variants' => self::productVariants($product['variants']),
             ];
         }, $products));
+    }
+
+    public static function productVariants(array $productVariants): ArrayCollection
+    {
+        return new ArrayCollection(array_map(function($productVariant) {
+            return (object) [
+                'platformId' => $productVariant['id'],
+                'channel' => Channels::shopify->value,
+                'data' => $productVariant,
+            ];
+        }, $productVariants));
     }
 }

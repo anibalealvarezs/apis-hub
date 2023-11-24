@@ -4,7 +4,6 @@ namespace Classes\Requests;
 
 use Chmw\ShopifyApi\ShopifyApi;
 use Classes\Conversions\ShopifyConvert;
-use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
@@ -13,7 +12,7 @@ use Entities\Analytics\Channeled\ChanneledCustomer;
 use Entities\Analytics\Channeled\ChanneledDiscount;
 use Entities\Analytics\Channeled\ChanneledOrder;
 use Entities\Analytics\Channeled\ChanneledProduct;
-use Entities\Analytics\Discount;
+use Entities\Analytics\Channeled\ChanneledProductVariant;
 use Entities\Analytics\Order;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
@@ -60,6 +59,7 @@ class OrderRequests
         $channeledOrderRepository = $manager->getRepository(ChanneledOrder::class);
         $channeledDiscountRepository = $manager->getRepository(ChanneledDiscount::class);
         $channeledProductRepository = $manager->getRepository(ChanneledProduct::class);
+        $channeledProductVariantRepository = $manager->getRepository(ChanneledProductVariant::class);
         $channeledCustomerRepository = $manager->getRepository(ChanneledCustomer::class);
         $orderRepository = $manager->getRepository(Order::class);
         foreach ($ordersCollection as $order) {
@@ -92,6 +92,7 @@ class OrderRequests
                 $channeledOrderEntity->addChanneledDiscount($channeledDiscountEntity);
                 $manager->persist($channeledDiscountEntity);
                 $manager->persist($channeledOrderEntity);
+                $manager->flush();
             }
             foreach($order->lineItems as $lineItem) {
                 if (!$channeledProductEntity = $channeledProductRepository->getByPlatformIdAndChannel($lineItem['product_id'], $order->channel)) {
@@ -104,9 +105,23 @@ class OrderRequests
                         returnEntity: true,
                     );
                 }
+                if (!$channeledProductVariantEntity = $channeledProductVariantRepository->getByPlatformIdAndChannel($lineItem['variant_id'], $order->channel)) {
+                    $channeledProductVariantEntity = $channeledProductVariantRepository->create(
+                        data: (object) [
+                            'channel' => $order->channel,
+                            'platformId' => $lineItem['product_id'],
+                            'data' => [],
+                        ],
+                        returnEntity: true,
+                    );
+                }
                 $channeledOrderEntity->addChanneledProduct($channeledProductEntity);
+                $channeledOrderEntity->addChanneledProductVariant($channeledProductVariantEntity);
+                $channeledProductEntity->addChanneledProductVariant($channeledProductVariantEntity);
                 $manager->persist($channeledProductEntity);
+                $manager->persist($channeledProductVariantEntity);
                 $manager->persist($channeledOrderEntity);
+                $manager->flush();
             }
             if (!$channeledCustomerEntity = $channeledCustomerRepository->getByEmailAndChannel($order->customer->email, $order->channel)) {
                 $channeledCustomerEntity = $channeledCustomerRepository->create(

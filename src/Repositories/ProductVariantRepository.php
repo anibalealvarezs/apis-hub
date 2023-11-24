@@ -8,20 +8,20 @@ use Doctrine\ORM\NonUniqueResultException;
 use Entities\Entity;
 use Enums\Channels;
 
-class ProductRepository extends BaseRepository
+class ProductVariantRepository extends BaseRepository
 {
     /**
-     * @param string $productId
+     * @param string $productVariantId
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function getByProductId(string $productId): ?Entity
+    public function getByProductVariantId(string $productVariantId): ?Entity
     {
         return $this->_em->createQueryBuilder()
             ->select('e')
             ->from($this->_entityName, 'e')
-            ->where('e.productId = :productId')
-            ->setParameter('productId', $productId)
+            ->where('e.productVariantId = :productVariantId')
+            ->setParameter('productVariantId', $productVariantId)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }
@@ -37,15 +37,15 @@ class ProductRepository extends BaseRepository
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
+            ->addSelect('pv')
             ->addSelect('p')
             ->addSelect('v')
             ->addSelect('c')
-            ->addSelect('pv')
             ->from($this->_entityName, 'e');
-        $query->leftJoin('e.channeledProducts', 'p');
+        $query->leftJoin('e.channeledProductVariants', 'pv');
+        $query->leftJoin('pv.channeledProduct', 'p');
         $query->leftJoin('p.channeledVendor', 'v');
         $query->leftJoin('p.channeledProductCategories', 'c');
-        $query->leftJoin('p.channeledProductVariants', 'pv');
         if ($ids) {
             $query->where('e.id IN (:ids)')
                 ->setParameter('ids', $ids);
@@ -60,19 +60,16 @@ class ProductRepository extends BaseRepository
             ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
         return new ArrayCollection(array_map(function($item) {
-            $item['channeledProducts'] = array_map(function($channelProduct) {
-                $channelProduct['channel'] = Channels::from($channelProduct['channel'])->getName();
-                unset($channelProduct['channeledVendor']['channel']);
-                $channelProduct['channeledProductCategories'] = array_map(function($channeledProductCategory) {
+            $item['channeledProductVariants'] = array_map(function($channelProductVariant) {
+                $channelProductVariant['channel'] = Channels::from($channelProductVariant['channel'])->getName();
+                unset($channelProductVariant['channeledProduct']['channel']);
+                unset($channelProductVariant['channeledProduct']['channeledVendor']['channel']);
+                $channelProductVariant['channeledProduct']['channeledProductCategories'] = array_map(function($channeledProductCategory) {
                     unset($channeledProductCategory['channel']);
                     return $channeledProductCategory;
-                }, $channelProduct['channeledProductCategories']);
-                $channelProduct['channeledProductVariants'] = array_map(function($channeledProductVariant) {
-                    unset($channeledProductVariant['channel']);
-                    return $channeledProductVariant;
-                }, $channelProduct['channeledProductVariants']);
-                return $channelProduct;
-            }, $item['channeledProducts']);
+                }, $channelProductVariant['channeledProduct']['channeledProductCategories']);
+                return $channelProductVariant;
+            }, $item['channeledProductVariants']);
             return $item;
         }, $list));
     }

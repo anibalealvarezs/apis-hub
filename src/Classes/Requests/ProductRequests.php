@@ -9,8 +9,10 @@ use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
 use Entities\Analytics\Channeled\ChanneledProduct;
+use Entities\Analytics\Channeled\ChanneledProductVariant;
 use Entities\Analytics\Channeled\ChanneledVendor;
 use Entities\Analytics\Product;
+use Entities\Analytics\ProductVariant;
 use Entities\Analytics\Vendor;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
@@ -59,8 +61,10 @@ class ProductRequests
         );
         $channeledProductsCollection = ShopifyConvert::products($sourceProducts['products']);
         $productRepository = $manager->getRepository(Product::class);
+        $productVariantRepository = $manager->getRepository(ProductVariant::class);
         $vendorRepository = $manager->getRepository(Vendor::class);
         $channeledProductRepository = $manager->getRepository(ChanneledProduct::class);
+        $channeledProductVariantRepository = $manager->getRepository(ChanneledProductVariant::class);
         $channeledVendorRepository = $manager->getRepository(ChanneledVendor::class);
         foreach ($channeledProductsCollection as $channeledProduct) {
             if (!$productEntity = $productRepository->getByProductId($channeledProduct->platformId)) {
@@ -96,6 +100,29 @@ class ProductRequests
                 $channeledProductEntity
                     ->addPlatformId($channeledProduct->platformId)
                     ->addData($channeledProduct->data);
+            }
+            foreach($channeledProduct->variants as $productVariant) {
+                if (!$productVariantEntity = $productVariantRepository->getByProductVariantId($productVariant->platformId)) {
+                    $productVariantEntity = $productVariantRepository->create(
+                        data: (object) ['productVariantId' => $productVariant->platformId,],
+                        returnEntity: true,
+                    );
+                }
+                if (!$channeledProductVariantEntity = $channeledProductVariantRepository->getByPlatformIdAndChannel($productVariant->platformId, $channeledProduct->channel)) {
+                    $channeledProductVariantEntity = $channeledProductVariantRepository->create(
+                        data: $productVariant,
+                        returnEntity: true,
+                    );
+                }
+                if (empty($channeledProductVariantEntity->getData())) {
+                    $channeledProductVariantEntity
+                        ->addPlatformId($productVariant->platformId)
+                        ->addData($productVariant->data);
+                }
+                $productVariantEntity->addChanneledProductVariant($channeledProductVariantEntity);
+                $channeledProductEntity->addChanneledProductVariant($channeledProductVariantEntity);
+                $manager->persist($productVariantEntity);
+                $manager->flush();
             }
             $channeledProductEntity->addChanneledVendor($channeledVendorEntity);
             $vendorEntity->addChanneledVendor($channeledVendorEntity);

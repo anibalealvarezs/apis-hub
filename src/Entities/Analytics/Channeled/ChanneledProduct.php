@@ -19,6 +19,9 @@ class ChanneledProduct extends ChanneledEntity
 
     // Relationships with channeled entities
 
+    #[ORM\OneToMany(mappedBy: 'channeledProduct', targetEntity: 'ChanneledProductVariant', orphanRemoval: true)]
+    protected Collection $channeledProductVariants;
+
     #[ORM\ManyToMany(targetEntity: 'ChanneledProductCategory', mappedBy: 'channeledProducts')]
     protected Collection $channeledProductCategories;
 
@@ -40,8 +43,54 @@ class ChanneledProduct extends ChanneledEntity
      */
     public function __construct()
     {
+        $this->channeledProductVariants = new ArrayCollection();
         $this->channeledProductCategories = new ArrayCollection();
         $this->channeledOrders = new ArrayCollection();
+    }
+
+    public function getChanneledProductVariants(): ?Collection
+    {
+        return $this->channeledProductVariants;
+    }
+
+    public function addChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
+    {
+        if (!$this->channeledProductVariants->contains($channeledProductVariant)) {
+            $this->channeledProductVariants->add($channeledProductVariant);
+            $channeledProductVariant->addChanneledProduct($this);
+        }
+
+        return $this;
+    }
+
+    public function addChanneledProductVariants(Collection $channeledProductVariants): self
+    {
+        foreach ($channeledProductVariants as $channeledProductVariant) {
+            $this->addChanneledProductVariant($channeledProductVariant);
+        }
+
+        return $this;
+    }
+
+    public function removeChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
+    {
+        if ($this->channeledProductVariants->contains($channeledProductVariant)) {
+            $this->channeledProductVariants->removeElement($channeledProductVariant);
+            if ($channeledProductVariant->getChanneledProduct() === $this) {
+                $channeledProductVariant->addChanneledProduct(null);
+            }
+        }
+
+        return $this;
+    }
+
+    public function removeChanneledProductVariants(Collection $channeledProductVariants): self
+    {
+        foreach ($channeledProductVariants as $channeledProductVariant) {
+            $this->removeChanneledProductVariant($channeledProductVariant);
+        }
+
+        return $this;
     }
 
     /**
@@ -93,6 +142,7 @@ class ChanneledProduct extends ChanneledEntity
 
     /**
      * @param Collection $channeledProductCategories
+     * @return ChanneledProduct
      */
     public function removeChanneledProductCategories(Collection $channeledProductCategories): self
     {
@@ -152,6 +202,7 @@ class ChanneledProduct extends ChanneledEntity
 
     /**
      * @param Collection $channeledOrders
+     * @return ChanneledProduct
      */
     public function removeChanneledOrders(Collection $channeledOrders): self
     {
