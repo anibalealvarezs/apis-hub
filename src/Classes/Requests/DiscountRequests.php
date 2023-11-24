@@ -57,7 +57,9 @@ class DiscountRequests
         foreach ($priceRulesCollection as $channeledPriceRule) {
             if (!$channeledPriceRulesRepository->getByPlatformIdAndChannel($channeledPriceRule->platformId, $channeledPriceRule->channel)) {
                 $priceRuleEntity = $priceRuleRepository->create(
-                    data: (object) [],
+                    data: (object) [
+                        'priceRuleId' => $channeledPriceRule->platformId,
+                    ],
                     returnEntity: true,
                 );
                 $channeledPriceRuleEntity = $channeledPriceRulesRepository->create(

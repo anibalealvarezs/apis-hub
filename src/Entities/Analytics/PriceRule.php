@@ -11,15 +11,38 @@ use Repositories\PriceRuleRepository;
 
 #[ORM\Entity(repositoryClass: PriceRuleRepository::class)]
 #[ORM\Table(name: 'priceRules')]
+#[ORM\Index(columns: ['priceRuleId'])]
 #[ORM\HasLifecycleCallbacks]
 class PriceRule extends Entity
 {
+    #[ORM\Column(type: 'bigint', unique: true)]
+    protected int|string $priceRuleId;
+
     #[ORM\OneToMany(mappedBy: 'priceRule', targetEntity: ChanneledPriceRule::class, orphanRemoval: true)]
     protected Collection $channeledPriceRules;
 
     public function __construct()
     {
         $this->channeledPriceRules = new ArrayCollection();
+    }
+
+    /**
+     * @return string
+     */
+    public function getPriceRuleId(): string
+    {
+        return $this->priceRuleId;
+    }
+
+    /**
+     * @param string $priceRuleId
+     * @return PriceRule
+     */
+    public function addPriceRuleId(string $priceRuleId): self
+    {
+        $this->priceRuleId = $priceRuleId;
+
+        return $this;
     }
 
     public function getChanneledPriceRules(): ?Collection
