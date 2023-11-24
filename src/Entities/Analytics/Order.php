@@ -11,6 +11,7 @@ use Repositories\OrderRepository;
 
 #[ORM\Entity(repositoryClass: OrderRepository::class)]
 #[ORM\Table(name: 'orders')]
+#[ORM\Index(columns: ['orderId'])]
 #[ORM\HasLifecycleCallbacks]
 class Order extends Entity
 {
@@ -35,6 +36,7 @@ class Order extends Entity
 
     /**
      * @param string $orderId
+     * @return Order
      */
     public function addOrderId(string $orderId): self
     {

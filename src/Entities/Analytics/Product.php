@@ -11,6 +11,7 @@ use Repositories\ProductRepository;
 
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
 #[ORM\Table(name: 'products')]
+#[ORM\Index(columns: ['productId'])]
 #[ORM\HasLifecycleCallbacks]
 class Product extends Entity
 {
@@ -35,6 +36,7 @@ class Product extends Entity
 
     /**
      * @param string $productId
+     * @return Product
      */
     public function addProductId(string $productId): self
     {
