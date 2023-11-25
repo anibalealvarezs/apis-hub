@@ -80,7 +80,7 @@ class DiscountRequests
                             returnEntity: true,
                         );
                     }
-                    if (!$channeledDiscountEntity = $channeledDiscountsRepository->getByPlatformIdAndChannel($channeledDiscount->platformId, $channeledDiscount->channel)) {
+                    if (!$channeledDiscountEntity = $channeledDiscountsRepository->getByCodeAndChannel($channeledDiscount->code, $channeledDiscount->channel)) {
                         $channeledDiscountEntity = $channeledDiscountsRepository->create(
                             data: $channeledDiscount,
                             returnEntity: true,
