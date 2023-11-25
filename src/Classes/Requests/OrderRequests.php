@@ -109,7 +109,7 @@ class OrderRequests
                     $channeledProductVariantEntity = $channeledProductVariantRepository->create(
                         data: (object) [
                             'channel' => $order->channel,
-                            'platformId' => $lineItem['product_id'],
+                            'platformId' => $lineItem['variant_id'],
                             'data' => [],
                         ],
                         returnEntity: true,

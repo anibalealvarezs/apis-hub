@@ -122,6 +122,7 @@ class ProductRequests
                 $productVariantEntity->addChanneledProductVariant($channeledProductVariantEntity);
                 $channeledProductEntity->addChanneledProductVariant($channeledProductVariantEntity);
                 $manager->persist($productVariantEntity);
+                $manager->persist($channeledProductVariantEntity);
                 $manager->flush();
             }
             $channeledProductEntity->addChanneledVendor($channeledVendorEntity);

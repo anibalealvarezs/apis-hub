@@ -23,6 +23,9 @@ entities:
   product:
     class: \Entities\Analytics\Product
     crud_enabled: true
+  product_variant:
+    class: \Entities\Analytics\ProductVariant
+    crud_enabled: true
   product_category:
     class: \Entities\Analytics\ProductCategory
     crud_enabled: true
