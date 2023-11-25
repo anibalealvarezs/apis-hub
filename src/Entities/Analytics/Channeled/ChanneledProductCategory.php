@@ -14,11 +14,14 @@ use Repositories\Channeled\ChanneledProductCategoryRepository;
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProductCategory extends ChanneledEntity
 {
+    #[ORM\Column(type: 'boolean')]
+    protected bool $isSmartCollection;
+
     // Relationships with channeled entities
 
     #[ORM\ManyToMany(targetEntity: 'ChanneledProduct', inversedBy: 'channeledProductCategories', cascade: ['persist'])]
     #[ORM\JoinTable(name: 'channeled_product_categories_channeled_products')]
-    protected ArrayCollection $channeledProducts;
+    protected Collection $channeledProducts;
 
     // Relationships with non-channeled entities
 
@@ -29,6 +32,25 @@ class ChanneledProductCategory extends ChanneledEntity
     public function __construct()
     {
         $this->channeledProducts = new ArrayCollection();
+    }
+
+    /**
+     * @return bool
+     */
+    public function getIsSmartCollection(): bool
+    {
+        return $this->isSmartCollection;
+    }
+
+    /**
+     * @param bool $isSmartCollection
+     * @return ChanneledProductCategory
+     */
+    public function addIsSmartCollection(bool $isSmartCollection): self
+    {
+        $this->isSmartCollection = $isSmartCollection;
+
+        return $this;
     }
 
     /**
@@ -84,6 +106,7 @@ class ChanneledProductCategory extends ChanneledEntity
 
     /**
      * @param Collection $channeledProducts
+     * @return ChanneledProductCategory
      */
     public function removeChanneledProducts(Collection $channeledProducts): self
     {

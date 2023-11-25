@@ -27,7 +27,12 @@ enum AnalyticsEntities
     /**
      * @var string
      */
-    case productCategory;
+    case product_category;
+
+    /**
+     * @var string
+     */
+    case product_variant;
 
     /**
      * @var string
@@ -52,7 +57,8 @@ enum AnalyticsEntities
             'discount' => 'DiscountRequests',
             'order' => 'OrderRequests',
             'product' => 'ProductRequests',
-            'productCategory' => 'ProductCategoryRequests',
+            'product_category' => 'ProductCategoryRequests',
+            'product_variant' => 'ProductVariantRequests',
             'vendor' => 'VendorRequests',
         };
     }

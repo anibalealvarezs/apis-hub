@@ -87,4 +87,26 @@ class ShopifyConvert
             ];
         }, $productVariants));
     }
+
+    public static function productCategories(array $productCategories, bool $isSmartCollection = false): ArrayCollection
+    {
+        return new ArrayCollection(array_map(function($productCategory) use ($isSmartCollection) {
+            return (object) [
+                'platformId' => $productCategory['id'],
+                'channel' => Channels::shopify->value,
+                'data' => $productCategory,
+                'isSmartCollection' => $isSmartCollection,
+            ];
+        }, $productCategories));
+    }
+
+    public static function collects(array $collects): ArrayCollection
+    {
+        $collectionsProducts = [];
+        foreach ($collects as $collect) {
+            $collectionsProducts[$collect['collection_id']][] = $collect['product_id'];
+        }
+
+        return new ArrayCollection($collectionsProducts);
+    }
 }
