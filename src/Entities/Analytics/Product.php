@@ -15,7 +15,7 @@ use Repositories\ProductRepository;
 #[ORM\HasLifecycleCallbacks]
 class Product extends Entity
 {
-    #[ORM\Column(type: 'bigint', unique: true)]
+    #[ORM\Column(type: 'string', unique: true)]
     protected int|string $productId;
 
     #[ORM\OneToMany(mappedBy: 'product', targetEntity: ChanneledProduct::class, orphanRemoval: true)]

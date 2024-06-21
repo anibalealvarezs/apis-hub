@@ -15,12 +15,12 @@ use Repositories\BaseRepository;
 class ChanneledBaseRepository extends BaseRepository
 {
     /**
-     * @param int $platformId
+     * @param int|string $platformId
      * @param int $channel
      * @return Entity|null
      * @throws NonUniqueResultException
      */
-    public function getByPlatformIdAndChannel(int $platformId, int $channel): ?Entity
+    public function getByPlatformIdAndChannel(int|string $platformId, int $channel): ?Entity
     {
         if ((new ReflectionEnum(Channels::class))->getConstant($channel)) {
             die ('Invalid channel');

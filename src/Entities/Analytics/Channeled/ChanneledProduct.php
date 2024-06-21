@@ -14,7 +14,7 @@ use Repositories\Channeled\ChanneledProductRepository;
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProduct extends ChanneledEntity
 {
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'string')]
     protected int|string $platformId;
 
     // Relationships with channeled entities

@@ -80,7 +80,7 @@ class CacheController
             return new Response('Invalid parameters', Response::HTTP_BAD_REQUEST);
         }
 
-        return $requestsClassName::{'getListFrom'.Channels::shopify->getCommonName()}(...$parameters);
+        return $requestsClassName::{'getListFrom'.$channel->getCommonName()}(...$parameters);
     }
 
     /**

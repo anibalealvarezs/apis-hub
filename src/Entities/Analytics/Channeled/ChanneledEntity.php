@@ -8,7 +8,7 @@ use Interfaces\ChannelInterface;
 
 class ChanneledEntity extends Entity implements ChannelInterface
 {
-    #[ORM\Column(type: 'bigint')]
+    #[ORM\Column(type: 'string')]
     protected int|string $platformId;
 
     #[ORM\Column(type: 'integer')]

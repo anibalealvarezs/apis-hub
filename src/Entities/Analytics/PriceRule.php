@@ -15,7 +15,7 @@ use Repositories\PriceRuleRepository;
 #[ORM\HasLifecycleCallbacks]
 class PriceRule extends Entity
 {
-    #[ORM\Column(type: 'bigint', unique: true)]
+    #[ORM\Column(type: 'string', unique: true)]
     protected int|string $priceRuleId;
 
     #[ORM\OneToMany(mappedBy: 'priceRule', targetEntity: ChanneledPriceRule::class, orphanRemoval: true)]
