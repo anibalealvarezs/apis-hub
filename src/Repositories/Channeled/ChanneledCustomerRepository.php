@@ -5,43 +5,48 @@ namespace Repositories\Channeled;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
 use Entities\Entity;
+use Enums\Channels;
 
 class ChanneledCustomerRepository extends ChanneledBaseRepository
 {
     /**
      * @param string $email
-     * @param int $channel
+     * @param Channels $channel
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function getByEmailAndChannel(string $email, int $channel): ?Entity
+    public function getByEmail(string $email, Channels $channel /*, bool $useCached = false */): ?Entity
     {
         return $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->where('e.email = :email')
             ->setParameter('email', $email)
-            ->andWhere('e.channel = :channel')
-            ->setParameter('channel', $channel)
+            ->andWhere('e.channel = :channelId')
+            ->setParameter('channelId', $channel->value)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }
 
     /**
      * @param string $email
-     * @return ArrayCollection
+     * @param Channels $channel
+     * @return bool
+     * @throws NoResultException
+     * @throws NonUniqueResultException
      */
-    public function getListByEmail(string $email): ArrayCollection
+    public function existsByEmail(string $email, Channels $channel): bool
     {
-        $list = $this->_em->createQueryBuilder()
-            ->select('e')
-            ->from($this->_entityName, 'e')
-            ->where('e.email = :email')
-            ->setParameter('email', $email)
-            ->getQuery()
-            ->getResult(AbstractQuery::HYDRATE_ARRAY);
-
-        return new ArrayCollection($list);
+        return $this->_em->createQueryBuilder()
+                ->select('COUNT(e.id)')
+                ->from($this->getEntityName(), 'e')
+                ->where('e.email = :email')
+                ->setParameter('email', $email)
+                ->andWhere('e.channel = :channelId')
+                ->setParameter('channelId', $channel->value)
+                ->getQuery()
+                ->getSingleScalarResult() > 0;
     }
 }

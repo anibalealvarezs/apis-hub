@@ -11,11 +11,11 @@ use Repositories\CustomerRepository;
 
 #[ORM\Entity(repositoryClass: CustomerRepository::class)]
 #[ORM\Table(name: 'customers')]
-#[ORM\Index(columns: ['email'])]
+#[ORM\Index(columns: ['email'], name: 'email_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Customer extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(type: 'string', length: 180, unique: true)]
     protected string $email;
 
     #[ORM\OneToMany(mappedBy: 'customer', targetEntity: ChanneledCustomer::class, orphanRemoval: true)]
@@ -52,10 +52,12 @@ class Customer extends Entity
 
     public function addChanneledCustomer(ChanneledCustomer $channeledCustomer): self
     {
-        if (!$this->channeledCustomers->contains($channeledCustomer)) {
-            $this->channeledCustomers->add($channeledCustomer);
-            $channeledCustomer->addCustomer($this);
+        if ($this->channeledCustomers->contains($channeledCustomer)) {
+            return $this;
         }
+
+        $this->channeledCustomers->add($channeledCustomer);
+        $channeledCustomer->addCustomer($this);
 
         return $this;
     }
@@ -71,12 +73,17 @@ class Customer extends Entity
 
     public function removeChanneledCustomer(ChanneledCustomer $channeledCustomer): self
     {
-        if ($this->channeledCustomers->contains($channeledCustomer)) {
-            $this->channeledCustomers->removeElement($channeledCustomer);
-            if ($channeledCustomer->getCustomer() === $this) {
-                $channeledCustomer->addCustomer(null);
-            }
+        if (!$this->channeledCustomers->contains($channeledCustomer)) {
+            return $this;
         }
+
+        $this->channeledCustomers->removeElement($channeledCustomer);
+
+        if ($channeledCustomer->getCustomer() !== $this) {
+            return $this;
+        }
+
+        $channeledCustomer->addCustomer(customer: null);
 
         return $this;
     }

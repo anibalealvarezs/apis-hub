@@ -11,7 +11,7 @@ use Repositories\PriceRuleRepository;
 
 #[ORM\Entity(repositoryClass: PriceRuleRepository::class)]
 #[ORM\Table(name: 'priceRules')]
-#[ORM\Index(columns: ['priceRuleId'])]
+#[ORM\Index(columns: ['priceRuleId'], name: 'priceRuleId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class PriceRule extends Entity
 {
@@ -52,10 +52,12 @@ class PriceRule extends Entity
 
     public function addChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): self
     {
-        if (!$this->channeledPriceRules->contains($channeledPriceRule)) {
-            $this->channeledPriceRules->add($channeledPriceRule);
-            $channeledPriceRule->addPriceRule($this);
+        if ($this->channeledPriceRules->contains($channeledPriceRule)) {
+            return $this;
         }
+
+        $this->channeledPriceRules->add($channeledPriceRule);
+        $channeledPriceRule->addPriceRule($this);
 
         return $this;
     }
@@ -71,12 +73,17 @@ class PriceRule extends Entity
 
     public function removeChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): self
     {
-        if ($this->channeledPriceRules->contains($channeledPriceRule)) {
-            $this->channeledPriceRules->removeElement($channeledPriceRule);
-            if ($channeledPriceRule->getPriceRule() === $this) {
-                $channeledPriceRule->addPriceRule(null);
-            }
+        if (!$this->channeledPriceRules->contains($channeledPriceRule)) {
+            return $this;
         }
+
+        $this->channeledPriceRules->removeElement($channeledPriceRule);
+
+        if ($channeledPriceRule->getPriceRule() !== $this) {
+            return $this;
+        }
+
+        $channeledPriceRule->addPriceRule(priceRule: null);
 
         return $this;
     }

@@ -21,7 +21,7 @@ class PriceRuleRepository extends BaseRepository
             ->select('e')
             ->addSelect('p')
             ->addSelect('d')
-            ->from($this->_entityName, 'e');
+            ->from($this->getEntityName(), 'e');
         $query->leftJoin('e.channeledPriceRules', 'p');
         $query->leftJoin('p.channeledDiscounts', 'd');
         if ($ids) {

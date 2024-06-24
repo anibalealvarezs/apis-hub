@@ -5,6 +5,7 @@ namespace Repositories;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
 use Entities\Entity;
 use Enums\Channels;
 
@@ -19,11 +20,28 @@ class DiscountRepository extends BaseRepository
     {
         return $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->where('e.code = :code')
             ->setParameter('code', $code)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+    }
+
+    /**
+     * @param string $code
+     * @return bool
+     * @throws NonUniqueResultException
+     * @throws NoResultException
+     */
+    public function existsByCode(string $code): bool
+    {
+        return $this->_em->createQueryBuilder()
+            ->select('COUNT(e.id)')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.code = :code')
+            ->setParameter('code', $code)
+            ->getQuery()
+            ->getSingleScalarResult() > 0;
     }
 
     /**
@@ -40,7 +58,7 @@ class DiscountRepository extends BaseRepository
             ->addSelect('d')
             ->addSelect('pr')
             ->addSelect('o')
-            ->from($this->_entityName, 'e');
+            ->from($this->getEntityName(), 'e');
         $query->leftJoin('e.channeledDiscounts', 'd');
         $query->leftJoin('d.channeledPriceRule', 'pr');
         $query->leftJoin('d.channeledOrders', 'o');

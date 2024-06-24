@@ -11,7 +11,7 @@ use Repositories\ProductCategoryRepository;
 
 #[ORM\Entity(repositoryClass: ProductCategoryRepository::class)]
 #[ORM\Table(name: 'productCategories')]
-#[ORM\Index(columns: ['productCategoryId'])]
+#[ORM\Index(columns: ['productCategoryId'], name: 'productCategoryId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ProductCategory extends Entity
 {
@@ -74,10 +74,12 @@ class ProductCategory extends Entity
 
     public function addChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
-        if (!$this->channeledProductCategories->contains($channeledProductCategory)) {
-            $this->channeledProductCategories->add($channeledProductCategory);
-            $channeledProductCategory->addProductCategory($this);
+        if ($this->channeledProductCategories->contains($channeledProductCategory)) {
+            return $this;
         }
+
+        $this->channeledProductCategories->add($channeledProductCategory);
+        $channeledProductCategory->addProductCategory($this);
 
         return $this;
     }
@@ -93,12 +95,17 @@ class ProductCategory extends Entity
 
     public function removeChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
-        if ($this->channeledProductCategories->contains($channeledProductCategory)) {
-            $this->channeledProductCategories->removeElement($channeledProductCategory);
-            if ($channeledProductCategory->getProductCategory() === $this) {
-                $channeledProductCategory->addProductCategory(null);
-            }
+        if (!$this->channeledProductCategories->contains($channeledProductCategory)) {
+            return $this;
         }
+
+        $this->channeledProductCategories->removeElement($channeledProductCategory);
+
+        if ($channeledProductCategory->getProductCategory() !== $this) {
+            return $this;
+        }
+
+        $channeledProductCategory->addProductCategory(productCategory: null);
 
         return $this;
     }

@@ -11,7 +11,7 @@ use Repositories\ProductRepository;
 
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
 #[ORM\Table(name: 'products')]
-#[ORM\Index(columns: ['productId'])]
+#[ORM\Index(columns: ['productId'], name: 'productId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Product extends Entity
 {
@@ -52,10 +52,12 @@ class Product extends Entity
 
     public function addChanneledProduct(ChanneledProduct $channeledProduct): self
     {
-        if (!$this->channeledProducts->contains($channeledProduct)) {
-            $this->channeledProducts->add($channeledProduct);
-            $channeledProduct->addProduct($this);
+        if ($this->channeledProducts->contains($channeledProduct)) {
+            return $this;
         }
+
+        $this->channeledProducts->add($channeledProduct);
+        $channeledProduct->addProduct($this);
 
         return $this;
     }
@@ -71,12 +73,17 @@ class Product extends Entity
 
     public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
     {
-        if ($this->channeledProducts->contains($channeledProduct)) {
-            $this->channeledProducts->removeElement($channeledProduct);
-            if ($channeledProduct->getProduct() === $this) {
-                $channeledProduct->addProduct(null);
-            }
+        if (!$this->channeledProducts->contains($channeledProduct)) {
+            return $this;
         }
+
+        $this->channeledProducts->removeElement($channeledProduct);
+
+        if ($channeledProduct->getProduct() !== $this) {
+            return $this;
+        }
+
+        $channeledProduct->addProduct(product: null);
 
         return $this;
     }

@@ -5,6 +5,7 @@ namespace Helpers;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\Exception\MissingMappingDriverImplementation;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\ORMSetup;
 use Doctrine\Persistence\Mapping\MappingException;
@@ -19,6 +20,8 @@ use Symfony\Component\Yaml\Yaml;
 
 class Helpers
 {
+    private static ?EntityManager $entityManager = null;
+
     /**
      * @param int $limit
      * @return array
@@ -43,7 +46,6 @@ class Helpers
         $reflector = new ReflectionObject($instance);
         foreach ($properties as $property) {
             $property = $reflector->getProperty($property);
-            $property->setAccessible(true);
             $instance->$property = $property->getValue($instance);
         }
         return $instance;
@@ -66,7 +68,7 @@ class Helpers
     /**
      * @return array
      */
-    public static function getConfig(): array
+    public static function getDbConfig(): array
     {
         return Yaml::parseFile(__DIR__ . "/../../config/yaml/dbconfig.yaml");
     }
@@ -76,15 +78,29 @@ class Helpers
      */
     public static function getChannelsConfig(): array
     {
-        return self::getConfig()['channels'];
+        return Yaml::parseFile(__DIR__ . "/../../config/yaml/channelsconfig.yaml");
     }
 
     /**
-     * @return array
+     * @return EntityManager
+     * @throws Exception
+     * @throws MissingMappingDriverImplementation
      */
-    public static function getConnectionParams(): array
+    public static function getSingletonManager(): EntityManager
     {
-        return self::getConfig()['connection_params'];
+        if (self::$entityManager === null) {
+            self::$entityManager = new EntityManager(
+                conn: DriverManager::getConnection(
+                    params: self::getDbConfig(),
+                ),
+                config: ORMSetup::createAttributeMetadataConfiguration(
+                    paths: array(__DIR__."/.."),
+                    isDevMode: true
+                ),
+            );
+        }
+
+        return self::$entityManager;
     }
 
     /**
@@ -94,18 +110,23 @@ class Helpers
      */
     public static function getManager(): EntityManager
     {
-        $connectionParams = self::getConnectionParams();
-        $conn = DriverManager::getConnection($connectionParams);
-        $config = ORMSetup::createAttributeMetadataConfiguration(paths: array(__DIR__."/.."), isDevMode: true);
-        return EntityManager::create($conn, $config);
+        return new EntityManager(
+            conn: DriverManager::getConnection(
+                params: self::getDbConfig(),
+            ),
+            config: ORMSetup::createAttributeMetadataConfiguration(
+                paths: array(__DIR__."/.."),
+                isDevMode: true
+            ),
+        );
     }
 
     /**
      * @return array
      */
-    public static function getCrudEntities(): array
+    public static function getEntitiesConfig(): array
     {
-        return self::getConfig()['entities'];
+        return Yaml::parseFile(__DIR__ . "/../../config/yaml/entitiesconfig.yaml");
     }
 
     /**
@@ -113,7 +134,7 @@ class Helpers
      */
     public static function getEnabledCrudEntities(): array
     {
-        return array_filter(self::getConfig()['entities'], function ($entity) {
+        return array_filter(self::getEntitiesConfig(), function ($entity) {
             if ($entity['crud_enabled']) {
                 return $entity;
             };
@@ -127,7 +148,17 @@ class Helpers
      */
     public static function toCamelcase(string $string): string
     {
-        $str = str_replace(' ', '', ucwords(str_replace(['_', '-'], ' ', $string)));
+        $str = str_replace(
+            search: ' ',
+            replace: '',
+            subject: ucwords(
+                string: str_replace(
+                    search: ['_', '-'],
+                    replace: ' ',
+                    subject: $string
+                )
+            )
+        );
         $str[0] = strtolower($str[0]);
         return $str;
     }

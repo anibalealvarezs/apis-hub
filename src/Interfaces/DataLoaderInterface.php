@@ -10,7 +10,7 @@ interface DataLoaderInterface
      * @param array $references
      * @return object
      */
-    public static function getNewEntity(array $references = []);
+    public static function getNewEntity(array $references = []): object;
 
     /**
      * @param ObjectManager $manager

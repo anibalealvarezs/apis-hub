@@ -10,7 +10,8 @@ use Repositories\Channeled\ChanneledProductRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledProductRepository::class)]
 #[ORM\Table(name: 'channeled_products')]
-#[ORM\Index(columns: ['platformId', 'channel'])]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
+#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProduct extends ChanneledEntity
 {
@@ -55,10 +56,12 @@ class ChanneledProduct extends ChanneledEntity
 
     public function addChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
     {
-        if (!$this->channeledProductVariants->contains($channeledProductVariant)) {
-            $this->channeledProductVariants->add($channeledProductVariant);
-            $channeledProductVariant->addChanneledProduct($this);
+        if ($this->channeledProductVariants->contains($channeledProductVariant)) {
+            return $this;
         }
+
+        $this->channeledProductVariants->add($channeledProductVariant);
+        $channeledProductVariant->addChanneledProduct($this);
 
         return $this;
     }
@@ -74,12 +77,17 @@ class ChanneledProduct extends ChanneledEntity
 
     public function removeChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
     {
-        if ($this->channeledProductVariants->contains($channeledProductVariant)) {
-            $this->channeledProductVariants->removeElement($channeledProductVariant);
-            if ($channeledProductVariant->getChanneledProduct() === $this) {
-                $channeledProductVariant->addChanneledProduct(null);
-            }
+        if (!$this->channeledProductVariants->contains($channeledProductVariant)) {
+            return $this;
         }
+
+        $this->channeledProductVariants->removeElement($channeledProductVariant);
+
+        if ($channeledProductVariant->getChanneledProduct() !== $this) {
+            return $this;
+        }
+
+        $channeledProductVariant->addChanneledProduct(channeledProduct: null);
 
         return $this;
     }
@@ -107,9 +115,11 @@ class ChanneledProduct extends ChanneledEntity
      */
     public function addChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
-        if (!$this->channeledProductCategories->contains($channeledProductCategory)) {
-            $this->channeledProductCategories->add($channeledProductCategory);
+        if ($this->channeledProductCategories->contains($channeledProductCategory)) {
+            return $this;
         }
+
+        $this->channeledProductCategories->add($channeledProductCategory);
 
         return $this;
     }
@@ -133,9 +143,11 @@ class ChanneledProduct extends ChanneledEntity
      */
     public function removeChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
-        if ($this->channeledProductCategories->contains($channeledProductCategory)) {
-            $this->channeledProductCategories->removeElement($channeledProductCategory);
+        if (!$this->channeledProductCategories->contains($channeledProductCategory)) {
+            return $this;
         }
+
+        $this->channeledProductCategories->removeElement($channeledProductCategory);
 
         return $this;
     }
@@ -167,9 +179,11 @@ class ChanneledProduct extends ChanneledEntity
      */
     public function addChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        if (!$this->channeledOrders->contains($channeledOrder)) {
-            $this->channeledOrders->add($channeledOrder);
+        if ($this->channeledOrders->contains($channeledOrder)) {
+            return $this;
         }
+
+        $this->channeledOrders->add($channeledOrder);
 
         return $this;
     }
@@ -193,9 +207,11 @@ class ChanneledProduct extends ChanneledEntity
      */
     public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        if ($this->channeledOrders->contains($channeledOrder)) {
-            $this->channeledOrders->removeElement($channeledOrder);
+        if (!$this->channeledOrders->contains($channeledOrder)) {
+            return $this;
         }
+
+        $this->channeledOrders->removeElement($channeledOrder);
 
         return $this;
     }

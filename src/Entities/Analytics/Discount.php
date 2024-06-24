@@ -11,7 +11,7 @@ use Repositories\DiscountRepository;
 
 #[ORM\Entity(repositoryClass: DiscountRepository::class)]
 #[ORM\Table(name: 'discounts')]
-#[ORM\Index(columns: ['code'])]
+#[ORM\Index(columns: ['code'], name: 'code_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Discount extends Entity
 {
@@ -36,6 +36,7 @@ class Discount extends Entity
 
     /**
      * @param string $code
+     * @return Discount
      */
     public function addCode(string $code): self
     {
@@ -51,10 +52,12 @@ class Discount extends Entity
 
     public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
-        if (!$this->channeledDiscounts->contains($channeledDiscount)) {
-            $this->channeledDiscounts->add($channeledDiscount);
-            $channeledDiscount->addDiscount($this);
+        if ($this->channeledDiscounts->contains($channeledDiscount)) {
+            return $this;
         }
+
+        $this->channeledDiscounts->add($channeledDiscount);
+        $channeledDiscount->addDiscount($this);
 
         return $this;
     }
@@ -70,12 +73,17 @@ class Discount extends Entity
 
     public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
-        if ($this->channeledDiscounts->contains($channeledDiscount)) {
-            $this->channeledDiscounts->removeElement($channeledDiscount);
-            if ($channeledDiscount->getDiscount() === $this) {
-                $channeledDiscount->addDiscount(null);
-            }
+        if (!$this->channeledDiscounts->contains($channeledDiscount)) {
+            return $this;
         }
+
+        $this->channeledDiscounts->removeElement($channeledDiscount);
+
+        if ($channeledDiscount->getDiscount() !== $this) {
+            return $this;
+        }
+
+        $channeledDiscount->addDiscount(discount: null);
 
         return $this;
     }

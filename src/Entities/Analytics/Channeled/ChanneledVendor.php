@@ -10,7 +10,8 @@ use Repositories\Channeled\ChanneledVendorRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledVendorRepository::class)]
 #[ORM\Table(name: 'channeled_vendors')]
-#[ORM\Index(columns: ['name', 'platformId', 'channel'])]
+#[ORM\Index(columns: ['name', 'platformId', 'channel'], name: 'name_platformId_channel_idx')]
+#[ORM\Index(columns: ['name'], name: 'name_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledVendor extends ChanneledEntity
 {
@@ -59,10 +60,12 @@ class ChanneledVendor extends ChanneledEntity
 
     public function addChanneledProduct(ChanneledProduct $channeledProduct): self
     {
-        if (!$this->channeledProducts->contains($channeledProduct)) {
-            $this->channeledProducts->add($channeledProduct);
-            $channeledProduct->addChanneledVendor($this);
+        if ($this->channeledProducts->contains($channeledProduct)) {
+            return $this;
         }
+
+        $this->channeledProducts->add($channeledProduct);
+        $channeledProduct->addChanneledVendor($this);
 
         return $this;
     }
@@ -78,12 +81,17 @@ class ChanneledVendor extends ChanneledEntity
 
     public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
     {
-        if ($this->channeledProducts->contains($channeledProduct)) {
-            $this->channeledProducts->removeElement($channeledProduct);
-            if ($channeledProduct->getChanneledVendor() === $this) {
-                $channeledProduct->addChanneledVendor(null);
-            }
+        if (!$this->channeledProducts->contains($channeledProduct)) {
+            return $this;
         }
+
+        $this->channeledProducts->removeElement($channeledProduct);
+
+        if ($channeledProduct->getChanneledVendor() !== $this) {
+            return $this;
+        }
+
+        $channeledProduct->addChanneledVendor(channeledVendor: null);
 
         return $this;
     }

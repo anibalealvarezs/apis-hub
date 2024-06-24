@@ -10,7 +10,8 @@ use Repositories\Channeled\ChanneledPriceRuleRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledPriceRuleRepository::class)]
 #[ORM\Table(name: 'channeled_price_rules')]
-#[ORM\Index(columns: ['platformId', 'channel'])]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
+#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledPriceRule extends ChanneledEntity
 {
@@ -37,10 +38,12 @@ class ChanneledPriceRule extends ChanneledEntity
 
     public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
-        if (!$this->channeledDiscounts->contains($channeledDiscount)) {
-            $this->channeledDiscounts->add($channeledDiscount);
-            $channeledDiscount->addChanneledPriceRule($this);
+        if ($this->channeledDiscounts->contains($channeledDiscount)) {
+            return $this;
         }
+
+        $this->channeledDiscounts->add($channeledDiscount);
+        $channeledDiscount->addChanneledPriceRule($this);
 
         return $this;
     }
@@ -56,12 +59,17 @@ class ChanneledPriceRule extends ChanneledEntity
 
     public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
-        if ($this->channeledDiscounts->contains($channeledDiscount)) {
-            $this->channeledDiscounts->removeElement($channeledDiscount);
-            if ($channeledDiscount->getChanneledPriceRule() === $this) {
-                $channeledDiscount->addChanneledPriceRule(null);
-            }
+        if (!$this->channeledDiscounts->contains($channeledDiscount)) {
+            return $this;
         }
+
+        $this->channeledDiscounts->removeElement($channeledDiscount);
+
+        if ($channeledDiscount->getChanneledPriceRule() !== $this) {
+            return $this;
+        }
+
+        $channeledDiscount->addChanneledPriceRule(channeledPriceRule: null);
 
         return $this;
     }

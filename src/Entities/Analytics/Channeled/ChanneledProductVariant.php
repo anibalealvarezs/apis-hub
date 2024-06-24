@@ -10,7 +10,8 @@ use Repositories\Channeled\ChanneledProductVariantRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledProductVariantRepository::class)]
 #[ORM\Table(name: 'channeled_product_variants')]
-#[ORM\Index(columns: ['platformId', 'channel'])]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
+#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProductVariant extends ChanneledEntity
 {
@@ -54,9 +55,11 @@ class ChanneledProductVariant extends ChanneledEntity
      */
     public function addChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        if (!$this->channeledOrders->contains($channeledOrder)) {
-            $this->channeledOrders->add($channeledOrder);
+        if ($this->channeledOrders->contains($channeledOrder)) {
+            return $this;
         }
+
+        $this->channeledOrders->add($channeledOrder);
 
         return $this;
     }
@@ -80,9 +83,11 @@ class ChanneledProductVariant extends ChanneledEntity
      */
     public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        if ($this->channeledOrders->contains($channeledOrder)) {
-            $this->channeledOrders->removeElement($channeledOrder);
+        if (!$this->channeledOrders->contains($channeledOrder)) {
+            return $this;
         }
+
+        $this->channeledOrders->removeElement($channeledOrder);
 
         return $this;
     }

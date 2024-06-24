@@ -5,6 +5,7 @@ namespace Repositories;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
 use Entities\Entity;
 use Enums\Channels;
 
@@ -15,15 +16,47 @@ class CustomerRepository extends BaseRepository
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function getByEmail(string $email): ?Entity
+    public function getByEmail(string $email /*, bool $useCached = false */): ?Entity
     {
         return $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->where('e.email = :email')
             ->setParameter('email', $email)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+
+        /* if (!$useCached) {
+            return $query->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+        }
+
+        $cache = new FilesystemAdapter(namespace: 'my_cache_namespace');
+        $cacheItem = $cache->getItem(key: 'getByEmail_' . md5($email));
+
+        if (!$cacheItem->isHit()) {
+            $result = $query->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+            $cacheItem->set($result);
+            $cache->save($cacheItem);
+        }
+
+        return $cacheItem->get(); */
+    }
+
+    /**
+     * @param string $email
+     * @return bool
+     * @throws NonUniqueResultException
+     * @throws NoResultException
+     */
+    public function existsByEmail(string $email): bool
+    {
+        return $this->_em->createQueryBuilder()
+            ->select('COUNT(e.id)')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.email = :email')
+            ->setParameter('email', $email)
+            ->getQuery()
+            ->getSingleScalarResult() > 0;
     }
 
     /**
@@ -38,7 +71,7 @@ class CustomerRepository extends BaseRepository
         $query = $this->_em->createQueryBuilder()
             ->select('e')
             ->addSelect('c')
-            ->from($this->_entityName, 'e');
+            ->from($this->getEntityName(), 'e');
         $query->leftJoin('e.channeledCustomers', 'c');
         if ($ids) {
             $query->where('e.id IN (:ids)')

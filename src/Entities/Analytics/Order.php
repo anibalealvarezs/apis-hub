@@ -11,7 +11,7 @@ use Repositories\OrderRepository;
 
 #[ORM\Entity(repositoryClass: OrderRepository::class)]
 #[ORM\Table(name: 'orders')]
-#[ORM\Index(columns: ['orderId'])]
+#[ORM\Index(columns: ['orderId'], name: 'orderId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Order extends Entity
 {
@@ -52,10 +52,12 @@ class Order extends Entity
 
     public function addChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        if (!$this->channeledOrders->contains($channeledOrder)) {
-            $this->channeledOrders->add($channeledOrder);
-            $channeledOrder->addOrder($this);
+        if ($this->channeledOrders->contains($channeledOrder)) {
+            return $this;
         }
+
+        $this->channeledOrders->add($channeledOrder);
+        $channeledOrder->addOrder($this);
 
         return $this;
     }
@@ -71,12 +73,17 @@ class Order extends Entity
 
     public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        if ($this->channeledOrders->contains($channeledOrder)) {
-            $this->channeledOrders->removeElement($channeledOrder);
-            if ($channeledOrder->getOrder() === $this) {
-                $channeledOrder->addOrder(null);
-            }
+        if (!$this->channeledOrders->contains($channeledOrder)) {
+            return $this;
         }
+
+        $this->channeledOrders->removeElement($channeledOrder);
+
+        if ($channeledOrder->getOrder() !== $this) {
+            return $this;
+        }
+
+        $channeledOrder->addOrder(order: null);
 
         return $this;
     }

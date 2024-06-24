@@ -48,22 +48,26 @@ class BaseRepository extends EntityRepository
     /**
      * @param int $id
      * @param bool $returnEntity
+     * @param object|null $filters
      * @return Entity|array|null
      * @throws NonUniqueResultException
      */
-    public function read(int $id, bool $returnEntity = false): Entity|array|null
+    public function read(int $id, bool $returnEntity = false, object $filters = null): Entity|array|null
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->where('e.id = :id')
-            ->setParameter('id', $id)
-            ->getQuery();
+            ->setParameter('id', $id);
+        foreach($filters as $key => $value) {
+            $query->andWhere('e.' . $key . ' = :' . $key)
+                ->setParameter($key, $value);
+        }
 
         if ($returnEntity) {
-            $entity = $query->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
         } else {
-            $entity = $query->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
         }
 
         if (!$entity) {
@@ -82,7 +86,7 @@ class BaseRepository extends EntityRepository
     {
         return $this->_em->createQueryBuilder()
             ->select('COUNT(e)')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->getQuery()
             ->getSingleScalarResult();
     }
@@ -98,7 +102,7 @@ class BaseRepository extends EntityRepository
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e');
+            ->from($this->getEntityName(), 'e');
         if ($ids) {
             $query->where('e.id IN (:ids)')
                 ->setParameter('ids', $ids);
@@ -124,7 +128,7 @@ class BaseRepository extends EntityRepository
      */
     public function update(int $id, stdClass $data = null, bool $returnEntity = false): bool|array|null|Entity
     {
-        $entity = $this->_em->find($this->_entityName, $id);
+        $entity = $this->_em->find($this->getEntityName(), $id);
 
         if (!$entity) {
             return false;
@@ -155,7 +159,7 @@ class BaseRepository extends EntityRepository
      */
     public function delete(int $id): bool
     {
-        $entity = $this->_em->find($this->_entityName, $id);
+        $entity = $this->_em->find($this->getEntityName(), $id);
 
         if (!$entity) {
             return false;

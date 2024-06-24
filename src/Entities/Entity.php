@@ -63,15 +63,17 @@ class Entity
     #[ORM\PreUpdate]
     public function onPreUpdate(): void
     {
-        $this->updatedAt = new DateTime('now');
+        $this->updatedAt = new DateTime(datetime: 'now');
     }
 
     #[ORM\PrePersist]
     public function onPrePersist(): void
     {
-        if (!isset($this->createdAt)) {
-            $this->createdAt = new DateTime('now');
-            $this->updatedAt = new DateTime('now');
+        if (isset($this->createdAt)) {
+            return;
         }
+
+        $this->createdAt = new DateTime(datetime: 'now');
+        $this->updatedAt = new DateTime(datetime: 'now');
     }
 }

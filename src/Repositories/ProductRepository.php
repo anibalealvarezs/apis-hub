@@ -5,6 +5,7 @@ namespace Repositories;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
 use Entities\Entity;
 use Enums\Channels;
 
@@ -19,11 +20,28 @@ class ProductRepository extends BaseRepository
     {
         return $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->where('e.productId = :productId')
             ->setParameter('productId', $productId)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+    }
+
+    /**
+     * @param string $productId
+     * @return bool
+     * @throws NonUniqueResultException
+     * @throws NoResultException
+     */
+    public function existsByProductId(string $productId): bool
+    {
+        return $this->_em->createQueryBuilder()
+            ->select('COUNT(e.id)')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.productId = :productId')
+            ->setParameter('productId', $productId)
+            ->getQuery()
+            ->getSingleScalarResult() > 0;
     }
 
     /**
@@ -41,7 +59,7 @@ class ProductRepository extends BaseRepository
             ->addSelect('v')
             ->addSelect('c')
             ->addSelect('pv')
-            ->from($this->_entityName, 'e');
+            ->from($this->getEntityName(), 'e');
         $query->leftJoin('e.channeledProducts', 'p');
         $query->leftJoin('p.channeledVendor', 'v');
         $query->leftJoin('p.channeledProductCategories', 'c');

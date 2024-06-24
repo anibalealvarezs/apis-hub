@@ -10,7 +10,8 @@ use Repositories\Channeled\ChanneledDiscountRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledDiscountRepository::class)]
 #[ORM\Table(name: 'channeled_discounts')]
-#[ORM\Index(columns: ['code', 'platformId', 'channel'])]
+#[ORM\Index(columns: ['code', 'platformId', 'channel'], name: 'code_platformId_channel_idx')]
+#[ORM\Index(columns: ['code'], name: 'code_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledDiscount extends ChanneledEntity
 {
@@ -70,9 +71,11 @@ class ChanneledDiscount extends ChanneledEntity
      */
     public function addChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        if (!$this->channeledOrders->contains($channeledOrder)) {
-            $this->channeledOrders->add($channeledOrder);
+        if ($this->channeledOrders->contains($channeledOrder)) {
+            return $this;
         }
+
+        $this->channeledOrders->add($channeledOrder);
 
         return $this;
     }
@@ -96,9 +99,11 @@ class ChanneledDiscount extends ChanneledEntity
      */
     public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        if ($this->channeledOrders->contains($channeledOrder)) {
-            $this->channeledOrders->removeElement($channeledOrder);
+        if (!$this->channeledOrders->contains($channeledOrder)) {
+            return $this;
         }
+
+        $this->channeledOrders->removeElement($channeledOrder);
 
         return $this;
     }

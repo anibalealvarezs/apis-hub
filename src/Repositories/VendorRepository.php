@@ -5,6 +5,7 @@ namespace Repositories;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
 use Entities\Entity;
 use Enums\Channels;
 
@@ -19,11 +20,28 @@ class VendorRepository extends BaseRepository
     {
         return $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->where('e.name = :name')
             ->setParameter('name', $name)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+    }
+
+    /**
+     * @param string $name
+     * @return bool
+     * @throws NonUniqueResultException
+     * @throws NoResultException
+     */
+    public function existsByName(string $name): bool
+    {
+        return $this->_em->createQueryBuilder()
+            ->select('COUNT(e.id)')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.name = :name')
+            ->setParameter('name', $name)
+            ->getQuery()
+            ->getSingleScalarResult() > 0;
     }
 
     /**
@@ -39,7 +57,7 @@ class VendorRepository extends BaseRepository
             ->select('e')
             ->addSelect('v')
             ->addSelect('p')
-            ->from($this->_entityName, 'e');
+            ->from($this->getEntityName(), 'e');
         $query->leftJoin('e.channeledVendors', 'v');
         $query->leftJoin('v.channeledProducts', 'p');
         if ($ids) {

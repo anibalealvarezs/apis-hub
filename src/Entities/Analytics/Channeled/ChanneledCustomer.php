@@ -10,7 +10,8 @@ use Repositories\Channeled\ChanneledCustomerRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledCustomerRepository::class)]
 #[ORM\Table(name: 'channeled_customers')]
-#[ORM\Index(columns: ['email', 'platformId', 'channel'])]
+#[ORM\Index(columns: ['email', 'platformId', 'channel'], name: 'email_platformId_channel_idx')]
+#[ORM\Index(columns: ['email'], name: 'email_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledCustomer extends ChanneledEntity
 {
@@ -59,10 +60,12 @@ class ChanneledCustomer extends ChanneledEntity
 
     public function addChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        if (!$this->channeledOrders->contains($channeledOrder)) {
-            $this->channeledOrders->add($channeledOrder);
-            $channeledOrder->addChanneledCustomer($this);
+        if ($this->channeledOrders->contains($channeledOrder)) {
+            return $this;
         }
+
+        $this->channeledOrders->add($channeledOrder);
+        $channeledOrder->addChanneledCustomer($this);
 
         return $this;
     }
@@ -78,12 +81,17 @@ class ChanneledCustomer extends ChanneledEntity
 
     public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
     {
-        if ($this->channeledOrders->contains($channeledOrder)) {
-            $this->channeledOrders->removeElement($channeledOrder);
-            if ($channeledOrder->getChanneledCustomer() === $this) {
-                $channeledOrder->addChanneledCustomer(null);
-            }
+        if (!$this->channeledOrders->contains($channeledOrder)) {
+            return $this;
         }
+
+        $this->channeledOrders->removeElement($channeledOrder);
+
+        if ($channeledOrder->getChanneledCustomer() !== $this) {
+            return $this;
+        }
+
+        $channeledOrder->addChanneledCustomer(channeledCustomer: null);
 
         return $this;
     }

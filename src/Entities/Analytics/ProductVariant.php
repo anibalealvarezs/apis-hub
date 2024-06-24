@@ -11,7 +11,7 @@ use Repositories\ProductVariantRepository;
 
 #[ORM\Entity(repositoryClass: ProductVariantRepository::class)]
 #[ORM\Table(name: 'product_variants')]
-#[ORM\Index(columns: ['productVariantId'])]
+#[ORM\Index(columns: ['productVariantId'], name: 'productVariantId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ProductVariant extends Entity
 {
@@ -52,10 +52,12 @@ class ProductVariant extends Entity
 
     public function addChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
     {
-        if (!$this->channeledProductVariants->contains($channeledProductVariant)) {
-            $this->channeledProductVariants->add($channeledProductVariant);
-            $channeledProductVariant->addProductVariant($this);
+        if ($this->channeledProductVariants->contains($channeledProductVariant)) {
+            return $this;
         }
+
+        $this->channeledProductVariants->add($channeledProductVariant);
+        $channeledProductVariant->addProductVariant($this);
 
         return $this;
     }
@@ -71,12 +73,17 @@ class ProductVariant extends Entity
 
     public function removeChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
     {
-        if ($this->channeledProductVariants->contains($channeledProductVariant)) {
-            $this->channeledProductVariants->removeElement($channeledProductVariant);
-            if ($channeledProductVariant->getProductVariant() === $this) {
-                $channeledProductVariant->addProductVariant(null);
-            }
+        if (!$this->channeledProductVariants->contains($channeledProductVariant)) {
+            return $this;
         }
+
+        $this->channeledProductVariants->removeElement($channeledProductVariant);
+
+        if ($channeledProductVariant->getProductVariant() !== $this) {
+            return $this;
+        }
+
+        $channeledProductVariant->addProductVariant(productVariant: null);
 
         return $this;
     }

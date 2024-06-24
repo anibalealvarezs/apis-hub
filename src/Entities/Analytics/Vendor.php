@@ -11,7 +11,7 @@ use Repositories\VendorRepository;
 
 #[ORM\Entity(repositoryClass: VendorRepository::class)]
 #[ORM\Table(name: 'vendors')]
-#[ORM\Index(columns: ['name'])]
+#[ORM\Index(columns: ['name'], name: 'name_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Vendor extends Entity
 {
@@ -52,10 +52,12 @@ class Vendor extends Entity
 
     public function addChanneledVendor(ChanneledVendor $channeledVendor): self
     {
-        if (!$this->channeledVendors->contains($channeledVendor)) {
-            $this->channeledVendors->add($channeledVendor);
-            $channeledVendor->addVendor($this);
+        if ($this->channeledVendors->contains($channeledVendor)) {
+            return $this;
         }
+
+        $this->channeledVendors->add($channeledVendor);
+        $channeledVendor->addVendor($this);
 
         return $this;
     }
@@ -71,12 +73,17 @@ class Vendor extends Entity
 
     public function removeChanneledVendor(ChanneledVendor $channeledVendor): self
     {
-        if ($this->channeledVendors->contains($channeledVendor)) {
-            $this->channeledVendors->removeElement($channeledVendor);
-            if ($channeledVendor->getVendor() === $this) {
-                $channeledVendor->addVendor(null);
-            }
+        if (!$this->channeledVendors->contains($channeledVendor)) {
+            return $this;
         }
+
+        $this->channeledVendors->removeElement($channeledVendor);
+
+        if ($channeledVendor->getVendor() !== $this) {
+            return $this;
+        }
+
+        $channeledVendor->addVendor(vendor: null);
 
         return $this;
     }

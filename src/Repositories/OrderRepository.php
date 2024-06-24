@@ -5,6 +5,7 @@ namespace Repositories;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
 use Entities\Entity;
 use Enums\Channels;
 
@@ -19,11 +20,28 @@ class OrderRepository extends BaseRepository
     {
         return $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->where('e.orderId = :orderId')
             ->setParameter('orderId', $orderId)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+    }
+
+    /**
+     * @param string $orderId
+     * @return bool
+     * @throws NonUniqueResultException
+     * @throws NoResultException
+     */
+    public function existsByOrderId(string $orderId): bool
+    {
+        return $this->_em->createQueryBuilder()
+            ->select('COUNT(e.id)')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.orderId = :orderId')
+            ->setParameter('orderId', $orderId)
+            ->getQuery()
+            ->getSingleScalarResult() > 0;
     }
 
     /**
@@ -41,7 +59,7 @@ class OrderRepository extends BaseRepository
             ->addSelect('c')
             ->addSelect('p')
             ->addSelect('d')
-            ->from($this->_entityName, 'e');
+            ->from($this->getEntityName(), 'e');
         $query->leftJoin('e.channeledOrders', 'o');
         $query->leftJoin('o.channeledCustomer', 'c');
         $query->leftJoin('o.channeledProducts', 'p');

@@ -4,6 +4,7 @@ namespace Commands\Crud;
 
 use Controllers\CrudController;
 use Doctrine\ORM\Exception\NotSupported;
+use ReflectionException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -34,7 +35,7 @@ class CreateEntityCommand extends Command
      * @param InputInterface $input
      * @param OutputInterface $output
      * @return int
-     * @throws NotSupported|\ReflectionException
+     * @throws NotSupported|ReflectionException
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {

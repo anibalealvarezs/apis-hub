@@ -120,7 +120,7 @@ class JobRepository extends BaseRepository
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e');
+            ->from($this->getEntityName(), 'e');
         foreach($filters as $key => $value) {
             if ($key == 'status' && !is_int($value)) {
                 $value = (new ReflectionEnum(JobStatus::class))->getConstant($value);

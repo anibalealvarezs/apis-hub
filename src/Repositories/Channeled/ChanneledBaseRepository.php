@@ -5,11 +5,10 @@ namespace Repositories\Channeled;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
-use Doctrine\Persistence\Mapping\MappingException;
+use Doctrine\ORM\NoResultException;
 use Entities\Entity;
 use Enums\Channels;
 use ReflectionEnum;
-use ReflectionException;
 use Repositories\BaseRepository;
 
 class ChanneledBaseRepository extends BaseRepository
@@ -22,19 +21,81 @@ class ChanneledBaseRepository extends BaseRepository
      */
     public function getByPlatformIdAndChannel(int|string $platformId, int $channel): ?Entity
     {
-        if ((new ReflectionEnum(Channels::class))->getConstant($channel)) {
+        if ((new ReflectionEnum(objectOrClass: Channels::class))->getConstant($channel)) {
             die ('Invalid channel');
         }
 
         return $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->where('e.platformId = :platformId')
             ->setParameter('platformId', $platformId)
             ->andWhere('e.channel = :channel')
             ->setParameter('channel', $channel)
             ->getQuery()
-            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+            ->getOneOrNullResult(hydrationMode: AbstractQuery::HYDRATE_OBJECT);
+    }
+
+    /**
+     * @param int|string $platformId
+     * @param int $channel
+     * @return bool
+     * @throws NonUniqueResultException
+     * @throws NoResultException
+     */
+    public function existsByPlatformIdAndChannel(int|string $platformId, int $channel): bool
+    {
+        if ((new ReflectionEnum(objectOrClass: Channels::class))->getConstant($channel)) {
+            die ('Invalid channel');
+        }
+
+        return $this->_em->createQueryBuilder()
+            ->select('COUNT(e.id)')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.platformId = :platformId')
+            ->setParameter('platformId', $platformId)
+            ->andWhere('e.channel = :channel')
+            ->setParameter('channel', $channel)
+            ->getQuery()
+            ->getSingleScalarResult() > 0;
+    }
+
+    /**
+     * @param int $id
+     * @param bool $returnEntity
+     * @param object|null $filters
+     * @return Entity|array|null
+     * @throws NonUniqueResultException
+     */
+    public function read(int $id, bool $returnEntity = false, object $filters = null): Entity|array|null
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('e')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.id = :id')
+            ->setParameter('id', $id);
+        foreach($filters as $key => $value) {
+            $query->andWhere('e.' . $key . ' = :' . $key)
+                ->setParameter($key, $value);
+        }
+
+        if ($returnEntity) {
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+        } else {
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
+        }
+
+        if (!$entity) {
+            return null;
+        }
+
+        if (is_array($entity)) {
+            $entity['channel'] = Channels::from($entity['channel'])->getName();
+        } else {
+            $entity->channel = Channels::from($entity->channel)->getName();
+        }
+
+        return $entity;
     }
 
     /**
@@ -43,17 +104,15 @@ class ChanneledBaseRepository extends BaseRepository
      * @param array|null $ids
      * @param object|null $filters
      * @return ArrayCollection
-     * @throws MappingException
-     * @throws ReflectionException
      */
     public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e');
+            ->from($this->getEntityName(), 'e');
         foreach($filters as $key => $value) {
             if ($key == 'channel' && !is_int($value)) {
-                $value = (new ReflectionEnum(Channels::class))->getConstant($value);
+                $value = (new ReflectionEnum(objectOrClass: Channels::class))->getConstant($value);
             }
             $query->andWhere('e.' . $key . ' = :' . $key)
                 ->setParameter($key, $value);
@@ -61,10 +120,12 @@ class ChanneledBaseRepository extends BaseRepository
         $list = $query->setMaxResults($limit)
             ->setFirstResult($limit * $pagination)
             ->getQuery()
-            ->getResult()
             ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
-        return new ArrayCollection($list);
+        return new ArrayCollection(array_map(function($item) {
+            $item['channel'] = Channels::from($item['channel'])->getName();
+            return $item;
+        }, $list));
     }
 
     /**
