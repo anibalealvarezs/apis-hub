@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . "/../app/bootstrap.php";
-
 use Symfony\Component\HttpFoundation\Request;
 use Classes\RoutingCore;
+
+$entityManager = require_once __DIR__ . "/../app/bootstrap.php";
 
 $request = Request::createFromGlobals();
 
@@ -13,6 +13,10 @@ $app = new RoutingCore();
 
 // Custom routes first
 $cacheRoutes = require_once __DIR__ . "/../src/Routes/cache.php";
+$app->multiMap($cacheRoutes);
+
+// Channeled CRUD routes next
+$cacheRoutes = require_once __DIR__ . "/../src/Routes/channeledcrud.php";
 $app->multiMap($cacheRoutes);
 
 // CRUD routes last

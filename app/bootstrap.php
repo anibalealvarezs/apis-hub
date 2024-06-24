@@ -4,5 +4,6 @@ use Helpers\Helpers;
 
 require_once __DIR__ . "/../vendor/autoload.php";
 
-// obtaining the entity manager
-$entityManager = Helpers::getManager();
+// Return the entity manager
+// return Helpers::getSingletonManager();
+return Helpers::getManager();

@@ -1,21 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 use Commands\Crud\CreateEntityCommand;
 use Commands\Crud\DeleteEntityCommand;
 use Commands\Crud\ReadEntityCommand;
 use Commands\Crud\UpdateEntityCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
-use Doctrine\ORM\Version;
 use Symfony\Component\Console\Application;
 
-require_once __DIR__ . "/../app/bootstrap.php";
+$entityManager = require_once __DIR__ . "/../app/bootstrap.php";
+$helperSet = require_once __DIR__ . "/../config/cli-config.php";
 
-$helperSet = ConsoleRunner::createHelperSet($entityManager);
-
-// as before ...
-
-// replace the ConsoleRunner::run() statement with:
-$cli = new Application('Doctrine Command Line Interface', Version::VERSION);
+$cli = new Application(
+    name: 'Doctrine Command Line Interface',
+    version: '1.0.0'
+);
 $cli->setCatchExceptions(true);
 $cli->setHelperSet($helperSet);
 
@@ -23,10 +23,12 @@ $cli->setHelperSet($helperSet);
 ConsoleRunner::addCommands($cli);
 
 // Register your own command
-$cli->addCommands([new CreateEntityCommand()]);
-$cli->addCommands([new DeleteEntityCommand()]);
-$cli->addCommands([new ReadEntityCommand()]);
-$cli->addCommands([new UpdateEntityCommand()]);
+$cli->addCommands([
+    new CreateEntityCommand(),
+    new DeleteEntityCommand(),
+    new ReadEntityCommand(),
+    new UpdateEntityCommand()
+]);
 
 // Runs console application
 $cli->run();

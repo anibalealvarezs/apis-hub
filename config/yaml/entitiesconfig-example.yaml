@@ -1,0 +1,27 @@
+job:
+  class: \Entities\Job
+  crud_enabled: true
+customer:
+  class: \Entities\Analytics\Customer
+  crud_enabled: true
+discount:
+  class: \Entities\Analytics\Discount
+  crud_enabled: true
+price_rule:
+  class: \Entities\Analytics\PriceRule
+  crud_enabled: true
+order:
+  class: \Entities\Analytics\Order
+  crud_enabled: true
+product:
+  class: \Entities\Analytics\Product
+  crud_enabled: true
+product_variant:
+  class: \Entities\Analytics\ProductVariant
+  crud_enabled: true
+product_category:
+  class: \Entities\Analytics\ProductCategory
+  crud_enabled: true
+vendor:
+  class: \Entities\Analytics\Vendor
+  crud_enabled: true

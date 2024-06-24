@@ -51,6 +51,10 @@
         },
         {
             "type": "git",
+            "url": "git@gitlab.com:chmw/pod-beta/oauthv1.git"
+        },
+        {
+            "type": "git",
             "url": "git@gitlab.com:chmw/pod-beta/amazon-api.git"
         },
         {
