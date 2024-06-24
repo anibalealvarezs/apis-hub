@@ -2,9 +2,11 @@
 
 namespace Classes\Requests;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Interfaces\RequestInterface;
 use Symfony\Component\HttpFoundation\Response;
 
-class VendorRequests
+class VendorRequests implements RequestInterface
 {
     /**
      * @param int $limit
@@ -48,5 +50,16 @@ class VendorRequests
     public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
         return new Response(json_encode([]));
+    }
+
+    /**
+     * @param ArrayCollection $channeledCollection
+     * @return Response
+     */
+    static function process(ArrayCollection $channeledCollection): Response
+    {
+        // TODO: Implement process() method.
+
+        return new Response(json_encode(['Vendors processed']));
     }
 }
