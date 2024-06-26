@@ -135,7 +135,7 @@ class ProductVariantRequests implements RequestInterface
                 } else {
                     $vendorEntity = $vendorRepository->getByName($channeledVariant->vendor);
                 }
-                if (!$channeledVendorRepository->existsByNameAndChannel($channeledVariant->vendor,
+                if (!$channeledVendorRepository->existsByName($channeledVariant->vendor,
                     $channeledVariant->channel)) {
                     $channeledVendorEntity = $channeledVendorRepository->create(
                         data: (object)[
@@ -147,18 +147,18 @@ class ProductVariantRequests implements RequestInterface
                         returnEntity: true,
                     );
                 } else {
-                    $channeledVendorEntity = $channeledVendorRepository->getByNameAndChannel($channeledVariant->vendor,
+                    $channeledVendorEntity = $channeledVendorRepository->getByName($channeledVariant->vendor,
                         $channeledVariant->channel);
                 }
             }
-            if (!$channeledProductRepository->existsByPlatformIdAndChannel($channeledVariant->platformId,
+            if (!$channeledProductRepository->existsByPlatformId($channeledVariant->platformId,
                 $channeledVariant->channel)) {
                 $channeledProductEntity = $channeledProductRepository->create(
                     data: $channeledVariant,
                     returnEntity: true,
                 );
             } else {
-                $channeledProductEntity = $channeledProductRepository->getByPlatformIdAndChannel($channeledVariant->platformId,
+                $channeledProductEntity = $channeledProductRepository->getByPlatformId($channeledVariant->platformId,
                     $channeledVariant->channel);
             }
             if (empty($channeledProductEntity->getData())) {
@@ -175,14 +175,14 @@ class ProductVariantRequests implements RequestInterface
                 } else {
                     $productVariantEntity = $productVariantRepository->getByProductVariantId($productVariant->platformId);
                 }
-                if (!$channeledProductVariantRepository->existsByPlatformIdAndChannel($productVariant->platformId,
+                if (!$channeledProductVariantRepository->existsByPlatformId($productVariant->platformId,
                     $channeledVariant->channel)) {
                     $channeledProductVariantEntity = $channeledProductVariantRepository->create(
                         data: $productVariant,
                         returnEntity: true,
                     );
                 } else {
-                    $channeledProductVariantEntity = $channeledProductVariantRepository->getByPlatformIdAndChannel($productVariant->platformId,
+                    $channeledProductVariantEntity = $channeledProductVariantRepository->getByPlatformId($productVariant->platformId,
                         $channeledVariant->channel);
                 }
                 if (empty($channeledProductVariantEntity->getData())) {

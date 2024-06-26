@@ -51,7 +51,7 @@ class ProductRepository extends BaseRepository
      * @param object|null $filters
      * @return ArrayCollection
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
+    public function readMultiple(int $limit = 100, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')

@@ -19,7 +19,7 @@ class ChanneledBaseRepository extends BaseRepository
      * @return Entity|null
      * @throws NonUniqueResultException
      */
-    public function getByPlatformIdAndChannel(int|string $platformId, int $channel): ?Entity
+    public function getByPlatformId(int|string $platformId, int $channel): ?Entity
     {
         if ((new ReflectionEnum(objectOrClass: Channels::class))->getConstant($channel)) {
             die ('Invalid channel');
@@ -43,7 +43,7 @@ class ChanneledBaseRepository extends BaseRepository
      * @throws NonUniqueResultException
      * @throws NoResultException
      */
-    public function existsByPlatformIdAndChannel(int|string $platformId, int $channel): bool
+    public function existsByPlatformId(int|string $platformId, int $channel): bool
     {
         if ((new ReflectionEnum(objectOrClass: Channels::class))->getConstant($channel)) {
             die ('Invalid channel');
@@ -74,9 +74,11 @@ class ChanneledBaseRepository extends BaseRepository
             ->from($this->getEntityName(), 'e')
             ->where('e.id = :id')
             ->setParameter('id', $id);
-        foreach($filters as $key => $value) {
-            $query->andWhere('e.' . $key . ' = :' . $key)
-                ->setParameter($key, $value);
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
         }
 
         if ($returnEntity) {
@@ -91,8 +93,6 @@ class ChanneledBaseRepository extends BaseRepository
 
         if (is_array($entity)) {
             $entity['channel'] = Channels::from($entity['channel'])->getName();
-        } else {
-            $entity->channel = Channels::from($entity->channel)->getName();
         }
 
         return $entity;
@@ -105,17 +105,19 @@ class ChanneledBaseRepository extends BaseRepository
      * @param object|null $filters
      * @return ArrayCollection
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
+    public function readMultiple(int $limit = 100, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
             ->from($this->getEntityName(), 'e');
-        foreach($filters as $key => $value) {
-            if ($key == 'channel' && !is_int($value)) {
-                $value = (new ReflectionEnum(objectOrClass: Channels::class))->getConstant($value);
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                if ($key == 'channel' && !is_int($value)) {
+                    $value = (new ReflectionEnum(objectOrClass: Channels::class))->getConstant($value);
+                }
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
             }
-            $query->andWhere('e.' . $key . ' = :' . $key)
-                ->setParameter($key, $value);
         }
         $list = $query->setMaxResults($limit)
             ->setFirstResult($limit * $pagination)

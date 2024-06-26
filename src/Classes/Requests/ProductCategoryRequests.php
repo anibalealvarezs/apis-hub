@@ -3,7 +3,7 @@
 namespace Classes\Requests;
 
 use Chmw\KlaviyoApi\KlaviyoApi;
-use Chmw\ShopifyApi\ShopifyApi;
+use Classes\Overrides\ShopifyApi\ShopifyApi;
 use Classes\Conversions\KlaviyoConvert;
 use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -36,7 +36,6 @@ class ProductCategoryRequests implements RequestInterface
     public static function getListFromShopify(string $publishedAtMin = null, string $publishedAtMax = null, array $fields = null, object $filters = null): Response
     {
         $config = Helpers::getChannelsConfig()['shopify'];
-        $manager = Helpers::getManager();
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
             shopName: $config['shopify_shop_name'],
@@ -50,6 +49,7 @@ class ProductCategoryRequests implements RequestInterface
             sinceId: $filters->sinceId ?? null,
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
+            pageInfo: $filters->pageInfo ?? null,
         );
         $sourceSmartCollections = $shopifyClient->getAllSmartCollections(
             fields: $fields,
@@ -59,8 +59,11 @@ class ProductCategoryRequests implements RequestInterface
             sinceId: $filters->sinceId ?? null,
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
+            pageInfo: $filters->pageInfo ?? null,
         );
-        $sourceCollects = $shopifyClient->getAllCollects();
+        $sourceCollects = $shopifyClient->getAllCollects(
+            pageInfo: $filters->pageInfo ?? null,
+        );
         return self::process(
             new ArrayCollection(
                 [
@@ -167,13 +170,13 @@ class ProductCategoryRequests implements RequestInterface
             } else {
                 $productCategoryEntity = $productCategoryRepository->getByProductCategoryId($productCategory->platformId);
             }
-            if (!$channeledProductCategoryRepository->existsByPlatformIdAndChannel($productCategory->platformId, $productCategory->channel)) {
+            if (!$channeledProductCategoryRepository->existsByPlatformId($productCategory->platformId, $productCategory->channel)) {
                 $channeledProductCategoryEntity = $channeledProductCategoryRepository->create(
                     data: $productCategory,
                     returnEntity: true,
                 );
             } else {
-                $channeledProductCategoryEntity = $channeledProductCategoryRepository->getByPlatformIdAndChannel($productCategory->platformId, $productCategory->channel);
+                $channeledProductCategoryEntity = $channeledProductCategoryRepository->getByPlatformId($productCategory->platformId, $productCategory->channel);
             }
             if (empty($channeledProductCategoryEntity->getData())) {
                 $channeledProductCategoryEntity
@@ -183,7 +186,7 @@ class ProductCategoryRequests implements RequestInterface
             }
             if ($collects && isset($collects[$productCategory->platformId])) {
                 foreach($collects[$productCategory->platformId] as $productId) {
-                    if (!$channeledProductRepository->existsByPlatformIdAndChannel($productId, $productCategory->channel)) {
+                    if (!$channeledProductRepository->existsByPlatformId($productId, $productCategory->channel)) {
                         $channeledProductEntity = $channeledProductRepository->create(
                             data: (object) [
                                 'channel' => $productCategory->channel,
@@ -193,7 +196,7 @@ class ProductCategoryRequests implements RequestInterface
                             returnEntity: true,
                         );
                     } else {
-                        $channeledProductEntity = $channeledProductRepository->getByPlatformIdAndChannel($productId, $productCategory->channel);
+                        $channeledProductEntity = $channeledProductRepository->getByPlatformId($productId, $productCategory->channel);
                     }
                     $channeledProductCategoryEntity->addChanneledProduct($channeledProductEntity);
                     $manager->persist($channeledProductEntity);

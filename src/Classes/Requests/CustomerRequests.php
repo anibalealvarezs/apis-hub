@@ -39,7 +39,7 @@ class CustomerRequests implements RequestInterface
             version: $config['shopify_last_stable_revision'],
         );
 
-        $shopifyClient->getAllCustomers(
+        $shopifyClient->getAllCustomersAndProcess(
             createdAtMin: $createdAtMin,
             createdAtMax: $createdAtMax,
             fields: $fields,
@@ -47,6 +47,7 @@ class CustomerRequests implements RequestInterface
             sinceId: $filters->sinceId ?? null,
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
+            pageInfo: $filters->pageInfo ?? null,
             callback: function($customers) {
                 self::process(ShopifyConvert::customers($customers));
             }
@@ -177,7 +178,7 @@ class CustomerRequests implements RequestInterface
             } else {
                 $customerEntity = $customerRepository->getByEmail($channeledCustomer->email);
             }
-            if (!$channeledCustomerRepository->existsByPlatformIdAndChannel(
+            if (!$channeledCustomerRepository->existsByPlatformId(
                 platformId: $channeledCustomer->platformId,
                 channel: $channeledCustomer->channel)
             ) {
@@ -186,7 +187,7 @@ class CustomerRequests implements RequestInterface
                     returnEntity: true,
                 );
             } else {
-                $channeledCustomerEntity = $channeledCustomerRepository->getByPlatformIdAndChannel(
+                $channeledCustomerEntity = $channeledCustomerRepository->getByPlatformId(
                     platformId: $channeledCustomer->platformId,
                     channel: $channeledCustomer->channel,
                 );

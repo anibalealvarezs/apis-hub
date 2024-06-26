@@ -15,7 +15,7 @@ class PriceRuleRepository extends BaseRepository
      * @param object|null $filters
      * @return ArrayCollection
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
+    public function readMultiple(int $limit = 100, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
@@ -28,9 +28,11 @@ class PriceRuleRepository extends BaseRepository
             $query->where('e.id IN (:ids)')
                 ->setParameter('ids', $ids);
         }
-        foreach($filters as $key => $value) {
-            $query->andWhere('e.' . $key . ' = :' . $key)
-                ->setParameter($key, $value);
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
         }
         $list = $query->setMaxResults($limit)
             ->setFirstResult($limit * $pagination)

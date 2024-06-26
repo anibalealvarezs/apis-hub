@@ -15,7 +15,7 @@ class ChanneledDiscountRepository extends ChanneledBaseRepository
      * @return Entity|null
      * @throws NonUniqueResultException
      */
-    public function getByCodeAndChannel(string $code, int $channel): ?Entity
+    public function getByCode(string $code, int $channel): ?Entity
     {
         return $this->_em->createQueryBuilder()
             ->select('e')
@@ -35,7 +35,7 @@ class ChanneledDiscountRepository extends ChanneledBaseRepository
      * @throws NonUniqueResultException
      * @throws NoResultException
      */
-    public function existsByCodeAndChannel(string $code, int $channel): bool
+    public function existsByCode(string $code, int $channel): bool
     {
         return $this->_em->createQueryBuilder()
             ->select('COUNT(e.id)')

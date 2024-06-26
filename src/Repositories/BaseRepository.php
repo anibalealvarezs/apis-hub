@@ -59,9 +59,11 @@ class BaseRepository extends EntityRepository
             ->from($this->getEntityName(), 'e')
             ->where('e.id = :id')
             ->setParameter('id', $id);
-        foreach($filters as $key => $value) {
-            $query->andWhere('e.' . $key . ' = :' . $key)
-                ->setParameter($key, $value);
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
         }
 
         if ($returnEntity) {
@@ -98,7 +100,7 @@ class BaseRepository extends EntityRepository
      * @param object|null $filters
      * @return ArrayCollection
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
+    public function readMultiple(int $limit = 100, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
@@ -107,9 +109,11 @@ class BaseRepository extends EntityRepository
             $query->where('e.id IN (:ids)')
                 ->setParameter('ids', $ids);
         }
-        foreach($filters as $key => $value) {
-            $query->andWhere('e.' . $key . ' = :' . $key)
-                ->setParameter($key, $value);
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
         }
         $list = $query->setMaxResults($limit)
             ->setFirstResult($limit * $pagination)

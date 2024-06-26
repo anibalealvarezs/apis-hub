@@ -22,6 +22,11 @@ enum AnalyticsEntities
     /**
      * @var string
      */
+    case price_rule;
+
+    /**
+     * @var string
+     */
     case product;
 
     /**
@@ -56,6 +61,7 @@ enum AnalyticsEntities
             'customer' => 'CustomerRequests',
             'discount' => 'DiscountRequests',
             'order' => 'OrderRequests',
+            'price_rule' => 'PriceRuleRequests',
             'product' => 'ProductRequests',
             'product_category' => 'ProductCategoryRequests',
             'product_variant' => 'ProductVariantRequests',

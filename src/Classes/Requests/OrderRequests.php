@@ -38,7 +38,7 @@ class OrderRequests implements RequestInterface
             shopName: $config['shopify_shop_name'],
             version: $config['shopify_last_stable_revision'],
         );
-        $shopifyClient->getAllOrders(
+        $shopifyClient->getAllOrdersAndProcess(
             createdAtMin: $filters->createdAtMin ?? null,
             createdAtMax: $filters->createdAtMax ?? null,
             fields: $fields, // Example: ["id", "processed_at", "total_price", "total_discounts", "discount_codes", "customer", "line_items"]
@@ -51,6 +51,7 @@ class OrderRequests implements RequestInterface
             status: $filters->status ?? null,
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
+            pageInfo: $filters->pageInfo ?? null,
             callback: function($orders) {
                 self::process(ShopifyConvert::orders($orders));
             }
@@ -120,16 +121,16 @@ class OrderRequests implements RequestInterface
             } else {
                 $orderEntity = $orderRepository->getByOrderId($order->platformId);
             }
-            if (!$channeledOrderRepository->existsByPlatformIdAndChannel($order->platformId, $order->channel)) {
+            if (!$channeledOrderRepository->existsByPlatformId($order->platformId, $order->channel)) {
                 $channeledOrderEntity = $channeledOrderRepository->create(
                     data: $order,
                     returnEntity: true,
                 );
             } else {
-                $channeledOrderEntity = $channeledOrderRepository->getByPlatformIdAndChannel($order->platformId, $order->channel);
+                $channeledOrderEntity = $channeledOrderRepository->getByPlatformId($order->platformId, $order->channel);
             }
             foreach($order->discountCodes as $discountCode) {
-                if (!$channeledDiscountRepository->existsByCodeAndChannel($discountCode, $order->channel)) {
+                if (!$channeledDiscountRepository->existsByCode($discountCode, $order->channel)) {
                     $channeledDiscountEntity = $channeledDiscountRepository->create(
                         data: (object) [
                             'code' => $discountCode,
@@ -140,7 +141,7 @@ class OrderRequests implements RequestInterface
                         returnEntity: true,
                     );
                 } else {
-                    $channeledDiscountEntity = $channeledDiscountRepository->getByCodeAndChannel($discountCode, $order->channel);
+                    $channeledDiscountEntity = $channeledDiscountRepository->getByCode($discountCode, $order->channel);
                 }
                 $channeledOrderEntity->addChanneledDiscount($channeledDiscountEntity);
                 $manager->persist($channeledDiscountEntity);
@@ -149,7 +150,7 @@ class OrderRequests implements RequestInterface
             }
             foreach($order->lineItems as $lineItem) {
                 if ($lineItem['product_id']) {
-                    if (!$channeledProductRepository->existsByPlatformIdAndChannel($lineItem['product_id'], $order->channel)) {
+                    if (!$channeledProductRepository->existsByPlatformId($lineItem['product_id'], $order->channel)) {
                         $channeledProductEntity = $channeledProductRepository->create(
                             data: (object) [
                                 'channel' => $order->channel,
@@ -159,12 +160,12 @@ class OrderRequests implements RequestInterface
                             returnEntity: true,
                         );
                     } else {
-                        $channeledProductEntity = $channeledProductRepository->getByPlatformIdAndChannel($lineItem['product_id'], $order->channel);
+                        $channeledProductEntity = $channeledProductRepository->getByPlatformId($lineItem['product_id'], $order->channel);
                     }
                     $channeledOrderEntity->addChanneledProduct($channeledProductEntity);
                 }
                 if ($lineItem['variant_id']) {
-                    if (!$channeledProductVariantRepository->existsByPlatformIdAndChannel($lineItem['variant_id'], $order->channel)) {
+                    if (!$channeledProductVariantRepository->existsByPlatformId($lineItem['variant_id'], $order->channel)) {
                         $channeledProductVariantEntity = $channeledProductVariantRepository->create(
                             data: (object) [
                                 'channel' => $order->channel,
@@ -174,7 +175,7 @@ class OrderRequests implements RequestInterface
                             returnEntity: true,
                         );
                     } else {
-                        $channeledProductVariantEntity = $channeledProductVariantRepository->getByPlatformIdAndChannel($lineItem['variant_id'], $order->channel);
+                        $channeledProductVariantEntity = $channeledProductVariantRepository->getByPlatformId($lineItem['variant_id'], $order->channel);
                     }
                     $channeledOrderEntity->addChanneledProductVariant($channeledProductVariantEntity);
                     $manager->persist($channeledProductVariantEntity);
@@ -188,7 +189,7 @@ class OrderRequests implements RequestInterface
             }
             $customerId = isset($order->customer->id) && $order->customer->id ? $order->customer->id : 'fake-'.$order->platformId;
             $email = isset($order->customer->email) && $order->customer->email ? $order->customer->email : $customerId . '@' . $order->channel;
-            if (!$channeledCustomerRepository->existsByEmailAndChannel($email, $order->channel)) {
+            if (!$channeledCustomerRepository->existsByEmail($email, $order->channel)) {
                 $channeledCustomerEntity = $channeledCustomerRepository->create(
                     data: (object) [
                         'channel' => $order->channel,
@@ -199,7 +200,7 @@ class OrderRequests implements RequestInterface
                     returnEntity: true,
                 );
             } else {
-                $channeledCustomerEntity = $channeledCustomerRepository->getByEmailAndChannel($email, $order->channel);
+                $channeledCustomerEntity = $channeledCustomerRepository->getByEmail($email, $order->channel);
             }
             $channeledCustomerEntity->addChanneledOrder($channeledOrderEntity);
             $orderEntity->addChanneledOrder($channeledOrderEntity);
