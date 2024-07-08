@@ -11,6 +11,10 @@ use Repositories\Channeled\ChanneledDiscountRepository;
 #[ORM\Entity(repositoryClass: ChanneledDiscountRepository::class)]
 #[ORM\Table(name: 'channeled_discounts')]
 #[ORM\Index(columns: ['code', 'platformId', 'channel'], name: 'code_platformId_channel_idx')]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
+#[ORM\Index(columns: ['code', 'channel'], name: 'email_channel_idx')]
+#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
+#[ORM\Index(columns: ['platformCreatedAt'], name: 'platformCreatedAt_idx')]
 #[ORM\Index(columns: ['code'], name: 'code_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledDiscount extends ChanneledEntity

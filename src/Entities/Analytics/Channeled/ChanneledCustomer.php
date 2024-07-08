@@ -11,7 +11,12 @@ use Repositories\Channeled\ChanneledCustomerRepository;
 #[ORM\Entity(repositoryClass: ChanneledCustomerRepository::class)]
 #[ORM\Table(name: 'channeled_customers')]
 #[ORM\Index(columns: ['email', 'platformId', 'channel'], name: 'email_platformId_channel_idx')]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
+#[ORM\Index(columns: ['email', 'channel'], name: 'email_channel_idx')]
+#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
+#[ORM\Index(columns: ['platformCreatedAt'], name: 'platformCreatedAt_idx')]
 #[ORM\Index(columns: ['email'], name: 'email_idx')]
+
 #[ORM\HasLifecycleCallbacks]
 class ChanneledCustomer extends ChanneledEntity
 {

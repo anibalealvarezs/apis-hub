@@ -33,7 +33,10 @@ class ProductRequests implements RequestInterface
      * @param array|null $fields
      * @param object|null $filters
      * @return Response
+     * @throws Exception
      * @throws GuzzleException
+     * @throws NotSupported
+     * @throws ORMException
      */
     public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, int $collectionId = null, array $fields = null, object $filters = null): Response
     {
@@ -59,7 +62,7 @@ class ProductRequests implements RequestInterface
             productType: $filters->productType ?? null,
             publishedAtMin: $filters->publishedAtMin ?? null,
             publishedAtMax: $filters->publishedAtMax ?? null,
-            sinceId: $filters->sinceId ?? $lastChanneledProduct ?: null,
+            sinceId: $filters->sinceId ?? $lastChanneledProduct['platformId'] ?? null,
             status: $filters->status ?? null,
             title: $filters->title ?? null,
             updatedAtMin: $filters->updatedAtMin ?? null,

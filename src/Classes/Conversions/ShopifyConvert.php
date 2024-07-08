@@ -2,6 +2,7 @@
 
 namespace Classes\Conversions;
 
+use Carbon\Carbon;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channels;
 
@@ -12,6 +13,7 @@ class ShopifyConvert
         return new ArrayCollection(array_map(function($customer) {
             return (object) [
                 'platformId' => $customer['id'],
+                'platformCreatedAt' => Carbon::parse($customer['created_at']),
                 'channel' => Channels::shopify->value,
                 'email' => $customer['email'],
                 'data' => $customer,
@@ -28,6 +30,7 @@ class ShopifyConvert
         return new ArrayCollection(array_map(function($discount) {
             return (object) [
                 'platformId' => $discount['id'],
+                'platformCreatedAt' => Carbon::parse($discount['created_at']),
                 'channel' => Channels::shopify->value,
                 'code' => $discount['code'],
                 'data' => $discount,
@@ -40,6 +43,7 @@ class ShopifyConvert
         return new ArrayCollection(array_map(function($priceRule) {
             return (object) [
                 'platformId' => $priceRule['id'],
+                'platformCreatedAt' => Carbon::parse($priceRule['created_at']),
                 'channel' => Channels::shopify->value,
                 'data' => $priceRule,
             ];
@@ -51,6 +55,7 @@ class ShopifyConvert
         return new ArrayCollection(array_map(function($order) {
             return (object) [
                 'platformId' => $order['id'],
+                'platformCreatedAt' => Carbon::parse($order['created_at']),
                 'channel' => Channels::shopify->value,
                 'data' => $order,
                 'customer' => (object) $order['customer'],
@@ -69,6 +74,7 @@ class ShopifyConvert
         return new ArrayCollection(array_map(function($product) {
             return (object) [
                 'platformId' => $product['id'],
+                'platformCreatedAt' => Carbon::parse($product['created_at']),
                 'channel' => Channels::shopify->value,
                 'data' => $product,
                 'vendor' => $product['vendor'],
@@ -82,6 +88,7 @@ class ShopifyConvert
         return new ArrayCollection(array_map(function($productVariant) {
             return (object) [
                 'platformId' => $productVariant['id'],
+                'platformCreatedAt' => Carbon::parse($productVariant['created_at']),
                 'channel' => Channels::shopify->value,
                 'data' => $productVariant,
             ];
@@ -93,6 +100,7 @@ class ShopifyConvert
         return new ArrayCollection(array_map(function($productCategory) use ($isSmartCollection) {
             return (object) [
                 'platformId' => $productCategory['id'],
+                'platformCreatedAt' => Carbon::parse($productCategory['published_at']),
                 'channel' => Channels::shopify->value,
                 'data' => $productCategory,
                 'isSmartCollection' => $isSmartCollection,

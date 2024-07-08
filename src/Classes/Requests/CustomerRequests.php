@@ -3,9 +3,9 @@
 namespace Classes\Requests;
 
 use Carbon\Carbon;
-use Chmw\KlaviyoApi\KlaviyoApi;
 use Classes\Conversions\KlaviyoConvert;
 use Classes\Conversions\ShopifyConvert;
+use Classes\Overrides\ShopifyApi\KlaviyoApi;
 use Classes\Overrides\ShopifyApi\ShopifyApi;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
@@ -52,7 +52,7 @@ class CustomerRequests implements RequestInterface
             createdAtMax: $createdAtMax,
             fields: $fields,
             ids: $filters->ids ?? null,
-            sinceId: $filters->sinceId ?? $lastChanneledCustomer ?: null,
+            sinceId: $filters->sinceId ?? ($lastChanneledCustomer['platformId'] ?? null),
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
             pageInfo: $filters->pageInfo ?? null,
@@ -82,8 +82,13 @@ class CustomerRequests implements RequestInterface
         $klaviyoClient = new KlaviyoApi(
             apiKey: $config['klaviyo_api_key'],
         );
+
+        $manager = Helpers::getManager();
+        $channeledCustomerRepository = $manager->getRepository(entityName: ChanneledCustomer::class);
+        $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformCreatedAt(channel: Channels::klaviyo->value);
+
         $origin = Carbon::parse(time: "2000-01-01");
-        $min = $createdAtMin ? Carbon::parse($createdAtMin) : null;
+        $min = $createdAtMin ? Carbon::parse($createdAtMin) : Carbon::parse($lastChanneledCustomer['platformCreatedAt']) ?? null;
         $max = $createdAtMax ? Carbon::parse($createdAtMax) : null;
         $now = Carbon::now();
         $from = $min && $min->lt($now) && $min->lt($max) && $origin->lte($min) ?
@@ -102,7 +107,7 @@ class CustomerRequests implements RequestInterface
                 ];
             }
         }
-        $sourceCustomers = $klaviyoClient->getAllProfiles(
+        $klaviyoClient->getAllProfilesAndProcess(
             profileFields: $fields,
             additionalFields: ['predictive_analytics','subscriptions'],
             filter: [
@@ -112,8 +117,12 @@ class CustomerRequests implements RequestInterface
                     ["operator" => ["less-than"], "field" => "created", "value" => $to],
                 ]
             ],
+            sortField: 'created',
+            callback: function($customers) {
+                self::process(KlaviyoConvert::customers($customers));
+            }
         );
-        return self::process(KlaviyoConvert::customers($sourceCustomers['data']));
+        return new Response(json_encode(['Customers retrieved']));
     }
 
     /**

@@ -12,6 +12,7 @@ use Repositories\Channeled\ChanneledOrderRepository;
 #[ORM\Table(name: 'channeled_orders')]
 #[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
 #[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
+#[ORM\Index(columns: ['platformCreatedAt'], name: 'platformCreatedAt_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledOrder extends ChanneledEntity
 {

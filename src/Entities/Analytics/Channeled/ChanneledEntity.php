@@ -2,6 +2,7 @@
 
 namespace Entities\Analytics\Channeled;
 
+use DateTime;
 use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Interfaces\ChannelInterface;
@@ -16,6 +17,9 @@ class ChanneledEntity extends Entity implements ChannelInterface
 
     #[ORM\Column(type: 'json')]
     protected array $data;
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    protected DateTime $platformCreatedAt;
 
     /**
      * @return int|string
@@ -32,6 +36,25 @@ class ChanneledEntity extends Entity implements ChannelInterface
     public function addPlatformId(int|string $platformId): self
     {
         $this->platformId = $platformId;
+
+        return $this;
+    }
+
+    /**
+     * @return DateTime
+     */
+    public function getPlatformCreatedAt(): DateTime
+    {
+        return $this->platformCreatedAt;
+    }
+
+    /**
+     * @param DateTime $platformCreatedAt
+     * @return ChanneledEntity
+     */
+    public function addPlatformCreatedAt(DateTime $platformCreatedAt): self
+    {
+        $this->platformCreatedAt = $platformCreatedAt;
 
         return $this;
     }

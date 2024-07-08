@@ -53,7 +53,7 @@ class PriceRuleRequests implements RequestInterface
             createdAtMax: $createdAtMax,
             endsAtMin: $filters->endsAtMin ?? null,
             endsAtMax: $filters->endsAtMax ?? null,
-            sinceId: $filters->sinceId ?? $lastChanneledPriceRule ?: null,
+            sinceId: $filters->sinceId ?? $lastChanneledPriceRule['platformId'] ?? null,
             startsAtMin: $filters->startsAtMin ?? null,
             startsAtMax: $filters->startsAtMax ?? null,
             timesUsed: $filters->timesUsed ?? null,
