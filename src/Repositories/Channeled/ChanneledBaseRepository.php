@@ -138,4 +138,25 @@ class ChanneledBaseRepository extends BaseRepository
     {
         return Channels::from($channel)->getName();
     }
+
+    /**
+     * @param int $channel
+     * @return string
+     * @throws NonUniqueResultException
+     */
+    public function getLastByPlatformId(int $channel): string
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('e, LENGTH(e.platformId) AS HIDDEN length')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.channel = :channel')
+            ->setParameter('channel', $channel)
+            ->addOrderBy('length', 'DESC')
+            ->addOrderBy('e.platformId', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
+
+        return $query ? $query['platformId'] : '';
+    }
 }

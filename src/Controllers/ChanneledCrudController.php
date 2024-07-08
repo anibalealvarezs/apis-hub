@@ -45,9 +45,15 @@ class ChanneledCrudController
         if (!$this->isValidCrudableEntity($entity)) {
             return new Response('Invalid crudable entity', Response::HTTP_NOT_FOUND);
         }
-        
-        if (defined(Channels::class . '::' . $channel) === false) {
+
+        $channelsConfig = Helpers::getChannelsConfig();
+
+        if ((defined(Channels::class . '::' . $channel) === false) || !in_array($channel, array_keys($channelsConfig))) {
             return new Response('Invalid channel', Response::HTTP_NOT_FOUND);
+        }
+
+        if ($channelsConfig[$channel]['enabled'] === false) {
+            return new Response('Channel disabled', Response::HTTP_FORBIDDEN);
         }
 
         $channelConstant = (new ReflectionEnum(objectOrClass: Channels::class))->getConstant($channel);

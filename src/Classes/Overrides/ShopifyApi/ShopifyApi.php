@@ -5,6 +5,7 @@ namespace Classes\Overrides\ShopifyApi;
 use Chmw\ShopifyApi\Enums\FinancialStatus;
 use Chmw\ShopifyApi\Enums\FulfillmentStatus;
 use Chmw\ShopifyApi\Enums\PublishedStatus;
+use Chmw\ShopifyApi\Enums\SortOptions;
 use Chmw\ShopifyApi\Enums\Status;
 use GuzzleHttp\Exception\GuzzleException;
 
@@ -21,6 +22,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
      * @param string|null $updatedAtMax
      * @param string|null $pageInfo
      * @param callable|null $callback
+     * @param SortOptions $sort
      * @return void
      * @throws GuzzleException
      */
@@ -35,6 +37,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
         ?string $updatedAtMax = null,
         ?string $pageInfo = null,
         callable $callback = null,
+        SortOptions $sort = SortOptions::idAsc,
     ): void {
 
         do {
@@ -49,6 +52,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
                 updatedAtMin: $updatedAtMin,
                 updatedAtMax: $updatedAtMax,
                 includeHeaders: true,
+                sort: $sort,
             );
             if (!empty($response['body']['customers'])) {
                 if ($callback) {
@@ -74,6 +78,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
      * @param string|null $updatedAtMax
      * @param string|null $pageInfo
      * @param callable|null $callback
+     * @param SortOptions $sort
      * @return void
      * @throws GuzzleException
      */
@@ -93,6 +98,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
         ?string $updatedAtMax = null,
         ?string $pageInfo = null,
         callable $callback = null,
+        SortOptions $sort = SortOptions::idAsc,
     ): void {
 
         do {
@@ -112,6 +118,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
                 updatedAtMin: $updatedAtMin,
                 updatedAtMax: $updatedAtMax,
                 includeHeaders: true,
+                sort: $sort,
             );
             if (!empty($response['body']['orders'])) {
                 if ($callback) {
@@ -135,6 +142,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
      * @param string|null $updatedAtMax
      * @param string|null $pageInfo
      * @param callable|null $callback
+     * @param SortOptions $sort
      * @return void
      * @throws GuzzleException
      */
@@ -152,6 +160,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
         ?string $updatedAtMax = null,
         ?string $pageInfo = null,
         callable $callback = null,
+        SortOptions $sort = SortOptions::idAsc,
     ): void {
 
         do {
@@ -169,6 +178,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
                 updatedAtMin: $updatedAtMin,
                 updatedAtMax: $updatedAtMax,
                 includeHeaders: true,
+                sort: $sort,
             );
             if (!empty($response['body']['price_rules'])) {
                 if ($callback) {
@@ -228,6 +238,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
      * @param string|null $vendor
      * @param string|null $pageInfo
      * @param callable|null $callback
+     * @param SortOptions $sort
      * @return void
      * @throws GuzzleException
      */
@@ -251,6 +262,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
         ?string $vendor = null,
         ?string $pageInfo = null,
         callable $callback = null,
+        SortOptions $sort = SortOptions::idAsc,
     ): void {
 
         do {
@@ -274,6 +286,7 @@ class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
                 updatedAtMax: $updatedAtMax,
                 vendor: $vendor,
                 includeHeaders: true,
+                sort: $sort,
             );
             if (!empty($response['body']['products'])) {
                 if ($callback) {

@@ -11,7 +11,7 @@ $request = Request::createFromGlobals();
 
 $app = new RoutingCore();
 
-// Custom routes first
+// Cache routes first
 $cacheRoutes = require_once __DIR__ . "/../src/Routes/cache.php";
 $app->multiMap($cacheRoutes);
 

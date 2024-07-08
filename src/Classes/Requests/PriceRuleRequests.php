@@ -12,10 +12,12 @@ use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\Persistence\ObjectRepository;
+use Entities\Analytics\Channeled\ChanneledCustomer;
 use Entities\Analytics\Channeled\ChanneledDiscount;
 use Entities\Analytics\Channeled\ChanneledPriceRule;
 use Entities\Analytics\Discount;
 use Entities\Analytics\PriceRule;
+use Enums\Channels;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -28,7 +30,10 @@ class PriceRuleRequests implements RequestInterface
      * @param string|null $createdAtMax
      * @param object|null $filters
      * @return Response
+     * @throws Exception
      * @throws GuzzleException
+     * @throws NotSupported
+     * @throws ORMException
      */
     public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, object $filters = null): Response
     {
@@ -38,12 +43,17 @@ class PriceRuleRequests implements RequestInterface
             shopName: $config['shopify_shop_name'],
             version: $config['shopify_last_stable_revision'],
         );
+
+        $manager = Helpers::getManager();
+        $channeledPriceRuleRepository = $manager->getRepository(entityName: ChanneledPriceRule::class);
+        $lastChanneledPriceRule = $channeledPriceRuleRepository->getLastByPlatformId(channel: Channels::shopify->value);
+
         $shopifyClient->getAllPriceRulesAndProcess(
             createdAtMin: $createdAtMin,
             createdAtMax: $createdAtMax,
             endsAtMin: $filters->endsAtMin ?? null,
             endsAtMax: $filters->endsAtMax ?? null,
-            sinceId: $filters->sinceId ?? null,
+            sinceId: $filters->sinceId ?? $lastChanneledPriceRule ?: null,
             startsAtMin: $filters->startsAtMin ?? null,
             startsAtMax: $filters->startsAtMax ?? null,
             timesUsed: $filters->timesUsed ?? null,

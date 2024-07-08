@@ -15,6 +15,7 @@ use Entities\Analytics\Channeled\ChanneledOrder;
 use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductVariant;
 use Entities\Analytics\Order;
+use Enums\Channels;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -38,6 +39,11 @@ class OrderRequests implements RequestInterface
             shopName: $config['shopify_shop_name'],
             version: $config['shopify_last_stable_revision'],
         );
+
+        $manager = Helpers::getManager();
+        $channeledOrderRepository = $manager->getRepository(entityName: ChanneledOrder::class);
+        $lastChanneledOrder = $channeledOrderRepository->getLastByPlatformId(channel: Channels::shopify->value);
+
         $shopifyClient->getAllOrdersAndProcess(
             createdAtMin: $filters->createdAtMin ?? null,
             createdAtMax: $filters->createdAtMax ?? null,
@@ -47,7 +53,7 @@ class OrderRequests implements RequestInterface
             ids: $filters->ids ?? null,
             processedAtMin: $processedAtMin,
             processedAtMax: $processedAtMax,
-            sinceId: $filters->sinceId ?? null,
+            sinceId: $filters->sinceId ?? $lastChanneledOrder ?: null,
             status: $filters->status ?? null,
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,

@@ -11,12 +11,14 @@ use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
+use Entities\Analytics\Channeled\ChanneledOrder;
 use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductVariant;
 use Entities\Analytics\Channeled\ChanneledVendor;
 use Entities\Analytics\Product;
 use Entities\Analytics\ProductVariant;
 use Entities\Analytics\Vendor;
+use Enums\Channels;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -41,6 +43,11 @@ class ProductRequests implements RequestInterface
             shopName: $config['shopify_shop_name'],
             version: $config['shopify_last_stable_revision'],
         );
+
+        $manager = Helpers::getManager();
+        $channeledProductRepository = $manager->getRepository(entityName: ChanneledProduct::class);
+        $lastChanneledProduct = $channeledProductRepository->getLastByPlatformId(channel: Channels::shopify->value);
+
         $shopifyClient->getAllProductsAndProcess(
             collectionId: $collectionId,
             createdAtMin: $createdAtMin,
@@ -52,6 +59,7 @@ class ProductRequests implements RequestInterface
             productType: $filters->productType ?? null,
             publishedAtMin: $filters->publishedAtMin ?? null,
             publishedAtMax: $filters->publishedAtMax ?? null,
+            sinceId: $filters->sinceId ?? $lastChanneledProduct ?: null,
             status: $filters->status ?? null,
             title: $filters->title ?? null,
             updatedAtMin: $filters->updatedAtMin ?? null,

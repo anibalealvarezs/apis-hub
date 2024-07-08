@@ -15,6 +15,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\OptimisticLockException;
 use Entities\Analytics\Channeled\ChanneledCustomer;
 use Entities\Analytics\Customer;
+use Enums\Channels;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -28,7 +29,10 @@ class CustomerRequests implements RequestInterface
      * @param array|null $fields
      * @param object|null $filters
      * @return Response
+     * @throws Exception
      * @throws GuzzleException
+     * @throws NotSupported
+     * @throws ORMException
      */
     public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, array $fields = null, object $filters = null): Response
     {
@@ -39,12 +43,16 @@ class CustomerRequests implements RequestInterface
             version: $config['shopify_last_stable_revision'],
         );
 
+        $manager = Helpers::getManager();
+        $channeledCustomerRepository = $manager->getRepository(entityName: ChanneledCustomer::class);
+        $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformId(channel: Channels::shopify->value);
+
         $shopifyClient->getAllCustomersAndProcess(
             createdAtMin: $createdAtMin,
             createdAtMax: $createdAtMax,
             fields: $fields,
             ids: $filters->ids ?? null,
-            sinceId: $filters->sinceId ?? null,
+            sinceId: $filters->sinceId ?? $lastChanneledCustomer ?: null,
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
             pageInfo: $filters->pageInfo ?? null,

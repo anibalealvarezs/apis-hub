@@ -72,10 +72,11 @@ class JobRepository extends BaseRepository
     /**
      * @param int $id
      * @param bool $returnEntity
+     * @param object|null $filters
      * @return Entity|array|null
      * @throws NonUniqueResultException
      */
-    public function read(int $id, bool $returnEntity = false): Entity|array|null
+    public function read(int $id, bool $returnEntity = false, object $filters = null): Entity|array|null
     {
         $entity = parent::read($id, $returnEntity);
 
