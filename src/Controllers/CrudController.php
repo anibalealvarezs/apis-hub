@@ -46,6 +46,7 @@ class CrudController
 
         return match ($method) {
             'read' => $this->read($entity, $id),
+            'count' => $this->count($entity, $body, $params),
             'list' => $this->list($entity, $body, $params),
             'create' => $this->create($entity, $body),
             'update' => $this->update($entity, $id, $body),
@@ -67,6 +68,29 @@ class CrudController
         );
 
         return new Response(json_encode($repository->read(id: $id) ?: []));
+    }
+
+    /**
+     * @param string $entity
+     * @param string|null $body
+     * @param array|null $params
+     * @return Response
+     * @throws NotSupported
+     * @throws ReflectionException
+     */
+    protected function count(string $entity, string $body = null, ?array $params = null): Response
+    {
+        $repository = $this->em->getRepository(
+            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
+        );
+
+        if (!empty($params) && !$this->validateParams(array_keys($params), $repository::class, 'readMultiple')) {
+            return new Response('Invalid parameters', Response::HTTP_BAD_REQUEST);
+        }
+
+        $params['filters'] = Helpers::bodyToObject($body);
+
+        return new Response(json_encode($repository->countElements(...$params)));
     }
 
     /**

@@ -3,7 +3,7 @@
 use Controllers\CrudController;
 
 return [
-    '/{entity}/create' => [
+    '/entity/{entity}/create' => [
         'httpMethod' => 'POST',
         'callable' => function (string $entity, ?string $body = null, ?array $params = null) {
             return (new CrudController())(
@@ -13,7 +13,18 @@ return [
             );
         }
     ],
-    '/{entity}/{id}' => [
+    '/entity/{entity}/count' => [
+        'httpMethod' => 'GET',
+        'callable' => function (string $entity, ?string $body = null, ?array $params = null) {
+            return (new CrudController())(
+                entity: $entity,
+                method: 'count',
+                body: $body,
+                params: $params,
+            );
+        }
+    ],
+    '/entity/{entity}/{id}' => [
         'httpMethod' => 'GET',
         'callable' => function (string $entity, int $id, ?string $body = null, ?array $params = null) {
             return (new CrudController())(
@@ -23,7 +34,7 @@ return [
             );
         }
     ],
-    '/{entity}' => [
+    '/entity/{entity}' => [
         'httpMethod' => 'GET',
         'callable' => function (string $entity, ?string $body = null, ?array $params = null) {
             return (new CrudController())(
@@ -34,7 +45,7 @@ return [
             );
         }
     ],
-    '/{entity}/{id}/update' => [
+    '/entity/{entity}/{id}/update' => [
         'httpMethod' => 'PUT',
         'callable' => function (string $entity, int $id, ?string $body = null, ?array $params = null) {
             return (new CrudController())(
@@ -45,7 +56,7 @@ return [
             );
         }
     ],
-    '/{entity}/{id}/delete' => [
+    '/entity/{entity}/{id}/delete' => [
         'httpMethod' => 'DELETE',
         'callable' => function (string $entity, int $id, ?string $body = null, ?array $params = null) {
             return (new CrudController())(

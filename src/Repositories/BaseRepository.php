@@ -94,6 +94,26 @@ class BaseRepository extends EntityRepository
     }
 
     /**
+     * @param object|null $filters
+     * @return int
+     * @throws NoResultException
+     * @throws NonUniqueResultException
+     */
+    public function countElements(object $filters = null): int
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('count(e.id)')
+            ->from($this->getEntityName(), 'e');
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+        return $query->getQuery()->getSingleScalarResult();
+    }
+
+    /**
      * @param int $limit
      * @param int $pagination
      * @param array|null $ids

@@ -60,6 +60,7 @@ class ChanneledCrudController
 
         return match ($method) {
             'read' => $this->read($entity, $channelConstant, $id),
+            'count' => $this->count($entity, $channelConstant, $body, $params),
             'list' => $this->list($entity, $channelConstant, $body, $params),
             default => new Response('Method not found', Response::HTTP_NOT_FOUND),
         };
@@ -86,6 +87,33 @@ class ChanneledCrudController
         ];
 
         return new Response(json_encode($repository->read(...$params) ?: []));
+    }
+
+    /**
+     * @param string $entity
+     * @param Channels $channel
+     * @param string|null $body
+     * @param array|null $params
+     * @return Response
+     * @throws NotSupported
+     * @throws ReflectionException
+     */
+    protected function count(string $entity, Channels $channel, string $body = null, ?array $params = null): Response
+    {
+        $repository = $this->em->getRepository(
+            Helpers::getEntitiesConfig()[strtolower($entity)]['channeled_class']
+        );
+
+        if (!empty($params) && !$this->validateParams(array_keys($params), $repository::class, 'readMultiple')) {
+            return new Response('Invalid parameters', Response::HTTP_BAD_REQUEST);
+        }
+
+        $params['filters'] = Helpers::bodyToObject($body);
+        if (!isset($params['filters']->channel)) {
+            $params['filters']->channel = $channel->value;
+        }
+
+        return new Response(json_encode($repository->countElements(...$params)));
     }
 
     /**

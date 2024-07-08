@@ -15,13 +15,13 @@ $app = new RoutingCore();
 $cacheRoutes = require_once __DIR__ . "/../src/Routes/cache.php";
 $app->multiMap($cacheRoutes);
 
-// Channeled CRUD routes next
-$cacheRoutes = require_once __DIR__ . "/../src/Routes/channeledcrud.php";
-$app->multiMap($cacheRoutes);
-
 // CRUD routes last
 $crudRoutes = require_once __DIR__ . "/../src/Routes/crud.php";
 $app->multiMap($crudRoutes);
+
+// Channeled CRUD routes next
+$cacheRoutes = require_once __DIR__ . "/../src/Routes/channeledcrud.php";
+$app->multiMap($cacheRoutes);
 
 $response = $app->handle($request);
 
