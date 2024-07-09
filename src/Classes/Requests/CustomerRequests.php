@@ -90,7 +90,7 @@ class CustomerRequests implements RequestInterface
         $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformCreatedAt(channel: Channels::klaviyo->value);
 
         $origin = Carbon::parse(time: "2000-01-01");
-        $min = $createdAtMin ? Carbon::parse($createdAtMin) : Carbon::parse($lastChanneledCustomer['platformCreatedAt']) ?? null;
+        $min = $createdAtMin ? Carbon::parse($createdAtMin) : (isset($lastChanneledCustomer['platformCreatedAt']) ? Carbon::parse($lastChanneledCustomer['platformCreatedAt']) : null);
         $max = $createdAtMax ? Carbon::parse($createdAtMax) : null;
         $now = Carbon::now();
         $from = $min && $min->lt($now) && $min->lt($max) && $origin->lte($min) ?
