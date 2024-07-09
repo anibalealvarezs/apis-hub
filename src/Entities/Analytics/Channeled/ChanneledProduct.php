@@ -12,12 +12,20 @@ use Repositories\Channeled\ChanneledProductRepository;
 #[ORM\Table(name: 'channeled_products')]
 #[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
 #[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
+#[ORM\Index(columns: ['sku'], name: 'sku_idx')]
 #[ORM\Index(columns: ['platformCreatedAt'], name: 'platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platformId', 'sku'], name: 'platformId_sku_idx')]
+#[ORM\Index(columns: ['platformId', 'platformCreatedAt'], name: 'platformId_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['sku', 'platformCreatedAt'], name: 'sku_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platformId', 'sku', 'platformCreatedAt'], name: 'platformId_sku_platformCreatedAt_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProduct extends ChanneledEntity
 {
     #[ORM\Column(type: 'string')]
     protected int|string $platformId;
+
+    #[ORM\Column(type: 'string', nullable: true)]
+    protected int|string $sku;
 
     // Relationships with channeled entities
 
@@ -48,6 +56,25 @@ class ChanneledProduct extends ChanneledEntity
         $this->channeledProductVariants = new ArrayCollection();
         $this->channeledProductCategories = new ArrayCollection();
         $this->channeledOrders = new ArrayCollection();
+    }
+
+    /**
+     * @return string
+     */
+    public function getSku(): string
+    {
+        return $this->sku;
+    }
+
+    /**
+     * @param string $sku
+     * @return ChanneledProduct
+     */
+    public function addSku(string $sku): self
+    {
+        $this->sku = $sku;
+
+        return $this;
     }
 
     public function getChanneledProductVariants(): ?Collection

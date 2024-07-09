@@ -1,6 +1,6 @@
 <?php
 
-namespace Classes\Overrides\ShopifyApi;
+namespace Classes\Overrides\KlaviyoApi;
 
 use Chmw\KlaviyoApi\Enums\Sort;
 use GuzzleHttp\Exception\GuzzleException;

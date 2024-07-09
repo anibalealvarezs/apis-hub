@@ -5,6 +5,7 @@ namespace Entities\Analytics;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductVariant;
 use Entities\Entity;
 use Repositories\ProductVariantRepository;
@@ -12,11 +13,16 @@ use Repositories\ProductVariantRepository;
 #[ORM\Entity(repositoryClass: ProductVariantRepository::class)]
 #[ORM\Table(name: 'product_variants')]
 #[ORM\Index(columns: ['productVariantId'], name: 'productVariantId_idx')]
+#[ORM\Index(columns: ['sku'], name: 'sku_idx')]
+#[ORM\Index(columns: ['productVariantId', 'sku'], name: 'productVariantId_sku_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ProductVariant extends Entity
 {
     #[ORM\Column(type: 'string', unique: true)]
     protected int|string $productVariantId;
+
+    #[ORM\Column(type: 'string', nullable: true)]
+    protected int|string $sku;
 
     #[ORM\OneToMany(mappedBy: 'productVariant', targetEntity: ChanneledProductVariant::class, orphanRemoval: true)]
     protected Collection $channeledProductVariants;
@@ -32,6 +38,25 @@ class ProductVariant extends Entity
     public function getProductVariantId(): string
     {
         return $this->productVariantId;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSku(): string
+    {
+        return $this->sku;
+    }
+
+    /**
+     * @param string $sku
+     * @return ProductVariant
+     */
+    public function addSku(string $sku): self
+    {
+        $this->sku = $sku;
+
+        return $this;
     }
 
     /**

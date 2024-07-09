@@ -19,6 +19,9 @@ class ChanneledProductVariant extends ChanneledEntity
     #[ORM\Column(type: 'string')]
     protected int|string $platformId;
 
+    #[ORM\Column(type: 'string', nullable: true)]
+    protected int|string $sku;
+
     // Relationships with channeled entities
 
     #[ORM\ManyToMany(targetEntity: 'ChanneledOrder', mappedBy: 'channeledProductVariants')]
@@ -40,6 +43,25 @@ class ChanneledProductVariant extends ChanneledEntity
     public function __construct()
     {
         $this->channeledOrders = new ArrayCollection();
+    }
+
+    /**
+     * @return string
+     */
+    public function getSku(): string
+    {
+        return $this->sku;
+    }
+
+    /**
+     * @param string $sku
+     * @return ChanneledProductVariant
+     */
+    public function addSku(string $sku): self
+    {
+        $this->sku = $sku;
+
+        return $this;
     }
 
     /**

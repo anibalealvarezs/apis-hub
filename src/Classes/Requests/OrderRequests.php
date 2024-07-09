@@ -2,6 +2,8 @@
 
 namespace Classes\Requests;
 
+use Classes\Conversions\NetSuiteConvert;
+use Classes\Overrides\NetSuiteApi\NetSuiteApi;
 use Classes\Overrides\ShopifyApi\ShopifyApi;
 use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -84,10 +86,63 @@ class OrderRequests implements RequestInterface
      * @param int $pagination
      * @param object|null $filters
      * @return Response
+     * @throws Exception
+     * @throws GuzzleException
+     * @throws NotSupported
+     * @throws ORMException
      */
     public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
     {
-        return new Response(json_encode([]));
+        $config = Helpers::getChannelsConfig()['netsuite'];
+        $netsuiteClient = new NetSuiteApi(
+            consumerId: $config['netsuite_consumer_id'],
+            consumerSecret: $config['netsuite_consumer_secret'],
+            token: $config['netsuite_token_id'],
+            tokenSecret: $config['netsuite_token_secret'],
+            accountId: $config['netsuite_account_id'],
+        );
+
+        $manager = Helpers::getManager();
+        $channeledOrderRepository = $manager->getRepository(entityName: ChanneledOrder::class);
+        $lastChanneledOrder = $channeledOrderRepository->getLastByPlatformId(channel: Channels::netsuite->value);
+
+        $query = "SELECT
+                Customer.email,
+                Customer.entityid,
+                Customer.firstname,
+                Customer.id AS customerid,
+                Customer.lastname,
+                Entity.altname,
+                Entity.contact,
+                Entity.datecreated,
+                Entity.entitytitle,
+                Entity.group,
+                Entity.id AS entityid,
+                Entity.isinactive,
+                Entity.isperson,
+                Entity.lastmodifieddate,
+                Entity.parent,
+                Entity.phone,
+                Entity.title,
+                Entity.toplevelparent,
+                Entity.type
+            FROM Customer
+            INNER JOIN Entity
+                ON Entity.customer = Customer.id
+            WHERE Entity.id > " . ($lastChanneledOrder['platformId'] ?? 0);
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $query .= " AND Entity.$key = '$value'";
+            }
+        }
+        $query .= " ORDER BY Entity.id ASC";
+        $netsuiteClient->getSuiteQLQueryAllAndProcess(
+            query: $query,
+            callback: function($orders) {
+                self::process(NetSuiteConvert::orders($orders));
+            }
+        );
+        return new Response(json_encode(['Orders retrieved']));
     }
 
     /**

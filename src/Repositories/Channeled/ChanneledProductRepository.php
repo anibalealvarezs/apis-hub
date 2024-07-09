@@ -4,7 +4,11 @@ namespace Repositories\Channeled;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
+use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
+use Entities\Entity;
 use Enums\Channels;
+use ReflectionEnum;
 
 class ChanneledProductRepository extends ChanneledBaseRepository
 {
@@ -52,5 +56,52 @@ class ChanneledProductRepository extends ChanneledBaseRepository
             }, $item['channeledProductVariants']);
             return $item;
         }, $list));
+    }
+
+    /**
+     * @param string $sku
+     * @param int $channel
+     * @return Entity|null
+     * @throws NonUniqueResultException
+     */
+    public function getBySku(string $sku, int $channel): ?Entity
+    {
+        if ((new ReflectionEnum(objectOrClass: Channels::class))->getConstant($channel)) {
+            die ('Invalid channel');
+        }
+
+        return $this->_em->createQueryBuilder()
+            ->select('e')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.sku = :sku')
+            ->setParameter('sku', $sku)
+            ->andWhere('e.channel = :channel')
+            ->setParameter('channel', $channel)
+            ->getQuery()
+            ->getOneOrNullResult(hydrationMode: AbstractQuery::HYDRATE_OBJECT);
+    }
+
+    /**
+     * @param string $sku
+     * @param int $channel
+     * @return bool
+     * @throws NoResultException
+     * @throws NonUniqueResultException
+     */
+    public function existsBySku(string $sku, int $channel): bool
+    {
+        if ((new ReflectionEnum(objectOrClass: Channels::class))->getConstant($channel)) {
+            die ('Invalid channel');
+        }
+
+        return $this->_em->createQueryBuilder()
+                ->select('COUNT(e.id)')
+                ->from($this->getEntityName(), 'e')
+                ->where('e.sku = :sku')
+                ->setParameter('sku', $sku)
+                ->andWhere('e.channel = :channel')
+                ->setParameter('channel', $channel)
+                ->getQuery()
+                ->getSingleScalarResult() > 0;
     }
 }

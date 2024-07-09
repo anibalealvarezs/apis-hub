@@ -4,9 +4,11 @@ namespace Classes\Requests;
 
 use Carbon\Carbon;
 use Classes\Conversions\KlaviyoConvert;
+use Classes\Conversions\NetSuiteConvert;
 use Classes\Conversions\ShopifyConvert;
-use Classes\Overrides\ShopifyApi\KlaviyoApi;
+use Classes\Overrides\KlaviyoApi\KlaviyoApi;
 use Classes\Overrides\ShopifyApi\ShopifyApi;
+use Classes\Overrides\NetSuiteApi\NetSuiteApi;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
@@ -126,36 +128,83 @@ class CustomerRequests implements RequestInterface
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
      * @param object|null $filters
      * @return Response
      */
-    public static function getListFromFacebook(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromFacebook(object $filters = null): Response
     {
         return new Response(json_encode([]));
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
      * @param object|null $filters
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromBigCommerce(object $filters = null): Response
     {
         return new Response(json_encode([]));
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
      * @param object|null $filters
      * @return Response
+     * @throws Exception
+     * @throws GuzzleException
+     * @throws NotSupported
+     * @throws ORMException
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromNetsuite(object $filters = null): Response
     {
-        return new Response(json_encode([]));
+        $config = Helpers::getChannelsConfig()['netsuite'];
+        $netsuiteClient = new NetSuiteApi(
+            consumerId: $config['netsuite_consumer_id'],
+            consumerSecret: $config['netsuite_consumer_secret'],
+            token: $config['netsuite_token_id'],
+            tokenSecret: $config['netsuite_token_secret'],
+            accountId: $config['netsuite_account_id'],
+        );
+
+        $manager = Helpers::getManager();
+        $channeledCustomerRepository = $manager->getRepository(entityName: ChanneledCustomer::class);
+        $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformId(channel: Channels::netsuite->value);
+
+        $query = "SELECT
+                Customer.email,
+                Customer.entityid,
+                Customer.firstname,
+                Customer.id AS customerid,
+                Customer.lastname,
+                Entity.altname,
+                Entity.contact,
+                Entity.datecreated,
+                Entity.entitytitle,
+                Entity.group,
+                Entity.id AS entityid,
+                Entity.isinactive,
+                Entity.isperson,
+                Entity.lastmodifieddate,
+                Entity.parent,
+                Entity.phone,
+                Entity.title,
+                Entity.toplevelparent,
+                Entity.type
+            FROM Customer
+            INNER JOIN Entity
+                ON Entity.customer = Customer.id
+            WHERE Entity.id > " . ($lastChanneledCustomer['platformId'] ?? 0);
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $query .= " AND Entity.$key = '$value'";
+            }
+        }
+        $query .= " ORDER BY Entity.id ASC";
+        $netsuiteClient->getSuiteQLQueryAllAndProcess(
+            query: $query,
+            callback: function($customers) {
+                self::process(NetSuiteConvert::customers($customers));
+            }
+        );
+        return new Response(json_encode(['Customers retrieved']));
     }
 
     /**

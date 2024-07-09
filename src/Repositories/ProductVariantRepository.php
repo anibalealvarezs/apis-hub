@@ -45,6 +45,39 @@ class ProductVariantRepository extends BaseRepository
     }
 
     /**
+     * @param string $sku
+     * @return array|null
+     * @throws NonUniqueResultException
+     */
+    public function getBySku(string $sku): ?Entity
+    {
+        return $this->_em->createQueryBuilder()
+            ->select('e')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.sku = :sku')
+            ->setParameter('sku', $sku)
+            ->getQuery()
+            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+    }
+
+    /**
+     * @param string $sku
+     * @return bool
+     * @throws NoResultException
+     * @throws NonUniqueResultException
+     */
+    public function existsBySku(string $sku): bool
+    {
+        return $this->_em->createQueryBuilder()
+                ->select('COUNT(e.id)')
+                ->from($this->getEntityName(), 'e')
+                ->where('e.sku = :sku')
+                ->setParameter('sku', $sku)
+                ->getQuery()
+                ->getSingleScalarResult() > 0;
+    }
+
+    /**
      * @param int $limit
      * @param int $pagination
      * @param array|null $ids

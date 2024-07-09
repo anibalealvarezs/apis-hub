@@ -12,11 +12,16 @@ use Repositories\ProductRepository;
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
 #[ORM\Table(name: 'products')]
 #[ORM\Index(columns: ['productId'], name: 'productId_idx')]
+#[ORM\Index(columns: ['sku'], name: 'sku_idx')]
+#[ORM\Index(columns: ['productId', 'sku'], name: 'productId_sku_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Product extends Entity
 {
     #[ORM\Column(type: 'string', unique: true)]
     protected int|string $productId;
+
+    #[ORM\Column(type: 'string', nullable: true)]
+    protected int|string $sku;
 
     #[ORM\OneToMany(mappedBy: 'product', targetEntity: ChanneledProduct::class, orphanRemoval: true)]
     protected Collection $channeledProducts;
@@ -41,6 +46,25 @@ class Product extends Entity
     public function addProductId(string $productId): self
     {
         $this->productId = $productId;
+
+        return $this;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSku(): string
+    {
+        return $this->sku;
+    }
+
+    /**
+     * @param string $sku
+     * @return Product
+     */
+    public function addSku(string $sku): self
+    {
+        $this->sku = $sku;
 
         return $this;
     }

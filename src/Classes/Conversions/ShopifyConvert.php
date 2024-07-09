@@ -74,6 +74,7 @@ class ShopifyConvert
         return new ArrayCollection(array_map(function($product) {
             return (object) [
                 'platformId' => $product['id'],
+                'sku' => $product['sku'] ?? '',
                 'platformCreatedAt' => Carbon::parse($product['created_at']),
                 'channel' => Channels::shopify->value,
                 'data' => $product,
@@ -88,6 +89,7 @@ class ShopifyConvert
         return new ArrayCollection(array_map(function($productVariant) {
             return (object) [
                 'platformId' => $productVariant['id'],
+                'sku' => $productVariant['sku'] ?? '',
                 'platformCreatedAt' => Carbon::parse($productVariant['created_at']),
                 'channel' => Channels::shopify->value,
                 'data' => $productVariant,

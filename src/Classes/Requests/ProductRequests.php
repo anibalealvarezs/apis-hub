@@ -3,6 +3,8 @@
 namespace Classes\Requests;
 
 use Chmw\KlaviyoApi\KlaviyoApi;
+use Classes\Conversions\NetSuiteConvert;
+use Classes\Overrides\NetSuiteApi\NetSuiteApi;
 use Classes\Overrides\ShopifyApi\ShopifyApi;
 use Classes\Conversions\KlaviyoConvert;
 use Classes\Conversions\ShopifyConvert;
@@ -11,7 +13,6 @@ use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
-use Entities\Analytics\Channeled\ChanneledOrder;
 use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductVariant;
 use Entities\Analytics\Channeled\ChanneledVendor;
@@ -110,34 +111,108 @@ class ProductRequests implements RequestInterface
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
      * @param object|null $filters
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromBigCommerce(object $filters = null): Response
     {
         return new Response(json_encode([]));
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
      * @param object|null $filters
      * @return Response
+     * @throws Exception
+     * @throws GuzzleException
+     * @throws NotSupported
+     * @throws ORMException
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromNetsuite(object $filters = null): Response
     {
-        return new Response(json_encode([]));
+        $config = Helpers::getChannelsConfig()['netsuite'];
+        $netsuiteClient = new NetSuiteApi(
+            consumerId: $config['netsuite_consumer_id'],
+            consumerSecret: $config['netsuite_consumer_secret'],
+            token: $config['netsuite_token_id'],
+            tokenSecret: $config['netsuite_token_secret'],
+            accountId: $config['netsuite_account_id'],
+        );
+
+        $manager = Helpers::getManager();
+        $channeledProductRepository = $manager->getRepository(entityName: ChanneledProduct::class);
+        $lastChanneledProduct = $channeledProductRepository->getLastByPlatformId(channel: Channels::netsuite->value);
+
+        $query = "SELECT
+                Item.*,
+                CUSTOMLIST_ITEM_STYLE.Id AS StyleID,
+                CUSTOMLIST_ITEM_STYLE.Name AS StyleName,
+                CUSTOMLIST_ITEM_SIZE.Id AS SizeID,
+                CUSTOMLIST_ITEM_SIZE.Name AS SizeName,
+                ItemInventoryBalance.quantityavailable,
+                ItemInventoryBalance.quantityonhand,
+                ItemInventoryBalance.quantitypicked,
+                ItemPrice.price AS itemprice,
+                CommerceCategory.id AS CommerceCategoryId,
+                CommerceCategory.name AS CommerceCategoryName,
+                CUSTOMLIST_ITEM_CATEGORY.Name AS CategoryName,
+                CUSTOMLIST_ITEM_CATEGORY.Id AS CategoryID,
+                CUSTOMLIST_ITEM_COLOR.id AS ColorID,
+                CUSTOMLIST_ITEM_COLOR.name AS ColorName,
+                ItemCollection.id AS CollectionID,
+                ItemCollection.name AS CollectionName,
+                CUSTOMRECORD_WEBSTORES.name as storeName,
+                CUSTOMRECORD_DESIGN.custrecord_deadline_date AS designdeadlinedate,
+                CUSTOMRECORD_DESIGN.custrecord_nssca_cannot_ship_after_date AS designcannotshipafterdate
+            FROM Item
+            LEFT JOIN CUSTOMLIST_ITEM_STYLE
+                ON Item.custitem_item_style = CUSTOMLIST_ITEM_STYLE.id
+            LEFT JOIN CUSTOMLIST_ITEM_SIZE
+                ON item.custitem_item_size = CUSTOMLIST_ITEM_SIZE.id
+            LEFT JOIN ItemInventoryBalance
+                ON Item.id = ItemInventoryBalance.item
+            LEFT JOIN ItemPrice
+                ON Item.id = ItemPrice.item
+            LEFT JOIN CUSTOMLIST_ITEM_CATEGORY
+                ON Item.custitem_item_category = CUSTOMLIST_ITEM_CATEGORY.id
+            LEFT JOIN CUSTOMLIST_ITEM_COLOR
+                ON Item.custitem_item_color = CUSTOMLIST_ITEM_COLOR.id
+            LEFT JOIN ItemCollectionItemSimpleMap
+                ON Item.id = ItemCollectionItemSimpleMap.item
+            LEFT JOIN ItemCollection
+                ON ItemCollectionItemSimpleMap.itemcollection = ItemCollection.id
+            LEFT JOIN CommerceCategoryItemAssociation
+                ON CommerceCategoryItemAssociation.item = Item.id
+            LEFT JOIN CommerceCategory
+                ON CommerceCategoryItemAssociation.category = CommerceCategory.id
+            LEFT JOIN MAP_item_custitem_awa_display_in_webstore
+                ON item.id = MAP_item_custitem_awa_display_in_webstore.mapone
+            LEFT JOIN CUSTOMRECORD_WEBSTORES
+                ON MAP_item_custitem_awa_display_in_webstore.maptwo = CUSTOMRECORD_WEBSTORES.id
+            LEFT JOIN CUSTOMRECORD_DESIGN
+                ON Item.custitem_design_code = CUSTOMRECORD_DESIGN.id
+            WHERE Item.itemtype IN ('NonInvtPart', 'Assembly', 'InvtPart')
+                AND (CUSTOMRECORD_WEBSTORES.name IS NULL OR CUSTOMRECORD_WEBSTORES.name = 'WorkPlacePro')
+                AND Item.id >= " . ($lastChanneledProduct['platformId'] ?? 0);
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $query .= " AND Item.$key = '$value'";
+            }
+        }
+        $query .= " ORDER BY Item.id ASC";
+        $netsuiteClient->getSuiteQLQueryAllAndProcess(
+            query: $query,
+            callback: function($products) {
+                self::process(NetSuiteConvert::products($products));
+            }
+        );
+        return new Response(json_encode(['Products retrieved']));
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
      * @param object|null $filters
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromAmazon(object $filters = null): Response
     {
         return new Response(json_encode([]));
     }
