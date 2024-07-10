@@ -207,11 +207,14 @@ class ProductRequests implements RequestInterface
                     return $product->platformId;
                 }, $convertedProductsArray);
                 if (!empty($productsIds)) {
-                    sleep(1); // Delay to prevent rate limit issues between the `items` and `images` queries
+                    usleep(700000); // Delay to prevent rate limit issues between the `items` and `images` queries
                     $images = $netsuiteClient->getImagesForProducts(
                         store: $config['netsuite_store_name'],
                         productsIds: array_values($productsIds),
                     );
+                    if ($images['count'] == 0) {
+                        usleep(300000); // Delay to prevent rate limit issues between the `images` and `items` queries
+                    }
                     $keyedImages = [];
                     foreach($images['items'] as $image) {
                         if (!isset($keyedImages[$image['item']])) {
@@ -277,7 +280,10 @@ class ProductRequests implements RequestInterface
         foreach ($channeledCollection as $channeledProduct) {
             if (!$productRepository->existsByProductId($channeledProduct->platformId)) {
                 $productEntity = $productRepository->create(
-                    data: (object)['productId' => $channeledProduct->platformId,],
+                    data: (object) [
+                        'productId' => $channeledProduct->platformId,
+                        'sku' => $channeledProduct->sku,
+                    ],
                     returnEntity: true,
                 );
             } else {
@@ -286,7 +292,9 @@ class ProductRequests implements RequestInterface
             if ($channeledProduct->vendor) {
                 if (!$vendorRepository->existsByName($channeledProduct->vendor)) {
                     $vendorEntity = $vendorRepository->create(
-                        data: (object)['name' => $channeledProduct->vendor,],
+                        data: (object) [
+                            'name' => $channeledProduct->vendor,
+                        ],
                         returnEntity: true,
                     );
                 } else {
@@ -295,7 +303,7 @@ class ProductRequests implements RequestInterface
                 if (!$channeledVendorRepository->existsByName($channeledProduct->vendor,
                     $channeledProduct->channel)) {
                     $channeledVendorEntity = $channeledVendorRepository->create(
-                        data: (object)[
+                        data: (object) [
                             'name' => $channeledProduct->vendor,
                             'channel' => $channeledProduct->channel,
                             'platformId' => 0,
@@ -326,7 +334,10 @@ class ProductRequests implements RequestInterface
             foreach ($channeledProduct->variants as $productVariant) {
                 if (!$productVariantRepository->existsByProductVariantId($productVariant->platformId)) {
                     $productVariantEntity = $productVariantRepository->create(
-                        data: (object)['productVariantId' => $productVariant->platformId,],
+                        data: (object) [
+                            'productVariantId' => $productVariant->platformId,
+                            'sku' => $productVariant->sku,
+                        ],
                         returnEntity: true,
                     );
                 } else {
