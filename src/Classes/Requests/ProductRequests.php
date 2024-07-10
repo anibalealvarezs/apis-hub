@@ -191,7 +191,7 @@ class ProductRequests implements RequestInterface
             LEFT JOIN CUSTOMRECORD_DESIGN
                 ON Item.custitem_design_code = CUSTOMRECORD_DESIGN.id
             WHERE Item.itemtype IN ('NonInvtPart', 'Assembly', 'InvtPart')
-                AND (CUSTOMRECORD_WEBSTORES.name IS NULL OR CUSTOMRECORD_WEBSTORES.name = 'WorkPlacePro')
+                AND (CUSTOMRECORD_WEBSTORES.name IS NULL OR CUSTOMRECORD_WEBSTORES.name = '".$config['netsuite_store_name']."')
                 AND Item.id >= " . ($lastChanneledProduct['platformId'] ?? 0);
         if ($filters) {
             foreach ($filters as $key => $value) {
@@ -201,8 +201,47 @@ class ProductRequests implements RequestInterface
         $query .= " ORDER BY Item.id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
             query: $query,
-            callback: function($products) {
-                self::process(NetSuiteConvert::products($products));
+            callback: function($products) use ($netsuiteClient, $config) {
+                $convertedProductsArray = NetSuiteConvert::products($products)->toArray();
+                $productsIds = array_map(function($product) {
+                    return $product->platformId;
+                }, $convertedProductsArray);
+                if (!empty($productsIds)) {
+                    sleep(1); // Delay to prevent rate limit issues between the `items` and `images` queries
+                    $images = $netsuiteClient->getImagesForProducts(
+                        store: $config['netsuite_store_name'],
+                        productsIds: array_values($productsIds),
+                    );
+                    $keyedImages = [];
+                    foreach($images['items'] as $image) {
+                        if (!isset($keyedImages[$image['item']])) {
+                            $keyedImages[$image['item']] = [];
+                        }
+                        $keyedImages[$image['item']][] = [
+                            'name' => $image['name'],
+                            'url' => $config['netsuite_store_base_url'] . (!str_ends_with($config['netsuite_store_base_url'], '/') ? '/' : '') . 'site/images/' . $image['name'],
+                        ];
+                    }
+                    foreach($convertedProductsArray as &$product) {
+                        $product->data['images'] = array_map(function($image) {
+                            return $image['url'];
+                        }, $keyedImages[$product->platformId] ?? []);
+                        foreach($product->variants as &$variant) {
+                            $variant->data['images'] = [];
+                            if (!isset($keyedImages[$product->platformId])) {
+                                continue;
+                            }
+                            foreach($keyedImages[$product->platformId] as $image) {
+                                $cleanNameArray = explode('.', $image['name']);
+                                if (str_starts_with($variant->sku, $cleanNameArray[0])) {
+                                    $variant->data['images'][] = $image['url'];
+                                }
+                            }
+                        }
+                    }
+                }
+                $convertedProducts = new ArrayCollection($convertedProductsArray);
+                self::process($convertedProducts);
             }
         );
         return new Response(json_encode(['Products retrieved']));
