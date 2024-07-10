@@ -207,13 +207,13 @@ class ProductRequests implements RequestInterface
                     return $product->platformId;
                 }, $convertedProductsArray);
                 if (!empty($productsIds)) {
-                    usleep(700000); // Delay to prevent rate limit issues between the `items` and `images` queries
+                    usleep(100000); // Delay to prevent rate limit issues between the `items` and `images` queries
                     $images = $netsuiteClient->getImagesForProducts(
                         store: $config['netsuite_store_name'],
                         productsIds: array_values($productsIds),
                     );
                     if ($images['count'] == 0) {
-                        usleep(300000); // Delay to prevent rate limit issues between the `images` and `items` queries
+                        usleep(500000); // Delay to prevent rate limit issues between the `images` and `items` queries
                     }
                     $keyedImages = [];
                     foreach($images['items'] as $image) {
