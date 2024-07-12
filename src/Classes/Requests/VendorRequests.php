@@ -12,9 +12,10 @@ class VendorRequests implements RequestInterface
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode(['Vendors are not supported in Shopify. They\'re retrieved along with Products.']));
     }
@@ -23,9 +24,10 @@ class VendorRequests implements RequestInterface
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
@@ -34,9 +36,10 @@ class VendorRequests implements RequestInterface
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
@@ -45,9 +48,10 @@ class VendorRequests implements RequestInterface
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }

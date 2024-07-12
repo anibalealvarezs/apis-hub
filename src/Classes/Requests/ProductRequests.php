@@ -14,9 +14,11 @@ use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
 use Entities\Analytics\Channeled\ChanneledProduct;
+use Entities\Analytics\Channeled\ChanneledProductCategory;
 use Entities\Analytics\Channeled\ChanneledProductVariant;
 use Entities\Analytics\Channeled\ChanneledVendor;
 use Entities\Analytics\Product;
+use Entities\Analytics\ProductCategory;
 use Entities\Analytics\ProductVariant;
 use Entities\Analytics\Vendor;
 use Enums\Channels;
@@ -33,13 +35,14 @@ class ProductRequests implements RequestInterface
      * @param int|null $collectionId
      * @param array|null $fields
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, int $collectionId = null, array $fields = null, object $filters = null): Response
+    public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, int $collectionId = null, array $fields = null, object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
@@ -63,7 +66,7 @@ class ProductRequests implements RequestInterface
             productType: $filters->productType ?? null,
             publishedAtMin: $filters->publishedAtMin ?? null,
             publishedAtMax: $filters->publishedAtMax ?? null,
-            sinceId: $filters->sinceId ?? $lastChanneledProduct['platformId'] ?? null,
+            sinceId: $filters->sinceId ?? isset($lastChanneledProduct['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledProduct['platformId'] : null,
             status: $filters->status ?? null,
             title: $filters->title ?? null,
             updatedAtMin: $filters->updatedAtMin ?? null,
@@ -80,6 +83,7 @@ class ProductRequests implements RequestInterface
     /**
      * @param array|null $fields
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
@@ -87,7 +91,7 @@ class ProductRequests implements RequestInterface
      * @throws ORMException
      * @throws OptimisticLockException
      */
-    public static function getListFromKlaviyo(array $fields = null, object $filters = null): Response
+    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['klaviyo'];
         $klaviyoClient = new KlaviyoApi(
@@ -112,22 +116,24 @@ class ProductRequests implements RequestInterface
 
     /**
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(object $filters = null): Response
+    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
 
     /**
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(object $filters = null): Response
+    public static function getListFromNetsuite(object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
@@ -153,7 +159,6 @@ class ProductRequests implements RequestInterface
                 ItemInventoryBalance.quantitypicked,
                 ItemPrice.price AS itemprice,
                 CommerceCategory.id AS CommerceCategoryId,
-                CommerceCategory.name AS CommerceCategoryName,
                 CUSTOMLIST_ITEM_CATEGORY.Name AS CategoryName,
                 CUSTOMLIST_ITEM_CATEGORY.Id AS CategoryID,
                 CUSTOMLIST_ITEM_COLOR.id AS ColorID,
@@ -190,9 +195,10 @@ class ProductRequests implements RequestInterface
                 ON MAP_item_custitem_awa_display_in_webstore.maptwo = CUSTOMRECORD_WEBSTORES.id
             LEFT JOIN CUSTOMRECORD_DESIGN
                 ON Item.custitem_design_code = CUSTOMRECORD_DESIGN.id
-            WHERE Item.itemtype IN ('NonInvtPart', 'Assembly', 'InvtPart')
+            WHERE Item.itemtype IN ('NonInvtPart', 'Assembly')
                 AND (CUSTOMRECORD_WEBSTORES.name IS NULL OR CUSTOMRECORD_WEBSTORES.name = '".$config['netsuite_store_name']."')
-                AND Item.id >= " . ($lastChanneledProduct['platformId'] ?? 0);
+                AND Item.createddate >= TO_DATE('01/01/2020', 'mm/dd/yyyy')
+                AND Item.id >= " . (isset($lastChanneledProduct['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledProduct['platformId'] : 0);
         if ($filters) {
             foreach ($filters as $key => $value) {
                 $query .= " AND Item.$key = '$value'";
@@ -207,7 +213,7 @@ class ProductRequests implements RequestInterface
                     return $product->platformId;
                 }, $convertedProductsArray);
                 if (!empty($productsIds)) {
-                    usleep(100000); // Delay to prevent rate limit issues between the `items` and `images` queries
+                    usleep(500000); // Delay to prevent rate limit issues between the `items` and `images` queries
                     $images = $netsuiteClient->getImagesForProducts(
                         store: $config['netsuite_store_name'],
                         productsIds: array_values($productsIds),
@@ -252,9 +258,10 @@ class ProductRequests implements RequestInterface
 
     /**
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(object $filters = null): Response
+    public static function getListFromAmazon(object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
@@ -273,11 +280,14 @@ class ProductRequests implements RequestInterface
         $manager = Helpers::getManager();
         $productRepository = $manager->getRepository(entityName: Product::class);
         $productVariantRepository = $manager->getRepository(entityName: ProductVariant::class);
+        $productCategoryRepository = $manager->getRepository(entityName: ProductCategory::class);
         $vendorRepository = $manager->getRepository(entityName: Vendor::class);
         $channeledProductRepository = $manager->getRepository(entityName: ChanneledProduct::class);
         $channeledProductVariantRepository = $manager->getRepository(entityName: ChanneledProductVariant::class);
+        $channeledProductCategoryRepository = $manager->getRepository(entityName: ChanneledProductCategory::class);
         $channeledVendorRepository = $manager->getRepository(entityName: ChanneledVendor::class);
         foreach ($channeledCollection as $channeledProduct) {
+            // Process Product
             if (!$productRepository->existsByProductId($channeledProduct->platformId)) {
                 $productEntity = $productRepository->create(
                     data: (object) [
@@ -289,33 +299,7 @@ class ProductRequests implements RequestInterface
             } else {
                 $productEntity = $productRepository->getByProductId($channeledProduct->platformId);
             }
-            if ($channeledProduct->vendor) {
-                if (!$vendorRepository->existsByName($channeledProduct->vendor)) {
-                    $vendorEntity = $vendorRepository->create(
-                        data: (object) [
-                            'name' => $channeledProduct->vendor,
-                        ],
-                        returnEntity: true,
-                    );
-                } else {
-                    $vendorEntity = $vendorRepository->getByName($channeledProduct->vendor);
-                }
-                if (!$channeledVendorRepository->existsByName($channeledProduct->vendor,
-                    $channeledProduct->channel)) {
-                    $channeledVendorEntity = $channeledVendorRepository->create(
-                        data: (object) [
-                            'name' => $channeledProduct->vendor,
-                            'channel' => $channeledProduct->channel,
-                            'platformId' => 0,
-                            'data' => [],
-                        ],
-                        returnEntity: true,
-                    );
-                } else {
-                    $channeledVendorEntity = $channeledVendorRepository->getByName($channeledProduct->vendor,
-                        $channeledProduct->channel);
-                }
-            }
+            // Process Channeled Product
             if (!$channeledProductRepository->existsByPlatformId($channeledProduct->platformId,
                 $channeledProduct->channel)) {
                 $channeledProductEntity = $channeledProductRepository->create(
@@ -329,8 +313,43 @@ class ProductRequests implements RequestInterface
             if (empty($channeledProductEntity->getData())) {
                 $channeledProductEntity
                     ->addPlatformId($channeledProduct->platformId)
+                    ->addPlatformCreatedAt($channeledProduct->platformCreatedAt)
                     ->addData($channeledProduct->data);
             }
+            // Process Vendor
+            if (isset($channeledProduct->vendor->name)) {
+                if (!$vendorRepository->existsByName($channeledProduct->vendor->name)) {
+                    $vendorEntity = $vendorRepository->create(
+                        data: (object) [
+                            'name' => $channeledProduct->vendor,
+                        ],
+                        returnEntity: true,
+                    );
+                } else {
+                    $vendorEntity = $vendorRepository->getByName($channeledProduct->vendor->name);
+                }
+                if (!$channeledVendorRepository->existsByName($channeledProduct->vendor->name,
+                    $channeledProduct->channel)) {
+                    $channeledVendorEntity = $channeledVendorRepository->create(
+                        data: $channeledProduct->vendor,
+                        returnEntity: true,
+                    );
+                } else {
+                    $channeledVendorEntity = $channeledVendorRepository->getByName($channeledProduct->vendor->name,
+                        $channeledProduct->channel);
+                }
+                if (!empty($channeledVendorEntity->getData())) {
+                    $channeledVendorEntity
+                        ->addPlatformId($channeledProduct->vendor->platformId)
+                        ->addPlatformCreatedAt($channeledProduct->vendor->platformCreatedAt)
+                        ->addData($channeledProduct->vendor->data);
+                }
+                $channeledProductEntity->addChanneledVendor($channeledVendorEntity);
+                $vendorEntity->addChanneledVendor($channeledVendorEntity);
+                $manager->persist($vendorEntity);
+                $manager->persist($channeledVendorEntity);
+            }
+            // Process Variants
             foreach ($channeledProduct->variants as $productVariant) {
                 if (!$productVariantRepository->existsByProductVariantId($productVariant->platformId)) {
                     $productVariantEntity = $productVariantRepository->create(
@@ -356,6 +375,7 @@ class ProductRequests implements RequestInterface
                 if (empty($channeledProductVariantEntity->getData())) {
                     $channeledProductVariantEntity
                         ->addPlatformId($productVariant->platformId)
+                        ->addPlatformCreatedAt($productVariant->platformCreatedAt)
                         ->addData($productVariant->data);
                 }
                 $productVariantEntity->addChanneledProductVariant($channeledProductVariantEntity);
@@ -364,12 +384,44 @@ class ProductRequests implements RequestInterface
                 $manager->persist($channeledProductVariantEntity);
                 $manager->flush();
             }
-            if ($channeledProduct->vendor) {
-                $channeledProductEntity->addChanneledVendor($channeledVendorEntity);
-                $vendorEntity->addChanneledVendor($channeledVendorEntity);
-                $manager->persist($vendorEntity);
-                $manager->persist($channeledVendorEntity);
+            // Process Categories
+            if (!empty($channeledProduct->categories)) {
+                foreach ($channeledProduct->categories as $category) {
+                    if (!$productCategoryRepository->existsByProductCategoryId($category->platformId)) {
+                        $productCategoryEntity = $productCategoryRepository->create(
+                            data: (object) [
+                                'productCategoryId' => $category->platformId,
+                                'isSmartCollection' => $category->isSmartCollection,
+                            ],
+                            returnEntity: true,
+                        );
+                    } else {
+                        $productCategoryEntity = $productCategoryRepository->getByProductCategoryId($category->platformId);
+                    }
+                    if (!$channeledProductCategoryRepository->existsByPlatformId($category->platformId,
+                        $channeledProduct->channel)) {
+                        $channeledProductCategoryEntity = $channeledProductCategoryRepository->create(
+                            data: $category,
+                            returnEntity: true,
+                        );
+                    } else {
+                        $channeledProductCategoryEntity = $channeledProductCategoryRepository->getByPlatformId($category->platformId,
+                            $channeledProduct->channel);
+                    }
+                    if (empty($channeledProductCategoryEntity->getData())) {
+                        $channeledProductCategoryEntity
+                            ->addPlatformId($category->platformId)
+                            ->addPlatformCreatedAt($category->platformCreatedAt)
+                            ->addData($category->data);
+                    }
+                    $productCategoryEntity->addChanneledProductCategory($channeledProductCategoryEntity);
+                    $channeledProductCategoryEntity->addChanneledProduct($channeledProductEntity);
+                    $manager->persist($productCategoryEntity);
+                    $manager->persist($channeledProductCategoryEntity);
+                    $manager->flush();
+                }
             }
+            // Persist Product and Channeled Product
             $productEntity->addChanneledProduct($channeledProductEntity);
             $manager->persist($productEntity);
             $manager->persist($channeledProductEntity);

@@ -3,6 +3,8 @@
 namespace Classes\Requests;
 
 use Chmw\KlaviyoApi\KlaviyoApi;
+use Classes\Conversions\NetSuiteConvert;
+use Classes\Overrides\NetSuiteApi\NetSuiteApi;
 use Classes\Overrides\ShopifyApi\ShopifyApi;
 use Classes\Conversions\KlaviyoConvert;
 use Classes\Conversions\ShopifyConvert;
@@ -14,6 +16,7 @@ use Doctrine\ORM\OptimisticLockException;
 use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductCategory;
 use Entities\Analytics\ProductCategory;
+use Enums\Channels;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -26,6 +29,7 @@ class ProductCategoryRequests implements RequestInterface
      * @param string|null $publishedAtMax
      * @param array|null $fields
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
@@ -33,7 +37,7 @@ class ProductCategoryRequests implements RequestInterface
      * @throws ORMException
      * @throws OptimisticLockException
      */
-    public static function getListFromShopify(string $publishedAtMin = null, string $publishedAtMax = null, array $fields = null, object $filters = null): Response
+    public static function getListFromShopify(string $publishedAtMin = null, string $publishedAtMax = null, array $fields = null, object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
@@ -78,65 +82,68 @@ class ProductCategoryRequests implements RequestInterface
     /**
      * @param array|null $fields
      * @param object|null $filters
+     * @param string|bool $resume
+     * @return Response
+     */
+    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true): Response
+    {
+        return new Response(json_encode([]));
+    }
+
+    /**
+     * @param int $limit
+     * @param int $pagination
+     * @param object|null $filters
+     * @param string|bool $resume
+     * @return Response
+     */
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    {
+        return new Response(json_encode([]));
+    }
+
+    /**
+     * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
      * @throws NotSupported
      * @throws ORMException
-     * @throws OptimisticLockException
      */
-    public static function getListFromKlaviyo(array $fields = null, object $filters = null): Response
+    public static function getListFromNetsuite(object $filters = null, string|bool $resume = true): Response
     {
-        $config = Helpers::getChannelsConfig()['klaviyo'];
-        $klaviyoClient = new KlaviyoApi(
-            apiKey: $config['klaviyo_api_key'],
+        $config = Helpers::getChannelsConfig()['netsuite'];
+        $netsuiteClient = new NetSuiteApi(
+            consumerId: $config['netsuite_consumer_id'],
+            consumerSecret: $config['netsuite_consumer_secret'],
+            token: $config['netsuite_token_id'],
+            tokenSecret: $config['netsuite_token_secret'],
+            accountId: $config['netsuite_account_id'],
         );
-        $formattedFilters = [];
-        if ($filters) {
-            foreach ($filters as $key => $value) {
-                $formattedFilters[] = [
-                    "operator" => 'equals',
-                    "field" => $key,
-                    "value" => $value,
-                ];
+
+        $manager = Helpers::getManager();
+        $channeledProductCategoryRepository = $manager->getRepository(entityName: ChanneledProductCategory::class);
+        $lastChanneledProductCategory = $channeledProductCategoryRepository->getLastByPlatformId(channel: Channels::netsuite->value);
+
+        $query = "SELECT * FROM CommerceCategory WHERE id >= " . (isset($lastChanneledProductCategory['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledProductCategory['platformId'] : 0) . " ORDER BY id ASC";
+        $netsuiteClient->getSuiteQLQueryAllAndProcess(
+            query: $query,
+            callback: function($productCategories) {
+                self::process(NetSuiteConvert::productCategories($productCategories));
             }
-        }
-        $sourceCategories = $klaviyoClient->getAllCatalogVariants(
-            catalogVariantsFields: $fields,
-            filter: $formattedFilters,
         );
-        return self::process(KlaviyoConvert::productCategories(productCategories: $sourceCategories['data']));
+        return new Response(json_encode(['Product Categories retrieved.']));
     }
 
     /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @return Response
-     */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @return Response
-     */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
@@ -182,6 +189,7 @@ class ProductCategoryRequests implements RequestInterface
                 $channeledProductCategoryEntity
                     ->addPlatformId($productCategory->platformId)
                     ->addIsSmartCollection($productCategory->isSmartCollection)
+                    ->addPlatformCreatedAt($productCategory->platformCreatedAt)
                     ->addData($productCategory->data);
             }
             if ($collects && isset($collects[$productCategory->platformId])) {

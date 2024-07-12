@@ -30,13 +30,14 @@ class OrderRequests implements RequestInterface
      * @param string|null $processedAtMax
      * @param array|null $fields
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromShopify(string $processedAtMin = null, string $processedAtMax = null, array $fields = null, object $filters = null): Response
+    public static function getListFromShopify(string $processedAtMin = null, string $processedAtMax = null, array $fields = null, object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
@@ -58,7 +59,7 @@ class OrderRequests implements RequestInterface
             ids: $filters->ids ?? null,
             processedAtMin: $processedAtMin,
             processedAtMax: $processedAtMax,
-            sinceId: $filters->sinceId ?? $lastChanneledOrder['platformId'] ?? null,
+            sinceId: $filters->sinceId ?? isset($lastChanneledOrder['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledOrder['platformId'] : null,
             status: $filters->status ?? null,
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
@@ -71,12 +72,12 @@ class OrderRequests implements RequestInterface
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
+     * @param array|null $fields
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
@@ -85,13 +86,26 @@ class OrderRequests implements RequestInterface
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
+     * @return Response
+     */
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    {
+        return new Response(json_encode([]));
+    }
+
+    /**
+     * @param int $limit
+     * @param int $pagination
+     * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
@@ -129,7 +143,7 @@ class OrderRequests implements RequestInterface
             FROM Customer
             INNER JOIN Entity
                 ON Entity.customer = Customer.id
-            WHERE Entity.id > " . ($lastChanneledOrder['platformId'] ?? 0);
+            WHERE Entity.id > " . (isset($lastChanneledOrder['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledOrder['platformId'] : 0);
         if ($filters) {
             foreach ($filters as $key => $value) {
                 $query .= " AND Entity.$key = '$value'";
@@ -149,9 +163,10 @@ class OrderRequests implements RequestInterface
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }

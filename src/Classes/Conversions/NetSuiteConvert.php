@@ -79,15 +79,24 @@ class NetSuiteConvert
                 continue;
             }
             // Identify Parents
-            if (($product['itemtype'] === 'NonInvtPart') || (($product['itemtype'] === 'InvtPart') && !isset($product['parent']))) {
+            if ($product['itemtype'] === 'NonInvtPart') {
                 if (!isset($productsArray[$product['id']])){
                     $productsArray[$product['id']] = [
                         'id' => $product['id'],
                         'sku' => $product['itemid'] ?? '',
                         'created_at' => $product['createddate'] ?? '',
                         'design_id' => $product['custitem_design_code'] ?? '',
-                        'vendor' => $product['vendorname'] ?? '',
+                        'vendors' => isset($product['vendorname']) && $product['vendorname'] ? [
+                            [
+                                'name' => $product['vendorname'],
+                            ]
+                        ] : [],
                         'variants' => [],
+                        'categories' => isset($product['commercecategoryid']) ? [
+                            [
+                                'id' => $product['commercecategoryid'],
+                            ],
+                        ] : [],
                         'data' => $product,
                     ];
                 }
@@ -99,8 +108,18 @@ class NetSuiteConvert
                     'sku' => '',
                     'created_at' => '',
                     'design_id' => $product['custitem_design_code'] ?? '',
-                    'vendor' => $product['vendorname'] ?? '',
+                    'vendors' => isset($product['vendorname']) && $product['vendorname'] ? [
+                        [
+                            'name' => $product['vendorname'],
+                        ]
+                    ] : [],
                     'variants' => [],
+                    'categories' => isset($product['commercecategoryid']) ? [
+                        [
+                            'id' => $product['commercecategoryid'],
+                            'data' => [],
+                        ],
+                    ] : [],
                     'data' => [],
                 ];
             }
@@ -110,13 +129,6 @@ class NetSuiteConvert
                     continue;
                 }
                 $productsArray[$product['custitem_web_store_design_item']]['variants'][] = $product;
-            }
-            // Process InvtPart Variants
-            if (($product['itemtype'] === 'InvtPart') && isset($product['parent'])) {
-                if (!isset($productsArray[$product['parent']])) {
-                    continue;
-                }
-                $productsArray[$product['parent']]['variants'][] = $product;
             }
         }
 
@@ -143,8 +155,9 @@ class NetSuiteConvert
                 'platformCreatedAt' => Carbon::parse($product['created_at']),
                 'channel' => Channels::netsuite->value,
                 'data' => $product['data'],
-                'vendor' => $product['vendor'],
+                'vendor' => self::vendors($product['vendors'])[0] ?? [],
                 'variants' => self::productVariants($product['variants']),
+                'categories' => self::productCategories($product['categories']),
             ];
         }, $fixedProductsArray));
     }
@@ -157,21 +170,34 @@ class NetSuiteConvert
                 'sku' => $productVariant['itemid'] ?? '',
                 'platformCreatedAt' => isset($productVariant['createddate']) ? Carbon::parse($productVariant['createddate']) : null,
                 'channel' => Channels::netsuite->value,
-                'data' => $productVariant,
+                'data' => count(array_keys($productVariant)) > 1 ? $productVariant : [],
             ];
         }, $productVariants));
     }
 
-    public static function productCategories(array $productCategories, bool $isSmartCollection = false): ArrayCollection
+    public static function productCategories(array $productCategories): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($productCategory) use ($isSmartCollection) {
+        return new ArrayCollection(array_map(function($productCategory) {
             return (object) [
                 'platformId' => $productCategory['id'],
-                'platformCreatedAt' => Carbon::parse($productCategory['published_at']),
+                'platformCreatedAt' => isset($productCategory['created']) ? Carbon::parse($productCategory['created']) : null,
                 'channel' => Channels::netsuite->value,
-                'data' => $productCategory,
-                'isSmartCollection' => $isSmartCollection,
+                'data' => count(array_keys($productCategory)) > 1 ? $productCategory : [],
+                'isSmartCollection' => false,
             ];
         }, $productCategories));
+    }
+
+    public static function vendors(array $vendors): ArrayCollection
+    {
+        return new ArrayCollection(array_map(function($vendor) {
+            return (object) [
+                'platformId' => $vendor['id'] ?? '',
+                'name' => $vendor['name'] ?? '',
+                'platformCreatedAt' => isset($productCategory['created']) ? Carbon::parse($productCategory['created']) : null,
+                'channel' => Channels::netsuite->value,
+                'data' => count(array_keys($vendor)) > 1 ? $vendor : [],
+            ];
+        }, $vendors));
     }
 }

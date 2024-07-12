@@ -13,7 +13,6 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
-use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\OptimisticLockException;
 use Entities\Analytics\Channeled\ChanneledCustomer;
 use Entities\Analytics\Customer;
@@ -30,13 +29,14 @@ class CustomerRequests implements RequestInterface
      * @param string|null $createdAtMax
      * @param array|null $fields
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, array $fields = null, object $filters = null): Response
+    public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, array $fields = null, object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
@@ -54,7 +54,7 @@ class CustomerRequests implements RequestInterface
             createdAtMax: $createdAtMax,
             fields: $fields,
             ids: $filters->ids ?? null,
-            sinceId: $filters->sinceId ?? ($lastChanneledCustomer['platformId'] ?? null),
+            sinceId: $filters->sinceId ?? (isset($lastChanneledCustomer['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledCustomer['platformId'] : null),
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
             pageInfo: $filters->pageInfo ?? null,
@@ -70,15 +70,14 @@ class CustomerRequests implements RequestInterface
      * @param string|null $createdAtMax
      * @param array|null $fields
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
-     * @throws NonUniqueResultException
      * @throws NotSupported
      * @throws ORMException
-     * @throws OptimisticLockException
      */
-    public static function getListFromKlaviyo(string $createdAtMin = null, string $createdAtMax = null, array $fields = null, object $filters = null): Response
+    public static function getListFromKlaviyo(string $createdAtMin = null, string $createdAtMax = null, array $fields = null, object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['klaviyo'];
         $klaviyoClient = new KlaviyoApi(
@@ -90,7 +89,7 @@ class CustomerRequests implements RequestInterface
         $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformCreatedAt(channel: Channels::klaviyo->value);
 
         $origin = Carbon::parse(time: "2000-01-01");
-        $min = $createdAtMin ? Carbon::parse($createdAtMin) : (isset($lastChanneledCustomer['platformCreatedAt']) ? Carbon::parse($lastChanneledCustomer['platformCreatedAt']) : null);
+        $min = $createdAtMin ? Carbon::parse($createdAtMin) : (isset($lastChanneledCustomer['platformCreatedAt']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? Carbon::parse($lastChanneledCustomer['platformCreatedAt']) : null);
         $max = $createdAtMax ? Carbon::parse($createdAtMax) : null;
         $now = Carbon::now();
         $from = $min && $min->lt($now) && $min->lt($max) && $origin->lte($min) ?
@@ -129,31 +128,36 @@ class CustomerRequests implements RequestInterface
 
     /**
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromFacebook(object $filters = null): Response
+    public static function getListFromFacebook(object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
 
     /**
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(object $filters = null): Response
+    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
 
     /**
+     * @param string|null $createdAtMin
+     * @param string|null $createdAtMax
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(object $filters = null): Response
+    public static function getListFromNetsuite(string $createdAtMin = null, string $createdAtMax = null, object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
@@ -191,7 +195,9 @@ class CustomerRequests implements RequestInterface
             FROM Customer
             INNER JOIN Entity
                 ON Entity.customer = Customer.id
-            WHERE Entity.id > " . ($lastChanneledCustomer['platformId'] ?? 0);
+            WHERE Entity.datecreated >= TO_DATE('". ($createdAtMin ? Carbon::parse($createdAtMin)->format('m/d/Y') : '01/01/1989') ."', 'mm/dd/yyyy')
+                AND Entity.datecreated <= TO_DATE('". ($createdAtMax ? Carbon::parse($createdAtMax)->format('m/d/Y') : '01/01/2099') ."', 'mm/dd/yyyy')
+                AND Entity.id > " . (isset($lastChanneledCustomer['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledCustomer['platformId'] : 0);
         if ($filters) {
             foreach ($filters as $key => $value) {
                 $query .= " AND Entity.$key = '$value'";
@@ -208,12 +214,11 @@ class CustomerRequests implements RequestInterface
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromAmazon(object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
@@ -261,6 +266,7 @@ class CustomerRequests implements RequestInterface
             if (empty($channeledCustomerEntity->getData())) {
                 $channeledCustomerEntity
                     ->addPlatformId($channeledCustomer->platformId)
+                    ->addPlatformCreatedAt($channeledCustomer->platformCreatedAt)
                     ->addData($channeledCustomer->data);
             }
             $customerEntity->addChanneledCustomer($channeledCustomerEntity);

@@ -19,7 +19,7 @@ class ChanneledEntity extends Entity implements ChannelInterface
     protected array $data;
 
     #[ORM\Column(type: 'datetime', nullable: true)]
-    protected DateTime $platformCreatedAt;
+    protected ?DateTime $platformCreatedAt;
 
     /**
      * @return int|string
@@ -41,18 +41,18 @@ class ChanneledEntity extends Entity implements ChannelInterface
     }
 
     /**
-     * @return DateTime
+     * @return DateTime|null
      */
-    public function getPlatformCreatedAt(): DateTime
+    public function getPlatformCreatedAt(): ?DateTime
     {
         return $this->platformCreatedAt;
     }
 
     /**
-     * @param DateTime $platformCreatedAt
+     * @param DateTime|null $platformCreatedAt
      * @return ChanneledEntity
      */
-    public function addPlatformCreatedAt(DateTime $platformCreatedAt): self
+    public function addPlatformCreatedAt(?DateTime $platformCreatedAt): self
     {
         $this->platformCreatedAt = $platformCreatedAt;
 

@@ -29,13 +29,14 @@ class PriceRuleRequests implements RequestInterface
      * @param string|null $createdAtMin
      * @param string|null $createdAtMax
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      * @throws Exception
      * @throws GuzzleException
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, object $filters = null): Response
+    public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
@@ -53,7 +54,7 @@ class PriceRuleRequests implements RequestInterface
             createdAtMax: $createdAtMax,
             endsAtMin: $filters->endsAtMin ?? null,
             endsAtMax: $filters->endsAtMax ?? null,
-            sinceId: $filters->sinceId ?? $lastChanneledPriceRule['platformId'] ?? null,
+            sinceId: $filters->sinceId ?? isset($lastChanneledPriceRule['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledPriceRule['platformId'] : null,
             startsAtMin: $filters->startsAtMin ?? null,
             startsAtMax: $filters->startsAtMax ?? null,
             timesUsed: $filters->timesUsed ?? null,
@@ -71,9 +72,10 @@ class PriceRuleRequests implements RequestInterface
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
@@ -82,9 +84,10 @@ class PriceRuleRequests implements RequestInterface
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
@@ -93,9 +96,10 @@ class PriceRuleRequests implements RequestInterface
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
+     * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null): Response
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
