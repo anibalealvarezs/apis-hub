@@ -83,20 +83,16 @@ class OrderRequests implements RequestInterface
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
      * @param object|null $filters
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
      * @param object|null $filters
      * @param string|bool $resume
      * @return Response
@@ -105,7 +101,7 @@ class OrderRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromNetsuite(object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
@@ -121,35 +117,80 @@ class OrderRequests implements RequestInterface
         $lastChanneledOrder = $channeledOrderRepository->getLastByPlatformId(channel: Channels::netsuite->value);
 
         $query = "SELECT
-                Customer.email,
-                Customer.entityid,
-                Customer.firstname,
-                Customer.id AS customerid,
-                Customer.lastname,
-                Entity.altname,
-                Entity.contact,
-                Entity.datecreated,
-                Entity.entitytitle,
-                Entity.group,
-                Entity.id AS entityid,
-                Entity.isinactive,
-                Entity.isperson,
-                Entity.lastmodifieddate,
-                Entity.parent,
-                Entity.phone,
-                Entity.title,
-                Entity.toplevelparent,
-                Entity.type
-            FROM Customer
-            INNER JOIN Entity
-                ON Entity.customer = Customer.id
-            WHERE Entity.id > " . (isset($lastChanneledOrder['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledOrder['platformId'] : 0);
+                transaction.*,
+                entity.customer as CustomerID,
+                customer.email as CustomerEmail,
+                Item.id as ItemID,
+                Item.itemid as ItemSku,
+                Item.custitem_web_store_design_item as ItemWebStoreDesignItem,
+                Item.parent as ItemParent,
+                promotionCode.name AS PromotionCodeName,
+                transactionBillingAddress.addr1 AS billingAddress1,
+                transactionBillingAddress.addr2 AS billingAddress2,
+                transactionBillingAddress.addrtext AS billingAddressText,
+                transactionBillingAddress.city AS billingCity,
+                transactionBillingAddress.country AS billingCountry,
+                transactionBillingAddress.dropdownstate AS billingDropdownState,
+                transactionBillingAddress.recordowner AS billingRecordOwner,
+                transactionBillingAddress.state AS billingState,
+                transactionBillingAddress.zip AS billingZip,
+                TransactionLine.actualshipdate as TransactionLineActualShipDate,
+                TransactionLine.closedate as TransactionLineCloseDate,
+                TransactionLine.costestimate as TransactionLineCostEstimate,
+                TransactionLine.costestimaterate as TransactionLineCostEstimateRate,
+                TransactionLine.costestimatetype as TransactionLineCostEstimateType,
+                TransactionLine.creditforeignamount as TransactionLineCreditForeignAmount,
+                TransactionLine.custcol_design_code as TransactionLineDesignCode,
+                TransactionLine.custcol_design_market as TransactionLineDesignMarket,
+                TransactionLine.custcol_promo_code as TransactionLinePromoCode,
+                TransactionLine.estgrossprofit as TransactionLineEstGrossProfit,
+                TransactionLine.estgrossprofitpercent as TransactionLineEstGrossProfitPercent,
+                TransactionLine.expenseaccount as TransactionLineExpenseAccount,
+                TransactionLine.expectedshipdate as TransactionLineExpectedShipDate,
+                TransactionLine.foreignamount as TransactionLineForeignAmount,
+                TransactionLine.id as TransactionLineID,
+                TransactionLine.isclosed as TransactionLineIsClosed,
+                TransactionLine.isfullyshipped as TransactionLineIsFullyShipped,
+                TransactionLine.itemtype as TransactionLineItemType,
+                TransactionLine.linelastmodifieddate as TransactionLineLastModifiedDate,
+                TransactionLine.linesequencenumber as TransactionLineSequenceNumber,
+                TransactionLine.memo as TransactionLineMemo,
+                TransactionLine.netamount as TransactionLineNetAmount,
+                TransactionLine.price as TransactionLinePrice,
+                TransactionLine.quantity as TransactionLineQuantity,
+                TransactionLine.quantitybackordered as TransactionLineQuantityBackordered,
+                TransactionLine.quantitybilled as TransactionLineQuantityBilled,
+                TransactionLine.quantitypacked as TransactionLineQuantityPacked,
+                TransactionLine.quantitypicked as TransactionLineQuantityPicked,
+                TransactionLine.quantityrejected as TransactionLineQuantityRejected,
+                TransactionLine.quantityshiprecv as TransactionLineQuantityShipRecv,
+                TransactionLine.rate as TransactionLineRate,
+                TransactionLine.rateamount as TransactionLineRateAmount,
+                TransactionLine.uniquekey as TransactionLineUniqueKey
+            FROM transaction
+            INNER JOIN TransactionLine
+                ON TransactionLine.Transaction = transaction.ID
+            LEFT JOIN entity
+                ON transaction.entity = entity.id
+            INNER JOIN customer
+                ON entity.customer = customer.id
+            LEFT JOIN transactionBillingAddress
+                ON transaction.billingaddress = transactionBillingAddress.nkey
+            LEFT JOIN Item
+                ON TransactionLine.item = Item.id
+            INNER JOIN tranPromotion
+                ON transaction.id = tranPromotion.transaction
+            INNER JOIN promotionCode
+                ON tranPromotion.promocode = promotionCode.id
+            WHERE transaction.Type = 'SalesOrd'
+                AND (TransactionLine.itemtype IN ('Discount', 'ShipItem', 'TaxItem', 'Assembly', 'NonInvtPart'))
+                AND transaction.id >= " . (isset($lastChanneledOrder['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledOrder['platformId'] : 0);
         if ($filters) {
             foreach ($filters as $key => $value) {
-                $query .= " AND Entity.$key = '$value'";
+                $query .= " AND transaction.$key = '$value'";
             }
         }
-        $query .= " ORDER BY Entity.id ASC";
+        $query .= " ORDER BY transaction.id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
             query: $query,
             callback: function($orders) {
@@ -160,13 +201,11 @@ class OrderRequests implements RequestInterface
     }
 
     /**
-     * @param int $limit
-     * @param int $pagination
      * @param object|null $filters
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromAmazon(object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }

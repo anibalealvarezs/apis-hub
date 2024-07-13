@@ -225,4 +225,22 @@ class Helpers
         }
         return (object)[];
     }
+
+    /**
+     * @param array $multiDimensionalArray
+     * @return array
+     */
+    public static function multiDimensionalArrayUnique(array $multiDimensionalArray): array
+    {
+        // Apply array_map() to each sub-array to convert it to a string representation
+        $stringMatrix = array_map(function($array) {
+            return json_encode($array);
+        }, $multiDimensionalArray);
+        // Remove duplicates based on the string representation
+        $uniqueStringMatrix = array_unique($stringMatrix);
+        // Convert back to the original multidimensional array
+        return array_map(function($variant) {
+            return json_decode($variant, true);
+        }, $uniqueStringMatrix);
+    }
 }
