@@ -243,4 +243,20 @@ class Helpers
             return json_decode($variant, true);
         }, $uniqueStringMatrix);
     }
+
+    /**
+     * @param string $url
+     * @return string|null
+     */
+    public static function getDomain(string $url): ?string
+    {
+        // Remove scheme (http/https) and www subdomain if present
+        $url = preg_replace('#^https?://(?:www\.)?#', '', $url);
+
+        // Extract domain name
+        preg_match('#^([a-zA-Z0-9-]+\.[a-zA-Z]{2,})#', $url, $matches);
+
+        // Return the domain name
+        return $matches[1] ?? null;
+    }
 }

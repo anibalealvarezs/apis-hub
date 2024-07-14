@@ -26,6 +26,7 @@ class ChanneledCustomerRepository extends ChanneledBaseRepository
             ->setParameter('email', $email)
             ->andWhere('e.channel = :channelId')
             ->setParameter('channelId', $channel instanceof Channels ? $channel->value : $channel)
+            ->setMaxResults(1) // Special condition because NetSuite could actually have multiple customers with the same email
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }

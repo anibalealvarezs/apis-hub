@@ -2,6 +2,7 @@
 
 namespace Classes\Requests;
 
+use Carbon\Carbon;
 use Classes\Conversions\NetSuiteConvert;
 use Classes\Overrides\NetSuiteApi\NetSuiteApi;
 use Classes\Overrides\ShopifyApi\ShopifyApi;
@@ -93,6 +94,7 @@ class OrderRequests implements RequestInterface
     }
 
     /**
+     * @param string $fromDate
      * @param object|null $filters
      * @param string|bool $resume
      * @return Response
@@ -101,7 +103,7 @@ class OrderRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromNetsuite(string $fromDate = '01/01/1999', object $filters = null, string|bool $resume = true): Response
     {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
@@ -184,6 +186,8 @@ class OrderRequests implements RequestInterface
                 ON tranPromotion.promocode = promotionCode.id
             WHERE transaction.Type = 'SalesOrd'
                 AND (TransactionLine.itemtype IN ('Discount', 'ShipItem', 'TaxItem', 'Assembly', 'NonInvtPart'))
+                AND transaction.trandate >= TO_DATE('".Carbon::parse($fromDate)->format('m/d/Y')."', 'mm/dd/yyyy')
+                AND transaction.custbody_division_domain = '".Helpers::getDomain($config['netsuite_store_base_url'])."'
                 AND transaction.id >= " . (isset($lastChanneledOrder['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledOrder['platformId'] : 0);
         if ($filters) {
             foreach ($filters as $key => $value) {
@@ -305,27 +309,45 @@ class OrderRequests implements RequestInterface
                 $manager->persist($channeledOrderEntity);
                 $manager->flush();
             }
-            $customerId = isset($order->customer->id) && $order->customer->id ? $order->customer->id : 'fake-'.$order->platformId;
-            $email = isset($order->customer->email) && $order->customer->email ? $order->customer->email : $customerId . '@' . $order->channel;
-            if (!$channeledCustomerRepository->existsByEmail($email, $order->channel)) {
-                $channeledCustomerEntity = $channeledCustomerRepository->create(
-                    data: (object) [
-                        'channel' => $order->channel,
-                        'platformId' => $customerId,
-                        'email' => $email,
-                        'data' => [],
-                    ],
-                    returnEntity: true,
-                );
-            } else {
-                $channeledCustomerEntity = $channeledCustomerRepository->getByEmail($email, $order->channel);
+            if (isset($order->customer->id) && $order->customer->id) {
+                if (!$channeledCustomerRepository->existsByPlatformId($order->customer->id, $order->channel)) {
+                    $channeledCustomerEntity = $channeledCustomerRepository->create(
+                        data: (object) [
+                            'channel' => $order->channel,
+                            'platformId' => $order->customer->id,
+                            'email' => $order->customer->email ?? '',
+                            'data' => [],
+                        ],
+                        returnEntity: true,
+                    );
+                } else {
+                    $channeledCustomerEntity = $channeledCustomerRepository->getByPlatformId($order->customer->id, $order->channel);
+                }
             }
-            $channeledCustomerEntity->addChanneledOrder($channeledOrderEntity);
+            if (!isset($channeledCustomerEntity) && isset($order->customer->email) && $order->customer->email) {
+                if (!$channeledCustomerRepository->existsByEmail($order->customer->email, $order->channel)) {
+                    $channeledCustomerEntity = $channeledCustomerRepository->create(
+                        data: (object) [
+                            'channel' => $order->channel,
+                            'platformId' => $order->customer->id ?? '',
+                            'email' => $order->customer->email,
+                            'data' => [],
+                        ],
+                        returnEntity: true,
+                    );
+                } else {
+                    $channeledCustomerEntity = $channeledCustomerRepository->getByEmail($order->customer->email, $order->channel);
+                }
+            }
             $orderEntity->addChanneledOrder($channeledOrderEntity);
             $manager->persist($orderEntity);
-            $manager->persist($channeledCustomerEntity);
+            if (isset($channeledCustomerEntity)) {
+                $channeledCustomerEntity->addChanneledOrder($channeledOrderEntity);
+                $manager->persist($channeledCustomerEntity);
+            }
             $manager->persist($channeledOrderEntity);
             $manager->flush();
+            unset($channeledCustomerEntity);
         }
 
         return new Response(json_encode(['Orders processed']));
