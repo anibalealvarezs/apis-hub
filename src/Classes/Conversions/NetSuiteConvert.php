@@ -11,15 +11,48 @@ class NetSuiteConvert
 {
     public static function customers(array $customers): ArrayCollection
     {
+        $addressLineKeys = [
+            strtolower('AddressAddr1'),
+            strtolower('AddressAddr2'),
+            strtolower('AddressCity'),
+            strtolower('AddressCountry'),
+            strtolower('AddressState'),
+            strtolower('AddressDropdownState'),
+            strtolower('AddressZip'),
+            strtolower('AddressAddressee'),
+            strtolower('AddressPhone'),
+            strtolower('AddressText'),
+            strtolower('AddressAttention'),
+            strtolower('AddressOverride'),
+            strtolower('AddressRecordOwner'),
+        ];
+
+        $customersArray = [];
+        foreach ($customers as $customer) {
+            // Identify Customers
+            if (!isset($customersArray[$customer['entityid']])){
+                $customerWithoutAddress = array_diff_key($customer, array_flip($addressLineKeys));
+                $customerWithoutAddress['addresses'] = [];
+                $customersArray[$customer['entityid']] = [
+                    'entityid' => $customerWithoutAddress['entityid'],
+                    'email' => $customerWithoutAddress['email'] ?? '',
+                    'datecreated' => $customerWithoutAddress['datecreated'] ?? '',
+                    'data' => $customerWithoutAddress,
+                ];
+            }
+            $address = array_intersect_key($customer, array_flip($addressLineKeys));
+            $customersArray[$customer['entityid']]['data']['addresses'][] = $address;
+        }
+
         return new ArrayCollection(array_map(function($customer) {
             return (object) [
                 'platformId' => $customer['entityid'],
                 'platformCreatedAt' => isset($customer['datecreated']) && $customer['datecreated'] ? Carbon::parse($customer['datecreated']) : null,
                 'channel' => Channels::netsuite->value,
                 'email' => $customer['email'] ?? '',
-                'data' => $customer,
+                'data' => $customer['data'],
             ];
-        }, $customers));
+        }, $customersArray));
     }
 
     /**
@@ -194,12 +227,14 @@ class NetSuiteConvert
                         'vendors' => isset($product['vendorname']) && $product['vendorname'] ? [
                             [
                                 'name' => $product['vendorname'],
+                                'data' => [],
                             ]
                         ] : [],
                         'variants' => [],
                         'categories' => isset($product['commercecategoryid']) ? [
                             [
                                 'id' => $product['commercecategoryid'],
+                                'data' => [],
                             ],
                         ] : [],
                         'data' => $product,
@@ -217,6 +252,7 @@ class NetSuiteConvert
                     'vendors' => isset($product['vendorname']) && $product['vendorname'] ? [
                         [
                             'name' => $product['vendorname'],
+                            'data' => [],
                         ]
                     ] : [],
                     'variants' => [],
@@ -267,7 +303,7 @@ class NetSuiteConvert
                 'sku' => $productVariant['itemid'] ?? '',
                 'platformCreatedAt' => isset($productVariant['createddate']) ? Carbon::parse($productVariant['createddate']) : null,
                 'channel' => Channels::netsuite->value,
-                'data' => count(array_keys($productVariant)) > 1 ? $productVariant : [],
+                'data' => $productVariant['data'] ?? [],
             ];
         }, $productVariants));
     }
@@ -279,7 +315,7 @@ class NetSuiteConvert
                 'platformId' => $productCategory['id'],
                 'platformCreatedAt' => isset($productCategory['created']) ? Carbon::parse($productCategory['created']) : null,
                 'channel' => Channels::netsuite->value,
-                'data' => count(array_keys($productCategory)) > 1 ? $productCategory : [],
+                'data' => $productCategory['data'],
                 'isSmartCollection' => false,
             ];
         }, $productCategories));
@@ -293,7 +329,7 @@ class NetSuiteConvert
                 'name' => $vendor['name'] ?? '',
                 'platformCreatedAt' => isset($productCategory['created']) ? Carbon::parse($productCategory['created']) : null,
                 'channel' => Channels::netsuite->value,
-                'data' => count(array_keys($vendor)) > 1 ? $vendor : [],
+                'data' => $vendor['data'],
             ];
         }, $vendors));
     }

@@ -5,7 +5,7 @@ use Controllers\CrudController;
 return [
     '/entity/{entity}/create' => [
         'httpMethod' => 'POST',
-        'callable' => function (string $entity, ?string $body = null, ?array $params = null) {
+        'callable' => function (string $entity, ?string $body = null) {
             return (new CrudController())(
                 entity: $entity,
                 method: 'create',

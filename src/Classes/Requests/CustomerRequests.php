@@ -178,6 +178,19 @@ class CustomerRequests implements RequestInterface
                 Customer.firstname,
                 Customer.id AS customerid,
                 Customer.lastname,
+                customerAddressbookEntityAddress.addr1 as AddressAddr1,
+                customerAddressbookEntityAddress.addr2 as AddressAddr2,
+                customerAddressbookEntityAddress.city as AddressCity,
+                customerAddressbookEntityAddress.country as AddressCountry,
+                customerAddressbookEntityAddress.state as AddressState,
+                customerAddressbookEntityAddress.dropdownstate as AddressDropdownState,
+                customerAddressbookEntityAddress.zip as AddressZip,
+                customerAddressbookEntityAddress.addressee as AddressAddressee,
+                customerAddressbookEntityAddress.addrphone as AddressPhone,
+                customerAddressbookEntityAddress.addrtext as AddressText,
+                customerAddressbookEntityAddress.attention as AddressAttention,
+                customerAddressbookEntityAddress.override as AddressOverride,
+                customerAddressbookEntityAddress.recordowner as AddressRecordOwner,
                 Entity.altname,
                 Entity.contact,
                 Entity.datecreated,
@@ -195,6 +208,10 @@ class CustomerRequests implements RequestInterface
             FROM Customer
             INNER JOIN Entity
                 ON Entity.customer = Customer.id
+            INNER JOIN customerAddressbook
+                ON Customer.id = customerAddressbook.entity
+            LEFT JOIN customerAddressbookEntityAddress
+                ON customerAddressbook.addressbookaddress = customerAddressbookEntityAddress.nkey
             WHERE Entity.datecreated >= TO_DATE('". ($createdAtMin ? Carbon::parse($createdAtMin)->format('m/d/Y') : '01/01/1989') ."', 'mm/dd/yyyy')
                 AND Entity.datecreated <= TO_DATE('". ($createdAtMax ? Carbon::parse($createdAtMax)->format('m/d/Y') : '01/01/2099') ."', 'mm/dd/yyyy')
                 AND Entity.id > " . (isset($lastChanneledCustomer['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledCustomer['platformId'] : 0);
@@ -268,6 +285,12 @@ class CustomerRequests implements RequestInterface
                     ->addPlatformId($channeledCustomer->platformId)
                     ->addPlatformCreatedAt($channeledCustomer->platformCreatedAt)
                     ->addData($channeledCustomer->data);
+            } else {
+                $data = $channeledCustomerEntity->getData();
+                $data['addresses'] = Helpers::multiDimensionalArrayUnique(
+                    array_merge($data['addresses'], $channeledCustomer->data['addresses'])
+                );
+                $channeledCustomerEntity->addData($data);
             }
             $customerEntity->addChanneledCustomer($channeledCustomerEntity);
             $manager->persist($customerEntity);

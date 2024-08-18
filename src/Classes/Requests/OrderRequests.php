@@ -122,6 +122,8 @@ class OrderRequests implements RequestInterface
                 transaction.*,
                 entity.customer as CustomerID,
                 customer.email as CustomerEmail,
+                CUSTOMLIST_NLI_STATUS.id as NliStatusID,
+                CUSTOMLIST_SOS_TYPE.id as SosTypeID,
                 Item.id as ItemID,
                 Item.itemid as ItemSku,
                 Item.custitem_web_store_design_item as ItemWebStoreDesignItem,
@@ -184,6 +186,10 @@ class OrderRequests implements RequestInterface
                 ON transaction.id = tranPromotion.transaction
             INNER JOIN promotionCode
                 ON tranPromotion.promocode = promotionCode.id
+            INNER JOIN CUSTOMLIST_NLI_STATUS
+                ON transaction.custbody_nli_status = CUSTOMLIST_NLI_STATUS.id
+            INNER JOIN CUSTOMLIST_SOS_TYPE
+                ON transaction.custbody_shared_order_type = CUSTOMLIST_SOS_TYPE.id
             WHERE transaction.Type = 'SalesOrd'
                 AND (TransactionLine.itemtype IN ('Discount', 'ShipItem', 'TaxItem', 'Assembly', 'NonInvtPart'))
                 AND transaction.trandate >= TO_DATE('".Carbon::parse($fromDate)->format('m/d/Y')."', 'mm/dd/yyyy')
@@ -250,6 +256,18 @@ class OrderRequests implements RequestInterface
                 );
             } else {
                 $channeledOrderEntity = $channeledOrderRepository->getByPlatformId($order->platformId, $order->channel);
+                // Special `line_items` merge for NetSuite
+                if ($order->channel === Channels::netsuite->value) {
+                    $data = $channeledOrderEntity->getData();
+                    if (isset($data['line_items']) && count($data['line_items'])) {
+                        $data['line_items'] = [...$data['line_items'], ...$order->data['line_items']];
+                    } else {
+                        $data['line_items'] = $order->data['line_items'];
+                    }
+                    $data['line_items'] = Helpers::multiDimensionalArrayUnique($data['line_items']);
+                    $channeledOrderEntity->addData($data);
+                }
+                // End of special `line_items` merge for NetSuite
             }
             foreach($order->discountCodes as $discountCode) {
                 if (!$channeledDiscountRepository->existsByCode($discountCode, $order->channel)) {
