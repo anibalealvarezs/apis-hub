@@ -12,6 +12,52 @@ use Enums\Channels;
 class ProductRepository extends BaseRepository
 {
     /**
+     * @param int $id
+     * @param bool $returnEntity
+     * @param object|null $filters
+     * @return Entity|array|null
+     * @throws NonUniqueResultException
+     */
+    public function read(int $id, bool $returnEntity = false, object $filters = null): Entity|array|null
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('e')
+            ->addSelect('p')
+            ->addSelect('v')
+            ->addSelect('c')
+            ->addSelect('pv')
+            ->from($this->getEntityName(), 'e')
+            ->leftJoin('e.channeledProducts', 'p')
+            ->leftJoin('p.channeledVendor', 'v')
+            ->leftJoin('p.channeledProductCategories', 'c')
+            ->leftJoin('p.channeledProductVariants', 'pv')
+            ->where('e.id = :id')
+            ->setParameter('id', $id);
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        if ($returnEntity) {
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+        } else {
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
+        }
+
+        if (!$entity) {
+            return null;
+        }
+
+        if (is_array($entity)) {
+            $entity = $this->replaceChannelName($entity);
+        }
+
+        return $entity;
+    }
+
+    /**
      * @param string $productId
      * @return array|null
      * @throws NonUniqueResultException
@@ -111,20 +157,30 @@ class ProductRepository extends BaseRepository
             ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
         return new ArrayCollection(array_map(function($item) {
-            $item['channeledProducts'] = array_map(function($channelProduct) {
-                $channelProduct['channel'] = Channels::from($channelProduct['channel'])->getName();
-                unset($channelProduct['channeledVendor']['channel']);
-                $channelProduct['channeledProductCategories'] = array_map(function($channeledProductCategory) {
-                    unset($channeledProductCategory['channel']);
-                    return $channeledProductCategory;
-                }, $channelProduct['channeledProductCategories']);
-                $channelProduct['channeledProductVariants'] = array_map(function($channeledProductVariant) {
-                    unset($channeledProductVariant['channel']);
-                    return $channeledProductVariant;
-                }, $channelProduct['channeledProductVariants']);
-                return $channelProduct;
-            }, $item['channeledProducts']);
-            return $item;
+            return $this->replaceChannelName($item);
         }, $list));
+    }
+
+    /**
+     * @param mixed $entity
+     * @return mixed
+     */
+    protected function replaceChannelName(mixed $entity): mixed
+    {
+        $entity['channeledProducts'] = array_map(function ($channelProduct) {
+            $channelProduct['channel'] = Channels::from($channelProduct['channel'])->getName();
+            unset($channelProduct['channeledVendor']['channel']);
+            $channelProduct['channeledProductCategories'] = array_map(function ($channeledProductCategory) {
+                unset($channeledProductCategory['channel']);
+                return $channeledProductCategory;
+            }, $channelProduct['channeledProductCategories']);
+            $channelProduct['channeledProductVariants'] = array_map(function ($channeledProductVariant) {
+                unset($channeledProductVariant['channel']);
+                return $channeledProductVariant;
+            }, $channelProduct['channeledProductVariants']);
+            return $channelProduct;
+        }, $entity['channeledProducts']);
+
+        return $entity;
     }
 }

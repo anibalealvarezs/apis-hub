@@ -7,8 +7,11 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
 use Entities\Entity;
+use Enums\AnalyticsEntities;
+use Enums\Channels;
 use Enums\JobStatus;
 use Faker\Factory;
+use InvalidArgumentException;
 use ReflectionEnum;
 use ReflectionException;
 use stdClass;
@@ -42,18 +45,17 @@ class JobRepository extends BaseRepository
         $job['status'] = $this->getStatusName($job['status']);
 
         return $job;
-
     }
 
     /**
-     * @param string $filename
+     * @param string $uuid
      * @return array
      */
-    public function getJobsByFilename(string $filename): array
+    public function getJobsByUuid(string $uuid): array
     {
         $qb = $this->createQueryBuilder('j');
-        $qb->where('j.filename = :filename')
-            ->setParameter('filename', $filename);
+        $qb->where('j.uuid = :uuid')
+            ->setParameter('uuid', $uuid);
         $job = $qb->getQuery()->getResult();
         $job['status'] = $this->getStatusName($job['status']);
 
@@ -80,7 +82,7 @@ class JobRepository extends BaseRepository
     {
         $entity = parent::read($id, $returnEntity);
 
-        if (!$returnEntity) {
+        if (!$returnEntity && $entity) {
             $entity['status'] = $this->getStatusName($entity['status']);
         }
 
@@ -100,11 +102,25 @@ class JobRepository extends BaseRepository
         if (isset($data->status) && is_int($data->status) && $job = JobStatus::from($data->status)) {
             $data->status = $job->value;
         } else {
-            $data->status = JobStatus::processing->value;
+            $data->status = JobStatus::scheduled->value;
         }
 
-        if (!isset($data->filename)) {
-            $data->filename = Factory::create()->uuid;
+        if (!isset($data->entity) || !$data->entity) {
+            throw new InvalidArgumentException('Entity is required');
+        }
+        if (!(new ReflectionEnum(AnalyticsEntities::class))->getConstant($data->entity)) {
+            throw new InvalidArgumentException('Invalid entity');
+        }
+
+        if (!isset($data->channel)) {
+            throw new InvalidArgumentException('Channel is required');
+        }
+        if (!(new ReflectionEnum(Channels::class))->getConstant($data->channel)) {
+            throw new InvalidArgumentException('Invalid channel');
+        }
+
+        if (!isset($data->uuid)) {
+            $data->uuid = Factory::create()->uuid;
         }
 
         return parent::create($data);

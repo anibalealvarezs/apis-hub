@@ -12,6 +12,50 @@ use Enums\Channels;
 class DiscountRepository extends BaseRepository
 {
     /**
+     * @param int $id
+     * @param bool $returnEntity
+     * @param object|null $filters
+     * @return Entity|array|null
+     * @throws NonUniqueResultException
+     */
+    public function read(int $id, bool $returnEntity = false, object $filters = null): Entity|array|null
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('e')
+            ->addSelect('d')
+            ->addSelect('pr')
+            // ->addSelect('o')
+            ->from($this->getEntityName(), 'e')
+            ->leftJoin('e.channeledDiscounts', 'd')
+            ->leftJoin('d.channeledPriceRule', 'pr')
+            // ->leftJoin('d.channeledOrders', 'o')
+            ->where('e.id = :id')
+            ->setParameter('id', $id);
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        if ($returnEntity) {
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+        } else {
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
+        }
+
+        if (!$entity) {
+            return null;
+        }
+
+        if (is_array($entity)) {
+            $entity = $this->replaceChannelName($entity);
+        }
+
+        return $entity;
+    }
+
+    /**
      * @param string $code
      * @return array|null
      * @throws NonUniqueResultException
@@ -57,11 +101,11 @@ class DiscountRepository extends BaseRepository
             ->select('e')
             ->addSelect('d')
             ->addSelect('pr')
-            ->addSelect('o')
+            // ->addSelect('o')
             ->from($this->getEntityName(), 'e');
         $query->leftJoin('e.channeledDiscounts', 'd');
         $query->leftJoin('d.channeledPriceRule', 'pr');
-        $query->leftJoin('d.channeledOrders', 'o');
+        // $query->leftJoin('d.channeledOrders', 'o');
         if ($ids) {
             $query->where('e.id IN (:ids)')
                 ->setParameter('ids', $ids);
@@ -78,16 +122,25 @@ class DiscountRepository extends BaseRepository
             ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
         return new ArrayCollection(array_map(function($item) {
-            $item['channeledDiscounts'] = array_map(function($channelDiscount) {
-                $channelDiscount['channel'] = Channels::from($channelDiscount['channel'])->getName();
-                unset($channelDiscount['channeledPriceRule']['channel']);
-                $channelDiscount['channeledOrders'] = array_map(function($channeledOrder) {
-                    unset($channeledOrder['channel']);
-                    return $channeledOrder;
-                }, $channelDiscount['channeledOrders']);
-                return $channelDiscount;
-            }, $item['channeledDiscounts']);
-            return $item;
+            return $this->replaceChannelName($item);
         }, $list));
+    }
+
+    /**
+     * @param array $entity
+     * @return array
+     */
+    protected function replaceChannelName(array $entity): array
+    {
+        $entity['channeledDiscounts'] = array_map(function ($channelDiscount) {
+            $channelDiscount['channel'] = Channels::from($channelDiscount['channel'])->getName();
+            unset($channelDiscount['channeledPriceRule']['channel']);
+            /* $channelDiscount['channeledOrders'] = array_map(function ($channeledOrder) {
+                unset($channeledOrder['channel']);
+                return $channeledOrder;
+            }, $channelDiscount['channeledOrders']); */
+            return $channelDiscount;
+        }, $entity['channeledDiscounts']);
+        return $entity;
     }
 }

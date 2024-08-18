@@ -12,6 +12,48 @@ use Enums\Channels;
 class VendorRepository extends BaseRepository
 {
     /**
+     * @param int $id
+     * @param bool $returnEntity
+     * @param object|null $filters
+     * @return Entity|array|null
+     * @throws NonUniqueResultException
+     */
+    public function read(int $id, bool $returnEntity = false, object $filters = null): Entity|array|null
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('e')
+            ->addSelect('v')
+            ->addSelect('p')
+            ->from($this->getEntityName(), 'e')
+            ->leftJoin('e.channeledVendors', 'v')
+            ->leftJoin('v.channeledProducts', 'p')
+            ->where('e.id = :id')
+            ->setParameter('id', $id);
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        if ($returnEntity) {
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+        } else {
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
+        }
+
+        if (!$entity) {
+            return null;
+        }
+
+        if (is_array($entity)) {
+            $entity = $this->replaceChannelName($entity);
+        }
+
+        return $entity;
+    }
+
+    /**
      * @param string $name
      * @return array|null
      * @throws NonUniqueResultException
@@ -74,15 +116,20 @@ class VendorRepository extends BaseRepository
             ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
         return new ArrayCollection(array_map(function($item) {
-            $item['channeledVendors'] = array_map(function($channelVendor) {
-                $channelVendor['channel'] = Channels::from($channelVendor['channel'])->getName();
-                $channelVendor['channeledProducts'] = array_map(function($channeledProduct) {
-                    unset($channeledProduct['channel']);
-                    return $channeledProduct;
-                }, $channelVendor['channeledProducts']);
-                return $channelVendor;
-            }, $item['channeledVendors']);
-            return $item;
+            return $this->replaceChannelName($item);
         }, $list));
+    }
+
+    private function replaceChannelName(array $entity)
+    {
+        $entity['channeledVendors'] = array_map(function($channelVendor) {
+            $channelVendor['channel'] = Channels::from($channelVendor['channel'])->getName();
+            $channelVendor['channeledProducts'] = array_map(function($channeledProduct) {
+                unset($channeledProduct['channel']);
+                return $channeledProduct;
+            }, $channelVendor['channeledProducts']);
+            return $channelVendor;
+        }, $entity['channeledVendors']);
+        return $entity;
     }
 }
