@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Lost?</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #17212a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+            flex-direction: column;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-size: 3rem;
+            color: #e7980b;
+            margin-bottom: 0.5rem;
+        }
+
+        p {
+            font-size: 1.25rem;
+            max-width: 600px;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        a.button {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: #2089ab;
+            color: #ffffff;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        a.button:hover {
+            background-color: #186b8c;
+        }
+
+        .ghost {
+            font-size: 5rem;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2.2rem;
+            }
+
+            p {
+                font-size: 1rem;
+            }
+
+            .ghost {
+                font-size: 4rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="ghost">👻</div>
+<h1>Hello, curious traveler!</h1>
+<p>It seems you’ve wandered into the unknown. There’s nothing to see here… or is there?<br><br>
+    I’m <strong>Aníbal Álvarez</strong>, a software developer. If you’re curious about what I do, you’re welcome to check out my site.</p>
+<a class="button" href="https://anibalalvarez.com" target="_blank">Visit anibalalvarez.com</a>
+</body>
+</html>

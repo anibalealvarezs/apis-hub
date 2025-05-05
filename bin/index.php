@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Symfony\Component\HttpFoundation\Request;
 use Classes\RoutingCore;
+use Symfony\Component\HttpFoundation\Response;
 
 $entityManager = require_once __DIR__ . "/../app/bootstrap.php";
 
@@ -23,8 +24,19 @@ $app->multiMap($crudRoutes);
 $cacheRoutes = require_once __DIR__ . "/../src/Routes/channeledcrud.php";
 $app->multiMap($cacheRoutes);
 
-$response = $app->handle($request);
+// Page routes next
+$pageRoutes = require_once __DIR__ . "/../src/Routes/page.php";
+$app->multiMap($pageRoutes);
 
-header('Content-Type: application/json');
-
-$response->send();
+try {
+    $response = $app->handle($request);
+    $response->send();
+} catch (Exception $e) {
+    $response = new Response();
+    $response->setContent($e->getMessage());
+    $response->setStatusCode(500);
+    $response->send();
+} finally {
+    $entityManager->close();
+    $entityManager = null;
+}

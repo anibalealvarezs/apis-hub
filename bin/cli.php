@@ -31,4 +31,8 @@ $cli->addCommands([
 ]);
 
 // Runs console application
-$cli->run();
+try {
+    $cli->run();
+} catch (Exception $e) {
+
+}

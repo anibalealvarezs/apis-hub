@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Nothing to See Here</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #17212a;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 0.3em;
+            color: #e7980b;
+        }
+
+        p {
+            font-size: 1.2em;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        a {
+            margin-top: 1.5em;
+            display: inline-block;
+            padding: 0.8em 1.5em;
+            background-color: #2089ab;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        a:hover {
+            background-color: #176c89;
+        }
+
+        .ghost {
+            position: relative;
+            width: 120px;
+            height: 140px;
+            background: #ffffff;
+            border-radius: 60% 60% 20% 20%;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .ghost::before,
+        .ghost::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            width: 24px;
+            height: 24px;
+            background: #ffffff;
+            border-radius: 50%;
+        }
+
+        .ghost::before {
+            left: 0;
+        }
+
+        .ghost::after {
+            right: 0;
+        }
+
+        .ghost .eyes {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 40px;
+        }
+
+        .ghost .eyes div {
+            width: 15px;
+            height: 15px;
+            background: #17212a;
+            border-radius: 50%;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body>
+<div class="ghost">
+    <div class="eyes">
+        <div></div>
+        <div></div>
+    </div>
+</div>
+<h1>Hello, curious traveler!</h1>
+<p>There’s nothing to see here… or is there?</p>
+<p>Since you're here, let me say hi — I'm <strong>Aníbal Álvarez</strong>, a software developer.</p>
+<a href="https://anibalalvarez.com" target="_blank">Visit my website</a>
+</body>
+</html>

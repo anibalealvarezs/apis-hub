@@ -44,15 +44,25 @@ class RoutingCore implements HttpKernelInterface
         try {
             $attributes = $matcher->match($request->getPathInfo());
             $controller = $attributes['controller'];
-            unset($attributes['controller']);
-            unset($attributes['_route']);
+            $isHtml = $attributes['html'] ?? false; // Detect if HTML
+
+            unset($attributes['controller'], $attributes['_route'], $attributes['html']);
             $attributes['body'] = $request->getContent() ?: null;
             $attributes['params'] = $request->query->all() ?: null;
+
             $response = call_user_func_array($controller, $attributes);
-        } catch (ResourceNotFoundException $e) {
-            $response = new Response(content: 'Route not found!', status: Response::HTTP_NOT_FOUND);
+
+            // If not HTML, force Content-Type JSON
+            if (!$isHtml && !$response->headers->has('Content-Type')) {
+                $response->headers->set('Content-Type', 'application/json');
+            }
+        } catch (ResourceNotFoundException) {
+            $html = file_get_contents(__DIR__ . '/../views/404.html');
+            $response = new Response($html, Response::HTTP_NOT_FOUND, ['Content-Type' => 'text/html']);
         } catch (Exception $e) {
-            $response = new Response($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
+            $response = new Response($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR, headers: [
+                'Content-Type' => 'application/json'
+            ]);
         }
 
         return $response;
