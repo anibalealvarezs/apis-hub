@@ -1,0 +1,10 @@
+/vendor/
+/.idea/
+/config/yaml/cache.yaml
+/config/yaml/channelsconfig.yaml
+/config/yaml/dbconfig.yaml
+/config/yaml/entitiesconfig.yaml
+/tests/Benchmark/*
+/tests/App/*
+/src/Entities/Analytics/Lead.php
+/src/Entities/Analytics/Accounts/*

@@ -1,0 +1,35 @@
+job:
+  class: \Entities\Job
+  crud_enabled: true
+customer:
+  class: \Entities\Analytics\Customer
+  channeled_class: \Entities\Analytics\Channeled\ChanneledCustomer
+  crud_enabled: true
+discount:
+  class: \Entities\Analytics\Discount
+  channeled_class: \Entities\Analytics\Channeled\ChanneledDiscount
+  crud_enabled: true
+price_rule:
+  class: \Entities\Analytics\PriceRule
+  channeled_class: \Entities\Analytics\Channeled\ChanneledPriceRule
+  crud_enabled: true
+order:
+  class: \Entities\Analytics\Order
+  channeled_class: \Entities\Analytics\Channeled\ChanneledOrder
+  crud_enabled: true
+product:
+  class: \Entities\Analytics\Product
+  channeled_class: \Entities\Analytics\Channeled\ChanneledProduct
+  crud_enabled: true
+product_variant:
+  class: \Entities\Analytics\ProductVariant
+  channeled_class: \Entities\Analytics\Channeled\ChanneledProductVariant
+  crud_enabled: true
+product_category:
+  class: \Entities\Analytics\ProductCategory
+  channeled_class: \Entities\Analytics\Channeled\ChanneledProductCategory
+  crud_enabled: true
+vendor:
+  class: \Entities\Analytics\Vendor
+  channeled_class: \Entities\Analytics\Channeled\ChanneledVendor
+  crud_enabled: true
