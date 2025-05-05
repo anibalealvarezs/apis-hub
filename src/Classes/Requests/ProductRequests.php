@@ -2,7 +2,7 @@
 
 namespace Classes\Requests;
 
-use Chmw\KlaviyoApi\KlaviyoApi;
+use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
 use Classes\Conversions\NetSuiteConvert;
 use Classes\Overrides\NetSuiteApi\NetSuiteApi;
 use Classes\Overrides\ShopifyApi\ShopifyApi;

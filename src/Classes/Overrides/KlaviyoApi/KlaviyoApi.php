@@ -2,10 +2,10 @@
 
 namespace Classes\Overrides\KlaviyoApi;
 
-use Chmw\KlaviyoApi\Enums\Sort;
+use Anibalealvarezs\KlaviyoApi\Enums\Sort;
 use GuzzleHttp\Exception\GuzzleException;
 
-class KlaviyoApi extends \Chmw\KlaviyoApi\KlaviyoApi
+class KlaviyoApi extends \Anibalealvarezs\KlaviyoApi\KlaviyoApi
 {
     /**
      * @param array|null $profileFields

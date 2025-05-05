@@ -2,14 +2,14 @@
 
 namespace Classes\Overrides\ShopifyApi;
 
-use Chmw\ShopifyApi\Enums\FinancialStatus;
-use Chmw\ShopifyApi\Enums\FulfillmentStatus;
-use Chmw\ShopifyApi\Enums\PublishedStatus;
-use Chmw\ShopifyApi\Enums\SortOptions;
-use Chmw\ShopifyApi\Enums\Status;
+use Anibalealvarezs\ShopifyApi\Enums\FinancialStatus;
+use Anibalealvarezs\ShopifyApi\Enums\FulfillmentStatus;
+use Anibalealvarezs\ShopifyApi\Enums\PublishedStatus;
+use Anibalealvarezs\ShopifyApi\Enums\SortOptions;
+use Anibalealvarezs\ShopifyApi\Enums\Status;
 use GuzzleHttp\Exception\GuzzleException;
 
-class ShopifyApi extends \Chmw\ShopifyApi\ShopifyApi
+class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
 {
     /**
      * @param string|null $createdAtMin

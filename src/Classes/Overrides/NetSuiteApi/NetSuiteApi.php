@@ -4,7 +4,7 @@ namespace Classes\Overrides\NetSuiteApi;
 
 use GuzzleHttp\Exception\GuzzleException;
 
-class NetSuiteApi extends \Chmw\NetSuiteApi\NetSuiteApi
+class NetSuiteApi extends \Anibalealvarezs\NetSuiteApi\NetSuiteApi
 {
     /**
      * @param string $query

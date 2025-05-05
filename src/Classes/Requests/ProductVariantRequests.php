@@ -2,7 +2,7 @@
 
 namespace Classes\Requests;
 
-use Chmw\KlaviyoApi\KlaviyoApi;
+use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
 use Classes\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
