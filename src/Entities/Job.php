@@ -15,7 +15,13 @@ class Job extends Entity
     protected int $status;
 
     #[ORM\Column(type: 'string')]
-    protected string $filename;
+    protected string $uuid;
+
+    #[ORM\Column(type: 'string')]
+    protected string $entity;
+
+    #[ORM\Column(type: 'string')]
+    protected string $channel;
 
     /**
      * @return string
@@ -36,16 +42,48 @@ class Job extends Entity
     /**
      * @return string
      */
-    public function getFilename(): string
+    public function getUuid(): string
     {
-        return $this->filename;
+        return $this->uuid;
     }
 
     /**
-     * @param string $filename
+     * @param string $uuid
      */
-    public function addFilename(string $filename): void
+    public function addUuid(string $uuid): void
     {
-        $this->filename = $filename;
+        $this->uuid = $uuid;
+    }
+
+    /**
+     * @return string
+     */
+    public function getEntity(): string
+    {
+        return $this->entity;
+    }
+
+    /**
+     * @param string $entity
+     */
+    public function addEntity(string $entity): void
+    {
+        $this->entity = $entity;
+    }
+
+    /**
+     * @return string
+     */
+    public function getChannel(): string
+    {
+        return $this->channel;
+    }
+
+    /**
+     * @param string $channel
+     */
+    public function addChannel(string $channel): void
+    {
+        $this->channel = $channel;
     }
 }
