@@ -2,12 +2,18 @@
 
 ## Instructions
 
-1. Create the `config/yaml/dbconfig.yaml` file from the `config/yaml/dbconfig-example.yaml` file included in this repo and configure your database connection
+1. Create the configuration files from the examples included in this repo  
+
+    | File                              | Purpose                                                                           |
+    |-----------------------------------|-----------------------------------------------------------------------------------|
+    | `config/yaml/dbconfig.yaml`       | configure your database connection                                                |
+    | `config/yaml/entitiesconfig.yaml` | specify which entities will be used in the application and which are crudable     |
+    | `config/yaml/channelsconfig.yaml` | fill in the necessary information for each channel |
 
 2. Run the following command in order to create the table in the database
 
     ```bash
-    vendor/bin/doctrine orm:schema-tool:update --force
+    vendor/bin/doctrine orm:schema-tool:update --force --complete
     ```
 
 3. Execute the corresponding command in order to interact with jobs in the database

@@ -4,130 +4,118 @@ namespace Entities\Analytics;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
-use Interfaces\ChannelInterface;
+use Entities\Analytics\Channeled\ChanneledProductCategory;
+use Entities\Entity;
 use Repositories\ProductCategoryRepository;
 
 #[ORM\Entity(repositoryClass: ProductCategoryRepository::class)]
-#[ORM\Table(name: 'product_categories')]
+#[ORM\Table(name: 'productCategories')]
+#[ORM\Index(columns: ['productCategoryId'], name: 'productCategoryId_idx')]
 #[ORM\HasLifecycleCallbacks]
-class ProductCategory extends Entity implements ChannelInterface
+class ProductCategory extends Entity
 {
-    #[ORM\Column]
-    protected int|string $platformId;
+    #[ORM\Column(type: 'bigint', unique: true)]
+    protected int|string $productCategoryId;
 
-    #[ORM\Column(type: 'integer')]
-    protected int $channel;
+    #[ORM\Column(type: 'boolean')]
+    protected bool $isSmartCollection;
 
-    #[ORM\Column(type: 'json')]
-    protected string $data;
-
-    // Many Categories have Many Products.
-    #[ORM\ManyToMany(targetEntity: 'Product', inversedBy: 'productCategories', cascade: ['persist'])]
-    #[ORM\JoinTable(name: 'product_categories_products')]
-    protected ArrayCollection $products;
+    #[ORM\OneToMany(mappedBy: 'productCategory', targetEntity: ChanneledProductCategory::class, orphanRemoval: true)]
+    protected Collection $channeledProductCategories;
 
     public function __construct()
     {
-        $this->products = new ArrayCollection();
-    }
-
-    /**
-     * @return int|string
-     */
-    public function getPlatformId(): int|string
-    {
-        return $this->platformId;
-    }
-
-    /**
-     * @param int|string $platformId
-     */
-    public function addPlatformId(int|string $platformId): void
-    {
-        $this->platformId = $platformId;
+        $this->channeledProductCategories = new ArrayCollection();
     }
 
     /**
      * @return string
      */
-    public function getChannel(): string
+    public function getProductCategoryId(): string
     {
-        return $this->channel;
+        return $this->productCategoryId;
     }
 
     /**
-     * @param int $channel
-     */
-    public function addChannel(int $channel): void
-    {
-        $this->channel = $channel;
-    }
-
-    /**
-     * @return string
-     */
-    public function getData(): string
-    {
-        return $this->data;
-    }
-
-    /**
-     * @param string $data
-     */
-    public function addData(string $data): void
-    {
-        $this->data = $data;
-    }
-
-    /**
-     * @return Collection|null
-     */
-    public function getProducts(): ?Collection
-    {
-        return $this->products;
-    }
-
-    /**
-     * @param Product $product
+     * @param string $productCategoryId
      * @return ProductCategory
      */
-    public function addProduct(Product $product): self
+    public function addProductCategoryId(string $productCategoryId): self
     {
-        $this->products->add($product);
+        $this->productCategoryId = $productCategoryId;
 
         return $this;
     }
 
     /**
-     * @param Collection $products
+     * @return bool
+     */
+    public function getIsSmartCollection(): bool
+    {
+        return $this->isSmartCollection;
+    }
+
+    /**
+     * @param bool $isSmartCollection
      * @return ProductCategory
      */
-    public function addProducts(Collection $products): self
+    public function addIsSmartCollection(bool $isSmartCollection): self
     {
-        foreach ($products as $product) {
-            $this->addProduct($product);
+        $this->isSmartCollection = $isSmartCollection;
+
+        return $this;
+    }
+
+    public function getChanneledProductCategories(): ?Collection
+    {
+        return $this->channeledProductCategories;
+    }
+
+    public function addChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
+    {
+        if ($this->channeledProductCategories->contains($channeledProductCategory)) {
+            return $this;
+        }
+
+        $this->channeledProductCategories->add($channeledProductCategory);
+        $channeledProductCategory->addProductCategory($this);
+
+        return $this;
+    }
+
+    public function addChanneledProductCategories(Collection $channeledProductCategories): self
+    {
+        foreach ($channeledProductCategories as $channeledProductCategory) {
+            $this->addChanneledProductCategory($channeledProductCategory);
         }
 
         return $this;
     }
 
-    /**
-     * @param Product $product
-     */
-    public function removeProduct(Product $product): void
+    public function removeChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
-        $this->products->removeElement($product);
+        if (!$this->channeledProductCategories->contains($channeledProductCategory)) {
+            return $this;
+        }
+
+        $this->channeledProductCategories->removeElement($channeledProductCategory);
+
+        if ($channeledProductCategory->getProductCategory() !== $this) {
+            return $this;
+        }
+
+        $channeledProductCategory->addProductCategory(productCategory: null);
+
+        return $this;
     }
 
-    /**
-     * @param Collection $products
-     */
-    public function removeProducts(Collection $products): void
+    public function removeChanneledProductCategories(Collection $channeledProductCategories): self
     {
-        foreach ($products as $product) {
-            $this->removeProduct($product);
+        foreach ($channeledProductCategories as $channeledProductCategory) {
+            $this->removeChanneledProductCategory($channeledProductCategory);
         }
+
+        return $this;
     }
 }

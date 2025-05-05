@@ -2,6 +2,7 @@
 
 namespace Repositories;
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\NonUniqueResultException;
@@ -16,12 +17,13 @@ class BaseRepository extends EntityRepository
 {
     /**
      * @param stdClass|null $data
-     * @return array|null
+     * @param bool $returnEntity
+     * @return Entity|array|null
      * @throws MappingException
      * @throws NonUniqueResultException
      * @throws ReflectionException
      */
-    public function create(stdClass $data = null): ?array
+    public function create(stdClass $data = null, bool $returnEntity = false): Entity|array|null
     {
         $entityName = $this->getEntityName();
         $entity = new $entityName();
@@ -37,73 +39,44 @@ class BaseRepository extends EntityRepository
         $this->_em->persist($entity);
         $this->_em->flush();
 
-        return $this->read(id: $entity->getId());
+        return $this->read(
+            id: $entity->getId(),
+            returnEntity: $returnEntity,
+        );
     }
 
     /**
      * @param int $id
-     * @param bool $withAssociations
-     * @return array|null
-     * @throws MappingException
+     * @param bool $returnEntity
+     * @param object|null $filters
+     * @return Entity|array|null
      * @throws NonUniqueResultException
-     * @throws ReflectionException
      */
-    public function read(int $id, bool $withAssociations = false): ?array
+    public function read(int $id, bool $returnEntity = false, object $filters = null): Entity|array|null
     {
-        $entity = $this->_em->createQueryBuilder()
+        $query = $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->where('e.id = :id')
-            ->setParameter('id', $id)
-            ->getQuery()
-            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+            ->setParameter('id', $id);
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        if ($returnEntity) {
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+        } else {
+            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
+        }
 
         if (!$entity) {
             return null;
         }
 
-        return $this->mapEntityData($entity, $withAssociations);
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws MappingException
-     */
-    protected function mapEntityData(object $entity, bool $withAssociations = false): array
-    {
-        $fields = array_keys($this->_class->fieldMappings);
-        $associated = $this->_class->associationMappings;
-
-        $data = [];
-        foreach ($fields as $field) {
-            if (method_exists($this->_entityName, 'get' . Helpers::toCamelcase($field))) {
-                $data[$field] = $entity->{'get' . Helpers::toCamelcase($field)}();
-            }
-        }
-        if (!$withAssociations) {
-            return $data;
-        }
-        foreach ($associated as $association) {
-            $fieldName = $association['fieldName'];
-            $className = $association['targetEntity'];
-            if (!method_exists($this->_entityName, 'get' . Helpers::toCamelcase($fieldName))) {
-                continue;
-            }
-            $element = $entity->{'get' . Helpers::toCamelcase($fieldName)}();
-            if (!$element) {
-                continue;
-            }
-            if (Helpers::isEntity($this->_em, $element)) {
-                $data[$fieldName] = Helpers::jsonSerialize($element);
-                continue;
-            }
-            $data[$fieldName] = [];
-            foreach ($element as $el) {
-                $data[$fieldName][] = $this->_em->getRepository($className)->read($el->getId());
-            }
-        }
-
-        return $data;
+        return $entity;
     }
 
     /**
@@ -115,50 +88,71 @@ class BaseRepository extends EntityRepository
     {
         return $this->_em->createQueryBuilder()
             ->select('COUNT(e)')
-            ->from($this->_entityName, 'e')
+            ->from($this->getEntityName(), 'e')
             ->getQuery()
             ->getSingleScalarResult();
     }
 
     /**
+     * @param object|null $filters
+     * @return int
+     * @throws NoResultException
+     * @throws NonUniqueResultException
+     */
+    public function countElements(object $filters = null): int
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('count(e.id)')
+            ->from($this->getEntityName(), 'e');
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+        return $query->getQuery()->getSingleScalarResult();
+    }
+
+    /**
      * @param int $limit
      * @param int $pagination
+     * @param array|null $ids
      * @param object|null $filters
-     * @param bool $withAssociations
-     * @return array
-     * @throws MappingException
-     * @throws ReflectionException
+     * @return ArrayCollection
      */
-    public function readMultiple(int $limit = 10, int $pagination = 0, object $filters = null, bool $withAssociations = false): array
+    public function readMultiple(int $limit = 100, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
     {
         $query = $this->_em->createQueryBuilder()
             ->select('e')
-            ->from($this->_entityName, 'e');
-        foreach($filters as $key => $value) {
-            $query->andWhere('e.' . $key . ' = :' . $key)
-                ->setParameter($key, $value);
+            ->from($this->getEntityName(), 'e');
+        if ($ids) {
+            $query->where('e.id IN (:ids)')
+                ->setParameter('ids', $ids);
+        }
+        if ($filters) {
+            foreach($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
         }
         $list = $query->setMaxResults($limit)
             ->setFirstResult($limit * $pagination)
             ->getQuery()
-            ->getResult();
+            ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
-        return array_map(function ($element) use ($withAssociations) {
-            return $this->mapEntityData($element, $withAssociations);
-        }, $list);
+        return new ArrayCollection($list);
     }
 
     /**
      * @param int $id
      * @param stdClass|null $data
-     * @return bool|array|null
-     * @throws MappingException
+     * @param bool $returnEntity
+     * @return bool|array|Entity|null
      * @throws NonUniqueResultException
-     * @throws ReflectionException
      */
-    public function update(int $id, stdClass $data = null): bool|array|null
+    public function update(int $id, stdClass $data = null, bool $returnEntity = false): bool|array|null|Entity
     {
-        $entity = $this->_em->find($this->_entityName, $id);
+        $entity = $this->_em->find($this->getEntityName(), $id);
 
         if (!$entity) {
             return false;
@@ -177,7 +171,10 @@ class BaseRepository extends EntityRepository
         $this->_em->persist($entity);
         $this->_em->flush();
 
-        return $this->read($entity->getId());
+        return $this->read(
+            id: $entity->getId(),
+            returnEntity: $returnEntity,
+        );
     }
 
     /**
@@ -186,7 +183,7 @@ class BaseRepository extends EntityRepository
      */
     public function delete(int $id): bool
     {
-        $entity = $this->_em->find($this->_entityName, $id);
+        $entity = $this->_em->find($this->getEntityName(), $id);
 
         if (!$entity) {
             return false;
@@ -204,24 +201,5 @@ class BaseRepository extends EntityRepository
         $this->_em->flush();
 
         return true;
-    }
-
-    /**
-     * @param int $platformId
-     * @param int $channel
-     * @return array|null
-     * @throws NonUniqueResultException
-     */
-    public function getByPlatformIdAndChannel(int $platformId, int $channel): ?Entity
-    {
-        return $this->_em->createQueryBuilder()
-            ->select('e')
-            ->from($this->_entityName, 'e')
-            ->where('e.platformId = :platformId')
-            ->setParameter('platformId', $platformId)
-            ->andWhere('e.channel = :channel')
-            ->setParameter('channel', $channel)
-            ->getQuery()
-            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }
 }

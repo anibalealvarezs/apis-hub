@@ -72,15 +72,21 @@ class CacheController
             $parameters['filters'] = (object) $parameters['filters'];
         }
 
+        if (!$params) {
+            $params = [];
+        }
         foreach($params as $key => $value) {
             $parameters[$key] = $value;
         }
 
+        if (!$parameters) {
+            $parameters = [];
+        }
         if (!$this->validateParams(array_keys($parameters), $requestsClassName, 'getListFrom'.$channel->getCommonName())) {
             return new Response('Invalid parameters', Response::HTTP_BAD_REQUEST);
         }
 
-        return $requestsClassName::{'getListFrom'.Channels::shopify->getCommonName()}(...$parameters);
+        return $requestsClassName::{'getListFrom'.$channel->getCommonName()}(...$parameters);
     }
 
     /**
@@ -89,7 +95,7 @@ class CacheController
      */
     protected function isValidEntity(string $entity): bool
     {
-        $crudEntities = Helpers::getCrudEntities();
+        $crudEntities = Helpers::getEntitiesConfig();
 
         return in_array($entity, array_keys($crudEntities));
     }

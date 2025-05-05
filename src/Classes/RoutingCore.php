@@ -50,7 +50,7 @@ class RoutingCore implements HttpKernelInterface
             $attributes['params'] = $request->query->all() ?: null;
             $response = call_user_func_array($controller, $attributes);
         } catch (ResourceNotFoundException $e) {
-            $response = new Response('Route not found!', Response::HTTP_NOT_FOUND);
+            $response = new Response(content: 'Route not found!', status: Response::HTTP_NOT_FOUND);
         } catch (Exception $e) {
             $response = new Response($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
@@ -59,16 +59,21 @@ class RoutingCore implements HttpKernelInterface
     }
 
     // Associates a URL with a callback function
+
     /**
      * @param string $path
+     * @param string $httpMethod
      * @param callable $controller
      */
-    public function map(string $path, callable $controller): void
+    public function map(string $path, string $httpMethod, callable $controller): void
     {
-        $this->routes->add($path, new Route(
+        $routes = new RouteCollection();
+        $routes->add($path, new Route(
             $path,
             array('controller' => $controller)
         ));
+        $routes->setMethods($httpMethod);
+        $this->routes->addCollection($routes);
     }
 
     /**
@@ -76,8 +81,8 @@ class RoutingCore implements HttpKernelInterface
      */
     public function multiMap(array $routes): void
     {
-        foreach ($routes as $path => $callable) {
-            $this->map($path, $callable);
+        foreach ($routes as $path => $data) {
+            $this->map($path, $data['httpMethod'], $data['callable']);
         }
     }
 }

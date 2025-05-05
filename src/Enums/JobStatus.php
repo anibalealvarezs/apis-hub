@@ -7,17 +7,22 @@ enum JobStatus: int
     /**
      * @var int
      */
-    case processing = 1;
+    case scheduled = 1;
 
     /**
      * @var int
      */
-    case completed = 2;
+    case processing = 2;
 
     /**
      * @var int
      */
-    case failed = 3;
+    case completed = 3;
+
+    /**
+     * @var int
+     */
+    case failed = 4;
 
     /**
      * @return string

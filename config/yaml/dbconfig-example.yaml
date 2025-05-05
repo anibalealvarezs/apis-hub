@@ -1,54 +1,5 @@
-connection_params:
-  dbname: dbname
-  user: user
-  password: password
-  host: localhost
-  driver: pdo_mysql
-entities:
-  job:
-    class: \Entities\Job
-    crud_enabled: true
-  customer:
-    class: \Entities\Analytics\Customer
-    crud_enabled: true
-  discount:
-    class: \Entities\Analytics\Discount
-    crud_enabled: true
-  order:
-    class: \Entities\Analytics\Order
-    crud_enabled: true
-  product:
-    class: \Entities\Analytics\Product
-    crud_enabled: true
-  product_category:
-    class: \Entities\Analytics\ProductCategory
-    crud_enabled: true
-  vendor:
-    class: \Entities\Analytics\Vendor
-    crud_enabled: true
-channels:
-  shopify:
-    shopify_api_key: # api_key
-    shopify_shop_name: # shop_name
-    shopify_last_stable_revision: 2023-01
-  klaviyo:
-    klaviyo_api_key: # api_key
-  bigcommerce:
-    # bigcommerce_client_id: # client_id
-    # bigcommerce_client_secret: # client_secret
-    bigcommerce_access_token: # access_token
-    bigcommerce_store_hash: # store_hash
-  netsuite:
-    netsuite_consumer_id: # consumer_id
-    netsuite_consumer_secret: # consumer_secret
-    netsuite_token_id: # token_id
-    netsuite_token_secret: # token_secret
-    netsuite_account_id: # account_id
-  amazon:
-    ads_client_id: # sheets_client_id
-    ads_client_secret: # sheets_client_secret
-    ads_redirect_uri: https://chmwmedia.postman.co
-    ads_refresh_token: # sheets_refresh_token
-    sheets_scope: [ advertising::campaign_management ]
-    ads_token: # token_string
-    ads_profile_id: # 358923519404264
+dbname: dbname
+user: user
+password: password
+host: localhost
+driver: pdo_mysql

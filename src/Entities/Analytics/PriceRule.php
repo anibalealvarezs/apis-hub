@@ -4,165 +4,96 @@ namespace Entities\Analytics;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
-use Interfaces\ChannelInterface;
+use Entities\Analytics\Channeled\ChanneledPriceRule;
+use Entities\Entity;
 use Repositories\PriceRuleRepository;
 
 #[ORM\Entity(repositoryClass: PriceRuleRepository::class)]
-#[ORM\Table(name: 'price_rules')]
+#[ORM\Table(name: 'priceRules')]
+#[ORM\Index(columns: ['priceRuleId'], name: 'priceRuleId_idx')]
 #[ORM\HasLifecycleCallbacks]
-class PriceRule extends Entity implements ChannelInterface
+class PriceRule extends Entity
 {
-    #[ORM\Column]
-    protected int|string $platformId;
+    #[ORM\Column(type: 'string', unique: true)]
+    protected int|string $priceRuleId;
 
-    #[ORM\Column(type: 'integer')]
-    protected int $channel;
-
-    #[ORM\Column(type: 'json')]
-    protected string $data;
-
-    #[ORM\ManyToMany(targetEntity: 'Order', mappedBy: 'priceRules')]
-    protected Collection $orders;
-
-    #[ORM\OneToMany(mappedBy: 'priceRule', targetEntity: 'Discount', cascade: ['persist', 'remove'], orphanRemoval: true)]
-    protected Collection $discounts;
+    #[ORM\OneToMany(mappedBy: 'priceRule', targetEntity: ChanneledPriceRule::class, orphanRemoval: true)]
+    protected Collection $channeledPriceRules;
 
     public function __construct()
     {
-        $this->orders = new ArrayCollection();
-        $this->discounts = new ArrayCollection();
-    }
-
-    /**
-     * @return int|string
-     */
-    public function getPlatformId(): int|string
-    {
-        return $this->platformId;
-    }
-
-    /**
-     * @param int|string $platformId
-     */
-    public function addPlatformId(int|string $platformId): void
-    {
-        $this->platformId = $platformId;
+        $this->channeledPriceRules = new ArrayCollection();
     }
 
     /**
      * @return string
      */
-    public function getChannel(): string
+    public function getPriceRuleId(): string
     {
-        return $this->channel;
+        return $this->priceRuleId;
     }
 
     /**
-     * @param int $channel
-     */
-    public function addChannel(int $channel): void
-    {
-        $this->channel = $channel;
-    }
-
-    /**
-     * @return string
-     */
-    public function getData(): string
-    {
-        return $this->data;
-    }
-
-    /**
-     * @param string $data
-     */
-    public function addData(string $data): void
-    {
-        $this->data = $data;
-    }
-
-    /**
-     * @return Collection|null
-     */
-    public function getOrders(): ?Collection
-    {
-        return $this->orders;
-    }
-
-    /**
-     * @param Order $order
+     * @param string $priceRuleId
      * @return PriceRule
      */
-    public function addOrder(Order $order): self
+    public function addPriceRuleId(string $priceRuleId): self
     {
-        $this->orders->add($order);
+        $this->priceRuleId = $priceRuleId;
 
         return $this;
     }
 
-    /**
-     * @param Collection $orders
-     * @return PriceRule
-     */
-    public function addOrders(Collection $orders): self
+    public function getChanneledPriceRules(): ?Collection
     {
-        foreach ($orders as $order) {
-            $this->addOrder($order);
+        return $this->channeledPriceRules;
+    }
+
+    public function addChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): self
+    {
+        if ($this->channeledPriceRules->contains($channeledPriceRule)) {
+            return $this;
+        }
+
+        $this->channeledPriceRules->add($channeledPriceRule);
+        $channeledPriceRule->addPriceRule($this);
+
+        return $this;
+    }
+
+    public function addChanneledPriceRules(Collection $channeledPriceRules): self
+    {
+        foreach ($channeledPriceRules as $channeledPriceRule) {
+            $this->addChanneledPriceRule($channeledPriceRule);
         }
 
         return $this;
     }
 
-    /**
-     * @param Order $order
-     */
-    public function removeOrder(Order $order): void
+    public function removeChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): self
     {
-        $this->orders->removeElement($order);
-    }
-
-    /**
-     * @param Collection $orders
-     */
-    public function removeOrders(Collection $orders): void
-    {
-        foreach ($orders as $order) {
-            $this->removeOrder($order);
+        if (!$this->channeledPriceRules->contains($channeledPriceRule)) {
+            return $this;
         }
-    }
 
-    public function getDiscounts(): ?Collection
-    {
-        return $this->discounts;
-    }
+        $this->channeledPriceRules->removeElement($channeledPriceRule);
 
-    public function addDiscount(Discount $discount): self
-    {
-        $this->discounts->add($discount);
+        if ($channeledPriceRule->getPriceRule() !== $this) {
+            return $this;
+        }
+
+        $channeledPriceRule->addPriceRule(priceRule: null);
 
         return $this;
     }
 
-    public function addDiscounts(Collection $discounts): self
+    public function removeChanneledPriceRules(Collection $channeledPriceRules): self
     {
-        foreach ($discounts as $discount) {
-            $this->addDiscount($discount);
+        foreach ($channeledPriceRules as $channeledPriceRule) {
+            $this->removeChanneledPriceRule($channeledPriceRule);
         }
 
         return $this;
-    }
-
-    public function removeDiscount(Discount $discount): void
-    {
-        $this->discounts->removeElement($discount);
-    }
-
-    public function removeDiscounts(Collection $discounts): void
-    {
-        foreach ($discounts as $discount) {
-            $this->removeDiscount($discount);
-        }
     }
 }

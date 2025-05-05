@@ -4,201 +4,120 @@ namespace Entities\Analytics;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
-use Interfaces\ChannelInterface;
+use Entities\Analytics\Channeled\ChanneledProduct;
+use Entities\Entity;
 use Repositories\ProductRepository;
 
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
 #[ORM\Table(name: 'products')]
+#[ORM\Index(columns: ['productId'], name: 'productId_idx')]
+#[ORM\Index(columns: ['sku'], name: 'sku_idx')]
+#[ORM\Index(columns: ['productId', 'sku'], name: 'productId_sku_idx')]
 #[ORM\HasLifecycleCallbacks]
-class Product extends Entity implements ChannelInterface
+class Product extends Entity
 {
-    #[ORM\Column]
-    protected int|string $platformId;
+    #[ORM\Column(type: 'string', unique: true)]
+    protected int|string $productId;
 
-    #[ORM\Column(type: 'integer')]
-    protected int $channel;
+    #[ORM\Column(type: 'string', nullable: true)]
+    protected int|string $sku;
 
-    #[ORM\Column(type: 'json')]
-    protected string $data;
+    #[ORM\OneToMany(mappedBy: 'product', targetEntity: ChanneledProduct::class, orphanRemoval: true)]
+    protected Collection $channeledProducts;
 
-    // Many Products have Many ProductCategories.
-    #[ORM\ManyToMany(targetEntity: 'ProductCategory', mappedBy: 'products')]
-    protected Collection $productCategories;
-
-    // Many Products have Many Orders.
-    #[ORM\ManyToMany(targetEntity: 'Order', mappedBy: 'products')]
-    protected Collection $orders;
-
-    #[ORM\ManyToOne(targetEntity:"Vendor", inversedBy: 'products')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
-    protected Vendor $vendor;
-
-    /**
-     * @return void
-     */
     public function __construct()
     {
-        $this->productCategories = new ArrayCollection();
-        $this->orders = new ArrayCollection();
-    }
-
-    /**
-     * @return int|string
-     */
-    public function getPlatformId(): int|string
-    {
-        return $this->platformId;
-    }
-
-    /**
-     * @param int|string $platformId
-     */
-    public function addPlatformId(int|string $platformId): void
-    {
-        $this->platformId = $platformId;
+        $this->channeledProducts = new ArrayCollection();
     }
 
     /**
      * @return string
      */
-    public function getChannel(): string
+    public function getProductId(): string
     {
-        return $this->channel;
+        return $this->productId;
     }
 
     /**
-     * @param int $channel
+     * @param string $productId
+     * @return Product
      */
-    public function addChannel(int $channel): void
+    public function addProductId(string $productId): self
     {
-        $this->channel = $channel;
+        $this->productId = $productId;
+
+        return $this;
     }
 
     /**
      * @return string
      */
-    public function getData(): string
+    public function getSku(): string
     {
-        return $this->data;
+        return $this->sku;
     }
 
     /**
-     * @param string $data
-     */
-    public function addData(string $data): void
-    {
-        $this->data = $data;
-    }
-
-    /**
-     * @return Collection|null
-     */
-    public function getProductCategories(): ?Collection
-    {
-        return $this->productCategories;
-    }
-
-    /**
-     * @param ProductCategory $productCategory
+     * @param string $sku
      * @return Product
      */
-    public function addProductCategory(ProductCategory $productCategory): self
+    public function addSku(string $sku): self
     {
-        $this->productCategories->add($productCategory);
+        $this->sku = $sku;
 
         return $this;
     }
 
-    /**
-     * @param Collection $productCategories
-     * @return Product
-     */
-    public function addProductCategories(Collection $productCategories): self
+    public function getChanneledProducts(): ?Collection
     {
-        foreach ($productCategories as $productCategory) {
-            $this->addProductCategory($productCategory);
+        return $this->channeledProducts;
+    }
+
+    public function addChanneledProduct(ChanneledProduct $channeledProduct): self
+    {
+        if ($this->channeledProducts->contains($channeledProduct)) {
+            return $this;
+        }
+
+        $this->channeledProducts->add($channeledProduct);
+        $channeledProduct->addProduct($this);
+
+        return $this;
+    }
+
+    public function addChanneledProducts(Collection $channeledProducts): self
+    {
+        foreach ($channeledProducts as $channeledProduct) {
+            $this->addChanneledProduct($channeledProduct);
         }
 
         return $this;
     }
 
-    /**
-     * @param ProductCategory $productCategory
-     */
-    public function removeProductCategory(ProductCategory $productCategory): void
+    public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
     {
-        $this->productCategories->removeElement($productCategory);
-    }
-
-    /**
-     * @param Collection $productCategories
-     */
-    public function removeProductCategories(Collection $productCategories): void
-    {
-        foreach ($productCategories as $productCategory) {
-            $this->removeProductCategory($productCategory);
+        if (!$this->channeledProducts->contains($channeledProduct)) {
+            return $this;
         }
-    }
 
-    /**
-     * @return Collection|null
-     */
-    public function getOrders(): ?Collection
-    {
-        return $this->orders;
-    }
+        $this->channeledProducts->removeElement($channeledProduct);
 
-    /**
-     * @param Order $order
-     * @return Product
-     */
-    public function addOrder(Order $order): self
-    {
-        $this->orders->add($order);
+        if ($channeledProduct->getProduct() !== $this) {
+            return $this;
+        }
+
+        $channeledProduct->addProduct(product: null);
 
         return $this;
     }
 
-    /**
-     * @param Collection $orders
-     * @return Product
-     */
-    public function addOrders(Collection $orders): self
+    public function removeChanneledProducts(Collection $channeledProducts): self
     {
-        foreach ($orders as $order) {
-            $this->addOrder($order);
+        foreach ($channeledProducts as $channeledProduct) {
+            $this->removeChanneledProduct($channeledProduct);
         }
 
         return $this;
-    }
-
-    /**
-     * @param Order $order
-     */
-    public function removeOrder(Order $order): void
-    {
-        $this->orders->removeElement($order);
-    }
-
-    /**
-     * @param Collection $orders
-     */
-    public function removeOrders(Collection $orders): void
-    {
-        foreach ($orders as $order) {
-            $this->removeOrder($order);
-        }
-    }
-
-    public function getVendor(): Vendor
-    {
-        return $this->vendor;
-    }
-
-    public function addVendor(Vendor $vendor): void
-    {
-        $this->vendor = $vendor;
     }
 }

@@ -43,9 +43,9 @@ abstract class DataLoaderFixture extends AbstractFixture implements FixtureInter
      * @param Entity $entity
      * @param $method
      * @param array $references
-     * @return object
+     * @return Entity
      */
-    public static function setRelations(Entity $entity, $method, array $references = [])
+    public static function setRelations(Entity $entity, $method, array $references = []): Entity
     {
         $refNumbers = Helpers::getNumbersArray(count($references));
         shuffle($refNumbers);

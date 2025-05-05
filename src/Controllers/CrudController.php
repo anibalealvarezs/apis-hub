@@ -6,7 +6,9 @@ use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
+use Enums\Channels;
 use Helpers\Helpers;
+use ReflectionEnum;
 use ReflectionException;
 use ReflectionMethod;
 use Symfony\Component\HttpFoundation\Response;
@@ -44,6 +46,7 @@ class CrudController
 
         return match ($method) {
             'read' => $this->read($entity, $id),
+            'count' => $this->count($entity, $body, $params),
             'list' => $this->list($entity, $body, $params),
             'create' => $this->create($entity, $body),
             'update' => $this->update($entity, $id, $body),
@@ -61,10 +64,33 @@ class CrudController
     protected function read(string $entity, int $id = null): Response
     {
         $repository = $this->em->getRepository(
-            Helpers::getCrudEntities()[strtolower($entity)]['class']
+            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
         );
 
-        return new Response(json_encode($repository->read(id: $id, withAssociations: true) ?: []));
+        return new Response(json_encode($repository->read(id: $id) ?: []));
+    }
+
+    /**
+     * @param string $entity
+     * @param string|null $body
+     * @param array|null $params
+     * @return Response
+     * @throws NotSupported
+     * @throws ReflectionException
+     */
+    protected function count(string $entity, string $body = null, ?array $params = null): Response
+    {
+        $repository = $this->em->getRepository(
+            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
+        );
+
+        if (!empty($params) && !$this->validateParams(array_keys($params), $repository::class, 'readMultiple')) {
+            return new Response('Invalid parameters', Response::HTTP_BAD_REQUEST);
+        }
+
+        $params['filters'] = Helpers::bodyToObject($body);
+
+        return new Response(json_encode($repository->countElements(...$params)));
     }
 
     /**
@@ -77,7 +103,7 @@ class CrudController
     protected function list(string $entity, string $body = null, ?array $params = null): Response
     {
         $repository = $this->em->getRepository(
-            Helpers::getCrudEntities()[strtolower($entity)]['class']
+            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
         );
 
         if (!empty($params) && !$this->validateParams(array_keys($params), $repository::class, 'readMultiple')) {
@@ -85,9 +111,8 @@ class CrudController
         }
 
         $params['filters'] = Helpers::bodyToObject($body);
-        $params['withAssociations'] = true;
 
-        return new Response(json_encode($repository->readMultiple(...$params)));
+        return new Response(json_encode($repository->readMultiple(...$params)->toArray()));
     }
 
     /**
@@ -99,7 +124,7 @@ class CrudController
     protected function create(string $entity, string $body = null): Response
     {
         $repository = $this->em->getRepository(
-            Helpers::getCrudEntities()[strtolower($entity)]['class']
+            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
         );
 
         return new Response(json_encode($repository->create(Helpers::bodyToObject($body))));
@@ -115,7 +140,7 @@ class CrudController
     protected function update(string $entity, int $id = null, string $body = null): Response
     {
         $repository = $this->em->getRepository(
-            Helpers::getCrudEntities()[strtolower($entity)]['class']
+            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
         );
 
         return new Response(json_encode($repository->update($id, Helpers::bodyToObject($body))));
@@ -130,7 +155,7 @@ class CrudController
     protected function delete(string $entity, int $id = null): Response
     {
         $repository = $this->em->getRepository(
-            Helpers::getCrudEntities()[strtolower($entity)]['class']
+            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
         );
 
         if ($repository->delete($id)) {

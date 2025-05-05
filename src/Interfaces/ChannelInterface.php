@@ -12,7 +12,7 @@ interface ChannelInterface
     /**
      * @param int|string $platformId
      */
-    public function addPlatformId(int|string $platformId): void;
+    public function addPlatformId(int|string $platformId): self;
 
     /**
      * @return object
@@ -22,15 +22,15 @@ interface ChannelInterface
     /**
      * @param int $channel
      */
-    public function addChannel(int $channel): void;
+    public function addChannel(int $channel): self;
 
     /**
-     * @return object
+     * @return array
      */
-    public function getData(): string;
+    public function getData(): array;
 
     /**
-     * @param string $data
+     * @param array $data
      */
-    public function addData(string $data): void;
+    public function addData(array $data): self;
 }
