@@ -5,16 +5,6 @@ namespace Classes\Requests;
 use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
 use Classes\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\DBAL\Exception;
-use Doctrine\ORM\Exception\NotSupported;
-use Doctrine\ORM\Exception\ORMException;
-use Doctrine\ORM\OptimisticLockException;
-use Entities\Analytics\Channeled\ChanneledProduct;
-use Entities\Analytics\Channeled\ChanneledProductVariant;
-use Entities\Analytics\Channeled\ChanneledVendor;
-use Entities\Analytics\Product;
-use Entities\Analytics\ProductVariant;
-use Entities\Analytics\Vendor;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -39,11 +29,7 @@ class ProductVariantRequests implements RequestInterface
      * @param object|null $filters
      * @param string|bool $resume
      * @return Response
-     * @throws Exception
      * @throws GuzzleException
-     * @throws NotSupported
-     * @throws ORMException
-     * @throws OptimisticLockException
      */
     public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true): Response
     {
@@ -107,10 +93,6 @@ class ProductVariantRequests implements RequestInterface
     /**
      * @param ArrayCollection $channeledCollection
      * @return Response
-     * @throws Exception
-     * @throws NotSupported
-     * @throws ORMException
-     * @throws OptimisticLockException
      */
     public static function process(
         ArrayCollection $channeledCollection,

@@ -3,7 +3,7 @@
 namespace Helpers;
 
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Exception;
+use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\MissingMappingDriverImplementation;
 use Doctrine\ORM\Exception\ORMException;
@@ -11,16 +11,25 @@ use Doctrine\ORM\ORMSetup;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\Persistence\Proxy;
 use Entities\Entity;
+use Exception;
+use Predis\Client;
+use Predis\ClientInterface;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
 use ReflectionObject;
 use ReflectionProperty;
+use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 
 class Helpers
 {
     private static ?EntityManager $entityManager = null;
+    private static ?ClientInterface $redisClient = null;
+    private static ?array $cacheConfig = null;
+    private static ?array $dbConfig = null;
+    private static ?array $channelsConfig = null;
+    private static ?array $entitiesConfig = null;
 
     /**
      * @param int $limit
@@ -70,7 +79,22 @@ class Helpers
      */
     public static function getDbConfig(): array
     {
-        return Yaml::parseFile(__DIR__ . "/../../config/yaml/dbconfig.yaml");
+        if (self::$dbConfig === null) {
+            $filePath = __DIR__ . '/../../config/yaml/dbconfig.yaml';
+            try {
+                if (!file_exists($filePath)) {
+                    throw new RuntimeException("Database configuration file not found: $filePath");
+                }
+                $config = Yaml::parseFile($filePath);
+                if (!is_array($config)) {
+                    throw new RuntimeException("Invalid database configuration: $filePath must return an array");
+                }
+                self::$dbConfig = $config;
+            } catch (Exception $e) {
+                throw new RuntimeException("Failed to load database configuration: " . $e->getMessage());
+            }
+        }
+        return self::$dbConfig;
     }
 
     /**
@@ -78,47 +102,22 @@ class Helpers
      */
     public static function getChannelsConfig(): array
     {
-        return Yaml::parseFile(__DIR__ . "/../../config/yaml/channelsconfig.yaml");
-    }
-
-    /**
-     * @return EntityManager
-     * @throws Exception
-     * @throws MissingMappingDriverImplementation
-     */
-    public static function getSingletonManager(): EntityManager
-    {
-        if (self::$entityManager === null) {
-            self::$entityManager = new EntityManager(
-                conn: DriverManager::getConnection(
-                    params: self::getDbConfig(),
-                ),
-                config: ORMSetup::createAttributeMetadataConfiguration(
-                    paths: array(__DIR__."/.."),
-                    isDevMode: true
-                ),
-            );
+        if (self::$channelsConfig === null) {
+            $filePath = __DIR__ . '/../../config/yaml/channelsconfig.yaml';
+            try {
+                if (!file_exists($filePath)) {
+                    throw new RuntimeException("Channels configuration file not found: $filePath");
+                }
+                $config = Yaml::parseFile($filePath);
+                if (!is_array($config)) {
+                    throw new RuntimeException("Invalid channels configuration: $filePath must return an array");
+                }
+                self::$channelsConfig = $config;
+            } catch (Exception $e) {
+                throw new RuntimeException("Failed to load channels configuration: " . $e->getMessage());
+            }
         }
-
-        return self::$entityManager;
-    }
-
-    /**
-     * @return EntityManager
-     * @throws Exception
-     * @throws ORMException
-     */
-    public static function getManager(): EntityManager
-    {
-        return new EntityManager(
-            conn: DriverManager::getConnection(
-                params: self::getDbConfig(),
-            ),
-            config: ORMSetup::createAttributeMetadataConfiguration(
-                paths: array(__DIR__."/.."),
-                isDevMode: true
-            ),
-        );
+        return self::$channelsConfig;
     }
 
     /**
@@ -126,7 +125,91 @@ class Helpers
      */
     public static function getEntitiesConfig(): array
     {
-        return Yaml::parseFile(__DIR__ . "/../../config/yaml/entitiesconfig.yaml");
+        if (self::$entitiesConfig === null) {
+            $filePath = __DIR__ . '/../../config/yaml/entitiesconfig.yaml';
+            try {
+                if (!file_exists($filePath)) {
+                    throw new RuntimeException("Entities configuration file not found: $filePath");
+                }
+                $config = Yaml::parseFile($filePath);
+                if (!is_array($config)) {
+                    throw new RuntimeException("Invalid entities configuration: $filePath must return an array");
+                }
+                self::$entitiesConfig = $config;
+            } catch (Exception $e) {
+                throw new RuntimeException("Failed to load entities configuration: " . $e->getMessage());
+            }
+        }
+        return self::$entitiesConfig;
+    }
+
+    /**
+     * @return array
+     */
+    public static function getCacheConfig(): array
+    {
+        if (self::$cacheConfig === null) {
+            $filePath = __DIR__ . '/../../config/yaml/cacheconfig.yaml';
+            try {
+                if (!file_exists($filePath)) {
+                    throw new RuntimeException("Cache configuration file not found: $filePath");
+                }
+                $config = Yaml::parseFile($filePath);
+                if (!is_array($config)) {
+                    throw new RuntimeException("Invalid cache configuration: $filePath must return an array");
+                }
+                self::$cacheConfig = $config;
+            } catch (Exception $e) {
+                throw new RuntimeException("Failed to load cache configuration: " . $e->getMessage());
+            }
+        }
+        return self::$cacheConfig;
+    }
+
+    /**
+     * @return ClientInterface
+     * @throws RuntimeException
+     */
+    public static function getRedisClient(): ClientInterface
+    {
+        if (self::$redisClient === null) {
+            try {
+                $config = self::getCacheConfig()['redis'] ?? [
+                    'scheme' => 'tcp',
+                    'host' => 'localhost',
+                    'port' => 6379,
+                    'password' => null,
+                ];
+
+                self::$redisClient = new Client($config);
+                self::$redisClient->ping();
+            } catch (Exception $e) {
+                throw new RuntimeException('Failed to initialize Redis client: ' . $e->getMessage());
+            }
+        }
+
+        return self::$redisClient;
+    }
+
+    /**
+     * @return EntityManager
+     */
+    public static function getManager(): EntityManager
+    {
+        if (self::$entityManager === null || !self::$entityManager->isOpen()) {
+            try {
+                $connection = DriverManager::getConnection(self::getDbConfig());
+                $config = ORMSetup::createAttributeMetadataConfiguration(
+                    paths: [__DIR__ . '/..'],
+                    isDevMode: true
+                );
+                self::$entityManager = new EntityManager($connection, $config);
+            } catch (Exception $e) {
+                throw new RuntimeException('Failed to initialize EntityManager: ' . $e->getMessage());
+            }
+        }
+
+        return self::$entityManager;
     }
 
     /**
@@ -137,7 +220,7 @@ class Helpers
         return array_filter(self::getEntitiesConfig(), function ($entity) {
             if ($entity['crud_enabled']) {
                 return $entity;
-            };
+            }
             return false;
         });
     }
@@ -173,7 +256,7 @@ class Helpers
     {
         $reflect = new ReflectionClass($entity);
         $props = $reflect->getProperties(ReflectionProperty::IS_STATIC | ReflectionProperty::IS_PUBLIC | ReflectionProperty::IS_PROTECTED | ReflectionProperty::IS_PRIVATE);
-    
+
         $propsIterator = function () use ($props, $entity, $fields) {
             foreach ($props as $prop) {
                 if (method_exists($entity, self::toCamelcase('get_' . $prop->getName())) && (!$fields || in_array($prop->getName(), $fields))) {
@@ -181,7 +264,7 @@ class Helpers
                 }
             }
         };
-    
+
         return iterator_to_array($propsIterator());
     }
 
@@ -198,7 +281,7 @@ class Helpers
                 ? get_parent_class($class)
                 : get_class($class);
         }
-    
+
         return ! $em->getMetadataFactory()->isTransient($class);
     }
 
@@ -250,13 +333,17 @@ class Helpers
      */
     public static function getDomain(string $url): ?string
     {
-        // Remove scheme (http/https) and www subdomain if present
-        $url = preg_replace('#^https?://(?:www\.)?#', '', $url);
+        // Remove scheme and www
+        $url = preg_replace('~^https?://(?:www\.)?~i', '', $url);
 
-        // Extract domain name
-        preg_match('#^([a-zA-Z0-9-]+\.[a-zA-Z]{2,})#', $url, $matches);
+        // Remove path and query strings
+        $url = preg_replace('~[/?#].*$~', '', $url);
 
-        // Return the domain name
-        return $matches[1] ?? null;
+        // Validate domain pattern (supports international domains)
+        if (preg_match('~^([a-z0-9\-]+\.)+[a-z]{2,}$~i', $url)) {
+            return $url;
+        }
+
+        return null;
     }
 }

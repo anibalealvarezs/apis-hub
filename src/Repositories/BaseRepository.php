@@ -7,14 +7,40 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Entity;
+use Enums\QueryBuilderType;
 use Helpers\Helpers;
 use ReflectionException;
 use stdClass;
 
 class BaseRepository extends EntityRepository
 {
+    /**
+     * @param QueryBuilderType $type
+     * @return QueryBuilder
+     */
+    protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
+    {
+        return $this->createBaseQueryBuilderNoJoins($type);
+    }
+
+    /**
+     * @param QueryBuilderType $type
+     * @return QueryBuilder
+     */
+    protected function createBaseQueryBuilderNoJoins(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
+    {
+        $query = $this->_em->createQueryBuilder();
+        match ($type) {
+            QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
+            QueryBuilderType::COUNT => $query->select('count(e.id)'),
+        };
+
+        return $query->from($this->getEntityName(), 'e');
+    }
+
     /**
      * @param stdClass|null $data
      * @param bool $returnEntity
@@ -35,7 +61,7 @@ class BaseRepository extends EntityRepository
                 }
             }
         }
-    
+
         $this->_em->persist($entity);
         $this->_em->flush();
 
@@ -52,31 +78,44 @@ class BaseRepository extends EntityRepository
      * @return Entity|array|null
      * @throws NonUniqueResultException
      */
-    public function read(int $id, bool $returnEntity = false, object $filters = null): Entity|array|null
+    public function read(int $id, bool $returnEntity = false, ?object $filters = null): Entity|array|null
     {
-        $query = $this->_em->createQueryBuilder()
-            ->select('e')
-            ->from($this->getEntityName(), 'e')
-            ->where('e.id = :id')
-            ->setParameter('id', $id);
-        if ($filters) {
-            foreach($filters as $key => $value) {
-                $query->andWhere('e.' . $key . ' = :' . $key)
-                    ->setParameter($key, $value);
-            }
-        }
+        $query = $this->buildReadQuery(id: $id, filters: $filters);
 
-        if ($returnEntity) {
-            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
-        } else {
-            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
-        }
+        $entity = $returnEntity
+            ? $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT)
+            : $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
 
         if (!$entity) {
             return null;
         }
 
-        return $entity;
+        if (!is_array($entity)) {
+            return $entity;
+        }
+
+        return $this->processResult(result: $entity);
+    }
+
+    /**
+     * @param int $id
+     * @param object|null $filters
+     * @return QueryBuilder
+     */
+    protected function buildReadQuery(int $id, ?object $filters = null): QueryBuilder
+    {
+        $query = $this->createBaseQueryBuilder()
+            ->where('e.id = :id')
+            ->setParameter('id', $id);
+
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        return $query;
     }
 
     /**
@@ -86,9 +125,7 @@ class BaseRepository extends EntityRepository
      */
     public function getCount(): int
     {
-        return $this->_em->createQueryBuilder()
-            ->select('COUNT(e)')
-            ->from($this->getEntityName(), 'e')
+        return $this->createBaseQueryBuilder(QueryBuilderType::COUNT)
             ->getQuery()
             ->getSingleScalarResult();
     }
@@ -101,9 +138,7 @@ class BaseRepository extends EntityRepository
      */
     public function countElements(object $filters = null): int
     {
-        $query = $this->_em->createQueryBuilder()
-            ->select('count(e.id)')
-            ->from($this->getEntityName(), 'e');
+        $query = $this->createBaseQueryBuilder(QueryBuilderType::COUNT);
         if ($filters) {
             foreach($filters as $key => $value) {
                 $query->andWhere('e.' . $key . ' = :' . $key)
@@ -118,29 +153,84 @@ class BaseRepository extends EntityRepository
      * @param int $pagination
      * @param array|null $ids
      * @param object|null $filters
+     * @param string $orderBy
+     * @param string $orderDir
      * @return ArrayCollection
      */
-    public function readMultiple(int $limit = 100, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
+    public function readMultiple(
+        int $limit = 100,
+        int $pagination = 0,
+        ?array $ids = null,
+        ?object $filters = null,
+        string $orderBy = 'id',
+        string $orderDir = 'DESC'
+    ): ArrayCollection
     {
-        $query = $this->_em->createQueryBuilder()
-            ->select('e')
-            ->from($this->getEntityName(), 'e');
+        $query = $this->buildReadMultipleQuery(
+            ids: $ids,
+            filters: $filters,
+            orderBy: $orderBy,
+            orderDir: $orderDir,
+            limit: $limit,
+            pagination: $pagination
+        );
+
+        $list = $query->getQuery()->getResult(AbstractQuery::HYDRATE_ARRAY);
+
+        $processedList = array_map(
+            fn($item) => $this->processResult($item),
+            $list
+        );
+
+        return new ArrayCollection($processedList);
+    }
+
+    /**
+     * @param array|null $ids
+     * @param object|null $filters
+     * @param string $orderBy
+     * @param string $orderDir
+     * @param int $limit
+     * @param int $pagination
+     * @return QueryBuilder
+     */
+    protected function buildReadMultipleQuery(
+        ?array $ids,
+        ?object $filters,
+        string $orderBy,
+        string $orderDir,
+        int $limit,
+        int $pagination
+    ): QueryBuilder
+    {
+        $query = $this->createBaseQueryBuilder();
+
         if ($ids) {
             $query->where('e.id IN (:ids)')
                 ->setParameter('ids', $ids);
         }
+
         if ($filters) {
-            foreach($filters as $key => $value) {
+            foreach ($filters as $key => $value) {
                 $query->andWhere('e.' . $key . ' = :' . $key)
                     ->setParameter($key, $value);
             }
         }
-        $list = $query->setMaxResults($limit)
-            ->setFirstResult($limit * $pagination)
-            ->getQuery()
-            ->getResult(AbstractQuery::HYDRATE_ARRAY);
 
-        return new ArrayCollection($list);
+        $query->orderBy("e.$orderBy", strtoupper($orderDir))
+            ->setMaxResults($limit)
+            ->setFirstResult($limit * $pagination);
+
+        return $query;
+    }
+
+    /**
+     * @param array $result
+     * @return array
+     */
+    protected function processResult(array $result): array
+    {
+        return $result; // Default: no processing
     }
 
     /**
@@ -167,7 +257,7 @@ class BaseRepository extends EntityRepository
         }
 
         $entity->onPreUpdate();
-    
+
         $this->_em->persist($entity);
         $this->_em->flush();
 

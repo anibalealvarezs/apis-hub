@@ -56,4 +56,23 @@ enum Channels: int
             self::amazon => 'Amazon',
         };
     }
+
+    /**
+     * Map a string channel name to an enum instance.
+     *
+     * @param string $name
+     * @return ?self
+     */
+    public static function tryFromName(string $name): ?self
+    {
+        return match (strtolower($name)) {
+            'shopify' => self::shopify,
+            'klaviyo' => self::klaviyo,
+            'facebook' => self::facebook,
+            'bigcommerce' => self::bigcommerce,
+            'netsuite' => self::netsuite,
+            'amazon' => self::amazon,
+            default => null,
+        };
+    }
 }
