@@ -6,56 +6,35 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
+use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\Channels;
+use Enums\QueryBuilderType;
 use ReflectionEnum;
 
 class ChanneledProductRepository extends ChanneledBaseRepository
 {
     /**
-     * @param int $limit
-     * @param int $pagination
-     * @param array|null $ids
-     * @param object|null $filters
-     * @return ArrayCollection
+     * @param QueryBuilderType $type
+     * @return QueryBuilder
      */
-    public function readMultiple(int $limit = 100, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
+    protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
-        $query = $this->_em->createQueryBuilder()
-            ->select('e')
+        $query = $this->_em->createQueryBuilder();
+        match ($type) {
+            QueryBuilderType::SELECT => $query->select('e'),
+            QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::LAST => $query->select('e, LENGTH(e.platformId) AS HIDDEN length'),
+        };
+
+        return $query
             ->addSelect('v')
             ->addSelect('c')
             ->addSelect('pv')
-            ->from($this->getEntityName(), 'e');
-        $query->leftJoin('e.channeledVendor', 'v');
-        $query->leftJoin('e.channeledProductCategories', 'c');
-        $query->leftJoin('e.channeledProductVariants', 'pv');
-        if ($ids) {
-            $query->where('e.id IN (:ids)')
-                ->setParameter('ids', $ids);
-        }
-        foreach($filters as $key => $value) {
-            $query->andWhere('e.' . $key . ' = :' . $key)
-                ->setParameter($key, $value);
-        }
-        $list = $query->setMaxResults($limit)
-            ->setFirstResult($limit * $pagination)
-            ->getQuery()
-            ->getResult(AbstractQuery::HYDRATE_ARRAY);
-
-        return new ArrayCollection(array_map(function($item) {
-            $item['channel'] = Channels::from($item['channel'])->getName();
-            unset($item['channeledVendor']['channel']);
-            $item['channeledProductCategories'] = array_map(function($channeledProductCategory) {
-                unset($channeledProductCategory['channel']);
-                return $channeledProductCategory;
-            }, $item['channeledProductCategories']);
-            $item['channeledProductVariants'] = array_map(function($channeledProductVariant) {
-                unset($channeledProductVariant['channel']);
-                return $channeledProductVariant;
-            }, $item['channeledProductVariants']);
-            return $item;
-        }, $list));
+            ->from($this->getEntityName(), 'e')
+            ->leftJoin('e.channeledVendor', 'v')
+            ->leftJoin('e.channeledProductCategories', 'c')
+            ->leftJoin('e.channeledProductVariants', 'pv');
     }
 
     /**
@@ -66,13 +45,9 @@ class ChanneledProductRepository extends ChanneledBaseRepository
      */
     public function getBySku(string $sku, int $channel): ?Entity
     {
-        if ((new ReflectionEnum(objectOrClass: Channels::class))->getConstant($channel)) {
-            die ('Invalid channel');
-        }
+        $channel = $this->validateChannel($channel);
 
-        return $this->_em->createQueryBuilder()
-            ->select('e')
-            ->from($this->getEntityName(), 'e')
+        return $this->createBaseQueryBuilder()
             ->where('e.sku = :sku')
             ->setParameter('sku', $sku)
             ->andWhere('e.channel = :channel')
@@ -90,18 +65,33 @@ class ChanneledProductRepository extends ChanneledBaseRepository
      */
     public function existsBySku(string $sku, int $channel): bool
     {
-        if ((new ReflectionEnum(objectOrClass: Channels::class))->getConstant($channel)) {
-            die ('Invalid channel');
-        }
+        $channel = $this->validateChannel($channel);
 
-        return $this->_em->createQueryBuilder()
-                ->select('COUNT(e.id)')
-                ->from($this->getEntityName(), 'e')
+        return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
                 ->where('e.sku = :sku')
                 ->setParameter('sku', $sku)
                 ->andWhere('e.channel = :channel')
                 ->setParameter('channel', $channel)
                 ->getQuery()
                 ->getSingleScalarResult() > 0;
+    }
+
+    /**
+     * @param array $entity
+     * @return array
+     */
+    protected function replaceChannelName(array $entity): array
+    {
+        $entity['channel'] = Channels::from($entity['channel'])->getName();
+        unset($entity['channeledVendor']['channel']);
+        $entity['channeledProductCategories'] = array_map(function($channeledProductCategory) {
+            unset($channeledProductCategory['channel']);
+            return $channeledProductCategory;
+        }, $entity['channeledProductCategories']);
+        $entity['channeledProductVariants'] = array_map(function($channeledProductVariant) {
+            unset($channeledProductVariant['channel']);
+            return $channeledProductVariant;
+        }, $entity['channeledProductVariants']);
+        return $entity;
     }
 }

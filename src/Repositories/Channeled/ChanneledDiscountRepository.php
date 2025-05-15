@@ -6,6 +6,7 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Entities\Entity;
+use Enums\QueryBuilderType;
 
 class ChanneledDiscountRepository extends ChanneledBaseRepository
 {
@@ -17,9 +18,8 @@ class ChanneledDiscountRepository extends ChanneledBaseRepository
      */
     public function getByCode(string $code, int $channel): ?Entity
     {
-        return $this->_em->createQueryBuilder()
-            ->select('e')
-            ->from($this->getEntityName(), 'e')
+        $channel = $this->validateChannel($channel);
+        return $this->createBaseQueryBuilder()
             ->where('e.code = :code')
             ->setParameter('code', $code)
             ->andWhere('e.channel = :channel')
@@ -37,9 +37,8 @@ class ChanneledDiscountRepository extends ChanneledBaseRepository
      */
     public function existsByCode(string $code, int $channel): bool
     {
-        return $this->_em->createQueryBuilder()
-            ->select('COUNT(e.id)')
-            ->from($this->getEntityName(), 'e')
+        $channel = $this->validateChannel($channel);
+        return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
             ->where('e.code = :code')
             ->setParameter('code', $code)
             ->andWhere('e.channel = :channel')

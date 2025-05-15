@@ -2,71 +2,53 @@
 
 namespace Controllers;
 
-use Doctrine\DBAL\Exception;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Exception\ORMException;
 use Enums\AnalyticsEntities;
 use Enums\Channels;
+use Exception;
 use Helpers\Helpers;
 use ReflectionEnum;
 use ReflectionException;
-use ReflectionMethod;
 use Symfony\Component\HttpFoundation\Response;
 
-class CacheController
+class CacheController extends BaseController
 {
-    /**
-     * @var EntityManager
-     */
-    protected EntityManager $em;
-
-    /**
-     * @throws Exception
-     * @throws ORMException
-     */
-    public function __construct()
-    {
-        $this->em = Helpers::getManager();
-    }
-
     /**
      * @param string $channel
      * @param string $entity
      * @param string|null $body
      * @param array|null $params
      * @return Response
-     * @throws ReflectionException
      */
-    public function __invoke(string $channel, string $entity, ?string $body = null, ?array $params = null): Response
-    {
-        if (!$this->isValidEntity($entity)) {
-            return new Response('Invalid analytics entity', Response::HTTP_NOT_FOUND);
+    public function __invoke(
+        string $channel,
+        string $entity,
+        ?string $body = null,
+        ?array $params = null
+    ): Response {
+        if (!$this->isValidEntity(entity: $entity)) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: 'Invalid analytics entity',
+                httpStatus: Response::HTTP_NOT_FOUND
+            );
         }
 
         return $this->list(
             entity: $entity,
-            channel: (new ReflectionEnum(Channels::class))->getConstant($channel),
+            channel: (new ReflectionEnum(objectOrClass: Channels::class))->getConstant(name: $channel),
             body: $body,
-            params: $params,
+            params: $params
         );
     }
 
     /**
-     * @param string $entity
-     * @param Channels $channel
-     * @param string|null $body
      * @param array|null $params
-     * @return Response
-     * @throws ReflectionException
+     * @param string|null $body
+     * @return array
      */
-    protected function list(string $entity, Channels $channel, string $body = null, ?array $params = null): Response
+    protected function prepareAnalyticsParams(?array $params, ?string $body): array
     {
-        $requestsClassName = '\Classes\Requests\\'.$this->getEntityRequestsClassName($entity);
-
-        if (!method_exists($requestsClassName, 'getListFrom'.$channel->getCommonName())) {
-            return new Response('Method not found', Response::HTTP_NOT_FOUND);
-        }
-
         $parameters = $body ? json_decode($body, true) : null;
         if (isset($parameters['filters'])) {
             $parameters['filters'] = (object) $parameters['filters'];
@@ -75,18 +57,37 @@ class CacheController
         if (!$params) {
             $params = [];
         }
-        foreach($params as $key => $value) {
+        foreach ($params as $key => $value) {
             $parameters[$key] = $value;
         }
 
-        if (!$parameters) {
-            $parameters = [];
-        }
-        if (!$this->validateParams(array_keys($parameters), $requestsClassName, 'getListFrom'.$channel->getCommonName())) {
-            return new Response('Invalid parameters', Response::HTTP_BAD_REQUEST);
-        }
+        return $parameters ?: [];
+    }
 
-        return $requestsClassName::{'getListFrom'.$channel->getCommonName()}(...$parameters);
+    /**
+     * @param string $entity
+     * @param Channels $channel
+     * @param string|null $body
+     * @param array|null $params
+     * @return Response
+     */
+    protected function list(string $entity, Channels $channel, ?string $body = null, ?array $params = null): Response
+    {
+        try {
+            $data = $this->fetchData($entity, $channel, $params, $body);
+
+            return $this->createResponse(
+                data: $data ?: [],
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
     /**
@@ -96,32 +97,54 @@ class CacheController
     protected function isValidEntity(string $entity): bool
     {
         $crudEntities = Helpers::getEntitiesConfig();
-
-        return in_array($entity, array_keys($crudEntities));
+        return in_array(needle: $entity, haystack: array_keys(array: $crudEntities));
     }
 
     /**
      * @param string $entity
      * @return string
+     * @throws ReflectionException
      */
     protected function getEntityRequestsClassName(string $entity): string
     {
-        return (new ReflectionEnum(AnalyticsEntities::class))->getConstant($entity)->getRequestsClassName();
+        return (new ReflectionEnum(objectOrClass: AnalyticsEntities::class))->getConstant(name: $entity)->getRequestsClassName();
     }
 
     /**
-     * @param array $params
-     * @param string $class
-     * @param string $method
-     * @return bool
+     * Fetch data and cache it.
+     *
+     * @param string $entity
+     * @param Channels $channel
+     * @param array|null $params
+     * @param string|null $body
+     * @return mixed
      * @throws ReflectionException
      */
-    protected function validateParams(array $params, string $class, string $method): bool
+    protected function fetchData(string $entity, Channels $channel, ?array $params, ?string $body): mixed
     {
-        $r = new ReflectionMethod($class, $method);
-        $methodParams = $r->getParameters();
-        return empty(array_diff($params, array_map(function($param) {
-            return $param->getName();
-        }, $methodParams)));
+        $requestsClassName = '\Classes\Requests\\' . $this->getEntityRequestsClassName($entity);
+        $methodName = 'getListFrom' . $channel->getCommonName();
+
+        if (!method_exists($requestsClassName, $methodName)) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: 'Method not found',
+                httpStatus: Response::HTTP_NOT_FOUND
+            );
+        }
+
+        $parameters = $this->prepareAnalyticsParams($params, $body);
+
+        if (!$this->validateParams(array_keys($parameters), $requestsClassName, $methodName)) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: 'Invalid parameters',
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
+        }
+
+        return $requestsClassName::$methodName(...$parameters) ?: [];
     }
 }

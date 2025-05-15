@@ -11,6 +11,8 @@ use Classes\Overrides\ShopifyApi\ShopifyApi;
 use Classes\Overrides\NetSuiteApi\NetSuiteApi;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
+use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
@@ -20,6 +22,7 @@ use Enums\Channels;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
+use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
 class CustomerRequests implements RequestInterface
@@ -243,60 +246,166 @@ class CustomerRequests implements RequestInterface
     /**
      * @param ArrayCollection $channeledCollection
      * @return Response
-     * @throws Exception
+     * @throws ORMException
+     */
+    public static function process(ArrayCollection $channeledCollection): Response
+    {
+        try {
+            $manager = Helpers::getManager();
+            $repos = self::initializeRepositories(manager: $manager);
+
+            foreach ($channeledCollection as $channeledCustomer) {
+                self::processSingleCustomer(
+                    channeledCustomer: $channeledCustomer,
+                    repos: $repos,
+                    manager: $manager
+                );
+            }
+
+            return new Response(content: json_encode(value: ['Customers processed']));
+        } catch (Exception $e) {
+            return new Response(
+                content: json_encode(value: ['error' => $e->getMessage()]),
+                status: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * @param EntityManager $manager
+     * @return array
      * @throws NotSupported
+     */
+    private static function initializeRepositories(EntityManager $manager): array
+    {
+        return [
+            'customer' => $manager->getRepository(entityName: Customer::class),
+            'channeledCustomer' => $manager->getRepository(entityName: ChanneledCustomer::class),
+        ];
+    }
+
+    /**
+     * @param object $channeledCustomer
+     * @param array $repos
+     * @param EntityManager $manager
+     * @return void
      * @throws ORMException
      * @throws OptimisticLockException
      */
-    public static function process(
-        ArrayCollection $channeledCollection
-    ): Response {
-        $manager = Helpers::getManager();
-        $customerRepository = $manager->getRepository(entityName: Customer::class);
-        $channeledCustomerRepository = $manager->getRepository(entityName: ChanneledCustomer::class);
-        foreach ($channeledCollection as $channeledCustomer) {
-            if (!$channeledCustomer->email) {
-                continue;
-            }
-            if (!$customerRepository->existsByEmail($channeledCustomer->email)) {
-                $customerEntity = $customerRepository->create(
-                    data: (object)['email' => $channeledCustomer->email,],
-                    returnEntity: true,
-                );
-            } else {
-                $customerEntity = $customerRepository->getByEmail($channeledCustomer->email);
-            }
-            if (!$channeledCustomerRepository->existsByPlatformId(
-                platformId: $channeledCustomer->platformId,
-                channel: $channeledCustomer->channel)
-            ) {
-                $channeledCustomerEntity = $channeledCustomerRepository->create(
-                    data: $channeledCustomer,
-                    returnEntity: true,
-                );
-            } else {
-                $channeledCustomerEntity = $channeledCustomerRepository->getByPlatformId(
-                    platformId: $channeledCustomer->platformId,
-                    channel: $channeledCustomer->channel,
-                );
-            }
-            if (empty($channeledCustomerEntity->getData())) {
-                $channeledCustomerEntity
-                    ->addPlatformId($channeledCustomer->platformId)
-                    ->addPlatformCreatedAt($channeledCustomer->platformCreatedAt)
-                    ->addData($channeledCustomer->data);
-            } else {
-                $data = $channeledCustomerEntity->getData();
-                $data['addresses'] = Helpers::multiDimensionalArrayUnique(
-                    array_merge($data['addresses'], $channeledCustomer->data['addresses'])
-                );
-                $channeledCustomerEntity->addData($data);
-            }
-            $customerEntity->addChanneledCustomer($channeledCustomerEntity);
-            $manager->persist($customerEntity);
-            $manager->persist($channeledCustomerEntity);
-            $manager->flush();
+    private static function processSingleCustomer(object $channeledCustomer, array $repos, EntityManager $manager): void
+    {
+        // Skip if email is empty
+        if (empty($channeledCustomer->email)) {
+            return;
         }
-        return new Response(json_encode(['Customers processed']));
+
+        $cacheService = CacheService::getInstance(redisClient: Helpers::getRedisClient());
+
+        // Process customer
+        $customerEntity = self::getOrCreateCustomer(
+            channeledCustomer: $channeledCustomer,
+            repository: $repos['customer']
+        );
+
+        // Process channeled customer
+        $channeledCustomerEntity = self::getOrCreateChanneledCustomer(
+            channeledCustomer: $channeledCustomer,
+            repository: $repos['channeledCustomer']
+        );
+
+        // Update customer data if necessary
+        self::updateChanneledCustomerData(
+            channeledCustomer: $channeledCustomer,
+            channeledCustomerEntity: $channeledCustomerEntity
+        );
+
+        // Finalize relationships
+        self::finalizeCustomerRelationships(
+            customerEntity: $customerEntity,
+            channeledCustomerEntity: $channeledCustomerEntity,
+            manager: $manager
+        );
+
+        // Invalidate caches for all affected entities
+        $entities = [
+            'Customer' => $customerEntity->getEmail(),
+            'ChanneledCustomer' => $channeledCustomerEntity->getPlatformId(),
+        ];
+        $cacheService->invalidateMultipleEntities(
+            entities: array_filter($entities, fn($value) => !empty($value)),
+            channel: $channeledCustomer->channel
+        );
+    }
+
+    /**
+     * @param object $channeledCustomer
+     * @param EntityRepository $repository
+     * @return Customer
+     */
+    private static function getOrCreateCustomer(object $channeledCustomer, EntityRepository $repository): Customer
+    {
+        return $repository->existsByEmail(email: $channeledCustomer->email)
+            ? $repository->getByEmail(email: $channeledCustomer->email)
+            : $repository->create(
+                data: (object) ['email' => $channeledCustomer->email],
+                returnEntity: true
+            );
+    }
+
+    /**
+     * @param object $channeledCustomer
+     * @param EntityRepository $repository
+     * @return ChanneledCustomer
+     */
+    private static function getOrCreateChanneledCustomer(object $channeledCustomer, EntityRepository $repository): ChanneledCustomer
+    {
+        return $repository->existsByPlatformId(platformId: $channeledCustomer->platformId, channel: $channeledCustomer->channel)
+            ? $repository->getByPlatformId(platformId: $channeledCustomer->platformId, channel: $channeledCustomer->channel)
+            : $repository->create(
+                data: $channeledCustomer,
+                returnEntity: true
+            );
+    }
+
+    /**
+     * @param object $channeledCustomer
+     * @param ChanneledCustomer $channeledCustomerEntity
+     * @return void
+     */
+    private static function updateChanneledCustomerData(object $channeledCustomer, ChanneledCustomer $channeledCustomerEntity): void
+    {
+        if (empty($channeledCustomerEntity->getData())) {
+            $channeledCustomerEntity
+                ->addPlatformId(platformId: $channeledCustomer->platformId)
+                ->addPlatformCreatedAt(platformCreatedAt: $channeledCustomer->platformCreatedAt)
+                ->addData(data: $channeledCustomer->data);
+        } else {
+            $data = $channeledCustomerEntity->getData();
+            $data['addresses'] = Helpers::multiDimensionalArrayUnique(
+                array_merge(
+                    $data['addresses'] ?? [],
+                    $channeledCustomer->data['addresses'] ?? []
+                )
+            );
+            $channeledCustomerEntity->addData(data: $data);
+        }
+    }
+
+    /**
+     * @param Customer $customerEntity
+     * @param ChanneledCustomer $channeledCustomerEntity
+     * @param EntityManager $manager
+     * @return void
+     * @throws ORMException
+     * @throws OptimisticLockException
+     */
+    private static function finalizeCustomerRelationships(
+        Customer $customerEntity,
+        ChanneledCustomer $channeledCustomerEntity,
+        EntityManager $manager
+    ): void {
+        $manager->persist(entity: $customerEntity);
+        $manager->persist(entity: $channeledCustomerEntity);
+        $manager->flush();
     }
 }

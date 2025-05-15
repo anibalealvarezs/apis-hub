@@ -1,10 +1,14 @@
 /vendor/
 /.idea/
-/config/yaml/cache.yaml
+/config/yaml/cacheconfig.yaml
 /config/yaml/channelsconfig.yaml
 /config/yaml/dbconfig.yaml
-/config/yaml/entitiesconfig.yaml
+/config/yaml/entitiesconfig_old.yaml
 /tests/Benchmark/*
 /tests/App/*
 /src/Entities/Analytics/Lead.php
 /src/Entities/Analytics/Accounts/*
+/.phpunit.result.cache
+*entities.php*
+*stderr*
+test_output_patch.txt

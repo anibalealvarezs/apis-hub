@@ -6,23 +6,26 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
+use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\Channels;
+use Enums\QueryBuilderType;
 
 class ProductVariantRepository extends BaseRepository
 {
     /**
-     * @param int $id
-     * @param bool $returnEntity
-     * @param object|null $filters
-     * @return Entity|array|null
-     * @throws NonUniqueResultException
+     * @param QueryBuilderType $type
+     * @return QueryBuilder
      */
-    public function read(int $id, bool $returnEntity = false, object $filters = null): Entity|array|null
+    protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
-        $query = $this->_em->createQueryBuilder()
-            ->select('e')
-            ->addSelect('pv')
+        $query = $this->_em->createQueryBuilder();
+        match ($type) {
+            QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
+            QueryBuilderType::COUNT => $query->select('count(e.id)'),
+        };
+
+        return $query->addSelect('pv')
             ->addSelect('p')
             ->addSelect('v')
             ->addSelect('c')
@@ -30,31 +33,16 @@ class ProductVariantRepository extends BaseRepository
             ->leftJoin('e.channeledProductVariants', 'pv')
             ->leftJoin('pv.channeledProduct', 'p')
             ->leftJoin('p.channeledVendor', 'v')
-            ->leftJoin('p.channeledProductCategories', 'c')
-            ->where('e.id = :id')
-            ->setParameter('id', $id);
-        if ($filters) {
-            foreach($filters as $key => $value) {
-                $query->andWhere('e.' . $key . ' = :' . $key)
-                    ->setParameter($key, $value);
-            }
-        }
+            ->leftJoin('p.channeledProductCategories', 'c');
+    }
 
-        if ($returnEntity) {
-            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
-        } else {
-            $entity = $query->getQuery()->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
-        }
-
-        if (!$entity) {
-            return null;
-        }
-
-        if (is_array($entity)) {
-            $entity = $this->replaceChannelName($entity);
-        }
-
-        return $entity;
+    /**
+     * @param array $result
+     * @return array
+     */
+    protected function processResult(array $result): array
+    {
+        return $this->replaceChannelName($result);
     }
 
     /**
@@ -64,9 +52,7 @@ class ProductVariantRepository extends BaseRepository
      */
     public function getByProductVariantId(string $productVariantId): ?Entity
     {
-        return $this->_em->createQueryBuilder()
-            ->select('e')
-            ->from($this->getEntityName(), 'e')
+        return $this->createBaseQueryBuilder()
             ->where('e.productVariantId = :productVariantId')
             ->setParameter('productVariantId', $productVariantId)
             ->getQuery()
@@ -81,9 +67,7 @@ class ProductVariantRepository extends BaseRepository
      */
     public function existsByProductVariantId(string $productVariantId): bool
     {
-        return $this->_em->createQueryBuilder()
-            ->select('COUNT(e.id)')
-            ->from($this->getEntityName(), 'e')
+        return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
             ->where('e.productVariantId = :productVariantId')
             ->setParameter('productVariantId', $productVariantId)
             ->getQuery()
@@ -97,9 +81,7 @@ class ProductVariantRepository extends BaseRepository
      */
     public function getBySku(string $sku): ?Entity
     {
-        return $this->_em->createQueryBuilder()
-            ->select('e')
-            ->from($this->getEntityName(), 'e')
+        return $this->createBaseQueryBuilder()
             ->where('e.sku = :sku')
             ->setParameter('sku', $sku)
             ->getQuery()
@@ -114,51 +96,11 @@ class ProductVariantRepository extends BaseRepository
      */
     public function existsBySku(string $sku): bool
     {
-        return $this->_em->createQueryBuilder()
-                ->select('COUNT(e.id)')
-                ->from($this->getEntityName(), 'e')
+        return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
                 ->where('e.sku = :sku')
                 ->setParameter('sku', $sku)
                 ->getQuery()
                 ->getSingleScalarResult() > 0;
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param array|null $ids
-     * @param object|null $filters
-     * @return ArrayCollection
-     */
-    public function readMultiple(int $limit = 100, int $pagination = 0, ?array $ids = null, object $filters = null): ArrayCollection
-    {
-        $query = $this->_em->createQueryBuilder()
-            ->select('e')
-            ->addSelect('pv')
-            ->addSelect('p')
-            ->addSelect('v')
-            ->addSelect('c')
-            ->from($this->getEntityName(), 'e');
-        $query->leftJoin('e.channeledProductVariants', 'pv');
-        $query->leftJoin('pv.channeledProduct', 'p');
-        $query->leftJoin('p.channeledVendor', 'v');
-        $query->leftJoin('p.channeledProductCategories', 'c');
-        if ($ids) {
-            $query->where('e.id IN (:ids)')
-                ->setParameter('ids', $ids);
-        }
-        foreach($filters as $key => $value) {
-            $query->andWhere('e.' . $key . ' = :' . $key)
-                ->setParameter($key, $value);
-        }
-        $list = $query->setMaxResults($limit)
-            ->setFirstResult($limit * $pagination)
-            ->getQuery()
-            ->getResult(AbstractQuery::HYDRATE_ARRAY);
-
-        return new ArrayCollection(array_map(function($item) {
-            return $this->replaceChannelName($item);
-        }, $list));
     }
 
     /**

@@ -7,16 +7,21 @@
     | File                              | Purpose                                                                           |
     |-----------------------------------|-----------------------------------------------------------------------------------|
     | `config/yaml/dbconfig.yaml`       | configure your database connection                                                |
-    | `config/yaml/entitiesconfig.yaml` | specify which entities will be used in the application and which are crudable     |
     | `config/yaml/channelsconfig.yaml` | fill in the necessary information for each channel |
 
-2. Run the following command in order to create the table in the database
+2. (Optional) Run the following command in order re-generate the `entitiesconfig.yaml` file
+
+    ```bash
+    vendor/bin/doctrine generate:entities-config
+    ```
+
+3. Run the following command in order to create the table in the database
 
     ```bash
     vendor/bin/doctrine orm:schema-tool:update --force --complete
     ```
 
-3. Execute the corresponding command in order to interact with jobs in the database
+4. Execute the corresponding command in order to interact with jobs in the database
 
     ```bash
     php bin/cli.php app:{method}

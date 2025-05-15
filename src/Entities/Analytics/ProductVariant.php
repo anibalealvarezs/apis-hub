@@ -5,7 +5,6 @@ namespace Entities\Analytics;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductVariant;
 use Entities\Entity;
 use Repositories\ProductVariantRepository;

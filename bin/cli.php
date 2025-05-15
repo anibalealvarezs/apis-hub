@@ -6,6 +6,7 @@ use Commands\Crud\CreateEntityCommand;
 use Commands\Crud\DeleteEntityCommand;
 use Commands\Crud\ReadEntityCommand;
 use Commands\Crud\UpdateEntityCommand;
+use Commands\GenerateEntitiesConfigCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use Symfony\Component\Console\Application;
 
@@ -27,7 +28,8 @@ $cli->addCommands([
     new CreateEntityCommand(),
     new DeleteEntityCommand(),
     new ReadEntityCommand(),
-    new UpdateEntityCommand()
+    new UpdateEntityCommand(),
+    new GenerateEntitiesConfigCommand()
 ]);
 
 // Runs console application

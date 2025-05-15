@@ -2,93 +2,112 @@
 
 namespace Controllers;
 
-use Doctrine\DBAL\Exception;
-use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\NotSupported;
-use Doctrine\ORM\Exception\ORMException;
+use Exception;
 use Helpers\Helpers;
+use InvalidArgumentException;
 use ReflectionException;
-use ReflectionMethod;
+use Services\CacheKeyGenerator;
+use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
-class CrudController
+class CrudController extends BaseController
 {
-    /**
-     * @var EntityManager
-     */
-    protected EntityManager $em;
+    private CacheService $cacheService;
+    private CacheKeyGenerator $cacheKeyGenerator;
 
-    /**
-     * @throws Exception
-     * @throws ORMException
-     */
     public function __construct()
     {
-        $this->em = Helpers::getManager();
+        $this->cacheService = CacheService::getInstance(redisClient: Helpers::getRedisClient());
+        $this->cacheKeyGenerator = new CacheKeyGenerator();
+        parent::__construct();
     }
 
     /**
-     * @param string $entity
-     * @param string $method
-     * @param int|null $id
-     * @param string|null $body
-     * @param array|null $params
-     * @return Response
-     * @throws NotSupported|ReflectionException
+     * @throws ReflectionException
+     * @throws NotSupported
      */
-    public function __invoke(string $entity, string $method, int $id = null, string $body = null, ?array $params = null): Response
-    {
-        if (!$this->isValidCrudableEntity($entity)) {
-            return new Response('Invalid crudable entity', Response::HTTP_NOT_FOUND);
+    public function __invoke(
+        string $entity,
+        string $method,
+        ?int $id = null,
+        ?string $body = null,
+        ?array $params = null
+    ): Response {
+        if (!$this->isValidCrudableEntity(entity: $entity)) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: 'Invalid crudable entity',
+                httpStatus: Response::HTTP_NOT_FOUND
+            );
         }
 
         return match ($method) {
-            'read' => $this->read($entity, $id),
-            'count' => $this->count($entity, $body, $params),
-            'list' => $this->list($entity, $body, $params),
-            'create' => $this->create($entity, $body),
-            'update' => $this->update($entity, $id, $body),
-            'delete' => $this->delete($entity, $id),
-            default => new Response('Method not found', Response::HTTP_NOT_FOUND),
+            'read' => $this->read(entity: $entity, id: $id),
+            'count' => $this->count(entity: $entity, body: $body, params: $params),
+            'list' => $this->list(entity: $entity, body: $body, params: $params),
+            'create' => $this->create(entity: $entity, body: $body),
+            'update' => $this->update(entity: $entity, id: $id, body: $body),
+            'delete' => $this->delete(entity: $entity, id: $id),
+            default => $this->createResponse(
+                data: null,
+                status: 'error',
+                error: 'Method not found',
+                httpStatus: Response::HTTP_NOT_FOUND
+            ),
         };
     }
 
     /**
+     * @param array|null $params
+     * @param string $repositoryClass
+     * @param string|null $body
+     * @return array
+     */
+    protected function prepareReadMultipleParams(
+        ?array $params,
+        string $repositoryClass,
+        ?string $body
+    ): array {
+        if (!empty($params) && !$this->validateParams(params: array_keys(array: $params), entity: $repositoryClass, method: 'readMultiple')) {
+            throw new InvalidArgumentException(message: 'Invalid parameters');
+        }
+
+        $params = $params ?? [];
+        $params['filters'] = Helpers::bodyToObject(data: $body) ?? [];
+
+        return $params;
+    }
+
+    /**
      * @param string $entity
      * @param int|null $id
      * @return Response
      * @throws NotSupported
      */
-    protected function read(string $entity, int $id = null): Response
+    protected function read(string $entity, ?int $id = null): Response
     {
-        $repository = $this->em->getRepository(
-            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
-        );
+        try {
+            $repository = $this->getRepository(entity: $entity);
+            $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id);
+            $data = $this->cacheService->get(
+                key: $cacheKey,
+                callback: fn() => $repository->read(id: $id)
+            );
 
-        return new Response(json_encode($repository->read(id: $id) ?: []));
-    }
-
-    /**
-     * @param string $entity
-     * @param string|null $body
-     * @param array|null $params
-     * @return Response
-     * @throws NotSupported
-     * @throws ReflectionException
-     */
-    protected function count(string $entity, string $body = null, ?array $params = null): Response
-    {
-        $repository = $this->em->getRepository(
-            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
-        );
-
-        if (!empty($params) && !$this->validateParams(array_keys($params), $repository::class, 'readMultiple')) {
-            return new Response('Invalid parameters', Response::HTTP_BAD_REQUEST);
+            return $this->createResponse(
+                data: $data ?: [],
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
-
-        $params['filters'] = Helpers::bodyToObject($body);
-
-        return new Response(json_encode($repository->countElements(...$params)));
     }
 
     /**
@@ -98,19 +117,69 @@ class CrudController
      * @return Response
      * @throws NotSupported|ReflectionException
      */
-    protected function list(string $entity, string $body = null, ?array $params = null): Response
+    protected function count(string $entity, ?string $body = null, ?array $params = null): Response
     {
-        $repository = $this->em->getRepository(
-            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
-        );
+        try {
+            $repository = $this->getRepository(entity: $entity);
+            $params = $this->prepareReadMultipleParams(
+                params: $params,
+                repositoryClass: $repository::class,
+                body: $body
+            );
+            $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
+            $count = $this->cacheService->get(
+                key: $cacheKey,
+                callback: fn() => $repository->countElements(filters: $params['filters'])
+            );
 
-        if (!empty($params) && !$this->validateParams(array_keys($params), $repository::class, 'readMultiple')) {
-            return new Response('Invalid parameters', Response::HTTP_BAD_REQUEST);
+            return $this->createResponse(
+                data: ['count' => $count],
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
+    }
 
-        $params['filters'] = Helpers::bodyToObject($body);
+    /**
+     * @param string $entity
+     * @param string|null $body
+     * @param array|null $params
+     * @return Response
+     * @throws NotSupported|ReflectionException
+     */
+    protected function list(string $entity, ?string $body = null, ?array $params = null): Response
+    {
+        try {
+            $repository = $this->getRepository(entity: $entity);
+            $params = $this->prepareReadMultipleParams(
+                params: $params,
+                repositoryClass: $repository::class,
+                body: $body
+            );
+            $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params));
+            $data = $this->cacheService->get(
+                key: $cacheKey,
+                callback: fn() => $repository->readMultiple(...$params)->toArray()
+            );
 
-        return new Response(json_encode($repository->readMultiple(...$params)->toArray()));
+            return $this->createResponse(
+                data: $data ?: [],
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
     /**
@@ -119,13 +188,44 @@ class CrudController
      * @return Response
      * @throws NotSupported
      */
-    protected function create(string $entity, string $body = null): Response
+    protected function create(string $entity, ?string $body = null): Response
     {
-        $repository = $this->em->getRepository(
-            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
-        );
+        try {
+            $data = Helpers::bodyToObject(data: $body);
+            $repository = $this->getRepository(entity: $entity);
+            $result = $repository->create(data: $data);
 
-        return new Response(json_encode($repository->create(Helpers::bodyToObject($body))));
+            if (!$result) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Invalid or missing data',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            // Invalidate caches
+            $id = $this->extractId($result);
+            if ($id) {
+                $this->cacheService->invalidateMultipleEntities(
+                    entities: [$entity => $id],
+                    channel: $this->extractChannel($result)
+                );
+            }
+
+            return $this->createResponse(
+                data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
+                status: 'success',
+                httpStatus: Response::HTTP_CREATED
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
     /**
@@ -135,13 +235,51 @@ class CrudController
      * @return Response
      * @throws NotSupported
      */
-    protected function update(string $entity, int $id = null, string $body = null): Response
+    protected function update(string $entity, ?int $id = null, ?string $body = null): Response
     {
-        $repository = $this->em->getRepository(
-            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
-        );
+        try {
+            if (!$id) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Invalid or missing ID',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
 
-        return new Response(json_encode($repository->update($id, Helpers::bodyToObject($body))));
+            $repository = $this->getRepository(entity: $entity);
+            $result = $repository->update(
+                id: $id,
+                data: Helpers::bodyToObject(data: $body)
+            );
+
+            if (!$result) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Record not found or could not be updated',
+                    httpStatus: Response::HTTP_NOT_FOUND
+                );
+            }
+
+            // Invalidate caches
+            $this->cacheService->invalidateMultipleEntities(
+                entities: [$entity => $id],
+                channel: $this->extractChannel($result)
+            );
+
+            return $this->createResponse(
+                data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
     /**
@@ -150,43 +288,86 @@ class CrudController
      * @return Response
      * @throws NotSupported
      */
-    protected function delete(string $entity, int $id = null): Response
+    protected function delete(string $entity, ?int $id = null): Response
     {
-        $repository = $this->em->getRepository(
-            Helpers::getEntitiesConfig()[strtolower($entity)]['class']
-        );
+        try {
+            if (!$id) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Missing ID',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
 
-        if ($repository->delete($id)) {
-            return new Response('Record successfully deleted');
+            $repository = $this->getRepository(entity: $entity);
+            $success = $repository->delete(id: $id);
+
+            if (!$success) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Record not found or could not be deleted',
+                    httpStatus: Response::HTTP_NOT_FOUND
+                );
+            }
+
+            // Invalidate caches
+            $this->cacheService->invalidateMultipleEntities(
+                entities: [$entity => $id]
+            );
+
+            return $this->createResponse(
+                data: null,
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
         }
-
-        return new Response('Record could not be deleted');
     }
 
     /**
-     * @param string $entity
-     * @return bool
+     * Extract ID from result (entity or array)
+     * @param mixed $result
+     * @return int|string|null
      */
-    protected function isValidCrudableEntity(string $entity): bool
+    protected function extractId(mixed $result): int|string|null
     {
-        $crudEntities = Helpers::getEnabledCrudEntities();
-
-        return in_array(strtolower($entity), array_keys($crudEntities));
+        if (is_object($result)) {
+            if (method_exists($result, 'getId')) {
+                return $result->getId();
+            }
+            if (method_exists($result, 'getOrderId')) {
+                return $result->getOrderId();
+            }
+            if (method_exists($result, 'getPlatformId')) {
+                return $result->getPlatformId();
+            }
+        }
+        if (is_array($result) && isset($result['id'])) {
+            return $result['id'];
+        }
+        return null;
     }
 
     /**
-     * @param array $params
-     * @param string $class
-     * @param string $method
-     * @return bool
-     * @throws ReflectionException
+     * Extract channel from result (entity or array)
+     * @param mixed $result
+     * @return string|null
      */
-    protected function validateParams(array $params, string $class, string $method): bool
+    protected function extractChannel(mixed $result): ?string
     {
-        $r = new ReflectionMethod($class, $method);
-        $methodParams = $r->getParameters();
-        return empty(array_diff($params, array_map(function($param) {
-            return $param->getName();
-        }, $methodParams)));
+        if (is_object($result) && method_exists($result, 'getChannel')) {
+            return $result->getChannel();
+        }
+        if (is_array($result) && isset($result['channel'])) {
+            return $result['channel'];
+        }
+        return null;
     }
 }
