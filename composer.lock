@@ -120,18 +120,19 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "cda673dd9f096f20fd424ceaa90c5835f7281b06"
+                "reference": "61b2ebf2d0e0721df8204be45b117be045516a92"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-cda673dd9f096f20fd424ceaa90c5835f7281b06-zip-7714b9.zip",
-                "reference": "cda673dd9f096f20fd424ceaa90c5835f7281b06",
-                "shasum": "93e002245303be73ce043bd3a5bfa8930cfca474"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-61b2ebf2d0e0721df8204be45b117be045516a92-zip-7842e5.zip",
+                "reference": "61b2ebf2d0e0721df8204be45b117be045516a92",
+                "shasum": "d31ef1b5c3f6aeb6d17b807fee0999c22e2493bb"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
                 "ext-json": "*",
                 "guzzlehttp/guzzle": "^7.0",
+                "monolog/monolog": "3.x-dev",
                 "nesbot/carbon": "^2.61",
                 "php": ">=8.1",
                 "symfony/yaml": "^5.4.10"
@@ -166,7 +167,7 @@
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues"
             },
-            "time": "2025-05-04T16:27:01+00:00"
+            "time": "2025-05-05T04:54:04+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -174,13 +175,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/google-api.git",
-                "reference": "3e4dca753df9f3ba831d07e8dce18afadff44713"
+                "reference": "91fd8d4e4e8536f82e5f6e0b3b3837e747e13d54"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-3e4dca753df9f3ba831d07e8dce18afadff44713-zip-c9d107.zip",
-                "reference": "3e4dca753df9f3ba831d07e8dce18afadff44713",
-                "shasum": "b5c860751ac90fcd582b893932b7dec55993b7d0"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-91fd8d4e4e8536f82e5f6e0b3b3837e747e13d54-zip-996dc3.zip",
+                "reference": "91fd8d4e4e8536f82e5f6e0b3b3837e747e13d54",
+                "shasum": "110f7b0d5a98965f7474cbc0d5b4e234ade0e3d1"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -192,6 +193,7 @@
                 "symfony/yaml": "^5.4.10"
             },
             "require-dev": {
+                "fakerphp/faker": "^1.20",
                 "phpunit/phpunit": "^9"
             },
             "default-branch": true,
@@ -220,7 +222,7 @@
                 "source": "https://github.com/anibalealvarezs/google-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/google-api/issues"
             },
-            "time": "2025-02-08T03:43:11+00:00"
+            "time": "2025-05-18T13:23:37+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -906,12 +908,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/dbal.git",
-                "reference": "2fcb5ebc35282905e10514f63a033ad60af5267e"
+                "reference": "06160c85aab6c3b03ee26ab2b72f6baae4e6c9ca"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/dbal/zipball/2fcb5ebc35282905e10514f63a033ad60af5267e",
-                "reference": "2fcb5ebc35282905e10514f63a033ad60af5267e",
+                "url": "https://api.github.com/repos/doctrine/dbal/zipball/06160c85aab6c3b03ee26ab2b72f6baae4e6c9ca",
+                "reference": "06160c85aab6c3b03ee26ab2b72f6baae4e6c9ca",
                 "shasum": ""
             },
             "require": {
@@ -1012,7 +1014,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-04-22T16:24:33+00:00"
+            "time": "2025-05-13T18:09:44+00:00"
         },
         {
             "name": "doctrine/deprecations",
@@ -1981,6 +1983,110 @@
             "time": "2025-03-27T12:30:47+00:00"
         },
         {
+            "name": "monolog/monolog",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Seldaek/monolog.git",
+                "reference": "2e97231b969e0ffdeff03329b808945b4ba55e38"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Seldaek/monolog/zipball/2e97231b969e0ffdeff03329b808945b4ba55e38",
+                "reference": "2e97231b969e0ffdeff03329b808945b4ba55e38",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.1",
+                "psr/log": "^2.0 || ^3.0"
+            },
+            "provide": {
+                "psr/log-implementation": "3.0.0"
+            },
+            "require-dev": {
+                "aws/aws-sdk-php": "^3.0",
+                "doctrine/couchdb": "~1.0@dev",
+                "elasticsearch/elasticsearch": "^7 || ^8",
+                "ext-json": "*",
+                "graylog2/gelf-php": "^1.4.2 || ^2.0",
+                "guzzlehttp/guzzle": "^7.4.5",
+                "guzzlehttp/psr7": "^2.2",
+                "mongodb/mongodb": "^1.8",
+                "php-amqplib/php-amqplib": "~2.4 || ^3",
+                "php-console/php-console": "^3.1.8",
+                "phpstan/phpstan": "^2",
+                "phpstan/phpstan-deprecation-rules": "^2",
+                "phpstan/phpstan-strict-rules": "^2",
+                "phpunit/phpunit": "^10.5.17 || ^11.0.7",
+                "predis/predis": "^1.1 || ^2",
+                "rollbar/rollbar": "^4.0",
+                "ruflin/elastica": "^7 || ^8",
+                "symfony/mailer": "^5.4 || ^6",
+                "symfony/mime": "^5.4 || ^6"
+            },
+            "suggest": {
+                "aws/aws-sdk-php": "Allow sending log messages to AWS services like DynamoDB",
+                "doctrine/couchdb": "Allow sending log messages to a CouchDB server",
+                "elasticsearch/elasticsearch": "Allow sending log messages to an Elasticsearch server via official client",
+                "ext-amqp": "Allow sending log messages to an AMQP server (1.0+ required)",
+                "ext-curl": "Required to send log messages using the IFTTTHandler, the LogglyHandler, the SendGridHandler, the SlackWebhookHandler or the TelegramBotHandler",
+                "ext-mbstring": "Allow to work properly with unicode symbols",
+                "ext-mongodb": "Allow sending log messages to a MongoDB server (via driver)",
+                "ext-openssl": "Required to send log messages using SSL",
+                "ext-sockets": "Allow sending log messages to a Syslog server (via UDP driver)",
+                "graylog2/gelf-php": "Allow sending log messages to a GrayLog2 server",
+                "mongodb/mongodb": "Allow sending log messages to a MongoDB server (via library)",
+                "php-amqplib/php-amqplib": "Allow sending log messages to an AMQP server using php-amqplib",
+                "rollbar/rollbar": "Allow sending log messages to Rollbar",
+                "ruflin/elastica": "Allow sending log messages to an Elastic Search server"
+            },
+            "default-branch": true,
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "3.x-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Monolog\\": "src/Monolog"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jordi Boggiano",
+                    "email": "j.boggiano@seld.be",
+                    "homepage": "https://seld.be"
+                }
+            ],
+            "description": "Sends your logs to files, sockets, inboxes, databases and various web services",
+            "homepage": "https://github.com/Seldaek/monolog",
+            "keywords": [
+                "log",
+                "logging",
+                "psr-3"
+            ],
+            "support": {
+                "issues": "https://github.com/Seldaek/monolog/issues",
+                "source": "https://github.com/Seldaek/monolog/tree/main"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/Seldaek",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/monolog/monolog",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2025-04-03T11:44:45+00:00"
+        },
+        {
             "name": "nesbot/carbon",
             "version": "2.x-dev",
             "source": {
@@ -2093,12 +2199,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/predis/predis.git",
-                "reference": "7d86f7afb37940bfc7aaa2909147616881377667"
+                "reference": "afa8b55aa3b33de44bc6d0896f3b6de2a6f95f8d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/predis/predis/zipball/7d86f7afb37940bfc7aaa2909147616881377667",
-                "reference": "7d86f7afb37940bfc7aaa2909147616881377667",
+                "url": "https://api.github.com/repos/predis/predis/zipball/afa8b55aa3b33de44bc6d0896f3b6de2a6f95f8d",
+                "reference": "afa8b55aa3b33de44bc6d0896f3b6de2a6f95f8d",
                 "shasum": ""
             },
             "require": {
@@ -2141,7 +2247,7 @@
             ],
             "support": {
                 "issues": "https://github.com/predis/predis/issues",
-                "source": "https://github.com/predis/predis/tree/v3.0.0"
+                "source": "https://github.com/predis/predis/tree/main"
             },
             "funding": [
                 {
@@ -2149,7 +2255,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-05-02T23:18:59+00:00"
+            "time": "2025-05-16T18:33:03+00:00"
         },
         {
             "name": "psr/cache",
@@ -2869,12 +2975,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/config.git",
-                "reference": "4e55e7e4ffddd343671ea972216d4509f46c22ef"
+                "reference": "af5917a3b1571f54689e56677a3f06440d2fe4c7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/config/zipball/4e55e7e4ffddd343671ea972216d4509f46c22ef",
-                "reference": "4e55e7e4ffddd343671ea972216d4509f46c22ef",
+                "url": "https://api.github.com/repos/symfony/config/zipball/af5917a3b1571f54689e56677a3f06440d2fe4c7",
+                "reference": "af5917a3b1571f54689e56677a3f06440d2fe4c7",
                 "shasum": ""
             },
             "require": {
@@ -2936,7 +3042,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2024-11-04T11:33:53+00:00"
+            "time": "2025-05-14T06:00:01+00:00"
         },
         {
             "name": "symfony/console",
@@ -2944,12 +3050,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/console.git",
-                "reference": "a3011c7b7adb58d89f6c0d822abb641d7a5f9719"
+                "reference": "7d29659bc3c9d8e9a34e2c3414ef9e9e003e6cf3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/console/zipball/a3011c7b7adb58d89f6c0d822abb641d7a5f9719",
-                "reference": "a3011c7b7adb58d89f6c0d822abb641d7a5f9719",
+                "url": "https://api.github.com/repos/symfony/console/zipball/7d29659bc3c9d8e9a34e2c3414ef9e9e003e6cf3",
+                "reference": "7d29659bc3c9d8e9a34e2c3414ef9e9e003e6cf3",
                 "shasum": ""
             },
             "require": {
@@ -3030,7 +3136,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-04-07T15:42:41+00:00"
+            "time": "2025-05-07T07:05:04+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",
@@ -3406,12 +3512,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-foundation.git",
-                "reference": "ef8252ece055a6771c39614bcbec68cd146a09e8"
+                "reference": "6b7c97fe1ddac8df3cc9ba6410c8abc683e148ae"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-foundation/zipball/ef8252ece055a6771c39614bcbec68cd146a09e8",
-                "reference": "ef8252ece055a6771c39614bcbec68cd146a09e8",
+                "url": "https://api.github.com/repos/symfony/http-foundation/zipball/6b7c97fe1ddac8df3cc9ba6410c8abc683e148ae",
+                "reference": "6b7c97fe1ddac8df3cc9ba6410c8abc683e148ae",
                 "shasum": ""
             },
             "require": {
@@ -3475,7 +3581,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-05-04T06:50:42+00:00"
+            "time": "2025-05-11T15:36:20+00:00"
         },
         {
             "name": "symfony/http-kernel",
@@ -4803,12 +4909,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/var-dumper.git",
-                "reference": "5be5bdd07600c270083d821a4b20697a47526311"
+                "reference": "548f6760c54197b1084e1e5c71f6d9d523f2f78e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/var-dumper/zipball/5be5bdd07600c270083d821a4b20697a47526311",
-                "reference": "5be5bdd07600c270083d821a4b20697a47526311",
+                "url": "https://api.github.com/repos/symfony/var-dumper/zipball/548f6760c54197b1084e1e5c71f6d9d523f2f78e",
+                "reference": "548f6760c54197b1084e1e5c71f6d9d523f2f78e",
                 "shasum": ""
             },
             "require": {
@@ -4879,7 +4985,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-04-09T08:14:14+00:00"
+            "time": "2025-04-27T18:39:23+00:00"
         },
         {
             "name": "symfony/var-exporter",
@@ -4887,12 +4993,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/var-exporter.git",
-                "reference": "6d25a2377310c85f0400797e4f07c303df00bd74"
+                "reference": "c9a1168891b5aaadfd6332ef44393330b3498c4c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/var-exporter/zipball/6d25a2377310c85f0400797e4f07c303df00bd74",
-                "reference": "6d25a2377310c85f0400797e4f07c303df00bd74",
+                "url": "https://api.github.com/repos/symfony/var-exporter/zipball/c9a1168891b5aaadfd6332ef44393330b3498c4c",
+                "reference": "c9a1168891b5aaadfd6332ef44393330b3498c4c",
                 "shasum": ""
             },
             "require": {
@@ -4956,7 +5062,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-05-02T08:36:13+00:00"
+            "time": "2025-05-15T09:04:05+00:00"
         },
         {
             "name": "symfony/yaml",
@@ -5041,12 +5147,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/data-fixtures.git",
-                "reference": "8c012b089a07b615ab765b52dcec7e14cce74c4d"
+                "reference": "f3fdfaa3567173d4df89f474e63a7c9ae7084987"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/data-fixtures/zipball/8c012b089a07b615ab765b52dcec7e14cce74c4d",
-                "reference": "8c012b089a07b615ab765b52dcec7e14cce74c4d",
+                "url": "https://api.github.com/repos/doctrine/data-fixtures/zipball/f3fdfaa3567173d4df89f474e63a7c9ae7084987",
+                "reference": "f3fdfaa3567173d4df89f474e63a7c9ae7084987",
                 "shasum": ""
             },
             "require": {
@@ -5068,7 +5174,7 @@
                 "doctrine/orm": "^2.14 || ^3",
                 "ext-sqlite3": "*",
                 "fig/log-test": "^1",
-                "phpstan/phpstan": "2.1.14",
+                "phpstan/phpstan": "2.1.16",
                 "phpunit/phpunit": "^9.6.13 || 10.5.45",
                 "psr/log": "^1.1 || ^2 || ^3",
                 "symfony/cache": "^5.4 || ^6.3 || ^7",
@@ -5119,7 +5225,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-05-05T12:09:00+00:00"
+            "time": "2025-05-16T15:19:57+00:00"
         },
         {
             "name": "mikey179/vfsstream",
@@ -5939,12 +6045,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "43d2cb18d0675c38bd44982a5d1d88f6d53d8d95"
+                "reference": "e3874aa4afb83cb6afa3689f22a300a9d7882e0f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/43d2cb18d0675c38bd44982a5d1d88f6d53d8d95",
-                "reference": "43d2cb18d0675c38bd44982a5d1d88f6d53d8d95",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/e3874aa4afb83cb6afa3689f22a300a9d7882e0f",
+                "reference": "e3874aa4afb83cb6afa3689f22a300a9d7882e0f",
                 "shasum": ""
             },
             "require": {
@@ -6018,7 +6124,7 @@
             "support": {
                 "issues": "https://github.com/sebastianbergmann/phpunit/issues",
                 "security": "https://github.com/sebastianbergmann/phpunit/security/policy",
-                "source": "https://github.com/sebastianbergmann/phpunit/tree/9.6.23"
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/9.6"
             },
             "funding": [
                 {
@@ -6042,7 +6148,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-05-02T06:40:34+00:00"
+            "time": "2025-05-14T13:32:26+00:00"
         },
         {
             "name": "sebastian/cli-parser",

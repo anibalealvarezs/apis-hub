@@ -3,11 +3,25 @@
 namespace Classes\Requests;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Enums\Channel;
 use Interfaces\RequestInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class VendorRequests implements RequestInterface
 {
+    /**
+     * @return Channel[]
+     */
+    public static function supportedChannels(): array
+    {
+        return [
+            Channel::shopify->value,
+            Channel::bigcommerce->value,
+            Channel::netsuite->value,
+            Channel::amazon->value,
+        ];
+    }
+
     /**
      * @param int $limit
      * @param int $pagination

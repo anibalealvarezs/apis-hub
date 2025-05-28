@@ -32,11 +32,18 @@ class ChanneledPriceRule extends ChanneledEntity
         $this->channeledDiscounts = new ArrayCollection();
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledDiscounts(): ?Collection
     {
         return $this->channeledDiscounts;
     }
 
+    /**
+     * @param ChanneledDiscount $channeledDiscount
+     * @return ChanneledPriceRule
+     */
     public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
         if ($this->channeledDiscounts->contains($channeledDiscount)) {
@@ -49,6 +56,10 @@ class ChanneledPriceRule extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @param Collection<ChanneledDiscount> $channeledDiscounts
+     * @return ChanneledPriceRule
+     */
     public function addChanneledDiscounts(Collection $channeledDiscounts): self
     {
         foreach ($channeledDiscounts as $channeledDiscount) {
@@ -58,6 +69,10 @@ class ChanneledPriceRule extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @param ChanneledDiscount $channeledDiscount
+     * @return ChanneledPriceRule
+     */
     public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
         if (!$this->channeledDiscounts->contains($channeledDiscount)) {
@@ -75,6 +90,10 @@ class ChanneledPriceRule extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @param Collection<ChanneledDiscount> $channeledDiscounts
+     * @return ChanneledPriceRule
+     */
     public function removeChanneledDiscounts(Collection $channeledDiscounts): self
     {
         foreach ($channeledDiscounts as $channeledDiscount) {
@@ -84,11 +103,18 @@ class ChanneledPriceRule extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return PriceRule
+     */
     public function getPriceRule(): PriceRule
     {
         return $this->priceRule;
     }
 
+    /**
+     * @param PriceRule|null $priceRule
+     * @return ChanneledPriceRule
+     */
     public function addPriceRule(?PriceRule $priceRule): self
     {
         $this->priceRule = $priceRule;

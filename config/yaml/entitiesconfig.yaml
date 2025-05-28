@@ -1,3 +1,410 @@
+campaign:
+  class: Entities\Analytics\Campaign
+  channeled_class: Entities\Analytics\Channeled\ChanneledCampaign
+  crud_enabled: true
+  repository_class: Repositories\CampaignRepository
+  repository_methods:
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    getByEmail:
+      parameters:
+        - campaignId
+      return_type: Entities\Entity
+    existsByEmail:
+      parameters:
+        - campaignId
+      return_type: bool
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+channeled_ad:
+  class: Entities\Analytics\Channeled\ChanneledAd
+  crud_enabled: true
+  repository_class: Repositories\Channeled\ChanneledAdRepository
+  repository_methods:
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    getByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: Entities\Entity
+    existsByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: bool
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    getLastByPlatformId:
+      parameters:
+        - channel
+      return_type: array
+    getLastByPlatformCreatedAt:
+      parameters:
+        - channel
+      return_type: array
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+channeled_ad_group:
+  class: Entities\Analytics\Channeled\ChanneledAdGroup
+  crud_enabled: true
+  repository_class: Repositories\Channeled\ChanneledAdGroupRepository
+  repository_methods:
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    getByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: Entities\Entity
+    existsByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: bool
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    getLastByPlatformId:
+      parameters:
+        - channel
+      return_type: array
+    getLastByPlatformCreatedAt:
+      parameters:
+        - channel
+      return_type: array
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+channeled_campaign:
+  class: Entities\Analytics\Channeled\ChanneledCampaign
+  crud_enabled: true
+  repository_class: Repositories\Channeled\ChanneledCampaignRepository
+  repository_methods:
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    getByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: Entities\Entity
+    existsByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: bool
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    getLastByPlatformId:
+      parameters:
+        - channel
+      return_type: array
+    getLastByPlatformCreatedAt:
+      parameters:
+        - channel
+      return_type: array
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
 channeled_customer:
   class: Entities\Analytics\Channeled\ChanneledCustomer
   crud_enabled: true
@@ -226,21 +633,239 @@ channeled_discount:
     matching:
       parameters:
         - criteria
+channeled_metric:
+  class: Entities\Analytics\Channeled\ChanneledMetric
+  crud_enabled: true
+  repository_class: Repositories\Channeled\ChanneledMetricRepository
+  repository_methods:
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Analytics\Channeled\ChanneledMetric
+    findByDimension:
+      parameters:
+        - channel
+        - key
+        - value
+      return_type: array
+    getByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: Entities\Entity
+    existsByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: bool
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    getLastByPlatformId:
+      parameters:
+        - channel
+      return_type: array
+    getLastByPlatformCreatedAt:
+      parameters:
+        - channel
+      return_type: array
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+channeled_metric_dimension:
+  class: Entities\Analytics\Channeled\ChanneledMetricDimension
+  crud_enabled: true
+  repository_class: Repositories\Channeled\ChanneledMetricDimensionRepository
+  repository_methods:
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    findByKeyAndValue:
+      parameters:
+        - key
+        - value
+      return_type: array
+    findByChanneledMetric:
+      parameters:
+        - channeledMetric
+      return_type: array
+    findDistinctValues:
+      parameters:
+        - key
+        - channel
+      return_type: array
+    getByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: Entities\Entity
+    existsByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: bool
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    getLastByPlatformId:
+      parameters:
+        - channel
+      return_type: array
+    getLastByPlatformCreatedAt:
+      parameters:
+        - channel
+      return_type: array
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
 channeled_order:
   class: Entities\Analytics\Channeled\ChanneledOrder
   crud_enabled: true
   repository_class: Repositories\Channeled\ChanneledOrderRepository
   repository_methods:
-    getByOrderId:
-      parameters:
-        - orderId
-        - channel
-      return_type: Entities\Entity
-    existsByOrderId:
-      parameters:
-        - orderId
-        - channel
-      return_type: bool
     getByPlatformId:
       parameters:
         - platformId
@@ -890,6 +1515,120 @@ channeled_vendor:
     matching:
       parameters:
         - criteria
+creative:
+  class: Entities\Analytics\Creative
+  crud_enabled: true
+  repository_class: Repositories\CreativeRepository
+  repository_methods:
+    findByCreativeId:
+      parameters:
+        - creativeId
+      return_type: Entities\Analytics\Creative
+    findByName:
+      parameters:
+        - name
+        - limit
+      return_type: array
+    findByDataAttribute:
+      parameters:
+        - key
+        - value
+        - limit
+      return_type: array
+    findAdsUsingCreative:
+      parameters:
+        - creativeId
+      return_type: array
+    findCampaignsUsingCreative:
+      parameters:
+        - creativeId
+      return_type: array
+    findByPlatform:
+      parameters:
+        - channel
+        - limit
+      return_type: array
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
 customer:
   class: Entities\Analytics\Customer
   channeled_class: Entities\Analytics\Channeled\ChanneledCustomer
@@ -1080,6 +1819,132 @@ discount:
     matching:
       parameters:
         - criteria
+metric:
+  class: Entities\Analytics\Metric
+  channeled_class: Entities\Analytics\Channeled\ChanneledMetric
+  crud_enabled: true
+  repository_class: Repositories\MetricRepository
+  repository_methods:
+    existsByChannelAndName:
+      parameters:
+        - channel
+        - name
+        - period
+        - metricDate
+      return_type: bool
+    getByChannelAndName:
+      parameters:
+        - channel
+        - name
+        - period
+        - metricDate
+      return_type: Entities\Analytics\Metric
+    findMetricsByPeriod:
+      parameters:
+        - channel
+        - name
+        - period
+        - start
+        - end
+      return_type: array
+    findByChannelAndDimensions:
+      parameters:
+        - channel
+        - name
+        - period
+        - metricDate
+        - dimensions
+      return_type: Entities\Analytics\Metric
+    findMetricsByPeriodAndDimensions:
+      parameters:
+        - channel
+        - name
+        - period
+        - start
+        - end
+        - dimensions
+      return_type: array
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
 order:
   class: Entities\Analytics\Order
   channeled_class: Entities\Analytics\Channeled\ChanneledOrder
@@ -1094,6 +1959,225 @@ order:
       parameters:
         - orderId
       return_type: bool
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+page:
+  class: Entities\Analytics\Page
+  crud_enabled: true
+  repository_class: Repositories\PageRepository
+  repository_methods:
+    findByUrl:
+      parameters:
+        - url
+      return_type: Entities\Analytics\Page
+    findByTitle:
+      parameters:
+        - title
+        - limit
+      return_type: array
+    findByDataAttribute:
+      parameters:
+        - key
+        - value
+        - limit
+      return_type: array
+    findByCampaign:
+      parameters:
+        - campaignId
+      return_type: array
+    findByMetricValue:
+      parameters:
+        - metricName
+        - value
+        - operator
+        - limit
+      return_type: array
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+post:
+  class: Entities\Analytics\Post
+  crud_enabled: true
+  repository_class: Repositories\PostRepository
+  repository_methods:
+    findByPostId:
+      parameters:
+        - postId
+      return_type: Entities\Analytics\Post
+    findByDataAttribute:
+      parameters:
+        - key
+        - value
+        - limit
+      return_type: array
+    findByCampaign:
+      parameters:
+        - campaignId
+      return_type: array
+    findByMetricValue:
+      parameters:
+        - metricName
+        - value
+        - operator
+        - limit
+      return_type: array
     create:
       parameters:
         - data
@@ -1482,6 +2566,113 @@ product_variant:
       parameters:
         - sku
       return_type: bool
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+query:
+  class: Entities\Analytics\Query
+  crud_enabled: true
+  repository_class: Repositories\QueryRepository
+  repository_methods:
+    findByQuery:
+      parameters:
+        - query
+      return_type: Entities\Analytics\Query
+    findByDataAttribute:
+      parameters:
+        - key
+        - value
+        - limit
+      return_type: array
+    findByCampaign:
+      parameters:
+        - campaignId
+      return_type: array
+    findByMetricValue:
+      parameters:
+        - metricName
+        - value
+        - operator
+        - limit
+      return_type: array
     create:
       parameters:
         - data

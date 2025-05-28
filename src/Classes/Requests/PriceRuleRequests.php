@@ -15,7 +15,7 @@ use Entities\Analytics\Channeled\ChanneledDiscount;
 use Entities\Analytics\Channeled\ChanneledPriceRule;
 use Entities\Analytics\Discount;
 use Entities\Analytics\PriceRule;
-use Enums\Channels;
+use Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -24,6 +24,19 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PriceRuleRequests implements RequestInterface
 {
+    /**
+     * @return Channel[]
+     */
+    public static function supportedChannels(): array
+    {
+        return [
+            Channel::shopify->value,
+            Channel::bigcommerce->value,
+            Channel::netsuite->value,
+            Channel::amazon->value,
+        ];
+    }
+
     /**
      * @param string|null $createdAtMin
      * @param string|null $createdAtMax
@@ -46,7 +59,7 @@ class PriceRuleRequests implements RequestInterface
 
         $manager = Helpers::getManager();
         $channeledPriceRuleRepository = $manager->getRepository(entityName: ChanneledPriceRule::class);
-        $lastChanneledPriceRule = $channeledPriceRuleRepository->getLastByPlatformId(channel: Channels::shopify->value);
+        $lastChanneledPriceRule = $channeledPriceRuleRepository->getLastByPlatformId(channel: Channel::shopify->value);
 
         $shopifyClient->getAllPriceRulesAndProcess(
             createdAtMin: $createdAtMin,
@@ -252,7 +265,7 @@ class PriceRuleRequests implements RequestInterface
         EntityRepository $channeledDiscountRepository,
         EntityManager $manager
     ): array {
-        if ($channeledPriceRule->channel !== Channels::shopify->value) {
+        if ($channeledPriceRule->channel !== Channel::shopify->value) {
             return ['discountCodes' => [], 'channeledDiscountCodes' => []];
         }
 
@@ -348,9 +361,8 @@ class PriceRuleRequests implements RequestInterface
      */
     private static function getOrCreateDiscount(object $channeledDiscount, EntityRepository $repository): Discount
     {
-        return $repository->existsByCode(code: $channeledDiscount->code)
-            ? $repository->getByCode(code: $channeledDiscount->code)
-            : $repository->create(
+        return $repository->getByCode(code: $channeledDiscount->code)
+            ?? $repository->create(
                 data: (object) ['code' => $channeledDiscount->code],
                 returnEntity: true
             );
@@ -363,9 +375,8 @@ class PriceRuleRequests implements RequestInterface
      */
     private static function getOrCreateChanneledDiscount(object $channeledDiscount, EntityRepository $repository): ChanneledDiscount
     {
-        return $repository->existsByCode(code: $channeledDiscount->code, channel: $channeledDiscount->channel)
-            ? $repository->getByCode(code: $channeledDiscount->code, channel: $channeledDiscount->channel)
-            : $repository->create(
+        return $repository->getByCode(code: $channeledDiscount->code, channel: $channeledDiscount->channel)
+            ?? $repository->create(
                 data: $channeledDiscount,
                 returnEntity: true
             );

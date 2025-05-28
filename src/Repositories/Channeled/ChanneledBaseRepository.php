@@ -7,11 +7,12 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 use Exception;
 use InvalidArgumentException;
 use Repositories\BaseRepository;
+use RuntimeException;
 use ValueError;
 
 class ChanneledBaseRepository extends BaseRepository
@@ -31,13 +32,16 @@ class ChanneledBaseRepository extends BaseRepository
      */
     protected function createBaseQueryBuilderNoJoins(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
+        if (!$this->_em) {
+            throw new RuntimeException("EntityManager is not initialized");
+        }
         $query = $this->_em->createQueryBuilder();
         match ($type) {
             QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
             QueryBuilderType::LAST => $query->select('e, LENGTH(e.platformId) AS HIDDEN length'),
+            QueryBuilderType::CUSTOM => null,
         };
-
         return $query->from($this->getEntityName(), 'e');
     }
 
@@ -50,13 +54,12 @@ class ChanneledBaseRepository extends BaseRepository
      */
     public function getByPlatformId(int|string $platformId, int $channel): ?Entity
     {
-        $this->validateChannel($channel);
-
+        $channelValue = $this->validateChannel($channel);
         return $this->createBaseQueryBuilder()
             ->where('e.platformId = :platformId')
             ->setParameter('platformId', $platformId)
             ->andWhere('e.channel = :channel')
-            ->setParameter('channel', $channel)
+            ->setParameter('channel', $channelValue)
             ->getQuery()
             ->getOneOrNullResult(hydrationMode: AbstractQuery::HYDRATE_OBJECT);
     }
@@ -71,13 +74,12 @@ class ChanneledBaseRepository extends BaseRepository
      */
     public function existsByPlatformId(int|string $platformId, int $channel): bool
     {
-        $this->validateChannel($channel);
-
+        $channelValue = $this->validateChannel($channel);
         return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
                 ->where('e.platformId = :platformId')
                 ->setParameter('platformId', $platformId)
                 ->andWhere('e.channel = :channel')
-                ->setParameter('channel', $channel)
+                ->setParameter('channel', $channelValue)
                 ->getQuery()
                 ->getSingleScalarResult() > 0;
     }
@@ -90,15 +92,18 @@ class ChanneledBaseRepository extends BaseRepository
      */
     public function countElements(object $filters = null): int
     {
-        $query = $this->createBaseQueryBuilder(QueryBuilderType::COUNT);
+        if ($filters && property_exists($filters, 'channel') && !is_int($filters->channel)) {
+            try {
+                $this->validateChannelName($filters->channel);
+            } catch (ValueError) {
+                throw new InvalidArgumentException("Invalid channel name: " . $filters->channel);
+            }
+        }
+        $query = $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT);
         if ($filters) {
             foreach ($filters as $key => $value) {
                 if ($key === 'channel' && !is_int($value)) {
-                    try {
-                        $value = $this->validateChannelName($value);
-                    } catch (ValueError $e) {
-                        throw new InvalidArgumentException("Invalid channel name: $value");
-                    }
+                    $value = $this->validateChannelName($value); // Already validated, but kept for consistency
                 }
                 $query->andWhere('e.' . $key . ' = :' . $key)
                     ->setParameter($key, $value);
@@ -122,19 +127,27 @@ class ChanneledBaseRepository extends BaseRepository
      */
     protected function replaceChannelName(array $entity): array
     {
-        $entity['channel'] = Channels::from($entity['channel'])->getName();
+        if (isset($entity['channel'])) {
+            $entity['channel'] = Channel::from($entity['channel'])->getName();
+        }
         return $entity;
     }
 
     /**
-     * @param int $channel
+     * @param int|string|null $channel
      * @return int
      */
-    protected function validateChannel(int $channel): int
+    protected function validateChannel(int|string|null $channel): int
     {
-        $channelEnum = Channels::tryFrom($channel);
+        if ($channel === null || (is_string($channel) && empty($channel))) {
+            throw new InvalidArgumentException('Invalid channel: channel cannot be null or empty');
+        }
+        if (is_string($channel)) {
+            return $this->validateChannelName($channel);
+        }
+        $channelEnum = Channel::tryFrom($channel);
         if ($channelEnum === null) {
-            throw new InvalidArgumentException('Invalid channel');
+            throw new InvalidArgumentException('Invalid channel: ' . $channel);
         }
         return $channelEnum->value;
     }
@@ -147,7 +160,7 @@ class ChanneledBaseRepository extends BaseRepository
     protected function validateChannelName(string $name): int
     {
         try {
-            $channel = Channels::tryFromName($name);
+            $channel = Channel::tryFromName($name);
             if ($channel === null) {
                 throw new InvalidArgumentException("Invalid channel name: $name");
             }
@@ -165,7 +178,7 @@ class ChanneledBaseRepository extends BaseRepository
     public function getLastByPlatformId(int $channel): ?array
     {
         $this->validateChannel($channel);
-        $data = $this->createBaseQueryBuilder(QueryBuilderType::LAST)
+        return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::LAST)
             ->where('e.channel = :channel')
             ->setParameter('channel', $channel)
             ->addOrderBy('length', 'DESC')
@@ -173,7 +186,6 @@ class ChanneledBaseRepository extends BaseRepository
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
-        return $data ? $this->replaceChannelName($data) : null;
     }
 
     /**
@@ -184,13 +196,13 @@ class ChanneledBaseRepository extends BaseRepository
     public function getLastByPlatformCreatedAt(int $channel): ?array
     {
         $this->validateChannel($channel);
-        $data = $this->createBaseQueryBuilder()
+        $data = $this->createBaseQueryBuilderNoJoins(QueryBuilderType::LAST)
             ->where('e.channel = :channel')
             ->setParameter('channel', $channel)
             ->addOrderBy('e.platformCreatedAt', 'DESC')
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
-        return $data ? $this->replaceChannelName($data) : null;
+        return $data ? ['platformCreatedAt' => $data['platformCreatedAt']] : null;
     }
 }

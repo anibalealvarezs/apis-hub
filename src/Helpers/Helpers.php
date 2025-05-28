@@ -227,9 +227,10 @@ class Helpers
 
     /**
      * @param string $string
+     * @param bool $capitalizeFirst
      * @return string
      */
-    public static function toCamelcase(string $string): string
+    public static function toCamelcase(string $string, bool $capitalizeFirst = false): string
     {
         $str = str_replace(
             search: ' ',
@@ -242,8 +243,16 @@ class Helpers
                 )
             )
         );
-        $str[0] = strtolower($str[0]);
+        if (!$capitalizeFirst) {
+            $str[0] = strtolower($str[0]);
+        }
         return $str;
+    }
+
+    public static function toSnakeCase(string $string): string
+    {
+        $string = preg_replace('/([a-z])([A-Z])/', '$1_$2', $string);
+        return strtolower($string);
     }
 
     /**
@@ -345,5 +354,25 @@ class Helpers
         }
 
         return null;
+    }
+
+    /**
+     * @param string $haystack
+     * @param array $needles
+     * @return bool
+     */
+    public static function str_contains_any(string $haystack, array $needles): bool
+    {
+        return array_reduce($needles, fn($a, $n) => $a || str_contains($haystack, $n), false);
+    }
+
+    /**
+     * @param string $haystack
+     * @param array $needles
+     * @return bool
+     */
+    public static function str_contains_all(string $haystack, array $needles): bool
+    {
+        return array_reduce($needles, fn($a, $n) => $a && str_contains($haystack, $n), true);
     }
 }

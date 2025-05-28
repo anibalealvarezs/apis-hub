@@ -4,7 +4,7 @@ namespace Classes\Conversions;
 
 use Carbon\Carbon;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channels;
+use Enums\Channel;
 use Helpers\Helpers;
 
 class NetSuiteConvert
@@ -48,7 +48,7 @@ class NetSuiteConvert
             return (object) [
                 'platformId' => $customer['entityid'],
                 'platformCreatedAt' => isset($customer['datecreated']) && $customer['datecreated'] ? Carbon::parse($customer['datecreated']) : null,
-                'channel' => Channels::netsuite->value,
+                'channel' => Channel::netsuite->value,
                 'email' => $customer['email'] ?? '',
                 'data' => $customer['data'],
             ];
@@ -65,7 +65,7 @@ class NetSuiteConvert
             return (object) [
                 'platformId' => $discount['id'],
                 'platformCreatedAt' => Carbon::parse($discount['created_at']),
-                'channel' => Channels::netsuite->value,
+                'channel' => Channel::netsuite->value,
                 'code' => $discount['code'],
                 'data' => $discount,
             ];
@@ -78,7 +78,7 @@ class NetSuiteConvert
             return (object) [
                 'platformId' => $priceRule['id'],
                 'platformCreatedAt' => Carbon::parse($priceRule['created_at']),
-                'channel' => Channels::netsuite->value,
+                'channel' => Channel::netsuite->value,
                 'data' => $priceRule,
             ];
         }, $priceRules));
@@ -195,7 +195,7 @@ class NetSuiteConvert
             return (object) [
                 'platformId' => $order['id'],
                 'platformCreatedAt' => isset($order['created_at']) && $order['created_at'] ? Carbon::parse($order['created_at']) : null,
-                'channel' => Channels::netsuite->value,
+                'channel' => Channel::netsuite->value,
                 'data' => $order['data'],
                 'customer' => (object) [
                     'id' => $order['data']['entity'] ?? '',
@@ -286,7 +286,7 @@ class NetSuiteConvert
                 'platformId' => $product['id'],
                 'sku' => $product['sku'] ?? '',
                 'platformCreatedAt' => Carbon::parse($product['created_at']),
-                'channel' => Channels::netsuite->value,
+                'channel' => Channel::netsuite->value,
                 'data' => $product['data'],
                 'vendor' => self::vendors($product['vendors'])[0] ?? [],
                 'variants' => self::productVariants($product['variants']),
@@ -302,7 +302,7 @@ class NetSuiteConvert
                 'platformId' => $productVariant['id'],
                 'sku' => $productVariant['itemid'] ?? '',
                 'platformCreatedAt' => isset($productVariant['createddate']) ? Carbon::parse($productVariant['createddate']) : null,
-                'channel' => Channels::netsuite->value,
+                'channel' => Channel::netsuite->value,
                 'data' => $productVariant['data'] ?? [],
             ];
         }, $productVariants));
@@ -314,7 +314,7 @@ class NetSuiteConvert
             return (object) [
                 'platformId' => $productCategory['id'],
                 'platformCreatedAt' => isset($productCategory['created']) ? Carbon::parse($productCategory['created']) : null,
-                'channel' => Channels::netsuite->value,
+                'channel' => Channel::netsuite->value,
                 'data' => $productCategory['data'],
                 'isSmartCollection' => false,
             ];
@@ -328,7 +328,7 @@ class NetSuiteConvert
                 'platformId' => $vendor['id'] ?? '',
                 'name' => $vendor['name'] ?? '',
                 'platformCreatedAt' => isset($productCategory['created']) ? Carbon::parse($productCategory['created']) : null,
-                'channel' => Channels::netsuite->value,
+                'channel' => Channel::netsuite->value,
                 'data' => $vendor['data'],
             ];
         }, $vendors));

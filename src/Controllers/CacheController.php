@@ -2,11 +2,11 @@
 
 namespace Controllers;
 
-use Enums\AnalyticsEntities;
-use Enums\Channels;
+use Enums\AnalyticsEntity;
+use Enums\Channel;
 use Exception;
 use Helpers\Helpers;
-use ReflectionEnum;
+use InvalidArgumentException;
 use ReflectionException;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -18,6 +18,7 @@ class CacheController extends BaseController
      * @param string|null $body
      * @param array|null $params
      * @return Response
+     * @throws ReflectionException
      */
     public function __invoke(
         string $channel,
@@ -25,6 +26,16 @@ class CacheController extends BaseController
         ?string $body = null,
         ?array $params = null
     ): Response {
+        $channelEnum = Channel::tryFromName($channel);
+        if (!$channelEnum) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: "Invalid channel: " . $channel,
+                httpStatus: Response::HTTP_NOT_FOUND
+            );
+        }
+
         if (!$this->isValidEntity(entity: $entity)) {
             return $this->createResponse(
                 data: null,
@@ -34,9 +45,19 @@ class CacheController extends BaseController
             );
         }
 
+        $requestsClassName = $this->getEntityRequestsClassName($entity);
+        if (method_exists($requestsClassName, 'supportedChannels') && !in_array($channelEnum->value, $requestsClassName::supportedChannels(), true)) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: "Channel ". $channelEnum->getCommonName() ." not supported for entity " . $entity,
+                httpStatus: Response::HTTP_NOT_FOUND
+            );
+        }
+
         return $this->list(
             entity: $entity,
-            channel: (new ReflectionEnum(objectOrClass: Channels::class))->getConstant(name: $channel),
+            channel: $channelEnum,
             body: $body,
             params: $params
         );
@@ -66,12 +87,12 @@ class CacheController extends BaseController
 
     /**
      * @param string $entity
-     * @param Channels $channel
+     * @param Channel $channel
      * @param string|null $body
      * @param array|null $params
      * @return Response
      */
-    protected function list(string $entity, Channels $channel, ?string $body = null, ?array $params = null): Response
+    protected function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
     {
         try {
             $data = $this->fetchData($entity, $channel, $params, $body);
@@ -103,48 +124,60 @@ class CacheController extends BaseController
     /**
      * @param string $entity
      * @return string
-     * @throws ReflectionException
      */
     protected function getEntityRequestsClassName(string $entity): string
     {
-        return (new ReflectionEnum(objectOrClass: AnalyticsEntities::class))->getConstant(name: $entity)->getRequestsClassName();
+        $enum = AnalyticsEntity::tryFrom($entity);
+        if (!$enum) {
+            throw new InvalidArgumentException("Invalid entity: " . $entity);
+        }
+        return $enum->getRequestsClassName();
     }
 
     /**
      * Fetch data and cache it.
      *
      * @param string $entity
-     * @param Channels $channel
+     * @param Channel $channel
      * @param array|null $params
      * @param string|null $body
      * @return mixed
      * @throws ReflectionException
      */
-    protected function fetchData(string $entity, Channels $channel, ?array $params, ?string $body): mixed
+    protected function fetchData(string $entity, Channel $channel, ?array $params, ?string $body): mixed
     {
-        $requestsClassName = '\Classes\Requests\\' . $this->getEntityRequestsClassName($entity);
-        $methodName = 'getListFrom' . $channel->getCommonName();
+        try {
+            $requestsClassName = $this->getEntityRequestsClassName($entity);
+            $methodName = 'getListFrom' . $channel->getCommonName();
 
-        if (!method_exists($requestsClassName, $methodName)) {
+            if (!method_exists($requestsClassName, $methodName)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: "Channel " . $channel->getCommonName() . " not supported for entity " . $entity,
+                    httpStatus: Response::HTTP_NOT_FOUND
+                );
+            }
+
+            $parameters = $this->prepareAnalyticsParams($params, $body);
+
+            /* if (!$this->validateParams(array_keys($parameters), $requestsClassName, $methodName)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Invalid parameters',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            } */
+
+            return $requestsClassName::$methodName(...$parameters) ?: [];
+        } catch (Exception) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
-                error: 'Method not found',
+                error: "Entity " . $entity . " not found in AnalyticsEntities",
                 httpStatus: Response::HTTP_NOT_FOUND
             );
         }
-
-        $parameters = $this->prepareAnalyticsParams($params, $body);
-
-        if (!$this->validateParams(array_keys($parameters), $requestsClassName, $methodName)) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: 'Invalid parameters',
-                httpStatus: Response::HTTP_BAD_REQUEST
-            );
-        }
-
-        return $requestsClassName::$methodName(...$parameters) ?: [];
     }
 }

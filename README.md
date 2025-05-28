@@ -12,7 +12,7 @@
 2. (Optional) Run the following command in order re-generate the `entitiesconfig.yaml` file
 
     ```bash
-    vendor/bin/doctrine generate:entities-config
+    php bin/cli.php generate:entities-config
     ```
 
 3. Run the following command in order to create the table in the database
@@ -21,7 +21,13 @@
     vendor/bin/doctrine orm:schema-tool:update --force --complete
     ```
 
-4. Execute the corresponding command in order to interact with jobs in the database
+4. Run the following command in order to initialize entities in the database
+
+    ```bash
+    php bin/cli.php app:initialize-entities
+    ```
+
+5. Execute the corresponding command in order to interact with jobs in the database
 
     ```bash
     php bin/cli.php app:{method}

@@ -4,12 +4,12 @@ namespace Repositories;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
+use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
-use Entities\Entity;
-use Enums\AnalyticsEntities;
-use Enums\Channels;
+use Enums\AnalyticsEntity;
+use Enums\Channel;
 use Enums\JobStatus;
 use Enums\QueryBuilderType;
 use Faker\Factory;
@@ -23,6 +23,7 @@ class JobRepository extends BaseRepository
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
+     * @throws \Exception
      */
     protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
@@ -30,6 +31,7 @@ class JobRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => throw new \Exception('To be implemented'),
         };
 
         return $query->from($this->getEntityName(), 'e');
@@ -41,7 +43,7 @@ class JobRepository extends BaseRepository
      * @return array|null
      * @throws NonUniqueResultException
      * @throws ReflectionException
-     * @throws MappingException
+     * @throws MappingException|OptimisticLockException
      */
     public function create(stdClass $data = null, bool $returnEntity = false): ?array
     {
@@ -54,14 +56,14 @@ class JobRepository extends BaseRepository
         if (!isset($data->entity) || !$data->entity) {
             throw new InvalidArgumentException('Entity is required');
         }
-        if (!(new ReflectionEnum(AnalyticsEntities::class))->getConstant($data->entity)) {
+        if (!(new ReflectionEnum(AnalyticsEntity::class))->getConstant($data->entity)) {
             throw new InvalidArgumentException('Invalid entity');
         }
 
         if (!isset($data->channel)) {
             throw new InvalidArgumentException('Channel is required');
         }
-        if (!(new ReflectionEnum(Channels::class))->getConstant($data->channel)) {
+        if (!(new ReflectionEnum(Channel::class))->getConstant($data->channel)) {
             throw new InvalidArgumentException('Invalid channel');
         }
 

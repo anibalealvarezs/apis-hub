@@ -6,20 +6,20 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 
 class ChanneledCustomerRepository extends ChanneledBaseRepository
 {
     /**
      * @param string $email
-     * @param Channels|int $channel
+     * @param Channel|int $channel
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function getByEmail(string $email, Channels|int $channel /*, bool $useCached = false */): ?Entity
+    public function getByEmail(string $email, Channel|int $channel /*, bool $useCached = false */): ?Entity
     {
-        $channelValue = $channel instanceof Channels ? $channel->value : $this->validateChannel($channel);
+        $channelValue = $channel instanceof Channel ? $channel->value : $this->validateChannel($channel);
         return $this->createBaseQueryBuilder()
             ->where('e.email = :email')
             ->setParameter('email', $email)
@@ -32,14 +32,14 @@ class ChanneledCustomerRepository extends ChanneledBaseRepository
 
     /**
      * @param string $email
-     * @param Channels|int $channel
+     * @param Channel|int $channel
      * @return bool
      * @throws NoResultException
      * @throws NonUniqueResultException
      */
-    public function existsByEmail(string $email, Channels|int $channel): bool
+    public function existsByEmail(string $email, Channel|int $channel): bool
     {
-        $channelValue = $channel instanceof Channels ? $channel->value : $this->validateChannel($channel);
+        $channelValue = $channel instanceof Channel ? $channel->value : $this->validateChannel($channel);
         return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
             ->where('e.email = :email')
             ->setParameter('email', $email)

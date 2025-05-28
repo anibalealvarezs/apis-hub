@@ -61,16 +61,16 @@ class CrudController extends BaseController
 
     /**
      * @param array|null $params
-     * @param string $repositoryClass
+     * @param string $entityName
      * @param string|null $body
      * @return array
      */
     protected function prepareReadMultipleParams(
         ?array $params,
-        string $repositoryClass,
+        string $entityName,
         ?string $body
     ): array {
-        if (!empty($params) && !$this->validateParams(params: array_keys(array: $params), entity: $repositoryClass, method: 'readMultiple')) {
+        if (!empty($params) && !$this->validateParams(params: array_keys($params), entity: $entityName, method: 'readMultiple')) {
             throw new InvalidArgumentException(message: 'Invalid parameters');
         }
 
@@ -123,7 +123,7 @@ class CrudController extends BaseController
             $repository = $this->getRepository(entity: $entity);
             $params = $this->prepareReadMultipleParams(
                 params: $params,
-                repositoryClass: $repository::class,
+                entityName: $entity,
                 body: $body
             );
             $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
@@ -159,7 +159,7 @@ class CrudController extends BaseController
             $repository = $this->getRepository(entity: $entity);
             $params = $this->prepareReadMultipleParams(
                 params: $params,
-                repositoryClass: $repository::class,
+                entityName: $entity,
                 body: $body
             );
             $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params));

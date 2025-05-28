@@ -10,13 +10,17 @@ use Doctrine\ORM\Mapping as ORM;
 class Entity
 {
     #[ORM\Id, ORM\Column(type: 'integer'), ORM\GeneratedValue]
-    protected int $id;
+    protected ?int $id = null;
 
     #[ORM\Column(name: 'created_at', type: 'datetime', options: ['default' => 'CURRENT_TIMESTAMP'])]
     protected DateTime $createdAt;
 
     #[ORM\Column(name: 'updated_at', type: 'datetime', options: ['default' => 'CURRENT_TIMESTAMP'])]
     protected DateTime $updatedAt;
+
+    #[ORM\Version]
+    #[ORM\Column(type: 'integer')]
+    protected int $version = 0;
 
     /**
      * @return int|null
@@ -60,12 +64,26 @@ class Entity
         $this->updatedAt = $updatedAt;
     }
 
+    /**
+     * @return int
+     */
+    public function getVersion(): int
+    {
+        return $this->version;
+    }
+
+    /**
+     * @return void
+     */
     #[ORM\PreUpdate]
     public function onPreUpdate(): void
     {
         $this->updatedAt = new DateTime(datetime: 'now');
     }
 
+    /**
+     * @return void
+     */
     #[ORM\PrePersist]
     public function onPrePersist(): void
     {

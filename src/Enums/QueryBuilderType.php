@@ -18,4 +18,9 @@ enum QueryBuilderType: string
      * @var int
      */
     case LAST = 'last';
+
+    /**
+     * @var int
+     */
+    case CUSTOM = 'custom';
 }

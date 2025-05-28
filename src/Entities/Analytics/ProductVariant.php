@@ -69,11 +69,18 @@ class ProductVariant extends Entity
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledProductVariants(): ?Collection
     {
         return $this->channeledProductVariants;
     }
 
+    /**
+     * @param ChanneledProductVariant $channeledProductVariant
+     * @return ProductVariant
+     */
     public function addChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
     {
         if ($this->channeledProductVariants->contains($channeledProductVariant)) {
@@ -86,6 +93,10 @@ class ProductVariant extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledProductVariants
+     * @return ProductVariant
+     */
     public function addChanneledProductVariants(Collection $channeledProductVariants): self
     {
         foreach ($channeledProductVariants as $channeledProductVariant) {
@@ -95,6 +106,10 @@ class ProductVariant extends Entity
         return $this;
     }
 
+    /**
+     * @param ChanneledProductVariant $channeledProductVariant
+     * @return ProductVariant
+     */
     public function removeChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
     {
         if (!$this->channeledProductVariants->contains($channeledProductVariant)) {
@@ -112,6 +127,10 @@ class ProductVariant extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledProductVariants
+     * @return ProductVariant
+     */
     public function removeChanneledProductVariants(Collection $channeledProductVariants): self
     {
         foreach ($channeledProductVariants as $channeledProductVariant) {

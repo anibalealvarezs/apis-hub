@@ -45,11 +45,18 @@ class PriceRule extends Entity
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledPriceRules(): ?Collection
     {
         return $this->channeledPriceRules;
     }
 
+    /**
+     * @param ChanneledPriceRule $channeledPriceRule
+     * @return PriceRule
+     */
     public function addChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): self
     {
         if ($this->channeledPriceRules->contains($channeledPriceRule)) {
@@ -62,6 +69,10 @@ class PriceRule extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledPriceRules
+     * @return PriceRule
+     */
     public function addChanneledPriceRules(Collection $channeledPriceRules): self
     {
         foreach ($channeledPriceRules as $channeledPriceRule) {
@@ -71,6 +82,10 @@ class PriceRule extends Entity
         return $this;
     }
 
+    /**
+     * @param ChanneledPriceRule $channeledPriceRule
+     * @return PriceRule
+     */
     public function removeChanneledPriceRule(ChanneledPriceRule $channeledPriceRule): self
     {
         if (!$this->channeledPriceRules->contains($channeledPriceRule)) {
@@ -88,6 +103,10 @@ class PriceRule extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledPriceRules
+     * @return PriceRule
+     */
     public function removeChanneledPriceRules(Collection $channeledPriceRules): self
     {
         foreach ($channeledPriceRules as $channeledPriceRule) {

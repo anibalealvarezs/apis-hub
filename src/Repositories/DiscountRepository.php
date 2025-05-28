@@ -8,7 +8,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 
 class DiscountRepository extends BaseRepository
@@ -79,7 +79,7 @@ class DiscountRepository extends BaseRepository
     protected function replaceChannelName(array $entity): array
     {
         $entity['channeledDiscounts'] = array_map(function ($channelDiscount) {
-            $channelDiscount['channel'] = Channels::from($channelDiscount['channel'])->getName();
+            $channelDiscount['channel'] = Channel::from($channelDiscount['channel'])->getName();
             unset($channelDiscount['channeledPriceRule']['channel']);
             /* $channelDiscount['channeledOrders'] = array_map(function ($channeledOrder) {
                 unset($channeledOrder['channel']);

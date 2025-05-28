@@ -77,11 +77,18 @@ class ChanneledProduct extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledProductVariants(): ?Collection
     {
         return $this->channeledProductVariants;
     }
 
+    /**
+     * @param ChanneledProductVariant $channeledProductVariant
+     * @return ChanneledProduct
+     */
     public function addChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
     {
         if ($this->channeledProductVariants->contains($channeledProductVariant)) {
@@ -94,6 +101,10 @@ class ChanneledProduct extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledProductVariants
+     * @return ChanneledProduct
+     */
     public function addChanneledProductVariants(Collection $channeledProductVariants): self
     {
         foreach ($channeledProductVariants as $channeledProductVariant) {
@@ -103,6 +114,10 @@ class ChanneledProduct extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @param ChanneledProductVariant $channeledProductVariant
+     * @return ChanneledProduct
+     */
     public function removeChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
     {
         if (!$this->channeledProductVariants->contains($channeledProductVariant)) {
@@ -120,6 +135,10 @@ class ChanneledProduct extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledProductVariants
+     * @return ChanneledProduct
+     */
     public function removeChanneledProductVariants(Collection $channeledProductVariants): self
     {
         foreach ($channeledProductVariants as $channeledProductVariant) {
@@ -257,11 +276,18 @@ class ChanneledProduct extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return ChanneledVendor
+     */
     public function getChanneledVendor(): ChanneledVendor
     {
         return $this->channeledVendor;
     }
 
+    /**
+     * @param ChanneledVendor|null $channeledVendor
+     * @return ChanneledProduct
+     */
     public function addChanneledVendor(?ChanneledVendor $channeledVendor): self
     {
         $this->channeledVendor = $channeledVendor;
@@ -269,11 +295,18 @@ class ChanneledProduct extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return Product
+     */
     public function getProduct(): Product
     {
         return $this->product;
     }
 
+    /**
+     * @param Product|null $product
+     * @return ChanneledProduct
+     */
     public function addProduct(?Product $product): self
     {
         $this->product = $product;

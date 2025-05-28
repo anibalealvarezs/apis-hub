@@ -3,11 +3,26 @@
 namespace Classes\Requests;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Enums\Channel;
 use Interfaces\RequestInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class DiscountRequests implements RequestInterface
 {
+    /**
+     * @return Channel[]
+     */
+    public static function supportedChannels(): array
+    {
+        return [
+            Channel::shopify->value,
+            Channel::klaviyo->value,
+            Channel::bigcommerce->value,
+            Channel::netsuite->value,
+            Channel::amazon->value,
+        ];
+    }
+
     /**
      * @param int $limit
      * @param int $pagination
@@ -40,6 +55,16 @@ class DiscountRequests implements RequestInterface
      * @return Response
      */
     public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    {
+        return new Response(json_encode([]));
+    }
+
+    /**
+     * @param object|null $filters
+     * @param string|bool $resume
+     * @return Response
+     */
+    public static function getListFromAmazon(object $filters = null, string|bool $resume = true): Response
     {
         return new Response(json_encode([]));
     }

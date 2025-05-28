@@ -126,11 +126,18 @@ class ChanneledProductCategory extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return ProductCategory
+     */
     public function getProductCategory(): ProductCategory
     {
         return $this->productCategory;
     }
 
+    /**
+     * @param ProductCategory|null $productCategory
+     * @return ChanneledProductCategory
+     */
     public function addProductCategory(?ProductCategory $productCategory): self
     {
         $this->productCategory = $productCategory;

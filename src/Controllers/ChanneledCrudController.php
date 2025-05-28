@@ -2,7 +2,7 @@
 
 namespace Controllers;
 
-use Enums\Channels;
+use Enums\Channel;
 use Exception;
 use Helpers\Helpers;
 use InvalidArgumentException;
@@ -10,6 +10,7 @@ use ReflectionEnum;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
+use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 
 class ChanneledCrudController extends BaseController
@@ -53,7 +54,7 @@ class ChanneledCrudController extends BaseController
 
         $channelsConfig = Helpers::getChannelsConfig();
 
-        if (!defined(constant_name: Channels::class . '::' . $channel) || !in_array(needle: $channel, haystack: array_keys(array: $channelsConfig))) {
+        if (!defined(constant_name: Channel::class . '::' . $channel) || !in_array(needle: $channel, haystack: array_keys(array: $channelsConfig))) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -71,7 +72,7 @@ class ChanneledCrudController extends BaseController
             );
         }
 
-        $channelConstant = (new ReflectionEnum(objectOrClass: Channels::class))->getConstant(name: $channel);
+        $channelConstant = (new ReflectionEnum(objectOrClass: Channel::class))->getConstant(name: $channel);
 
         return match ($method) {
             'read' => $this->read(entity: $entity, channel: $channelConstant, id: $id),
@@ -90,21 +91,21 @@ class ChanneledCrudController extends BaseController
      * @param array|null $params
      * @param string $repositoryClass
      * @param string|null $body
-     * @param Channels $channel
+     * @param Channel $channel
      * @return array
      */
     protected function prepareChanneledReadMultipleParams(
         ?array $params,
         string $repositoryClass,
         ?string $body,
-        Channels $channel
+        Channel $channel
     ): array {
         if (!empty($params) && !$this->validateParams(params: array_keys(array: $params), entity: $repositoryClass, method: 'readMultiple')) {
             throw new InvalidArgumentException(message: 'Invalid parameters');
         }
 
         $params = $params ?? [];
-        $params['filters'] = Helpers::bodyToObject(data: $body) ?? new \stdClass();
+        $params['filters'] = Helpers::bodyToObject(data: $body) ?? new stdClass();
         if (!isset($params['filters']->channel)) {
             $params['filters']->channel = $channel->value;
         }
@@ -114,11 +115,11 @@ class ChanneledCrudController extends BaseController
 
     /**
      * @param string $entity
-     * @param Channels $channel
+     * @param Channel $channel
      * @param int|null $id
      * @return Response
      */
-    protected function read(string $entity, Channels $channel, ?int $id = null): Response
+    protected function read(string $entity, Channel $channel, ?int $id = null): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
@@ -152,13 +153,13 @@ class ChanneledCrudController extends BaseController
 
     /**
      * @param string $entity
-     * @param Channels $channel
+     * @param Channel $channel
      * @param string|null $body
      * @param array|null $params
      * @return Response
      * @throws ReflectionException
      */
-    protected function count(string $entity, Channels $channel, ?string $body = null, ?array $params = null): Response
+    protected function count(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
@@ -200,13 +201,13 @@ class ChanneledCrudController extends BaseController
 
     /**
      * @param string $entity
-     * @param Channels $channel
+     * @param Channel $channel
      * @param string|null $body
      * @param array|null $params
      * @return Response
      * @throws ReflectionException
      */
-    protected function list(string $entity, Channels $channel, ?string $body = null, ?array $params = null): Response
+    protected function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
@@ -248,11 +249,11 @@ class ChanneledCrudController extends BaseController
 
     /**
      * @param string $entity
-     * @param Channels $channel
+     * @param Channel $channel
      * @param string|null $body
      * @return Response
      */
-    protected function create(string $entity, Channels $channel, ?string $body = null): Response
+    protected function create(string $entity, Channel $channel, ?string $body = null): Response
     {
         try {
             $data = Helpers::bodyToObject(data: $body);
@@ -297,12 +298,12 @@ class ChanneledCrudController extends BaseController
 
     /**
      * @param string $entity
-     * @param Channels $channel
+     * @param Channel $channel
      * @param int|null $id
      * @param string|null $body
      * @return Response
      */
-    protected function update(string $entity, Channels $channel, ?int $id = null, ?string $body = null): Response
+    protected function update(string $entity, Channel $channel, ?int $id = null, ?string $body = null): Response
     {
         try {
             if (!$id) {
@@ -352,11 +353,11 @@ class ChanneledCrudController extends BaseController
 
     /**
      * @param string $entity
-     * @param Channels $channel
+     * @param Channel $channel
      * @param int|null $id
      * @return Response
      */
-    protected function delete(string $entity, Channels $channel, ?int $id = null): Response
+    protected function delete(string $entity, Channel $channel, ?int $id = null): Response
     {
         try {
             if (!$id) {

@@ -21,9 +21,13 @@ class Order extends Entity
     #[ORM\OneToMany(mappedBy: 'order', targetEntity: ChanneledOrder::class, orphanRemoval: true)]
     protected Collection $channeledOrders;
 
+    #[ORM\OneToMany(mappedBy: 'order', targetEntity: Metric::class, orphanRemoval: true)]
+    protected Collection $metrics;
+
     public function __construct()
     {
         $this->channeledOrders = new ArrayCollection();
+        $this->metrics = new ArrayCollection();
     }
 
     /**
@@ -45,11 +49,18 @@ class Order extends Entity
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledOrders(): ?Collection
     {
         return $this->channeledOrders;
     }
 
+    /**
+     * @param ChanneledOrder $channeledOrder
+     * @return Order
+     */
     public function addChanneledOrder(ChanneledOrder $channeledOrder): self
     {
         if ($this->channeledOrders->contains($channeledOrder)) {
@@ -62,6 +73,10 @@ class Order extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledOrders
+     * @return Order
+     */
     public function addChanneledOrders(Collection $channeledOrders): self
     {
         foreach ($channeledOrders as $channeledOrder) {
@@ -71,6 +86,10 @@ class Order extends Entity
         return $this;
     }
 
+    /**
+     * @param ChanneledOrder $channeledOrder
+     * @return Order
+     */
     public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
     {
         if (!$this->channeledOrders->contains($channeledOrder)) {
@@ -88,6 +107,10 @@ class Order extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledOrders
+     * @return Order
+     */
     public function removeChanneledOrders(Collection $channeledOrders): self
     {
         foreach ($channeledOrders as $channeledOrder) {

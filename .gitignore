@@ -12,3 +12,5 @@
 *entities.php*
 *stderr*
 test_output_patch.txt
+test_redis.php
+*.log

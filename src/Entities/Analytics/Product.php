@@ -26,9 +26,13 @@ class Product extends Entity
     #[ORM\OneToMany(mappedBy: 'product', targetEntity: ChanneledProduct::class, orphanRemoval: true)]
     protected Collection $channeledProducts;
 
+    #[ORM\OneToMany(mappedBy: 'product', targetEntity: Metric::class, orphanRemoval: true)]
+    protected Collection $metrics;
+
     public function __construct()
     {
         $this->channeledProducts = new ArrayCollection();
+        $this->metrics = new ArrayCollection();
     }
 
     /**
@@ -69,11 +73,18 @@ class Product extends Entity
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledProducts(): ?Collection
     {
         return $this->channeledProducts;
     }
 
+    /**
+     * @param ChanneledProduct $channeledProduct
+     * @return Product
+     */
     public function addChanneledProduct(ChanneledProduct $channeledProduct): self
     {
         if ($this->channeledProducts->contains($channeledProduct)) {
@@ -86,6 +97,10 @@ class Product extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledProducts
+     * @return Product
+     */
     public function addChanneledProducts(Collection $channeledProducts): self
     {
         foreach ($channeledProducts as $channeledProduct) {
@@ -95,6 +110,10 @@ class Product extends Entity
         return $this;
     }
 
+    /**
+     * @param ChanneledProduct $channeledProduct
+     * @return Product
+     */
     public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
     {
         if (!$this->channeledProducts->contains($channeledProduct)) {
@@ -112,6 +131,10 @@ class Product extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledProducts
+     * @return Product
+     */
     public function removeChanneledProducts(Collection $channeledProducts): self
     {
         foreach ($channeledProducts as $channeledProduct) {

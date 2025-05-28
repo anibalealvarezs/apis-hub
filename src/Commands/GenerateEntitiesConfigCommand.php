@@ -71,7 +71,7 @@ class GenerateEntitiesConfigCommand extends Command
             }
         }
 
-        $this->saveConfig($entities, $output);
+        $this->saveConfig($entities, $output, __DIR__.'/../../config/yaml/entitiesconfig.yaml');
         return Command::SUCCESS;
     }
 
@@ -222,7 +222,7 @@ class GenerateEntitiesConfigCommand extends Command
             return $methods;
 
         } catch (ReflectionException $e) {
-            $output->writeln("<error>Reflection failed for $repositoryClass: {$e->getMessage()}</error>");
+            $output->writeln("<error>Reflection failed for " . $repositoryClass . ": " . $e->getMessage() . "</error>");
             return [];
         }
     }
@@ -257,10 +257,18 @@ class GenerateEntitiesConfigCommand extends Command
             : ltrim($key, '_');
     }
 
-    private function saveConfig(array $entities, OutputInterface $output): void
+    protected function saveConfig(array $entities, OutputInterface $output, string $path = null): void
     {
+        $path = $path ?? __DIR__.'/../../config/yaml/entitiesconfig.yaml';
+        if (empty($entities)) {
+            $output->writeln("<info>Successfully generated config for 0 entities</info>");
+            return;
+        }
         $yaml = Yaml::dump($entities, 6, 2, Yaml::DUMP_OBJECT_AS_MAP);
-        file_put_contents(__DIR__.'/../../config/yaml/entitiesconfig.yaml', $yaml);
+        if (file_put_contents($path, $yaml) === false) {
+            $output->writeln("<error>Failed to write config to $path</error>");
+            throw new RuntimeException("Failed to write config to $path");
+        }
         $output->writeln("<info>Successfully generated config for ".count($entities)." entities</info>");
     }
 

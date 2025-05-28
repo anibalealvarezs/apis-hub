@@ -45,11 +45,18 @@ class Vendor extends Entity
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledVendors(): ?Collection
     {
         return $this->channeledVendors;
     }
 
+    /**
+     * @param ChanneledVendor $channeledVendor
+     * @return Vendor
+     */
     public function addChanneledVendor(ChanneledVendor $channeledVendor): self
     {
         if ($this->channeledVendors->contains($channeledVendor)) {
@@ -62,6 +69,10 @@ class Vendor extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledVendors
+     * @return Vendor
+     */
     public function addChanneledVendors(Collection $channeledVendors): self
     {
         foreach ($channeledVendors as $channeledVendor) {
@@ -71,6 +82,10 @@ class Vendor extends Entity
         return $this;
     }
 
+    /**
+     * @param ChanneledVendor $channeledVendor
+     * @return Vendor
+     */
     public function removeChanneledVendor(ChanneledVendor $channeledVendor): self
     {
         if (!$this->channeledVendors->contains($channeledVendor)) {
@@ -88,6 +103,10 @@ class Vendor extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledVendors
+     * @return Vendor
+     */
     public function removeChanneledVendors(Collection $channeledVendors): self
     {
         foreach ($channeledVendors as $channeledVendor) {

@@ -9,7 +9,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Faker\Factory;
 use Faker\Generator;
 use InvalidArgumentException;
@@ -51,7 +51,7 @@ class ChanneledCustomerRepositoryTest extends TestCase
     public function testGetByEmailWithEnumReturnsEntity(): void
     {
         $email = $this->faker->email;
-        $channel = Channels::shopify; // Enum
+        $channel = Channel::shopify; // Enum
         $entity = new Entity();
 
         $parameterCalls = [];
@@ -104,7 +104,7 @@ class ChanneledCustomerRepositoryTest extends TestCase
     public function testGetByEmailWithEnumReturnsNull(): void
     {
         $email = $this->faker->email;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
 
         $parameterCalls = [];
         $this->queryBuilder->expects($this->exactly(2))
@@ -235,7 +235,7 @@ class ChanneledCustomerRepositoryTest extends TestCase
     public function testExistsByEmailWithEnumReturnsTrue(): void
     {
         $email = $this->faker->email;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
 
         $parameterCalls = [];
         $this->queryBuilder->expects($this->exactly(2))
@@ -283,7 +283,7 @@ class ChanneledCustomerRepositoryTest extends TestCase
     public function testExistsByEmailWithEnumReturnsFalse(): void
     {
         $email = $this->faker->email;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
 
         $parameterCalls = [];
         $this->queryBuilder->expects($this->exactly(2))

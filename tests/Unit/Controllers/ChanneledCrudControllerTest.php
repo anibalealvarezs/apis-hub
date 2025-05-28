@@ -5,7 +5,7 @@ namespace Tests\Unit\Controllers;
 use Controllers\ChanneledCrudController;
 use Doctrine\ORM\EntityManager;
 use Entities\Analytics\Channeled\ChanneledDiscount;
-use Enums\Channels;
+use Enums\Channel;
 use Exception;
 use Faker\Factory;
 use Faker\Generator;
@@ -54,7 +54,7 @@ class ChanneledCrudControllerTest extends TestCase
         $method = 'read';
         $this->controller->setMockCrudEntities([]);
         $this->controller->setMockChannelsConfig([
-            Channels::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true]
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method);
@@ -107,12 +107,12 @@ class ChanneledCrudControllerTest extends TestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            Channels::shopify->value => ['enabled' => false]
+            Channel::shopify->value => ['enabled' => false]
         ]);
 
         // Set channel config override
         $this->controller->setMockChannelsConfigOverride([
-            Channels::shopify->value => ['enabled' => false]
+            Channel::shopify->value => ['enabled' => false]
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method);
@@ -138,7 +138,7 @@ class ChanneledCrudControllerTest extends TestCase
         $method = 'read';
         $id = $this->faker->randomNumber();
         $data = ['id' => $id, 'name' => $this->faker->word];
-        $cacheKey = "channeled_entity_" . Channels::shopify->value . "_{$entity}_{$id}";
+        $cacheKey = "channeled_entity_" . Channel::shopify->value . "_{$entity}_{$id}";
 
         // Ensure $id is not null
         $this->assertNotNull($id, 'Faker generated a null ID');
@@ -149,7 +149,7 @@ class ChanneledCrudControllerTest extends TestCase
             ->getMock();
         $repository->expects($this->once())
             ->method('read')
-            ->with($id, false, (object) ['channel' => Channels::shopify->value])
+            ->with($id, false, (object) ['channel' => Channel::shopify->value])
             ->willReturn($data);
 
         $this->entityManager->expects($this->once())
@@ -159,7 +159,7 @@ class ChanneledCrudControllerTest extends TestCase
 
         $this->cacheKeyGenerator->expects($this->once())
             ->method('forChanneledEntity')
-            ->with(Channels::shopify->value, $entity, $id)
+            ->with(Channel::shopify->value, $entity, $id)
             ->willReturn($cacheKey);
 
         $this->cacheService->expects($this->once())
@@ -172,12 +172,12 @@ class ChanneledCrudControllerTest extends TestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            Channels::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true]
         ]);
 
         // Set channel config override
         $this->controller->setMockChannelsConfigOverride([
-            Channels::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true]
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method, $id);
@@ -205,12 +205,12 @@ class ChanneledCrudControllerTest extends TestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            Channels::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true]
         ]);
 
         // Set channel config override
         $this->controller->setMockChannelsConfigOverride([
-            Channels::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true]
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method);
@@ -231,7 +231,7 @@ class ChanneledCrudControllerTest extends TestCase
         $body = json_encode(['key' => 'value']);
         $params = ['extra' => 'param'];
         $repositoryClass = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $filters = (object) ['key' => 'value', 'channel' => $channel->value];
         $expected = [
             'extra' => 'param',
@@ -256,7 +256,7 @@ class ChanneledCrudControllerTest extends TestCase
     {
         $params = ['invalid' => 'param'];
         $repositoryClass = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
 
         $this->controller->setMockEntitiesConfig([
             'customer' => [
@@ -279,7 +279,7 @@ class ChanneledCrudControllerTest extends TestCase
     public function testReadReturnsCachedData(): void
     {
         $entity = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $id = $this->faker->randomNumber();
         $data = ['id' => $id, 'name' => $this->faker->word];
         $cacheKey = "channeled_entity_{$channel->value}_{$entity}_{$id}";
@@ -338,7 +338,7 @@ class ChanneledCrudControllerTest extends TestCase
     public function testReadHandlesException(): void
     {
         $entity = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $id = $this->faker->randomNumber();
         $exceptionMessage = 'Repository error';
         $cacheKey = "channeled_entity_{$channel->value}_{$entity}_{$id}";
@@ -397,7 +397,7 @@ class ChanneledCrudControllerTest extends TestCase
     public function testCountReturnsCount(): void
     {
         $entity = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $body = json_encode(['key' => 'value']);
         $params = [];
         $count = $this->faker->numberBetween(0, 100);
@@ -458,7 +458,7 @@ class ChanneledCrudControllerTest extends TestCase
     public function testListReturnsData(): void
     {
         $entity = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $body = json_encode(['key' => 'value']);
         $params = ['extra' => 'param'];
         $data = [['id' => 1, 'name' => $this->faker->word]];
@@ -528,7 +528,7 @@ class ChanneledCrudControllerTest extends TestCase
     public function testCreateReturnsCreatedEntity(): void
     {
         $entity = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $body = json_encode(['name' => $this->faker->word]);
         $data = ['id' => $this->faker->randomNumber(), 'name' => $this->faker->word, 'channel' => $channel->value];
         $id = $data['id'];
@@ -592,7 +592,7 @@ class ChanneledCrudControllerTest extends TestCase
     public function testCreateReturnsErrorForInvalidData(): void
     {
         $entity = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $body = json_encode(['name' => $this->faker->word]);
 
         // Mock repository
@@ -634,7 +634,7 @@ class ChanneledCrudControllerTest extends TestCase
     public function testUpdateReturnsUpdatedEntity(): void
     {
         $entity = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $id = $this->faker->randomNumber();
         $body = json_encode(['name' => $this->faker->word]);
         $data = ['id' => $id, 'name' => $this->faker->word, 'channel' => $channel->value];
@@ -694,7 +694,7 @@ class ChanneledCrudControllerTest extends TestCase
     public function testUpdateReturnsErrorForMissingId(): void
     {
         $entity = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $body = json_encode(['name' => $this->faker->word]);
 
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
@@ -721,7 +721,7 @@ class ChanneledCrudControllerTest extends TestCase
     public function testDeleteReturnsSuccess(): void
     {
         $entity = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $id = $this->faker->randomNumber();
 
         // Mock repository
@@ -766,7 +766,7 @@ class ChanneledCrudControllerTest extends TestCase
     public function testDeleteReturnsErrorForMissingId(): void
     {
         $entity = 'customer';
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
 
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
@@ -858,12 +858,12 @@ class ChanneledCrudControllerTest extends TestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            Channels::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true]
         ]);
 
         // Set channel config override
         $this->controller->setMockChannelsConfigOverride([
-            Channels::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true]
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method, $id);
@@ -989,7 +989,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         ?array $params,
         string $repositoryClass,
         ?string $body,
-        Channels $channel
+        Channel $channel
     ): array {
         if (!empty($params) && !$this->validateParams(array_keys($params), $repositoryClass, 'readMultiple')) {
             throw new InvalidArgumentException('Invalid parameters');
@@ -1004,7 +1004,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         return $params;
     }
 
-    public function read(string $entity, Channels $channel, ?int $id = null): Response
+    public function read(string $entity, Channel $channel, ?int $id = null): Response
     {
         try {
             if ($id === null) {
@@ -1039,7 +1039,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function count(string $entity, Channels $channel, ?string $body = null, ?array $params = null): Response
+    public function count(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
     {
         try {
             $repository = $this->getRepository($entity);
@@ -1079,7 +1079,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function list(string $entity, Channels $channel, ?string $body = null, ?array $params = null): Response
+    public function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
     {
         try {
             $repository = $this->getRepository($entity);
@@ -1119,7 +1119,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function create(string $entity, Channels $channel, ?string $body = null): Response
+    public function create(string $entity, Channel $channel, ?string $body = null): Response
     {
         try {
             $data = Helpers::bodyToObject($body);
@@ -1161,7 +1161,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function update(string $entity, Channels $channel, ?int $id = null, ?string $body = null): Response
+    public function update(string $entity, Channel $channel, ?int $id = null, ?string $body = null): Response
     {
         try {
             if (!$id) {
@@ -1208,7 +1208,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function delete(string $entity, Channels $channel, ?int $id = null): Response
+    public function delete(string $entity, Channel $channel, ?int $id = null): Response
     {
         try {
             if (!$id) {
@@ -1280,7 +1280,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
     {
         $channelsConfig = $this->getChannelsConfig();
         $validChannels = ['shopify', 'klaviyo', 'facebook', 'bigcommerce', 'netsuite', 'amazon'];
-        $channelEnum = Channels::tryFromName($channel);
+        $channelEnum = Channel::tryFromName($channel);
         if (!in_array($channel, $validChannels) || !$channelEnum || !isset($channelsConfig[$channelEnum->value])) {
             return $this->createResponse(
                 data: null,
@@ -1327,7 +1327,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
             );
         }
 
-        $channelEnum = Channels::tryFrom($channelValue);
+        $channelEnum = Channel::tryFrom($channelValue);
         if (!$channelEnum) {
             return $this->createResponse(
                 data: null,

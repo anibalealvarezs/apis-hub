@@ -208,11 +208,18 @@ class ChanneledOrder extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledDiscounts(): ?Collection
     {
         return $this->channeledDiscounts;
     }
 
+    /**
+     * @param ChanneledDiscount $channeledDiscount
+     * @return ChanneledOrder
+     */
     public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
         if ($this->channeledDiscounts->contains($channeledDiscount)) {
@@ -225,6 +232,10 @@ class ChanneledOrder extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledDiscounts
+     * @return ChanneledOrder
+     */
     public function addChanneledDiscounts(Collection $channeledDiscounts): self
     {
         foreach ($channeledDiscounts as $channeledDiscount) {
@@ -234,6 +245,10 @@ class ChanneledOrder extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @param ChanneledDiscount $channeledDiscount
+     * @return ChanneledOrder
+     */
     public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
         if (!$this->channeledDiscounts->contains($channeledDiscount)) {
@@ -251,6 +266,10 @@ class ChanneledOrder extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledDiscounts
+     * @return ChanneledOrder
+     */
     public function removeDiscounts(Collection $channeledDiscounts): self
     {
         foreach ($channeledDiscounts as $channeledDiscount) {
@@ -260,11 +279,18 @@ class ChanneledOrder extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return Order
+     */
     public function getOrder(): Order
     {
         return $this->order;
     }
 
+    /**
+     * @param Order|null $order
+     * @return ChanneledOrder
+     */
     public function addOrder(?Order $order): self
     {
         $this->order = $order;

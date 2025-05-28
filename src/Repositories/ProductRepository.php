@@ -7,7 +7,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 
 class ProductRepository extends BaseRepository
@@ -109,7 +109,7 @@ class ProductRepository extends BaseRepository
     protected function replaceChannelName(mixed $entity): mixed
     {
         $entity['channeledProducts'] = array_map(function ($channelProduct) {
-            $channelProduct['channel'] = Channels::from($channelProduct['channel'])->getName();
+            $channelProduct['channel'] = Channel::from($channelProduct['channel'])->getName();
             unset($channelProduct['channeledVendor']['channel']);
             $channelProduct['channeledProductCategories'] = array_map(function ($channeledProductCategory) {
                 unset($channeledProductCategory['channel']);

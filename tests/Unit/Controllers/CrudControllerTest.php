@@ -153,7 +153,7 @@ class CrudControllerTest extends TestCase
     {
         $body = json_encode(['key' => 'value']);
         $params = ['extra' => 'param'];
-        $repositoryClass = 'customer';
+        $entity = 'Customer';
         $filters = (object) ['key' => 'value'];
         $expected = [
             'extra' => 'param',
@@ -169,7 +169,7 @@ class CrudControllerTest extends TestCase
             ]
         ]);
 
-        $result = $this->controller->prepareReadMultipleParams($params, $repositoryClass, $body);
+        $result = $this->controller->prepareReadMultipleParams($params, $entity, $body);
 
         $this->assertEquals($expected, $result);
     }
@@ -180,7 +180,7 @@ class CrudControllerTest extends TestCase
     public function testPrepareReadMultipleParamsThrowsExceptionForInvalidParams(): void
     {
         $params = ['invalid' => 'param'];
-        $repositoryClass = 'customer';
+        $entity = 'Customer';
 
         $this->controller->setMockEntitiesConfig([
             'customer' => [
@@ -194,7 +194,7 @@ class CrudControllerTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid parameters');
 
-        $this->controller->prepareReadMultipleParams($params, $repositoryClass, null);
+        $this->controller->prepareReadMultipleParams($params, $entity, null);
     }
 
     /**
@@ -780,9 +780,9 @@ class ConcreteCrudController extends CrudController
         return empty(array_diff($params, $validParams));
     }
 
-    public function prepareReadMultipleParams(?array $params, string $repositoryClass, ?string $body): array
+    public function prepareReadMultipleParams(?array $params, string $entityName, ?string $body): array
     {
-        if (!empty($params) && !$this->validateParams(array_keys($params), $repositoryClass, 'readMultiple')) {
+        if (!empty($params) && !$this->validateParams(array_keys($params), $entityName, 'readMultiple')) {
             throw new InvalidArgumentException('Invalid parameters');
         }
 

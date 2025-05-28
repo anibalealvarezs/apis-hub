@@ -4,7 +4,7 @@ namespace Tests\Unit\Controllers;
 
 use Controllers\CacheController;
 use Doctrine\ORM\EntityManager;
-use Enums\Channels;
+use Enums\Channel;
 use Exception;
 use Faker\Factory;
 use Faker\Generator;
@@ -51,7 +51,7 @@ class CacheControllerTest extends TestCase
         $body = null;
         $params = ['key' => 'value'];
         $data = ['result' => $this->faker->word];
-        $channelEnum = Channels::shopify;
+        $channelEnum = Channel::shopify;
 
         // Mock entities config and channel
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
@@ -97,7 +97,7 @@ class CacheControllerTest extends TestCase
     public function testListReturnsSuccessResponse(): void
     {
         $entity = $this->faker->word;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $data = ['result' => $this->faker->word];
 
         $this->controller->setMockListData($data);
@@ -115,7 +115,7 @@ class CacheControllerTest extends TestCase
     public function testListHandlesException(): void
     {
         $entity = $this->faker->word;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $exceptionMessage = 'Fetch error';
 
         $this->controller->setMockListException(new Exception($exceptionMessage));
@@ -167,7 +167,7 @@ class CacheControllerTest extends TestCase
     public function testFetchDataReturnsDataForValidMethod(): void
     {
         $entity = $this->faker->word;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $params = ['key' => 'value'];
         $body = json_encode(['filters' => ['a' => 'b']]);
         $data = ['result' => $this->faker->word];
@@ -195,7 +195,7 @@ class CacheControllerTest extends TestCase
     public function testFetchDataReturnsErrorResponseForInvalidMethod(): void
     {
         $entity = $this->faker->word;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $requestsClassName = '\Classes\Requests\SomeClass';
         $methodName = 'getListFrom' . $channel->getCommonName();
 
@@ -218,7 +218,7 @@ class CacheControllerTest extends TestCase
     public function testFetchDataReturnsErrorResponseForInvalidParameters(): void
     {
         $entity = $this->faker->word;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $params = ['invalid' => 'param'];
         $requestsClassName = '\Classes\Requests\SomeClass';
         $methodName = 'getListFrom' . $channel->getCommonName();
@@ -288,7 +288,7 @@ class ConcreteCacheController extends CacheController
         ];
     }
 
-    public function setMockChannel(string $channelName, Channels $channelEnum): void
+    public function setMockChannel(string $channelName, Channel $channelEnum): void
     {
         $this->mockChannels[$channelName] = $channelEnum;
     }
@@ -314,7 +314,7 @@ class ConcreteCacheController extends CacheController
             );
         }
 
-        $channelEnum = $this->mockChannels[$channel] ?? Channels::shopify; // Default for tests
+        $channelEnum = $this->mockChannels[$channel] ?? Channel::shopify; // Default for tests
         return $this->list($entity, $channelEnum, $body, $params);
     }
 
@@ -328,7 +328,7 @@ class ConcreteCacheController extends CacheController
         return parent::prepareAnalyticsParams($params, $body);
     }
 
-    public function list(string $entity, Channels $channel, ?string $body = null, ?array $params = null): Response
+    public function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
     {
         if ($this->mockListException) {
             return $this->createResponse(
@@ -355,7 +355,7 @@ class ConcreteCacheController extends CacheController
         return $this->mockEntityClassNames[$entity] ?? 'SomeRequestsClass';
     }
 
-    public function fetchData(string $entity, Channels $channel, ?array $params, ?string $body): mixed
+    public function fetchData(string $entity, Channel $channel, ?array $params, ?string $body): mixed
     {
         if (empty($this->mockFetchData)) {
             return parent::fetchData($entity, $channel, $params, $body);

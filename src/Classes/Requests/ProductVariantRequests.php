@@ -5,6 +5,7 @@ namespace Classes\Requests;
 use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
 use Classes\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
+use Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -12,6 +13,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ProductVariantRequests implements RequestInterface
 {
+    /**
+     * @return Channel[]
+     */
+    public static function supportedChannels(): array
+    {
+        return [
+            Channel::shopify->value,
+            Channel::klaviyo->value,
+            Channel::bigcommerce->value,
+            Channel::netsuite->value,
+            Channel::amazon->value,
+        ];
+    }
+
     /**
      * @param int $limit
      * @param int $pagination

@@ -42,13 +42,13 @@ abstract class BaseController
 
     protected function validateParams(array $params, string $entity, string $method): bool
     {
-        $config = Helpers::getEntitiesConfig()[strtolower($entity)] ?? null;
+        $config = Helpers::getEntitiesConfig()[Helpers::toSnakeCase($entity)] ?? null;
         if (!$config || empty($config['repository_methods'][$method]['parameters'])) {
             return false;
         }
 
         $validParams = $config['repository_methods'][$method]['parameters'];
-        return empty(array_diff($params, $validParams));
+        return empty(array_diff($params, $validParams)) || empty($params);
     }
 
     /**

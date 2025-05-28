@@ -7,10 +7,12 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
+use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Entity;
 use Enums\QueryBuilderType;
+use Exception;
 use Helpers\Helpers;
 use ReflectionException;
 use stdClass;
@@ -20,6 +22,7 @@ class BaseRepository extends EntityRepository
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
+     * @throws Exception
      */
     protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
@@ -29,6 +32,7 @@ class BaseRepository extends EntityRepository
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
+     * @throws Exception
      */
     protected function createBaseQueryBuilderNoJoins(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
@@ -36,6 +40,7 @@ class BaseRepository extends EntityRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => throw new Exception('To be implemented'),
         };
 
         return $query->from($this->getEntityName(), 'e');
@@ -48,27 +53,43 @@ class BaseRepository extends EntityRepository
      * @throws MappingException
      * @throws NonUniqueResultException
      * @throws ReflectionException
+     * @throws OptimisticLockException
      */
     public function create(stdClass $data = null, bool $returnEntity = false): Entity|array|null
     {
-        $entityName = $this->getEntityName();
-        $entity = new $entityName();
+        $retryCount = 0;
+        $maxRetries = 3;
+        while ($retryCount < $maxRetries) {
+            try {
+                $entityName = $this->getEntityName();
+                $entity = new $entityName();
 
-        if ((array) $data) {
-            foreach ($data as $key => $value) {
-                if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
-                    $entity->{'add' . Helpers::toCamelcase($key)}($value);
+                if ((array) $data) {
+                    foreach ($data as $key => $value) {
+                        if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
+                            $entity->{'add' . Helpers::toCamelcase($key, true)}($value);
+                        }
+                    }
                 }
+
+                $this->getEntityManager()->persist($entity);
+                $this->getEntityManager()->flush();
+
+                return $this->read(
+                    id: $entity->getId(),
+                    returnEntity: $returnEntity,
+                );
+            } catch (OptimisticLockException $e) {
+                if ($retryCount < $maxRetries - 1) {
+                    $retryCount++;
+                    usleep(100000 * $retryCount); // Backoff: 100ms, 200ms, 300ms
+                    continue;
+                }
+                error_log("BaseRepository::create failed after $maxRetries retries: {$e->getMessage()}");
+                throw $e;
             }
         }
-
-        $this->_em->persist($entity);
-        $this->_em->flush();
-
-        return $this->read(
-            id: $entity->getId(),
-            returnEntity: $returnEntity,
-        );
+        return null;
     }
 
     /**
@@ -77,6 +98,7 @@ class BaseRepository extends EntityRepository
      * @param object|null $filters
      * @return Entity|array|null
      * @throws NonUniqueResultException
+     * @throws Exception
      */
     public function read(int $id, bool $returnEntity = false, ?object $filters = null): Entity|array|null
     {
@@ -101,6 +123,7 @@ class BaseRepository extends EntityRepository
      * @param int $id
      * @param object|null $filters
      * @return QueryBuilder
+     * @throws Exception
      */
     protected function buildReadQuery(int $id, ?object $filters = null): QueryBuilder
     {
@@ -156,6 +179,7 @@ class BaseRepository extends EntityRepository
      * @param string $orderBy
      * @param string $orderDir
      * @return ArrayCollection
+     * @throws Exception
      */
     public function readMultiple(
         int $limit = 100,
@@ -193,6 +217,7 @@ class BaseRepository extends EntityRepository
      * @param int $limit
      * @param int $pagination
      * @return QueryBuilder
+     * @throws Exception
      */
     protected function buildReadMultipleQuery(
         ?array $ids,

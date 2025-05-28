@@ -7,8 +7,9 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
+use Exception;
 use ReflectionException;
 use Entities\Entity;
 use stdClass;
@@ -18,6 +19,7 @@ class CustomerRepository extends BaseRepository
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
+     * @throws Exception
      */
     protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
@@ -25,6 +27,7 @@ class CustomerRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => throw new Exception('To be implemented'),
         };
 
         return $query->addSelect('c')
@@ -93,7 +96,7 @@ class CustomerRepository extends BaseRepository
     protected function replaceChannelName(array $entity): array
     {
         $entity['channeledCustomers'] = array_map(function($channelCustomer) {
-            $channelCustomer['channel'] = Channels::from($channelCustomer['channel'])->getName();
+            $channelCustomer['channel'] = Channel::from($channelCustomer['channel'])->getName();
             return $channelCustomer;
         }, $entity['channeledCustomers']);
         return $entity;

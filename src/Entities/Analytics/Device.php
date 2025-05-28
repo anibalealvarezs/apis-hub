@@ -1,0 +1,38 @@
+<?php
+
+namespace Entities\Analytics;
+
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\ORM\Mapping as ORM;
+use Entities\Entity;
+use Enums\Device as DeviceEnum;
+
+#[ORM\Entity]
+#[ORM\Table(name: 'devices')]
+#[ORM\UniqueConstraint(name: 'device_type_unique', columns: ['type'])]
+#[ORM\HasLifecycleCallbacks]
+class Device extends Entity
+{
+    #[ORM\Column(type: 'string', enumType: DeviceEnum::class)]
+    protected DeviceEnum $type;
+
+    #[ORM\OneToMany(mappedBy: 'query', targetEntity: Metric::class, orphanRemoval: true)]
+    protected Collection $metrics;
+
+    public function __construct()
+    {
+        $this->metrics = new ArrayCollection();
+    }
+
+    public function addType(DeviceEnum $type): self
+    {
+        $this->type = $type;
+        return $this;
+    }
+
+    public function getType(): DeviceEnum
+    {
+        return $this->type;
+    }
+}

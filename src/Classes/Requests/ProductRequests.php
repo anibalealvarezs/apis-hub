@@ -2,8 +2,8 @@
 
 namespace Classes\Requests;
 
-use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
 use Classes\Conversions\NetSuiteConvert;
+use Classes\Overrides\KlaviyoApi\KlaviyoApi;
 use Classes\Overrides\NetSuiteApi\NetSuiteApi;
 use Classes\Overrides\ShopifyApi\ShopifyApi;
 use Classes\Conversions\KlaviyoConvert;
@@ -23,7 +23,7 @@ use Entities\Analytics\Product;
 use Entities\Analytics\ProductCategory;
 use Entities\Analytics\ProductVariant;
 use Entities\Analytics\Vendor;
-use Enums\Channels;
+use Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -32,6 +32,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ProductRequests implements RequestInterface
 {
+    /**
+     * @return Channel[]
+     */
+    public static function supportedChannels(): array
+    {
+        return [
+            Channel::shopify->value,
+            Channel::klaviyo->value,
+            Channel::bigcommerce->value,
+            Channel::netsuite->value,
+            Channel::amazon->value,
+        ];
+    }
+
     /**
      * @param string|null $createdAtMin
      * @param string|null $createdAtMax
@@ -56,7 +70,7 @@ class ProductRequests implements RequestInterface
 
         $manager = Helpers::getManager();
         $channeledProductRepository = $manager->getRepository(entityName: ChanneledProduct::class);
-        $lastChanneledProduct = $channeledProductRepository->getLastByPlatformId(channel: Channels::shopify->value);
+        $lastChanneledProduct = $channeledProductRepository->getLastByPlatformId(channel: Channel::shopify->value);
 
         $shopifyClient->getAllProductsAndProcess(
             collectionId: $collectionId,
@@ -89,9 +103,6 @@ class ProductRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      * @throws GuzzleException
-     * @throws NotSupported
-     * @throws ORMException
-     * @throws OptimisticLockException
      */
     public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true): Response
     {
@@ -99,6 +110,7 @@ class ProductRequests implements RequestInterface
         $klaviyoClient = new KlaviyoApi(
             apiKey: $config['klaviyo_api_key'],
         );
+
         $formattedFilters = [];
         if ($filters) {
             foreach ($filters as $key => $value) {
@@ -109,11 +121,16 @@ class ProductRequests implements RequestInterface
                 ];
             }
         }
-        $sourceProducts = $klaviyoClient->getAllCatalogItems(
+
+        $klaviyoClient->getAllCatalogItemsAndProcess(
             catalogItemsFields: $fields,
             filter: $formattedFilters,
+            callback: function ($products) {
+                self::process(KlaviyoConvert::products($products));
+            }
         );
-        return self::process(KlaviyoConvert::products($sourceProducts['data']));
+
+        return new Response(json_encode(['Products retrieved']));
     }
 
     /**
@@ -148,7 +165,7 @@ class ProductRequests implements RequestInterface
 
         $manager = Helpers::getManager();
         $channeledProductRepository = $manager->getRepository(entityName: ChanneledProduct::class);
-        $lastChanneledProduct = $channeledProductRepository->getLastByPlatformId(channel: Channels::netsuite->value);
+        $lastChanneledProduct = $channeledProductRepository->getLastByPlatformId(channel: Channel::netsuite->value);
 
         $query = "SELECT
                 Item.*,
@@ -396,9 +413,8 @@ class ProductRequests implements RequestInterface
      */
     private static function getOrCreateProduct(object $channeledProduct, EntityRepository $repository): Product
     {
-        return $repository->existsByProductId(productId: $channeledProduct->platformId)
-            ? $repository->getByProductId(productId: $channeledProduct->platformId)
-            : $repository->create(
+        return $repository->getByProductId(productId: $channeledProduct->platformId)
+            ?? $repository->create(
                 data: (object) [
                     'productId' => $channeledProduct->platformId,
                     'sku' => $channeledProduct->sku,
@@ -414,9 +430,8 @@ class ProductRequests implements RequestInterface
      */
     private static function getOrCreateChanneledProduct(object $channeledProduct, EntityRepository $repository): ChanneledProduct
     {
-        return $repository->existsByPlatformId(platformId: $channeledProduct->platformId, channel: $channeledProduct->channel)
-            ? $repository->getByPlatformId(platformId: $channeledProduct->platformId, channel: $channeledProduct->channel)
-            : $repository->create(
+        return $repository->getByPlatformId(platformId: $channeledProduct->platformId, channel: $channeledProduct->channel)
+            ?? $repository->create(
                 data: $channeledProduct,
                 returnEntity: true
             );
@@ -457,16 +472,14 @@ class ProductRequests implements RequestInterface
             return ['vendorNames' => [], 'channeledVendorNames' => []];
         }
 
-        $vendorEntity = $vendorRepository->existsByName(name: $channeledProduct->vendor->name)
-            ? $vendorRepository->getByName(name: $channeledProduct->vendor->name)
-            : $vendorRepository->create(
+        $vendorEntity = $vendorRepository->getByName(name: $channeledProduct->vendor->name)
+            ?? $vendorRepository->create(
                 data: (object) ['name' => $channeledProduct->vendor->name],
                 returnEntity: true
             );
 
-        $channeledVendorEntity = $channeledVendorRepository->existsByName(name: $channeledProduct->vendor->name, channel: $channeledProduct->channel)
-            ? $channeledVendorRepository->getByName(name: $channeledProduct->vendor->name, channel: $channeledProduct->channel)
-            : $channeledVendorRepository->create(
+        $channeledVendorEntity = $channeledVendorRepository->getByName(name: $channeledProduct->vendor->name, channel: $channeledProduct->channel)
+            ?? $channeledVendorRepository->create(
                 data: $channeledProduct->vendor,
                 returnEntity: true
             );
@@ -511,9 +524,8 @@ class ProductRequests implements RequestInterface
         $channeledProductVariantIds = [];
 
         foreach ($variants as $productVariant) {
-            $productVariantEntity = $productVariantRepository->existsByProductVariantId(productVariantId: $productVariant->platformId)
-                ? $productVariantRepository->getByProductVariantId(productVariantId: $productVariant->platformId)
-                : $productVariantRepository->create(
+            $productVariantEntity = $productVariantRepository->getByProductVariantId(productVariantId: $productVariant->platformId)
+                ?? $productVariantRepository->create(
                     data: (object) [
                         'productVariantId' => $productVariant->platformId,
                         'sku' => $productVariant->sku,
@@ -521,9 +533,8 @@ class ProductRequests implements RequestInterface
                     returnEntity: true
                 );
 
-            $channeledProductVariantEntity = $channeledProductVariantRepository->existsByPlatformId(platformId: $productVariant->platformId, channel: $channeledProductEntity->getChannel())
-                ? $channeledProductVariantRepository->getByPlatformId(platformId: $productVariant->platformId, channel: $channeledProductEntity->getChannel())
-                : $channeledProductVariantRepository->create(
+            $channeledProductVariantEntity = $channeledProductVariantRepository->getByPlatformId(platformId: $productVariant->platformId, channel: $channeledProductEntity->getChannel())
+                ?? $channeledProductVariantRepository->create(
                     data: $productVariant,
                     returnEntity: true
                 );
@@ -577,9 +588,8 @@ class ProductRequests implements RequestInterface
         $channeledProductCategoryIds = [];
 
         foreach ($categories as $category) {
-            $productCategoryEntity = $productCategoryRepository->existsByProductCategoryId(productCategoryId: $category->platformId)
-                ? $productCategoryRepository->getByProductCategoryId(productCategoryId: $category->platformId)
-                : $productCategoryRepository->create(
+            $productCategoryEntity = $productCategoryRepository->getByProductCategoryId(productCategoryId: $category->platformId)
+                ?? $productCategoryRepository->create(
                     data: (object) [
                         'productCategoryId' => $category->platformId,
                         'isSmartCollection' => $category->isSmartCollection,
@@ -587,9 +597,8 @@ class ProductRequests implements RequestInterface
                     returnEntity: true
                 );
 
-            $channeledProductCategoryEntity = $channeledProductCategoryRepository->existsByPlatformId(platformId: $category->platformId, channel: $channeledProductEntity->getChannel())
-                ? $channeledProductCategoryRepository->getByPlatformId(platformId: $category->platformId, channel: $channeledProductEntity->getChannel())
-                : $channeledProductCategoryRepository->create(
+            $channeledProductCategoryEntity = $channeledProductCategoryRepository->getByPlatformId(platformId: $category->platformId, channel: $channeledProductEntity->getChannel())
+                ?? $channeledProductCategoryRepository->create(
                     data: $category,
                     returnEntity: true
                 );

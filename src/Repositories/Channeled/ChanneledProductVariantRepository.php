@@ -7,14 +7,16 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
+use Exception;
 
 class ChanneledProductVariantRepository extends ChanneledBaseRepository
 {
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
+     * @throws Exception
      */
     protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
@@ -23,6 +25,7 @@ class ChanneledProductVariantRepository extends ChanneledBaseRepository
             QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
             QueryBuilderType::LAST => $query->select('e, LENGTH(e.platformId) AS HIDDEN length'),
+            QueryBuilderType::CUSTOM => null
         };
 
         return $query
@@ -78,7 +81,7 @@ class ChanneledProductVariantRepository extends ChanneledBaseRepository
      */
     protected function replaceChannelName(array $entity): array
     {
-        $entity['channel'] = Channels::from($entity['channel'])->getName();
+        $entity['channel'] = Channel::from($entity['channel'])->getName();
         unset($entity['channeledProduct']['channel']);
         unset($entity['channeledProduct']['channeledVendor']['channel']);
         $entity['channeledProduct']['channeledProductCategories'] = array_map(function($channeledProductCategory) {

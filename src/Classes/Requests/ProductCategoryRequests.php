@@ -16,7 +16,7 @@ use Doctrine\ORM\OptimisticLockException;
 use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductCategory;
 use Entities\Analytics\ProductCategory;
-use Enums\Channels;
+use Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -25,6 +25,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ProductCategoryRequests implements RequestInterface
 {
+    /**
+     * @return Channel[]
+     */
+    public static function supportedChannels(): array
+    {
+        return [
+            Channel::shopify->value,
+            Channel::klaviyo->value,
+            Channel::bigcommerce->value,
+            Channel::netsuite->value,
+            Channel::amazon->value,
+        ];
+    }
+
     /**
      * @param string|null $publishedAtMin
      * @param string|null $publishedAtMax
@@ -124,7 +138,7 @@ class ProductCategoryRequests implements RequestInterface
 
         $manager = Helpers::getManager();
         $channeledProductCategoryRepository = $manager->getRepository(entityName: ChanneledProductCategory::class);
-        $lastChanneledProductCategory = $channeledProductCategoryRepository->getLastByPlatformId(channel: Channels::netsuite->value);
+        $lastChanneledProductCategory = $channeledProductCategoryRepository->getLastByPlatformId(channel: Channel::netsuite->value);
 
         $query = "SELECT * FROM CommerceCategory WHERE id >= " . (isset($lastChanneledProductCategory['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledProductCategory['platformId'] : 0) . " ORDER BY id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
@@ -256,9 +270,8 @@ class ProductCategoryRequests implements RequestInterface
      */
     private static function getOrCreateProductCategory(object $productCategory, EntityRepository $repository): ProductCategory
     {
-        return $repository->existsByProductCategoryId(productCategoryId: $productCategory->platformId)
-            ? $repository->getByProductCategoryId(productCategoryId: $productCategory->platformId)
-            : $repository->create(
+        return $repository->getByProductCategoryId(productCategoryId: $productCategory->platformId)
+            ?? $repository->create(
                 data: (object) [
                     'productCategoryId' => $productCategory->platformId,
                     'isSmartCollection' => $productCategory->isSmartCollection,
@@ -274,9 +287,8 @@ class ProductCategoryRequests implements RequestInterface
      */
     private static function getOrCreateChanneledProductCategory(object $productCategory, EntityRepository $repository): ChanneledProductCategory
     {
-        return $repository->existsByPlatformId(platformId: $productCategory->platformId, channel: $productCategory->channel)
-            ? $repository->getByPlatformId(platformId: $productCategory->platformId, channel: $productCategory->channel)
-            : $repository->create(
+        return $repository->getByPlatformId(platformId: $productCategory->platformId, channel: $productCategory->channel)
+            ?? $repository->create(
                 data: $productCategory,
                 returnEntity: true
             );
@@ -318,9 +330,8 @@ class ProductCategoryRequests implements RequestInterface
         $collectedProductIds = [];
 
         foreach ($productIds as $productId) {
-            $channeledProductEntity = $repository->existsByPlatformId(platformId: $productId, channel: $channel)
-                ? $repository->getByPlatformId(platformId: $productId, channel: $channel)
-                : $repository->create(
+            $channeledProductEntity = $repository->getByPlatformId(platformId: $productId, channel: $channel)
+                ?? $repository->create(
                     data: (object) [
                         'channel' => $channel,
                         'platformId' => $productId,

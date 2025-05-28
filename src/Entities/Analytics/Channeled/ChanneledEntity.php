@@ -7,6 +7,7 @@ use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Interfaces\ChannelInterface;
 
+#[ORM\MappedSuperclass]
 class ChanneledEntity extends Entity implements ChannelInterface
 {
     #[ORM\Column(type: 'string')]
@@ -15,11 +16,11 @@ class ChanneledEntity extends Entity implements ChannelInterface
     #[ORM\Column(type: 'integer')]
     protected int $channel;
 
-    #[ORM\Column(type: 'json')]
-    protected array $data;
+    #[ORM\Column(type: 'json', nullable: true)]
+    protected ?array $data = null;
 
-    #[ORM\Column(type: 'datetime', nullable: true)]
-    protected ?DateTime $platformCreatedAt;
+    #[ORM\Column(type: 'datetime')]
+    protected DateTime $platformCreatedAt;
 
     /**
      * @return int|string
@@ -36,33 +37,31 @@ class ChanneledEntity extends Entity implements ChannelInterface
     public function addPlatformId(int|string $platformId): self
     {
         $this->platformId = $platformId;
-
         return $this;
     }
 
     /**
-     * @return DateTime|null
+     * @return DateTime
      */
-    public function getPlatformCreatedAt(): ?DateTime
+    public function getPlatformCreatedAt(): DateTime
     {
         return $this->platformCreatedAt;
     }
 
     /**
-     * @param DateTime|null $platformCreatedAt
+     * @param DateTime $platformCreatedAt
      * @return ChanneledEntity
      */
-    public function addPlatformCreatedAt(?DateTime $platformCreatedAt): self
+    public function addPlatformCreatedAt(DateTime $platformCreatedAt): self
     {
         $this->platformCreatedAt = $platformCreatedAt;
-
         return $this;
     }
 
     /**
-     * @return string
+     * @return int
      */
-    public function getChannel(): string
+    public function getChannel(): int
     {
         return $this->channel;
     }
@@ -74,25 +73,24 @@ class ChanneledEntity extends Entity implements ChannelInterface
     public function addChannel(int $channel): self
     {
         $this->channel = $channel;
-
         return $this;
     }
 
     /**
-     * @return array
+     * @return array|null
      */
-    public function getData(): array
+    public function getData(): ?array
     {
         return $this->data;
     }
 
     /**
-     * @param mixed $data
+     * @param array|null $data
+     * @return ChanneledEntity
      */
-    public function addData(array $data): self
+    public function addData(?array $data): self
     {
         $this->data = $data;
-
         return $this;
     }
 }

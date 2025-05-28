@@ -128,11 +128,18 @@ class ChanneledProductVariant extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return ChanneledProduct
+     */
     public function getChanneledProduct(): ChanneledProduct
     {
         return $this->channeledProduct;
     }
 
+    /**
+     * @param ChanneledProduct|null $channeledProduct
+     * @return ChanneledProductVariant
+     */
     public function addChanneledProduct(?ChanneledProduct $channeledProduct): self
     {
         $this->channeledProduct = $channeledProduct;
@@ -140,11 +147,18 @@ class ChanneledProductVariant extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return ProductVariant
+     */
     public function getProductVariant(): ProductVariant
     {
         return $this->productVariant;
     }
 
+    /**
+     * @param ProductVariant|null $productVariant
+     * @return ChanneledProductVariant
+     */
     public function addProductVariant(?ProductVariant $productVariant): self
     {
         $this->productVariant = $productVariant;
