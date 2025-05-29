@@ -246,408 +246,963 @@ class MetricRequests implements RequestInterface
      */
     public static function getListFromGoogleSearchConsole(
         string $startDate = null,
-        string $endDate = null,
-        object $filters = null,
+        ?string $endDate = null,
+        ?object $filters = null,
         string|bool $resume = true,
-        LoggerInterface $logger = null
+        ?LoggerInterface $logger = null
     ): Response {
         if (!$logger) {
             $logger = new Logger('gsc');
             $logger->pushHandler(new StreamHandler('logs/gsc.log', Level::Info));
         }
 
-        $logger->info("Starting getListFromGoogleSearchConsole: startDate=" . $startDate . ", endDate=" . $endDate . ", resume=" . $resume);
+        $logger->info("Starting getListFromGoogleSearchConsole: startDate=$startDate, endDate=$endDate, resume=$resume");
         $manager = Helpers::getManager();
         try {
             // Validate configuration
-            $config = Helpers::getChannelsConfig()['google'] ?? null;
-            if (!$config) {
-                throw new Exception("Missing 'google' configuration in channels config");
-            }
-            $scConfig = Helpers::getChannelsConfig()['google_search_console'] ?? null;
-            if (!$scConfig) {
-                throw new Exception("Missing 'google_search_console' configuration in channels config");
-            }
-            $bypassTargetKeywords = $scConfig['bypass_target_keywords'] ?? false;
-            $rowLimit = $scConfig['rowLimit'] ?? 25000;
-            $logger->info("Config: bypassTargetKeywords=" . ($bypassTargetKeywords ? 'true' : 'false') . ", rowLimit=$rowLimit");
-            $logger->info("Loaded GSC config: sites=" . count($scConfig['sites']));
+            $config = self::validateGoogleConfig($logger);
 
-            // Initialize API with retry for transient errors
-            $maxApiRetries = 3;
-            $apiRetryCount = 0;
-            $api = null;
-            while ($apiRetryCount < $maxApiRetries) {
-                try {
-                    $api = new SearchConsoleApi(
-                        redirectUrl: $config['redirect_uri'] ?? '',
-                        clientId: $config['client_id'] ?? '',
-                        clientSecret: $config['client_secret'] ?? '',
-                        refreshToken: $config['refresh_token'] ?? '',
-                        userId: $config['user_id'] ?? '',
-                        scopes: [$scConfig['scope'] ?? ''],
-                        token: $scConfig['token'] ?? ''
-                    );
-                    $logger->info("Initialized SearchConsoleApi");
-                    break;
-                } catch (Exception $e) {
-                    $apiRetryCount++;
-                    if ($apiRetryCount >= $maxApiRetries) {
-                        throw new Exception("Failed to initialize SearchConsoleApi after $maxApiRetries retries: " . $e->getMessage());
-                    }
-                    $logger->warning("SearchConsoleApi initialization failed, retry $apiRetryCount/$maxApiRetries: " . $e->getMessage());
-                    usleep(100000 * $apiRetryCount);
-                }
-            }
+            // Initialize API client
+            $api = self::initializeSearchConsoleApi($config, $logger);
 
+            // Initialize repositories and settings
             $channeledMetricRepository = $manager->getRepository(ChanneledMetric::class);
             $pageRepository = $manager->getRepository(Page::class);
             $countryRepository = $manager->getRepository(Country::class);
             $deviceRepository = $manager->getRepository(Device::class);
-            $metricNames = $filters->metricNames ?? ($scConfig['metrics'] ?? ['clicks', 'impressions', 'ctr', 'position']);
+            $metricNames = $filters->metricNames ?? ($config['google_search_console']['metrics'] ?? ['clicks', 'impressions', 'ctr', 'position']);
             $dimensions = $filters->dimensions ?? ['date', 'query', 'page', 'country', 'device'];
             $batchSize = 500;
 
-            $logger->info("Initialized repositories, dimensions=" . implode(',', $dimensions) . ", metricNames=" . json_encode($metricNames) . ", batchSize=" . $batchSize);
+            $logger->info("Initialized repositories, dimensions=" . implode(',', $dimensions) . ", metricNames=" . json_encode($metricNames) . ", batchSize=$batchSize");
             $logger->warning("Note: 'searchAppearance' is not included in dimensions due to GSC API restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
 
-            // Start single transaction
+            // Start transaction
             $manager->getConnection()->beginTransaction();
             $logger->info("Started transaction");
 
             $createdPages = [];
-            $counter = 0;
             $totalMetrics = 0;
             $totalRows = 0;
             $totalDuplicates = 0;
-            foreach ($scConfig['sites'] as $site) {
+            $counter = 0;
+
+            foreach ($config['google_search_console']['sites'] as $site) {
                 if ($counter >= 1) {
                     $logger->info("Stopping after first site for testing");
-                    break; // Limit to one site for testing
+                    break;
                 }
-                $siteUrl = $site['url'];
-                $siteKey = str_replace(['https://', 'sc-domain:', '/'], '', $siteUrl);
-                $title = $site['title'] ?? $siteUrl;
-                $hostname = $site['hostname'] ?? parse_url($siteUrl, PHP_URL_HOST) ?? str_replace('sc-domain:', '', $siteUrl);
-
-                $normalizedSiteUrl = rtrim($siteUrl, '/');
-                $logger->info("Processing site: " . $siteUrl . ", normalized: " . $normalizedSiteUrl . ", siteKey=" . $siteKey);
-
-                $pageEntity = $pageRepository->findOneBy(['url' => $normalizedSiteUrl]);
-                if (!$pageEntity) {
-                    $logger->error("Page entity not found for URL=" . $normalizedSiteUrl . ". Run app:initialize-entities command.");
-                    throw new Exception("Page entity not found for URL=" . $normalizedSiteUrl);
-                }
-                $logger->info("Found Page: ID=" . $pageEntity->getId() . ", URL=" . $normalizedSiteUrl);
-
-                // Update title/hostname if changed (optional, for consistency)
-                if ($pageEntity->getTitle() !== $title || $pageEntity->getHostname() !== $hostname) {
-                    $pageEntity->addTitle($title)
-                        ->addHostname($hostname)
-                        ->addUpdatedAt(new DateTime());
-                    $manager->persist($pageEntity);
-                    $logger->info("Updated Page entity: ID=" . $pageEntity->getId() . ", URL=" . $normalizedSiteUrl);
-                }
-
-                $lastChanneledMetric = $channeledMetricRepository->getLastByPlatformCreatedAtForSite(
-                    Channel::google_search_console->value,
-                    $siteKey
+                $result = self::processSite(
+                    $site,
+                    $startDate,
+                    $endDate,
+                    $resume,
+                    $api,
+                    $manager,
+                    $channeledMetricRepository,
+                    $pageRepository,
+                    $countryRepository,
+                    $deviceRepository,
+                    $metricNames,
+                    $dimensions,
+                    $batchSize,
+                    $filters,
+                    $logger,
+                    $createdPages,
+                    $totalMetrics,
+                    $totalRows,
+                    $totalDuplicates
                 );
-                $logger->info("Last channeled metric: " . ($lastChanneledMetric ? json_encode($lastChanneledMetric) : 'none'));
-
-                $origin = Carbon::parse("2000-01-01");
-                $now = Carbon::now();
-                $min = $startDate ? Carbon::parse($startDate) : (
-                $lastChanneledMetric && filter_var($resume, FILTER_VALIDATE_BOOLEAN)
-                    ? Carbon::parse($lastChanneledMetric['platformCreatedAt'])
-                    : $origin
-                );
-                $max = $endDate ? Carbon::parse($endDate) : null;
-                $from = $origin->format('Y-m-d');
-                if ($min->lte($now) && $min->gte($origin) && (!$max || $min->lt($max))) {
-                    $from = $min->format('Y-m-d');
-                }
-                $to = $max->lte($now) ? $max->format('Y-m-d') : $now->format('Y-m-d');
-                $logger->info("Date range: from=" . $from . ", to=" . $to);
-
-                $targetKeywords = $site['target_keywords'] ?? [];
-                $targetCountries = $site['target_countries'] ?? [];
-                $dimensionFilterGroups = self::getDimensionFilterGroups($filters, $site);
-                $logger->info("Target keywords: " . implode(',', $targetKeywords) . ", countries: " . implode(',', $targetCountries));
-
-                $batch = new ArrayCollection();
-                $loopCount = 0;
-                $entitiesToInvalidate = ['metric' => [], 'channeledMetric' => [], 'query' => []];
-                // Initialize caches once per site
-                $queryCache = [];
-                $metricCache = [];
-                $channeledMetricCache = [];
-                $dimensionCache = [];
-                $startTime = microtime(true);
-
-                // Split into daily requests
-                $period = Carbon::parse($from)->toPeriod($to, '1 day');
-                foreach ($period as $day) {
-                    $dayStr = $day->format('Y-m-d');
-                    $logger->info("Processing GSC data for site " . $siteUrl . ", date " . $dayStr);
-
-                    try {
-                        $api->getAllSearchQueryResultsAndProcess(
-                            siteUrl: $siteUrl,
-                            startDate: $dayStr,
-                            endDate: $dayStr,
-                            rowLimit: $rowLimit,
-                            dimensions: $dimensions,
-                            dimensionFilterGroups: $dimensionFilterGroups,
-                            callback: function ($rows) use ($siteUrl, $siteKey, $metricNames, &$batch, $batchSize, $targetKeywords, $targetCountries, &$loopCount, &$totalMetrics, &$totalRows, &$entitiesToInvalidate, &$queryCache, &$metricCache, &$channeledMetricCache, &$dimensionCache, $logger, $manager, $pageEntity, $countryRepository, $deviceRepository, &$totalDuplicates) {
-                                try {
-                                    $loopStart = microtime(true);
-                                    $loopCount++;
-                                    $totalRows += count($rows);
-                                    $logger->info("Processing API callback loop " . $loopCount . ", rows=" . count($rows) . ", totalRows=" . $totalRows);
-                                    $logger->debug("Raw API rows: " . json_encode(array_slice($rows, 0, 5))); // Log first 5 rows
-
-                                    $pageMetrics = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, $siteKey, $targetKeywords, $targetCountries, $logger, $pageEntity, $manager);
-                                    $logger->info("Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, first metric: " . (count($pageMetrics) > 0 ? json_encode(['name' => $pageMetrics[0]->name, 'query' => is_string($pageMetrics[0]->query) ? $pageMetrics[0]->query : ($pageMetrics[0]->query instanceof Query ? $pageMetrics[0]->query->getQuery() : 'none')]) : 'none'));
-
-                                    // Check for duplicate metrics in pageMetrics
-                                    $metricKeys = [];
-                                    $queuedMetrics = 0;
-                                    $filteredMetrics = 0;
-                                    $skippedMetrics = 0;
-                                    foreach ($pageMetrics as $index => $metric) {
-                                        $queryStr = is_string($metric->query) ? $metric->query : ($metric->query instanceof Query ? $metric->query->getQuery() : 'none');
-                                        $metricKey = md5(json_encode([
-                                            'channel' => $metric->channel,
-                                            'name' => $metric->name,
-                                            'period' => $metric->period,
-                                            'metricDate' => $metric->metricDate->format('Y-m-d'),
-                                            'query' => $queryStr,
-                                            'pageId' => $pageEntity?->getId(),
-                                            'pageUrl' => $dimensions['page'] ?? 'none',
-                                            'countryCode' => $metric->countryCode,
-                                            'deviceType' => $metric->deviceType,
-                                            'dimensions' => $dimensions ?? [],
-                                        ], JSON_UNESCAPED_UNICODE));
-                                        if (in_array($metricKey, $metricKeys)) {
-                                            $logger->warning("Duplicate metric at index=$index: name={$metric->name}, query=$queryStr, date={$metric->metricDate->format('Y-m-d')}");
-                                            $skippedMetrics++;
-                                            $totalDuplicates++;
-                                            continue;
-                                        }
-                                        $metricKeys[] = $metricKey;
-
-                                        if (!$metricNames || in_array($metric->name, $metricNames)) {
-                                            $countryCode = $metric->countryCode;
-                                            try {
-                                                $countryEnum = CountryEnum::from($countryCode);
-                                            } catch (ValueError $e) {
-                                                $countryEnum = CountryEnum::OTH;
-                                                $logger->info("Country set to 'OTH' for query=$queryStr, original=$countryCode");
-                                            }
-                                            $countryEntity = $countryRepository->findOneBy(['code' => $countryEnum]);
-                                            if (!$countryEntity) {
-                                                $countryEntity = $countryRepository->findOneBy(['code' => CountryEnum::OTH]);
-                                                if (!$countryEntity) {
-                                                    $logger->error("Country OTH not found");
-                                                    return;
-                                                }
-                                                $logger->info("Country set to 'OTH' for query=$queryStr, original=$countryCode");
-                                            }
-                                            $metric->country = $countryEntity;
-
-                                            $deviceType = $metric->deviceType;
-                                            try {
-                                                $deviceEnum = DeviceEnum::from($deviceType);
-                                            } catch (ValueError $e) {
-                                                $deviceEnum = DeviceEnum::OTHER;
-                                                $logger->warning("Invalid deviceType '$deviceType', defaulting to OTHER");
-                                            }
-                                            $deviceEntity = $deviceRepository->findOneBy(['type' => $deviceEnum]);
-                                            if (!$deviceEntity) {
-                                                $logger->error("Device $deviceType not found");
-                                                return;
-                                            }
-                                            $metric->device = $deviceEntity;
-
-                                            $batch->add($metric);
-                                            $queuedMetrics++;
-                                            $totalMetrics++;
-                                            $logger->info("Queued metric: query=$queryStr, name=$metric->name");
-                                        } else {
-                                            $logger->warning("Skipped metric: name=$metric->name, not in " . json_encode($metricNames));
-                                            $filteredMetrics++;
-                                        }
-                                    }
-                                    $logger->info("Processed rows: metrics=" . count($pageMetrics) . ", queued=$queuedMetrics, filtered=$filteredMetrics, duplicates=$totalDuplicates, skipped=$skippedMetrics");
-
-                                    // Process batch if full
-                                    if ($batch->count() >= $batchSize) {
-                                        $batchStart = microtime(true);
-                                        $logger->info("Processing batch " . $loopCount . " for site " . $siteUrl . ", " . $batch->count() . " metrics");
-                                        try {
-                                            $manager->persist($pageEntity);
-                                            /* foreach ($batch as $metric) {
-                                                $manager->persist($metric);
-                                            } */
-                                            self::processBatch(
-                                                $batch->toArray(),
-                                                $manager,
-                                                self::initializeRepositories($manager),
-                                                $entitiesToInvalidate,
-                                                $queryCache,
-                                                $metricCache,
-                                                $channeledMetricCache,
-                                                $dimensionCache,
-                                                $logger,
-                                                $pageEntity
-                                            );
-                                            $manager->flush();
-                                            $logger->info("Flushed batch: inserts=" . count($manager->getUnitOfWork()->getScheduledEntityInsertions()) . ", updates=" . count($manager->getUnitOfWork()->getScheduledEntityUpdates()));
-                                            $batchTime = microtime(true) - $batchStart;
-                                            $logger->info("Processed batch " . $loopCount . " for site " . $siteUrl . ", took " . $batchTime . " seconds");
-                                            $batch->clear();
-                                            gc_collect_cycles();
-                                        } catch (ORMException $e) {
-                                            $logger->error("Error processing batch " . $loopCount . " for site " . $siteUrl . ": " . $e->getMessage());
-                                            throw $e;
-                                        }
-                                    }
-
-                                    $loopTime = microtime(true) - $loopStart;
-                                    $logger->info("Loop " . $loopCount . ": Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, queued " . $queuedMetrics . " metrics, filtered " . $filteredMetrics . " metrics for site " . $siteUrl . ", took " . $loopTime . " seconds");
-                                } catch (Exception $e) {
-                                    $logger->error("Error in API callback loop " . $loopCount . " for site " . $siteUrl . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
-                                    throw $e;
-                                }
-                            }
-                        );
-                        $logger->info("Completed API query for date=$dayStr, duplicates=$totalDuplicates");
-
-                        // Final batch after daily loop:
-                        // Process any remaining metrics in the batch
-                        if ($batch->count() > 0) {
-                            $batchStart = microtime(true);
-                            $logger->info("Processing final batch for site " . $siteUrl . ", date " . $dayStr . ", " . $batch->count() . " metrics");
-                            try {
-                                $manager->persist($pageEntity);
-                                /* foreach ($batch as $metric) {
-                                    $manager->persist($metric);
-                                } */
-                                self::processBatch(
-                                    $batch->toArray(),
-                                    $manager,
-                                    self::initializeRepositories($manager),
-                                    $entitiesToInvalidate,
-                                    $queryCache,
-                                    $metricCache,
-                                    $channeledMetricCache,
-                                    $dimensionCache,
-                                    $logger,
-                                    $pageEntity
-                                );
-                                $manager->flush();
-                                $logger->info("Flushed final batch: inserts=" . count($manager->getUnitOfWork()->getScheduledEntityInsertions()) . ", updates=" . count($manager->getUnitOfWork()->getScheduledEntityUpdates()));
-                                $batchTime = microtime(true) - $batchStart;
-                                $batch->clear();
-                                $logger->info("Processed final batch for site " . $siteUrl . ", date " . $dayStr . ", took " . $batchTime . " seconds");
-                                gc_collect_cycles();
-                            } catch (ORMException $e) {
-                                $logger->error("Error processing final batch for site " . $siteUrl . ", date " . $dayStr . ": " . $e->getMessage());
-                                throw $e;
-                            }
-                        }
-
-                        // Update metrics values for this day
-                        $logger->info("Updating metrics values for site " . $siteUrl . ", date " . $dayStr);
-                        try {
-                            $connection = $manager->getConnection();
-                            $connection->executeStatement("
-                            UPDATE metrics m
-                            JOIN (
-                                SELECT 
-                                    cm.metric_id,
-                                    m.name,
-                                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.impressions')), 0) as total_impressions,
-                                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.clicks')), 0) as total_clicks,
-                                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.position_weighted')), 0) as total_position_weighted,
-                                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.ctr')), 0) as total_ctr
-                                FROM channeled_metrics cm
-                                JOIN metrics m ON cm.metric_id = m.id
-                                WHERE cm.channel = :channel
-                                AND cm.platformCreatedAt LIKE :date
-                                GROUP BY cm.metric_id, m.name
-                            ) cm_agg ON m.id = cm_agg.metric_id
-                            SET m.value = CASE cm_agg.name
-                                WHEN 'impressions' THEN COALESCE(cm_agg.total_impressions, 0)
-                                WHEN 'clicks' THEN COALESCE(cm_agg.total_clicks, 0)
-                                WHEN 'ctr' THEN COALESCE(cm_agg.total_ctr, 0)
-                                WHEN 'position' THEN IF(cm_agg.total_impressions > 0, cm_agg.total_position_weighted / cm_agg.total_impressions, 0)
-                                ELSE COALESCE(m.value, 0)
-                            END
-                            WHERE m.channel = :channel
-                        ", [
-                                'channel' => Channel::google_search_console->value,
-                                'date' => $dayStr . '%'
-                            ]);
-                            $logger->info("Updated metrics values for site " . $siteUrl . ", date " . $dayStr);
-                        } catch (\Doctrine\DBAL\Exception $e) {
-                            $logger->error("Error updating metrics values for site " . $siteUrl . ", date " . $dayStr . ": " . $e->getMessage());
-                            throw $e;
-                        }
-                    } catch (GuzzleException $e) {
-                        $logger->error("GSC API error for site " . $siteUrl . ", date " . $dayStr . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
-                        throw $e;
-                    } catch (Exception $e) {
-                        $logger->error("Error during GSC API query for site " . $siteUrl . ", date " . $dayStr . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
-                        throw $e;
-                    }
-                }
-
+                $totalMetrics += $result['metrics'];
+                $totalRows += $result['rows'];
+                $totalDuplicates += $result['duplicates'];
                 $counter++;
             }
 
-            // Flush and commit all changes
-            if ($createdPages || $totalMetrics > 0) {
-                $logger->info("Flushing " . count($createdPages) . " new Page entities and " . $totalMetrics . " metrics");
-                $manager->flush();
-                $manager->getConnection()->commit();
-                $logger->info("Committed transaction");
-            } else {
-                $logger->info("No changes to flush, rolling back transaction");
-                $manager->getConnection()->rollback();
-            }
-            $logger->info("Completed: metrics=$totalMetrics, rows=$totalRows, duplicates=$totalDuplicates");
+            // Finalize transaction and cache
+            $response = self::finalizeTransaction(
+                $manager,
+                $createdPages,
+                $totalMetrics,
+                $totalRows,
+                $totalDuplicates,
+                $logger,
+                $startDate,
+                $endDate
+            );
 
-            $logger->info("Invalidating cache for " . count($entitiesToInvalidate['metric']) . " metrics, " . count($entitiesToInvalidate['channeledMetric']) . " channeled metrics, " . count($entitiesToInvalidate['query']) . " queries");
-            $cacheService = CacheService::getInstance(Helpers::getRedisClient());
-            foreach ($entitiesToInvalidate as $entity => $ids) {
-                if (!empty($ids)) {
-                    $cacheService->invalidateEntityCache(
-                        entity: $entity,
-                        ids: array_unique($ids),
-                        channel: Channel::google_search_console->getName()
-                    );
-                }
-            }
-
-            $totalTime = microtime(true) - $startTime;
-            $logger->info("Fetched and processed " . $totalMetrics . " metrics from " . $totalRows . " rows for all sites from " . $from . " to " . $to . ", took " . $totalTime . " seconds");
-
-            return new Response(json_encode(['Metrics retrieved']));
-        } catch (Exception $e) {
-            // Safely handle transaction rollback
+            return $response;
+        } catch (\Exception $e) {
             try {
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                     $logger->info("Rolled back transaction");
                 }
-            } catch (Exception $rollbackException) {
+            } catch (\Exception $rollbackException) {
                 $logger->error("Error during transaction rollback: " . $rollbackException->getMessage());
             }
             $logger->error("Unexpected error in getListFromGoogleSearchConsole: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
             throw $e;
         }
+    }
+
+    /**
+     * Validates Google and GSC configurations.
+     *
+     * @param LoggerInterface $logger
+     * @return array
+     * @throws Exception
+     */
+    private static function validateGoogleConfig(LoggerInterface $logger): array
+    {
+        $config = Helpers::getChannelsConfig()['google'] ?? null;
+        if (!$config) {
+            $logger->error("Missing 'google' configuration in channels config");
+            throw new Exception("Missing 'google' configuration in channels config");
+        }
+        $scConfig = Helpers::getChannelsConfig()['google_search_console'] ?? null;
+        if (!$scConfig) {
+            $logger->error("Missing 'google_search_console' configuration in channels config");
+            throw new Exception("Missing 'google_search_console' configuration in channels config");
+        }
+        $logger->info("Loaded GSC config: sites=" . count($scConfig['sites']));
+        return [
+            'google' => $config,
+            'google_search_console' => $scConfig,
+        ];
+    }
+
+    /**
+     * Initializes the SearchConsoleApi client with retry logic.
+     *
+     * @param array $config
+     * @param LoggerInterface $logger
+     * @return SearchConsoleApi
+     * @throws Exception
+     */
+    private static function initializeSearchConsoleApi(array $config, LoggerInterface $logger): SearchConsoleApi
+    {
+        $maxApiRetries = 3;
+        $apiRetryCount = 0;
+        while ($apiRetryCount < $maxApiRetries) {
+            try {
+                $apiInstance = new SearchConsoleApi(
+                    redirectUrl: $config['google']['redirect_uri'] ?? null,
+                    clientId: $config['google']['client_id'] ?? null,
+                    clientSecret: $config['google']['client_secret'] ?? null,
+                    refreshToken: $config['google']['refresh_token'] ?? null,
+                    userId: $config['google']['user_id'] ?? null,
+                    scopes: [$config['google_search_console']['scope'] ?? null],
+                    token: $config['google_search_console']['token'] ?? null
+                );
+                $logger->info("Initialized SearchConsoleApi");
+                return $apiInstance;
+            } catch (\Exception $e) {
+                $apiRetryCount++;
+                if ($apiRetryCount >= $maxApiRetries) {
+                    $logger->error("Failed to initialize SearchConsoleApi after $maxApiRetries retries: " . $e->getMessage());
+                    throw new Exception("Failed to initialize SearchConsoleApi after $maxApiRetries retries: " . $e->getMessage());
+                }
+                $logger->warning("SearchConsoleApi initialization failed, retry $apiRetryCount/$maxApiRetries: " . $e->getMessage());
+                usleep(100000 * $apiRetryCount);
+            }
+        }
+        throw new Exception("Failed to initialize SearchConsoleApi");
+    }
+
+    /**
+     * Processes a single site, including page lookup and data fetching.
+     *
+     * @param array $site
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param string|bool $resume
+     * @param SearchConsoleApi $api
+     * @param EntityManager $manager
+     * @param EntityRepository $channeledMetricRepository
+     * @param EntityRepository $pageRepository
+     * @param EntityRepository $countryRepository
+     * @param EntityRepository $deviceRepository
+     * @param array $metricNames
+     * @param array $dimensions
+     * @param int $batchSize
+     * @param object|null $filters
+     * @param LoggerInterface $logger
+     * @param array &$createdPages
+     * @param int &$totalMetrics
+     * @param int &$totalRows
+     * @param int &$totalDuplicates
+     * @return array
+     * @throws Exception
+     */
+    private static function processSite(
+        array $site,
+        ?string $startDate,
+        ?string $endDate,
+        string|bool $resume,
+        SearchConsoleApi $api,
+        EntityManager $manager,
+        EntityRepository $channeledMetricRepository,
+        EntityRepository $pageRepository,
+        EntityRepository $countryRepository,
+        EntityRepository $deviceRepository,
+        array $metricNames,
+        array $dimensions,
+        int $batchSize,
+        ?object $filters,
+        LoggerInterface $logger,
+        array &$createdPages,
+        int &$totalMetrics,
+        int &$totalRows,
+        int &$totalDuplicates
+    ): array {
+        $siteUrl = $site['url'];
+        $siteKey = str_replace(['https://', 'sc-domain:', '/'], '', $siteUrl);
+        $title = $site['title'] ?? $siteUrl;
+        $hostname = $site['hostname'] ?? parse_url($siteUrl, PHP_URL_HOST) ?? str_replace('sc-domain:', '', $siteUrl);
+        $normalizedSiteUrl = rtrim($siteUrl, '/');
+        $logger->info("Processing site: $siteUrl, normalized: $normalizedSiteUrl, siteKey=$siteKey");
+
+        $pageEntity = $pageRepository->findOneBy(['url' => $normalizedSiteUrl]);
+        if (!$pageEntity) {
+            $logger->error("Page entity not found for URL=$normalizedSiteUrl. Run app:initialize-entities command.");
+            throw new Exception("Page entity not found for URL=$normalizedSiteUrl");
+        }
+        $logger->info("Found Page: ID=" . $pageEntity->getId() . ", URL=$normalizedSiteUrl");
+
+        if ($pageEntity->getTitle() !== $title || $pageEntity->getHostname() !== $hostname) {
+            $pageEntity->addTitle($title)
+                ->addHostname($hostname)
+                ->addUpdatedAt(new \DateTime());
+            $manager->persist($pageEntity);
+            $logger->info("Updated Page entity: ID=" . $pageEntity->getId() . ", URL=$normalizedSiteUrl");
+        }
+
+        $lastChanneledMetric = $channeledMetricRepository->getLastByPlatformCreatedAtForSite(
+            Channel::google_search_console->value,
+            $siteKey
+        );
+        $logger->info("Last channeled metric: " . ($lastChanneledMetric ? json_encode($lastChanneledMetric) : 'none'));
+
+        $origin = Carbon::parse("2000-01-01");
+        $now = Carbon::now();
+        $min = $startDate ? Carbon::parse($startDate) : (
+        $lastChanneledMetric && filter_var($resume, FILTER_VALIDATE_BOOLEAN)
+            ? Carbon::parse($lastChanneledMetric['platformCreatedAt'])
+            : $origin
+        );
+        $max = $endDate ? Carbon::parse($endDate) : null;
+        $from = $origin->format('Y-m-d');
+        if ($min->lte($now) && $min->gte($origin) && (!$max || $min->lt($max))) {
+            $from = $min->format('Y-m-d');
+        }
+        $to = $max && $max->lte($now) ? $max->format('Y-m-d') : $now->format('Y-m-d');
+        $logger->info("Date range: from=$from, to=$to");
+
+        $targetKeywords = $site['target_keywords'] ?? [];
+        $targetCountries = $site['target_countries'] ?? [];
+        $dimensionFilterGroups = self::getDimensionFilterGroups($filters, $site);
+        $logger->info("Target keywords: " . implode(',', $targetKeywords) . ", countries: " . implode(',', $targetCountries));
+
+        $batch = new ArrayCollection();
+        $entitiesToInvalidate = ['metric' => [], 'channeledMetric' => [], 'query' => []];
+        $queryCache = [];
+        $metricCache = [];
+        $channeledMetricCache = [];
+        $dimensionCache = [];
+        $startTime = microtime(true);
+
+        $siteMetrics = 0;
+        $siteRows = 0;
+        $siteDuplicates = 0;
+
+        $period = Carbon::parse($from)->toPeriod($to, '1 day');
+        foreach ($period as $day) {
+            $dayStr = $day->format('Y-m-d');
+            $result = self::fetchDailyData(
+                $dayStr,
+                $site,
+                $api,
+                $manager,
+                $pageEntity,
+                $metricNames,
+                $dimensions,
+                $batchSize,
+                $batch,
+                $entitiesToInvalidate,
+                $queryCache,
+                $metricCache,
+                $channeledMetricCache,
+                $dimensionCache,
+                $countryRepository,
+                $deviceRepository,
+                $targetKeywords,
+                $targetCountries,
+                $dimensionFilterGroups,
+                $logger
+            );
+            $siteMetrics += $result['metrics'];
+            $siteRows += $result['rows'];
+            $siteDuplicates += $result['duplicates'];
+
+            self::updateMetricsValues($manager, $siteUrl, $dayStr, $logger);
+        }
+
+        $totalTime = microtime(true) - $startTime;
+        $logger->info("Processed site $siteUrl: metrics=$siteMetrics, rows=$siteRows, duplicates=$siteDuplicates, took $totalTime seconds");
+
+        return [
+            'metrics' => $siteMetrics,
+            'rows' => $siteRows,
+            'duplicates' => $siteDuplicates
+        ];
+    }
+
+    /**
+     * Fetches and processes data for a single day.
+     *
+     * @param string $dayStr
+     * @param array $site
+     * @param SearchConsoleApi $api
+     * @param EntityManager $manager
+     * @param Page $pageEntity
+     * @param array $metricNames
+     * @param array $dimensions
+     * @param int $batchSize
+     * @param ArrayCollection $batch
+     * @param array &$entitiesToInvalidate
+     * @param array &$queryCache
+     * @param array &$metricCache
+     * @param array &$channeledMetricCache
+     * @param array &$dimensionCache
+     * @param EntityRepository $countryRepository
+     * @param EntityRepository $deviceRepository
+     * @param array $targetKeywords
+     * @param array $targetCountries
+     * @param array $dimensionFilterGroups
+     * @param LoggerInterface $logger
+     * @return array
+     * @throws ORMException
+     */
+    private static function fetchDailyData(
+        string $dayStr,
+        array $site,
+        SearchConsoleApi $api,
+        EntityManager $manager,
+        Page $pageEntity,
+        array $metricNames,
+        array $dimensions,
+        int $batchSize,
+        ArrayCollection $batch,
+        array &$entitiesToInvalidate,
+        array &$queryCache,
+        array &$metricCache,
+        array &$channeledMetricCache,
+        array &$dimensionCache,
+        EntityRepository $countryRepository,
+        EntityRepository $deviceRepository,
+        array $targetKeywords,
+        array $targetCountries,
+        array $dimensionFilterGroups,
+        LoggerInterface $logger
+    ): array {
+        $siteUrl = $site['url'];
+        $siteKey = str_replace(['https://', 'sc-domain:', '/'], '', $siteUrl);
+        $rowLimit = $site['rowLimit'] ?? 25000;
+        $logger->info("Processing GSC data for site $siteUrl, date $dayStr");
+
+        $loopCount = 0;
+        $totalMetrics = 0;
+        $totalRows = 0;
+        $totalDuplicates = 0;
+
+        try {
+            $api->getAllSearchQueryResultsAndProcess(
+                siteUrl: $siteUrl,
+                startDate: $dayStr,
+                endDate: $dayStr,
+                rowLimit: $rowLimit,
+                dimensions: $dimensions,
+                dimensionFilterGroups: $dimensionFilterGroups,
+                callback: function($rows) use (
+                    $siteUrl,
+                    $siteKey,
+                    $metricNames,
+                    &$batch,
+                    $batchSize,
+                    $targetKeywords,
+                    $targetCountries,
+                    &$loopCount,
+                    &$totalMetrics,
+                    &$totalRows,
+                    &$entitiesToInvalidate,
+                    &$queryCache,
+                    &$metricCache,
+                    &$channeledMetricCache,
+                    &$dimensionCache,
+                    $logger,
+                    $manager,
+                    $pageEntity,
+                    $countryRepository,
+                    $deviceRepository,
+                    &$totalDuplicates
+                ) {
+                    $loopStart = microtime(true);
+                    $loopCount++;
+                    $totalRows += count($rows);
+                    $logger->info("Processing API callback loop $loopCount, rows=" . count($rows) . ", totalRows=$totalRows");
+                    $logger->debug("Raw API rows: " . json_encode(array_slice($rows, 0, 5)));
+
+                    $pageMetrics = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, $siteKey, $targetKeywords, $targetCountries, $logger, $pageEntity, $manager);
+                    $logger->info("Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, first metric: " . (count($pageMetrics) > 0 ? json_encode(['name' => $pageMetrics[0]->name, 'query' => is_string($pageMetrics[0]->query) ? $pageMetrics[0]->query : ($pageMetrics[0]->query instanceof Query ? $pageMetrics[0]->query->getQuery() : 'none')]) : 'none'));
+
+                    $metricKeys = [];
+                    $queuedMetrics = 0;
+                    $filteredMetrics = 0;
+                    $skippedMetrics = 0;
+
+                    foreach ($pageMetrics as $index => $metric) {
+                        $queryStr = is_string($metric->query) ? $metric->query : ($metric->query instanceof Query ? $metric->query->getQuery() : 'none');
+                        $metricKey = md5(json_encode([
+                            'channel' => $metric->channel,
+                            'name' => $metric->name,
+                            'period' => $metric->period,
+                            'metricDate' => $metric->metricDate->format('Y-m-d'),
+                            'query' => $queryStr,
+                            'pageId' => $pageEntity?->getId(),
+                            'pageUrl' => $dimensions['page'] ?? 'none',
+                            'countryCode' => $metric->countryCode,
+                            'deviceType' => $metric->deviceType,
+                            'dimensions' => $dimensions ?? [],
+                        ], JSON_UNESCAPED_UNICODE));
+
+                        if (in_array($metricKey, $metricKeys)) {
+                            $logger->warning("Duplicate metric at index=$index: name={$metric->name}, query=$queryStr, date={$metric->metricDate->format('Y-m-d')}");
+                            $skippedMetrics++;
+                            $totalDuplicates++;
+                            continue;
+                        }
+                        $metricKeys[] = $metricKey;
+
+                        if (!$metricNames || in_array($metric->name, $metricNames)) {
+                            $countryCode = $metric->countryCode;
+                            try {
+                                $countryEnum = CountryEnum::from($countryCode);
+                            } catch (ValueError $e) {
+                                $countryEnum = CountryEnum::OTH;
+                                $logger->info("Country set to 'OTH' for query=$queryStr, original=$countryCode");
+                            }
+                            $countryEntity = $countryRepository->findOneBy(['code' => $countryEnum]);
+                            if (!$countryEntity) {
+                                $countryEntity = $countryRepository->findOneBy(['code' => CountryEnum::OTH]);
+                                if (!$countryEntity) {
+                                    $logger->error("Country OTH not found");
+                                    return;
+                                }
+                                $logger->info("Country set to 'OTH' for query=$queryStr, original=$countryCode");
+                            }
+                            $metric->country = $countryEntity;
+
+                            $deviceType = $metric->deviceType;
+                            try {
+                                $deviceEnum = DeviceEnum::from($deviceType);
+                            } catch (ValueError $e) {
+                                $deviceEnum = DeviceEnum::OTHER;
+                                $logger->warning("Invalid deviceType '$deviceType', defaulting to OTHER");
+                            }
+                            $deviceEntity = $deviceRepository->findOneBy(['type' => $deviceEnum]);
+                            if (!$deviceEntity) {
+                                $logger->error("Device $deviceType not found");
+                                return;
+                            }
+                            $metric->device = $deviceEntity;
+
+                            $batch->add($metric);
+                            $queuedMetrics++;
+                            $totalMetrics++;
+                            $logger->info("Queued metric: query=$queryStr, name={$metric->name}");
+                        } else {
+                            $logger->warning("Skipped metric: name={$metric->name}, not in " . json_encode($metricNames));
+                            $filteredMetrics++;
+                        }
+                    }
+
+                    $logger->info("Processed rows: metrics=" . count($pageMetrics) . ", queued=$queuedMetrics, filtered=$filteredMetrics, duplicates=$totalDuplicates, skipped=$skippedMetrics");
+
+                    if ($batch->count() >= $batchSize) {
+                        $batchStart = microtime(true);
+                        $logger->info("Processing batch $loopCount for site $siteUrl, " . $batch->count() . " metrics");
+                        try {
+                            self::processBatch(
+                                $batch->toArray(),
+                                $manager,
+                                self::initializeRepositories($manager),
+                                $entitiesToInvalidate,
+                                $queryCache,
+                                $metricCache,
+                                $channeledMetricCache,
+                                $dimensionCache,
+                                $logger,
+                                $pageEntity
+                            );
+                            $manager->flush();
+                            $logger->info("Flushed batch: inserts=" . count($manager->getUnitOfWork()->getScheduledEntityInsertions()) . ", updates=" . count($manager->getUnitOfWork()->getScheduledEntityUpdates()));
+                            $batchTime = microtime(true) - $batchStart;
+                            $logger->info("Processed batch $loopCount for site $siteUrl, took $batchTime seconds");
+                            $batch->clear();
+                            gc_collect_cycles();
+                        } catch (ORMException $e) {
+                            $logger->error("Error processing batch $loopCount for site $siteUrl: " . $e->getMessage());
+                            throw $e;
+                        }
+                    }
+
+                    $loopTime = microtime(true) - $loopStart;
+                    $logger->info("Loop $loopCount: Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, queued $queuedMetrics metrics, filtered $filteredMetrics metrics for site $siteUrl, took $loopTime seconds");
+                }
+            );
+
+            $logger->info("Completed API query for date=$dayStr, duplicates=$totalDuplicates");
+
+            if ($batch->count() > 0) {
+                $batchStart = microtime(true);
+                $logger->info("Processing final batch for site $siteUrl, date $dayStr, " . $batch->count() . " metrics");
+                try {
+                    self::processBatch(
+                        $batch->toArray(),
+                        $manager,
+                        self::initializeRepositories($manager),
+                        $entitiesToInvalidate,
+                        $queryCache,
+                        $metricCache,
+                        $channeledMetricCache,
+                        $dimensionCache,
+                        $logger,
+                        $pageEntity
+                    );
+                    $manager->flush();
+                    $logger->info("Flushed final batch: inserts=" . count($manager->getUnitOfWork()->getScheduledEntityInsertions()) . ", updates=" . count($manager->getUnitOfWork()->getScheduledEntityUpdates()));
+                    $batchTime = microtime(true) - $batchStart;
+                    $batch->clear();
+                    $logger->info("Processed final batch for site $siteUrl, date $dayStr, took $batchTime seconds");
+                    gc_collect_cycles();
+                } catch (ORMException $e) {
+                    $logger->error("Error processing final batch for site $siteUrl, date $dayStr: " . $e->getMessage());
+                    throw $e;
+                }
+            }
+
+            return [
+                'metrics' => $totalMetrics,
+                'rows' => $totalRows,
+                'duplicates' => $totalDuplicates
+            ];
+        } catch (Exception $e) {
+            $logger->error("Error during GSC API query for site $siteUrl, date $dayStr: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+            throw $e;
+        }
+    }
+
+    /**
+     * Updates aggregated metric values for a specific day.
+     *
+     * @param EntityManager $manager
+     * @param string $siteUrl
+     * @param string $dayStr
+     * @param LoggerInterface $logger
+     * @throws \Doctrine\DBAL\Exception
+     */
+    private static function updateMetricsValues(EntityManager $manager, string $siteUrl, string $dayStr, LoggerInterface $logger): void
+    {
+        $logger->info("Updating metrics values for site $siteUrl, date $dayStr");
+        try {
+            $connection = $manager->getConnection();
+            $connection->executeStatement("
+            UPDATE metrics m
+            JOIN (
+                SELECT 
+                    cm.metric_id,
+                    m.name,
+                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.impressions')), 0) as total_impressions,
+                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.clicks')), 0) as total_clicks,
+                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.position_weighted')), 0) as total_position_weighted,
+                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.ctr')), 0) as total_ctr
+                FROM channeled_metrics cm
+                JOIN metrics m ON cm.metric_id = m.id
+                WHERE cm.channel = :channel
+                AND cm.platformCreatedAt LIKE :date
+                GROUP BY cm.metric_id, m.name
+            ) cm_agg ON m.id = cm_agg.metric_id
+            SET m.value = CASE cm_agg.name
+                WHEN 'impressions' THEN COALESCE(cm_agg.total_impressions, 0)
+                WHEN 'clicks' THEN COALESCE(cm_agg.total_clicks, 0)
+                WHEN 'ctr' THEN COALESCE(cm_agg.total_ctr, 0)
+                WHEN 'position' THEN IF(cm_agg.total_impressions > 0, cm_agg.total_position_weighted / cm_agg.total_impressions, 0)
+                ELSE COALESCE(m.value, 0)
+            END
+            WHERE m.channel = :channel
+        ", [
+                'channel' => Channel::google_search_console->value,
+                'date' => $dayStr . '%'
+            ]);
+            $logger->info("Updated metrics values for site $siteUrl, date $dayStr");
+        } catch (\Doctrine\DBAL\Exception $e) {
+            $logger->error("Error updating metrics values for site $siteUrl, date $dayStr: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Finalizes the transaction and invalidates cache.
+     *
+     * @param EntityManager $manager
+     * @param array $createdPages
+     * @param int $totalMetrics
+     * @param int $totalRows
+     * @param int $totalDuplicates
+     * @param LoggerInterface $logger
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @return Response
+     */
+    private static function finalizeTransaction(
+        EntityManager $manager,
+        array $createdPages,
+        int $totalMetrics,
+        int $totalRows,
+        int $totalDuplicates,
+        LoggerInterface $logger,
+        ?string $startDate,
+        ?string $endDate
+    ): Response {
+        $logger->info("Completed: metrics=$totalMetrics, rows=$totalRows, duplicates=$totalDuplicates");
+
+        $entitiesToInvalidate = ['metric' => [], 'channeledMetric' => [], 'query' => []];
+        $cacheService = CacheService::getInstance(Helpers::getRedisClient());
+        foreach ($entitiesToInvalidate as $entity => $ids) {
+            if (!empty($ids)) {
+                $cacheService->invalidateEntityCache(
+                    entity: $entity,
+                    ids: array_unique($ids),
+                    channel: Channel::google_search_console->getName()
+                );
+            }
+        }
+
+        if ($createdPages || $totalMetrics > 0) {
+            $logger->info("Flushing " . count($createdPages) . " new Page entities and $totalMetrics metrics");
+            $manager->flush();
+            $manager->getConnection()->commit();
+            $logger->info("Committed transaction");
+        } else {
+            $logger->info("No changes to flush, rolling back transaction");
+            $manager->getConnection()->rollback();
+        }
+
+        $from = $startDate ?? 'unknown';
+        $to = $endDate ?? 'unknown';
+        $logger->info("Fetched and processed $totalMetrics metrics from $totalRows rows for all sites from $from to $to");
+
+        return new Response(json_encode(['Metrics retrieved']));
+    }
+
+    /**
+     * Processes a batch of channeled metrics.
+     *
+     * @param array $batch
+     * @param EntityManager $manager
+     * @param array $repos
+     * @param array $entitiesToInvalidate
+     * @param array $queryCache
+     * @param array $metricCache
+     * @param array $channeledMetricCache
+     * @param array $dimensionCache
+     * @param LoggerInterface $logger
+     * @param Page|null $pageEntity
+     * @throws ORMException
+     * @throws OptimisticLockException
+     */
+    private static function processBatch(
+        array $batch,
+        EntityManager $manager,
+        array $repos,
+        array &$entitiesToInvalidate,
+        array &$queryCache,
+        array &$metricCache,
+        array &$channeledMetricCache,
+        array &$dimensionCache,
+        LoggerInterface $logger,
+        ?Page $pageEntity = null
+    ): void {
+        $logger->info("Processing batch with " . count($batch) . " metrics");
+
+        $retryCount = 0;
+        $maxRetries = 3;
+
+        while ($retryCount < $maxRetries) {
+            try {
+                self::persistPageEntity($manager, $pageEntity, $logger);
+
+                $entitiesToPersist = ['metrics' => [], 'channeledMetrics' => [], 'dimensions' => []];
+                $skippedMetrics = 0;
+                $metricsCount = 0;
+                $channeledMetricsCount = 0;
+                $dimensionsCount = 0;
+
+                foreach ($batch as $index => $metric) {
+                    if (empty($metric->name)) {
+                        $logger->warning("Skipping metric at index $index: missing name");
+                        $skippedMetrics++;
+                        continue;
+                    }
+
+                    self::processSingleMetric(
+                        $index,
+                        $metric,
+                        $manager,
+                        $repos,
+                        $pageEntity,
+                        $entitiesToPersist,
+                        $entitiesToInvalidate,
+                        $queryCache,
+                        $metricCache,
+                        $channeledMetricCache,
+                        $dimensionCache,
+                        $logger,
+                        $metricsCount,
+                        $channeledMetricsCount,
+                        $dimensionsCount
+                    );
+                }
+
+                $logger->info("Entities queued for persistence: metrics=$metricsCount, channeledMetrics=$channeledMetricsCount, dimensions=$dimensionsCount, skipped=$skippedMetrics");
+
+                self::persistEntities($manager, $entitiesToPersist, $metricsCount, $channeledMetricsCount, $dimensionsCount, $logger);
+
+                break;
+            } catch (Exception $e) {
+                $retryCount = self::handleBatchRetry($retryCount, $maxRetries, $e, $logger);
+            }
+        }
+    }
+
+    /**
+     * Persists the page entity, ensuring it is managed.
+     *
+     * @param EntityManager $manager
+     * @param Page|null $pageEntity
+     * @param LoggerInterface $logger
+     * @throws RuntimeException
+     */
+    private static function persistPageEntity(EntityManager $manager, ?Page $pageEntity, LoggerInterface $logger): void
+    {
+        if (!$manager->isOpen()) {
+            $logger->error("EntityManager closed in processBatch");
+            throw new RuntimeException("EntityManager closed in processBatch");
+        }
+
+        if ($pageEntity && $pageEntity->getId()) {
+            if (!$manager->contains($pageEntity)) {
+                $logger->warning("Page entity detached: ID=" . $pageEntity->getId() . ", URL=" . $pageEntity->getUrl());
+                $pageEntity = $manager->find(Page::class, $pageEntity->getId());
+                if (!$pageEntity) {
+                    $logger->error("Failed to reattach Page entity: ID=" . $pageEntity->getId());
+                    throw new RuntimeException("Failed to reattach Page entity");
+                }
+            }
+            $manager->persist($pageEntity);
+            $logger->info("Persisted Page entity: ID=" . $pageEntity->getId());
+        }
+    }
+
+    /**
+     * Processes a single metric, including get/create and dimension handling.
+     *
+     * @param int $index
+     * @param object $metric
+     * @param EntityManager $manager
+     * @param array $repos
+     * @param Page|null $pageEntity
+     * @param array &$entitiesToPersist
+     * @param array &$entitiesToInvalidate
+     * @param array &$queryCache
+     * @param array &$metricCache
+     * @param array &$channeledMetricCache
+     * @param array &$dimensionCache
+     * @param LoggerInterface $logger
+     * @param int &$metricsCount
+     * @param int &$channeledMetricsCount
+     * @param int &$dimensionsCount
+     * @throws ORMException
+     */
+    private static function processSingleMetric(
+        int $index,
+        object $metric,
+        EntityManager $manager,
+        array $repos,
+        ?Page $pageEntity,
+        array &$entitiesToPersist,
+        array &$entitiesToInvalidate,
+        array &$queryCache,
+        array &$metricCache,
+        array &$channeledMetricCache,
+        array &$dimensionCache,
+        LoggerInterface $logger,
+        int &$metricsCount,
+        int &$channeledMetricsCount,
+        int &$dimensionsCount
+    ): void {
+        try {
+            $queryString = is_string($metric->query) ? $metric->query : ($metric->query instanceof Query ? $metric->query->getQuery() : 'none');
+            if ($metric->page instanceof Page && $metric->page !== $pageEntity) {
+                $logger->warning("Metric page mismatch at index $index: query=$queryString, name={$metric->name}");
+                $metric->page = $pageEntity;
+            }
+
+            $metricEntity = self::getOrCreateMetric(
+                metric: $metric,
+                repository: $repos['metric'],
+                queryRepository: $repos['query'],
+                logger: $logger,
+                queryCache: $queryCache,
+                metricCache: $metricCache,
+                pageEntity: $pageEntity,
+                em: $manager
+            );
+            if (!$manager->contains($metricEntity)) {
+                $logger->warning("Metric entity detached: ID=" . $metricEntity->getId() . ", name={$metric->name}");
+                $metricEntity = $manager->find(Metric::class, $metricEntity->getId());
+                if (!$metricEntity) {
+                    $logger->error("Failed to reattach Metric entity: ID=" . $metricEntity->getId());
+                    throw new RuntimeException("Failed to reattach Metric entity");
+                }
+            }
+            $manager->persist($metricEntity);
+            $entitiesToPersist['metrics'][] = $metricEntity;
+            $metricsCount++;
+            $logger->info("Metric " . ($metricEntity->getId() ? "found" : "created") . ": ID=" . $metricEntity->getId() . ", name={$metric->name}");
+
+            $channeledMetricEntity = self::getOrCreateChanneledMetric(
+                metricEntity: $metricEntity,
+                channeledMetric: $metric,
+                manager: $manager,
+                repository: $repos['channeledMetric'],
+                dimensionRepository: $repos['channeledMetricDimension'],
+                logger: $logger,
+                channeledMetricCache: $channeledMetricCache,
+                dimensionCache: $dimensionCache
+            );
+            if (!$manager->contains($channeledMetricEntity)) {
+                $logger->warning("ChanneledMetric entity detached: ID=" . $channeledMetricEntity->getId());
+                $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricEntity->getId());
+                if (!$channeledMetricEntity) {
+                    $logger->error("Failed to reattach ChanneledMetric entity: ID=" . $channeledMetricEntity->getId());
+                    throw new RuntimeException("Failed to reattach ChanneledMetric entity");
+                }
+            }
+            $manager->persist($channeledMetricEntity);
+            $entitiesToPersist['channeledMetrics'][] = $channeledMetricEntity;
+            $channeledMetricsCount++;
+            $logger->info("ChanneledMetric " . ($channeledMetricEntity->getId() ? "found" : "created") . ": ID=" . $channeledMetricEntity->getId());
+
+            if (isset($metric->dimensions)) {
+                foreach ($metric->dimensions as $dimension) {
+                    if (isset($dimension->dimensionKey, $dimension->dimensionValue)) {
+                        $dimCacheKey = md5($channeledMetricEntity->getId() . $dimension->dimensionKey . $dimension->dimensionValue);
+                        if (!isset($dimensionCache[$dimCacheKey])) {
+                            $entitiesToPersist['dimensions'][] = $dimension;
+                            $dimensionsCount++;
+                        }
+                    }
+                }
+            }
+
+            $entitiesToInvalidate['metric'][] = $metricEntity->getId();
+            $entitiesToInvalidate['channeledMetric'][] = $channeledMetricEntity->getId();
+            if ($metricEntity->getQuery()) {
+                $query = $metricEntity->getQuery();
+                if (!$manager->contains($query)) {
+                    $logger->warning("Query entity detached: ID=" . $query->getId());
+                    $query = $manager->find(Query::class, $query->getId());
+                    if (!$query) {
+                        $logger->error("Failed to reattach Query entity: ID=" . $query->getId());
+                        throw new RuntimeException("Failed to reattach Query entity");
+                    }
+                    $metricEntity->setQuery($query);
+                }
+                $entitiesToInvalidate['query'][] = $query->getId();
+            }
+        } catch (ORMException $e) {
+            $logger->error("Database error processing metric at index $index, query=$queryString: " . $e->getMessage());
+            throw $e;
+        } catch (Exception $e) {
+            $logger->error("Error processing metric at index $index, query=$queryString: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Persists all entities and flushes the batch.
+     *
+     * @param EntityManager $manager
+     * @param array $entitiesToPersist
+     * @param int $metricsCount
+     * @param int $channeledMetricsCount
+     * @param int $dimensionsCount
+     * @param LoggerInterface $logger
+     * @throws ORMException
+     */
+    private static function persistEntities(
+        EntityManager $manager,
+        array $entitiesToPersist,
+        int $metricsCount,
+        int $channeledMetricsCount,
+        int $dimensionsCount,
+        LoggerInterface $logger
+    ): void {
+        try {
+            $uow = $manager->getUnitOfWork();
+            $metricManaged = $metricsCount > 0 ? ($manager->contains($entitiesToPersist['metrics'][0] ?? null) ? 'yes' : 'no') : 'none';
+            $channeledMetricManaged = $channeledMetricsCount > 0 ? ($manager->contains($entitiesToPersist['channeledMetrics'][0] ?? null) ? 'yes' : 'no') : 'none';
+            $logger->info("Entity management before flush: Metric managed=$metricManaged, ChanneledMetric managed=$channeledMetricManaged");
+            $scheduledInserts = count($uow->getScheduledEntityInsertions());
+            $scheduledUpdates = count($uow->getScheduledEntityUpdates());
+            $logger->info("Scheduled before flush: inserts=$scheduledInserts, updates=$scheduledUpdates");
+
+            $manager->flush();
+            $logger->info("Flushed batch: inserts=$scheduledInserts, updates=$scheduledUpdates");
+            $logger->info("Transaction active after flush: " . ($manager->getConnection()->isTransactionActive() ? 'yes' : 'no'));
+            $logger->info("Committed batch with $metricsCount metrics");
+        } catch (ORMException $e) {
+            $logger->error("Flush failed: metrics=$metricsCount, channeledMetrics=$channeledMetricsCount, dimensions=$dimensionsCount, error=" . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Handles retry logic for batch processing errors.
+     *
+     * @param int $retryCount
+     * @param int $maxRetries
+     * @param Exception $e
+     * @param LoggerInterface $logger
+     * @return int
+     * @throws Exception
+     */
+    private static function handleBatchRetry(
+        int $retryCount,
+        int $maxRetries,
+        Exception $e,
+        LoggerInterface $logger
+    ): int {
+        if ($retryCount < $maxRetries - 1) {
+            $retryCount++;
+            $logger->error("Processing retry $retryCount/$maxRetries: " . $e->getMessage());
+            usleep($retryCount * 100000);
+            return $retryCount;
+        }
+        $logger->error("Failed after $maxRetries retries: " . $e->getMessage());
+        throw $e;
     }
 
     /**
@@ -798,215 +1353,6 @@ class MetricRequests implements RequestInterface
         }
 
         return new Response(json_encode(['Metrics processed']));
-    }
-
-    /**
-     * Processes a batch of channeled metrics.
-     *
-     * @param array $batch
-     * @param EntityManager $manager
-     * @param array $repos
-     * @param array $entitiesToInvalidate
-     * @param array $queryCache
-     * @param array $metricCache
-     * @param array $channeledMetricCache
-     * @param array $dimensionCache
-     * @param LoggerInterface $logger
-     * @param Page|null $pageEntity
-     * @throws ORMException
-     * @throws OptimisticLockException
-     */
-    private static function processBatch(
-        array $batch,
-        EntityManager $manager,
-        array $repos,
-        array &$entitiesToInvalidate,
-        array &$queryCache,
-        array &$metricCache,
-        array &$channeledMetricCache,
-        array &$dimensionCache,
-        LoggerInterface $logger,
-        ?Page $pageEntity = null
-    ): void {
-        $logger->info("Processing batch with " . count($batch) . " metrics");
-
-        $retryCount = 0;
-        $maxRetries = 3;
-        while ($retryCount < $maxRetries) {
-            try {
-                if (!$manager->isOpen()) {
-                    $logger->error("EntityManager closed in processBatch");
-                    throw new RuntimeException("EntityManager closed in processBatch");
-                }
-
-                if ($pageEntity && $pageEntity->getId()) {
-                    if (!$manager->contains($pageEntity)) {
-                        $logger->warning("Page entity detached: ID=" . $pageEntity->getId() . ", URL=" . $pageEntity->getUrl());
-                        $pageEntity = $manager->find(Page::class, $pageEntity->getId());
-                        if (!$pageEntity) {
-                            $logger->error("Failed to reattach Page entity: ID=" . $pageEntity->getId());
-                            throw new RuntimeException("Failed to reattach Page entity");
-                        }
-                    }
-                    $manager->persist($pageEntity);
-                    $logger->info("Persisted Page entity: ID=" . $pageEntity->getId());
-                }
-
-                $skippedMetrics = 0;
-                $metricsCount = 0;
-                $channeledMetricsCount = 0;
-                $dimensionsCount = 0;
-                $entitiesToPersist = ['metrics' => [], 'channeledMetrics' => [], 'dimensions' => []];
-
-                foreach ($batch as $index => $metric) {
-                    if (empty($metric->name)) {
-                        $logger->warning("Skipping metric at index $index: missing name");
-                        $skippedMetrics++;
-                        continue;
-                    }
-
-                    try {
-                        $queryString = is_string($metric->query) ? $metric->query : ($metric->query instanceof Query ? $metric->query->getQuery() : 'none');
-                        if ($metric->page instanceof Page && $metric->page !== $pageEntity) {
-                            $logger->warning("Metric page mismatch at index $index: query=$queryString, name=$metric->name");
-                            $metric->page = $pageEntity;
-                        }
-
-                        $metricEntity = self::getOrCreateMetric(
-                            metric: $metric,
-                            repository: $repos['metric'],
-                            queryRepository: $repos['query'],
-                            logger: $logger,
-                            queryCache: $queryCache,
-                            metricCache: $metricCache,
-                            pageEntity: $pageEntity,
-                            em: $manager
-                        );
-                        if (!$manager->contains($metricEntity)) {
-                            $logger->warning("Metric entity detached: ID=" . $metricEntity->getId() . ", name=$metric->name");
-                            $metricEntity = $manager->find(Metric::class, $metricEntity->getId());
-                            if (!$metricEntity) {
-                                $logger->error("Failed to reattach Metric entity: ID=" . $metricEntity->getId());
-                                throw new RuntimeException("Failed to reattach Metric entity");
-                            }
-                        }
-                        $manager->persist($metricEntity);
-                        $entitiesToPersist['metrics'][] = $metricEntity;
-                        $metricsCount++;
-                        $logger->info("Metric " . ($metricEntity->getId() ? "found" : "created") . ": ID=" . $metricEntity->getId() . ", name=$metric->name");
-
-                        $channeledMetricEntity = self::getOrCreateChanneledMetric(
-                            metricEntity: $metricEntity,
-                            channeledMetric: $metric,
-                            manager: $manager,
-                            repository: $repos['channeledMetric'],
-                            dimensionRepository: $repos['channeledMetricDimension'],
-                            logger: $logger,
-                            channeledMetricCache: $channeledMetricCache,
-                            dimensionCache: $dimensionCache
-                        );
-                        if (!$manager->contains($channeledMetricEntity)) {
-                            $logger->warning("ChanneledMetric entity detached: ID=" . $channeledMetricEntity->getId());
-                            $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricEntity->getId());
-                            if (!$channeledMetricEntity) {
-                                $logger->error("Failed to reattach ChanneledMetric entity: ID=" . $channeledMetricEntity->getId());
-                                throw new RuntimeException("Failed to reattach ChanneledMetric entity");
-                            }
-                        }
-                        $manager->persist($channeledMetricEntity);
-                        $entitiesToPersist['channeledMetrics'][] = $channeledMetricEntity;
-                        $channeledMetricsCount++;
-                        $logger->info("ChanneledMetric " . ($channeledMetricEntity->getId() ? "found" : "created") . ": ID=" . $channeledMetricEntity->getId());
-
-                        // Count dimensions for logging (persisted in getOrCreateChanneledMetric)
-                        if (isset($metric->dimensions)) {
-                            foreach ($metric->dimensions as $dimension) {
-                                if (isset($dimension->dimensionKey, $dimension->dimensionValue)) {
-                                    $dimCacheKey = md5($channeledMetricEntity->getId() . $dimension->dimensionKey . $dimension->dimensionValue);
-                                    if (!isset($dimensionCache[$dimCacheKey])) {
-                                        $entitiesToPersist['dimensions'][] = $dimension;
-                                        $dimensionsCount++;
-                                    }
-                                }
-                            }
-                        }
-
-                        $entitiesToInvalidate['metric'][] = $metricEntity->getId();
-                        $entitiesToInvalidate['channeledMetric'][] = $channeledMetricEntity->getId();
-                        if ($metricEntity->getQuery()) {
-                            $query = $metricEntity->getQuery();
-                            if (!$manager->contains($query)) {
-                                $logger->warning("Query entity detached: ID=" . $query->getId());
-                                $query = $manager->find(Query::class, $query->getId());
-                                if (!$query) {
-                                    $logger->error("Failed to reattach Query entity: ID=" . $query->getId());
-                                    throw new RuntimeException("Failed to reattach Query entity");
-                                }
-                                $metricEntity->setQuery($query);
-                            }
-                            $entitiesToInvalidate['query'][] = $query->getId();
-                        }
-                    } catch (ORMException $e) {
-                        $logger->error("Database error processing metric at index $index, query=$queryString: " . $e->getMessage());
-                        $skippedMetrics++;
-                        continue;
-                    } catch (Exception $e) {
-                        $logger->error("Error processing metric at index $index, query=$queryString: " . $e->getMessage());
-                        $skippedMetrics++;
-                        continue;
-                    }
-                }
-
-                $logger->info("Entities queued for persistence: metrics=$metricsCount, channeledMetrics=$channeledMetricsCount, dimensions=$dimensionsCount, skipped=$skippedMetrics");
-
-                try {
-                    $uow = $manager->getUnitOfWork();
-                    $metricManaged = $metricsCount > 0 ? ($manager->contains($entitiesToPersist['metrics'][0] ?? $metricEntity) ? 'yes' : 'no') : 'none';
-                    $channeledMetricManaged = $channeledMetricsCount > 0 ? ($manager->contains($entitiesToPersist['channeledMetrics'][0] ?? $channeledMetricEntity) ? 'yes' : 'no') : 'none';
-                    $logger->info("Entity management before flush: Metric managed=$metricManaged, ChanneledMetric managed=$channeledMetricManaged");
-                    $scheduledInserts = count($uow->getScheduledEntityInsertions());
-                    $scheduledUpdates = count($uow->getScheduledEntityUpdates());
-                    $logger->info("Scheduled before flush: inserts=$scheduledInserts, updates=$scheduledUpdates");
-
-                    $manager->flush();
-                    $logger->info("Flushed batch: inserts=$scheduledInserts, updates=$scheduledUpdates");
-                    $logger->info("Transaction active after flush: " . ($manager->getConnection()->isTransactionActive() ? 'yes' : 'no'));
-                    $logger->info("Committed batch with $metricsCount metrics");
-                } catch (ORMException $e) {
-                    $logger->error("Flush failed in processBatch: metrics=$metricsCount, channeledMetrics=$channeledMetricsCount, dimensions=$dimensionsCount, error=" . $e->getMessage());
-                    throw $e;
-                }
-
-                break;
-            } catch (OptimisticLockException $e) {
-                if ($retryCount < $maxRetries - 1) {
-                    $retryCount++;
-                    usleep(100000 * $retryCount);
-                    $logger->error("processBatch retry $retryCount/$maxRetries due to OptimisticLockException: " . $e->getMessage());
-                    continue;
-                }
-                $logger->error("processBatch failed after $maxRetries retries due to OptimisticLockException: " . $e->getMessage());
-                throw $e;
-            } catch (ORMException $e) {
-                if ($retryCount < $maxRetries - 1) {
-                    $retryCount++;
-                    usleep(100000 * $retryCount);
-                    $logger->error("processBatch retry $retryCount/$maxRetries due to ORMException: " . $e->getMessage());
-                    continue;
-                }
-                $logger->error("processBatch failed after $maxRetries retries due to ORMException: " . $e->getMessage());
-                throw $e;
-            } catch (Exception $e) {
-                if ($retryCount < $maxRetries - 1) {
-                    $retryCount++;
-                    usleep(100000 * $retryCount);
-                    $logger->error("processBatch retry $retryCount/$maxRetries due to: " . $e->getMessage());
-                    continue;
-                }
-                $logger->error("processBatch failed after $maxRetries retries: " . $e->getMessage());
-                throw $e;
-            }
-        }
     }
 
     /**
