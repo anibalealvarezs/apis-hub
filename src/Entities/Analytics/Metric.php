@@ -16,6 +16,10 @@ use Repositories\MetricRepository;
 #[ORM\Table(name: 'metrics')]
 #[ORM\Index(columns: ['channel', 'name', 'period', 'metricDate'], name: 'channel_name_period_metricDate_idx')]
 #[ORM\Index(columns: ['channel', 'name', 'metricDate'], name: 'channel_name_metricDate_idx')]
+#[ORM\Index(
+    columns: ['channel', 'name', 'period', 'metricDate', 'page_id', 'query_id', 'country_id', 'device_id'],
+    name: 'metric_lookup_idx'
+)]
 #[ORM\UniqueConstraint(name: 'metric_unique', columns: [
     'channel',
     'name',

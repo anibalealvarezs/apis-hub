@@ -271,7 +271,7 @@ class MetricRequests implements RequestInterface
             $deviceRepository = $manager->getRepository(Device::class);
             $metricNames = $filters->metricNames ?? ($config['google_search_console']['metrics'] ?? ['clicks', 'impressions', 'ctr', 'position']);
             $dimensions = $filters->dimensions ?? ['date', 'query', 'page', 'country', 'device'];
-            $batchSize = 500;
+            $batchSize = 100;
 
             $logger->info("Initialized repositories, dimensions=" . implode(',', $dimensions) . ", metricNames=" . json_encode($metricNames) . ", batchSize=$batchSize");
             $logger->warning("Note: 'searchAppearance' is not included in dimensions due to GSC API restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
@@ -293,10 +293,9 @@ class MetricRequests implements RequestInterface
             }
 
             // Start transaction
-            $manager->getConnection()->beginTransaction();
-            $logger->info("Started transaction");
+            // $manager->getConnection()->beginTransaction();
+            // $logger->info("Started transaction");
 
-            $createdPages = [];
             $totalMetrics = 0;
             $totalRows = 0;
             $totalDuplicates = 0;
@@ -304,7 +303,7 @@ class MetricRequests implements RequestInterface
 
             // Process each site
             foreach ($config['google_search_console']['sites'] as $site) {
-                if ($counter >= 1) {
+                if ($counter >= 2) {
                     $logger->info("Stopping after first site for testing");
                     break;
                 }
@@ -335,8 +334,6 @@ class MetricRequests implements RequestInterface
 
             // Finalize transaction and cache
             return self::finalizeTransaction(
-                $manager,
-                $createdPages,
                 $totalMetrics,
                 $totalRows,
                 $totalDuplicates,
@@ -529,7 +526,6 @@ class MetricRequests implements RequestInterface
         list($from, $to) = self::determineDateRange($startDate, $lastChanneledMetric, $resume, $endDate, $logger);
 
         // Initialize daily processing
-        $batch = new ArrayCollection();
         $entitiesToInvalidate = ['metric' => [], 'channeledMetric' => [], 'query' => []];
         $queryCache = [];
         $metricCache = [];
@@ -551,7 +547,6 @@ class MetricRequests implements RequestInterface
                 $metricNames,
                 $dimensions,
                 $batchSize,
-                $batch,
                 $entitiesToInvalidate,
                 $queryCache,
                 $metricCache,
@@ -594,7 +589,6 @@ class MetricRequests implements RequestInterface
      * @param array $metricNames
      * @param array $dimensions
      * @param int $batchSize
-     * @param ArrayCollection $batch
      * @param array &$entitiesToInvalidate
      * @param array &$queryCache
      * @param array &$metricCache
@@ -613,17 +607,17 @@ class MetricRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      * @throws OptimisticLockException
+     * @throws \Doctrine\DBAL\Exception
      */
     private static function fetchDailyData(
         string $dayStr,
         array $site,
         SearchConsoleApi $api,
         EntityManager $manager,
-        Page $pageEntity,
+        Page &$pageEntity,
         array $metricNames,
         array $dimensions,
         int $batchSize,
-        ArrayCollection $batch,
         array &$entitiesToInvalidate,
         array &$queryCache,
         array &$metricCache,
@@ -635,13 +629,14 @@ class MetricRequests implements RequestInterface
         array $targetCountries,
         array $dimensionFilterGroups,
         LoggerInterface $logger,
-        array $deviceMap = [],
-        array $countryMap = []
+        array &$deviceMap = [],
+        array &$countryMap = []
     ): array {
         $siteUrl = $site['url'];
         $siteKey = str_replace(['https://', 'sc-domain:', '/'], '', $siteUrl);
         $rowLimit = $site['rowLimit'] ?? 25000;
         $logger->info("Processing GSC data for site $siteUrl, date $dayStr");
+        $batch = new ArrayCollection();
 
         // Initialize counters
         $loopCount = 0;
@@ -740,23 +735,82 @@ class MetricRequests implements RequestInterface
                         $queuedMetrics++;
                         $totalMetrics++;
                         $logger->info("Queued metric: query=$queryStr, name=$metric->name");
+
+                        // Add a counter for batches processed
+                        $batchesProcessed = 0;
+                        $clearManagerEvery = 50; // Clear every 10 batches instead of every batch
+
+                        // CHECK AND COMMIT BATCH IMMEDIATELY after adding each metric
+                        if ($batch->count() >= $batchSize) {
+                            $batchStart = microtime(true);
+                            $batchesProcessed++;
+                            $logger->info("BATCH COMMIT: Processing and committing batch within loop, " . $batch->count() . " metrics");
+                            try {
+                                $manager->getConnection()->beginTransaction();
+                                self::processBatchIfNotEmpty(
+                                    $batch,
+                                    $manager,
+                                    $entitiesToInvalidate,
+                                    $queryCache,
+                                    $metricCache,
+                                    $channeledMetricCache,
+                                    $dimensionCache,
+                                    $logger,
+                                    $pageEntity
+                                );
+                                $manager->getConnection()->commit();
+
+                                // CLEAR THE BATCH after processing - this is what was missing!
+                                $batch->clear();
+
+                                $batchTime = microtime(true) - $batchStart;
+                                $logger->info("BATCH COMMIT: Committed batch within loop, took $batchTime seconds");
+
+                                // Only clear EntityManager every N batches
+                                if ($batchesProcessed % $clearManagerEvery === 0) {
+                                    $logger->info("MEMORY CLEANUP: Clearing EntityManager after $batchesProcessed batches");
+
+                                    $manager->clear(); // Free memory
+
+                                    // RE-ATTACH essential entities after clearing EntityManager
+                                    if ($pageEntity && $pageEntity->getId()) {
+                                        $pageEntity = $manager->find(Page::class, $pageEntity->getId());
+                                        $logger->info("Re-attached Page entity: ID=" . $pageEntity->getId());
+                                    }
+
+                                    // Re-attach Country entities
+                                    $newCountryMap = [];
+                                    foreach ($countryMap as $code => $country) {
+                                        if ($country->getId()) {
+                                            $newCountryMap[$code] = $manager->find(Country::class, $country->getId());
+                                        }
+                                    }
+                                    $countryMap = $newCountryMap;
+                                    $logger->info("Re-attached " . count($countryMap) . " Country entities");
+
+                                    // Re-attach Device entities
+                                    $newDeviceMap = [];
+                                    foreach ($deviceMap as $type => $device) {
+                                        if ($device->getId()) {
+                                            $newDeviceMap[$type] = $manager->find(Device::class, $device->getId());
+                                        }
+                                    }
+                                    $deviceMap = $newDeviceMap;
+                                    $logger->info("Re-attached " . count($deviceMap) . " Device entities");
+
+                                    gc_collect_cycles();
+                                }
+                            } catch (Exception $e) {
+                                $logger->error("BATCH COMMIT: Error processing batch within loop: " . $e->getMessage());
+                                if ($manager->getConnection()->isTransactionActive()) {
+                                    $manager->getConnection()->rollback();
+                                }
+                                throw $e;
+                            }
+                        }
                     }
 
                     $logger->info("Processed rows: metrics=" . count($pageMetrics) . ", queued=$queuedMetrics, filtered=$filteredMetrics, duplicates=$totalDuplicates, skipped=$skippedMetrics");
-
-                    if ($batch->count() >= $batchSize) {
-                        self::processBatchIfNotEmpty(
-                            $batch,
-                            $manager,
-                            $entitiesToInvalidate,
-                            $queryCache,
-                            $metricCache,
-                            $channeledMetricCache,
-                            $dimensionCache,
-                            $logger,
-                            $pageEntity
-                        );
-                    }
 
                     $loopTime = microtime(true) - $loopStart;
                     $logger->info("Loop $loopCount: Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, queued $queuedMetrics metrics, filtered $filteredMetrics metrics for site $siteUrl, took $loopTime seconds");
@@ -765,17 +819,26 @@ class MetricRequests implements RequestInterface
 
             $logger->info("Completed API query for date=$dayStr, duplicates=$totalDuplicates");
 
-            self::processBatchIfNotEmpty(
-                $batch,
-                $manager,
-                $entitiesToInvalidate,
-                $queryCache,
-                $metricCache,
-                $channeledMetricCache,
-                $dimensionCache,
-                $logger,
-                $pageEntity
-            );
+            try {
+                $manager->getConnection()->beginTransaction();
+                self::processBatchIfNotEmpty(
+                    $batch,
+                    $manager,
+                    $entitiesToInvalidate,
+                    $queryCache,
+                    $metricCache,
+                    $channeledMetricCache,
+                    $dimensionCache,
+                    $logger,
+                    $pageEntity
+                );
+                $manager->getConnection()->commit();
+            } catch (Exception $e) {
+                if ($manager->getConnection()->isTransactionActive()) {
+                    $manager->getConnection()->rollback();
+                }
+                throw $e;
+            }
 
             return [
                 'metrics' => $totalMetrics,
@@ -824,11 +887,11 @@ class MetricRequests implements RequestInterface
                 $logger->info("Flushed batch: inserts=" . count($manager->getUnitOfWork()->getScheduledEntityInsertions()) . ", updates=" . count($manager->getUnitOfWork()->getScheduledEntityUpdates()));
                 $batchTime = microtime(true) - $batchStart;
                 $logger->info("Processed batch in $batchTime seconds");
-                $batch->clear();
                 gc_collect_cycles();
             } catch (ORMException $e) {
                 $logger->error("Error processing batch: " . $e->getMessage());
                 throw $e;
+            } catch (Exception $e) {
             }
         }
     }
@@ -885,8 +948,6 @@ class MetricRequests implements RequestInterface
     /**
      * Finalizes the transaction and invalidates cache.
      *
-     * @param EntityManager $manager
-     * @param array $createdPages
      * @param int $totalMetrics
      * @param int $totalRows
      * @param int $totalDuplicates
@@ -894,13 +955,8 @@ class MetricRequests implements RequestInterface
      * @param string|null $startDate
      * @param string|null $endDate
      * @return Response
-     * @throws ORMException
-     * @throws OptimisticLockException
-     * @throws \Doctrine\DBAL\Exception
      */
     private static function finalizeTransaction(
-        EntityManager $manager,
-        array $createdPages,
         int $totalMetrics,
         int $totalRows,
         int $totalDuplicates,
@@ -920,16 +976,6 @@ class MetricRequests implements RequestInterface
                     channel: Channel::google_search_console->getName()
                 );
             }
-        }
-
-        if ($createdPages || $totalMetrics > 0) {
-            $logger->info("Flushing " . count($createdPages) . " new Page entities and $totalMetrics metrics");
-            $manager->flush();
-            $manager->getConnection()->commit();
-            $logger->info("Committed transaction");
-        } else {
-            $logger->info("No changes to flush, rolling back transaction");
-            $manager->getConnection()->rollback();
         }
 
         $from = $startDate ?? 'unknown';
@@ -1831,14 +1877,12 @@ class MetricRequests implements RequestInterface
             $channeledMetricEntity = $channeledMetricCache[$cacheKey];
         } else {
             // Query database
-            $criteria = [
+            if ($channeledMetricEntity = $repository->findOneBy([
                 'platformId' => $channeledMetric->platformId ?? null,
                 'channel' => $channeledMetric->channel ?? 8,
                 'metric' => $metricEntity,
                 'platformCreatedAt' => $platformCreatedAt
-            ];
-
-            if ($channeledMetricEntity = $repository->findOneBy($criteria)) {
+            ])) {
                 // Update existing entity
                 $channeledMetricData = $channeledMetricEntity->getData() ?? [];
                 $newData = (array)($channeledMetric->data ?? []);
@@ -1903,6 +1947,7 @@ class MetricRequests implements RequestInterface
      * @param EntityManager|null $em
      * @return array
      * @throws ORMException
+     * @throws Exception
      */
     protected static function checkIfTheQueryIsAlreadyCached(
         object $metric,
@@ -1966,26 +2011,6 @@ class MetricRequests implements RequestInterface
             $normalizedDimensions['date'] = $metric->metricDate->format('Y-m-d');
         }
         return $normalizedDimensions;
-    }
-
-    /**
-     * Finalizes relationships and persists entities.
-     *
-     * @param Metric $metricEntity
-     * @param ChanneledMetric $channeledMetricEntity
-     * @param EntityManager $manager
-     * @return void
-     * @throws ORMException
-     * @throws OptimisticLockException
-     */
-    private static function finalizeMetricRelationships(
-        Metric $metricEntity,
-        ChanneledMetric $channeledMetricEntity,
-        EntityManager $manager
-    ): void {
-        $manager->persist($metricEntity);
-        $manager->persist($channeledMetricEntity);
-        $manager->flush();
     }
 
     /**
