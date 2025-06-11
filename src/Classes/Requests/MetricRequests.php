@@ -493,7 +493,7 @@ class MetricRequests implements RequestInterface
         );
         $max = $endDate ? Carbon::parse($endDate) : null;
         $from = $origin->format('Y-m-d');
-        if ($min->lte($now) && $min->gte($origin) && (!$max || $min->lt($max))) {
+        if ($min->lte($now) && $min->gte($origin) && (!$max || $min->lte($max))) {
             $from = $min->format('Y-m-d');
         }
         $to = $max && $max->lte($now) ? $max->format('Y-m-d') : $now->format('Y-m-d');
