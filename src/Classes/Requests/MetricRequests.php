@@ -20,6 +20,7 @@ use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
+use Doctrine\ORM\TransactionRequiredException;
 use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Analytics\Channeled\ChanneledMetric;
 use Entities\Analytics\Channeled\ChanneledMetricDimension;
@@ -29,7 +30,6 @@ use Entities\Analytics\Metric;
 use Entities\Analytics\Page;
 use Entities\Analytics\Query;
 use Enums\Channel;
-use Enums\Period;
 use Enums\Country as CountryEnum;
 use Enums\Device as DeviceEnum;
 use GuzzleHttp\Exception\GuzzleException;
@@ -240,7 +240,6 @@ class MetricRequests implements RequestInterface
      * @param string|bool $resume
      * @param LoggerInterface|null $logger
      * @return Response
-     * @throws GuzzleException
      * @throws NotSupported
      * @throws Exception
      */
@@ -277,6 +276,22 @@ class MetricRequests implements RequestInterface
             $logger->info("Initialized repositories, dimensions=" . implode(',', $dimensions) . ", metricNames=" . json_encode($metricNames) . ", batchSize=$batchSize");
             $logger->warning("Note: 'searchAppearance' is not included in dimensions due to GSC API restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
 
+            // Load countries and create a map
+            /** @var Country[] $countries */
+            $countries = $countryRepository->findAll();
+            $countryMap = [];
+            foreach ($countries as $country) {
+                $countryMap[$country->getCode()->value] = $country;
+            }
+
+            // Load devices and create a map
+            /** @var Device[] $devices */
+            $devices = $deviceRepository->findAll();
+            $deviceMap = [];
+            foreach ($devices as $device) {
+                $deviceMap[$device->getType()->value] = $device;
+            }
+
             // Start transaction
             $manager->getConnection()->beginTransaction();
             $logger->info("Started transaction");
@@ -287,6 +302,7 @@ class MetricRequests implements RequestInterface
             $totalDuplicates = 0;
             $counter = 0;
 
+            // Process each site
             foreach ($config['google_search_console']['sites'] as $site) {
                 if ($counter >= 1) {
                     $logger->info("Stopping after first site for testing");
@@ -308,10 +324,8 @@ class MetricRequests implements RequestInterface
                     $batchSize,
                     $filters,
                     $logger,
-                    $createdPages,
-                    $totalMetrics,
-                    $totalRows,
-                    $totalDuplicates
+                    $deviceMap,
+                    $countryMap
                 );
                 $totalMetrics += $result['metrics'];
                 $totalRows += $result['rows'];
@@ -320,7 +334,7 @@ class MetricRequests implements RequestInterface
             }
 
             // Finalize transaction and cache
-            $response = self::finalizeTransaction(
+            return self::finalizeTransaction(
                 $manager,
                 $createdPages,
                 $totalMetrics,
@@ -330,20 +344,51 @@ class MetricRequests implements RequestInterface
                 $startDate,
                 $endDate
             );
-
-            return $response;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             try {
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                     $logger->info("Rolled back transaction");
                 }
-            } catch (\Exception $rollbackException) {
+            } catch (Exception $rollbackException) {
                 $logger->error("Error during transaction rollback: " . $rollbackException->getMessage());
             }
             $logger->error("Unexpected error in getListFromGoogleSearchConsole: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
             throw $e;
+        } catch (GuzzleException $e) {
+            $logger->error("GuzzleException in getListFromGoogleSearchConsole: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+            throw new Exception("GuzzleException in getListFromGoogleSearchConsole: " . $e->getMessage());
         }
+    }
+
+    /**
+     * @param object|null $filters
+     * @param string|bool $resume
+     * @return Response
+     */
+    public static function getListFromPinterest(object $filters = null, string|bool $resume = true): Response
+    {
+        return new Response(json_encode([]));
+    }
+
+    /**
+     * @param object|null $filters
+     * @param string|bool $resume
+     * @return Response
+     */
+    public static function getListFromLinkedIn(object $filters = null, string|bool $resume = true): Response
+    {
+        return new Response(json_encode([]));
+    }
+
+    /**
+     * @param object|null $filters
+     * @param string|bool $resume
+     * @return Response
+     */
+    public static function getListFromX(object $filters = null, string|bool $resume = true): Response
+    {
+        return new Response(json_encode([]));
     }
 
     /**
@@ -397,7 +442,7 @@ class MetricRequests implements RequestInterface
                 );
                 $logger->info("Initialized SearchConsoleApi");
                 return $apiInstance;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $apiRetryCount++;
                 if ($apiRetryCount >= $maxApiRetries) {
                     $logger->error("Failed to initialize SearchConsoleApi after $maxApiRetries retries: " . $e->getMessage());
@@ -428,11 +473,12 @@ class MetricRequests implements RequestInterface
      * @param int $batchSize
      * @param object|null $filters
      * @param LoggerInterface $logger
-     * @param array &$createdPages
-     * @param int &$totalMetrics
-     * @param int &$totalRows
-     * @param int &$totalDuplicates
+     * @param array $deviceMap
+     * @param array $countryMap
      * @return array
+     * @throws GuzzleException
+     * @throws ORMException
+     * @throws \Doctrine\DBAL\Exception
      * @throws Exception
      */
     private static function processSite(
@@ -451,18 +497,20 @@ class MetricRequests implements RequestInterface
         int $batchSize,
         ?object $filters,
         LoggerInterface $logger,
-        array &$createdPages,
-        int &$totalMetrics,
-        int &$totalRows,
-        int &$totalDuplicates
+        array $deviceMap = [],
+        array $countryMap = []
     ): array {
         $siteUrl = $site['url'];
         $siteKey = str_replace(['https://', 'sc-domain:', '/'], '', $siteUrl);
-        $title = $site['title'] ?? $siteUrl;
-        $hostname = $site['hostname'] ?? parse_url($siteUrl, PHP_URL_HOST) ?? str_replace('sc-domain:', '', $siteUrl);
         $normalizedSiteUrl = rtrim($siteUrl, '/');
         $logger->info("Processing site: $siteUrl, normalized: $normalizedSiteUrl, siteKey=$siteKey");
 
+        $targetKeywords = $site['target_keywords'] ?? [];
+        $targetCountries = $site['target_countries'] ?? [];
+        $dimensionFilterGroups = self::getDimensionFilterGroups($filters, $site);
+        $logger->info("Target keywords: " . implode(',', $targetKeywords) . ", countries: " . implode(',', $targetCountries));
+
+        // Get page entity
         $pageEntity = $pageRepository->findOneBy(['url' => $normalizedSiteUrl]);
         if (!$pageEntity) {
             $logger->error("Page entity not found for URL=$normalizedSiteUrl. Run app:initialize-entities command.");
@@ -470,40 +518,17 @@ class MetricRequests implements RequestInterface
         }
         $logger->info("Found Page: ID=" . $pageEntity->getId() . ", URL=$normalizedSiteUrl");
 
-        if ($pageEntity->getTitle() !== $title || $pageEntity->getHostname() !== $hostname) {
-            $pageEntity->addTitle($title)
-                ->addHostname($hostname)
-                ->addUpdatedAt(new \DateTime());
-            $manager->persist($pageEntity);
-            $logger->info("Updated Page entity: ID=" . $pageEntity->getId() . ", URL=$normalizedSiteUrl");
-        }
-
+        // Get last channeled metric
         $lastChanneledMetric = $channeledMetricRepository->getLastByPlatformCreatedAtForSite(
             Channel::google_search_console->value,
             $siteKey
         );
         $logger->info("Last channeled metric: " . ($lastChanneledMetric ? json_encode($lastChanneledMetric) : 'none'));
 
-        $origin = Carbon::parse("2000-01-01");
-        $now = Carbon::now();
-        $min = $startDate ? Carbon::parse($startDate) : (
-        $lastChanneledMetric && filter_var($resume, FILTER_VALIDATE_BOOLEAN)
-            ? Carbon::parse($lastChanneledMetric['platformCreatedAt'])
-            : $origin
-        );
-        $max = $endDate ? Carbon::parse($endDate) : null;
-        $from = $origin->format('Y-m-d');
-        if ($min->lte($now) && $min->gte($origin) && (!$max || $min->lte($max))) {
-            $from = $min->format('Y-m-d');
-        }
-        $to = $max && $max->lte($now) ? $max->format('Y-m-d') : $now->format('Y-m-d');
-        $logger->info("Date range: from=$from, to=$to");
+        // Determine date range
+        list($from, $to) = self::determineDateRange($startDate, $lastChanneledMetric, $resume, $endDate, $logger);
 
-        $targetKeywords = $site['target_keywords'] ?? [];
-        $targetCountries = $site['target_countries'] ?? [];
-        $dimensionFilterGroups = self::getDimensionFilterGroups($filters, $site);
-        $logger->info("Target keywords: " . implode(',', $targetKeywords) . ", countries: " . implode(',', $targetCountries));
-
+        // Initialize daily processing
         $batch = new ArrayCollection();
         $entitiesToInvalidate = ['metric' => [], 'channeledMetric' => [], 'query' => []];
         $queryCache = [];
@@ -511,11 +536,9 @@ class MetricRequests implements RequestInterface
         $channeledMetricCache = [];
         $dimensionCache = [];
         $startTime = microtime(true);
-
         $siteMetrics = 0;
         $siteRows = 0;
         $siteDuplicates = 0;
-
         $period = Carbon::parse($from)->toPeriod($to, '1 day');
         foreach ($period as $day) {
             $dayStr = $day->format('Y-m-d');
@@ -539,7 +562,9 @@ class MetricRequests implements RequestInterface
                 $targetKeywords,
                 $targetCountries,
                 $dimensionFilterGroups,
-                $logger
+                $logger,
+                $deviceMap,
+                $countryMap
             );
             $siteMetrics += $result['metrics'];
             $siteRows += $result['rows'];
@@ -581,8 +606,13 @@ class MetricRequests implements RequestInterface
      * @param array $targetCountries
      * @param array $dimensionFilterGroups
      * @param LoggerInterface $logger
+     * @param array $deviceMap
+     * @param array $countryMap
      * @return array
+     * @throws GuzzleException
+     * @throws NotSupported
      * @throws ORMException
+     * @throws OptimisticLockException
      */
     private static function fetchDailyData(
         string $dayStr,
@@ -604,18 +634,20 @@ class MetricRequests implements RequestInterface
         array $targetKeywords,
         array $targetCountries,
         array $dimensionFilterGroups,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        array $deviceMap = [],
+        array $countryMap = []
     ): array {
         $siteUrl = $site['url'];
         $siteKey = str_replace(['https://', 'sc-domain:', '/'], '', $siteUrl);
         $rowLimit = $site['rowLimit'] ?? 25000;
         $logger->info("Processing GSC data for site $siteUrl, date $dayStr");
 
+        // Initialize counters
         $loopCount = 0;
         $totalMetrics = 0;
         $totalRows = 0;
         $totalDuplicates = 0;
-
         try {
             $api->getAllSearchQueryResultsAndProcess(
                 siteUrl: $siteUrl,
@@ -645,7 +677,9 @@ class MetricRequests implements RequestInterface
                     $pageEntity,
                     $countryRepository,
                     $deviceRepository,
-                    &$totalDuplicates
+                    &$totalDuplicates,
+                    $deviceMap,
+                    $countryMap
                 ) {
                     $loopStart = microtime(true);
                     $loopCount++;
@@ -677,84 +711,51 @@ class MetricRequests implements RequestInterface
                         ], JSON_UNESCAPED_UNICODE));
 
                         if (in_array($metricKey, $metricKeys)) {
-                            $logger->warning("Duplicate metric at index=$index: name={$metric->name}, query=$queryStr, date={$metric->metricDate->format('Y-m-d')}");
+                            $logger->warning("Duplicate metric at index=$index: name=$metric->name, query=$queryStr, date={$metric->metricDate->format('Y-m-d')}");
                             $skippedMetrics++;
                             $totalDuplicates++;
                             continue;
                         }
                         $metricKeys[] = $metricKey;
 
-                        if (!$metricNames || in_array($metric->name, $metricNames)) {
-                            $countryCode = $metric->countryCode;
-                            try {
-                                $countryEnum = CountryEnum::from($countryCode);
-                            } catch (ValueError $e) {
-                                $countryEnum = CountryEnum::OTH;
-                                $logger->info("Country set to 'OTH' for query=$queryStr, original=$countryCode");
-                            }
-                            $countryEntity = $countryRepository->findOneBy(['code' => $countryEnum]);
-                            if (!$countryEntity) {
-                                $countryEntity = $countryRepository->findOneBy(['code' => CountryEnum::OTH]);
-                                if (!$countryEntity) {
-                                    $logger->error("Country OTH not found");
-                                    return;
-                                }
-                                $logger->info("Country set to 'OTH' for query=$queryStr, original=$countryCode");
-                            }
-                            $metric->country = $countryEntity;
-
-                            $deviceType = $metric->deviceType;
-                            try {
-                                $deviceEnum = DeviceEnum::from($deviceType);
-                            } catch (ValueError $e) {
-                                $deviceEnum = DeviceEnum::OTHER;
-                                $logger->warning("Invalid deviceType '$deviceType', defaulting to OTHER");
-                            }
-                            $deviceEntity = $deviceRepository->findOneBy(['type' => $deviceEnum]);
-                            if (!$deviceEntity) {
-                                $logger->error("Device $deviceType not found");
-                                return;
-                            }
-                            $metric->device = $deviceEntity;
-
-                            $batch->add($metric);
-                            $queuedMetrics++;
-                            $totalMetrics++;
-                            $logger->info("Queued metric: query=$queryStr, name={$metric->name}");
-                        } else {
-                            $logger->warning("Skipped metric: name={$metric->name}, not in " . json_encode($metricNames));
-                            $filteredMetrics++;
+                        if ($metricNames && !in_array($metric->name, $metricNames)) {
+                            $logger->warning("Skipped metric: =$metric->name, not in allowed names: " . json_encode($metricNames));
+                            $skippedMetrics++;
+                            continue;
                         }
+
+                        $countryEnum = CountryEnum::tryFrom($metric->countryCode) ?? CountryEnum::OTH;
+                        if ($countryEnum === CountryEnum::OTH) {
+                            $logger->info("Country set to 'OTH' for query=$queryStr, original=$metric->countryCode");
+                        }
+                        $metric->country = $countryMap[$countryEnum->value];
+
+                        $deviceEnum = DeviceEnum::from($metric->deviceType) ?? DeviceEnum::OTHER;
+                        if ($deviceEnum === DeviceEnum::OTHER) {
+                            $logger->info("Device set to 'OTHER' for query=$queryStr, original=$metric->deviceType");
+                        }
+                        $metric->device = $deviceMap[$deviceEnum->value];
+
+                        $batch->add($metric);
+                        $queuedMetrics++;
+                        $totalMetrics++;
+                        $logger->info("Queued metric: query=$queryStr, name=$metric->name");
                     }
 
                     $logger->info("Processed rows: metrics=" . count($pageMetrics) . ", queued=$queuedMetrics, filtered=$filteredMetrics, duplicates=$totalDuplicates, skipped=$skippedMetrics");
 
                     if ($batch->count() >= $batchSize) {
-                        $batchStart = microtime(true);
-                        $logger->info("Processing batch $loopCount for site $siteUrl, " . $batch->count() . " metrics");
-                        try {
-                            self::processBatch(
-                                $batch->toArray(),
-                                $manager,
-                                self::initializeRepositories($manager),
-                                $entitiesToInvalidate,
-                                $queryCache,
-                                $metricCache,
-                                $channeledMetricCache,
-                                $dimensionCache,
-                                $logger,
-                                $pageEntity
-                            );
-                            $manager->flush();
-                            $logger->info("Flushed batch: inserts=" . count($manager->getUnitOfWork()->getScheduledEntityInsertions()) . ", updates=" . count($manager->getUnitOfWork()->getScheduledEntityUpdates()));
-                            $batchTime = microtime(true) - $batchStart;
-                            $logger->info("Processed batch $loopCount for site $siteUrl, took $batchTime seconds");
-                            $batch->clear();
-                            gc_collect_cycles();
-                        } catch (ORMException $e) {
-                            $logger->error("Error processing batch $loopCount for site $siteUrl: " . $e->getMessage());
-                            throw $e;
-                        }
+                        self::processBatchIfNotEmpty(
+                            $batch,
+                            $manager,
+                            $entitiesToInvalidate,
+                            $queryCache,
+                            $metricCache,
+                            $channeledMetricCache,
+                            $dimensionCache,
+                            $logger,
+                            $pageEntity
+                        );
                     }
 
                     $loopTime = microtime(true) - $loopStart;
@@ -764,33 +765,17 @@ class MetricRequests implements RequestInterface
 
             $logger->info("Completed API query for date=$dayStr, duplicates=$totalDuplicates");
 
-            if ($batch->count() > 0) {
-                $batchStart = microtime(true);
-                $logger->info("Processing final batch for site $siteUrl, date $dayStr, " . $batch->count() . " metrics");
-                try {
-                    self::processBatch(
-                        $batch->toArray(),
-                        $manager,
-                        self::initializeRepositories($manager),
-                        $entitiesToInvalidate,
-                        $queryCache,
-                        $metricCache,
-                        $channeledMetricCache,
-                        $dimensionCache,
-                        $logger,
-                        $pageEntity
-                    );
-                    $manager->flush();
-                    $logger->info("Flushed final batch: inserts=" . count($manager->getUnitOfWork()->getScheduledEntityInsertions()) . ", updates=" . count($manager->getUnitOfWork()->getScheduledEntityUpdates()));
-                    $batchTime = microtime(true) - $batchStart;
-                    $batch->clear();
-                    $logger->info("Processed final batch for site $siteUrl, date $dayStr, took $batchTime seconds");
-                    gc_collect_cycles();
-                } catch (ORMException $e) {
-                    $logger->error("Error processing final batch for site $siteUrl, date $dayStr: " . $e->getMessage());
-                    throw $e;
-                }
-            }
+            self::processBatchIfNotEmpty(
+                $batch,
+                $manager,
+                $entitiesToInvalidate,
+                $queryCache,
+                $metricCache,
+                $channeledMetricCache,
+                $dimensionCache,
+                $logger,
+                $pageEntity
+            );
 
             return [
                 'metrics' => $totalMetrics,
@@ -800,6 +785,51 @@ class MetricRequests implements RequestInterface
         } catch (Exception $e) {
             $logger->error("Error during GSC API query for site $siteUrl, date $dayStr: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
             throw $e;
+        }
+    }
+
+    /**
+     * @throws OptimisticLockException
+     * @throws NotSupported
+     * @throws ORMException
+     */
+    private static function processBatchIfNotEmpty(
+        ArrayCollection $batch,
+        EntityManager $manager,
+        array &$entitiesToInvalidate,
+        array &$queryCache,
+        array &$metricCache,
+        array &$channeledMetricCache,
+        array &$dimensionCache,
+        LoggerInterface $logger,
+        Page $pageEntity
+    ): void {
+        if ($batch->count() > 0) {
+            $batchStart = microtime(true);
+            $logger->info("Processing batch: {$batch->count()} metrics");
+            try {
+                self::processBatch(
+                    $batch->toArray(),
+                    $manager,
+                    self::initializeRepositories($manager),
+                    $entitiesToInvalidate,
+                    $queryCache,
+                    $metricCache,
+                    $channeledMetricCache,
+                    $dimensionCache,
+                    $logger,
+                    $pageEntity
+                );
+                $manager->flush();
+                $logger->info("Flushed batch: inserts=" . count($manager->getUnitOfWork()->getScheduledEntityInsertions()) . ", updates=" . count($manager->getUnitOfWork()->getScheduledEntityUpdates()));
+                $batchTime = microtime(true) - $batchStart;
+                $logger->info("Processed batch in $batchTime seconds");
+                $batch->clear();
+                gc_collect_cycles();
+            } catch (ORMException $e) {
+                $logger->error("Error processing batch: " . $e->getMessage());
+                throw $e;
+            }
         }
     }
 
@@ -864,6 +894,9 @@ class MetricRequests implements RequestInterface
      * @param string|null $startDate
      * @param string|null $endDate
      * @return Response
+     * @throws ORMException
+     * @throws OptimisticLockException
+     * @throws \Doctrine\DBAL\Exception
      */
     private static function finalizeTransaction(
         EntityManager $manager,
@@ -920,7 +953,7 @@ class MetricRequests implements RequestInterface
      * @param LoggerInterface $logger
      * @param Page|null $pageEntity
      * @throws ORMException
-     * @throws OptimisticLockException
+     * @throws OptimisticLockException|Exception
      */
     private static function processBatch(
         array $batch,
@@ -992,7 +1025,9 @@ class MetricRequests implements RequestInterface
      * @param EntityManager $manager
      * @param Page|null $pageEntity
      * @param LoggerInterface $logger
-     * @throws RuntimeException
+     * @throws ORMException
+     * @throws OptimisticLockException
+     * @throws TransactionRequiredException
      */
     private static function persistPageEntity(EntityManager $manager, ?Page $pageEntity, LoggerInterface $logger): void
     {
@@ -1053,12 +1088,14 @@ class MetricRequests implements RequestInterface
         int &$dimensionsCount
     ): void {
         try {
+            // Validate metric name
             $queryString = is_string($metric->query) ? $metric->query : ($metric->query instanceof Query ? $metric->query->getQuery() : 'none');
             if ($metric->page instanceof Page && $metric->page !== $pageEntity) {
                 $logger->warning("Metric page mismatch at index $index: query=$queryString, name={$metric->name}");
                 $metric->page = $pageEntity;
             }
 
+            // Get or create the metric entity
             $metricEntity = self::getOrCreateMetric(
                 metric: $metric,
                 repository: $repos['metric'],
@@ -1069,6 +1106,8 @@ class MetricRequests implements RequestInterface
                 pageEntity: $pageEntity,
                 em: $manager
             );
+
+            // Check if the metric entity is managed
             if (!$manager->contains($metricEntity)) {
                 $logger->warning("Metric entity detached: ID=" . $metricEntity->getId() . ", name={$metric->name}");
                 $metricEntity = $manager->find(Metric::class, $metricEntity->getId());
@@ -1077,11 +1116,14 @@ class MetricRequests implements RequestInterface
                     throw new RuntimeException("Failed to reattach Metric entity");
                 }
             }
+
+            // Persist the metric entity
             $manager->persist($metricEntity);
             $entitiesToPersist['metrics'][] = $metricEntity;
             $metricsCount++;
             $logger->info("Metric " . ($metricEntity->getId() ? "found" : "created") . ": ID=" . $metricEntity->getId() . ", name={$metric->name}");
 
+            // Get or create the channeled metric entity
             $channeledMetricEntity = self::getOrCreateChanneledMetric(
                 metricEntity: $metricEntity,
                 channeledMetric: $metric,
@@ -1092,6 +1134,8 @@ class MetricRequests implements RequestInterface
                 channeledMetricCache: $channeledMetricCache,
                 dimensionCache: $dimensionCache
             );
+
+            // Check if the channeled metric entity is managed
             if (!$manager->contains($channeledMetricEntity)) {
                 $logger->warning("ChanneledMetric entity detached: ID=" . $channeledMetricEntity->getId());
                 $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricEntity->getId());
@@ -1100,11 +1144,14 @@ class MetricRequests implements RequestInterface
                     throw new RuntimeException("Failed to reattach ChanneledMetric entity");
                 }
             }
+
+            // Persist the channeled metric entity
             $manager->persist($channeledMetricEntity);
             $entitiesToPersist['channeledMetrics'][] = $channeledMetricEntity;
             $channeledMetricsCount++;
             $logger->info("ChanneledMetric " . ($channeledMetricEntity->getId() ? "found" : "created") . ": ID=" . $channeledMetricEntity->getId());
 
+            // Handle dimensions
             if (isset($metric->dimensions)) {
                 foreach ($metric->dimensions as $dimension) {
                     if (isset($dimension->dimensionKey, $dimension->dimensionValue)) {
@@ -1117,6 +1164,7 @@ class MetricRequests implements RequestInterface
                 }
             }
 
+            // Invalidate caches
             $entitiesToInvalidate['metric'][] = $metricEntity->getId();
             $entitiesToInvalidate['channeledMetric'][] = $channeledMetricEntity->getId();
             if ($metricEntity->getQuery()) {
@@ -1203,36 +1251,6 @@ class MetricRequests implements RequestInterface
         }
         $logger->error("Failed after $maxRetries retries: " . $e->getMessage());
         throw $e;
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromPinterest(object $filters = null, string|bool $resume = true): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromLinkedIn(object $filters = null, string|bool $resume = true): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromX(object $filters = null, string|bool $resume = true): Response
-    {
-        return new Response(json_encode([]));
     }
 
     /**
@@ -1398,9 +1416,11 @@ class MetricRequests implements RequestInterface
         ?Page $pageEntity = null,
         ?EntityManager $em = null
     ): Metric {
+        // Log the metric details
         $queryString = is_string($metric->query) ? strtolower(trim($metric->query)) : ($metric->query instanceof Query ? strtolower(trim($metric->query->getQuery())) : 'none');
-        $logger->info("Entering getOrCreateMetric: metricName={$metric->name}, query={$queryString}, metricDate={$metric->metricDate->format('Y-m-d')}");
+        $logger->info("Entering getOrCreateMetric: metricName=$metric->name, query=$queryString, metricDate={$metric->metricDate->format('Y-m-d')}");
 
+        // Validate metric page
         if ($em && $metric->page instanceof Page && $metric->page !== $pageEntity) {
             $logger->warning("Metric page mismatch: query=$queryString, name=$metric->name");
             $metric->page = $pageEntity;
@@ -1408,7 +1428,7 @@ class MetricRequests implements RequestInterface
 
         // Validate metric value
         if (!isset($metric->value)) {
-            $logger->warning("Metric value is NULL or unset for name={$metric->name}, query={$queryString}, defaulting to 0.0");
+            $logger->warning("Metric value is NULL or unset for name=$metric->name, query=$queryString, defaulting to 0.0");
             $metric->value = 0.0;
         }
 
@@ -1416,52 +1436,32 @@ class MetricRequests implements RequestInterface
         $maxRetries = 3;
         while ($retryCount < $maxRetries) {
             try {
-                $queryEntity = null;
-                if ($metric->channel === Channel::google_search_console->value && isset($metric->query)) {
-                    if (!is_string($queryString) || empty(trim($queryString))) {
-                        $logger->warning("Invalid query: " . print_r($queryString, true));
-                        $queryString = 'unknown';
-                    }
-                    $queryKey = md5($queryString);
-                    if (!isset($queryCache[$queryKey])) {
-                        $queryEntity = $queryRepository->findOneBy(['query' => $queryString]);
-                        if (!$queryEntity) {
-                            try {
-                                $queryEntity = $queryRepository->create((object)['query' => $queryString], true);
-                                if ($em) {
-                                    $em->persist($queryEntity);
-                                    $logger->info("Persisted new Query: '$queryString', ID=" . $queryEntity->getId());
-                                }
-                            } catch (ORMException $e) {
-                                if (str_contains($e->getMessage(), 'SQLSTATE[23000]')) {
-                                    $logger->warning("Duplicate query '$queryString', retrying lookup");
-                                    $queryEntity = $queryRepository->findOneBy(['query' => $queryString]);
-                                    if (!$queryEntity) {
-                                        $logger->error("Failed to find or create Query for '$queryString': " . $e->getMessage());
-                                        throw new Exception("Failed to find or create Query for '$queryString'");
-                                    }
-                                } else {
-                                    $logger->error("Database error creating Query for '$queryString': " . $e->getMessage());
-                                    throw $e;
-                                }
-                            }
-                        }
-                        $queryCache[$queryKey] = $queryEntity;
-                    } else {
-                        $queryEntity = $queryCache[$queryKey];
-                        $logger->info("Query found in cache: '$queryString', ID=" . $queryEntity->getId());
-                    }
-                }
+                // Check if the query is already cached
+                list($queryEntity, $queryString, $queryCache) = self::checkIfTheQueryIsAlreadyCached(
+                    $metric,
+                    $queryString,
+                    $logger,
+                    $queryCache,
+                    $queryRepository,
+                    $em
+                );
 
-                $dimensions = isset($metric->dimensions) ? array_column((array)$metric->dimensions ?? [], 'dimensionValue', 'dimensionKey') : [];
-                $normalizedDimensions = array_map(function ($value) {
-                    return is_string($value) ? strtolower(trim($value)) : ($value ?? 'unknown');
-                }, $dimensions);
-                // Ensure date dimension matches metricDate
-                if (isset($metric->metricDate)) {
-                    $normalizedDimensions['date'] = $metric->metricDate->format('Y-m-d');
-                }
+                // Normalize dimensions
+                $normalizedDimensions = self::getNormalizedDimensions($metric);
 
+                // Log the attempt to find or create the metric
+                $logger->info("Attempting to find Metric with criteria: " . json_encode([
+                        'channel' => $metric->channel,
+                        'name' => $metric->name,
+                        'period' => $metric->period,
+                        'metricDate' => $metric->metricDate->format('Y-m-d'),
+                        'pageId' => $pageEntity?->getId(),
+                        'queryId' => $queryEntity ? $queryEntity->getId() : null,
+                        'countryId' => $metric->country ? $metric->country->getId() : null,
+                        'deviceId' => $metric->device ? $metric->device->getId() : null
+                    ], JSON_UNESCAPED_UNICODE));
+
+                // Create a unique key for the metric
                 $metricKey = md5(json_encode([
                     'channel' => $metric->channel,
                     'name' => $metric->name,
@@ -1474,13 +1474,13 @@ class MetricRequests implements RequestInterface
                     'queryString' => $queryString,
                     'dimensions' => $normalizedDimensions
                 ], JSON_UNESCAPED_UNICODE));
-
+                // Log the metric key for debugging
                 if (isset($metricCache[$metricKey])) {
                     $logger->info("Metric found in cache: ID=" . $metricCache[$metricKey]->getId() . ", name=$metric->name, query=$queryString");
                     return $metricCache[$metricKey];
                 }
 
-                // Use findOneBy with exact metric_unique fields
+                // Check if the metric already exists in the database
                 $criteria = [
                     'channel' => $metric->channel,
                     'name' => $metric->name,
@@ -1499,21 +1499,7 @@ class MetricRequests implements RequestInterface
                     'customer' => null,
                     'order' => null
                 ];
-
-                $logger->info("Attempting to find Metric with criteria: " . json_encode([
-                        'channel' => $metric->channel,
-                        'name' => $metric->name,
-                        'period' => $metric->period,
-                        'metricDate' => $metric->metricDate->format('Y-m-d'),
-                        'pageId' => $pageEntity?->getId(),
-                        'queryId' => $queryEntity ? $queryEntity->getId() : null,
-                        'countryId' => $metric->country ? $metric->country->getId() : null,
-                        'deviceId' => $metric->device ? $metric->device->getId() : null
-                    ], JSON_UNESCAPED_UNICODE));
-
-                $metricEntity = $repository->findOneBy($criteria);
-
-                if ($metricEntity) {
+                if ($metricEntity = $repository->findOneBy($criteria)) {
                     $logger->info("Existing Metric found in database: ID=" . $metricEntity->getId() . ", name=$metric->name, query=$queryString");
                     if ($em && !$em->contains($metricEntity)) {
                         $logger->warning("Metric entity detached: ID=" . $metricEntity->getId() . ", name=$metric->name");
@@ -1527,22 +1513,24 @@ class MetricRequests implements RequestInterface
                     return $metricEntity;
                 }
 
+                // If not found, create a new Metric entity
                 $logger->info("Creating new Metric for $metric->name, query=$queryString");
                 $metric->query = $queryEntity;
                 try {
-                    $cleanMetric = (object) [
-                        'channel' => $metric->channel,
-                        'name' => $metric->name,
-                        'period' => $metric->period,
-                        'metricDate' => $metric->metricDate,
-                        'query' => $queryEntity,
-                        'page' => $pageEntity instanceof Page && $pageEntity->getId() ? $pageEntity : null,
-                        'country' => $metric->country,
-                        'device' => $metric->device,
-                        'value' => $metric->value ?: 0.0, // Ensure non-NULL
-                        'metadata' => $metric->metadata ?? []
-                    ];
-                    $metricEntity = $repository->create($cleanMetric, true);
+                    $metricEntity = $repository->create(
+                        (object) [
+                            'channel' => $metric->channel,
+                            'name' => $metric->name,
+                            'period' => $metric->period,
+                            'metricDate' => $metric->metricDate,
+                            'query' => $queryEntity,
+                            'page' => $pageEntity instanceof Page && $pageEntity->getId() ? $pageEntity : null,
+                            'country' => $metric->country,
+                            'device' => $metric->device,
+                            'value' => $metric->value ?: 0.0, // Ensure non-NULL
+                            'metadata' => $metric->metadata ?? []
+                        ]
+                    , true);
                     if (!$metricEntity->getId()) {
                         $logger->error("Metric entity created but has no ID: name=$metric->name, query=$queryString");
                     }
@@ -1633,6 +1621,7 @@ class MetricRequests implements RequestInterface
         array &$channeledMetricCache = [],
         array &$dimensionCache = []
     ): ChanneledMetric {
+        // Validate channeledMetric properties
         $logger->info("Entering getOrCreateChanneledMetric: platformId=" . ($channeledMetric->platformId ?? 'null') . ", metricId={$metricEntity->getId()}");
         $channeledMetric->metric = $metricEntity;
 
@@ -1650,136 +1639,28 @@ class MetricRequests implements RequestInterface
         ], JSON_UNESCAPED_UNICODE));
         $logger->info("Computed cacheKey: $cacheKey");
 
+        // Check if channeled metric is already cached
         $dimensionsToPersist = [];
         $retryCount = 0;
         $maxRetries = 3;
-
         while ($retryCount < $maxRetries) {
             try {
                 $logger->info("Attempting to find ChanneledMetric: platformId=" . ($channeledMetric->platformId ?? 'null') . ", channel=" . ($channeledMetric->channel ?? 'null') . ", metricId={$metricEntity->getId()}, platformCreatedAt={$platformCreatedAt->format('Y-m-d')}");
 
-                // Check cache first
-                if (isset($channeledMetricCache[$cacheKey])) {
-                    $logger->info("ChanneledMetric found in cache: id=" . $channeledMetricCache[$cacheKey]->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
-                    $channeledMetricEntity = $channeledMetricCache[$cacheKey];
-                } else {
-                    // Query database
-                    $criteria = [
-                        'platformId' => $channeledMetric->platformId ?? null,
-                        'channel' => $channeledMetric->channel ?? 8,
-                        'metric' => $metricEntity,
-                        'platformCreatedAt' => $platformCreatedAt
-                    ];
-                    $existing = $repository->findOneBy($criteria);
-
-                    if ($existing) {
-                        // Update existing entity
-                        $existingData = $existing->getData() ?? [];
-                        $newData = (array) ($channeledMetric->data ?? []);
-                        $updatedData = [
-                            'impressions' => max($existingData['impressions'] ?? 0, $newData['impressions'] ?? 0),
-                            'clicks' => max($existingData['clicks'] ?? 0, $newData['clicks'] ?? 0),
-                            'position_weighted' => max($existingData['position_weighted'] ?? 0, $newData['position_weighted'] ?? 0),
-                            'ctr' => max($existingData['ctr'] ?? 0, $newData['ctr'] ?? 0)
-                        ];
-
-                        $existing->addData($updatedData);
-                        $existing->addPlatformCreatedAt($platformCreatedAt);
-                        $existing->addUpdatedAt(new DateTime());
-                        $manager->persist($existing);
-
-                        // Check if entity is managed
-                        if (!$manager->contains($existing)) {
-                            $logger->error("ChanneledMetric entity detached after update: ID=" . $existing->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
-                            $existing = $manager->find(ChanneledMetric::class, $existing->getId());
-                            if (!$existing) {
-                                $logger->error("Failed to reattach ChanneledMetric: ID=" . $existing->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
-                                throw new Exception("Failed to reattach ChanneledMetric ID=" . $existing->getId());
-                            }
-                            // Reapply updates
-                            $existing->addData($updatedData);
-                            $existing->addPlatformCreatedAt($platformCreatedAt);
-                            $existing->addUpdatedAt(new DateTime());
-                            $manager->persist($existing);
-                        }
-                        $channeledMetricCache[$cacheKey] = $existing; // Cache the updated entity
-                        $logger->info("Updated existing ChanneledMetric: id=" . $existing->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null') . ", data=" . json_encode($updatedData));
-                        $channeledMetricEntity = $existing;
-                    } else {
-                        // Create new entity
-                        $channeledMetric->data = (array) ($channeledMetric->data ?? []);
-                        $channeledMetricEntity = $repository->create($channeledMetric, true);
-                        if (!$channeledMetricEntity->getId()) {
-                            $logger->error("ChanneledMetric entity created but has no ID: platformId=" . ($channeledMetric->platformId ?? 'null'));
-                        }
-                        if (!$manager->contains($channeledMetricEntity)) {
-                            $logger->error("ChanneledMetric entity detached after creation: ID=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
-                            $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricEntity->getId());
-                            if (!$channeledMetricEntity) {
-                                $logger->error("Failed to reattach ChanneledMetric after creation: ID=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
-                                throw new Exception("Failed to reattach ChanneledMetric ID=" . $channeledMetricEntity->getId());
-                            }
-                        }
-                        $manager->persist($channeledMetricEntity); // Ensure persisted
-                        $channeledMetricCache[$cacheKey] = $channeledMetricEntity;
-                        $logger->info("Created new ChanneledMetric: id={$channeledMetricEntity->getId()}, platformId=" . ($channeledMetric->platformId ?? 'null') . ", data=" . json_encode($channeledMetric->data));
-                    }
-                }
+                // Attempt to find existing channeled metric
+                list($channeledMetricCache, $channeledMetricEntity) = self::processChanneledMetric($channeledMetricCache,
+                    $cacheKey, $logger, $channeledMetric, $metricEntity, $platformCreatedAt, $repository, $manager);
 
                 // Process dimensions
-                if (isset($channeledMetric->dimensions)) {
-                    foreach ($channeledMetric->dimensions as $dimensionData) {
-                        $dimensionKey = $dimensionData->dimensionKey ?? null;
-                        $dimensionValue = $dimensionData->dimensionValue ?? null;
-                        if (!$dimensionKey || !$dimensionValue || in_array($dimensionKey, ['site', 'country', 'device'])) {
-                            $logger->warning("Skipping invalid dimension: key=" . ($dimensionKey ?? 'null') . ", value=" . ($dimensionValue ?? 'null') . " for ChanneledMetric ID={$channeledMetricEntity->getId()}");
-                            continue;
-                        }
-                        $dimCacheKey = md5($channeledMetricEntity->getId() . $dimensionKey . $dimensionValue);
-                        if (!isset($dimensionCache[$dimCacheKey])) {
-                            $existingDimension = $dimensionRepository->findOneByKeyValueAndMetric(
-                                $dimensionKey,
-                                $dimensionValue,
-                                $channeledMetricEntity
-                            );
-                            if ($existingDimension) {
-                                $dimensionCache[$dimCacheKey] = $existingDimension;
-                                $logger->info("Found ChanneledMetricDimension: key=$dimensionKey, value=$dimensionValue");
-                            } else {
-                                $dimension = new ChanneledMetricDimension();
-                                $dimension->addDimensionKey($dimensionKey)
-                                    ->addDimensionValue($dimensionValue)
-                                    ->addChanneledMetric($channeledMetricEntity);
-                                $dimensionsToPersist[] = $dimension;
-                                $dimensionCache[$dimCacheKey] = $dimension;
-                                $logger->info("Created ChanneledMetricDimension: key=$dimensionKey, value=$dimensionValue");
-                            }
-                        }
-                    }
-                }
-
-                // Persist dimensions
-                foreach ($dimensionsToPersist as $dimension) {
-                    try {
-                        $manager->persist($dimension);
-                    } catch (ORMException $e) {
-                        if (str_contains($e->getMessage(), 'SQLSTATE[23000]')) {
-                            $logger->warning("Duplicate ChanneledMetricDimension: key=" . $dimension->getDimensionKey() . ", value=" . $dimension->getDimensionValue());
-                            $existingDimension = $dimensionRepository->findOneByKeyValueAndMetric(
-                                $dimension->getDimensionKey(),
-                                $dimension->getDimensionValue(),
-                                $channeledMetricEntity
-                            );
-                            if ($existingDimension) {
-                                $dimCacheKey = md5($channeledMetricEntity->getId() . $dimension->getDimensionKey() . $dimension->getDimensionValue());
-                                $dimensionCache[$dimCacheKey] = $existingDimension;
-                                continue;
-                            }
-                        }
-                        $logger->error("Error persisting ChanneledMetricDimension: key=" . $dimension->getDimensionKey() . ", value=" . $dimension->getDimensionValue() . ": " . $e->getMessage());
-                        throw $e;
-                    }
-                }
+                list($dimensionCache) = self::processDimensions(
+                    $channeledMetric,
+                    $logger,
+                    $channeledMetricEntity,
+                    $dimensionCache,
+                    $dimensionRepository,
+                    $dimensionsToPersist,
+                    $manager
+                );
 
                 $logger->info("Exiting getOrCreateChanneledMetric: channeledMetricId={$channeledMetricEntity->getId()}");
                 return $channeledMetricEntity;
@@ -1811,33 +1692,280 @@ class MetricRequests implements RequestInterface
     }
 
     /**
-     * @throws OptimisticLockException
+     * @param string|null $startDate
+     * @param $lastChanneledMetric
+     * @param bool|string $resume
+     * @param string|null $endDate
+     * @param LoggerInterface $logger
+     * @return array
+     */
+    protected static function determineDateRange(
+        ?string $startDate,
+        $lastChanneledMetric,
+        bool|string $resume,
+        ?string $endDate,
+        LoggerInterface $logger
+    ): array {
+        $origin = Carbon::parse("2000-01-01");
+        $now = Carbon::now();
+        $min = $startDate ? Carbon::parse($startDate) : (
+        $lastChanneledMetric && filter_var($resume, FILTER_VALIDATE_BOOLEAN)
+            ? Carbon::parse($lastChanneledMetric['platformCreatedAt'])
+            : $origin
+        );
+        $max = $endDate ? Carbon::parse($endDate) : null;
+        $from = $origin->format('Y-m-d');
+        if ($min->lte($now) && $min->gte($origin) && (!$max || $min->lte($max))) {
+            $from = $min->format('Y-m-d');
+        }
+        $to = $max && $max->lte($now) ? $max->format('Y-m-d') : $now->format('Y-m-d');
+        $logger->info("Date range: from=$from, to=$to");
+        return array($from, $to);
+    }
+
+    /**
+     * @param object $channeledMetric
+     * @param LoggerInterface $logger
+     * @param mixed $channeledMetricEntity
+     * @param array $dimensionCache
+     * @param EntityRepository $dimensionRepository
+     * @param array $dimensionsToPersist
+     * @param EntityManager $manager
+     * @return array
      * @throws ORMException
      */
-    public static function getOrCreateChanneledMetricDimension(
-        ChanneledMetric $channeledMetricEntity,
-        ?string $dimensionKey,
-        ?string $dimensionValue,
-        EntityRepository $repository
-    ): ChanneledMetricDimension {
-        $existing = $repository->findOneByKeyValueAndMetric(
-            $dimensionKey,
-            $dimensionValue,
-            $channeledMetricEntity
-        );
-
-        if ($existing) {
-            return $existing;
+    protected static function processDimensions(
+        object $channeledMetric,
+        LoggerInterface $logger,
+        mixed $channeledMetricEntity,
+        array $dimensionCache,
+        EntityRepository $dimensionRepository,
+        array $dimensionsToPersist,
+        EntityManager $manager
+    ): array {
+        // Process dimensions
+        if (isset($channeledMetric->dimensions)) {
+            foreach ($channeledMetric->dimensions as $dimensionData) {
+                $dimensionKey = $dimensionData->dimensionKey ?? null;
+                $dimensionValue = $dimensionData->dimensionValue ?? null;
+                if (!$dimensionKey || !$dimensionValue || in_array($dimensionKey, ['site', 'country', 'device'])) {
+                    $logger->warning("Skipping invalid dimension: key=" . ($dimensionKey ?? 'null') . ", value=" . ($dimensionValue ?? 'null') . " for ChanneledMetric ID={$channeledMetricEntity->getId()}");
+                    continue;
+                }
+                $dimCacheKey = md5($channeledMetricEntity->getId() . $dimensionKey . $dimensionValue);
+                if (!isset($dimensionCache[$dimCacheKey])) {
+                    $existingDimension = $dimensionRepository->findOneByKeyValueAndMetric(
+                        $dimensionKey,
+                        $dimensionValue,
+                        $channeledMetricEntity
+                    );
+                    if ($existingDimension) {
+                        $dimensionCache[$dimCacheKey] = $existingDimension;
+                        $logger->info("Found ChanneledMetricDimension: key=$dimensionKey, value=$dimensionValue");
+                    } else {
+                        $dimension = new ChanneledMetricDimension();
+                        $dimension->addDimensionKey($dimensionKey)
+                            ->addDimensionValue($dimensionValue)
+                            ->addChanneledMetric($channeledMetricEntity);
+                        $dimensionsToPersist[] = $dimension;
+                        $dimensionCache[$dimCacheKey] = $dimension;
+                        $logger->info("Created ChanneledMetricDimension: key=$dimensionKey, value=$dimensionValue");
+                    }
+                }
+            }
         }
 
-        return $repository->create(
-            data: (object)[
-                'dimensionKey' => $dimensionKey,
-                'dimensionValue' => $dimensionValue,
-                'channeledMetric' => $channeledMetricEntity,
-            ],
-            returnEntity: true
-        );
+        // Persist dimensions
+        foreach ($dimensionsToPersist as $dimension) {
+            try {
+                $manager->persist($dimension);
+            } catch (ORMException $e) {
+                if (str_contains($e->getMessage(), 'SQLSTATE[23000]')) {
+                    $logger->warning("Duplicate ChanneledMetricDimension: key=" . $dimension->getDimensionKey() . ", value=" . $dimension->getDimensionValue());
+                    $existingDimension = $dimensionRepository->findOneByKeyValueAndMetric(
+                        $dimension->getDimensionKey(),
+                        $dimension->getDimensionValue(),
+                        $channeledMetricEntity
+                    );
+                    if ($existingDimension) {
+                        $dimCacheKey = md5($channeledMetricEntity->getId() . $dimension->getDimensionKey() . $dimension->getDimensionValue());
+                        $dimensionCache[$dimCacheKey] = $existingDimension;
+                        continue;
+                    }
+                }
+                $logger->error("Error persisting ChanneledMetricDimension: key=" . $dimension->getDimensionKey() . ", value=" . $dimension->getDimensionValue() . ": " . $e->getMessage());
+                throw $e;
+            }
+        }
+        return array($dimensionCache);
+    }
+
+    /**
+     * @param array $channeledMetricCache
+     * @param string $cacheKey
+     * @param LoggerInterface $logger
+     * @param object $channeledMetric
+     * @param Metric $metricEntity
+     * @param DateTime $platformCreatedAt
+     * @param EntityRepository $repository
+     * @param EntityManager $manager
+     * @return array
+     * @throws ORMException
+     * @throws OptimisticLockException
+     * @throws TransactionRequiredException
+     * @throws Exception
+     */
+    protected static function processChanneledMetric(
+        array $channeledMetricCache,
+        string $cacheKey,
+        LoggerInterface $logger,
+        object $channeledMetric,
+        Metric $metricEntity,
+        DateTime $platformCreatedAt,
+        EntityRepository $repository,
+        EntityManager $manager
+    ): array {
+        // Check cache first
+        if (isset($channeledMetricCache[$cacheKey])) {
+            $logger->info("ChanneledMetric found in cache: id=" . $channeledMetricCache[$cacheKey]->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+            $channeledMetricEntity = $channeledMetricCache[$cacheKey];
+        } else {
+            // Query database
+            $criteria = [
+                'platformId' => $channeledMetric->platformId ?? null,
+                'channel' => $channeledMetric->channel ?? 8,
+                'metric' => $metricEntity,
+                'platformCreatedAt' => $platformCreatedAt
+            ];
+
+            if ($channeledMetricEntity = $repository->findOneBy($criteria)) {
+                // Update existing entity
+                $channeledMetricData = $channeledMetricEntity->getData() ?? [];
+                $newData = (array)($channeledMetric->data ?? []);
+                $updatedData = [
+                    'impressions' => max($channeledMetricData['impressions'] ?? 0, $newData['impressions'] ?? 0),
+                    'clicks' => max($channeledMetricData['clicks'] ?? 0, $newData['clicks'] ?? 0),
+                    'position_weighted' => max($channeledMetricData['position_weighted'] ?? 0,
+                        $newData['position_weighted'] ?? 0),
+                    'ctr' => max($channeledMetricData['ctr'] ?? 0, $newData['ctr'] ?? 0)
+                ];
+
+                $channeledMetricEntity->addData($updatedData);
+                $channeledMetricEntity->addPlatformCreatedAt($platformCreatedAt);
+                $channeledMetricEntity->addUpdatedAt(new DateTime());
+                $manager->persist($channeledMetricEntity);
+
+                // Check if entity is managed
+                if (!$manager->contains($channeledMetricEntity)) {
+                    $logger->error("ChanneledMetric entity detached after update: ID=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+                    $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricEntity->getId());
+                    if (!$channeledMetricEntity) {
+                        $logger->error("Failed to reattach ChanneledMetric: ID=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+                        throw new Exception("Failed to reattach ChanneledMetric ID=" . $channeledMetricEntity->getId());
+                    }
+                    // Reapply updates
+                    $channeledMetricEntity->addData($updatedData);
+                    $channeledMetricEntity->addPlatformCreatedAt($platformCreatedAt);
+                    $channeledMetricEntity->addUpdatedAt(new DateTime());
+                    $manager->persist($channeledMetricEntity);
+                }
+                $channeledMetricCache[$cacheKey] = $channeledMetricEntity; // Cache the updated entity
+                $logger->info("Updated existing ChanneledMetric: id=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null') . ", data=" . json_encode($updatedData));
+            } else {
+                // Create new entity
+                $channeledMetric->data = (array)($channeledMetric->data ?? []);
+                $channeledMetricEntity = $repository->create($channeledMetric, true);
+                if (!$channeledMetricEntity->getId()) {
+                    $logger->error("ChanneledMetric entity created but has no ID: platformId=" . ($channeledMetric->platformId ?? 'null'));
+                }
+                if (!$manager->contains($channeledMetricEntity)) {
+                    $logger->error("ChanneledMetric entity detached after creation: ID=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+                    $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricEntity->getId());
+                    if (!$channeledMetricEntity) {
+                        $logger->error("Failed to reattach ChanneledMetric after creation: ID=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+                        throw new Exception("Failed to reattach ChanneledMetric ID=" . $channeledMetricEntity->getId());
+                    }
+                }
+                $manager->persist($channeledMetricEntity); // Ensure persisted
+                $channeledMetricCache[$cacheKey] = $channeledMetricEntity;
+                $logger->info("Created new ChanneledMetric: id={$channeledMetricEntity->getId()}, platformId=" . ($channeledMetric->platformId ?? 'null') . ", data=" . json_encode($channeledMetric->data));
+            }
+        }
+        return array($channeledMetricCache, $channeledMetricEntity);
+    }
+
+    /**
+     * @param object $metric
+     * @param mixed $queryString
+     * @param LoggerInterface $logger
+     * @param array $queryCache
+     * @param EntityRepository $queryRepository
+     * @param EntityManager|null $em
+     * @return array
+     * @throws ORMException
+     */
+    protected static function checkIfTheQueryIsAlreadyCached(
+        object $metric,
+        mixed $queryString,
+        LoggerInterface $logger,
+        array $queryCache,
+        EntityRepository $queryRepository,
+        ?EntityManager $em
+    ): array {
+        $queryEntity = null;
+        if ($metric->channel === Channel::google_search_console->value && isset($metric->query)) {
+            if (!is_string($queryString) || empty(trim($queryString))) {
+                $logger->warning("Invalid query: " . print_r($queryString, true));
+                $queryString = 'unknown';
+            }
+            $queryKey = md5($queryString);
+            if (!isset($queryCache[$queryKey])) {
+                if (!$queryEntity = $queryRepository->findOneBy(['query' => $queryString])) {
+                    try {
+                        $queryEntity = $queryRepository->create((object)['query' => $queryString], true);
+                        if ($em) {
+                            $em->persist($queryEntity);
+                            $logger->info("Persisted new Query: '$queryString', ID=" . $queryEntity->getId());
+                        }
+                    } catch (ORMException $e) {
+                        if (str_contains($e->getMessage(), 'SQLSTATE[23000]')) {
+                            $logger->warning("Duplicate query '$queryString', retrying lookup");
+                            $queryEntity = $queryRepository->findOneBy(['query' => $queryString]);
+                            if (!$queryEntity) {
+                                $logger->error("Failed to find or create Query for '$queryString': " . $e->getMessage());
+                                throw new Exception("Failed to find or create Query for '$queryString'");
+                            }
+                        } else {
+                            $logger->error("Database error creating Query for '$queryString': " . $e->getMessage());
+                            throw $e;
+                        }
+                    }
+                }
+                $queryCache[$queryKey] = $queryEntity;
+            } else {
+                $queryEntity = $queryCache[$queryKey];
+                $logger->info("Query found in cache: '$queryString', ID=" . $queryEntity->getId());
+            }
+        }
+        return array($queryEntity, $queryString, $queryCache);
+    }
+
+    /**
+     * @param object $metric
+     * @return array|string[]
+     */
+    protected static function getNormalizedDimensions(object $metric): array
+    {
+        $dimensions = isset($metric->dimensions) ? array_column((array)$metric->dimensions ?? [], 'dimensionValue',
+            'dimensionKey') : [];
+        $normalizedDimensions = array_map(function ($value) {
+            return is_string($value) ? strtolower(trim($value)) : ($value ?? 'unknown');
+        }, $dimensions);
+        // Ensure date dimension matches metricDate
+        if (isset($metric->metricDate)) {
+            $normalizedDimensions['date'] = $metric->metricDate->format('Y-m-d');
+        }
+        return $normalizedDimensions;
     }
 
     /**
