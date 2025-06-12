@@ -12,6 +12,7 @@ use Repositories\Channeled\ChanneledMetricRepository;
 #[ORM\Table(name: 'channeled_metrics')]
 #[ORM\UniqueConstraint(name: 'channeled_metrics_unique_idx', columns: ['platformId', 'channel', 'metric_id', 'platformCreatedAt'])]
 #[ORM\Index(columns: ['metric_id'], name: 'metric_id_idx')]
+#[ORM\Index(columns: ['metric_id', 'platformCreatedAt'], name: 'metric_id_platformCreatedAt_idx')]
 #[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
 #[ORM\Index(columns: ['platformId', 'channel', 'metric_id'], name: 'platformId_channel_metric_id_idx')]
 #[ORM\Index(columns: ['platformId', 'channel', 'platformCreatedAt'], name: 'platformId_channel_platformCreatedAt_idx')]
