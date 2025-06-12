@@ -32,9 +32,6 @@ class Page extends Entity
     public function __construct()
     {
         $this->metrics = new ArrayCollection();
-        $url = $this->url ?? 'unknown';
-        $id = $this->id ?? 'new';
-        error_log("Page::construct: Creating Page: id={$id}, url={$url}, trace=" . (new \Exception())->getTraceAsString());
     }
 
     /**

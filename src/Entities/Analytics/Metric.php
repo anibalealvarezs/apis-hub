@@ -290,24 +290,8 @@ class Metric extends Entity
     // In Entities\Analytics\Metric.php
     public function addPage(?Page $page): self
     {
-        $trace = (new \Exception())->getTraceAsString();
-        if ($page && !$page->getId()) {
-            error_log("Metric::addPage: Unmanaged Page: url=" . ($page->getUrl() ?? 'unknown') . ", trace=" . $trace);
-        } elseif ($page) {
-            error_log("Metric::addPage: Setting page: id={$page->getId()}, url={$page->getUrl()}, trace=" . $trace);
-        } else {
-            error_log("Metric::addPage: Setting page to null, trace=" . $trace);
-        }
         $this->page = $page;
         return $this;
-    }
-
-    public function __set($name, $value)
-    {
-        if ($name === 'page') {
-            error_log("Metric: Direct page property access detected: url=" . ($value->getUrl() ?? 'unknown') . ", trace=" . (new \Exception())->getTraceAsString());
-            $this->addPage($value);
-        }
     }
 
     /**

@@ -51,7 +51,6 @@ class MetricRepository extends BaseRepository
                                 continue; // Skip setting unmanaged Page
                             }
                             $entity->$setter($value);
-                            error_log("BaseRepository::create: Set property for {$entityName}: key={$key}, value_type=" . gettype($value) . ($value instanceof Page ? ", page_id=" . ($value->getId() ?: 'new') . ", page_url=" . $value->getUrl() : ''));
                         }
                     }
                 }
