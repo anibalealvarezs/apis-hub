@@ -375,4 +375,15 @@ class Helpers
     {
         return array_reduce($needles, fn($a, $n) => $a && str_contains($haystack, $n), true);
     }
+
+    /**
+     * Dump data as JSON for debugging purposes.
+     * @param mixed $data
+     * @return void
+     */
+    public static function dumpDebugJson(array $data){
+        header('Content-Type: application/json');
+        echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        die();
+    }
 }
