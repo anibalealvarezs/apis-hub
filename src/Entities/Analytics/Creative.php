@@ -22,7 +22,7 @@ class Creative extends Entity
     protected string $name;
 
     #[ORM\Column(type: 'json', nullable: true)]
-    protected array $data = [];
+    protected ?array $data = [];
 
     #[ORM\OneToMany(mappedBy: 'creative', targetEntity: ChanneledAd::class)]
     protected Collection $channeledAds;
@@ -83,10 +83,10 @@ class Creative extends Entity
 
     /**
      * Sets the creative data.
-     * @param array $data
+     * @param array|null $data
      * @return self
      */
-    public function addData(array $data): self
+    public function addData(?array $data): self
     {
         $this->data = $data;
         return $this;

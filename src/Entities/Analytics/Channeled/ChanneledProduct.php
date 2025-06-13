@@ -25,7 +25,7 @@ class ChanneledProduct extends ChanneledEntity
     protected int|string $platformId;
 
     #[ORM\Column(type: 'string', nullable: true)]
-    protected int|string $sku;
+    protected int|string|null $sku;
 
     // Relationships with channeled entities
 
@@ -67,10 +67,10 @@ class ChanneledProduct extends ChanneledEntity
     }
 
     /**
-     * @param string $sku
+     * @param string|null $sku
      * @return ChanneledProduct
      */
-    public function addSku(string $sku): self
+    public function addSku(?string $sku): self
     {
         $this->sku = $sku;
 

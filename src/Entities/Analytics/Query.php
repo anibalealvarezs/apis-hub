@@ -18,7 +18,7 @@ class Query extends Entity
     protected string $query;
 
     #[ORM\Column(type: 'json', nullable: true)]
-    protected array $data = [];
+    protected ?array $data = [];
 
     #[ORM\OneToMany(mappedBy: 'query', targetEntity: Metric::class, orphanRemoval: true)]
     protected Collection $metrics;
@@ -59,10 +59,10 @@ class Query extends Entity
 
     /**
      * Sets the query-specific data.
-     * @param array $data
+     * @param array|null $data
      * @return self
      */
-    public function addData(array $data): self
+    public function addData(?array $data): self
     {
         $this->data = $data;
         return $this;

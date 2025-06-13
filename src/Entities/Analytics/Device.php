@@ -7,8 +7,9 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Entities\Entity;
 use Enums\Device as DeviceEnum;
+use Repositories\DeviceRepository;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: DeviceRepository::class)]
 #[ORM\Table(name: 'devices')]
 #[ORM\UniqueConstraint(name: 'device_type_unique', columns: ['type'])]
 #[ORM\HasLifecycleCallbacks]

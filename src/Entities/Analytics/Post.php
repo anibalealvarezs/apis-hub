@@ -18,7 +18,7 @@ class Post extends Entity
     protected string $postId;
 
     #[ORM\Column(type: 'json', nullable: true)]
-    protected array $data = [];
+    protected ?array $data = [];
 
     #[ORM\OneToMany(mappedBy: 'post', targetEntity: Metric::class, orphanRemoval: true)]
     protected Collection $metrics;
@@ -59,10 +59,10 @@ class Post extends Entity
 
     /**
      * Sets the post-specific data.
-     * @param array $data
+     * @param array|null $data
      * @return self
      */
-    public function addData(array $data): self
+    public function addData(?array $data): self
     {
         $this->data = $data;
         return $this;

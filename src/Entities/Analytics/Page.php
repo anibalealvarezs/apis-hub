@@ -24,7 +24,7 @@ class Page extends Entity
     protected ?string $hostname = null;
 
     #[ORM\Column(type: 'json', nullable: true)]
-    protected array $data = [];
+    protected ?array $data = [];
 
     #[ORM\OneToMany(mappedBy: 'page', targetEntity: Metric::class, orphanRemoval: true)]
     protected Collection $metrics;
@@ -105,10 +105,10 @@ class Page extends Entity
 
     /**
      * Sets the page-specific data.
-     * @param array $data
+     * @param array|null $data
      * @return self
      */
-    public function addData(array $data): self
+    public function addData(?array $data): self
     {
         $this->data = $data;
         return $this;

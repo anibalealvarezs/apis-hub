@@ -21,7 +21,7 @@ class Product extends Entity
     protected int|string $productId;
 
     #[ORM\Column(type: 'string', nullable: true)]
-    protected int|string $sku;
+    protected int|string|null $sku;
 
     #[ORM\OneToMany(mappedBy: 'product', targetEntity: ChanneledProduct::class, orphanRemoval: true)]
     protected Collection $channeledProducts;
@@ -63,10 +63,10 @@ class Product extends Entity
     }
 
     /**
-     * @param string $sku
+     * @param string|null $sku
      * @return Product
      */
-    public function addSku(string $sku): self
+    public function addSku(?string $sku): self
     {
         $this->sku = $sku;
 

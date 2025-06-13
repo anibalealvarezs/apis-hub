@@ -7,8 +7,9 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Entities\Entity;
 use Enums\Country as CountryEnum;
+use Repositories\CountryRepository;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: CountryRepository::class)]
 #[ORM\Table(name: 'countries')]
 #[ORM\UniqueConstraint(name: 'country_code_unique', columns: ['code'])]
 #[ORM\HasLifecycleCallbacks]

@@ -108,10 +108,10 @@ class Metric extends Entity
     protected ?Device $device = null;
 
     #[ORM\Column(type: 'json', nullable: true)]
-    protected array $metadata = [];
+    protected ?array $metadata = [];
 
     /* #[ORM\Column(type: 'json', nullable: true)]
-    protected array $dimensions = []; */
+    protected ?array $dimensions = []; */
 
     /**
      * @return int
@@ -429,10 +429,10 @@ class Metric extends Entity
     }
 
     /**
-     * @param array $metadata
+     * @param array|null $metadata
      * @return self
      */
-    public function addMetadata(array $metadata): self
+    public function addMetadata(?array $metadata): self
     {
         $this->metadata = $metadata;
         return $this;
