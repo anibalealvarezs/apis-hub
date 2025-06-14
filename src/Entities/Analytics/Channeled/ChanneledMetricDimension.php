@@ -20,7 +20,7 @@ use Repositories\Channeled\ChanneledMetricDimensionRepository;
 class ChanneledMetricDimension extends Entity
 {
     #[ORM\ManyToOne(targetEntity: ChanneledMetric::class, inversedBy: 'dimensions')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'channeledMetric_id', onDelete: 'cascade')]
     protected ChanneledMetric $channeledMetric;
 
     #[ORM\Column(type: 'string', length: 255)]
