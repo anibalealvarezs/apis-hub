@@ -5,6 +5,9 @@ namespace Classes\Conversions;
 use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\Exception\ORMException;
+use Doctrine\ORM\OptimisticLockException;
+use Doctrine\ORM\TransactionRequiredException;
 use Entities\Analytics\Page;
 use Enums\Channel;
 use Enums\Period;
@@ -25,8 +28,11 @@ class GoogleSearchConsoleConvert
      * @param array $targetCountries
      * @param LoggerInterface|null $logger
      * @param Page|null $pageEntity
+     * @param EntityManager|null $em
      * @return ArrayCollection
-     * @throws Exception
+     * @throws ORMException
+     * @throws OptimisticLockException
+     * @throws TransactionRequiredException
      */
     public static function metrics(
         array $rows,
@@ -147,7 +153,7 @@ class GoogleSearchConsoleConvert
                     'ctr' => $impressions > 0 ? $clicks / $impressions : 0 // Fixed: Use calculated ctr
                 ];
 
-                $logger?->info("Created metric for row $index: name=$metricName, query=$queryTerm, page=" . ($pageEntity ? "ID={$pageEntity->getId()}, URL={$pageEntity->getUrl()}" : 'none') . ", dimension[page]=$page, data=" . json_encode($channeledMetric->data));
+                // $logger?->info("Created metric for row $index: name=$metricName, query=$queryTerm, page=" . ($pageEntity ? "ID={$pageEntity->getId()}, URL={$pageEntity->getUrl()}" : 'none') . ", dimension[page]=$page, data=" . json_encode($channeledMetric->data));
 
                 $collection->add($channeledMetric);
             }
@@ -155,7 +161,7 @@ class GoogleSearchConsoleConvert
             if ($index % 1000 === 0) {
                 $rowTime = microtime(true) - $rowStart;
                 $memory = memory_get_usage() / 1024 / 1024;
-                $logger?->info("Converted row $index/$rowCount, created " . $collection->count() . " metrics, took $rowTime seconds, memory: $memory MB");
+                // $logger?->info("Converted row $index/$rowCount, created " . $collection->count() . " metrics, took $rowTime seconds, memory: $memory MB");
             }
         }
 
