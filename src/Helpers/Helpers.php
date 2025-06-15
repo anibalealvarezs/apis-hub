@@ -205,36 +205,14 @@ class Helpers
 
                 // Set connection charset and collation
                 $connection->executeStatement("SET NAMES utf8mb4 COLLATE utf8mb4_bin");
-                $logger = new Logger('gsc'); // Adjust logger as needed
-                $logger->pushHandler(new ErrorLogHandler());
 
-                // Ensure database exists with correct collation
-                $dbName = $config['dbname'];
-                $connection->executeStatement("CREATE DATABASE IF NOT EXISTS `$dbName` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin");
-                $connection->executeStatement("ALTER DATABASE `$dbName` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin");
-
-                // Select the database
-                $connection->executeStatement("USE `$dbName`");
-
-                // Log connection settings
-                $charsetResults = $connection->executeQuery("SHOW VARIABLES LIKE 'character_set%'")->fetchAllAssociative();
-                $collationResults = $connection->executeQuery("SHOW VARIABLES LIKE 'collation%'")->fetchAllAssociative();
-                $logger->debug("Connection charset settings: " . json_encode($charsetResults));
-                $logger->debug("Connection collation settings: " . json_encode($collationResults));
-
-                // Verify database collation
-                $dbCollation = $connection->executeQuery("SELECT DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?", [$dbName])->fetchOne();
-                $logger->debug("Database collation for `$dbName`: " . $dbCollation);
-
-                if ($dbCollation !== 'utf8mb4_bin') {
-                    $logger->error("Failed to set database collation to utf8mb4_bin, current collation: $dbCollation");
-                    throw new RuntimeException("Database collation mismatch: expected utf8mb4_bin, got $dbCollation");
-                }
-
+                // Create attribute metadata configuration
                 $ormConfig = ORMSetup::createAttributeMetadataConfiguration(
                     paths: [__DIR__ . '/..'],
                     isDevMode: true
                 );
+
+                // Create EntityManager
                 self::$entityManager = new EntityManager($connection, $ormConfig);
             } catch (Exception $e) {
                 throw new RuntimeException('Failed to initialize EntityManager: ' . $e->getMessage());

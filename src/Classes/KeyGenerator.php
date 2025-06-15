@@ -126,7 +126,7 @@ class KeyGenerator
     public static function generateChanneledMetricDimensionKey(
         ChanneledMetric|int $channeledMetric,
         string $dimensionKey,
-        string $dimensionValue
+        ?string $dimensionValue
     ): string {
         return md5(($channeledMetric instanceof ChanneledMetric ? $channeledMetric->getId() : $channeledMetric) . $dimensionKey . $dimensionValue);
     }

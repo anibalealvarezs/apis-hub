@@ -17,8 +17,6 @@ use Classes\Overrides\KlaviyoApi\KlaviyoApi;
 use DateTime;
 use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\DBAL\ArrayParameterType;
-use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Exception\NotSupported;
@@ -47,7 +45,6 @@ use RuntimeException;
 use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 use Exception;
-use ValueError;
 
 class MetricRequests implements RequestInterface
 {
@@ -274,10 +271,12 @@ class MetricRequests implements RequestInterface
             $countryRepository = $manager->getRepository(Country::class);
             $deviceRepository = $manager->getRepository(Device::class);
             $metricNames = $filters->metricNames ?? ($config['google_search_console']['metrics'] ?? ['clicks', 'impressions', 'ctr', 'position']);
-            $dimensions = $filters->dimensions ?? ['date', 'query', 'page', 'country', 'device'];
+            // $dimensions = $filters->dimensions ?? ['date', 'query', 'page', 'country', 'device'];
+            // Custom filter for dimensions disabled for GSC given the strict structure. Config dimensions used instead
+            $allDimensions = $config['google_search_console']['dimensions'];
             $batchSize = 100;
 
-            $logger->info("Initialized repositories, dimensions=" . implode(',', $dimensions) . ", metricNames=" . json_encode($metricNames) . ", batchSize=$batchSize");
+            $logger->info("Initialized repositories, dimensions=" . implode(',', $allDimensions) . ", metricNames=" . json_encode($metricNames) . ", batchSize=$batchSize");
             $logger->warning("Note: 'searchAppearance' is not included in dimensions due to GSC API restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
 
             // Load countries and create a map
@@ -338,7 +337,7 @@ class MetricRequests implements RequestInterface
                     $countryRepository,
                     $deviceRepository,
                     $metricNames,
-                    $dimensions,
+                    $allDimensions,
                     $filters,
                     $logger,
                     $deviceMap,
@@ -484,7 +483,7 @@ class MetricRequests implements RequestInterface
      * @param EntityRepository $countryRepository
      * @param EntityRepository $deviceRepository
      * @param array $metricNames
-     * @param array $dimensions
+     * @param array $allDimensions
      * @param object|null $filters
      * @param LoggerInterface $logger
      * @param array $deviceMap
@@ -510,7 +509,7 @@ class MetricRequests implements RequestInterface
         EntityRepository $countryRepository,
         EntityRepository $deviceRepository,
         array $metricNames,
-        array $dimensions,
+        array $allDimensions,
         ?object $filters,
         LoggerInterface $logger,
         array $deviceMap,
@@ -565,7 +564,7 @@ class MetricRequests implements RequestInterface
                 $manager,
                 $pageEntity,
                 $metricNames,
-                $dimensions,
+                $allDimensions,
                 $entitiesToInvalidate,
                 $queryCache,
                 $metricCache,
@@ -607,7 +606,7 @@ class MetricRequests implements RequestInterface
      * @param EntityManager $manager
      * @param Page $pageEntity
      * @param array $metricNames
-     * @param array $dimensions
+     * @param array $allDimensions
      * @param array &$entitiesToInvalidate
      * @param array &$queryCache
      * @param array &$metricCache
@@ -633,9 +632,9 @@ class MetricRequests implements RequestInterface
         array $site,
         SearchConsoleApi $api,
         EntityManager $manager,
-        Page &$pageEntity,
+        Page $pageEntity,
         array $metricNames,
-        array $dimensions,
+        array $allDimensions,
         array &$entitiesToInvalidate,
         array &$queryCache,
         array &$metricCache,
@@ -667,7 +666,7 @@ class MetricRequests implements RequestInterface
                 startDate: $dayStr,
                 endDate: $dayStr,
                 rowLimit: $rowLimit,
-                dimensions: $dimensions,
+                dimensions: $allDimensions,
                 dimensionFilterGroups: $dimensionFilterGroups,
                 callback: function($rows) use (
                     $siteUrl,
@@ -692,13 +691,14 @@ class MetricRequests implements RequestInterface
                     $deviceMap,
                     $countryMap,
                     $pageMap,
+                    $allDimensions,
                 ) {
                     $loopCount++;
                     $totalRows += count($rows);
                     // $logger->info("Processing API callback loop $loopCount, rows=" . count($rows) . ", totalRows=$totalRows");
                     // $logger->info("Raw API rows: " . json_encode(array_slice($rows, 0, 5)));
 
-                    $pageMetrics = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, $siteKey, $targetKeywords, $targetCountries, $logger, $pageEntity, $manager);
+                    $pageMetrics = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, $siteKey, $targetKeywords, $targetCountries, $logger, $pageEntity, $manager, $allDimensions);
                     // $logger->info("Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, first metric: " . (count($pageMetrics) > 0 ? json_encode(['name' => $pageMetrics[0]->name, 'query' => is_string($pageMetrics[0]->query) ? $pageMetrics[0]->query : ($pageMetrics[0]->query instanceof Query ? $pageMetrics[0]->query->getQuery() : 'none')]) : 'none'));
 
                     // Adjust pageMetrics according to configurations

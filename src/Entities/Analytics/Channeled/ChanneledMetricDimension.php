@@ -16,6 +16,11 @@ use Repositories\Channeled\ChanneledMetricDimensionRepository;
 #[ORM\Index(columns: ['channeledMetric_id'], name: 'channeledMetric_id_idx')]
 #[ORM\Index(columns: ['dimensionKey', 'dimensionValue'], name: 'dimensionKey_dimensionValue_idx')]
 #[ORM\Index(columns: ['dimensionKey', 'dimensionValue', 'channeledMetric_id'], name: 'dimensionKey_dimensionValue_channeledMetric_id_idx')]
+#[ORM\Index(
+    columns: ['dimensionKey', 'dimensionValue', 'channeledMetric_id'],
+    name: 'channeled_metric_dimension_partial',
+    options: ['where' => 'dimensionValue IS NOT NULL']
+)]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledMetricDimension extends Entity
 {
@@ -26,8 +31,8 @@ class ChanneledMetricDimension extends Entity
     #[ORM\Column(type: 'string', length: 255)]
     protected string $dimensionKey;
 
-    #[ORM\Column(type: 'string', length: 255)]
-    protected string $dimensionValue;
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    protected ?string $dimensionValue;
 
     public function getDimensionKey(): string
     {
@@ -45,7 +50,7 @@ class ChanneledMetricDimension extends Entity
         return $this->dimensionValue;
     }
 
-    public function addDimensionValue(string $dimensionValue): self
+    public function addDimensionValue(?string $dimensionValue): self
     {
         $this->dimensionValue = $dimensionValue;
         return $this;

@@ -29,10 +29,12 @@ class GoogleSearchConsoleConvert
      * @param LoggerInterface|null $logger
      * @param Page|null $pageEntity
      * @param EntityManager|null $em
+     * @param array $dimensions
      * @return ArrayCollection
      * @throws ORMException
      * @throws OptimisticLockException
      * @throws TransactionRequiredException
+     * @throws Exception
      */
     public static function metrics(
         array $rows,
@@ -42,7 +44,8 @@ class GoogleSearchConsoleConvert
         array $targetCountries = [],
         LoggerInterface $logger = null,
         ?Page $pageEntity = null,
-        ?EntityManager $em = null
+        ?EntityManager $em = null,
+        array $dimensions = [],
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
@@ -50,73 +53,33 @@ class GoogleSearchConsoleConvert
         $skippedRows = 0;
 
         $logger?->info("Starting metrics conversion for site $siteUrl, rows=$rowCount");
-        $logger?->warning("Note: 'searchAppearance' not fetched from GSC API due to dimension restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
-        $logger?->info("Page entity for site $siteUrl: " . ($pageEntity ? "ID={$pageEntity->getId()}, URL={$pageEntity->getUrl()}" : 'none'));
-        if ($em && $pageEntity && $pageEntity->getId()) {
-            $isManaged = $em->getUnitOfWork()->isInIdentityMap($pageEntity) || $em->getUnitOfWork()->isEntityScheduled($pageEntity);
-            $logger?->info("EntityManager open: " . ($em->isOpen() ? 'yes' : 'no') . ", instance: " . spl_object_hash($em));
-            $logger?->info("pageEntity managed: " . ($isManaged ? 'yes' : 'no'));
-            if (!$isManaged && $em->isOpen()) {
-                $pageEntity = $em->find(\Entities\Analytics\Page::class, $pageEntity->getId());
-                if (!$pageEntity) {
-                    $logger?->error("Failed to re-find pageEntity in metrics, ID: " . $pageEntity->getId());
-                    $pageEntity = null;
-                } else {
-                    $logger?->info("Re-found pageEntity in metrics: " . $pageEntity->__toString());
-                }
-            }
-        }
-
-        $md5Cache = [];
+        // $logger?->warning("Note: 'searchAppearance' not fetched from GSC API due to dimension restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
+        // $logger?->info("Page entity for site $siteUrl: " . ($pageEntity ? "ID={$pageEntity->getId()}, URL={$pageEntity->getUrl()}" : 'none'));
+        $pageEntity = $em->find(Page::class, $pageEntity->getId());
+        $searchAppearance = 'WEB';
 
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
 
-            if (!isset($row['keys']) || !is_array($row['keys'])) {
-                $skippedRows++;
-                $logger?->warning("Skipped row $index due to missing or invalid keys: " . json_encode($row));
-                continue;
+            list($date, $query, $country, $page, $device) = self::getDimensionsValues($row, array_flip($dimensions), $targetKeywords, $targetCountries);
+            list($impressions, $clicks, $position) = self::getMetricsValues($row);
+
+            $dimensionValues = [];
+            foreach ($dimensions as $dimension) {
+                $dimensionValues[$dimension] = ${$dimension};
             }
+            $groupKey = md5(json_encode($dimensionValues, JSON_UNESCAPED_UNICODE));
 
-            $date = $row['keys'][0] ?? null;
-            $queryTerm = $row['keys'][1] ?? null;
-            if (!$date || !$queryTerm) {
-                $skippedRows++;
-                if ($index % 1000 === 0) {
-                    $logger?->warning("Skipped row $index due to missing date or query: " . json_encode($row));
-                }
-                continue;
-            }
-
-            $queryTerm = empty($targetKeywords) || Helpers::str_contains_any($queryTerm, $targetKeywords) ? $queryTerm : 'others';
-            $countryCode = isset($row['keys'][3]) && (empty($targetCountries) || in_array(strtolower($row['keys'][3]), $targetCountries)) ? strtoupper($row['keys'][3]) : 'OTH';
-            $page = $row['keys'][2] ?? 'unknown';
-            $device = isset($row['keys'][4]) ? strtolower($row['keys'][4]) : 'other';
-            $searchAppearance = 'WEB';
-
-            $pageKey = $page ?: 'unknown';
-            $md5Page = $md5Cache[$pageKey] ?? ($md5Cache[$pageKey] = md5($pageKey));
-
-            $groupKey = md5(json_encode([
-                'date' => $date,
-                'query' => $queryTerm,
-                'page' => $page,
-                'country' => $countryCode,
-                'device' => $device
-            ], JSON_UNESCAPED_UNICODE));
             if (isset($aggregatedRows[$groupKey])) {
-                $aggregatedRows[$groupKey]['clicks'] += $row['clicks'] ?? 0;
-                $aggregatedRows[$groupKey]['impressions'] += $row['impressions'] ?? 0;
-                $aggregatedRows[$groupKey]['position'] += ($row['position'] ?? 0) * ($row['impressions'] ?? 0);
+                $aggregatedRows[$groupKey]['clicks'] += $clicks;
+                $aggregatedRows[$groupKey]['impressions'] += $impressions;
+                $aggregatedRows[$groupKey]['position'] += ($position) * ($impressions);
                 $aggregatedRows[$groupKey]['count']++;
-                $logger?->info("Aggregated duplicate row $index for query=$queryTerm, page=$page");
+                $logger?->info("Aggregated duplicate row $index for query=$query, page=$page");
                 continue;
             }
-            $impressions = $row['impressions'] ?? 0;
-            $clicks = $row['clicks'] ?? 0;
-            $position = $row['position'] ?? 0;
 
-            $platformId = "gsc_{$siteKey}_{$groupKey}";
+            $platformId = "gsc_{$siteKey}_$groupKey";
             foreach (['clicks', 'impressions', 'ctr', 'position'] as $metricName) {
                 $value = match ($metricName) {
                     'clicks' => $clicks,
@@ -124,11 +87,6 @@ class GoogleSearchConsoleConvert
                     'ctr' => $impressions > 0 ? $clicks / $impressions : 0,
                     'position' => $impressions > 0 ? $position : 0,
                 };
-
-                if ($value === 0 && $metricName === 'position') {
-                    $logger?->info("Skipped $metricName metric for row $index, value=0");
-                    continue;
-                }
 
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::google_search_console->value;
@@ -138,8 +96,8 @@ class GoogleSearchConsoleConvert
                 $channeledMetric->metricDate = new DateTime($date);
                 $channeledMetric->platformId = $platformId;
                 $channeledMetric->platformCreatedAt = new DateTime($date);
-                $channeledMetric->query = $queryTerm;
-                $channeledMetric->countryCode = $countryCode;
+                $channeledMetric->query = $query;
+                $channeledMetric->countryCode = $country;
                 $channeledMetric->deviceType = $device;
                 $channeledMetric->page = $pageEntity;
                 $channeledMetric->dimensions = [
@@ -170,5 +128,84 @@ class GoogleSearchConsoleConvert
         $logger?->info("Completed metrics conversion: $rowCount rows to " . $collection->count() . " metrics, skipped $skippedRows rows, took $totalTime seconds, memory: $memory MB");
 
         return $collection;
+    }
+
+    /**
+     * @param array $row
+     * @param array $dimensionsIndex
+     * @return string|null
+     */
+    protected static function getDate(array $row, array $dimensionsIndex): ?string
+    {
+        return isset($dimensionsIndex['date']) ? ($row['keys'][$dimensionsIndex['date']] ?? null) : null;
+    }
+
+    /**
+     * @param array $row
+     * @param array $dimensionsIndex
+     * @param array $targetKeywords
+     * @return string|null
+     */
+    protected static function getQueryTerm(array $row, array $dimensionsIndex, array $targetKeywords): ?string
+    {
+        $queryTerm = isset($dimensionsIndex['query']) ? ($row['keys'][$dimensionsIndex['query']] ?? '') : '';
+        return empty($targetKeywords) || Helpers::str_contains_any($queryTerm, $targetKeywords) ? $queryTerm : 'others';
+    }
+
+    /**
+     * @param array $row
+     * @param array $dimensionsIndex
+     * @param array $targetCountries
+     * @return string|null
+     */
+    protected static function getCountryCode(array $row, array $dimensionsIndex, array $targetCountries): ?string
+    {
+        return isset($dimensionsIndex['country']) &&
+            isset($row['keys'][$dimensionsIndex['country']]) &&
+            (empty($targetCountries) || in_array(strtolower($row['keys'][$dimensionsIndex['country']]), $targetCountries)) ?
+                strtoupper($row['keys'][$dimensionsIndex['country']]) :
+                'OTH';
+    }
+
+    /**
+     * @param array $row
+     * @param array $dimensionsIndex
+     * @return string|null
+     */
+    protected static function getPage(array $row, array $dimensionsIndex): ?string
+    {
+        return isset($dimensionsIndex['page']) ? ($row['keys'][$dimensionsIndex['page']] ?? null) : null;
+    }
+
+    /**
+     * @param array $row
+     * @param array $dimensionsIndex
+     * @return string|null
+     */
+    protected static function getDevice(array $row, array $dimensionsIndex): ?string
+    {
+        return isset($dimensionsIndex['device']) && isset($row['keys'][$dimensionsIndex['device']]) ?
+                    strtolower($row['keys'][$dimensionsIndex['device']]) :
+                    'other';
+    }
+
+    protected static function getDimensionsValues(array $row, array $dimensionsIndex, array $targetKeywords, array $targetCountries): array
+    {
+        return [
+            self::getDate($row, $dimensionsIndex),
+            self::getQueryTerm($row, $dimensionsIndex, $targetKeywords),
+            self::getCountryCode($row, $dimensionsIndex, $targetCountries),
+            self::getPage($row, $dimensionsIndex),
+            self::getDevice($row, $dimensionsIndex)
+        ];
+    }
+
+    private static function getMetricsValues(mixed $row) : array
+    {
+        return [
+            $row['impressions'] ?? 0,
+            $row['clicks'] ?? 0,
+            $row['position'] ?? 0,
+        ];
     }
 }
