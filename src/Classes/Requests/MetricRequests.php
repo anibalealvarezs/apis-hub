@@ -36,7 +36,6 @@ use Enums\Country as CountryEnum;
 use Enums\Device as DeviceEnum;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
-use Interfaces\RequestInterface;
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
@@ -46,7 +45,7 @@ use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 use Exception;
 
-class MetricRequests implements RequestInterface
+class MetricRequests
 {
     /**
      * @return Channel[]
@@ -283,36 +282,36 @@ class MetricRequests implements RequestInterface
             /** @var Country[] $countries */
             $countries = $countryRepository->findAll();
             $countryMap = [
-                'countryMap' => [],
-                'countryMapReverse' => [],
+                'map' => [],
+                'mapReverse' => [],
             ];
             foreach ($countries as $country) {
-                $countryMap['countryMap'][$country->getCode()->value] = $country;
-                $countryMap['countryMapReverse'][$country->getId()] = $country;
+                $countryMap['map'][$country->getCode()->value] = $country;
+                $countryMap['mapReverse'][$country->getId()] = $country;
             }
 
             // Load devices and create a map
             /** @var Device[] $devices */
             $devices = $deviceRepository->findAll();
             $deviceMap = [
-                'deviceMap' => [],
-                'deviceMapReverse' => [],
+                'map' => [],
+                'mapReverse' => [],
             ];
             foreach ($devices as $device) {
-                $deviceMap['deviceMap'][$device->getType()->value] = $device;
-                $deviceMap['deviceMapReverse'][$device->getId()] = $device;
+                $deviceMap['map'][$device->getType()->value] = $device;
+                $deviceMap['mapReverse'][$device->getId()] = $device;
             }
 
             // Load pages and create a map
             /** @var Page[] $pages */
             $pages = $pageRepository->findAll();
             $pageMap = [
-                'pageMap' => [],
-                'pageMapReverse' => [],
+                'map' => [],
+                'mapReverse' => [],
             ];
             foreach ($pages as $page) {
-                $pageMap['pageMap'][$page->getUrl()] = $page;
-                $pageMap['pageMapReverse'][$page->getId()] = $page;
+                $pageMap['map'][$page->getUrl()] = $page;
+                $pageMap['mapReverse'][$page->getId()] = $page;
             }
 
             $totalMetrics = 0;
@@ -698,55 +697,46 @@ class MetricRequests implements RequestInterface
                     // $logger->info("Processing API callback loop $loopCount, rows=" . count($rows) . ", totalRows=$totalRows");
                     // $logger->info("Raw API rows: " . json_encode(array_slice($rows, 0, 5)));
 
-                    $pageMetrics = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, $siteKey, $targetKeywords, $targetCountries, $logger, $pageEntity, $manager, $allDimensions);
+                    $metrics = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, $siteKey, $targetKeywords, $targetCountries, $logger, $pageEntity, $manager, $allDimensions);
                     // $logger->info("Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, first metric: " . (count($pageMetrics) > 0 ? json_encode(['name' => $pageMetrics[0]->name, 'query' => is_string($pageMetrics[0]->query) ? $pageMetrics[0]->query : ($pageMetrics[0]->query instanceof Query ? $pageMetrics[0]->query->getQuery() : 'none')]) : 'none'));
 
                     // Adjust pageMetrics according to configurations
-                    foreach ($pageMetrics as &$metric) {
+                    foreach ($metrics as &$metric) {
                         if ($metricNames && !in_array($metric->name, $metricNames)) {
                             $logger->warning("Skipped metric: =$metric->name, not in allowed names: " . json_encode($metricNames));
                             continue;
                         }
 
                         $countryEnum = CountryEnum::tryFrom($metric->countryCode) ?? CountryEnum::OTH;
-                        $metric->country = $countryMap['countryMap'][$countryEnum->value];
+                        $metric->country = $countryMap['map'][$countryEnum->value];
 
                         $deviceEnum = DeviceEnum::from($metric->deviceType) ?? DeviceEnum::OTHER;
-                        $metric->device = $deviceMap['deviceMap'][$deviceEnum->value];
+                        $metric->device = $deviceMap['map'][$deviceEnum->value];
                     }
 
                     try {
                         $manager->getConnection()->beginTransaction();
 
-                        // Map queries
-                        $queryMap = self::processQueriesFromMetrics(
-                            $pageMetrics,
-                            $manager,
-                            $logger,
-                        );
-
                         // Map metrics
-                        $metricMap = self::processMetricsFromPageMetrics(
-                            $pageMetrics,
+                        $metricMap = self::processMetrics(
+                            $metrics,
                             $manager,
-                            $queryMap,
                             $countryMap,
                             $deviceMap,
                             $pageMap,
-                            $logger,
                         );
 
                         // Map channeled metrics
-                        $channeledMetricMap = self::processChanneledMetricsFromPageMetrics(
-                            $pageMetrics,
+                        $channeledMetricMap = self::processChanneledMetrics(
+                            $metrics,
                             $manager,
                             $metricMap,
                             $logger,
                         );
 
                         // Map dimensions
-                        self::processDimensionsFromPageMetrics(
-                            $pageMetrics,
+                        self::processChanneledMetricDimensions(
+                            $metrics,
                             $manager,
                             $metricMap,
                             $channeledMetricMap,
@@ -1967,17 +1957,16 @@ class MetricRequests implements RequestInterface
     }
 
     /**
-     * @param ArrayCollection $pageMetrics
+     * @param ArrayCollection $metrics
      * @param EntityManager $manager
-     * @param LoggerInterface $logger
      * @return array
      */
-    protected static function processQueriesFromMetrics(ArrayCollection $pageMetrics, EntityManager $manager, LoggerInterface $logger): array
+    protected static function processQueries(ArrayCollection $metrics, EntityManager $manager): array
     {
-        // Extract queries from pagemetrics
+        // Extract queries from metrics
         $queries = array_map(function ($metric) {
             return $metric->query;
-        }, $pageMetrics->toArray());
+        }, $metrics->toArray());
 
         // Remove duplicates
         $uniqueQueries = array_unique($queries);
@@ -1998,13 +1987,13 @@ class MetricRequests implements RequestInterface
         }
 
         // Map queries to their IDs and create a map for quick access
-        $queryMap = [];
+        $map = [];
         foreach ($existingQueries as $query) {
-            $queryMap[$query['query']] = $query['id'];
+            $map[$query['query']] = $query['id'];
         }
 
         // Get the list of queries that need to be inserted
-        $queriesToInsert = array_diff($uniqueQueries, array_keys($queryMap));
+        $queriesToInsert = array_diff($uniqueQueries, array_keys($map));
 
         // Bulk Insert queries that are not in the database with a single statement, letting SQL handle the auto-increment
         if (!empty($queriesToInsert)) {
@@ -2019,7 +2008,7 @@ class MetricRequests implements RequestInterface
             }
         }
 
-        $allQueries = array_merge(array_keys($queryMap), array_values($queriesToInsert));
+        $allQueries = array_merge(array_keys($map), array_values($queriesToInsert));
         $selectParams = array_values($allQueries);
         $selectPlaceholders = implode(', ', array_fill(0, count($selectParams), '?'));
 
@@ -2034,39 +2023,204 @@ class MetricRequests implements RequestInterface
             throw new RuntimeException("Failed to fetch existing queries: " . $e->getMessage(), 0, $e);
         }
         foreach ($finalQueries as $query) {
-            $queryMap[$query['query']] = $query['id'];
+            $map[$query['query']] = $query['id'];
         }
 
         return [
-            'queryMap' => $queryMap,
-            'queryMapReverse' => array_flip($queryMap),
+            'map' => $map,
+            'mapReverse' => array_flip($map),
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
+    protected static function processCampaigns(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
+    protected static function processChanneledCampaigns(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
+    protected static function processChanneledAdGroups(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
+    protected static function processChanneledAds(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
+    protected static function processPosts(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
+    protected static function processProducts(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
+    protected static function processCustomers(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
+    protected static function processOrders(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
         ];
     }
 
     /**
      * @throws \Doctrine\DBAL\Exception
      */
-    protected static function processMetricsFromPageMetrics(
-        ArrayCollection $pageMetrics,
+    protected static function processMetrics(
+        ArrayCollection $metrics,
         EntityManager $manager,
-        array $queryMap,
         array $countryMap,
         array $deviceMap,
         array $pageMap,
-        LoggerInterface $logger,
     ): array {
-        // Extract metrics from pagemetrics
+
+        // Map queries
+        $queryMap = self::processQueries(
+            $metrics,
+            $manager,
+        );
+
+        // Map campaigns
+        $campaignMap = self::processCampaigns(
+            $metrics,
+            $manager,
+        );
+
+        // Map channeled campaigns
+        $channeledCampaignMap = self::processChanneledCampaigns(
+            $metrics,
+            $manager,
+        );
+
+        // Map channeled campaigns
+        $channeledAdGroupMap = self::processChanneledAdGroups(
+            $metrics,
+            $manager,
+        );
+
+        // Map channeled ads
+        $channeledAdMap = self::processChanneledAds(
+            $metrics,
+            $manager,
+        );
+
+        // Map posts
+        $postMap = self::processPosts(
+            $metrics,
+            $manager,
+        );
+
+        // Map products
+        $productMap = self::processProducts(
+            $metrics,
+            $manager,
+        );
+
+        // Map customers
+        $customerMap = self::processCustomers(
+            $metrics,
+            $manager,
+        );
+
+        // Map orders
+        $orderMap = self::processOrders(
+            $metrics,
+            $manager,
+        );
+
+        // Extract metrics from metrics
         $uniqueMetrics = [];
-        foreach ($pageMetrics->toArray() as $metric) {
+        foreach ($metrics->toArray() as $metric) {
             $metricKey = KeyGenerator::generateMetricKey(
                 channel: $metric->channel,
                 name: $metric->name,
                 period: $metric->period,
                 metricDate: $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
-                page: $metric->page->getUrl(),
-                query: $metric->query,
-                country: $metric->countryCode,
-                device: $metric->deviceType,
+                campaign: isset($metric->campaign) ? $metric->campaign->getCampaignId() : null,
+                channeledCampaign: isset($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : null,
+                channeledAdGroup: isset($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : null,
+                channeledAd: isset($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : null,
+                page: isset($metric->page) ? $metric->page->getUrl() : null,
+                query: $metric->query ?? null,
+                post: isset($metric->post) ? $metric->post->getPostId() : null,
+                product: isset($metric->product) ? $metric->product->getProductId() : null,
+                customer: isset($metric->customer) ? $metric->customer->getEmail() : null,
+                order: isset($metric->order) ? $metric->order->getOrderId() : null,
+                country: $metric->countryCode ?? null,
+                device: $metric->deviceType ?? null,
             );
 
             $uniqueMetrics[$metricKey] = [
@@ -2074,10 +2228,18 @@ class MetricRequests implements RequestInterface
                 'name' => $metric->name,
                 'period' => $metric->period,
                 'metricDate' => $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
-                'query_id' => $queryMap['queryMap'][$metric->query],
-                'country_id' => $countryMap['countryMap'][$metric->countryCode]->getId(),
-                'device_id' => $deviceMap['deviceMap'][$metric->deviceType]->getId(),
-                'page_id' => $metric->page->getId(),
+                'campaign_id' => isset($metric->campaign) ? $campaignMap['map'][$metric->campaign->getCampaignId()] ?? null : null,
+                'channeledCampaign_id' => isset($metric->channeledCampaign) ? $channeledCampaignMap['map'][$metric->channeledCampaign->getPlatformId()] ?? null : null,
+                'channeledAdGroup_id' => isset($metric->channeledAdGroup) ? $channeledAdGroupMap['map'][$metric->channeledAdGroup->getPlatformId()] ?? null : null,
+                'channeledAd_id' => isset($metric->channeledAd) ? $channeledAdMap['map'][$metric->channeledAd->getPlatformId()] ?? null : null,
+                'query_id' => isset($metric->query) ? $queryMap['map'][$metric->query] : null,
+                'page_id' => isset($metric->page) ? $metric->page->getId() : null,
+                'post_id' => isset($metric->post) ? $postMap['map'][$metric->post->getPostId()] ?? null : null,
+                'product_id' => isset($metric->product) ? $productMap['map'][$metric->product->getProductId()] ?? null : null,
+                'customer_id' => isset($metric->customer) ? $customerMap['map'][$metric->customer->getEmail()] ?? null : null,
+                'order_id' => isset($metric->order) ? $orderMap['map'][$metric->order->getOrderId()] ?? null : null,
+                'country_id' => isset($metric->countryCode) ? $countryMap['map'][$metric->countryCode]->getId() : null,
+                'device_id' => isset($metric->deviceType) ? $deviceMap['map'][$metric->deviceType]->getId() : null,
                 'value' => $metric->value,
                 'metadata' => [],
                 'key' => $metricKey,
@@ -2088,31 +2250,45 @@ class MetricRequests implements RequestInterface
         $conditions = [];
         $selectParams = [];
 
+        $fields = [
+            'channel', 'name', 'period', 'metricDate', 'campaign_id', 'channeledCampaign_id', 'channeledAdGroup_id',
+            'channeledAd_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id'
+        ];
+
         foreach ($uniqueMetrics as $m) {
-            $conditions[] = '(channel = ? AND name = ? AND period = ? AND metricDate = ? AND page_id = ? AND query_id = ? AND country_id = ? AND device_id = ?)';
-            $selectParams[] = $m['channel'];
-            $selectParams[] = $m['name'];
-            $selectParams[] = $m['period'];
-            $selectParams[] = $m['metricDate'];
-            $selectParams[] = $m['page_id'];
-            $selectParams[] = $m['query_id'];
-            $selectParams[] = $m['country_id'];
-            $selectParams[] = $m['device_id'];
+            $subConditions = [];
+            foreach ($fields as $field) {
+                if (array_key_exists($field, $m) && $m[$field] === null) {
+                    $subConditions[] = "$field IS NULL";
+                } else {
+                    $subConditions[] = "$field = ?";
+                    $selectParams[] = $m[$field];
+                }
+            }
+            $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
         }
 
-        $sql = "SELECT id, channel, name, period, metricDate, page_id, query_id, country_id, device_id
-            FROM metrics
-            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
+        $sql = "SELECT id, " . implode(', ', $fields) . "
+                FROM metrics
+                WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
 
         // Map metrics to their IDs
         $metricMap = self::getMetricMap(
-            $manager,
-            $sql,
-            $selectParams,
-            $pageMap['pageMapReverse'],
-            $queryMap['queryMapReverse'],
-            $countryMap['countryMapReverse'],
-            $deviceMap['deviceMapReverse']
+            manager: $manager,
+            sql: $sql,
+            params: $selectParams,
+            campaignMap: $campaignMap['mapReverse'],
+            channeledCampaignMap: $channeledCampaignMap['mapReverse'],
+            channeledAdGroupMap: $channeledAdGroupMap['mapReverse'],
+            channeledAdMap: $channeledAdMap['mapReverse'],
+            pageMap: $pageMap['mapReverse'],
+            queryMap: $queryMap['mapReverse'],
+            postMap: $postMap['mapReverse'],
+            productMap: $productMap['mapReverse'],
+            customerMap: $customerMap['mapReverse'],
+            orderMap: $orderMap['mapReverse'],
+            countryMap: $countryMap['mapReverse'],
+            deviceMap: $deviceMap['mapReverse']
         );
 
         // Get the list of metrics that need to be inserted
@@ -2124,10 +2300,18 @@ class MetricRequests implements RequestInterface
                     'name' => $metric['name'],
                     'period' => $metric['period'],
                     'metricDate' => $metric['metricDate'],
-                    'page_id' => $metric['page_id'],
-                    'query_id' => $metric['query_id'],
-                    'country_id' => $metric['country_id'],
-                    'device_id' => $metric['device_id'],
+                    'campaign_id' => $metric['campaign_id'] ?? null,
+                    'channeledCampaign_id' => $metric['channeledCampaign_id'] ?? null,
+                    'channeledAdGroup_id' => $metric['channeledAdGroup_id'] ?? null,
+                    'channeledAd_id' => $metric['channeledAd_id'] ?? null,
+                    'query_id' => $metric['query_id'] ?? null,
+                    'page_id' => $metric['page_id'] ?? null,
+                    'post_id' => $metric['post_id'] ?? null,
+                    'product_id' => $metric['product_id'] ?? null,
+                    'customer_id' => $metric['customer_id'] ?? null,
+                    'order_id' => $metric['order_id'] ?? null,
+                    'country_id' => $metric['country_id'] ?? null,
+                    'device_id' => $metric['device_id'] ?? null,
                     'value' => $metric['value'],
                     'metadata' => json_encode($metric['metadata'] ?? []),
                     'key' => $key,
@@ -2138,54 +2322,82 @@ class MetricRequests implements RequestInterface
         // Bulk Insert metrics
         if (!empty($metricsToInsert)) {
             $insertParams = [];
-            $keysToInsert = [];
             foreach ($metricsToInsert as $row) {
                 $insertParams[] = $row['channel'];
                 $insertParams[] = $row['name'];
                 $insertParams[] = $row['period'];
                 $insertParams[] = $row['metricDate'];
-                $insertParams[] = $row['page_id'];
-                $insertParams[] = $row['query_id'];
-                $insertParams[] = $row['country_id'];
-                $insertParams[] = $row['device_id'];
+                $insertParams[] = $row['campaign_id'] ?? null;
+                $insertParams[] = $row['channeledCampaign_id'] ?? null;
+                $insertParams[] = $row['channeledAdGroup_id'] ?? null;
+                $insertParams[] = $row['channeledAd_id'] ?? null;
+                $insertParams[] = $row['query_id'] ?? null;
+                $insertParams[] = $row['page_id'] ?? null;
+                $insertParams[] = $row['post_id'] ?? null;
+                $insertParams[] = $row['product_id'] ?? null;
+                $insertParams[] = $row['customer_id'] ?? null;
+                $insertParams[] = $row['order_id'] ?? null;
+                $insertParams[] = $row['country_id'] ?? null;
+                $insertParams[] = $row['device_id'] ?? null;
                 $insertParams[] = $row['value'];
                 $insertParams[] = $row['metadata'];
-                $keysToInsert[] = $row['key'];
             }
             // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
             $manager->getConnection()->executeStatement(
-                'INSERT INTO metrics (channel, name, period, metricDate, page_id, query_id, country_id, device_id, value, metadata)
-             VALUES ' . implode(', ', array_fill(0, count($metricsToInsert), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
-                $insertParams
-            );
+                'INSERT INTO metrics (channel, name, period, metricDate, campaign_id, channeledCampaign_id, channeledAdGroup_id,
+                            channeledAd_id, query_id, page_id, post_id, product_id, customer_id, order_id, country_id, device_id, value, metadata)
+                     VALUES ' . implode(', ', array_fill(0, count($metricsToInsert), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
+                        $insertParams
+                    );
 
             // Re-fetch inserted metrics to get correct IDs
-            $selectPlaceholders = implode(', ', array_fill(0, count($keysToInsert), '(?, ?, ?, ?, ?, ?, ?, ?)'));
             $reFetchParams = [];
+            $conditions = [];
+
+            $fields = [
+                'channel', 'name', 'period', 'metricDate',
+                'campaign_id', 'channeledCampaign_id', 'channeledAdGroup_id', 'channeledAd_id',
+                'query_id', 'page_id', 'post_id', 'product_id',
+                'customer_id', 'order_id', 'country_id', 'device_id'
+            ];
+
             foreach ($metricsToInsert as $row) {
-                $reFetchParams[] = $row['channel'];
-                $reFetchParams[] = $row['name'];
-                $reFetchParams[] = $row['period'];
-                $reFetchParams[] = $row['metricDate'];
-                $reFetchParams[] = $row['page_id'];
-                $reFetchParams[] = $row['query_id'];
-                $reFetchParams[] = $row['country_id'];
-                $reFetchParams[] = $row['device_id'];
+                $subConditions = [];
+                foreach ($fields as $field) {
+                    if (!array_key_exists($field, $row) || $row[$field] === null) {
+                        $subConditions[] = "$field IS NULL";
+                    } else {
+                        $subConditions[] = "$field = ?";
+                        $reFetchParams[] = $row[$field];
+                    }
+                }
+                $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
             }
-            $reFetchSql = "SELECT id, channel, name, period, metricDate, page_id, query_id, country_id, device_id
-                       FROM metrics
-                       WHERE (channel, name, period, metricDate, page_id, query_id, country_id, device_id) IN ($selectPlaceholders)";
+
+            $reFetchSql = "SELECT id, " . implode(', ', $fields) . "
+                            FROM metrics
+                            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
+
             $newMetrics = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
+
             foreach ($newMetrics as $metric) {
                 $metricKey = KeyGenerator::generateMetricKey(
                     channel: $metric['channel'],
                     name: $metric['name'],
                     period: $metric['period'],
                     metricDate: $metric['metricDate'],
-                    page: $pageMap['pageMapReverse'][$metric['page_id']]->getUrl(),
-                    query: $queryMap['queryMapReverse'][$metric['query_id']],
-                    country: $countryMap['countryMapReverse'][$metric['country_id']]->getCode(),
-                    device: $deviceMap['deviceMapReverse'][$metric['device_id']]->getType(),
+                    campaign: isset($metric['campaign_id']) ? $campaignMap['mapReverse'][$metric['campaign_id']] : null,
+                    channeledCampaign: isset($metric['channeledCampaign_id']) ? $channeledCampaignMap['mapReverse'][$metric['channeledCampaign_id']] : null,
+                    channeledAdGroup: isset($metric['channeledAdGroup_id']) ? $channeledAdGroupMap['mapReverse'][$metric['channeledAdGroup_id']] : null,
+                    channeledAd: isset($metric['channeledAd_id']) ? $channeledAdMap['mapReverse'][$metric['channeledAd_id']] : null,
+                    page: isset($metric['page_id']) ? $pageMap['mapReverse'][$metric['page_id']]->getUrl() : null,
+                    query: isset($metric['query_id']) ? $queryMap['mapReverse'][$metric['query_id']] : null,
+                    post: isset($metric['post_id']) ? $postMap['mapReverse'][$metric['post_id']] : null,
+                    product: isset($metric['product_id']) ? $productMap['mapReverse'][$metric['product_id']] : null,
+                    customer: isset($metric['customer_id']) ? $customerMap['mapReverse'][$metric['customer_id']] : null,
+                    order: isset($metric['order_id']) ? $orderMap['mapReverse'][$metric['order_id']] : null,
+                    country: isset($metric['country_id']) ? $countryMap['mapReverse'][$metric['country_id']]->getCode() : null,
+                    device: isset($metric['device_id']) ? $deviceMap['mapReverse'][$metric['device_id']]->getType() : null,
                 );
                 $metricMap[$metricKey] = (int)$metric['id'];
                 // $logger->info("Added metric to map: metricKey=$metricKey, metric_id={$metric['id']}");
@@ -2193,42 +2405,50 @@ class MetricRequests implements RequestInterface
         }
 
         return [
-            'metricMap' => $metricMap,
-            'metricMapReverse' => array_flip($metricMap),
+            'map' => $metricMap,
+            'mapReverse' => array_flip($metricMap),
         ];
     }
 
     /**
-     * @param ArrayCollection $pageMetrics
+     * @param ArrayCollection $metrics
      * @param EntityManager $manager
      * @param array $metricMap
      * @param LoggerInterface $logger
      * @return array
      * @throws \Doctrine\DBAL\Exception
      */
-    protected static function processChanneledMetricsFromPageMetrics(
-        ArrayCollection $pageMetrics,
+    protected static function processChanneledMetrics(
+        ArrayCollection $metrics,
         EntityManager $manager,
         array $metricMap,
         LoggerInterface $logger,
     ): array {
-        // $logger->info("Processing " . count($pageMetrics->toArray()) . " metrics in processChanneledMetricsFromPageMetrics");
-        // Extract channeled metrics from pagemetrics
+        // $logger->info("Processing " . count($metrics->toArray()) . " metrics in processChanneledMetrics");
+        // Extract channeled metrics from metrics
         $uniqueChanneledMetrics = [];
-        foreach ($pageMetrics->toArray() as $metric) {
+        foreach ($metrics->toArray() as $metric) {
             $metricKey = KeyGenerator::generateMetricKey(
                 channel: $metric->channel,
                 name: $metric->name,
                 period: $metric->period,
                 metricDate: $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
-                page: $metric->page->getUrl(),
-                query: $metric->query,
-                country: $metric->countryCode,
-                device: $metric->deviceType,
+                campaign: isset($metric->campaign) ? $metric->campaign->getCampaignId() : null,
+                channeledCampaign: isset($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : null,
+                channeledAdGroup: isset($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : null,
+                channeledAd: isset($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : null,
+                page: isset($metric->page) ? $metric->page->getUrl() : null,
+                query: $metric->query ?? null,
+                post: isset($metric->post) ? $metric->post->getPostId() : null,
+                product: isset($metric->product) ? $metric->product->getProductId() : null,
+                customer: isset($metric->customer) ? $metric->customer->getEmail() : null,
+                order: isset($metric->order) ? $metric->order->getOrderId() : null,
+                country: $metric->countryCode ?? null,
+                device: $metric->deviceType ?? null,
             );
 
-            if (!isset($metricMap['metricMap'][$metricKey])) {
-                $logger->warning("Skipping channeled metric due to missing metricKey: metricKey=$metricKey, query={$metric->query}, page={$metric->page->getUrl()}");
+            if (!isset($metricMap['map'][$metricKey])) {
+                $logger->warning("Skipping channeled metric due to missing metricKey: metricKey=$metricKey, query=$metric->query, page={$metric->page->getUrl()}");
                 continue;
             }
             if (empty($metric->platformId)) {
@@ -2240,23 +2460,23 @@ class MetricRequests implements RequestInterface
                 continue;
             }
 
-            // $logger->info("ChanneledMetrics Inputs: metricKey=$metricKey, channel={$metric->channel}, platformId=" . ($metric->platformId ?? 'null') . ", metric_id={$metricMap['metricMap'][$metricKey]}, platformCreatedAt=" . ($metric->platformCreatedAt->format('Y-m-d H:i:s')));
+            // $logger->info("ChanneledMetrics Inputs: metricKey=$metricKey, channel={$metric->channel}, platformId=" . ($metric->platformId ?? 'null') . ", metric_id={$metricMap['map'][$metricKey]}, platformCreatedAt=" . ($metric->platformCreatedAt->format('Y-m-d H:i:s')));
             $channeledMetricKey = KeyGenerator::generateChanneledMetricKey(
                 channel: $metric->channel,
                 platformId: $metric->platformId,
-                metric: $metricMap['metricMap'][$metricKey],
+                metric: $metricMap['map'][$metricKey],
                 platformCreatedAt: $metric->platformCreatedAt->format('Y-m-d'),
             );
 
             $uniqueChanneledMetrics[$channeledMetricKey] = [
                 'channel' => $metric->channel,
                 'platformId' => $metric->platformId,
-                'metric_id' => $metricMap['metricMap'][$metricKey],
+                'metric_id' => $metricMap['map'][$metricKey],
                 'platformCreatedAt' => $metric->platformCreatedAt->format('Y-m-d'),
                 'data' => $metric->data ?? ['impressions' => 0, 'clicks' => 0, 'position_weighted' => 0, 'ctr' => 0],
                 'metricKey' => $metricKey,
             ];
-            // $logger->info("Prepared channeled metric: channeledMetricKey=$channeledMetricKey, metricKey=$metricKey, metric_id={$metricMap['metricMap'][$metricKey]}, platformId=$metric->platformId");
+            // $logger->info("Prepared channeled metric: channeledMetricKey=$channeledMetricKey, metricKey=$metricKey, metric_id={$metricMap['map'][$metricKey]}, platformId=$metric->platformId");
         }
 
         // Batch select channeled metrics from list
@@ -2420,17 +2640,17 @@ class MetricRequests implements RequestInterface
      * @throws ORMException
      * @throws \Doctrine\DBAL\Exception
      */
-    protected static function processDimensionsFromPageMetrics(
-        ArrayCollection $pageMetrics,
+    protected static function processChanneledMetricDimensions(
+        ArrayCollection $metrics,
         EntityManager $manager,
         array $metricMap,
         array $channeledMetricMap,
         LoggerInterface $logger
     ): void {
-        // $logger->info("Processing " . count($pageMetrics->toArray()) . " metrics in processDimensionsFromPageMetrics");
-        // Extract dimensions from pagemetrics
+        // $logger->info("Processing " . count($metrics->toArray()) . " metrics in processChanneledMetricDimensions");
+        // Extract dimensions from metrics
         $uniqueDimensions = [];
-        foreach ($pageMetrics->toArray() as $metric) {
+        foreach ($metrics->toArray() as $metric) {
             $dimensions = $metric->dimensions;
             foreach ($dimensions as $dimension) {
                 $metricKey = KeyGenerator::generateMetricKey(
@@ -2438,13 +2658,21 @@ class MetricRequests implements RequestInterface
                     name: $metric->name,
                     period: $metric->period,
                     metricDate: $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
-                    page: $metric->page->getUrl(),
-                    query: $metric->query,
-                    country: $metric->countryCode,
-                    device: $metric->deviceType,
+                    campaign: isset($metric->campaign) ? $metric->campaign->getCampaignId() : null,
+                    channeledCampaign: isset($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : null,
+                    channeledAdGroup: isset($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : null,
+                    channeledAd: isset($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : null,
+                    page: isset($metric->page) ? $metric->page->getUrl() : null,
+                    query: $metric->query ?? null,
+                    post: isset($metric->post) ? $metric->post->getPostId() : null,
+                    product: isset($metric->product) ? $metric->product->getProductId() : null,
+                    customer: isset($metric->customer) ? $metric->customer->getEmail() : null,
+                    order: isset($metric->order) ? $metric->order->getOrderId() : null,
+                    country: $metric->countryCode ?? null,
+                    device: $metric->deviceType ?? null,
                 );
 
-                if (!isset($metricMap['metricMap'][$metricKey])) {
+                if (!isset($metricMap['map'][$metricKey])) {
                     $logger->warning("Skipping dimension: metricKey=$metricKey not found in metricMap");
                     continue;
                 }
@@ -2454,16 +2682,16 @@ class MetricRequests implements RequestInterface
                     continue;
                 }
 
-                // $logger->info("Dimensions Inputs: metricKey=$metricKey, channel={$metric->channel}, platformId=" . ($metric->platformId ?? 'null') . ", metric_id={$metricMap['metricMap'][$metricKey]}, platformCreatedAt=" . ($metric->platformCreatedAt->format('Y-m-d H:i:s')));
+                // $logger->info("Dimensions Inputs: metricKey=$metricKey, channel={$metric->channel}, platformId=" . ($metric->platformId ?? 'null') . ", metric_id={$metricMap['map'][$metricKey]}, platformCreatedAt=" . ($metric->platformCreatedAt->format('Y-m-d H:i:s')));
                 $channeledMetricKey = KeyGenerator::generateChanneledMetricKey(
                     channel: $metric->channel,
                     platformId: $metric->platformId,
-                    metric: $metricMap['metricMap'][$metricKey],
+                    metric: $metricMap['map'][$metricKey],
                     platformCreatedAt: $metric->platformCreatedAt->format('Y-m-d'),
                 );
 
                 if (!isset($channeledMetricMap['channeledMetricMap'][$channeledMetricKey])) {
-                    $logger->error("ChanneledMetric not found for key=$channeledMetricKey, metricId=".$metricMap['metricMap'][$metricKey]." metricKey=$metricKey, platformId=" . ($metric->platformId ?? 'null') . ", platformCreatedAt=" . $metric->platformCreatedAt->format('Y-m-d'));
+                    $logger->error("ChanneledMetric not found for key=$channeledMetricKey, metricId=".$metricMap['map'][$metricKey]." metricKey=$metricKey, platformId=" . ($metric->platformId ?? 'null') . ", platformCreatedAt=" . $metric->platformCreatedAt->format('Y-m-d'));
                     continue;
                 }
 
@@ -2625,10 +2853,18 @@ class MetricRequests implements RequestInterface
      * @param EntityManager $manager
      * @param string $sql
      * @param array $params
-     * @param $pageMap
-     * @param $queryMap
-     * @param $countryMap
-     * @param $deviceMap
+     * @param array $campaignMap
+     * @param array $channeledCampaignMap
+     * @param array $channeledAdGroupMap
+     * @param array $channeledAdMap
+     * @param array $pageMap
+     * @param array $queryMap
+     * @param array $postMap
+     * @param array $productMap
+     * @param array $customerMap
+     * @param array $orderMap
+     * @param array $countryMap
+     * @param array $deviceMap
      * @return array
      * @throws \Doctrine\DBAL\Exception
      */
@@ -2636,10 +2872,18 @@ class MetricRequests implements RequestInterface
         EntityManager $manager,
         string $sql,
         array $params,
-        $pageMap,
-        $queryMap,
-        $countryMap,
-        $deviceMap,
+        array $campaignMap = [],
+        array $channeledCampaignMap = [],
+        array $channeledAdGroupMap = [],
+        array $channeledAdMap = [],
+        array $pageMap = [],
+        array $queryMap = [],
+        array $postMap = [],
+        array $productMap = [],
+        array $customerMap = [],
+        array $orderMap = [],
+        array $countryMap = [],
+        array $deviceMap = [],
     ): array {
         // Update the metric map with the newly inserted metrics
         $existingMetrics = $manager->getConnection()
@@ -2654,10 +2898,18 @@ class MetricRequests implements RequestInterface
                 name: $metric['name'],
                 period: $metric['period'],
                 metricDate: $metric['metricDate'],
-                page: $pageMap[$metric['page_id']]->getUrl(),
-                query: $queryMap[$metric['query_id']],
-                country: $countryMap[$metric['country_id']]->getCode(),
-                device: $deviceMap[$metric['device_id']]->getType(),
+                campaign: isset($metric['campaign_id']) ? $campaignMap[$metric['campaign_id']]->getCampaignId() : null,
+                channeledCampaign: isset($metric['channeledCampaign_id']) ? $channeledCampaignMap[$metric['channeledCampaign_id']]->getPlatformId() : null,
+                channeledAdGroup: isset($metric['channeledAdGroup_id']) ? $channeledAdGroupMap[$metric['channeledAdGroup_id']]->getPlatformId() : null,
+                channeledAd: isset($metric['channeledAd_id']) ? $channeledAdMap[$metric['channeledAd_id']]->getPlatformId() : null,
+                page: isset($metric['page_id']) ? $pageMap[$metric['page_id']]->getUrl() : null,
+                query: isset($metric['query_id']) ? $queryMap[$metric['query_id']] : null,
+                post: isset($metric['post_id']) ? $postMap[$metric['post_id']]->getPostId() : null,
+                product: isset($metric['product_id']) ? $productMap[$metric['product_id']]->getProductId() : null,
+                customer: isset($metric['customer_id']) ? $customerMap[$metric['customer_id']]->getEmail() : null,
+                order: isset($metric['order_id']) ? $orderMap[$metric['order_id']]->getOrderId() : null,
+                country: isset($metric['country_id']) ? $countryMap[$metric['country_id']]->getCode() : null,
+                device: isset($metric['device_id']) ? $deviceMap[$metric['device_id']]->getType() : null,
             );
             $metricMap[$metricKey] = (int)$metric['id'];
         }
@@ -2683,7 +2935,7 @@ class MetricRequests implements RequestInterface
         // Map channeled metrics to their IDs and create a map for quick access
         $channeledMetricMap = [];
         foreach ($existingChanneledMetrics as $channeledMetric) {
-            if (!isset($metricMap['metricMapReverse'][$channeledMetric['metric_id']])) {
+            if (!isset($metricMap['mapReverse'][$channeledMetric['metric_id']])) {
                 throw new RuntimeException("Channeled metric with ID {$channeledMetric['id']} references non-existent metric ID {$channeledMetric['metric_id']}");
             }
             $metricKey = KeyGenerator::generateChanneledMetricKey(
