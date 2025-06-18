@@ -254,6 +254,7 @@ enum Country: string
     case ZMB = 'ZMB'; // Zambia
     case ZWE = 'ZWE'; // Zimbabwe
     case OTH = 'OTH'; // Others
+    case UNK = 'UNK'; // Unknown
 
     public function getFullName(): string
     {
@@ -508,6 +509,7 @@ enum Country: string
             self::ZMB => 'Zambia',
             self::ZWE => 'Zimbabwe',
             self::OTH => 'Others',
+            self::UNK => 'Unknown',
         };
     }
 }

@@ -68,6 +68,7 @@ class InitializeEntitiesCommand extends Command
                 ['type' => DeviceEnum::MOBILE],
                 ['type' => DeviceEnum::TABLET],
                 ['type' => DeviceEnum::OTHER],
+                ['type' => DeviceEnum::UNKNOWN],
             ];
             $devicesInitialized = 0;
             $devicesSkipped = 0;

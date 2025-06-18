@@ -8,4 +8,5 @@ enum Device: string
     case MOBILE = 'mobile';
     case TABLET = 'tablet';
     case OTHER = 'other';
+    case UNKNOWN = 'unknown';
 }
