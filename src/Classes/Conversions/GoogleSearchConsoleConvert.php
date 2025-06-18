@@ -2,7 +2,8 @@
 
 namespace Classes\Conversions;
 
-use DateTime;
+use Carbon\Carbon;
+use Classes\KeyGenerator;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\ORMException;
@@ -10,42 +11,47 @@ use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\TransactionRequiredException;
 use Entities\Analytics\Page;
 use Enums\Channel;
+use Enums\Country;
+use Enums\Device;
 use Enums\Period;
-use Exception;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 use stdClass;
 
 class GoogleSearchConsoleConvert
 {
+    public static array $defaultValues = [
+        'query' => 'unknown',
+        'country' => 'UNK',
+        'page' => null,
+        'device' => 'unknown'
+    ];
+
+    public static array $allDimensions = ['date', 'query', 'country', 'page', 'device'];
+
+    public static array $optionalDimensions = ['query', 'country', 'device'];
+
     /**
      * Converts GSC API rows into a collection of metric objects.
      *
      * @param array $rows
      * @param string $siteUrl
      * @param string $siteKey
-     * @param array $targetKeywords
-     * @param array $targetCountries
      * @param LoggerInterface|null $logger
      * @param Page|null $pageEntity
      * @param EntityManager|null $em
-     * @param array $dimensions
      * @return ArrayCollection
      * @throws ORMException
      * @throws OptimisticLockException
      * @throws TransactionRequiredException
-     * @throws Exception
      */
     public static function metrics(
         array $rows,
         string $siteUrl,
         string $siteKey,
-        array $targetKeywords = [],
-        array $targetCountries = [],
         LoggerInterface $logger = null,
         ?Page $pageEntity = null,
         ?EntityManager $em = null,
-        array $dimensions = [],
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
@@ -58,62 +64,103 @@ class GoogleSearchConsoleConvert
         $pageEntity = $em->find(Page::class, $pageEntity->getId());
         $searchAppearance = 'WEB';
 
+        $aggregatedMetrics = [];
+        $aggregatedMetadata = [];
+        $elements = [];
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
 
-            list($date, $query, $country, $page, $device) = self::getDimensionsValues($row, array_flip($dimensions), $targetKeywords, $targetCountries);
-            list($impressions, $clicks, $position) = self::getMetricsValues($row);
+            $flippedDimensions = array_flip(GoogleSearchConsoleConvert::$allDimensions);
 
             $dimensionValues = [];
-            foreach ($dimensions as $dimension) {
-                $dimensionValues[$dimension] = ${$dimension};
+            foreach (GoogleSearchConsoleConvert::$allDimensions as $dimension) {
+                if (!isset($row['keys'][$flippedDimensions[$dimension]])) {
+                    $row['keys'][$flippedDimensions[$dimension]] = match($dimension) {
+                        'query' => 'unknown',
+                        'country' => Country::UNK->value,
+                        'page' => null,
+                        'device' => Device::UNKNOWN->value,
+                    };
+                }
+                $dimensionValues[$dimension] = $row['keys'][$flippedDimensions[$dimension]];
             }
-            $groupKey = md5(json_encode($dimensionValues, JSON_UNESCAPED_UNICODE));
+            $impressionsGroupKey = KeyGenerator::generateMetricKey(
+                channel: Channel::google_search_console->value,
+                name: 'impressions',
+                period: Period::Daily->value,
+                metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
+                page:  $pageEntity->getUrl(),
+                query: $dimensionValues['query'],
+                country: $dimensionValues['country'],
+                device: $dimensionValues['device'],
+            );
 
-            if (isset($aggregatedRows[$groupKey])) {
-                $aggregatedRows[$groupKey]['clicks'] += $clicks;
-                $aggregatedRows[$groupKey]['impressions'] += $impressions;
-                $aggregatedRows[$groupKey]['position'] += ($position) * ($impressions);
-                $aggregatedRows[$groupKey]['count']++;
-                $logger?->info("Aggregated duplicate row $index for query=$query, page=$page");
-                continue;
-            }
-
-            $platformId = "gsc_{$siteKey}_$groupKey";
-            foreach (['clicks', 'impressions', 'ctr', 'position'] as $metricName) {
-                $value = match ($metricName) {
+            list($impressions, $clicks, $position, $ctr) = self::getMetricsValues($row);
+            if (isset($aggregatedMetrics[$impressionsGroupKey])) {
+                // Aggregate existing row
+                $aggregatedMetrics[$impressionsGroupKey] = self::aggregateMetrics(
+                    $aggregatedMetrics[$impressionsGroupKey],
+                    [
+                        'impressions' => $impressions,
+                        'clicks' => $clicks,
+                        'position' => $position,
+                    ]
+                );
+                $aggregatedMetadata[$impressionsGroupKey][] = [
+                    ...$aggregatedMetrics[$impressionsGroupKey],
+                    'keys' => $row['keys'],
+                    'subset' => $row['subset'],
+                    'synthetic' => $row['synthetic'] ?? false,
+                    'impressions_difference' => $row['impressions_difference'],
+                    'clicks_difference' => $row['clicks_difference'],
+                ];
+            } else {
+                $aggregatedMetrics[$impressionsGroupKey] = [
                     'clicks' => $clicks,
                     'impressions' => $impressions,
-                    'ctr' => $impressions > 0 ? $clicks / $impressions : 0,
-                    'position' => $impressions > 0 ? $position : 0,
-                };
+                    'position' => $position,
+                    "ctr" => $ctr,
+                    'count' => 1,
+                ];
+                $aggregatedMetadata[$impressionsGroupKey] = [
+                    ...$aggregatedMetrics[$impressionsGroupKey],
+                    'keys' => $row['keys'],
+                    'subset' => $row['subset'],
+                    'synthetic' => $row['synthetic'] ?? false,
+                    'impressions_difference' => $row['impressions_difference'],
+                    'clicks_difference' => $row['clicks_difference'],
+                ];
+            }
 
+            $platformId = "gsc_{$siteKey}_$impressionsGroupKey";
+            foreach (['clicks', 'impressions', 'ctr', 'position'] as $metricName) {
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::google_search_console->value;
                 $channeledMetric->name = $metricName;
-                $channeledMetric->value = $value;
+                $channeledMetric->value = $aggregatedMetrics[$impressionsGroupKey][$metricName];
                 $channeledMetric->period = Period::Daily->value;
-                $channeledMetric->metricDate = new DateTime($date);
+                $channeledMetric->metricDate = Carbon::parse($row['keys'][$flippedDimensions['date']])->toDateString();
                 $channeledMetric->platformId = $platformId;
-                $channeledMetric->platformCreatedAt = new DateTime($date);
-                $channeledMetric->query = $query;
-                $channeledMetric->countryCode = $country;
-                $channeledMetric->deviceType = $device;
+                $channeledMetric->platformCreatedAt = Carbon::parse($row['keys'][$flippedDimensions['date']])->toDateTimeString();
+                $channeledMetric->query = $row['keys'][$flippedDimensions['query']];
+                $channeledMetric->countryCode = $row['keys'][$flippedDimensions['country']];
+                $channeledMetric->deviceType = $row['keys'][$flippedDimensions['device']];
                 $channeledMetric->page = $pageEntity;
                 $channeledMetric->dimensions = [
-                    (object) ['dimensionKey' => 'page', 'dimensionValue' => $page],
+                    (object) ['dimensionKey' => 'page', 'dimensionValue' => $row['keys'][$flippedDimensions['page']]],
                     (object) ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $searchAppearance],
                 ];
+                $channeledMetric->metadata = $aggregatedMetadata[$impressionsGroupKey];
                 $channeledMetric->data = [
-                    'impressions' => $impressions,
-                    'clicks' => $clicks,
-                    'position_weighted' => $position * $impressions,
-                    'ctr' => $impressions > 0 ? $clicks / $impressions : 0 // Fixed: Use calculated ctr
+                    'impressions' => $aggregatedMetrics[$impressionsGroupKey]['impressions'],
+                    'clicks' => $aggregatedMetrics[$impressionsGroupKey]['clicks'],
+                    'position_weighted' => $aggregatedMetrics[$impressionsGroupKey]['position'] * $aggregatedMetrics[$impressionsGroupKey]['impressions'],
+                    'ctr' => $aggregatedMetrics[$impressionsGroupKey]['ctr'],
                 ];
 
-                // $logger?->info("Created metric for row $index: name=$metricName, query=$queryTerm, page=" . ($pageEntity ? "ID={$pageEntity->getId()}, URL={$pageEntity->getUrl()}" : 'none') . ", dimension[page]=$page, data=" . json_encode($channeledMetric->data));
+                $logger?->warning("Temp data for country: ".$row['keys'][$flippedDimensions['country']]." and device ".$row['keys'][$flippedDimensions['device']].": " . json_encode($aggregatedMetrics[$impressionsGroupKey]));
 
-                $collection->add($channeledMetric);
+                $elements[$impressionsGroupKey][$metricName] = $channeledMetric;
             }
 
             if ($index % 1000 === 0) {
@@ -123,11 +170,37 @@ class GoogleSearchConsoleConvert
             }
         }
 
+        foreach($elements as $element) {
+            foreach($element as $metricNameElement) {
+                $collection->add($metricNameElement);
+            }
+        }
+
         $totalTime = microtime(true) - $startTime;
         $memory = memory_get_usage() / 1024 / 1024;
         $logger?->info("Completed metrics conversion: $rowCount rows to " . $collection->count() . " metrics, skipped $skippedRows rows, took $totalTime seconds, memory: $memory MB");
 
         return $collection;
+    }
+
+    public static function fillWithNullsAndFilter(array $rows, array $targetKeywords, array $targetCountries): array {
+        $newRows = [];
+        foreach ($rows as $row) {
+            list($date, $query, $country, $page, $device) = self::getDimensionsValues($row, array_flip($row['subset']), $targetKeywords, $targetCountries);
+            $row['keys'] = [$date, $query, $country, $page, $device];
+            $newRows[] = $row;
+        }
+        return $newRows;
+    }
+
+    public static function dontFillButFilter(array &$rows, array $subset, array $targetKeywords, array $targetCountries): array {
+        $allRows = [];
+        foreach ($rows as $row) {
+            list($date, $query, $country, $page, $device) = self::getDimensionsValues($row, array_flip($subset), $targetKeywords, $targetCountries);
+            $row['keys'] = [$date, $query, $country, $page, $device];
+            $allRows[] = $row;
+        }
+        return $allRows;
     }
 
     /**
@@ -148,8 +221,12 @@ class GoogleSearchConsoleConvert
      */
     protected static function getQueryTerm(array $row, array $dimensionsIndex, array $targetKeywords): ?string
     {
-        $queryTerm = isset($dimensionsIndex['query']) ? ($row['keys'][$dimensionsIndex['query']] ?? '') : '';
-        return empty($targetKeywords) || Helpers::str_contains_any($queryTerm, $targetKeywords) ? $queryTerm : 'others';
+        if (!isset($dimensionsIndex['query']) || !isset($row['keys'][$dimensionsIndex['query']])) {
+            return self::$defaultValues['query'];
+        }
+        $queryTerm = ($row['keys'][$dimensionsIndex['query']]);
+        return empty($targetKeywords) || Helpers::str_contains_any($queryTerm, $targetKeywords) ? $queryTerm :
+            ($queryTerm == self::$defaultValues['query'] ? self::$defaultValues['query'] : 'others');
     }
 
     /**
@@ -160,11 +237,12 @@ class GoogleSearchConsoleConvert
      */
     protected static function getCountryCode(array $row, array $dimensionsIndex, array $targetCountries): ?string
     {
-        return isset($dimensionsIndex['country']) &&
-            isset($row['keys'][$dimensionsIndex['country']]) &&
-            (empty($targetCountries) || in_array(strtolower($row['keys'][$dimensionsIndex['country']]), $targetCountries)) ?
+        if (!isset($dimensionsIndex['country']) || !isset($row['keys'][$dimensionsIndex['country']])) {
+            return self::$defaultValues['country'];
+        }
+        return (empty($targetCountries) || in_array(strtolower($row['keys'][$dimensionsIndex['country']]), $targetCountries)) ?
                 strtoupper($row['keys'][$dimensionsIndex['country']]) :
-                'OTH';
+                    ($row['keys'][$dimensionsIndex['country']] == self::$defaultValues['country'] ? self::$defaultValues['country'] : 'OTH');
     }
 
     /**
@@ -174,7 +252,10 @@ class GoogleSearchConsoleConvert
      */
     protected static function getPage(array $row, array $dimensionsIndex): ?string
     {
-        return isset($dimensionsIndex['page']) ? ($row['keys'][$dimensionsIndex['page']] ?? null) : null;
+        if (!isset($dimensionsIndex['page']) || !isset($row['keys'][$dimensionsIndex['page']])) {
+            return self::$defaultValues['page'];
+        }
+        return ($row['keys'][$dimensionsIndex['page']]);
     }
 
     /**
@@ -184,9 +265,10 @@ class GoogleSearchConsoleConvert
      */
     protected static function getDevice(array $row, array $dimensionsIndex): ?string
     {
-        return isset($dimensionsIndex['device']) && isset($row['keys'][$dimensionsIndex['device']]) ?
-                    strtolower($row['keys'][$dimensionsIndex['device']]) :
-                    'other';
+        if (!isset($dimensionsIndex['device']) || !isset($row['keys'][$dimensionsIndex['device']])) {
+            return self::$defaultValues['device'];
+        }
+        return strtolower($row['keys'][$dimensionsIndex['device']]);
     }
 
     protected static function getDimensionsValues(array $row, array $dimensionsIndex, array $targetKeywords, array $targetCountries): array
@@ -206,6 +288,30 @@ class GoogleSearchConsoleConvert
             $row['impressions'] ?? 0,
             $row['clicks'] ?? 0,
             $row['position'] ?? 0,
+            $row['ctr'] ?? 0,
         ];
+    }
+
+    public static function aggregateMetrics(array $data, array $new): array {
+        // Sum additive metrics
+        $totalImpressions = $data['impressions'] + $new['impressions'];
+        $totalClicks = $data['clicks'] + $new['clicks'];
+
+        // Recalculate CTR
+        $data['ctr'] = $totalImpressions > 0
+            ? $totalClicks / $totalImpressions
+            : 0;
+
+        // Recalculate weighted position
+        $totalWeightedPosition = ($data['position'] * $data['impressions']) // Impressions include previous and new
+            + ($new['position'] * $new['impressions']);
+        $data['position'] = $totalImpressions > 0 ? $totalWeightedPosition / $totalImpressions : 0;
+
+        // Update remaining fields
+        $data['impressions'] = $totalImpressions;
+        $data['clicks'] = $totalClicks;
+        $data['count']++;
+
+        return $data;
     }
 }

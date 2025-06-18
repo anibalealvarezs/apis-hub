@@ -272,10 +272,9 @@ class MetricRequests
             $metricNames = $filters->metricNames ?? ($config['google_search_console']['metrics'] ?? ['clicks', 'impressions', 'ctr', 'position']);
             // $dimensions = $filters->dimensions ?? ['date', 'query', 'page', 'country', 'device'];
             // Custom filter for dimensions disabled for GSC given the strict structure. Config dimensions used instead
-            $allDimensions = $config['google_search_console']['dimensions'];
             $batchSize = 100;
 
-            $logger->info("Initialized repositories, dimensions=" . implode(',', $allDimensions) . ", metricNames=" . json_encode($metricNames) . ", batchSize=$batchSize");
+            $logger->info("Initialized repositories, dimensions=" . implode(',', GoogleSearchConsoleConvert::$allDimensions) . ", metricNames=" . json_encode($metricNames) . ", batchSize=$batchSize");
             $logger->warning("Note: 'searchAppearance' is not included in dimensions due to GSC API restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
 
             // Load countries and create a map
@@ -336,7 +335,6 @@ class MetricRequests
                     $countryRepository,
                     $deviceRepository,
                     $metricNames,
-                    $allDimensions,
                     $filters,
                     $logger,
                     $deviceMap,
@@ -482,7 +480,6 @@ class MetricRequests
      * @param EntityRepository $countryRepository
      * @param EntityRepository $deviceRepository
      * @param array $metricNames
-     * @param array $allDimensions
      * @param object|null $filters
      * @param LoggerInterface $logger
      * @param array $deviceMap
@@ -508,7 +505,6 @@ class MetricRequests
         EntityRepository $countryRepository,
         EntityRepository $deviceRepository,
         array $metricNames,
-        array $allDimensions,
         ?object $filters,
         LoggerInterface $logger,
         array $deviceMap,
@@ -563,7 +559,6 @@ class MetricRequests
                 $manager,
                 $pageEntity,
                 $metricNames,
-                $allDimensions,
                 $entitiesToInvalidate,
                 $queryCache,
                 $metricCache,
@@ -605,7 +600,6 @@ class MetricRequests
      * @param EntityManager $manager
      * @param Page $pageEntity
      * @param array $metricNames
-     * @param array $allDimensions
      * @param array &$entitiesToInvalidate
      * @param array &$queryCache
      * @param array &$metricCache
@@ -633,7 +627,6 @@ class MetricRequests
         EntityManager $manager,
         Page $pageEntity,
         array $metricNames,
-        array $allDimensions,
         array &$entitiesToInvalidate,
         array &$queryCache,
         array &$metricCache,
@@ -659,98 +652,123 @@ class MetricRequests
         $totalMetrics = 0;
         $totalRows = 0;
         $totalDuplicates = 0;
+        $allMetrics = new ArrayCollection();
+        $allRows = [];
+        $subsetRows = [];
+
         try {
-            $api->getAllSearchQueryResultsAndProcess(
-                siteUrl: $siteUrl,
-                startDate: $dayStr,
-                endDate: $dayStr,
-                rowLimit: $rowLimit,
-                dimensions: $allDimensions,
-                dimensionFilterGroups: $dimensionFilterGroups,
-                callback: function($rows) use (
-                    $siteUrl,
-                    $siteKey,
-                    $metricNames,
-                    $targetKeywords,
-                    $targetCountries,
-                    &$loopCount,
-                    &$totalMetrics,
-                    &$totalRows,
-                    &$entitiesToInvalidate,
-                    &$queryCache,
-                    &$metricCache,
-                    &$channeledMetricCache,
-                    &$dimensionCache,
-                    $logger,
-                    $manager,
-                    $pageEntity,
-                    $countryRepository,
-                    $deviceRepository,
-                    &$totalDuplicates,
-                    $deviceMap,
-                    $countryMap,
-                    $pageMap,
-                    $allDimensions,
-                ) {
-                    $loopCount++;
-                    $totalRows += count($rows);
-                    // $logger->info("Processing API callback loop $loopCount, rows=" . count($rows) . ", totalRows=$totalRows");
-                    // $logger->info("Raw API rows: " . json_encode(array_slice($rows, 0, 5)));
+            $dimensionsSubsets = self::getAllSubsets(GoogleSearchConsoleConvert::$optionalDimensions);
+            // $dimensionsSubsets = [GoogleSearchConsoleConvert::$optionalDimensions];
+            foreach ($dimensionsSubsets as $dimensionsSubset) {
+                $actualDimensionsSubset = array_merge(array_diff(GoogleSearchConsoleConvert::$allDimensions, GoogleSearchConsoleConvert::$optionalDimensions), $dimensionsSubset);
+                $rows = $api->getAllSearchQueryResults(
+                    siteUrl: $siteUrl,
+                    startDate: $dayStr,
+                    endDate: $dayStr,
+                    rowLimit: $rowLimit,
+                    dimensions: $actualDimensionsSubset,
+                    dimensionFilterGroups: $dimensionFilterGroups,
+                );
+                $subsetRows[] = [
+                    'rows' => $rows['rows'],
+                    'subset' => $actualDimensionsSubset,
+                ];
+            }
 
-                    $metrics = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, $siteKey, $targetKeywords, $targetCountries, $logger, $pageEntity, $manager, $allDimensions);
-                    // $logger->info("Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, first metric: " . (count($pageMetrics) > 0 ? json_encode(['name' => $pageMetrics[0]->name, 'query' => is_string($pageMetrics[0]->query) ? $pageMetrics[0]->query : ($pageMetrics[0]->query instanceof Query ? $pageMetrics[0]->query->getQuery() : 'none')]) : 'none'));
-
-                    // Adjust pageMetrics according to configurations
-                    foreach ($metrics as &$metric) {
-                        if ($metricNames && !in_array($metric->name, $metricNames)) {
-                            $logger->warning("Skipped metric: =$metric->name, not in allowed names: " . json_encode($metricNames));
+            foreach($subsetRows as $rows) {
+                foreach ($rows as $row) {
+                    foreach($row as $key => $element) {
+                        if (is_string($element)) {
                             continue;
                         }
-
-                        $countryEnum = CountryEnum::tryFrom($metric->countryCode) ?? CountryEnum::OTH;
-                        $metric->country = $countryMap['map'][$countryEnum->value];
-
-                        $deviceEnum = DeviceEnum::from($metric->deviceType) ?? DeviceEnum::OTHER;
-                        $metric->device = $deviceMap['map'][$deviceEnum->value];
-                    }
-
-                    try {
-                        $manager->getConnection()->beginTransaction();
-
-                        // Map metrics
-                        $metricMap = self::processMetrics(
-                            $metrics,
-                            $manager,
-                            $countryMap,
-                            $deviceMap,
-                            $pageMap,
-                        );
-
-                        // Map channeled metrics
-                        $channeledMetricMap = self::processChanneledMetrics(
-                            $metrics,
-                            $manager,
-                            $metricMap,
-                            $logger,
-                        );
-
-                        // Map dimensions
-                        self::processChanneledMetricDimensions(
-                            $metrics,
-                            $manager,
-                            $metricMap,
-                            $channeledMetricMap,
-                            $logger,
-                        );
-                        $manager->getConnection()->commit();
-                    } catch (Exception $e) {
-                        if ($manager->getConnection()->isTransactionActive()) {
-                            $manager->getConnection()->rollback();
-                        }
-                        throw $e;
+                        $element['subset'] = $rows['subset'];
+                        $allRows[] = $element;
                     }
                 }
-            );
+            }
+
+            $childrenSums = self::computeChildrenSum($allRows);
+
+            /* $sums = [];
+            foreach ($allRows as $i => $row) {
+                $sums[] = "Record $i has children sum = " . (is_array($childrenSums[$i]) ? json_encode($childrenSums[$i]) : $childrenSums[$i]);
+            } */
+
+            $differences = self::calculateDifferences($allRows, $childrenSums);
+
+            $allocatedDifferences = self::allocatePositiveDifferences($differences, GoogleSearchConsoleConvert::$allDimensions);
+
+            $allocateFinalDifference = self::addGlobalRemainderSynthetic($allocatedDifferences, GoogleSearchConsoleConvert::$allDimensions);
+
+            $negativeDifferencesProcessed = self::flagOrScaleNegativeDifferences($allocateFinalDifference, true);
+
+            $scaleAdjusted = self::adjustScaledPositions($negativeDifferencesProcessed);
+
+            $finalRecords = array_values(array_filter($scaleAdjusted, function($record) {
+                // Keep if:
+                // - full subset (all 5 dims)
+                // - or synthetic record
+                return (count($record['subset']) === 5) || (!empty($record['synthetic']));
+            }));
+
+            $finalRecords = GoogleSearchConsoleConvert::fillWithNullsAndFilter($finalRecords, $targetKeywords, $targetCountries);
+
+            // Helpers::dumpDebugJson($finalRecords);
+
+            $metrics = GoogleSearchConsoleConvert::metrics($finalRecords, $siteUrl, $siteKey, $logger, $pageEntity, $manager);
+            // $logger->info("Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, first metric: " . (count($pageMetrics) > 0 ? json_encode(['name' => $pageMetrics[0]->name, 'query' => is_string($pageMetrics[0]->query) ? $pageMetrics[0]->query : ($pageMetrics[0]->query instanceof Query ? $pageMetrics[0]->query->getQuery() : 'none')]) : 'none'));
+
+            // Adjust pageMetrics according to configurations
+            foreach ($metrics as &$metric) {
+                if ($metricNames && !in_array($metric->name, $metricNames)) {
+                    $logger->warning("Skipped metric: =$metric->name, not in allowed names: " . json_encode($metricNames));
+                    continue;
+                }
+
+                $countryEnum = CountryEnum::tryFrom($metric->countryCode) ?? CountryEnum::UNK;
+                $metric->country = $countryMap['map'][$countryEnum->value];
+
+                $deviceEnum = DeviceEnum::from($metric->deviceType) ?? DeviceEnum::UNKNOWN;
+                $metric->device = $deviceMap['map'][$deviceEnum->value];
+
+                $allMetrics->add($metric);
+            }
+
+            try {
+                $manager->getConnection()->beginTransaction();
+
+                // Map metrics
+                $metricMap = self::processMetrics(
+                    $allMetrics,
+                    $manager,
+                    $countryMap,
+                    $deviceMap,
+                    $pageMap,
+                );
+
+                // Map channeled metrics
+                $channeledMetricMap = self::processChanneledMetrics(
+                    $allMetrics,
+                    $manager,
+                    $metricMap,
+                    $logger,
+                );
+
+                // Map dimensions
+                self::processChanneledMetricDimensions(
+                    $allMetrics,
+                    $manager,
+                    $metricMap,
+                    $channeledMetricMap,
+                    $logger,
+                );
+                $manager->getConnection()->commit();
+            } catch (Exception $e) {
+                if ($manager->getConnection()->isTransactionActive()) {
+                    $manager->getConnection()->rollback();
+                }
+                throw $e;
+            }
 
             $logger->info("Completed API query for date=$dayStr, duplicates=$totalDuplicates");
 
@@ -763,6 +781,335 @@ class MetricRequests
             $logger->error("Error during GSC API query for site $siteUrl, date $dayStr: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
             throw $e;
         }
+    }
+
+    protected static function computeChildrenSum(array $records): array {
+        $n = count($records);
+
+        // Initialize sums array with zeros for each metric
+        $childrenSums = array_fill(0, $n, ['impressions' => 0, 'clicks' => 0]);
+
+        // Sum children metrics
+        for ($i = 0; $i < $n; $i++) {
+            $parentSubset = $records[$i]['subset'];
+            $parentDims = $records[$i]['keys'];
+
+            for ($j = 0; $j < $n; $j++) {
+                if ($i === $j) continue;
+
+                $childSubset = $records[$j]['subset'];
+                $childDims = $records[$j]['keys'];
+
+                if (self::isParentOf($parentSubset, $parentDims, $childSubset, $childDims)) {
+                    $childrenSums[$i]['impressions'] += $records[$j]['impressions'] ?? 0;
+                    $childrenSums[$i]['clicks'] += $records[$j]['clicks'] ?? 0;
+                }
+            }
+        }
+
+        return $childrenSums;
+    }
+
+    protected static function calculateDifferences(array $records, array $childrenSums): array {
+        foreach ($records as $index => &$record) {
+            $ownImpressions = $record['impressions'] ?? 0;
+            $ownClicks = $record['clicks'] ?? 0;
+
+            $childrenImpressions = $childrenSums[$index]['impressions'] ?? 0;
+            $childrenClicks = $childrenSums[$index]['clicks'] ?? 0;
+
+            $record['impressions_difference'] = $ownImpressions - $childrenImpressions;
+            $record['clicks_difference'] = $ownClicks - $childrenClicks;
+        }
+        unset($record); // prevent accidental reference reuse
+        return $records;
+    }
+
+    protected static function allocatePositiveDifferences(array $records, array $dimensionNames, string $missingLabel = 'unknown'): array {
+        $extendedRecords = $records;
+
+        foreach ($records as $record) {
+            $impressionDiff = $record['impressions_difference'] ?? 0;
+            $clicksDiff = $record['clicks_difference'] ?? 0;
+
+            if ($impressionDiff > 0 || $clicksDiff > 0) {
+                $newKeys = $record['keys'];
+                $subset = $record['subset'];
+
+                // Find the first missing dimension
+                $missingDimension = null;
+                foreach ($dimensionNames as $dim) {
+                    if (!in_array($dim, $subset)) {
+                        $missingDimension = $dim;
+                        break;
+                    }
+                }
+
+                if ($missingDimension !== null) {
+                    $newKeys[] = $missingLabel;
+                    $newSubset = [...$subset, $missingDimension];
+
+                    // Create synthetic record
+                    $syntheticRecord = [
+                        'keys' => $newKeys,
+                        'clicks' => $clicksDiff,
+                        'impressions' => $impressionDiff,
+                        'ctr' => ($impressionDiff > 0) ? $clicksDiff / $impressionDiff : 0,
+                        'position' => null,
+                        'subset' => $newSubset,
+                        'impressions_difference' => 0,
+                        'clicks_difference' => 0,
+                        'synthetic' => true,
+                    ];
+
+                    $extendedRecords[] = $syntheticRecord;
+                }
+            }
+        }
+
+        return $extendedRecords;
+    }
+
+    protected static function addGlobalRemainderSynthetic(array $records, array $dimensionNames, array $parentSubset = ['date', 'page']): array
+    {
+        $extendedRecords = $records;
+
+        $allImpressions = 0;
+        $allClicks = 0;
+        $allPositionWeightedSum = 0;
+        $allPositionCount = 0;
+
+        $fiveDImpressions = 0;
+        $fiveDClicks = 0;
+        $fiveDPositionWeightedSum = 0;
+        $fiveDPositionCount = 0;
+
+        $partialImpressions = 0;
+        $partialClicks = 0;
+        $partialPositionWeightedSum = 0;
+        $partialPositionCount = 0;
+
+        // Step 1: Sum metrics by category
+        foreach ($records as $rec) {
+            $subset = $rec['subset'] ?? [];
+            $impr = $rec['impressions'] ?? 0;
+            $clicks = $rec['clicks'] ?? 0;
+            $pos = $rec['position'] ?? null;
+            $posWeighted = ($pos !== null) ? ($pos * $impr) : 0;
+
+            // Parent subset totals ("All")
+            if (array_values($subset) == $parentSubset) {
+                $allImpressions += $impr;
+                $allClicks += $clicks;
+                if ($pos !== null) {
+                    $allPositionWeightedSum += $posWeighted;
+                    $allPositionCount += $impr;
+                }
+            }
+
+            // Fully attributed 5D records (exclude synthetic)
+            if (count($subset) === count($dimensionNames) && empty($rec['synthetic'])) {
+                $fiveDImpressions += $impr;
+                $fiveDClicks += $clicks;
+                if ($pos !== null) {
+                    $fiveDPositionWeightedSum += $posWeighted;
+                    $fiveDPositionCount += $impr;
+                }
+            }
+
+            // Partial synthetic records
+            if (!empty($rec['synthetic'])) {
+                $partialImpressions += $impr;
+                $partialClicks += $clicks;
+                if ($pos !== null) {
+                    $partialPositionWeightedSum += $posWeighted;
+                    $partialPositionCount += $impr;
+                }
+            }
+        }
+
+        // Step 2: Calculate remaining values
+        $remainingImpressions = $allImpressions - $fiveDImpressions - $partialImpressions;
+        $remainingClicks = $allClicks - $fiveDClicks - $partialClicks;
+
+        // Weighted position average for remaining
+        // Compute weighted position of "All" minus weighted positions already accounted for
+        $allPositionAvg = ($allPositionCount > 0) ? ($allPositionWeightedSum / $allPositionCount) : null;
+
+        // For position, approximate remaining weighted sum and count
+        $remainingPositionWeightedSum = $allPositionWeightedSum - $fiveDPositionWeightedSum - $partialPositionWeightedSum;
+        $remainingPositionCount = $allPositionCount - $fiveDPositionCount - $partialPositionCount;
+
+        $remainingPosition = ($remainingPositionCount > 0) ? ($remainingPositionWeightedSum / $remainingPositionCount) : $allPositionAvg;
+
+        // CTR = clicks / impressions (avoid division by zero)
+        $remainingCtr = ($remainingImpressions > 0) ? ($remainingClicks / $remainingImpressions) : 0;
+
+        if ($remainingImpressions > 0 || $remainingClicks > 0) {
+            // Compose keys for parent subset, fill missing with $missingLabel
+            $keys = [];
+            foreach ($dimensionNames as $dim) {
+                $missingLabel = match($dim) {
+                    'country' => 'UNK',
+                    default => 'unknown',
+                };
+                if (in_array($dim, $parentSubset)) {
+                    // Find record with this subset and take its key for that dim, or fallback to missingLabel
+                    $foundKey = $missingLabel;
+                    foreach ($records as $rec) {
+                        if (($rec['subset'] ?? []) === $parentSubset) {
+                            $index = array_search($dim, $parentSubset);
+                            $foundKey = $rec['keys'][$index] ?? $missingLabel;
+                            break;
+                        }
+                    }
+                    $keys[] = $foundKey;
+                } else {
+                    $keys[] = $missingLabel;
+                }
+            }
+
+            $syntheticRecord = [
+                'keys' => $keys,
+                'subset' => $dimensionNames,
+                'impressions' => $remainingImpressions,
+                'clicks' => $remainingClicks,
+                'ctr' => $remainingCtr,
+                'position' => $remainingPosition,
+                'synthetic' => true,
+                'note' => 'final synthetic to reconcile unmatched parent metrics',
+                'impressions_difference' => 0,
+                'clicks_difference' => 0,
+            ];
+
+            $extendedRecords[] = $syntheticRecord;
+        }
+
+        return $extendedRecords;
+    }
+
+    protected static function flagOrScaleNegativeDifferences(array $records, bool $scaleNegative = false): array {
+        foreach ($records as &$record) {
+
+            $impressionDiff = $record['impressions_difference'] ?? 0;
+            $clicksDiff = $record['clicks_difference'] ?? 0;
+
+            $childrenImpressions = $record['children_sum']['impressions'] ?? 0;
+            $childrenClicks = $record['children_sum']['clicks'] ?? 0;
+
+            $impressions = $record['impressions'] ?? 0;
+            $clicks = $record['clicks'] ?? 0;
+
+            // If either metric has a negative difference, treat the record
+            if ($impressionDiff < 0 || $clicksDiff < 0) {
+                if ($scaleNegative) {
+                    $scaleFactorImpr = $childrenImpressions > 0 ? $impressions / $childrenImpressions : 0;
+                    $scaleFactorClicks = $childrenClicks > 0 ? $clicks / $childrenClicks : 0;
+
+                    $record['original_impressions'] = $impressions;
+                    $record['original_clicks'] = $clicks;
+                    $record['original_differences'] = [
+                        'impressions' => $impressionDiff,
+                        'clicks' => $clicksDiff
+                    ];
+
+                    $record['impressions'] = round($childrenImpressions * $scaleFactorImpr);
+                    $record['clicks'] = round($childrenClicks * $scaleFactorClicks);
+                    $record['scaled'] = true;
+                    $record['note'] = 'scaled down to match parent metrics';
+
+                    // Recalculate CTR
+                    $record['ctr'] = $record['impressions'] > 0 ? $record['clicks'] / $record['impressions'] : 0;
+                } else {
+                    $record['flagged'] = true;
+                    $record['note'] = 'exceeds parent; likely misattributed';
+                }
+            }
+        }
+
+        return $records;
+    }
+
+    protected static function adjustScaledPositions(array $records): array {
+        $n = count($records);
+
+        // Helper: same as before
+
+
+        for ($i = 0; $i < $n; $i++) {
+            if (!($records[$i]['scaled'] ?? false)) continue;
+
+            $parentSubset = $records[$i]['subset'];
+            $parentDims = $records[$i]['keys'];
+
+            $weightedSum = 0;
+            $totalImpressions = 0;
+
+            for ($j = 0; $j < $n; $j++) {
+                if ($i === $j) continue;
+
+                $childSubset = $records[$j]['subset'];
+                $childDims = $records[$j]['keys'];
+
+                if (self::isParentOf($parentSubset, $parentDims, $childSubset, $childDims)) {
+                    $impressions = $records[$j]['impressions'] ?? 0;
+                    $position = $records[$j]['position'] ?? null;
+
+                    if ($impressions > 0 && $position !== null) {
+                        $weightedSum += $impressions * $position;
+                        $totalImpressions += $impressions;
+                    }
+                }
+            }
+
+            if ($totalImpressions > 0) {
+                $records[$i]['original_position'] = $records[$i]['position'] ?? null;
+                $records[$i]['position'] = round($weightedSum / $totalImpressions, 2);
+            }
+        }
+
+        return $records;
+    }
+
+    protected static function isParentOf(array $parentSubset, array $parentDims, array $childSubset, array $childDims): bool {
+        if (count($childSubset) <= count($parentSubset)) {
+            return false;
+        }
+        $childSubsetIndex = array_flip($childSubset);
+        $parentIndexInChild = [];
+
+        foreach ($parentSubset as $dimName) {
+            if (!isset($childSubsetIndex[$dimName])) {
+                return false;
+            }
+            $parentIndexInChild[] = $childSubsetIndex[$dimName];
+        }
+
+        $prevIdx = -1;
+        foreach ($parentIndexInChild as $i => $childIdx) {
+            if ($childIdx <= $prevIdx) {
+                return false;
+            }
+            $prevIdx = $childIdx;
+            if ($parentDims[$i] !== $childDims[$childIdx]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static function getAllSubsets($elements): array
+    {
+        $subsets = [[]]; // Incluye el conjunto vacío
+        foreach ($elements as $element) {
+            $newSubsets = [];
+            foreach ($subsets as $subset) {
+                $newSubsets[] = $subset; // Copia el subconjunto existente
+                $newSubsets[] = array_merge($subset, [$element]); // Añade el elemento
+            }
+            $subsets = $newSubsets;
+        }
+        return $subsets;
     }
 
     /**
@@ -2241,7 +2588,7 @@ class MetricRequests
                 'country_id' => isset($metric->countryCode) ? $countryMap['map'][$metric->countryCode]->getId() : null,
                 'device_id' => isset($metric->deviceType) ? $deviceMap['map'][$metric->deviceType]->getId() : null,
                 'value' => $metric->value,
-                'metadata' => [],
+                'metadata' => $metric->metadata,
                 'key' => $metricKey,
             ];
         }
@@ -2455,24 +2802,20 @@ class MetricRequests
                 $logger->warning("Skipping channeled metric: platformId is empty, metricKey=$metricKey");
                 continue;
             }
-            if (!$metric->platformCreatedAt instanceof DateTime) {
-                $logger->warning("Skipping channeled metric: invalid platformCreatedAt, metricKey=$metricKey");
-                continue;
-            }
 
             // $logger->info("ChanneledMetrics Inputs: metricKey=$metricKey, channel={$metric->channel}, platformId=" . ($metric->platformId ?? 'null') . ", metric_id={$metricMap['map'][$metricKey]}, platformCreatedAt=" . ($metric->platformCreatedAt->format('Y-m-d H:i:s')));
             $channeledMetricKey = KeyGenerator::generateChanneledMetricKey(
                 channel: $metric->channel,
                 platformId: $metric->platformId,
                 metric: $metricMap['map'][$metricKey],
-                platformCreatedAt: $metric->platformCreatedAt->format('Y-m-d'),
+                platformCreatedAt: Carbon::parse($metric->platformCreatedAt)->format('Y-m-d'),
             );
 
             $uniqueChanneledMetrics[$channeledMetricKey] = [
                 'channel' => $metric->channel,
                 'platformId' => $metric->platformId,
                 'metric_id' => $metricMap['map'][$metricKey],
-                'platformCreatedAt' => $metric->platformCreatedAt->format('Y-m-d'),
+                'platformCreatedAt' => Carbon::parse($metric->platformCreatedAt)->format('Y-m-d'),
                 'data' => $metric->data ?? ['impressions' => 0, 'clicks' => 0, 'position_weighted' => 0, 'ctr' => 0],
                 'metricKey' => $metricKey,
             ];
@@ -2677,21 +3020,16 @@ class MetricRequests
                     continue;
                 }
 
-                if (empty($metric->platformId) || !$metric->platformCreatedAt instanceof DateTime) {
-                    $logger->warning("Skipping dimension due to invalid platformId or platformCreatedAt: metricKey=$metricKey, platformId=" . ($metric->platformId ?? 'null') . ", platformCreatedAt=" . (is_object($metric->platformCreatedAt) ? $metric->platformCreatedAt->format('Y-m-d H:i:s') : 'null'));
-                    continue;
-                }
-
                 // $logger->info("Dimensions Inputs: metricKey=$metricKey, channel={$metric->channel}, platformId=" . ($metric->platformId ?? 'null') . ", metric_id={$metricMap['map'][$metricKey]}, platformCreatedAt=" . ($metric->platformCreatedAt->format('Y-m-d H:i:s')));
                 $channeledMetricKey = KeyGenerator::generateChanneledMetricKey(
                     channel: $metric->channel,
                     platformId: $metric->platformId,
                     metric: $metricMap['map'][$metricKey],
-                    platformCreatedAt: $metric->platformCreatedAt->format('Y-m-d'),
+                    platformCreatedAt: Carbon::parse($metric->platformCreatedAt)->format('Y-m-d'),
                 );
 
                 if (!isset($channeledMetricMap['channeledMetricMap'][$channeledMetricKey])) {
-                    $logger->error("ChanneledMetric not found for key=$channeledMetricKey, metricId=".$metricMap['map'][$metricKey]." metricKey=$metricKey, platformId=" . ($metric->platformId ?? 'null') . ", platformCreatedAt=" . $metric->platformCreatedAt->format('Y-m-d'));
+                    $logger->error("ChanneledMetric not found for key=$channeledMetricKey, metricId=".$metricMap['map'][$metricKey]." metricKey=$metricKey, platformId=" . ($metric->platformId ?? 'null') . ", platformCreatedAt=" . Carbon::parse($metric->platformCreatedAt)->format('Y-m-d'));
                     continue;
                 }
 
