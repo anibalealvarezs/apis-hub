@@ -577,8 +577,6 @@ class MetricRequests
      * @param array $pageMap
      * @return array
      * @throws GuzzleException
-     * @throws NotSupported
-     * @throws ORMException
      * @throws \Doctrine\DBAL\Exception
      */
     private static function fetchDailyData(
@@ -628,6 +626,15 @@ class MetricRequests
                 ];
             }
 
+            if (count($subsetRows) === 0) {
+                $logger->info("No rows found for site $siteUrl, date $dayStr");
+                return [
+                    'metrics' => 0,
+                    'rows' => 0,
+                    'duplicates' => 0
+                ];
+            }
+
             foreach($subsetRows as $rows) {
                 foreach ($rows as $row) {
                     foreach($row as $element) {
@@ -640,6 +647,15 @@ class MetricRequests
                 }
             }
 
+            if (count($allRows) === 0) {
+                $logger->info("No rows found for site $siteUrl, date $dayStr");
+                return [
+                    'metrics' => 0,
+                    'rows' => 0,
+                    'duplicates' => 0
+                ];
+            }
+
             $finalRecords = GoogleSearchConsoleHelpers::getFinalRecords($allRows, $targetKeywords, $targetCountries);
 
             // Helpers::dumpDebugJson($finalRecords);
@@ -647,8 +663,7 @@ class MetricRequests
             $metrics = GoogleSearchConsoleConvert::metrics($finalRecords, $siteUrl, $siteKey, $logger, $pageEntity, $manager);
             // $logger->info("Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, first metric: " . (count($pageMetrics) > 0 ? json_encode(['name' => $pageMetrics[0]->name, 'query' => is_string($pageMetrics[0]->query) ? $pageMetrics[0]->query : ($pageMetrics[0]->query instanceof Query ? $pageMetrics[0]->query->getQuery() : 'none')]) : 'none'));
 
-            // Adjust pageMetrics according to configurations
-            foreach ($metrics as &$metric) {
+            foreach ($metrics as $metric) {
                 if ($metricNames && !in_array($metric->name, $metricNames)) {
                     $logger->warning("Skipped metric: =$metric->name, not in allowed names: " . json_encode($metricNames));
                     continue;
@@ -661,6 +676,15 @@ class MetricRequests
                 $metric->device = $deviceMap['map'][$deviceEnum->value];
 
                 $allMetrics->add($metric);
+            }
+
+            if (count($allMetrics) === 0) {
+                $logger->info("No metrics found for site $siteUrl, date $dayStr");
+                return [
+                    'metrics' => 0,
+                    'rows' => 0,
+                    'duplicates' => 0
+                ];
             }
 
             try {
