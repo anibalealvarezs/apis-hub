@@ -221,6 +221,20 @@ class Helpers
         return self::$entityManager;
     }
 
+    public static function getAllSubsets($elements): array
+    {
+        $subsets = [[]]; // Include the emtpy subset
+        foreach ($elements as $element) {
+            $newSubsets = [];
+            foreach ($subsets as $subset) {
+                $newSubsets[] = $subset; // Copy the existing subset
+                $newSubsets[] = array_merge($subset, [$element]); // Add the element to the existing subset
+            }
+            $subsets = $newSubsets;
+        }
+        return $subsets;
+    }
+
     /**
      * @return array
      */

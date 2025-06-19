@@ -14,23 +14,12 @@ use Enums\Channel;
 use Enums\Country;
 use Enums\Device;
 use Enums\Period;
-use Helpers\Helpers;
+use Helpers\GoogleSearchConsoleHelpers;
 use Psr\Log\LoggerInterface;
 use stdClass;
 
 class GoogleSearchConsoleConvert
 {
-    public static array $defaultValues = [
-        'query' => 'unknown',
-        'country' => 'UNK',
-        'page' => null,
-        'device' => 'unknown'
-    ];
-
-    public static array $allDimensions = ['date', 'query', 'country', 'page', 'device'];
-
-    public static array $optionalDimensions = ['query', 'country', 'device'];
-
     /**
      * Converts GSC API rows into a collection of metric objects.
      *
@@ -70,10 +59,10 @@ class GoogleSearchConsoleConvert
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
 
-            $flippedDimensions = array_flip(GoogleSearchConsoleConvert::$allDimensions);
+            $flippedDimensions = array_flip(GoogleSearchConsoleHelpers::$allDimensions);
 
             $dimensionValues = [];
-            foreach (GoogleSearchConsoleConvert::$allDimensions as $dimension) {
+            foreach (GoogleSearchConsoleHelpers::$allDimensions as $dimension) {
                 if (!isset($row['keys'][$flippedDimensions[$dimension]])) {
                     $row['keys'][$flippedDimensions[$dimension]] = match($dimension) {
                         'query' => 'unknown',
@@ -95,7 +84,7 @@ class GoogleSearchConsoleConvert
                 device: $dimensionValues['device'],
             );
 
-            list($impressions, $clicks, $position, $ctr) = self::getMetricsValues($row);
+            list($impressions, $clicks, $position, $ctr) = GoogleSearchConsoleHelpers::getMetricsValues($row);
             if (isset($aggregatedMetrics[$impressionsGroupKey])) {
                 // Aggregate existing row
                 $aggregatedMetrics[$impressionsGroupKey] = self::aggregateMetrics(
@@ -183,115 +172,13 @@ class GoogleSearchConsoleConvert
         return $collection;
     }
 
-    public static function fillWithNullsAndFilter(array $rows, array $targetKeywords, array $targetCountries): array {
-        $newRows = [];
-        foreach ($rows as $row) {
-            list($date, $query, $country, $page, $device) = self::getDimensionsValues($row, array_flip($row['subset']), $targetKeywords, $targetCountries);
-            $row['keys'] = [$date, $query, $country, $page, $device];
-            $newRows[] = $row;
-        }
-        return $newRows;
-    }
-
-    public static function dontFillButFilter(array &$rows, array $subset, array $targetKeywords, array $targetCountries): array {
-        $allRows = [];
-        foreach ($rows as $row) {
-            list($date, $query, $country, $page, $device) = self::getDimensionsValues($row, array_flip($subset), $targetKeywords, $targetCountries);
-            $row['keys'] = [$date, $query, $country, $page, $device];
-            $allRows[] = $row;
-        }
-        return $allRows;
-    }
-
     /**
-     * @param array $row
-     * @param array $dimensionsIndex
-     * @return string|null
+     * Aggregates metrics from two data arrays.
+     *
+     * @param array $data Existing data to aggregate into
+     * @param array $new New data to aggregate
+     * @return array Aggregated data
      */
-    protected static function getDate(array $row, array $dimensionsIndex): ?string
-    {
-        return isset($dimensionsIndex['date']) ? ($row['keys'][$dimensionsIndex['date']] ?? null) : null;
-    }
-
-    /**
-     * @param array $row
-     * @param array $dimensionsIndex
-     * @param array $targetKeywords
-     * @return string|null
-     */
-    protected static function getQueryTerm(array $row, array $dimensionsIndex, array $targetKeywords): ?string
-    {
-        if (!isset($dimensionsIndex['query']) || !isset($row['keys'][$dimensionsIndex['query']])) {
-            return self::$defaultValues['query'];
-        }
-        $queryTerm = ($row['keys'][$dimensionsIndex['query']]);
-        return empty($targetKeywords) || Helpers::str_contains_any($queryTerm, $targetKeywords) ? $queryTerm :
-            ($queryTerm == self::$defaultValues['query'] ? self::$defaultValues['query'] : 'others');
-    }
-
-    /**
-     * @param array $row
-     * @param array $dimensionsIndex
-     * @param array $targetCountries
-     * @return string|null
-     */
-    protected static function getCountryCode(array $row, array $dimensionsIndex, array $targetCountries): ?string
-    {
-        if (!isset($dimensionsIndex['country']) || !isset($row['keys'][$dimensionsIndex['country']])) {
-            return self::$defaultValues['country'];
-        }
-        return (empty($targetCountries) || in_array(strtolower($row['keys'][$dimensionsIndex['country']]), $targetCountries)) ?
-                strtoupper($row['keys'][$dimensionsIndex['country']]) :
-                    ($row['keys'][$dimensionsIndex['country']] == self::$defaultValues['country'] ? self::$defaultValues['country'] : 'OTH');
-    }
-
-    /**
-     * @param array $row
-     * @param array $dimensionsIndex
-     * @return string|null
-     */
-    protected static function getPage(array $row, array $dimensionsIndex): ?string
-    {
-        if (!isset($dimensionsIndex['page']) || !isset($row['keys'][$dimensionsIndex['page']])) {
-            return self::$defaultValues['page'];
-        }
-        return ($row['keys'][$dimensionsIndex['page']]);
-    }
-
-    /**
-     * @param array $row
-     * @param array $dimensionsIndex
-     * @return string|null
-     */
-    protected static function getDevice(array $row, array $dimensionsIndex): ?string
-    {
-        if (!isset($dimensionsIndex['device']) || !isset($row['keys'][$dimensionsIndex['device']])) {
-            return self::$defaultValues['device'];
-        }
-        return strtolower($row['keys'][$dimensionsIndex['device']]);
-    }
-
-    protected static function getDimensionsValues(array $row, array $dimensionsIndex, array $targetKeywords, array $targetCountries): array
-    {
-        return [
-            self::getDate($row, $dimensionsIndex),
-            self::getQueryTerm($row, $dimensionsIndex, $targetKeywords),
-            self::getCountryCode($row, $dimensionsIndex, $targetCountries),
-            self::getPage($row, $dimensionsIndex),
-            self::getDevice($row, $dimensionsIndex)
-        ];
-    }
-
-    private static function getMetricsValues(mixed $row) : array
-    {
-        return [
-            $row['impressions'] ?? 0,
-            $row['clicks'] ?? 0,
-            $row['position'] ?? 0,
-            $row['ctr'] ?? 0,
-        ];
-    }
-
     public static function aggregateMetrics(array $data, array $new): array {
         // Sum additive metrics
         $totalImpressions = $data['impressions'] + $new['impressions'];
