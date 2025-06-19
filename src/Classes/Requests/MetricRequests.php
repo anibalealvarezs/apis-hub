@@ -1376,6 +1376,8 @@ class MetricRequests
                     'query' => $queryEntity,
                     'country' => $metric->country,
                     'device' => $metric->device,
+                    'account' => null,
+                    'channeledAccount' => null,
                     'campaign' => null,
                     'channeledCampaign' => null,
                     'channeledAdGroup' => null,

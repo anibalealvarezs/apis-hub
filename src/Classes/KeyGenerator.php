@@ -3,7 +3,9 @@
 namespace Classes;
 
 use DateTime;
+use Entities\Analytics\Account;
 use Entities\Analytics\Campaign;
+use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledAd;
 use Entities\Analytics\Channeled\ChanneledAdGroup;
 use Entities\Analytics\Channeled\ChanneledCampaign;
@@ -34,6 +36,8 @@ class KeyGenerator
      * @param string $name
      * @param Period|string $period
      * @param DateTime|string $metricDate
+     * @param Account|int|null $account
+     * @param ChanneledAccount|int|null $channeledAccount
      * @param Campaign|int|null $campaign
      * @param ChanneledCampaign|int|null $channeledCampaign
      * @param ChanneledAdGroup|int|null $channeledAdGroup
@@ -53,6 +57,8 @@ class KeyGenerator
         string $name,
         Period|string $period,
         DateTime|string $metricDate,
+        Account|int|null $account = null,
+        ChanneledAccount|int|null $channeledAccount = null,
         Campaign|int|null $campaign = null,
         ChanneledCampaign|int|null $channeledCampaign = null,
         ChanneledAdGroup|int|null $channeledAdGroup = null,
@@ -73,6 +79,8 @@ class KeyGenerator
                 'name' => $name,
                 'period' => $period instanceof Period ? $period->value : $period,
                 'metricDate' => $metricDate instanceof DateTime ? $metricDate->format('Y-m-d') : $metricDate,
+                'account' => $account instanceof Account ? $account->getId() : $account,
+                'channeledAccount' => $channeledAccount instanceof ChanneledAccount ? $channeledAccount->getId() : $channeledAccount,
                 'campaign' => $campaign instanceof Campaign ? $campaign->getId() : $campaign,
                 'channeledCampaign' => $channeledCampaign instanceof ChanneledCampaign ? $channeledCampaign->getId() : $channeledCampaign,
                 'channeledAdGroup' => $channeledAdGroup instanceof ChanneledAdGroup ? $channeledAdGroup->getId() : $channeledAdGroup,
@@ -101,6 +109,8 @@ class KeyGenerator
                 'name' => $name,
                 'period' => $period instanceof Period ? $period->value : $period,
                 'metricDate' => $metricDate instanceof DateTime ? $metricDate->format('Y-m-d') : $metricDate,
+                'account' => $account instanceof Account ? $account->getId() : $account,
+                'channeledAccount' => $channeledAccount instanceof ChanneledAccount ? $channeledAccount->getId() : $channeledAccount,
                 'campaign' => $campaign instanceof Campaign ? $campaign->getId() : $campaign,
                 'channeledCampaign' => $channeledCampaign instanceof ChanneledCampaign ? $channeledCampaign->getId() : $channeledCampaign,
                 'channeledAdGroup' => $channeledAdGroup instanceof ChanneledAdGroup ? $channeledAdGroup->getId() : $channeledAdGroup,

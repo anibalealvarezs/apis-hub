@@ -5,6 +5,7 @@ namespace Entities\Analytics;
 use DateTimeInterface;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledAd;
 use Entities\Analytics\Channeled\ChanneledAdGroup;
 use Entities\Analytics\Channeled\ChanneledCampaign;
@@ -18,14 +19,22 @@ use Repositories\MetricRepository;
 #[ORM\Index(columns: ['channel', 'name', 'metricDate'], name: 'channel_name_metricDate_idx')]
 #[ORM\Index(
     columns: ['channel', 'name', 'period', 'metricDate', 'query_id', 'page_id', 'country_id', 'device_id'],
-    name: 'metric_lookup_idx'
+    name: 'gsc_metric_lookup_idx'
+)]
+#[ORM\Index(
+    columns: ['channel', 'name', 'period', 'metricDate', 'channeledAccount_id'],
+    name: 'channeled_account_metric_lookup_idx'
+)]
+#[ORM\Index(
+    columns: ['channel', 'name', 'period', 'metricDate', 'account_id'],
+    name: 'account_metric_lookup_idx'
 )]
 #[ORM\UniqueConstraint(name: 'metric_unique', columns: [
     'channel',
     'name',
     'period',
     'metricDate',
-    'campaign_id',
+    'channeledAccount_id',
     'channeledCampaign_id',
     'channeledAdGroup_id',
     'channeledAd_id',
@@ -36,7 +45,7 @@ use Repositories\MetricRepository;
     'customer_id',
     'order_id',
     'country_id',
-    'device_id'
+    'device_id',
 ])]
 #[ORM\HasLifecycleCallbacks]
 class Metric extends Entity
@@ -58,6 +67,14 @@ class Metric extends Entity
 
     #[ORM\OneToMany(mappedBy: 'metric', targetEntity: ChanneledMetric::class, orphanRemoval: true)]
     protected Collection $channeledMetrics;
+
+    #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'metrics')]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    protected ?Account $account = null;
+
+    #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'metrics')]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    protected ?ChanneledAccount $channeledAccount = null;
 
     #[ORM\ManyToOne(targetEntity: Campaign::class, inversedBy: 'metrics')]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
@@ -200,6 +217,42 @@ class Metric extends Entity
     public function addMetricDate(DateTimeInterface $metricDate): self
     {
         $this->metricDate = $metricDate;
+        return $this;
+    }
+
+    /**
+     * @return Account|null
+     */
+    public function getAccount(): ?Account
+    {
+        return $this->account;
+    }
+
+    /**
+     * @param Account|null $account
+     * @return self
+     */
+    public function addAccount(?Account $account): self
+    {
+        $this->account = $account;
+        return $this;
+    }
+
+    /**
+     * @return ChanneledAccount|null
+     */
+    public function getChanneledAccount(): ?ChanneledAccount
+    {
+        return $this->channeledAccount;
+    }
+
+    /**
+     * @param ChanneledAccount|null $channeledAccount
+     * @return self
+     */
+    public function addChanneledAccount(?ChanneledAccount $channeledAccount): self
+    {
+        $this->channeledAccount = $channeledAccount;
         return $this;
     }
 

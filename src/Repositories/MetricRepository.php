@@ -90,9 +90,10 @@ class MetricRepository extends BaseRepository
         };
 
         return $query->addSelect('partial cm.{id, platformId, data}')
+            ->addSelect('ca')
             ->addSelect('cc')
             ->addSelect('cag')
-            ->addSelect('ca')
+            ->addSelect('cad')
             ->addSelect('partial q.{id, query, data}')
             ->addSelect('pa')
             ->addSelect('po')
@@ -102,9 +103,10 @@ class MetricRepository extends BaseRepository
             ->addSelect('partial md.{id, dimensionKey, dimensionValue}')
             ->from($this->getEntityName(), 'e')
             ->leftJoin('e.channeledMetrics', 'cm')
+            ->leftJoin('e.channeledAccount', 'ca')
             ->leftJoin('e.channeledCampaign', 'cc')
             ->leftJoin('e.channeledAdGroup', 'cag')
-            ->leftJoin('e.channeledAd', 'ca')
+            ->leftJoin('e.channeledAd', 'cad')
             ->leftJoin('e.query', 'q')
             ->leftJoin('e.page', 'pa')
             ->leftJoin('e.post', 'po')
@@ -121,16 +123,6 @@ class MetricRepository extends BaseRepository
                 ->andWhere('e.name = :name')
                 ->andWhere('e.period = :period')
                 ->andWhere('e.metricDate = :metricDate')
-                ->andWhere('e.campaign IS NULL')
-                ->andWhere('e.channeledCampaign IS NULL')
-                ->andWhere('e.channeledAdGroup IS NULL')
-                ->andWhere('e.channeledAd IS NULL')
-                ->andWhere('e.page IS NULL')
-                ->andWhere('e.query IS NULL')
-                ->andWhere('e.post IS NULL')
-                ->andWhere('e.product IS NULL')
-                ->andWhere('e.customer IS NULL')
-                ->andWhere('e.order IS NULL')
                 ->setParameters([
                     'channel' => $channel,
                     'name' => $name,

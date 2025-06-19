@@ -8,10 +8,11 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
+use Enums\Account;
 use Enums\Channel;
 use Enums\QueryBuilderType;
 
-class VendorRepository extends BaseRepository
+class AccountRepository extends BaseRepository
 {
     /**
      * @param QueryBuilderType $type
@@ -30,8 +31,7 @@ class VendorRepository extends BaseRepository
         return $query->addSelect('v')
             ->addSelect('p')
             ->from($this->getEntityName(), 'e')
-            ->leftJoin('e.channeledVendors', 'v')
-            ->leftJoin('v.channeledProducts', 'p');
+            ->leftJoin('e.channeledAccounts', 'v');
     }
 
     /**
@@ -60,8 +60,8 @@ class VendorRepository extends BaseRepository
     /**
      * @param string $name
      * @return bool
-     * @throws NonUniqueResultException
      * @throws NoResultException
+     * @throws NonUniqueResultException
      */
     public function existsByName(string $name): bool
     {
@@ -74,14 +74,10 @@ class VendorRepository extends BaseRepository
 
     private function replaceChannelName(array $entity): array
     {
-        $entity['channeledVendors'] = array_map(function($channelVendor) {
-            $channelVendor['channel'] = Channel::from($channelVendor['channel'])->getName();
-            $channelVendor['channeledProducts'] = array_map(function($channeledProduct) {
-                unset($channeledProduct['channel']);
-                return $channeledProduct;
-            }, $channelVendor['channeledProducts']);
-            return $channelVendor;
-        }, $entity['channeledVendors']);
+        $entity['channeledAccounts'] = array_map(function($channelAccount) {
+            $channelAccount['channel'] = Channel::from($channelAccount['channel'])->getName();
+            return $channelAccount;
+        }, $entity['channeledAccounts']);
         return $entity;
     }
 }

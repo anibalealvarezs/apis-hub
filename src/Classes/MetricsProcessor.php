@@ -3,11 +3,10 @@
 namespace Classes;
 
 use Carbon\Carbon;
+use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Exception\NotSupported;
-use Doctrine\ORM\Exception\ORMException;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
@@ -86,6 +85,32 @@ class MetricsProcessor
         return [
             'map' => $map,
             'mapReverse' => array_flip($map),
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
+    public static function processAccounts(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
+    public static function processChanneledAccounts(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
         ];
     }
 
@@ -217,6 +242,18 @@ class MetricsProcessor
             $manager,
         );
 
+        // Map accounts
+        $accountMap = self::processAccounts(
+            $metrics,
+            $manager,
+        );
+
+        // Map channeled accounts
+        $channeledAccountMap = self::processChanneledAccounts(
+            $metrics,
+            $manager,
+        );
+
         // Map campaigns
         $campaignMap = self::processCampaigns(
             $metrics,
@@ -273,6 +310,8 @@ class MetricsProcessor
                 name: $metric->name,
                 period: $metric->period,
                 metricDate: $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
+                account: isset($metric->account) ? $metric->account->getAccountId() : null,
+                channeledAccount: isset($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : null,
                 campaign: isset($metric->campaign) ? $metric->campaign->getCampaignId() : null,
                 channeledCampaign: isset($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : null,
                 channeledAdGroup: isset($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : null,
@@ -292,6 +331,8 @@ class MetricsProcessor
                 'name' => $metric->name,
                 'period' => $metric->period,
                 'metricDate' => $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
+                'account_id' => isset($metric->account) ? $accountMap['map'][$metric->account->getAccountId()] ?? null : null,
+                'channeledAccount_id' => isset($metric->channeledAccount) ? $channeledAccountMap['map'][$metric->channeledAccount->getPlatformId()] ?? null : null,
                 'campaign_id' => isset($metric->campaign) ? $campaignMap['map'][$metric->campaign->getCampaignId()] ?? null : null,
                 'channeledCampaign_id' => isset($metric->channeledCampaign) ? $channeledCampaignMap['map'][$metric->channeledCampaign->getPlatformId()] ?? null : null,
                 'channeledAdGroup_id' => isset($metric->channeledAdGroup) ? $channeledAdGroupMap['map'][$metric->channeledAdGroup->getPlatformId()] ?? null : null,
@@ -315,7 +356,7 @@ class MetricsProcessor
         $selectParams = [];
 
         $fields = [
-            'channel', 'name', 'period', 'metricDate', 'campaign_id', 'channeledCampaign_id', 'channeledAdGroup_id',
+            'channel', 'name', 'period', 'metricDate', 'account_id', 'channeledAccount_id', 'campaign_id', 'channeledCampaign_id', 'channeledAdGroup_id',
             'channeledAd_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id'
         ];
 
@@ -341,6 +382,8 @@ class MetricsProcessor
             manager: $manager,
             sql: $sql,
             params: $selectParams,
+            accountMap: $accountMap['mapReverse'],
+            channeledAccountMap: $channeledAccountMap['mapReverse'],
             campaignMap: $campaignMap['mapReverse'],
             channeledCampaignMap: $channeledCampaignMap['mapReverse'],
             channeledAdGroupMap: $channeledAdGroupMap['mapReverse'],
@@ -364,6 +407,8 @@ class MetricsProcessor
                     'name' => $metric['name'],
                     'period' => $metric['period'],
                     'metricDate' => $metric['metricDate'],
+                    'account_id' => $metric['account_id'] ?? null,
+                    'channeledAccount_id' => $metric['channeledAccount_id'] ?? null,
                     'campaign_id' => $metric['campaign_id'] ?? null,
                     'channeledCampaign_id' => $metric['channeledCampaign_id'] ?? null,
                     'channeledAdGroup_id' => $metric['channeledAdGroup_id'] ?? null,
@@ -391,6 +436,8 @@ class MetricsProcessor
                 $insertParams[] = $row['name'];
                 $insertParams[] = $row['period'];
                 $insertParams[] = $row['metricDate'];
+                $insertParams[] = $row['account_id'] ?? null;
+                $insertParams[] = $row['channeledAccount_id'] ?? null;
                 $insertParams[] = $row['campaign_id'] ?? null;
                 $insertParams[] = $row['channeledCampaign_id'] ?? null;
                 $insertParams[] = $row['channeledAdGroup_id'] ?? null;
@@ -408,9 +455,9 @@ class MetricsProcessor
             }
             // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
             $manager->getConnection()->executeStatement(
-                'INSERT INTO metrics (channel, name, period, metricDate, campaign_id, channeledCampaign_id, channeledAdGroup_id,
+                'INSERT INTO metrics (channel, name, period, metricDate, account_id, channeledAccount_id, campaign_id, channeledCampaign_id, channeledAdGroup_id,
                             channeledAd_id, query_id, page_id, post_id, product_id, customer_id, order_id, country_id, device_id, value, metadata)
-                     VALUES ' . implode(', ', array_fill(0, count($metricsToInsert), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
+                     VALUES ' . implode(', ', array_fill(0, count($metricsToInsert), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
                 $insertParams
             );
 
@@ -419,7 +466,7 @@ class MetricsProcessor
             $conditions = [];
 
             $fields = [
-                'channel', 'name', 'period', 'metricDate',
+                'channel', 'name', 'period', 'metricDate', 'account_id', 'channeledAccount_id',
                 'campaign_id', 'channeledCampaign_id', 'channeledAdGroup_id', 'channeledAd_id',
                 'query_id', 'page_id', 'post_id', 'product_id',
                 'customer_id', 'order_id', 'country_id', 'device_id'
@@ -450,6 +497,8 @@ class MetricsProcessor
                     name: $metric['name'],
                     period: $metric['period'],
                     metricDate: $metric['metricDate'],
+                    account: isset($metric['account_id']) ? $accountMap['mapReverse'][$metric['account_id']] : null,
+                    channeledAccount: isset($metric['channeledAccount_id']) ? $channeledAccountMap['mapReverse'][$metric['channeledAccount_id']] : null,
                     campaign: isset($metric['campaign_id']) ? $campaignMap['mapReverse'][$metric['campaign_id']] : null,
                     channeledCampaign: isset($metric['channeledCampaign_id']) ? $channeledCampaignMap['mapReverse'][$metric['channeledCampaign_id']] : null,
                     channeledAdGroup: isset($metric['channeledAdGroup_id']) ? $channeledAdGroupMap['mapReverse'][$metric['channeledAdGroup_id']] : null,
@@ -497,6 +546,8 @@ class MetricsProcessor
                 name: $metric->name,
                 period: $metric->period,
                 metricDate: $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
+                account: isset($metric->account) ? $metric->account->getAccountId() : null,
+                channeledAccount: isset($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : null,
                 campaign: isset($metric->campaign) ? $metric->campaign->getCampaignId() : null,
                 channeledCampaign: isset($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : null,
                 channeledAdGroup: isset($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : null,
@@ -722,6 +773,8 @@ class MetricsProcessor
                     name: $metric->name,
                     period: $metric->period,
                     metricDate: $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
+                    account: isset($metric->account) ? $metric->account->getAccountId() : null,
+                    channeledAccount: isset($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : null,
                     campaign: isset($metric->campaign) ? $metric->campaign->getCampaignId() : null,
                     channeledCampaign: isset($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : null,
                     channeledAdGroup: isset($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : null,

@@ -46,6 +46,8 @@ class MapGenerator
      * @param EntityManager $manager
      * @param string $sql
      * @param array $params
+     * @param array $accountMap
+     * @param array $channeledAccountMap
      * @param array $campaignMap
      * @param array $channeledCampaignMap
      * @param array $channeledAdGroupMap
@@ -65,6 +67,8 @@ class MapGenerator
         EntityManager $manager,
         string $sql,
         array $params,
+        array $accountMap = [],
+        array $channeledAccountMap = [],
         array $campaignMap = [],
         array $channeledCampaignMap = [],
         array $channeledAdGroupMap = [],
@@ -91,6 +95,8 @@ class MapGenerator
                 name: $metric['name'],
                 period: $metric['period'],
                 metricDate: $metric['metricDate'],
+                account: isset($metric['account_id']) ? $accountMap[$metric['account_id']]->getAccountId() : null,
+                channeledAccount: isset($metric['channeledAccount_id']) ? $channeledAccountMap[$metric['channeledAccount_id']]->getPlatformId() : null,
                 campaign: isset($metric['campaign_id']) ? $campaignMap[$metric['campaign_id']]->getCampaignId() : null,
                 channeledCampaign: isset($metric['channeledCampaign_id']) ? $channeledCampaignMap[$metric['channeledCampaign_id']]->getPlatformId() : null,
                 channeledAdGroup: isset($metric['channeledAdGroup_id']) ? $channeledAdGroupMap[$metric['channeledAdGroup_id']]->getPlatformId() : null,
