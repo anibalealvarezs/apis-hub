@@ -18,12 +18,24 @@ class Account extends Entity
     #[ORM\Column(type: 'string')]
     protected string $name;
 
-    #[ORM\OneToMany(mappedBy: 'vendor', targetEntity: ChanneledAccount::class, orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'account', targetEntity: ChanneledAccount::class, orphanRemoval: true)]
     protected Collection $channeledAccounts;
+
+    #[ORM\OneToMany(mappedBy: 'account', targetEntity: MetricConfig::class, orphanRemoval: true)]
+    protected Collection $metricConfigs;
+
+    #[ORM\OneToMany(mappedBy: 'account', targetEntity: Page::class, orphanRemoval: true)]
+    protected Collection $pages;
+
+    #[ORM\OneToMany(mappedBy: 'account', targetEntity: Post::class, orphanRemoval: true)]
+    protected Collection $posts;
 
     public function __construct()
     {
         $this->channeledAccounts = new ArrayCollection();
+        $this->metricConfigs = new ArrayCollection();
+        $this->pages = new ArrayCollection();
+        $this->posts = new ArrayCollection();
     }
 
     /**
@@ -113,6 +125,123 @@ class Account extends Entity
             $this->removeChanneledAccount($channeledAccount);
         }
 
+        return $this;
+    }
+
+    /**
+     * Gets the collection of metric configs.
+     * @return Collection
+     */
+    public function getMetricConfigs(): Collection
+    {
+        return $this->metricConfigs;
+    }
+
+    /**
+     * Adds a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function addMetricConfig(MetricConfig $metricConfig): self
+    {
+        if (!$this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->add($metricConfig);
+            $metricConfig->addAccount($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function removeMetricConfig(MetricConfig $metricConfig): self
+    {
+        if ($this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->removeElement($metricConfig);
+            if ($metricConfig->getAccount() === $this) {
+                $metricConfig->addAccount(null);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Gets the collection of metric configs.
+     * @return Collection
+     */
+    public function getPosts(): Collection
+    {
+        return $this->posts;
+    }
+
+    /**
+     * Adds a metric config.
+     * @param Post $post
+     * @return self
+     */
+    public function addPost(Post $post): self
+    {
+        if (!$this->metricConfigs->contains($post)) {
+            $this->metricConfigs->add($post);
+            $post->addAccount($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a metric config.
+     * @param Post $post
+     * @return self
+     */
+    public function removePost(Post $post): self
+    {
+        if ($this->metricConfigs->contains($post)) {
+            $this->metricConfigs->removeElement($post);
+            if ($post->getAccount() === $this) {
+                $post->addAccount(null);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Gets the collection of metric configs.
+     * @return Collection
+     */
+    public function getPages(): Collection
+    {
+        return $this->pages;
+    }
+
+    /**
+     * Adds a metric config.
+     * @param Page $pages
+     * @return self
+     */
+    public function addPage(Page $pages): self
+    {
+        if (!$this->metricConfigs->contains($pages)) {
+            $this->metricConfigs->add($pages);
+            $pages->addAccount($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a metric config.
+     * @param Page $page
+     * @return self
+     */
+    public function removePage(Page $page): self
+    {
+        if ($this->metricConfigs->contains($page)) {
+            $this->metricConfigs->removeElement($page);
+            if ($page->getAccount() === $this) {
+                $page->addAccount(null);
+            }
+        }
         return $this;
     }
 }

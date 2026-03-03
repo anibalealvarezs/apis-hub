@@ -20,12 +20,12 @@ class Query extends Entity
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $data = [];
 
-    #[ORM\OneToMany(mappedBy: 'query', targetEntity: Metric::class, orphanRemoval: true)]
-    protected Collection $metrics;
+    #[ORM\OneToMany(mappedBy: 'query', targetEntity: MetricConfig::class, orphanRemoval: true)]
+    protected Collection $metricConfigs;
 
     public function __construct()
     {
-        $this->metrics = new ArrayCollection();
+        $this->metricConfigs = new ArrayCollection();
     }
 
     /**
@@ -65,6 +65,45 @@ class Query extends Entity
     public function addData(?array $data): self
     {
         $this->data = $data;
+        return $this;
+    }
+
+    /**
+     * Gets the collection of metric configs.
+     * @return Collection
+     */
+    public function getMetricConfigs(): Collection
+    {
+        return $this->metricConfigs;
+    }
+
+    /**
+     * Adds a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function addMetricConfig(MetricConfig $metricConfig): self
+    {
+        if (!$this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->add($metricConfig);
+            $metricConfig->addQuery($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function removeMetricConfig(MetricConfig $metricConfig): self
+    {
+        if ($this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->removeElement($metricConfig);
+            if ($metricConfig->getQuery() === $this) {
+                $metricConfig->addQuery(null);
+            }
+        }
         return $this;
     }
 }

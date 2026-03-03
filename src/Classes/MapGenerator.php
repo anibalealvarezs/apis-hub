@@ -5,10 +5,165 @@ namespace Classes;
 use DateTimeImmutable;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Entities\Analytics\Account;
+use Entities\Analytics\Campaign;
+use Entities\Analytics\Channeled\ChanneledAccount;
+use Entities\Analytics\Channeled\ChanneledAd;
+use Entities\Analytics\Channeled\ChanneledAdGroup;
+use Entities\Analytics\Channeled\ChanneledCampaign;
+use Entities\Analytics\Country;
+use Entities\Analytics\Customer;
+use Entities\Analytics\Device;
+use Entities\Analytics\Order;
+use Entities\Analytics\Page;
+use Entities\Analytics\Post;
+use Entities\Analytics\Product;
+use Entities\Analytics\Query;
+use Helpers\Helpers;
 use RuntimeException;
 
 class MapGenerator
 {
+    /**
+     * Generates a map of dimension keys to their IDs based on the provided SQL query and parameters.
+     * @param EntityManager $manager
+     * @param string $sql
+     * @param array $params
+     * @return array
+     * @throws Exception
+     */
+    public static function getPostMap(
+        EntityManager $manager,
+        string $sql,
+        array $params
+    ): array {
+        // Update the metric map with the newly inserted dimensions
+        $existingPosts = $manager->getConnection()
+            ->executeQuery($sql, $params)
+            ->fetchAllAssociative();
+
+        // Map dimensions to their IDs and create a map for quick access
+        $postMap = [];
+        foreach ($existingPosts as $post) {
+            $postKey = $post['postId'];
+            $postMap[$postKey] = (int)$post['id'];
+        }
+
+        return $postMap;
+    }
+
+    /**
+     * Generates a map of dimension keys to their IDs based on the provided SQL query and parameters.
+     * @param EntityManager $manager
+     * @param string $sql
+     * @param array $params
+     * @return array
+     * @throws Exception
+     */
+    public static function getCampaignMap(
+        EntityManager $manager,
+        string $sql,
+        array $params
+    ): array {
+        // Update the metric map with the newly inserted dimensions
+        $existingCampaigns = $manager->getConnection()
+            ->executeQuery($sql, $params)
+            ->fetchAllAssociative();
+
+        // Map dimensions to their IDs and create a map for quick access
+        $campaignMap = [];
+        foreach ($existingCampaigns as $campaign) {
+            $campaignKey = $campaign['campaignId'];
+            $campaignMap[$campaignKey] = (int)$campaign['id'];
+        }
+
+        return $campaignMap;
+    }
+
+    /**
+     * Generates a map of dimension keys to their IDs based on the provided SQL query and parameters.
+     * @param EntityManager $manager
+     * @param string $sql
+     * @param array $params
+     * @return array
+     * @throws Exception
+     */
+    public static function getChanneledCampaignMap(
+        EntityManager $manager,
+        string $sql,
+        array $params
+    ): array {
+        // Update the metric map with the newly inserted dimensions
+        $existingChanneledCampaigns = $manager->getConnection()
+            ->executeQuery($sql, $params)
+            ->fetchAllAssociative();
+
+        // Map dimensions to their IDs and create a map for quick access
+        $channeledCampaignMap = [];
+        foreach ($existingChanneledCampaigns as $channeledCampaign) {
+            $channeledCampaignKey = $channeledCampaign['platformId'];
+            $channeledCampaignMap[$channeledCampaignKey] = (int)$channeledCampaign['id'];
+        }
+
+        return $channeledCampaignMap;
+    }
+
+    /**
+     * Generates a map of dimension keys to their IDs based on the provided SQL query and parameters.
+     * @param EntityManager $manager
+     * @param string $sql
+     * @param array $params
+     * @return array
+     * @throws Exception
+     */
+    public static function getChanneledAdGroupMap(
+        EntityManager $manager,
+        string $sql,
+        array $params
+    ): array {
+        // Update the metric map with the newly inserted dimensions
+        $existingChanneledAdGroups = $manager->getConnection()
+            ->executeQuery($sql, $params)
+            ->fetchAllAssociative();
+
+        // Map dimensions to their IDs and create a map for quick access
+        $channeledAdGroupMap = [];
+        foreach ($existingChanneledAdGroups as $channeledAdGroup) {
+            $channeledAdGroupKey = $channeledAdGroup['platformId'];
+            $channeledAdGroupMap[$channeledAdGroupKey] = (int)$channeledAdGroup['id'];
+        }
+
+        return $channeledAdGroupMap;
+    }
+
+    /**
+     * Generates a map of dimension keys to their IDs based on the provided SQL query and parameters.
+     * @param EntityManager $manager
+     * @param string $sql
+     * @param array $params
+     * @return array
+     * @throws Exception
+     */
+    public static function getChanneledAdMap(
+        EntityManager $manager,
+        string $sql,
+        array $params
+    ): array {
+        // Update the metric map with the newly inserted dimensions
+        $existingChanneledAds = $manager->getConnection()
+            ->executeQuery($sql, $params)
+            ->fetchAllAssociative();
+
+        // Map dimensions to their IDs and create a map for quick access
+        $channeledAdMap = [];
+        foreach ($existingChanneledAds as $channeledAd) {
+            $channeledAdKey = $channeledAd['platformId'];
+            $channeledAdMap[$channeledAdKey] = (int)$channeledAd['id'];
+        }
+
+        return $channeledAdMap;
+    }
+
     /**
      * Generates a map of dimension keys to their IDs based on the provided SQL query and parameters.
      * @param EntityManager $manager
@@ -63,7 +218,7 @@ class MapGenerator
      * @return array
      * @throws Exception
      */
-    public static function getMetricMap(
+    public static function getMetricConfigMap(
         EntityManager $manager,
         string $sql,
         array $params,
@@ -83,6 +238,55 @@ class MapGenerator
         array $deviceMap = [],
     ): array {
         // Update the metric map with the newly inserted metrics
+        $existingMetricConfigs = $manager->getConnection()
+            ->executeQuery($sql, $params)
+            ->fetchAllAssociative();
+
+        // Map metrics to their IDs and create a map for quick access
+        $metricConfigMap = [];
+        foreach ($existingMetricConfigs as $metricConfig) {
+            $metricConfigKey = KeyGenerator::generateMetricConfigKey(
+                channel: $metricConfig['channel'],
+                name: $metricConfig['name'],
+                period: $metricConfig['period'],
+                metricDate: $metricConfig['metricDate'],
+                account: isset($metricConfig['account_id']) ? ($accountMap[$metricConfig['account_id']] instanceof Account ? $accountMap[$metricConfig['account_id']]->getName() : $accountMap[$metricConfig['account_id']]) : null,
+                channeledAccount: isset($metricConfig['channeledAccount_id']) ? ($channeledAccountMap[$metricConfig['channeledAccount_id']] instanceof ChanneledAccount ? $channeledAccountMap[$metricConfig['channeledAccount_id']]->getPlatformId() : $channeledAccountMap[$metricConfig['channeledAccount_id']]) : null,
+                campaign: isset($metricConfig['campaign_id']) ? ($campaignMap[$metricConfig['campaign_id']] instanceof Campaign ? $campaignMap[$metricConfig['campaign_id']]->getCampaignId() : $campaignMap[$metricConfig['campaign_id']]) : null,
+                channeledCampaign: isset($metricConfig['channeledCampaign_id']) ? ($channeledCampaignMap[$metricConfig['channeledCampaign_id']] instanceof ChanneledCampaign ? $channeledCampaignMap[$metricConfig['channeledCampaign_id']]->getPlatformId() : $channeledCampaignMap[$metricConfig['channeledCampaign_id']]) : null,
+                channeledAdGroup: isset($metricConfig['channeledAdGroup_id']) ? ($channeledAdGroupMap[$metricConfig['channeledAdGroup_id']] instanceof ChanneledAdGroup ? $channeledAdGroupMap[$metricConfig['channeledAdGroup_id']]->getPlatformId() : $channeledAdGroupMap[$metricConfig['channeledAdGroup_id']]) : null,
+                channeledAd: isset($metricConfig['channeledAd_id']) ? ($channeledAdMap[$metricConfig['channeledAd_id']] instanceof ChanneledAd ? $channeledAdMap[$metricConfig['channeledAd_id']]->getPlatformId() : $channeledAdMap[$metricConfig['channeledAd_id']]) : null,
+                page: isset($metricConfig['page_id']) ? ($pageMap[$metricConfig['page_id']] instanceof Page ? $pageMap[$metricConfig['page_id']]->getUrl() : $pageMap[$metricConfig['page_id']]) : null,
+                query: isset($metricConfig['query_id']) ? ($queryMap[$metricConfig['query_id']] instanceof Query ? $queryMap[$metricConfig['query_id']]->getQuery() : $queryMap[$metricConfig['query_id']]) : null,
+                post: isset($metricConfig['post_id']) ? ($postMap[$metricConfig['post_id']] instanceof Post ? $postMap[$metricConfig['post_id']]->getPostId() : $postMap[$metricConfig['post_id']]) : null,
+                product: isset($metricConfig['product_id']) ? ($productMap[$metricConfig['product_id']] instanceof Product ? $productMap[$metricConfig['product_id']]->getProductId() : $productMap[$metricConfig['product_id']]) : null,
+                customer: isset($metricConfig['customer_id']) ? ($customerMap[$metricConfig['customer_id']] instanceof Customer ? $customerMap[$metricConfig['customer_id']]->getEmail() : $customerMap[$metricConfig['customer_id']]) : null,
+                order: isset($metricConfig['order_id']) ? ($orderMap[$metricConfig['order_id']] instanceof Order ? $orderMap[$metricConfig['order_id']]->getOrderId() : $orderMap[$metricConfig['order_id']]) : null,
+                country: isset($metricConfig['country_id']) ? ($countryMap[$metricConfig['country_id']] instanceof Country ? $countryMap[$metricConfig['country_id']]->getCode() : $countryMap[$metricConfig['country_id']]) : null,
+                device: isset($metricConfig['device_id']) ? ($deviceMap[$metricConfig['device_id']] instanceof Device ? $deviceMap[$metricConfig['device_id']]->getType() : $deviceMap[$metricConfig['device_id']]) : null,
+            );
+            $metricConfigMap[$metricConfigKey] = (int)$metricConfig['id'];
+        }
+
+        return $metricConfigMap;
+    }
+
+    /**
+     * Generates a map of metrics based on the provided SQL query and parameters.
+     * @param EntityManager $manager
+     * @param string $sql
+     * @param array $params
+     * @param array $metricConfigMap
+     * @return array
+     * @throws Exception
+     */
+    public static function getMetricMap(
+        EntityManager $manager,
+        string $sql,
+        array $params,
+        array $metricConfigMap,
+    ): array {
+        // Update the metric map with the newly inserted metrics
         $existingMetrics = $manager->getConnection()
             ->executeQuery($sql, $params)
             ->fetchAllAssociative();
@@ -91,24 +295,8 @@ class MapGenerator
         $metricMap = [];
         foreach ($existingMetrics as $metric) {
             $metricKey = KeyGenerator::generateMetricKey(
-                channel: $metric['channel'],
-                name: $metric['name'],
-                period: $metric['period'],
-                metricDate: $metric['metricDate'],
-                account: isset($metric['account_id']) ? $accountMap[$metric['account_id']]->getAccountId() : null,
-                channeledAccount: isset($metric['channeledAccount_id']) ? $channeledAccountMap[$metric['channeledAccount_id']]->getPlatformId() : null,
-                campaign: isset($metric['campaign_id']) ? $campaignMap[$metric['campaign_id']]->getCampaignId() : null,
-                channeledCampaign: isset($metric['channeledCampaign_id']) ? $channeledCampaignMap[$metric['channeledCampaign_id']]->getPlatformId() : null,
-                channeledAdGroup: isset($metric['channeledAdGroup_id']) ? $channeledAdGroupMap[$metric['channeledAdGroup_id']]->getPlatformId() : null,
-                channeledAd: isset($metric['channeledAd_id']) ? $channeledAdMap[$metric['channeledAd_id']]->getPlatformId() : null,
-                page: isset($metric['page_id']) ? $pageMap[$metric['page_id']]->getUrl() : null,
-                query: isset($metric['query_id']) ? $queryMap[$metric['query_id']] : null,
-                post: isset($metric['post_id']) ? $postMap[$metric['post_id']]->getPostId() : null,
-                product: isset($metric['product_id']) ? $productMap[$metric['product_id']]->getProductId() : null,
-                customer: isset($metric['customer_id']) ? $customerMap[$metric['customer_id']]->getEmail() : null,
-                order: isset($metric['order_id']) ? $orderMap[$metric['order_id']]->getOrderId() : null,
-                country: isset($metric['country_id']) ? $countryMap[$metric['country_id']]->getCode() : null,
-                device: isset($metric['device_id']) ? $deviceMap[$metric['device_id']]->getType() : null,
+                dimensionsHash: $metric['dimensionsHash'],
+                metricConfigKey: $metricConfigMap['mapReverse'][$metric['metricConfig_id']]
             );
             $metricMap[$metricKey] = (int)$metric['id'];
         }

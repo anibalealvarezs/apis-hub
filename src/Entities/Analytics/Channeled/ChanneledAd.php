@@ -6,16 +6,27 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Entities\Analytics\Creative;
-use Entities\Analytics\Metric;
+use Entities\Analytics\MetricConfig;
+use Enums\CampaignStatus;
 use Repositories\Channeled\ChanneledAdRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledAdRepository::class)]
 #[ORM\Table(name: 'channeled_ads')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
+#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
+#[ORM\Index(columns: ['channel'], name: 'channel_idx')]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'channel_idx')]
+#[ORM\Index(columns: ['channeledAdGroup_id'], name: 'channeledAdGroup_id_idx')]
+#[ORM\Index(columns: ['channeledCampaign_id'], name: 'channeledCampaign_id_idx')]
+#[ORM\Index(columns: ['channeledCampaign_id', 'channeledAdGroup_id'], name: 'channeledCampaign_id_channeledAdGroup_id_idx')]
+#[ORM\Index(columns: ['platformId', 'channel', 'channeledCampaign_id', 'channeledAdGroup_id'], name: 'platformId_channel_channeledCampaign_id_channeledAdGroup_id_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledAd extends ChanneledEntity
 {
+    #[ORM\Column(type: 'string')]
     protected string $name;
+
+    #[ORM\Column(type: 'string', nullable: true, enumType: CampaignStatus::class)]
+    protected ?CampaignStatus $status = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAdGroup::class, inversedBy: 'channeledAds')]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
@@ -29,12 +40,12 @@ class ChanneledAd extends ChanneledEntity
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?Creative $creative = null;
 
-    #[ORM\OneToMany(mappedBy: 'channeledAd', targetEntity: Metric::class)]
-    protected Collection $metrics;
+    #[ORM\OneToMany(mappedBy: 'channeledAd', targetEntity: MetricConfig::class, orphanRemoval: true)]
+    protected Collection $metricConfigs;
 
     public function __construct()
     {
-        $this->metrics = new ArrayCollection();
+        $this->metricConfigs = new ArrayCollection();
     }
 
     /**
@@ -54,6 +65,26 @@ class ChanneledAd extends ChanneledEntity
     public function addName(string $name): self
     {
         $this->name = $name;
+        return $this;
+    }
+
+    /**
+     * Gets the unique campaign identifier.
+     * @return CampaignStatus|null
+     */
+    public function getStatus(): ?CampaignStatus
+    {
+        return $this->status;
+    }
+
+    /**
+     * Sets the unique campaign identifier.
+     * @param CampaignStatus|null $status
+     * @return self
+     */
+    public function addStatus(?CampaignStatus $status): self
+    {
+        $this->status = $status;
         return $this;
     }
 
@@ -118,39 +149,39 @@ class ChanneledAd extends ChanneledEntity
     }
 
     /**
-     * Gets the collection of metrics.
+     * Gets the collection of metric configs.
      * @return Collection
      */
-    public function getMetrics(): Collection
+    public function getMetricConfigs(): Collection
     {
-        return $this->metrics;
+        return $this->metricConfigs;
     }
 
     /**
-     * Adds a metric.
-     * @param Metric $metric
+     * Adds a metric config.
+     * @param MetricConfig $metricConfig
      * @return self
      */
-    public function addMetric(Metric $metric): self
+    public function addMetricConfig(MetricConfig $metricConfig): self
     {
-        if (!$this->metrics->contains($metric)) {
-            $this->metrics->add($metric);
-            $metric->addChanneledAd($this);
+        if (!$this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->add($metricConfig);
+            $metricConfig->addChanneledAd($this);
         }
         return $this;
     }
 
     /**
-     * Removes a metric.
-     * @param Metric $metric
+     * Removes a metric config.
+     * @param MetricConfig $metricConfig
      * @return self
      */
-    public function removeMetric(Metric $metric): self
+    public function removeMetricConfig(MetricConfig $metricConfig): self
     {
-        if ($this->metrics->contains($metric)) {
-            $this->metrics->removeElement($metric);
-            if ($metric->getChanneledAd() === $this) {
-                $metric->addChanneledAd(null);
+        if ($this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->removeElement($metricConfig);
+            if ($metricConfig->getChanneledAd() === $this) {
+                $metricConfig->addChanneledAd(null);
             }
         }
         return $this;

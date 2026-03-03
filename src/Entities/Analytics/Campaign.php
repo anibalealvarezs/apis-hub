@@ -35,14 +35,14 @@ class Campaign extends Entity
     #[ORM\OneToMany(mappedBy: 'campaign', targetEntity: ChanneledAdGroup::class)]
     protected Collection $channeledAdGroups;
 
-    #[ORM\OneToMany(mappedBy: 'campaign', targetEntity: Metric::class)]
-    protected Collection $metrics;
+    #[ORM\OneToMany(mappedBy: 'campaign', targetEntity: MetricConfig::class, orphanRemoval: true)]
+    protected Collection $metricConfigs;
 
     public function __construct()
     {
         $this->channeledCampaigns = new ArrayCollection();
         $this->channeledAdGroups = new ArrayCollection();
-        $this->metrics = new ArrayCollection();
+        $this->metricConfigs = new ArrayCollection();
     }
 
     /**
@@ -204,39 +204,39 @@ class Campaign extends Entity
     }
 
     /**
-     * Gets the collection of metrics.
+     * Gets the collection of metric configs.
      * @return Collection
      */
-    public function getMetrics(): Collection
+    public function getMetricConfigs(): Collection
     {
-        return $this->metrics;
+        return $this->metricConfigs;
     }
 
     /**
-     * Adds a metric.
-     * @param Metric $metric
+     * Adds a metric config.
+     * @param MetricConfig $metricConfig
      * @return self
      */
-    public function addMetric(Metric $metric): self
+    public function addMetricConfig(MetricConfig $metricConfig): self
     {
-        if (!$this->metrics->contains($metric)) {
-            $this->metrics->add($metric);
-            $metric->addCampaign($this);
+        if (!$this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->add($metricConfig);
+            $metricConfig->addCampaign($this);
         }
         return $this;
     }
 
     /**
-     * Removes a metric.
-     * @param Metric $metric
+     * Removes a metric config.
+     * @param MetricConfig $metricConfig
      * @return self
      */
-    public function removeMetric(Metric $metric): self
+    public function removeMetricConfig(MetricConfig $metricConfig): self
     {
-        if ($this->metrics->contains($metric)) {
-            $this->metrics->removeElement($metric);
-            if ($metric->getCampaign() === $this) {
-                $metric->addCampaign(null);
+        if ($this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->removeElement($metricConfig);
+            if ($metricConfig->getCampaign() === $this) {
+                $metricConfig->addCampaign(null);
             }
         }
         return $this;

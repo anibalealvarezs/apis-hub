@@ -11,6 +11,7 @@ use Repositories\PageRepository;
 #[ORM\Entity(repositoryClass: PageRepository::class)]
 #[ORM\Table(name: 'pages')]
 #[ORM\Index(columns: ['url'], name: 'url_idx')]
+#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Page extends Entity
 {
@@ -23,15 +24,26 @@ class Page extends Entity
     #[ORM\Column(type: 'string', nullable: true)]
     protected ?string $hostname = null;
 
+    #[ORM\Column(type: 'string')]
+    protected int|string $platformId;
+
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $data = [];
 
-    #[ORM\OneToMany(mappedBy: 'page', targetEntity: Metric::class, orphanRemoval: true)]
-    protected Collection $metrics;
+    #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'channeledAccounts')]
+    #[ORM\JoinColumn(onDelete: 'cascade')]
+    protected Account $account;
+
+    #[ORM\OneToMany(mappedBy: 'page', targetEntity: MetricConfig::class, orphanRemoval: true)]
+    protected Collection $metricConfigs;
+
+    #[ORM\OneToMany(mappedBy: 'page', targetEntity: Post::class, orphanRemoval: true)]
+    protected Collection $posts;
 
     public function __construct()
     {
-        $this->metrics = new ArrayCollection();
+        $this->metricConfigs = new ArrayCollection();
+        $this->posts = new ArrayCollection();
     }
 
     /**
@@ -95,6 +107,24 @@ class Page extends Entity
     }
 
     /**
+     * @return int|string
+     */
+    public function getPlatformId(): int|string
+    {
+        return $this->platformId;
+    }
+
+    /**
+     * @param int|string $platformId
+     * @return Page
+     */
+    public function addPlatformId(int|string $platformId): self
+    {
+        $this->platformId = $platformId;
+        return $this;
+    }
+
+    /**
      * Gets the page-specific data.
      * @return array
      */
@@ -114,12 +144,100 @@ class Page extends Entity
         return $this;
     }
 
-    public function __toString(): string
+    /**
+     * @return Account
+     */
+    public function getAccount(): Account
     {
-        return sprintf(
-            'Page(id=%s, url=%s)',
-            $this->getId() ?? 'new',
-            $this->getUrl() ?? 'unknown'
-        );
+        return $this->account;
+    }
+
+    /**
+     * @param Account|null $account
+     * @return self
+     */
+    public function addAccount(?Account $account): self
+    {
+        $this->account = $account;
+
+        return $this;
+    }
+
+    /**
+     * Gets the collection of metric configs.
+     * @return Collection
+     */
+    public function getMetricConfigs(): Collection
+    {
+        return $this->metricConfigs;
+    }
+
+    /**
+     * Adds a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function addMetricConfig(MetricConfig $metricConfig): self
+    {
+        if (!$this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->add($metricConfig);
+            $metricConfig->addPage($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function removeMetricConfig(MetricConfig $metricConfig): self
+    {
+        if ($this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->removeElement($metricConfig);
+            if ($metricConfig->getPage() === $this) {
+                $metricConfig->addPage(null);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Gets the collection of metric configs.
+     * @return Collection
+     */
+    public function getPosts(): Collection
+    {
+        return $this->posts;
+    }
+
+    /**
+     * Adds a metric config.
+     * @param Post $post
+     * @return self
+     */
+    public function addPost(Post $post): self
+    {
+        if (!$this->metricConfigs->contains($post)) {
+            $this->metricConfigs->add($post);
+            $post->addPage($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a metric config.
+     * @param Post $post
+     * @return self
+     */
+    public function removePost(Post $post): self
+    {
+        if ($this->metricConfigs->contains($post)) {
+            $this->metricConfigs->removeElement($post);
+            if ($post->getPage() === $this) {
+                $post->addPage(null);
+            }
+        }
+        return $this;
     }
 }

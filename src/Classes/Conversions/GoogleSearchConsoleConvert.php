@@ -73,30 +73,63 @@ class GoogleSearchConsoleConvert
                 }
                 $dimensionValues[$dimension] = $row['keys'][$flippedDimensions[$dimension]];
             }
-            $impressionsGroupKey = KeyGenerator::generateMetricKey(
-                channel: Channel::google_search_console->value,
-                name: 'impressions',
-                period: Period::Daily->value,
-                metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
-                page:  $pageEntity->getUrl(),
-                query: $dimensionValues['query'],
-                country: $dimensionValues['country'],
-                device: $dimensionValues['device'],
-            );
+            $metricConfigKeys = [
+                'impressions' => KeyGenerator::generateMetricConfigKey(
+                    channel: Channel::google_search_console->value,
+                    name: 'impressions',
+                    period: Period::Daily->value,
+                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
+                    page:  $pageEntity->getUrl(),
+                    query: $dimensionValues['query'],
+                    country: $dimensionValues['country'],
+                    device: $dimensionValues['device'],
+                ),
+                'clicks' => KeyGenerator::generateMetricConfigKey(
+                    channel: Channel::google_search_console->value,
+                    name: 'clicks',
+                    period: Period::Daily->value,
+                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
+                    page:  $pageEntity->getUrl(),
+                    query: $dimensionValues['query'],
+                    country: $dimensionValues['country'],
+                    device: $dimensionValues['device'],
+                ),
+                'position' => KeyGenerator::generateMetricConfigKey(
+                    channel: Channel::google_search_console->value,
+                    name: 'position',
+                    period: Period::Daily->value,
+                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
+                    page:  $pageEntity->getUrl(),
+                    query: $dimensionValues['query'],
+                    country: $dimensionValues['country'],
+                    device: $dimensionValues['device'],
+                ),
+                'ctr' => KeyGenerator::generateMetricConfigKey(
+                    channel: Channel::google_search_console->value,
+                    name: 'ctr',
+                    period: Period::Daily->value,
+                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
+                    page:  $pageEntity->getUrl(),
+                    query: $dimensionValues['query'],
+                    country: $dimensionValues['country'],
+                    device: $dimensionValues['device'],
+                )
+            ];
 
             list($impressions, $clicks, $position, $ctr) = GoogleSearchConsoleHelpers::getMetricsValues($row);
-            if (isset($aggregatedMetrics[$impressionsGroupKey])) {
+            // Aggregate metrics for calculations using the `impressions` metricConfigKey as the main key
+            if (isset($aggregatedMetrics[$metricConfigKeys['impressions']])) {
                 // Aggregate existing row
-                $aggregatedMetrics[$impressionsGroupKey] = self::aggregateMetrics(
-                    $aggregatedMetrics[$impressionsGroupKey],
+                $aggregatedMetrics[$metricConfigKeys['impressions']] = self::aggregateMetrics(
+                    $aggregatedMetrics[$metricConfigKeys['impressions']],
                     [
                         'impressions' => $impressions,
                         'clicks' => $clicks,
                         'position' => $position,
                     ]
                 );
-                $aggregatedMetadata[$impressionsGroupKey][] = [
-                    ...$aggregatedMetrics[$impressionsGroupKey],
+                $aggregatedMetadata[$metricConfigKeys['impressions']][] = [
+                    ...$aggregatedMetrics[$metricConfigKeys['impressions']],
                     'keys' => $row['keys'],
                     'subset' => $row['subset'],
                     'synthetic' => $row['synthetic'] ?? false,
@@ -104,15 +137,15 @@ class GoogleSearchConsoleConvert
                     'clicks_difference' => $row['clicks_difference'],
                 ];
             } else {
-                $aggregatedMetrics[$impressionsGroupKey] = [
+                $aggregatedMetrics[$metricConfigKeys['impressions']] = [
                     'clicks' => $clicks,
                     'impressions' => $impressions,
                     'position' => $position,
                     "ctr" => $ctr,
                     'count' => 1,
                 ];
-                $aggregatedMetadata[$impressionsGroupKey] = [
-                    ...$aggregatedMetrics[$impressionsGroupKey],
+                $aggregatedMetadata[$metricConfigKeys['impressions']] = [
+                    ...$aggregatedMetrics[$metricConfigKeys['impressions']],
                     'keys' => $row['keys'],
                     'subset' => $row['subset'],
                     'synthetic' => $row['synthetic'] ?? false,
@@ -121,12 +154,12 @@ class GoogleSearchConsoleConvert
                 ];
             }
 
-            $platformId = "gsc_{$siteKey}_$impressionsGroupKey";
+            $platformId = "gsc_{$siteKey}_{$metricConfigKeys['impressions']}";
             foreach (['clicks', 'impressions', 'ctr', 'position'] as $metricName) {
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::google_search_console->value;
                 $channeledMetric->name = $metricName;
-                $channeledMetric->value = $aggregatedMetrics[$impressionsGroupKey][$metricName];
+                $channeledMetric->value = $aggregatedMetrics[$metricConfigKeys['impressions']][$metricName];
                 $channeledMetric->period = Period::Daily->value;
                 $channeledMetric->metricDate = Carbon::parse($row['keys'][$flippedDimensions['date']])->toDateString();
                 $channeledMetric->platformId = $platformId;
@@ -136,20 +169,25 @@ class GoogleSearchConsoleConvert
                 $channeledMetric->deviceType = $row['keys'][$flippedDimensions['device']];
                 $channeledMetric->page = $pageEntity;
                 $channeledMetric->dimensions = [
-                    (object) ['dimensionKey' => 'page', 'dimensionValue' => $row['keys'][$flippedDimensions['page']]],
-                    (object) ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $searchAppearance],
+                    ['dimensionKey' => 'page', 'dimensionValue' => $row['keys'][$flippedDimensions['page']]],
+                    ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $searchAppearance],
                 ];
-                $channeledMetric->metadata = $aggregatedMetadata[$impressionsGroupKey];
+                $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash([
+                    ['dimensionKey' => 'page', 'dimensionValue' => $row['keys'][$flippedDimensions['page']]],
+                    ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $searchAppearance],
+                ]);
+                $channeledMetric->metricConfigKey = $metricConfigKeys[$metricName]; // Pass the actual metricConfigKey
+                $channeledMetric->metadata = $aggregatedMetadata[$metricConfigKeys['impressions']];
                 $channeledMetric->data = [
-                    'impressions' => $aggregatedMetrics[$impressionsGroupKey]['impressions'],
-                    'clicks' => $aggregatedMetrics[$impressionsGroupKey]['clicks'],
-                    'position_weighted' => $aggregatedMetrics[$impressionsGroupKey]['position'] * $aggregatedMetrics[$impressionsGroupKey]['impressions'],
-                    'ctr' => $aggregatedMetrics[$impressionsGroupKey]['ctr'],
+                    'impressions' => $aggregatedMetrics[$metricConfigKeys['impressions']]['impressions'],
+                    'clicks' => $aggregatedMetrics[$metricConfigKeys['impressions']]['clicks'],
+                    'position_weighted' => $aggregatedMetrics[$metricConfigKeys['impressions']]['position'] * $aggregatedMetrics[$metricConfigKeys['impressions']]['impressions'],
+                    'ctr' => $aggregatedMetrics[$metricConfigKeys['impressions']]['ctr'],
                 ];
 
-                $logger?->warning("Temp data for country: ".$row['keys'][$flippedDimensions['country']]." and device ".$row['keys'][$flippedDimensions['device']].": " . json_encode($aggregatedMetrics[$impressionsGroupKey]));
+                $logger?->warning("Temp data for country: ".$row['keys'][$flippedDimensions['country']]." and device ".$row['keys'][$flippedDimensions['device']].": " . json_encode($aggregatedMetrics[$metricConfigKeys['impressions']]));
 
-                $elements[$impressionsGroupKey][$metricName] = $channeledMetric;
+                $elements[$metricConfigKeys['impressions']][$metricName] = $channeledMetric;
             }
 
             if ($index % 1000 === 0) {

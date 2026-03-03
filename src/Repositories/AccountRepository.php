@@ -28,10 +28,9 @@ class AccountRepository extends BaseRepository
             QueryBuilderType::CUSTOM => throw new \Exception('To be implemented'),
         };
 
-        return $query->addSelect('v')
-            ->addSelect('p')
+        return $query->addSelect('a')
             ->from($this->getEntityName(), 'e')
-            ->leftJoin('e.channeledAccounts', 'v');
+            ->leftJoin('e.channeledAccounts', 'a');
     }
 
     /**

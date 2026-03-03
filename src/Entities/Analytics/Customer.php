@@ -21,13 +21,13 @@ class Customer extends Entity
     #[ORM\OneToMany(mappedBy: 'customer', targetEntity: ChanneledCustomer::class, orphanRemoval: true)]
     protected Collection $channeledCustomers;
 
-    #[ORM\OneToMany(mappedBy: 'customer', targetEntity: Metric::class, orphanRemoval: true)]
-    protected Collection $metrics;
+    #[ORM\OneToMany(mappedBy: 'customer', targetEntity: MetricConfig::class, orphanRemoval: true)]
+    protected Collection $metricConfigs;
 
     public function __construct()
     {
         $this->channeledCustomers = new ArrayCollection();
-        $this->metrics = new ArrayCollection();
+        $this->metricConfigs = new ArrayCollection();
     }
 
     /**
@@ -117,6 +117,45 @@ class Customer extends Entity
             $this->removeChanneledCustomer($channeledCustomer);
         }
 
+        return $this;
+    }
+
+    /**
+     * Gets the collection of metric configs.
+     * @return Collection
+     */
+    public function getMetricConfigs(): Collection
+    {
+        return $this->metricConfigs;
+    }
+
+    /**
+     * Adds a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function addMetricConfig(MetricConfig $metricConfig): self
+    {
+        if (!$this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->add($metricConfig);
+            $metricConfig->addCustomer($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function removeMetricConfig(MetricConfig $metricConfig): self
+    {
+        if ($this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->removeElement($metricConfig);
+            if ($metricConfig->getCustomer() === $this) {
+                $metricConfig->addCustomer(null);
+            }
+        }
         return $this;
     }
 }

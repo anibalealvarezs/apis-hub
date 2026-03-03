@@ -2,6 +2,8 @@
 
 namespace Repositories;
 
+use Doctrine\ORM\AbstractQuery;
+use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\Query\Expr\Join;
 use Entities\Analytics\Campaign;
 use Entities\Analytics\Channeled\ChanneledCampaign;
@@ -16,20 +18,18 @@ use Monolog\Logger;
  */
 class PageRepository extends BaseRepository
 {
-    public function findByUrl(string $url): ?Page
+    public function getByUrl(string $url): ?Page
     {
         $normalizedUrl = rtrim($url, '/');
         $logger = new Logger('gsc');
         $logger->pushHandler(new StreamHandler('logs/gsc.log', Level::Info));
-        $logger->info("findByUrl: url=$url, normalized=$normalizedUrl");
+        $logger->info("getByUrl: url=$url, normalized=$normalizedUrl");
 
         $qb = $this->createQueryBuilder('p')
             ->where('LOWER(p.url) = LOWER(:url)')
             ->setParameter('url', $normalizedUrl);
 
         $page = $qb->getQuery()->getOneOrNullResult();
-
-        $logger->info("findByUrl result: " . ($page ? "ID=" . $page->getId() . ", toString=" . $page->__toString() : 'none'));
 
         // Debug existing URLs
         $allUrls = $this->createQueryBuilder('p')
@@ -41,7 +41,7 @@ class PageRepository extends BaseRepository
         return $page;
     }
 
-    public function findByTitle(string $title, int $limit = 100): array
+    public function getByTitle(string $title, int $limit = 100): array
     {
         return $this->createQueryBuilder('p')
             ->where('p.title LIKE :title')
@@ -49,6 +49,18 @@ class PageRepository extends BaseRepository
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * @throws NonUniqueResultException
+     */
+    public function getByPlatformId(string $platformId): ?Page
+    {
+        return $this->createQueryBuilder('p')
+            ->where('p.platformId LIKE :platformId')
+            ->setParameter('platformId', $platformId)
+            ->getQuery()
+            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }
 
     public function findByDataAttribute(string $key, string $value, int $limit = 100): array
