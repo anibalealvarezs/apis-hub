@@ -129,7 +129,7 @@ class JobRepository extends BaseRepository
     protected function processResult(array $result): array
     {
         $result['status'] = $this->getStatusName($result['status']);
-        return $result;
+        return parent::processResult($result);
     }
 
     /**

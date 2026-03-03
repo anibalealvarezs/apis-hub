@@ -1002,7 +1002,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         return $params;
     }
 
-    public function read(string $entity, Channel $channel, ?int $id = null): Response
+    public function read(string $entity, Channel $channel, ?int $id = null, bool $rawData = false, array $hideFields = []): Response
     {
         try {
             if ($id === null) {
@@ -1077,7 +1077,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
+    public function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null, bool $rawData = false, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository($entity);

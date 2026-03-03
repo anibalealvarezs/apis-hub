@@ -42,14 +42,16 @@ class CrudController extends BaseController
             );
         }
 
+        $hideFields = array_filter(array_map('trim', explode(',', $params['hideFields'] ?? '')));
+
         return match ($method) {
-            'read' => $this->read(entity: $entity, id: $id),
-            'count' => $this->count(entity: $entity, body: $body, params: $params),
-            'list' => $this->list(entity: $entity, body: $body, params: $params),
+            'read'   => $this->read(entity: $entity, id: $id, hideFields: $hideFields),
+            'count'  => $this->count(entity: $entity, body: $body, params: $params),
+            'list'   => $this->list(entity: $entity, body: $body, params: $params, hideFields: $hideFields),
             'create' => $this->create(entity: $entity, body: $body),
             'update' => $this->update(entity: $entity, id: $id, body: $body),
             'delete' => $this->delete(entity: $entity, id: $id),
-            default => $this->createResponse(
+            default  => $this->createResponse(
                 data: null,
                 status: 'error',
                 error: 'Method not found',
@@ -78,11 +80,14 @@ class CrudController extends BaseController
      * @return Response
      * @throws NotSupported
      */
-    protected function read(string $entity, ?int $id = null): Response
+    protected function read(string $entity, ?int $id = null, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity);
-            $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id);
+            if ($hideFields) {
+                $repository->setHideFields($hideFields);
+            }
+            $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id) . ($hideFields ? '_' . implode('_', $hideFields) : '');
             $data = $this->cacheService->get(
                 key: $cacheKey,
                 callback: fn() => $repository->read(id: $id)
@@ -145,24 +150,34 @@ class CrudController extends BaseController
      * @return Response
      * @throws NotSupported|ReflectionException
      */
-    protected function list(string $entity, ?string $body = null, ?array $params = null): Response
+    protected function list(string $entity, ?string $body = null, ?array $params = null, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity);
+            if ($hideFields) {
+                $repository->setHideFields($hideFields);
+            }
             $params = $this->prepareReadMultipleParams(
                 params: $params,
                 entityName: $entity,
                 body: $body
             );
-            $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params));
+            $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params)) . ($hideFields ? '_' . implode('_', $hideFields) : '');
             $data = $this->cacheService->get(
                 key: $cacheKey,
                 callback: fn() => $repository->readMultiple(...$params)->toArray()
             );
 
+            $meta = array_filter(
+                $params,
+                fn($k) => !in_array($k, ['filters', 'extra']),
+                ARRAY_FILTER_USE_KEY
+            );
+
             return $this->createResponse(
                 data: $data ?: [],
-                status: 'success'
+                status: 'success',
+                meta: $meta ?: null
             );
         } catch (Exception $e) {
             return $this->createResponse(

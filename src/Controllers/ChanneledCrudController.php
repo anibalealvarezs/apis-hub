@@ -73,11 +73,13 @@ class ChanneledCrudController extends BaseController
         }
 
         $channelConstant = (new ReflectionEnum(objectOrClass: Channel::class))->getConstant(name: $channel);
+        $rawData    = filter_var($params['rawData'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $hideFields = array_filter(array_map('trim', explode(',', $params['hideFields'] ?? '')));
 
         return match ($method) {
-            'read' => $this->read(entity: $entity, channel: $channelConstant, id: $id),
+            'read'  => $this->read(entity: $entity, channel: $channelConstant, id: $id, rawData: $rawData, hideFields: $hideFields),
             'count' => $this->count(entity: $entity, channel: $channelConstant, body: $body, params: $params),
-            'list' => $this->list(entity: $entity, channel: $channelConstant, body: $body, params: $params),
+            'list'  => $this->list(entity: $entity, channel: $channelConstant, body: $body, params: $params, rawData: $rawData, hideFields: $hideFields),
             default => $this->createResponse(
                 data: null,
                 status: 'error',
@@ -115,10 +117,18 @@ class ChanneledCrudController extends BaseController
      * @param int|null $id
      * @return Response
      */
-    protected function read(string $entity, Channel $channel, ?int $id = null): Response
+    protected function read(string $entity, Channel $channel, ?int $id = null, bool $rawData = false, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
+
+            if ($rawData && method_exists($repository, 'setIncludeRawData')) {
+                $repository->setIncludeRawData(true);
+            }
+            if ($hideFields) {
+                $repository->setHideFields($hideFields);
+            }
+
             $params = [
                 'id' => $id,
                 'filters' => (object) [
@@ -126,7 +136,9 @@ class ChanneledCrudController extends BaseController
                 ],
             ];
 
-            $cacheKey = $this->cacheKeyGenerator->forChanneledEntity($channel->value, $entity, $id);
+            $cacheKey = $this->cacheKeyGenerator->forChanneledEntity($channel->value, $entity, $id) 
+                . ($rawData ? '_raw' : '') 
+                . ($hideFields ? '_' . implode('_', $hideFields) : '');
 
             $data = $this->cacheService->get(
                 key: $cacheKey,
@@ -203,10 +215,18 @@ class ChanneledCrudController extends BaseController
      * @return Response
      * @throws ReflectionException
      */
-    protected function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
+    protected function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null, bool $rawData = false, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
+
+            if ($rawData && method_exists($repository, 'setIncludeRawData')) {
+                $repository->setIncludeRawData(true);
+            }
+            if ($hideFields) {
+                $repository->setHideFields($hideFields);
+            }
+
             $params = $this->prepareChanneledReadMultipleParams(
                 params: $params,
                 repositoryClass: $repository::class,
@@ -214,7 +234,9 @@ class ChanneledCrudController extends BaseController
                 channel: $channel
             );
 
-            $cacheKey = 'channeled_list_' . $entity . '_' . $channel->value . '_' . md5(serialize($params['filters']));
+            $cacheKey = 'channeled_list_' . $entity . '_' . $channel->value . '_' . md5(serialize($params['filters'])) 
+                . ($rawData ? '_raw' : '') 
+                . ($hideFields ? '_' . implode('_', $hideFields) : '');
 
             $data = $this->cacheService->get(
                 key: $cacheKey,
@@ -222,9 +244,16 @@ class ChanneledCrudController extends BaseController
                 ttl: 600
             );
 
+            $meta = array_filter(
+                $params,
+                fn($k) => !in_array($k, ['filters', 'extra']),
+                ARRAY_FILTER_USE_KEY
+            );
+
             return $this->createResponse(
                 data: $data ?: [],
-                status: 'success'
+                status: 'success',
+                meta: $meta ?: null
             );
         } catch (InvalidArgumentException $e) {
             return $this->createResponse(

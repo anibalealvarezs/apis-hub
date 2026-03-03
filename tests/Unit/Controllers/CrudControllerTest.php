@@ -791,7 +791,7 @@ class ConcreteCrudController extends CrudController
         return $params;
     }
 
-    public function read(string $entity, ?int $id = null): Response
+    public function read(string $entity, ?int $id = null, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository($entity);
@@ -845,7 +845,7 @@ class ConcreteCrudController extends CrudController
         }
     }
 
-    public function list(string $entity, ?string $body = null, ?array $params = null): Response
+    public function list(string $entity, ?string $body = null, ?array $params = null, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository($entity);

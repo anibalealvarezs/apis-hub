@@ -469,6 +469,10 @@ class GenerateEntitiesConfigCommandTest extends TestCase
                 ],
                 'matching' => [
                     'parameters' => ['criteria']
+                ],
+                'setHideFields' => [
+                    'parameters' => ['fields'],
+                    'return_type' => 'static'
                 ]
             ]
         ];

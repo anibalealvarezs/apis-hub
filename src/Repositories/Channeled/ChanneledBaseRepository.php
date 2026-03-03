@@ -121,7 +121,8 @@ class ChanneledBaseRepository extends BaseRepository
      */
     protected function processResult(array $result): array
     {
-        return $this->replaceChannelName($result);
+        $result = $this->replaceChannelName($result);
+        return parent::processResult($result);
     }
 
     /**
@@ -130,7 +131,7 @@ class ChanneledBaseRepository extends BaseRepository
      */
     protected function replaceChannelName(array $entity): array
     {
-        if (isset($entity['channel'])) {
+        if (isset($entity['channel']) && is_int($entity['channel'])) {
             $entity['channel'] = Channel::from($entity['channel'])->getName();
         }
         return $entity;

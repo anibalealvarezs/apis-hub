@@ -341,9 +341,9 @@ class ConcreteCacheController extends CacheController
         return $this->list($entity, $channelEnum, $body, $params);
     }
 
-    public function createResponse(mixed $data, string $status, ?string $error = null, int $httpStatus = Response::HTTP_OK): Response
+    public function createResponse(mixed $data, string $status, ?string $error = null, int $httpStatus = Response::HTTP_OK, ?array $meta = null): Response
     {
-        return parent::createResponse($data, $status, $error, $httpStatus);
+        return parent::createResponse($data, $status, $error, $httpStatus, $meta);
     }
 
     public function prepareAnalyticsParams(?array $params, ?string $body, string $className = \Classes\Requests\MetricRequests::class, string $methodName = 'getListFromKlaviyo'): array

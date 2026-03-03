@@ -4,6 +4,7 @@ namespace Repositories;
 
 use DateTime;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
@@ -82,45 +83,167 @@ class MetricRepository extends BaseRepository
     {
         $query = $this->_em->createQueryBuilder();
         match ($type) {
-            QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('partial e.{id, channel, name, value, period, metricDate, metadata}'),
+            QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('partial e.{id, value, metadata}')
+                ->addSelect('partial mc.{id, channel, name, period, metricDate}'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
             QueryBuilderType::CUSTOM => throw new Exception('To be implemented'),
         };
 
-        return $query->addSelect('partial cm.{id, platformId, data}')
-            ->addSelect('ca')
-            ->addSelect('cc')
-            ->addSelect('cag')
-            ->addSelect('cad')
-            ->addSelect('partial q.{id, query, data}')
-            ->addSelect('pa')
-            ->addSelect('po')
-            ->addSelect('pr')
-            ->addSelect('cu')
-            ->addSelect('o')
-            ->addSelect('partial md.{id, dimensionKey, dimensionValue}')
-            ->from($this->getEntityName(), 'e')
-            ->leftJoin('e.channeledMetrics', 'cm')
-            ->leftJoin('e.channeledAccount', 'ca')
-            ->leftJoin('e.channeledCampaign', 'cc')
-            ->leftJoin('e.channeledAdGroup', 'cag')
-            ->leftJoin('e.channeledAd', 'cad')
-            ->leftJoin('e.query', 'q')
-            ->leftJoin('e.page', 'pa')
-            ->leftJoin('e.post', 'po')
-            ->leftJoin('e.product', 'pr')
-            ->leftJoin('e.customer', 'cu')
-            ->leftJoin('e.order', 'o')
-            ->leftJoin('cm.dimensions', 'md');
+        $query->from($this->getEntityName(), 'e')
+            ->leftJoin('e.metricConfig', 'mc');
+
+        if ($type !== QueryBuilderType::COUNT) {
+            $query->addSelect('partial cm.{id, platformId, data}')
+                ->addSelect('ca')
+                ->addSelect('cc')
+                ->addSelect('cag')
+                ->addSelect('cad')
+                ->addSelect('partial q.{id, query, data}')
+                ->addSelect('pa')
+                ->addSelect('po')
+                ->addSelect('pr')
+                ->addSelect('cu')
+                ->addSelect('o')
+                ->addSelect('partial md.{id, dimensionKey, dimensionValue}')
+                ->leftJoin('e.channeledMetrics', 'cm')
+                ->leftJoin('mc.channeledAccount', 'ca')
+                ->leftJoin('mc.channeledCampaign', 'cc')
+                ->leftJoin('mc.channeledAdGroup', 'cag')
+                ->leftJoin('mc.channeledAd', 'cad')
+                ->leftJoin('mc.query', 'q')
+                ->leftJoin('mc.page', 'pa')
+                ->leftJoin('mc.post', 'po')
+                ->leftJoin('mc.product', 'pr')
+                ->leftJoin('mc.customer', 'cu')
+                ->leftJoin('mc.order', 'o')
+                ->leftJoin('cm.dimensions', 'md');
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param int $id
+     * @param object|null $filters
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @return QueryBuilder
+     * @throws Exception
+     */
+    protected function buildReadQuery(
+        int $id,
+        ?object $filters = null,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): QueryBuilder {
+        $query = $this->createBaseQueryBuilder()
+            ->where('e.id = :id')
+            ->setParameter('id', $id);
+
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $alias = $this->getFieldAlias($key);
+                $query->andWhere($alias . '.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        $this->applyDateFilters($query, $startDate, $endDate);
+
+        return $query;
+    }
+
+    /**
+     * @param array|null $ids
+     * @param object|null $filters
+     * @param string $orderBy
+     * @param string $orderDir
+     * @param int $limit
+     * @param int $pagination
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @return QueryBuilder
+     * @throws Exception
+     */
+    protected function buildReadMultipleQuery(
+        ?array $ids,
+        ?object $filters,
+        string $orderBy,
+        string $orderDir,
+        int $limit,
+        int $pagination,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): QueryBuilder {
+        $query = $this->createBaseQueryBuilder();
+
+        if ($ids) {
+            $query->where('e.id IN (:ids)')
+                ->setParameter('ids', $ids);
+        }
+
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $alias = $this->getFieldAlias($key);
+                $query->andWhere($alias . '.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        $this->applyDateFilters($query, $startDate, $endDate);
+
+        $aliasOrderBy = $this->getFieldAlias($orderBy);
+        $query->orderBy("$aliasOrderBy.$orderBy", strtoupper($orderDir))
+            ->setMaxResults($limit)
+            ->setFirstResult($limit * $pagination);
+
+        return $query;
+    }
+
+    /**
+     * @param object|null $filters
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @return int
+     * @throws NonUniqueResultException
+     * @throws NoResultException
+     */
+    public function countElements(
+        ?object $filters = null,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): int {
+        $query = $this->createBaseQueryBuilder(QueryBuilderType::COUNT);
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $alias = $this->getFieldAlias($key);
+                $query->andWhere($alias . '.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        $this->applyDateFilters($query, $startDate, $endDate);
+
+        return $query->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * @param string $field
+     * @return string
+     */
+    protected function getFieldAlias(string $field): string
+    {
+        return in_array($field, ['id', 'value', 'dimensionsHash', 'metadata', 'channeledMetrics', 'metricConfig']) ? 'e' : 'mc';
     }
 
     public function existsByChannelAndName(int $channel, string $name, Period $period, DateTime $metricDate): bool
     {
         return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
-                ->where('e.channel = :channel')
-                ->andWhere('e.name = :name')
-                ->andWhere('e.period = :period')
-                ->andWhere('e.metricDate = :metricDate')
+                ->join('e.metricConfig', 'mc')
+                ->where('mc.channel = :channel')
+                ->andWhere('mc.name = :name')
+                ->andWhere('mc.period = :period')
+                ->andWhere('mc.metricDate = :metricDate')
                 ->setParameters([
                     'channel' => $channel,
                     'name' => $name,
@@ -139,10 +262,11 @@ class MetricRepository extends BaseRepository
     ): ?Metric
     {
         return $this->createQueryBuilder('m')
-            ->where('m.channel = :channel')
-            ->andWhere('m.name = :name')
-            ->andWhere('m.period = :period')
-            ->andWhere('m.metricDate = :metricDate')
+            ->join('m.metricConfig', 'mc')
+            ->where('mc.channel = :channel')
+            ->andWhere('mc.name = :name')
+            ->andWhere('mc.period = :period')
+            ->andWhere('mc.metricDate = :metricDate')
             ->setParameters([
                 'channel' => $channel,
                 'name' => $name,
@@ -157,10 +281,11 @@ class MetricRepository extends BaseRepository
     public function findMetricsByPeriod(int $channel, string $name, Period $period, DateTime $start, DateTime $end): array
     {
         return $this->createQueryBuilder('m')
-            ->where('m.channel = :channel')
-            ->andWhere('m.name = :name')
-            ->andWhere('m.period = :period')
-            ->andWhere('m.metricDate BETWEEN :start AND :end')
+            ->join('m.metricConfig', 'mc')
+            ->where('mc.channel = :channel')
+            ->andWhere('mc.name = :name')
+            ->andWhere('mc.period = :period')
+            ->andWhere('mc.metricDate BETWEEN :start AND :end')
             ->setParameters([
                 'channel' => $channel,
                 'name' => $name,
@@ -188,10 +313,11 @@ class MetricRepository extends BaseRepository
     ): ?Metric {
         try {
             $qb = $this->createQueryBuilder('m')
-                ->where('m.channel = :channel')
-                ->andWhere('m.name = :name')
-                ->andWhere('m.period = :period')
-                ->andWhere('m.metricDate = :metricDate')
+                ->join('m.metricConfig', 'mc')
+                ->where('mc.channel = :channel')
+                ->andWhere('mc.name = :name')
+                ->andWhere('mc.period = :period')
+                ->andWhere('mc.metricDate = :metricDate')
                 ->setParameters([
                     'channel' => $channel,
                     'name' => $name,
@@ -200,10 +326,10 @@ class MetricRepository extends BaseRepository
                 ]);
 
             if ($queryEntity) {
-                $qb->andWhere('m.query = :query')
+                $qb->andWhere('mc.query = :query')
                     ->setParameter('query', $queryEntity);
             } else {
-                $qb->andWhere('m.query IS NULL');
+                $qb->andWhere('mc.query IS NULL');
             }
 
             if ($page) {
@@ -211,24 +337,24 @@ class MetricRepository extends BaseRepository
                     error_log("MetricRepository::findByChannelAndDimensions: Unmanaged Page: url=" . $page->getUrl() . ", trace=" . (new \Exception())->getTraceAsString());
                     return null; // Skip query if page is unmanaged
                 }
-                $qb->andWhere('m.page = :page')
+                $qb->andWhere('mc.page = :page')
                     ->setParameter('page', $page);
             } else {
-                $qb->andWhere('m.page IS NULL');
+                $qb->andWhere('mc.page IS NULL');
             }
 
             if ($country) {
-                $qb->andWhere('m.country = :country')
+                $qb->andWhere('mc.country = :country')
                     ->setParameter('country', $country);
             } else {
-                $qb->andWhere('m.country IS NULL');
+                $qb->andWhere('mc.country IS NULL');
             }
 
             if ($device) {
-                $qb->andWhere('m.device = :device')
+                $qb->andWhere('mc.device = :device')
                     ->setParameter('device', $device);
             } else {
-                $qb->andWhere('m.device IS NULL');
+                $qb->andWhere('mc.device IS NULL');
             }
 
             if (!empty($dimensions)) {
@@ -275,12 +401,13 @@ class MetricRepository extends BaseRepository
         array $dimensions
     ): array {
         $qb = $this->createQueryBuilder('m')
+            ->join('m.metricConfig', 'mc')
             ->join('m.channeledMetrics', 'cm')
             ->join('cm.dimensions', 'cmd')
-            ->where('m.channel = :channel')
-            ->andWhere('m.name = :name')
-            ->andWhere('m.period = :period')
-            ->andWhere('m.metricDate BETWEEN :start AND :end')
+            ->where('mc.channel = :channel')
+            ->andWhere('mc.name = :name')
+            ->andWhere('mc.period = :period')
+            ->andWhere('mc.metricDate BETWEEN :start AND :end')
             ->setParameters([
                 'channel' => $channel,
                 'name' => $name,
@@ -300,14 +427,41 @@ class MetricRepository extends BaseRepository
     }
 
     /**
+     * @param QueryBuilder $query
+     * @param string|null $startDate
+     * @param string|null $endDate
+     */
+    protected function applyDateFilters(QueryBuilder $query, ?string $startDate, ?string $endDate): void
+    {
+        if (!$startDate && !$endDate) {
+            return;
+        }
+
+        if ($startDate) {
+            $query->andWhere("mc.metricDate >= :startDate")
+                ->setParameter('startDate', $startDate);
+        }
+        if ($endDate) {
+            $query->andWhere("mc.metricDate <= :endDate")
+                ->setParameter('endDate', $endDate);
+        }
+    }
+
+    /**
      * @param array $result
      * @return array
      */
     protected function processResult(array $result): array
     {
+        if (isset($result['metricConfig'])) {
+            $mc = $result['metricConfig'];
+            unset($result['metricConfig']);
+            $result = array_merge($result, $mc);
+        }
         $result = $this->replaceChannelName($result);
         $result = $this->stripPositionWeighted($result);
-        return $this->formatDate($result);
+        $result = $this->formatDate($result);
+        return parent::processResult($result);
     }
 
     /**

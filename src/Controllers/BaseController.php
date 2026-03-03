@@ -21,14 +21,21 @@ abstract class BaseController
         mixed $data,
         string $status,
         ?string $error = null,
-        int $httpStatus = Response::HTTP_OK
+        int $httpStatus = Response::HTTP_OK,
+        ?array $meta = null
     ): Response {
+        $responseArray = [
+            'data' => $data,
+            'status' => $status,
+            'error' => $error
+        ];
+
+        if ($meta !== null) {
+            $responseArray['meta'] = $meta;
+        }
+
         return new Response(
-            content: json_encode(value: [
-                'data' => $data,
-                'status' => $status,
-                'error' => $error
-            ]),
+            content: json_encode(value: $responseArray),
             status: $httpStatus,
             headers: ['Content-Type' => 'application/json']
         );
@@ -61,7 +68,7 @@ abstract class BaseController
      */
     protected const CRUD_TOP_LEVEL_PARAMS = [
         'limit', 'pagination', 'ids', 'filters', 'orderBy', 'orderDir',
-        'startDate', 'endDate'
+        'startDate', 'endDate', 'rawData', 'hideFields'
     ];
 
     /**
@@ -85,6 +92,12 @@ abstract class BaseController
      * @param string|null $body
      * @return array
      */
+    /**
+     * Params that are valid top-level control params but should NOT be forwarded to the repository.
+     * They are consumed by the controller layer only.
+     */
+    protected const CONTROLLER_ONLY_PARAMS = ['rawData', 'hideFields'];
+
     protected function prepareCrudParams(?array $params, ?string $body): array
     {
         $params = $params ?? [];
@@ -99,7 +112,8 @@ abstract class BaseController
                 if ($key === 'filters') {
                     // If they send ?filters[field]=value, merge it later
                     $queryFilters = array_merge($queryFilters, (array) $value);
-                } else {
+                } elseif (!in_array($key, self::CONTROLLER_ONLY_PARAMS)) {
+                    // Only forward params that the repository actually accepts
                     $finalParams[$key] = $value;
                 }
             } else {

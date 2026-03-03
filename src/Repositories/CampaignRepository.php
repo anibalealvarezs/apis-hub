@@ -82,7 +82,8 @@ class CampaignRepository extends BaseRepository
      */
     protected function processResult(array $result): array
     {
-        return $this->replaceChannelName($result);
+        $result = $this->replaceChannelName($result);
+        return parent::processResult($result);
     }
 
     /**

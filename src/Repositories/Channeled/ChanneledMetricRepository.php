@@ -7,15 +7,102 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\OptimisticLockException;
+use Doctrine\ORM\QueryBuilder;
 use Entities\Analytics\Channeled\ChanneledMetric;
 use Entities\Analytics\Channeled\ChanneledMetricDimension;
 use Entities\Analytics\Metric;
 use Entities\Entity;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 
 
 class ChanneledMetricRepository extends ChanneledBaseRepository
 {
+    /** Controls whether the raw JSON `data` field is included in results */
+    private bool $includeRawData = false;
+
+    /**
+     * @param bool $include
+     * @return static
+     */
+    public function setIncludeRawData(bool $include): static
+    {
+        $this->includeRawData = $include;
+        return $this;
+    }
+
+    /**
+     * @param QueryBuilderType $type
+     * @return QueryBuilder
+     */
+    protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
+    {
+        $query = $this->_em->createQueryBuilder();
+        match ($type) {
+            QueryBuilderType::SELECT => $query->select('e'),
+            QueryBuilderType::COUNT  => $query->select('count(e.id)'),
+            QueryBuilderType::LAST   => $query->select('e, LENGTH(e.platformId) AS HIDDEN length'),
+            QueryBuilderType::CUSTOM => null,
+        };
+
+        $query->from($this->getEntityName(), 'e');
+
+        if ($type !== QueryBuilderType::COUNT) {
+            $query->addSelect('partial m.{id, value, dimensionsHash, metadata}')
+                ->addSelect('partial mc.{id, channel, name, period, metricDate}')
+                ->addSelect('partial dim.{id, dimensionKey, dimensionValue}')
+                ->leftJoin('e.metric', 'm')
+                ->leftJoin('m.metricConfig', 'mc')
+                ->leftJoin('e.dimensions', 'dim');
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param array $result
+     * @return array
+     */
+    protected function processResult(array $result): array
+    {
+        // Flatten nested metric → metricConfig into the root of the result
+        if (isset($result['metric'])) {
+            $metric = $result['metric'];
+            unset($result['metric']);
+
+            if (isset($metric['metricConfig'])) {
+                $mc = $metric['metricConfig'];
+                unset($metric['metricConfig']);
+                // Flatten metricConfig fields to root
+                $result = array_merge($result, $mc);
+            }
+
+            // Merge remaining metric fields (value, dimensionsHash, metadata)
+            $result['metricId']       = $metric['id'] ?? null;
+            $result['value']          = $metric['value'] ?? null;
+            $result['dimensionsHash'] = $metric['dimensionsHash'] ?? null;
+            $result['metadata']       = $metric['metadata'] ?? null;
+        }
+
+        // Replace channel int with its name
+        if (isset($result['channel'])) {
+            $result['channel'] = Channel::from($result['channel'])->getName();
+        }
+
+        // Format metricDate
+        if (isset($result['metricDate']) && $result['metricDate'] instanceof \DateTimeInterface) {
+            $result['metricDate'] = $result['metricDate']->format('Y-m-d');
+        }
+
+        // Strip raw data JSON unless explicitly requested
+        if (!$this->includeRawData) {
+            unset($result['data']);
+        }
+
+        return parent::processResult($result);
+    }
+
+
     /**
      * @param object{
      *     platformId: string|int,

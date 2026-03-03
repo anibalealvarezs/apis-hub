@@ -20,6 +20,38 @@ use ReflectionException;
 class BaseRepository extends EntityRepository
 {
     /**
+     * List of top-level result fields to strip before returning the response.
+     * Set via setHideFields() from the controller layer.
+     */
+    private array $hideFields = [];
+
+    /**
+     * Set the list of fields to hide from the result.
+     *
+     * @param string[] $fields
+     * @return static
+     */
+    public function setHideFields(array $fields): static
+    {
+        $this->hideFields = $fields;
+        return $this;
+    }
+
+    /**
+     * Remove any fields listed in $this->hideFields from the top level of a result array.
+     *
+     * @param array $result
+     * @return array
+     */
+    protected function applyHideFields(array $result): array
+    {
+        foreach ($this->hideFields as $field) {
+            unset($result[trim($field)]);
+        }
+        return $result;
+    }
+
+    /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
      * @throws Exception
@@ -315,7 +347,27 @@ class BaseRepository extends EntityRepository
      */
     protected function processResult(array $result): array
     {
-        return $result; // Default: no processing
+        $result = $this->formatDates($result);
+        return $this->applyHideFields($result);
+    }
+
+    /**
+     * Recursive function to format all DateTimeInterface objects in an array.
+     *
+     * @param array $data
+     * @param string $format
+     * @return array
+     */
+    protected function formatDates(array $data, string $format = \DateTimeInterface::ATOM): array
+    {
+        foreach ($data as $key => $value) {
+            if ($value instanceof \DateTimeInterface) {
+                $data[$key] = $value->format($format);
+            } elseif (is_array($value)) {
+                $data[$key] = $this->formatDates($value, $format);
+            }
+        }
+        return $data;
     }
 
     /**

@@ -319,7 +319,8 @@ class MetricConfigRepository extends BaseRepository
     {
         $result = $this->replaceChannelName($result);
         $result = $this->stripPositionWeighted($result);
-        return $this->formatDate($result);
+        $result = $this->formatDate($result);
+        return parent::processResult($result);
     }
 
     /**
