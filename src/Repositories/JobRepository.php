@@ -37,7 +37,7 @@ class JobRepository extends BaseRepository
 
     /**
      * @param object|null $data
-     * @phpstan-param object{status?: int|string, entity?: string, channel?: string, uuid?: string}|null $data
+     * @phpstan-param object{status?: int|string, entity?: string, channel?: string, uuid?: string, payload?: array}|null $data
      * @param bool $returnEntity
      * @return array|null
      * @throws NonUniqueResultException

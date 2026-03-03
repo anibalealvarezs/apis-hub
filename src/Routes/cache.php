@@ -6,6 +6,19 @@ use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
 return [
+    '/cache/interrupt' => [
+        'httpMethod' => 'POST',
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $input = (array) Helpers::bodyToObject(data: $body);
+            $channel = $input['channel'] ?? $params['channel'] ?? null;
+            $entity = $input['entity'] ?? $params['entity'] ?? null;
+            
+            return (new CacheController())->interruptJobs(
+                channel: $channel,
+                entity: $entity
+            );
+        }
+    ],
     '/cache/reset/{entity}' => [
         'httpMethod' => 'POST',
         'callable' => function (string $entity, ?array $ids = null, bool $includeListAndCount = true, ?string $channel = null, ?string $body = null, ?array $params = null) {

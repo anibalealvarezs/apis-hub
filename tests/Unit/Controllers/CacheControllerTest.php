@@ -378,7 +378,7 @@ class ConcreteCacheController extends CacheController
         return $this->mockEntityClassNames[$entity] ?? 'SomeRequestsClass';
     }
 
-    public function fetchData(string $entity, Channel $channel, ?array $params, ?string $body): mixed
+    public function fetchData(string $entity, Channel $channel, ?array $params = null, ?string $body = null): mixed
     {
         if (empty($this->mockFetchData)) {
             return parent::fetchData($entity, $channel, $params, $body);

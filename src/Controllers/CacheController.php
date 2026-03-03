@@ -127,10 +127,84 @@ class CacheController extends BaseController
     protected function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
     {
         try {
-            $data = $this->fetchData($entity, $channel, $params, $body);
+            /** @var \Repositories\JobRepository $jobRepo */
+            $jobRepo = $this->em->getRepository(\Entities\Job::class);
+            $qb = $jobRepo->createQueryBuilder('j');
+            $qb->where('j.entity = :entity')
+               ->andWhere('j.channel = :channel')
+               ->andWhere('j.status IN (:statuses)')
+               ->setParameter('entity', $entity)
+               ->setParameter('channel', $channel->name)
+               ->setParameter('statuses', [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value]);
+            
+            $existingJobs = $qb->getQuery()->getResult();
+            if (count($existingJobs) > 0) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'There is already an active caching process for this endpoint.',
+                    httpStatus: Response::HTTP_CONFLICT
+                );
+            }
+
+            // Create job
+            $jobData = (object) [
+                'entity' => $entity,
+                'channel' => $channel->name,
+                'status' => \Enums\JobStatus::scheduled->value,
+                'payload' => [
+                    'body' => $body,
+                    'params' => $params
+                ]
+            ];
+            $jobRepo->create($jobData);
 
             return $this->createResponse(
-                data: $data ?: [],
+                data: ['message' => 'Caching job successfully scheduled in background.'],
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * @param string|null $channel
+     * @param string|null $entity
+     * @return Response
+     */
+    public function interruptJobs(?string $channel = null, ?string $entity = null): Response
+    {
+        try {
+            /** @var \Repositories\JobRepository $jobRepo */
+            $jobRepo = $this->em->getRepository(\Entities\Job::class);
+            $qb = $jobRepo->createQueryBuilder('j')
+                ->update()
+                ->set('j.status', \Enums\JobStatus::failed->value)
+                ->where('j.status IN (:statuses)')
+                ->setParameter('statuses', [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value]);
+            
+            if ($channel) {
+                $channelEnum = Channel::tryFromName($channel);
+                if ($channelEnum) {
+                    $qb->andWhere('j.channel = :channel')->setParameter('channel', $channelEnum->name);
+                } else {
+                    $qb->andWhere('j.channel = :channel')->setParameter('channel', $channel);
+                }
+            }
+            if ($entity) {
+                $qb->andWhere('j.entity = :entity')->setParameter('entity', $entity);
+            }
+            
+            $count = $qb->getQuery()->execute();
+            
+            return $this->createResponse(
+                data: ['message' => "$count caching jobs interrupted."],
                 status: 'success'
             );
         } catch (Exception $e) {
@@ -176,7 +250,7 @@ class CacheController extends BaseController
      * @return mixed
      * @throws ReflectionException
      */
-    protected function fetchData(string $entity, Channel $channel, ?array $params, ?string $body): mixed
+    public function fetchData(string $entity, Channel $channel, ?array $params = null, ?string $body = null): mixed
     {
         try {
             $requestsClassName = $this->getEntityRequestsClassName($entity);
