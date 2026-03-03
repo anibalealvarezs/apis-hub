@@ -24,7 +24,7 @@ class ChanneledVendor extends ChanneledEntity
 
     // Relationships with channeled entities
 
-    #[ORM\OneToMany(mappedBy: 'channeledVendor', targetEntity: 'ChanneledProduct', orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'channeledVendor', targetEntity: ChanneledProduct::class, orphanRemoval: true)]
     protected Collection $channeledProducts;
 
     // Relationships with non-channeled entities

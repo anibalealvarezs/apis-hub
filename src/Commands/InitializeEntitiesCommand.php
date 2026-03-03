@@ -36,8 +36,9 @@ class InitializeEntitiesCommand extends Command
     public function __construct(EntityManagerInterface $entityManager)
     {
         $this->entityManager = $entityManager;
-        $this->logger = new Logger('initialize-entities');
-        $this->logger->pushHandler(new StreamHandler('logs/initialize-entities.log', Level::Info));
+        $logger = new Logger('initialize-entities');
+        $logger->pushHandler(new StreamHandler('logs/initialize-entities.log', Level::Info));
+        $this->logger = $logger;
         parent::__construct();
     }
 
@@ -47,6 +48,7 @@ class InitializeEntitiesCommand extends Command
 
         try {
             // Initialize Countries
+            /** @var \Repositories\CountryRepository $countryRepository */
             $countryRepository = $this->entityManager->getRepository(Country::class);
             $countriesInitialized = 0;
             $countriesSkipped = 0;
@@ -67,6 +69,7 @@ class InitializeEntitiesCommand extends Command
             }
 
             // Initialize Devices
+            /** @var \Repositories\DeviceRepository $deviceRepository */
             $deviceRepository = $this->entityManager->getRepository(Device::class);
             $devices = [
                 ['type' => DeviceEnum::DESKTOP],
@@ -93,7 +96,9 @@ class InitializeEntitiesCommand extends Command
             }
 
             // Initialize Pages from google_search_console config
+            /** @var \Repositories\PageRepository $pageRepository */
             $pageRepository = $this->entityManager->getRepository(Page::class);
+            /** @var \Repositories\Channeled\ChanneledAccountRepository $channeledAccountRepository */
             $channeledAccountRepository = $this->entityManager->getRepository(ChanneledAccount::class);
             $gscConfig = Helpers::getChannelsConfig()['google_search_console'] ?? null;
             if (!$gscConfig) {
@@ -136,13 +141,16 @@ class InitializeEntitiesCommand extends Command
             }
 
             // Initialize Pages from facebook config
+            /** @var \Repositories\PageRepository $pageRepository */
             $pageRepository = $this->entityManager->getRepository(Page::class);
             $fbConfig = Helpers::getChannelsConfig()['facebook'] ?? null;
             if (!$fbConfig) {
                 throw new Exception("Missing 'facebook' configuration in channels config");
             }
 
+            /** @var \Repositories\AccountRepository $accountRepository */
             $accountRepository = $this->entityManager->getRepository(Account::class);
+            /** @var Account|null $accountEntity */
             $accountEntity = $accountRepository->getByName($fbConfig['accounts_group_name']);
             if (!$accountEntity) {
                 $accountEntity = new Account();

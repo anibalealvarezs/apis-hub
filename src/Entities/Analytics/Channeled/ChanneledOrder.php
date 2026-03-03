@@ -18,19 +18,19 @@ class ChanneledOrder extends ChanneledEntity
 {
     // Relationships with channeled entities
 
-    #[ORM\ManyToOne(targetEntity:"ChanneledCustomer", inversedBy: 'channeledOrders')]
+    #[ORM\ManyToOne(targetEntity:ChanneledCustomer::class, inversedBy: 'channeledOrders')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected ChanneledCustomer $channeledCustomer;
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledProduct', inversedBy: 'channeledOrders')]
+    #[ORM\ManyToMany(targetEntity: ChanneledProduct::class, inversedBy: 'channeledOrders')]
     #[ORM\JoinTable(name: 'channeled_order_channeled_products')]
     protected Collection $channeledProducts;
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledProductVariant', inversedBy: 'channeledOrders')]
+    #[ORM\ManyToMany(targetEntity: ChanneledProductVariant::class, inversedBy: 'channeledOrders')]
     #[ORM\JoinTable(name: 'channeled_order_channeled_product_variants')]
     protected Collection $channeledProductVariants;
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledDiscount', inversedBy: 'channeledOrders')]
+    #[ORM\ManyToMany(targetEntity: ChanneledDiscount::class, inversedBy: 'channeledOrders')]
     #[ORM\JoinTable(name: 'channeled_order_channeled_discounts')]
     protected Collection $channeledDiscounts;
 

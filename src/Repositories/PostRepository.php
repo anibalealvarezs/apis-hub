@@ -5,6 +5,8 @@ namespace Repositories;
 use Doctrine\ORM\Query\Expr\Join;
 use Entities\Analytics\Channeled\ChanneledCampaign;
 use Entities\Analytics\Post;
+use Entities\Analytics\Metric;
+use Entities\Analytics\Campaign;
 
 /**
  * Repository for Post entities, providing methods to query and manage social media posts.

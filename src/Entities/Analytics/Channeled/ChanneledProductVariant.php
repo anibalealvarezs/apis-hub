@@ -24,10 +24,10 @@ class ChanneledProductVariant extends ChanneledEntity
 
     // Relationships with channeled entities
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledOrder', mappedBy: 'channeledProductVariants')]
+    #[ORM\ManyToMany(targetEntity: ChanneledOrder::class, mappedBy: 'channeledProductVariants')]
     protected Collection $channeledOrders;
 
-    #[ORM\ManyToOne(targetEntity:"ChanneledProduct", inversedBy: 'channeledProductVariants')]
+    #[ORM\ManyToOne(targetEntity:ChanneledProduct::class, inversedBy: 'channeledProductVariants')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected ChanneledProduct $channeledProduct;
 

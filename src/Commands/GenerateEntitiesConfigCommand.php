@@ -174,24 +174,6 @@ class GenerateEntitiesConfigCommand extends Command
         return $repoClass;
     }
 
-    private function loadRepositoryClass(string $className, OutputInterface $output): bool
-    {
-        if (class_exists($className)) {
-            return true;
-        }
-
-        $filePath = __DIR__.'/../../src/'.str_replace('\\', '/', $className).'.php';
-        if (file_exists($filePath)) {
-            include_once $filePath;
-            if (class_exists($className)) {
-                $output->writeln("<info>Dynamically loaded repository: $className</info>", OutputInterface::VERBOSITY_VERBOSE);
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     protected function analyzeRepositoryMethods(
         string $repositoryClass,
         OutputInterface $output

@@ -12,13 +12,27 @@ use Entities\Analytics\Channeled\ChanneledMetricDimension;
 use Entities\Analytics\Metric;
 use Entities\Entity;
 use Enums\QueryBuilderType;
-use stdClass;
+
 
 class ChanneledMetricRepository extends ChanneledBaseRepository
 {
-    public function create(?stdClass $data = null, bool $returnEntity = false): ?ChanneledMetric
+    /**
+     * @param object{
+     *     platformId: string|int,
+     *     channel: int,
+     *     platformCreatedAt?: string|\DateTime|null,
+     *     metric: \Entities\Analytics\Metric,
+     *     data?: array|null,
+     *     dimensions?: array<object{dimensionKey: string, dimensionValue: string}>
+     * }|null $data
+     * @param bool $returnEntity
+     * @return ChanneledMetric|array|null
+     * @throws OptimisticLockException
+     */
+    public function create(?object $data = null, bool $returnEntity = false): ChanneledMetric|array|null
     {
-        if (!$data || !isset($data->platformId) || !isset($data->channel)) {
+        $data = (array) ($data ?? []);
+        if (!isset($data['platformId']) || !isset($data['channel'])) {
             return null;
         }
         $retryCount = 0;
@@ -26,21 +40,23 @@ class ChanneledMetricRepository extends ChanneledBaseRepository
         while ($retryCount < $maxRetries) {
             try {
                 $channeledMetric = new ChanneledMetric();
-                $channeledMetric->addPlatformId($data->platformId)
-                    ->addChannel($data->channel)
+                $platformCreatedAt = $data['platformCreatedAt'] ?? 'now';
+                $channeledMetric->addPlatformId($data['platformId'])
+                    ->addChannel($data['channel'])
                     ->addPlatformCreatedAt(
-                        $data->platformCreatedAt instanceof DateTime
-                            ? $data->platformCreatedAt
-                            : new DateTime($data->platformCreatedAt ?? 'now')
+                        $platformCreatedAt instanceof DateTime
+                            ? $platformCreatedAt
+                            : new DateTime($platformCreatedAt)
                     )
-                    ->addMetric($data->metric)
-                    ->addData($data->data ?? null);
+                    ->addMetric($data['metric'])
+                    ->addData($data['data'] ?? null);
 
-                if (isset($data->dimensions) && is_array($data->dimensions)) {
-                    foreach ($data->dimensions as $dimensionData) {
+                if (isset($data['dimensions'])) {
+                    foreach ((array) $data['dimensions'] as $dimensionData) {
+                        $dimensionData = (array) $dimensionData;
                         $dimension = new ChanneledMetricDimension();
-                        $dimension->addDimensionKey($dimensionData->dimensionKey)
-                            ->addDimensionValue($dimensionData->dimensionValue)
+                        $dimension->addDimensionKey($dimensionData['dimensionKey'])
+                            ->addDimensionValue($dimensionData['dimensionValue'])
                             ->addChanneledMetric($channeledMetric);
                         $channeledMetric->addDimension($dimension);
                     }

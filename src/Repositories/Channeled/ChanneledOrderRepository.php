@@ -38,8 +38,8 @@ class ChanneledOrderRepository extends ChanneledBaseRepository
     }
 
     /**
-     * @param mixed $entity
-     * @return mixed
+     * @param array $entity
+     * @return array
      */
     protected function replaceChannelName(array $entity): array
     {

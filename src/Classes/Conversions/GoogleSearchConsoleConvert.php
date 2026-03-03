@@ -65,10 +65,12 @@ class GoogleSearchConsoleConvert
             foreach (GoogleSearchConsoleHelpers::$allDimensions as $dimension) {
                 if (!isset($row['keys'][$flippedDimensions[$dimension]])) {
                     $row['keys'][$flippedDimensions[$dimension]] = match($dimension) {
+                        'date' => Carbon::now()->toDateString(),
                         'query' => 'unknown',
                         'country' => Country::UNK->value,
                         'page' => null,
                         'device' => Device::UNKNOWN->value,
+                        default => null,
                     };
                 }
                 $dimensionValues[$dimension] = $row['keys'][$flippedDimensions[$dimension]];
@@ -219,8 +221,8 @@ class GoogleSearchConsoleConvert
      */
     public static function aggregateMetrics(array $data, array $new): array {
         // Sum additive metrics
-        $totalImpressions = $data['impressions'] + $new['impressions'];
-        $totalClicks = $data['clicks'] + $new['clicks'];
+        $totalImpressions = (int)($data['impressions'] ?? 0) + (int)($new['impressions'] ?? 0);
+        $totalClicks = (int)($data['clicks'] ?? 0) + (int)($new['clicks'] ?? 0);
 
         // Recalculate CTR
         $data['ctr'] = $totalImpressions > 0
@@ -228,15 +230,17 @@ class GoogleSearchConsoleConvert
             : 0;
 
         // Recalculate weighted position
-        $totalWeightedPosition = ($data['position'] * $data['impressions']) // Impressions include previous and new
-            + ($new['position'] * $new['impressions']);
+        $totalWeightedPosition = ((float)($data['position'] ?? 0) * (int)($data['impressions'] ?? 0))
+            + ((float)($new['position'] ?? 0) * (int)($new['impressions'] ?? 0));
+
         $data['position'] = $totalImpressions > 0 ? $totalWeightedPosition / $totalImpressions : 0;
 
         // Update remaining fields
         $data['impressions'] = $totalImpressions;
         $data['clicks'] = $totalClicks;
-        $data['count']++;
+        $data['count'] = (int)($data['count'] ?? 0) + 1;
 
         return $data;
     }
+
 }

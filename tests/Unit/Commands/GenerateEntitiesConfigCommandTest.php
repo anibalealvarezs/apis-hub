@@ -68,10 +68,10 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         $this->vfs = vfsStream::setup('project', null, $structure);
 
         // Verify directory existence and debug contents
-        $entitiesDir = vfsStream::url('project/src/Entities');
-        $channeledDir = vfsStream::url('project/src/Analytics/Channeled');
-        $emptyDir = vfsStream::url('project/src/EmptyEntities');
-        $configDir = vfsStream::url('project/config/yaml');
+        $entitiesDir = $this->vfs->url() . '/src/Entities';
+        $channeledDir = $this->vfs->url() . '/src/Analytics/Channeled';
+        $emptyDir = $this->vfs->url() . '/src/EmptyEntities';
+        $configDir = $this->vfs->url() . '/config/yaml';
         $this->assertDirectoryExists($entitiesDir, 'Entities directory missing');
         $this->assertDirectoryExists($channeledDir, 'Analytics/Channeled directory missing');
         $this->assertDirectoryExists($emptyDir, 'EmptyEntities directory missing');
@@ -93,7 +93,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         $this->assertEquals(['.', '..'], scandir($configDir), 'Unexpected Config/yaml directory contents');
 
         // Verify vfsStream writability
-        $testFile = vfsStream::url('project/config/yaml/test_writability.yaml');
+        $testFile = $this->vfs->url() . '/config/yaml/test_writability.yaml';
         $this->assertTrue(file_put_contents($testFile, 'test') !== false, 'vfsStream is not writable');
         $this->assertTrue(file_exists($testFile), 'Failed to write test file to vfsStream');
         unlink($testFile);
@@ -111,26 +111,26 @@ class GenerateEntitiesConfigCommandTest extends TestCase
     public function testExecuteWithValidEntitiesGeneratesConfig(): void
     {
         $files = [
-            vfsStream::url('project/src/Entities/Product.php'),
-            vfsStream::url('project/src/Entities/Customer.php'),
-            vfsStream::url('project/src/Entities/Metric.php'),
-            vfsStream::url('project/src/Entities/Order.php'),
-            vfsStream::url('project/src/Entities/Discount.php'),
-            vfsStream::url('project/src/Entities/PriceRule.php'),
-            vfsStream::url('project/src/Entities/Campaign.php'),
-            vfsStream::url('project/src/Entities/ProductCategory.php'),
-            vfsStream::url('project/src/Entities/ProductVariant.php'),
-            vfsStream::url('project/src/Entities/Vendor.php'),
-            vfsStream::url('project/src/Analytics/Channeled/ChanneledProduct.php'),
-            vfsStream::url('project/src/Analytics/Channeled/ChanneledCustomer.php'),
-            vfsStream::url('project/src/Analytics/Channeled/ChanneledMetric.php'),
-            vfsStream::url('project/src/Analytics/Channeled/ChanneledOrder.php'),
-            vfsStream::url('project/src/Analytics/Channeled/ChanneledDiscount.php'),
-            vfsStream::url('project/src/Analytics/Channeled/ChanneledPriceRule.php'),
-            vfsStream::url('project/src/Analytics/Channeled/ChanneledCampaign.php'),
-            vfsStream::url('project/src/Analytics/Channeled/ChanneledProductCategory.php'),
-            vfsStream::url('project/src/Analytics/Channeled/ChanneledProductVariant.php'),
-            vfsStream::url('project/src/Analytics/Channeled/ChanneledVendor.php')
+            $this->vfs->url() . '/src/Entities/Product.php',
+            $this->vfs->url() . '/src/Entities/Customer.php',
+            $this->vfs->url() . '/src/Entities/Metric.php',
+            $this->vfs->url() . '/src/Entities/Order.php',
+            $this->vfs->url() . '/src/Entities/Discount.php',
+            $this->vfs->url() . '/src/Entities/PriceRule.php',
+            $this->vfs->url() . '/src/Entities/Campaign.php',
+            $this->vfs->url() . '/src/Entities/ProductCategory.php',
+            $this->vfs->url() . '/src/Entities/ProductVariant.php',
+            $this->vfs->url() . '/src/Entities/Vendor.php',
+            $this->vfs->url() . '/src/Analytics/Channeled/ChanneledProduct.php',
+            $this->vfs->url() . '/src/Analytics/Channeled/ChanneledCustomer.php',
+            $this->vfs->url() . '/src/Analytics/Channeled/ChanneledMetric.php',
+            $this->vfs->url() . '/src/Analytics/Channeled/ChanneledOrder.php',
+            $this->vfs->url() . '/src/Analytics/Channeled/ChanneledDiscount.php',
+            $this->vfs->url() . '/src/Analytics/Channeled/ChanneledPriceRule.php',
+            $this->vfs->url() . '/src/Analytics/Channeled/ChanneledCampaign.php',
+            $this->vfs->url() . '/src/Analytics/Channeled/ChanneledProductCategory.php',
+            $this->vfs->url() . '/src/Analytics/Channeled/ChanneledProductVariant.php',
+            $this->vfs->url() . '/src/Analytics/Channeled/ChanneledVendor.php'
         ];
         $fileList = $files;
 
@@ -156,8 +156,8 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         $entities = [];
         $channeledClassMap = [];
         $entityDirs = [
-            'general' => vfsStream::url('project/src/Entities'),
-            'channeled' => vfsStream::url('project/src/Analytics/Channeled')
+            'general' => $this->vfs->url() . '/src/Entities',
+            'channeled' => $this->vfs->url() . '/src/Analytics/Channeled'
         ];
 
         foreach ($entityDirs as $type => $dir) {
@@ -187,7 +187,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         }
 
         // Call saveConfig with virtual path
-        $outputFile = vfsStream::url('project/config/yaml/test_entitiesconfig.yaml');
+        $outputFile = $this->vfs->url() . '/config/yaml/test_entitiesconfig.yaml';
         try {
             $saveConfig = new ReflectionMethod($command, 'saveConfig');
             $saveConfig->setAccessible(true);
@@ -203,7 +203,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         }
 
         // Debug config files in vfsStream
-        $configDir = vfsStream::url('project/config/yaml');
+        $configDir = $this->vfs->url() . '/config/yaml';
         $filesInDir = array_diff(scandir($configDir), ['.', '..']);
         if (!empty($filesInDir) && !in_array('test_entitiesconfig.yaml', $filesInDir)) {
             $this->fail("Unexpected files in config/yaml/: " . implode(', ', $filesInDir) . "\nMessages: " . implode(', ', $messages));
@@ -254,15 +254,15 @@ class GenerateEntitiesConfigCommandTest extends TestCase
 
         $entities = [];
         $entityDirs = [
-            'general' => vfsStream::url('project/src/EmptyEntities'),
-            'channeled' => vfsStream::url('project/src/EmptyEntities')
+            'general' => $this->vfs->url() . '/src/EmptyEntities',
+            'channeled' => $this->vfs->url() . '/src/EmptyEntities'
         ];
 
         foreach ($entityDirs as $dir) {
             $this->assertDirectoryExists($dir, "Directory $dir does not exist");
         }
 
-        $outputFile = vfsStream::url('project/config/yaml/test_entitiesconfig.yaml');
+        $outputFile = $this->vfs->url() . '/config/yaml/test_entitiesconfig.yaml';
         $saveConfig = new ReflectionMethod($command, 'saveConfig');
         $saveConfig->setAccessible(true);
         $saveConfig->invoke($command, $entities, $output, $outputFile);
@@ -282,7 +282,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
      */
     public function testExecuteWithInvalidEntityFileSkipsFile(): void
     {
-        $files = [vfsStream::url('project/src/Entities/Invalid.php')];
+        $files = [$this->vfs->url() . '/src/Entities/Invalid.php'];
         $fileList = $files;
 
         $this->assertTrue(file_exists($files[0]), "Virtual file {$files[0]} does not exist");
@@ -291,7 +291,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         $output = $this->createMock(OutputInterface::class);
         $messages = [];
         $expectedMessages = [
-            '<comment>Invalid entity in: ' . vfsStream::url('project/src/Entities/Invalid.php') . '</comment>',
+            '<comment>Invalid entity in: ' . $this->vfs->url() . '/src/Entities/Invalid.php' . '</comment>',
             '<info>Successfully generated config for 0 entities</info>'
         ];
         $callIndex = 0;
@@ -309,8 +309,8 @@ class GenerateEntitiesConfigCommandTest extends TestCase
 
         $entities = [];
         $entityDirs = [
-            'general' => vfsStream::url('project/src/Entities'),
-            'channeled' => vfsStream::url('project/src/Analytics/Channeled')
+            'general' => $this->vfs->url() . '/src/Entities',
+            'channeled' => $this->vfs->url() . '/src/Analytics/Channeled'
         ];
 
         foreach ($entityDirs as $type => $dir) {
@@ -324,7 +324,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
             $this->assertCount($type === 'general' ? 1 : 0, $filteredFiles, "Expected " . ($type === 'general' ? 1 : 0) . " files for $type");
         }
 
-        $outputFile = vfsStream::url('project/config/yaml/test_entitiesconfig.yaml');
+        $outputFile = $this->vfs->url() . '/config/yaml/test_entitiesconfig.yaml';
         $saveConfig->setAccessible(true);
         $saveConfig->invoke($command, $entities, $output, $outputFile);
 
@@ -343,22 +343,22 @@ class GenerateEntitiesConfigCommandTest extends TestCase
      */
     public function testFindPhpFilesYieldsPhpFiles(): void
     {
-        $dir = vfsStream::url('project/src/Entities');
+        $dir = $this->vfs->url() . '/src/Entities';
         $reflection = new ReflectionMethod($this->command, 'findPhpFiles');
         $generator = $reflection->invoke($this->command, $dir);
         $result = iterator_to_array($generator);
         $expected = [
-            vfsStream::url('project/src/Entities/Campaign.php'),
-            vfsStream::url('project/src/Entities/Customer.php'),
-            vfsStream::url('project/src/Entities/Discount.php'),
-            vfsStream::url('project/src/Entities/Invalid.php'),
-            vfsStream::url('project/src/Entities/Metric.php'),
-            vfsStream::url('project/src/Entities/Order.php'),
-            vfsStream::url('project/src/Entities/PriceRule.php'),
-            vfsStream::url('project/src/Entities/Product.php'),
-            vfsStream::url('project/src/Entities/ProductCategory.php'),
-            vfsStream::url('project/src/Entities/ProductVariant.php'),
-            vfsStream::url('project/src/Entities/Vendor.php')
+            $this->vfs->url() . '/src/Entities/Campaign.php',
+            $this->vfs->url() . '/src/Entities/Customer.php',
+            $this->vfs->url() . '/src/Entities/Discount.php',
+            $this->vfs->url() . '/src/Entities/Invalid.php',
+            $this->vfs->url() . '/src/Entities/Metric.php',
+            $this->vfs->url() . '/src/Entities/Order.php',
+            $this->vfs->url() . '/src/Entities/PriceRule.php',
+            $this->vfs->url() . '/src/Entities/Product.php',
+            $this->vfs->url() . '/src/Entities/ProductCategory.php',
+            $this->vfs->url() . '/src/Entities/ProductVariant.php',
+            $this->vfs->url() . '/src/Entities/Vendor.php'
         ];
         $result = array_map(fn($path) => str_replace('\\', '/', $path), $result);
         $expected = array_map(fn($path) => str_replace('\\', '/', $path), $expected);
@@ -372,7 +372,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
      */
     public function testProcessEntityFileReturnsConfigForValidEntity(): void
     {
-        $file = vfsStream::url('project/src/Entities/Product.php');
+        $file = $this->vfs->url() . '/src/Entities/Product.php';
         $type = 'general';
         $output = $this->createMock(OutputInterface::class);
 

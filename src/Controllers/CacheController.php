@@ -46,7 +46,7 @@ class CacheController extends BaseController
         }
 
         $requestsClassName = $this->getEntityRequestsClassName($entity);
-        if (method_exists($requestsClassName, 'supportedChannels') && !in_array($channelEnum->value, $requestsClassName::supportedChannels(), true)) {
+        if (method_exists($requestsClassName, 'supportedChannels') && !in_array($channelEnum, $requestsClassName::supportedChannels(), true)) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -66,23 +66,55 @@ class CacheController extends BaseController
     /**
      * @param array|null $params
      * @param string|null $body
+     * @param string $className
+     * @param string $methodName
      * @return array
+     * @throws ReflectionException
      */
-    protected function prepareAnalyticsParams(?array $params, ?string $body): array
+    protected function prepareAnalyticsParams(?array $params, ?string $body, string $className, string $methodName): array
     {
-        $parameters = $body ? json_decode($body, true) : null;
-        if (isset($parameters['filters'])) {
-            $parameters['filters'] = (object) $parameters['filters'];
+        $bodyData = (array) Helpers::bodyToObject(data: $body);
+        $queryParams = $params ?? [];
+
+        // Correctly handle 'filters' if it's explicitly provided in the body
+        if (isset($bodyData['filters']) && is_array($bodyData['filters'])) {
+            $bodyData['filters'] = (object) $bodyData['filters'];
         }
 
-        if (!$params) {
-            $params = [];
-        }
-        foreach ($params as $key => $value) {
-            $parameters[$key] = $value;
+        // Combine body data and query params
+        $allInputs = array_merge($bodyData, $queryParams);
+
+        // Use Reflection to only pass parameters that the method expects
+        $reflection = new \ReflectionMethod($className, $methodName);
+        $methodParams = $reflection->getParameters();
+        
+        $finalParams = [];
+        $extraParams = [];
+
+        foreach ($allInputs as $key => $value) {
+            $isKnownParam = false;
+            foreach ($methodParams as $methodParam) {
+                if ($methodParam->getName() === $key) {
+                    $finalParams[$key] = $value;
+                    $isKnownParam = true;
+                    break;
+                }
+            }
+            if (!$isKnownParam) {
+                $extraParams[$key] = $value;
+            }
         }
 
-        return $parameters ?: [];
+        // If the method expects 'filters', put all unknown inputs there
+        foreach ($methodParams as $methodParam) {
+            if ($methodParam->getName() === 'filters') {
+                $currentFilters = (array) ($finalParams['filters'] ?? []);
+                $finalParams['filters'] = (object) array_merge($currentFilters, $extraParams);
+                break;
+            }
+        }
+
+        return $finalParams;
     }
 
     /**
@@ -159,7 +191,7 @@ class CacheController extends BaseController
                 );
             }
 
-            $parameters = $this->prepareAnalyticsParams($params, $body);
+            $parameters = $this->prepareAnalyticsParams($params, $body, $requestsClassName, $methodName);
 
             /* if (!$this->validateParams(array_keys($parameters), $requestsClassName, $methodName)) {
                 return $this->createResponse(

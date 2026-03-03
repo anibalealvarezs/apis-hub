@@ -83,16 +83,15 @@ class JobRepositoryTest extends TestCase
                 return JobStatus::from($status)->getName();
             });
         $this->repository->method('create')
-            ->willReturnCallback(function ($data, $returnEntity = false) {
+            ->willReturnCallback(function (?stdClass $data = null, bool $returnEntity = false) {
+                /** @var stdClass $data */
                 error_log("Mocked create with data=" . json_encode($data));
                 if (!isset($data->entity) || !$data->entity) {
                     throw new InvalidArgumentException('Entity is required');
                 }
-                error_log("Checking analyticsEntitiesEnum->getConstant with value={$data->entity}");
                 if (!$this->analyticsEntitiesEnum->getConstant($data->entity)) {
                     throw new InvalidArgumentException('Invalid entity');
                 }
-                error_log("Checking channelsEnum->getConstant with value={$data->channel}");
                 if (!isset($data->channel) || !$this->channelsEnum->getConstant($data->channel)) {
                     throw new InvalidArgumentException('Invalid channel');
                 }
@@ -102,7 +101,8 @@ class JobRepositoryTest extends TestCase
                 return ['id' => 1, 'uuid' => $data->uuid];
             });
         $this->repository->method('update')
-            ->willReturnCallback(function ($id, $data = null) {
+            ->willReturnCallback(function ($id, ?stdClass $data = null) {
+                /** @var stdClass $data */
                 error_log("Mocked update with id=$id, data=" . json_encode($data));
                 if (!isset($data->status) || !$data->status) {
                     return ['id' => $id];
@@ -263,7 +263,7 @@ class JobRepositoryTest extends TestCase
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(3))
             ->method('setParameter')
-            ->with($this->callback(function ($key) use (&$setParameterCallCount, $ids, $filters) {
+            ->with($this->callback(function ($key) use (&$setParameterCallCount, $ids) {
                 error_log("testBuildReadMultipleQuery: setParameter call #$setParameterCallCount with key=" . json_encode($key));
                 $expected = $setParameterCallCount === 0 ? ['ids', $ids] : (
                 $setParameterCallCount === 1 ? ['status', JobStatus::scheduled->value] : ['entity', 'order']

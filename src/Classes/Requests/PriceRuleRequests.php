@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Classes\Requests;
 
 use Classes\Conversions\ShopifyConvert;
@@ -7,7 +9,6 @@ use Classes\Overrides\ShopifyApi\ShopifyApi;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
@@ -16,6 +17,11 @@ use Entities\Analytics\Channeled\ChanneledPriceRule;
 use Entities\Analytics\Discount;
 use Entities\Analytics\PriceRule;
 use Enums\Channel;
+use Repositories\BaseRepository;
+use Repositories\Channeled\ChanneledDiscountRepository;
+use Repositories\Channeled\ChanneledPriceRuleRepository;
+use Repositories\DiscountRepository;
+use Repositories\PriceRuleRepository;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -25,15 +31,15 @@ use Symfony\Component\HttpFoundation\Response;
 class PriceRuleRequests implements RequestInterface
 {
     /**
-     * @return Channel[]
+     * @return \Enums\Channel[]
      */
     public static function supportedChannels(): array
     {
         return [
-            Channel::shopify->value,
-            Channel::bigcommerce->value,
-            Channel::netsuite->value,
-            Channel::amazon->value,
+            Channel::shopify,
+            Channel::bigcommerce,
+            Channel::netsuite,
+            Channel::amazon,
         ];
     }
 
@@ -48,8 +54,12 @@ class PriceRuleRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromShopify(string $createdAtMin = null, string $createdAtMax = null, object $filters = null, string|bool $resume = true): Response
-    {
+    public static function getListFromShopify(
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?object $filters = null,
+        string|bool $resume = true
+    ): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -58,6 +68,7 @@ class PriceRuleRequests implements RequestInterface
         );
 
         $manager = Helpers::getManager();
+        /** @var ChanneledPriceRuleRepository $channeledPriceRuleRepository */
         $channeledPriceRuleRepository = $manager->getRepository(entityName: ChanneledPriceRule::class);
         $lastChanneledPriceRule = $channeledPriceRuleRepository->getLastByPlatformId(channel: Channel::shopify->value);
 
@@ -225,35 +236,41 @@ class PriceRuleRequests implements RequestInterface
 
     /**
      * @param object $priceRule
-     * @param EntityRepository $repository
+     * @param PriceRuleRepository $repository
      * @return PriceRule
      */
-    private static function getOrCreatePriceRule(object $priceRule, EntityRepository $repository): PriceRule
+    private static function getOrCreatePriceRule(object $priceRule, PriceRuleRepository $repository): PriceRule
     {
-        return $repository->create(
+        /** @var PriceRule $entity */
+        $entity = $repository->create(
             data: (object) ['priceRuleId' => $priceRule->platformId],
             returnEntity: true
         );
+
+        return $entity;
     }
 
     /**
      * @param object $channeledPriceRule
-     * @param EntityRepository $repository
+     * @param ChanneledPriceRuleRepository $repository
      * @return ChanneledPriceRule
      */
-    private static function getOrCreateChanneledPriceRule(object $channeledPriceRule, EntityRepository $repository): ChanneledPriceRule
+    private static function getOrCreateChanneledPriceRule(object $channeledPriceRule, ChanneledPriceRuleRepository $repository): ChanneledPriceRule
     {
-        return $repository->create(
+        /** @var ChanneledPriceRule $entity */
+        $entity = $repository->create(
             data: $channeledPriceRule,
             returnEntity: true
         );
+
+        return $entity;
     }
 
     /**
      * @param object $channeledPriceRule
      * @param ChanneledPriceRule $channeledPriceRuleEntity
-     * @param EntityRepository $discountRepository
-     * @param EntityRepository $channeledDiscountRepository
+     * @param DiscountRepository $discountRepository
+     * @param ChanneledDiscountRepository $channeledDiscountRepository
      * @param EntityManager $manager
      * @return array
      * @throws GuzzleException
@@ -261,8 +278,8 @@ class PriceRuleRequests implements RequestInterface
     private static function processShopifyDiscountCodes(
         object $channeledPriceRule,
         ChanneledPriceRule $channeledPriceRuleEntity,
-        EntityRepository $discountRepository,
-        EntityRepository $channeledDiscountRepository,
+        DiscountRepository $discountRepository,
+        ChanneledDiscountRepository $channeledDiscountRepository,
         EntityManager $manager
     ): array {
         if ($channeledPriceRule->channel !== Channel::shopify->value) {
@@ -303,8 +320,8 @@ class PriceRuleRequests implements RequestInterface
     /**
      * @param ArrayCollection $channeledCollection
      * @param ChanneledPriceRule $channeledPriceRuleEntity
-     * @param EntityRepository $discountRepository
-     * @param EntityRepository $channeledDiscountRepository
+     * @param DiscountRepository $discountRepository
+     * @param ChanneledDiscountRepository $channeledDiscountRepository
      * @param EntityManager $manager
      * @return array
      * @throws ORMException
@@ -313,8 +330,8 @@ class PriceRuleRequests implements RequestInterface
     private static function processDiscounts(
         ArrayCollection $channeledCollection,
         ChanneledPriceRule $channeledPriceRuleEntity,
-        EntityRepository $discountRepository,
-        EntityRepository $channeledDiscountRepository,
+        DiscountRepository $discountRepository,
+        ChanneledDiscountRepository $channeledDiscountRepository,
         EntityManager $manager
     ): array {
         $discountCodes = [];
@@ -356,30 +373,36 @@ class PriceRuleRequests implements RequestInterface
 
     /**
      * @param object $channeledDiscount
-     * @param EntityRepository $repository
+     * @param DiscountRepository $repository
      * @return Discount
      */
-    private static function getOrCreateDiscount(object $channeledDiscount, EntityRepository $repository): Discount
+    private static function getOrCreateDiscount(object $channeledDiscount, DiscountRepository $repository): Discount
     {
-        return $repository->getByCode(code: $channeledDiscount->code)
+        /** @var Discount $entity */
+        $entity = $repository->getByCode(code: $channeledDiscount->code)
             ?? $repository->create(
                 data: (object) ['code' => $channeledDiscount->code],
                 returnEntity: true
             );
+
+        return $entity;
     }
 
     /**
      * @param object $channeledDiscount
-     * @param EntityRepository $repository
+     * @param ChanneledDiscountRepository $repository
      * @return ChanneledDiscount
      */
-    private static function getOrCreateChanneledDiscount(object $channeledDiscount, EntityRepository $repository): ChanneledDiscount
+    private static function getOrCreateChanneledDiscount(object $channeledDiscount, ChanneledDiscountRepository $repository): ChanneledDiscount
     {
-        return $repository->getByCode(code: $channeledDiscount->code, channel: $channeledDiscount->channel)
+        /** @var ChanneledDiscount $entity */
+        $entity = $repository->getByCode(code: $channeledDiscount->code, channel: $channeledDiscount->channel)
             ?? $repository->create(
                 data: $channeledDiscount,
                 returnEntity: true
             );
+
+        return $entity;
     }
 
     /**

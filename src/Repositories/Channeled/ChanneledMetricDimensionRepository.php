@@ -14,7 +14,7 @@ use Enums\QueryBuilderType;
 use Exception;
 use InvalidArgumentException;
 use Repositories\BaseRepository;
-use stdClass;
+
 
 class ChanneledMetricDimensionRepository extends BaseRepository
 {
@@ -37,33 +37,29 @@ class ChanneledMetricDimensionRepository extends BaseRepository
             ->leftJoin('e.channeledMetric', 'd');
     }
 
-    /**
-     * @param stdClass|null $data
-     * @param bool $returnEntity
-     * @return Entity|array|null
-     * @throws Exception
-     */
+
     /**
      * Create a new ChanneledMetricDimension from data.
      *
-     * @param stdClass|null $data
+     * @param object{dimensionKey: string, dimensionValue: string, channeledMetric: ChanneledMetric}|null $data
      * @param bool $returnEntity
-     * @return ChanneledMetricDimension|array|null
+     * @return Entity|array|null
      * @throws InvalidArgumentException
      * @throws ORMException
      */
-    public function create(?stdClass $data = null, bool $returnEntity = false): Entity|array|null
+    public function create(?object $data = null, bool $returnEntity = false): Entity|array|null
     {
-        if (!$data || !isset($data->dimensionKey) || !isset($data->dimensionValue) || !isset($data->channeledMetric)) {
+        $data = (array) ($data ?? []);
+        if (!isset($data['dimensionKey']) || !isset($data['dimensionValue']) || !isset($data['channeledMetric'])) {
             throw new InvalidArgumentException("dimensionKey, dimensionValue, and channeledMetric are required");
         }
 
         $entity = new ChanneledMetricDimension();
 
         // Explicitly set properties
-        $entity->addDimensionKey($data->dimensionKey)
-            ->addDimensionValue($data->dimensionValue)
-            ->addChanneledMetric($data->channeledMetric);
+        $entity->addDimensionKey($data['dimensionKey'])
+            ->addDimensionValue($data['dimensionValue'])
+            ->addChanneledMetric($data['channeledMetric']);
 
         // Fallback for createdAt/updatedAt
         $now = new DateTime('now');
@@ -71,8 +67,8 @@ class ChanneledMetricDimensionRepository extends BaseRepository
         $entity->addUpdatedAt($now);
 
         // Ensure channeledMetric is managed
-        if (!$this->_em->contains($data->channeledMetric)) {
-            $this->_em->persist($data->channeledMetric);
+        if (!$this->_em->contains($data['channeledMetric'])) {
+            $this->_em->persist($data['channeledMetric']);
         }
 
         $this->_em->persist($entity);

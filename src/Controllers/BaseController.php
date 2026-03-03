@@ -55,6 +55,18 @@ abstract class BaseController
      * @throws NotSupported
      * @throws Exception
      */
+    /**
+     * Top-level parameters for repository methods.
+     * Anything not in this list will be treated as a filter.
+     */
+    protected const CRUD_TOP_LEVEL_PARAMS = [
+        'limit', 'pagination', 'ids', 'filters', 'orderBy', 'orderDir'
+    ];
+
+    /**
+     * @throws NotSupported
+     * @throws Exception
+     */
     protected function getRepository(string $entity, string $configKey = 'class'): object
     {
         $config = Helpers::getEntitiesConfig();
@@ -65,5 +77,31 @@ abstract class BaseController
         return $this->em->getRepository(
             entityName: $config[$entityKey][$configKey]
         );
+    }
+
+    /**
+     * @param array|null $params
+     * @param string|null $body
+     * @return array
+     */
+    protected function prepareCrudParams(?array $params, ?string $body): array
+    {
+        $params = $params ?? [];
+        $bodyData = (array) Helpers::bodyToObject(data: $body);
+
+        $finalParams = [];
+        $filters = (array) ($bodyData['filters'] ?? $bodyData);
+
+        foreach ($params as $key => $value) {
+            if (in_array($key, self::CRUD_TOP_LEVEL_PARAMS)) {
+                $finalParams[$key] = $value;
+            } else {
+                $filters[$key] = $value;
+            }
+        }
+
+        $finalParams['filters'] = (object) $filters;
+
+        return $finalParams;
     }
 }

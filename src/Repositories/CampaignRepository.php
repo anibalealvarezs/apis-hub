@@ -9,8 +9,6 @@ use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\Channel;
 use Enums\QueryBuilderType;
-use stdClass;
-
 class CampaignRepository extends BaseRepository
 {
     /**
@@ -23,6 +21,7 @@ class CampaignRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => null,
         };
 
         return $query->addSelect('c')
@@ -32,18 +31,25 @@ class CampaignRepository extends BaseRepository
             ->leftJoin('e.channeledAdGroups', 'ag');
     }
 
-    public function create(stdClass $data = null, bool $returnEntity = false): array|Entity|null
+    /**
+     * @param object|null $data
+     * @phpstan-param object{campaignId?: string, name?: string}|null $data
+     * @param bool $returnEntity
+     * @return array|Entity|null
+     */
+    public function create(?object $data = null, bool $returnEntity = false): array|Entity|null
     {
-        if (!$data || !isset($data->campaignId)) {
+        $data = (array) ($data ?? []);
+        if (empty($data['campaignId'])) {
             return null; // Or throw \InvalidArgumentException
         }
-        $data->name = $data->name ?? 'Unnamed Campaign';
-        return parent::create($data, $returnEntity);
+        $data['name'] = $data['name'] ?? 'Unnamed Campaign';
+        return parent::create((object) $data, $returnEntity);
     }
 
     /**
      * @param string $campaignId
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByEmail(string $campaignId /*, bool $useCached = false */): ?Entity
@@ -56,7 +62,7 @@ class CampaignRepository extends BaseRepository
     }
 
     /**
-     * @param string $email
+     * @param string $campaignId
      * @return bool
      * @throws NonUniqueResultException
      * @throws NoResultException

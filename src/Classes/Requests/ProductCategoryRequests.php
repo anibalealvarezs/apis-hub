@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Classes\Requests;
 
 use Classes\Conversions\NetSuiteConvert;
@@ -9,7 +11,6 @@ use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
@@ -17,6 +18,9 @@ use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductCategory;
 use Entities\Analytics\ProductCategory;
 use Enums\Channel;
+use Repositories\Channeled\ChanneledProductCategoryRepository;
+use Repositories\Channeled\ChanneledProductRepository;
+use Repositories\ProductCategoryRepository;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -26,16 +30,16 @@ use Symfony\Component\HttpFoundation\Response;
 class ProductCategoryRequests implements RequestInterface
 {
     /**
-     * @return Channel[]
+     * @return \Enums\Channel[]
      */
     public static function supportedChannels(): array
     {
         return [
-            Channel::shopify->value,
-            Channel::klaviyo->value,
-            Channel::bigcommerce->value,
-            Channel::netsuite->value,
-            Channel::amazon->value,
+            Channel::shopify,
+            Channel::klaviyo,
+            Channel::bigcommerce,
+            Channel::netsuite,
+            Channel::amazon,
         ];
     }
 
@@ -51,8 +55,13 @@ class ProductCategoryRequests implements RequestInterface
      * @throws ORMException
      * @throws OptimisticLockException
      */
-    public static function getListFromShopify(string $publishedAtMin = null, string $publishedAtMax = null, array $fields = null, object $filters = null, string|bool $resume = true): Response
-    {
+    public static function getListFromShopify(
+        ?string $publishedAtMin = null,
+        ?string $publishedAtMax = null,
+        ?array $fields = null,
+        ?object $filters = null,
+        string|bool $resume = true
+    ): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -137,6 +146,7 @@ class ProductCategoryRequests implements RequestInterface
         );
 
         $manager = Helpers::getManager();
+        /** @var ChanneledProductCategoryRepository $channeledProductCategoryRepository */
         $channeledProductCategoryRepository = $manager->getRepository(entityName: ChanneledProductCategory::class);
         $lastChanneledProductCategory = $channeledProductCategoryRepository->getLastByPlatformId(channel: Channel::netsuite->value);
 
@@ -265,12 +275,13 @@ class ProductCategoryRequests implements RequestInterface
 
     /**
      * @param object $productCategory
-     * @param EntityRepository $repository
+     * @param ProductCategoryRepository $repository
      * @return ProductCategory
      */
-    private static function getOrCreateProductCategory(object $productCategory, EntityRepository $repository): ProductCategory
+    private static function getOrCreateProductCategory(object $productCategory, ProductCategoryRepository $repository): ProductCategory
     {
-        return $repository->getByProductCategoryId(productCategoryId: $productCategory->platformId)
+        /** @var ProductCategory $entity */
+        $entity = $repository->getByProductCategoryId(productCategoryId: $productCategory->platformId)
             ?? $repository->create(
                 data: (object) [
                     'productCategoryId' => $productCategory->platformId,
@@ -278,20 +289,25 @@ class ProductCategoryRequests implements RequestInterface
                 ],
                 returnEntity: true
             );
+
+        return $entity;
     }
 
     /**
      * @param object $productCategory
-     * @param EntityRepository $repository
+     * @param ChanneledProductCategoryRepository $repository
      * @return ChanneledProductCategory
      */
-    private static function getOrCreateChanneledProductCategory(object $productCategory, EntityRepository $repository): ChanneledProductCategory
+    private static function getOrCreateChanneledProductCategory(object $productCategory, ChanneledProductCategoryRepository $repository): ChanneledProductCategory
     {
-        return $repository->getByPlatformId(platformId: $productCategory->platformId, channel: $productCategory->channel)
+        /** @var ChanneledProductCategory $entity */
+        $entity = $repository->getByPlatformId(platformId: $productCategory->platformId, channel: $productCategory->channel)
             ?? $repository->create(
                 data: $productCategory,
                 returnEntity: true
             );
+
+        return $entity;
     }
 
     /**
@@ -313,8 +329,8 @@ class ProductCategoryRequests implements RequestInterface
     /**
      * @param array $productIds
      * @param ChanneledProductCategory $channeledProductCategoryEntity
-     * @param string $channel
-     * @param EntityRepository $repository
+     * @param int $channel
+     * @param ChanneledProductRepository $repository
      * @param EntityManager $manager
      * @return array
      * @throws ORMException
@@ -323,13 +339,14 @@ class ProductCategoryRequests implements RequestInterface
     private static function processCollects(
         array $productIds,
         ChanneledProductCategory $channeledProductCategoryEntity,
-        string $channel,
-        EntityRepository $repository,
+        int $channel,
+        ChanneledProductRepository $repository,
         EntityManager $manager
     ): array {
         $collectedProductIds = [];
 
         foreach ($productIds as $productId) {
+            /** @var ChanneledProduct $channeledProductEntity */
             $channeledProductEntity = $repository->getByPlatformId(platformId: $productId, channel: $channel)
                 ?? $repository->create(
                     data: (object) [

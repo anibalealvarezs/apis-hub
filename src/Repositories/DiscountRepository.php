@@ -23,6 +23,7 @@ class DiscountRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => null,
         };
 
         return $query->addSelect('d')
@@ -45,7 +46,7 @@ class DiscountRepository extends BaseRepository
 
     /**
      * @param string $code
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByCode(string $code): ?Entity

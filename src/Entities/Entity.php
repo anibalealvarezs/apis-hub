@@ -7,6 +7,8 @@ namespace Entities;
 use DateTime;
 use Doctrine\ORM\Mapping as ORM;
 
+#[ORM\MappedSuperclass]
+#[ORM\HasLifecycleCallbacks]
 class Entity
 {
     #[ORM\Id, ORM\Column(type: 'integer'), ORM\GeneratedValue]

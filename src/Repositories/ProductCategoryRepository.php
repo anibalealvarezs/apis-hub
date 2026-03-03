@@ -22,6 +22,7 @@ class ProductCategoryRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => null,
         };
 
         return $query->addSelect('p')
@@ -40,7 +41,7 @@ class ProductCategoryRepository extends BaseRepository
 
     /**
      * @param string $productCategoryId
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByProductCategoryId(string $productCategoryId): ?Entity

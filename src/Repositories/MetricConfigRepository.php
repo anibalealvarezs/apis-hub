@@ -20,12 +20,10 @@ use Enums\QueryBuilderType;
 use Exception;
 use Helpers\Helpers;
 use ReflectionException;
-use stdClass;
-
 class MetricConfigRepository extends BaseRepository
 {
     /**
-     * @param stdClass|null $data
+     * @param object|null $data
      * @param bool $returnEntity
      * @return Entity|array|null
      * @throws MappingException
@@ -33,7 +31,7 @@ class MetricConfigRepository extends BaseRepository
      * @throws ReflectionException
      * @throws OptimisticLockException
      */
-    public function create(stdClass $data = null, bool $returnEntity = false): Entity|array|null
+    public function create(?object $data = null, bool $returnEntity = false): Entity|array|null
     {
         $retryCount = 0;
         $maxRetries = 3;
@@ -43,12 +41,12 @@ class MetricConfigRepository extends BaseRepository
                 $entity = new $entityName();
 
                 if ((array) $data) {
-                    foreach ($data as $key => $value) {
+                    foreach ((array) $data as $key => $value) {
                         $setter = 'add' . Helpers::toCamelcase($key, true);
                         if (method_exists($entity, $setter)) {
                             // Special handling for 'page' to prevent unmanaged entities
                             if ($key === 'page' && $value instanceof Page && !$value->getId()) {
-                                error_log("BaseRepository::create: Skipping unmanaged Page entity for {$entityName}: key={$key}, url=" . ($value->getUrl() ?? 'unknown'));
+                                error_log("BaseRepository::create: Skipping unmanaged Page entity for {$entityName}: key={$key}, url=" . $value->getUrl());
                                 continue; // Skip setting unmanaged Page
                             }
                             $entity->$setter($value);
@@ -220,7 +218,7 @@ class MetricConfigRepository extends BaseRepository
 
             if ($page) {
                 if (!$page->getId()) {
-                    error_log("MetricRepository::findByChannelAndDimensions: Unmanaged Page: url=" . ($page->getUrl() ?? 'unknown') . ", trace=" . (new \Exception())->getTraceAsString());
+                    error_log("MetricRepository::findByChannelAndDimensions: Unmanaged Page: url=" . $page->getUrl() . ", trace=" . (new Exception())->getTraceAsString());
                     return null; // Skip query if page is unmanaged
                 }
                 $qb->andWhere('e.page = :page')
@@ -266,7 +264,7 @@ class MetricConfigRepository extends BaseRepository
             $result = $query->getOneOrNullResult();
 
             if ($result && $result->getPage() && !$result->getPage()->getId()) {
-                error_log("MetricRepository::findByChannelAndDimensions: Returned Metric with unmanaged Page: url=" . ($result->getPage()->getUrl() ?? 'unknown') . ", trace=" . (new \Exception())->getTraceAsString());
+                error_log("MetricRepository::findByChannelAndDimensions: Returned Metric with unmanaged Page: url=" . $result->getPage()->getUrl() . ", trace=" . (new Exception())->getTraceAsString());
                 return null; // Invalidate result
             }
 

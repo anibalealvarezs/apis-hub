@@ -572,7 +572,7 @@ class MetricsProcessor
 
             $reFetchSql = "SELECT id, " . implode(', ', $fields) . "
                             FROM metric_configs
-                            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
+                            WHERE " . implode(' OR ', $conditions);
 
             $newMetricConfigs = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
 
@@ -625,6 +625,7 @@ class MetricsProcessor
 
         // Extract metrics from $metrics
         $uniqueMetrics = [];
+        /** @var \stdClass&object{dimensions: array, metricConfigKey: string, value: float|int, metadata?: array} $metric */
         foreach ($metrics->toArray() as $metric) {
             $dimensions = array_map(function($dimension){
                 return [ 'dimensionKey' => $dimension['dimensionKey'], 'dimensionValue' => $dimension['dimensionValue'] ];
@@ -733,7 +734,7 @@ class MetricsProcessor
 
             $reFetchSql = "SELECT id, " . implode(', ', $fields) . "
                             FROM metrics
-                            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
+                            WHERE " . implode(' OR ', $conditions);
 
             $newMetrics = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
 
@@ -777,6 +778,7 @@ class MetricsProcessor
         // Helpers::dumpDebugJson($metrics->toArray());
 
         $uniqueChanneledMetrics = [];
+        /** @var \stdClass&object{dimensionsHash: string, metricConfigKey: string, channel: string, platformId: string, platformCreatedAt: string|\DateTime, data?: array} $metric */
         foreach ($metrics->toArray() as $metric) {
             $metricKey = KeyGenerator::generateMetricKey(
                 dimensionsHash: $metric->dimensionsHash,
@@ -1003,6 +1005,7 @@ class MetricsProcessor
         // Extract dimensions from metrics
         
         $uniqueDimensions = [];
+        /** @var \stdClass&object{dimensions: array, dimensionsHash: string, metricConfigKey: string, channel: string, platformId: string, platformCreatedAt: string|\DateTime} $metric */
         foreach ($metrics->toArray() as $metric) {
             $dimensions = $metric->dimensions;
             foreach ($dimensions as $dimension) {

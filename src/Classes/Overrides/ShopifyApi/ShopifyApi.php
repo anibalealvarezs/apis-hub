@@ -17,7 +17,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
      * @param array|null $fields
      * @param array|null $ids
      * @param int|null $limit
-     * @param int|null $sinceId
+     * @param int|string|null $sinceId
      * @param string|null $updatedAtMin
      * @param string|null $updatedAtMax
      * @param string|null $pageInfo
@@ -32,7 +32,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
         ?array $fields = null,
         ?array $ids = null,
         ?int $limit = 250, // Max: 250,
-        ?int $sinceId = null,
+        int|string|null $sinceId = null,
         ?string $updatedAtMin = null,
         ?string $updatedAtMax = null,
         ?string $pageInfo = null,
@@ -72,7 +72,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
      * @param int|null $limit
      * @param string|null $processedAtMin
      * @param string|null $processedAtMax
-     * @param int|null $sinceId
+     * @param int|string|null $sinceId
      * @param Status|null $status
      * @param string|null $updatedAtMin
      * @param string|null $updatedAtMax
@@ -92,7 +92,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
         ?int $limit = 250, // Max: 250,
         ?string $processedAtMin = null,
         ?string $processedAtMax = null,
-        ?int $sinceId = null,
+        int|string|null $sinceId = null,
         ?Status $status = Status::any,
         ?string $updatedAtMin = null,
         ?string $updatedAtMax = null,
@@ -134,7 +134,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
      * @param string|null $endsAtMin
      * @param string|null $endsAtMax
      * @param int|null $limit
-     * @param int|null $sinceId
+     * @param int|string|null $sinceId
      * @param string|null $startsAtMin
      * @param string|null $startsAtMax
      * @param int|null $timesUsed
@@ -152,7 +152,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
         ?string $endsAtMin = null,
         ?string $endsAtMax = null,
         ?int $limit = 250, // Max: 250,
-        ?int $sinceId = null,
+        int|string|null $sinceId = null,
         ?string $startsAtMin = null,
         ?string $startsAtMax = null,
         ?int $timesUsed = null,
@@ -189,7 +189,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
     }
 
     /**
-     * @param int|null $priceRuleId
+     * @param int|string|null $priceRuleId
      * @param int|null $limit
      * @param string|null $pageInfo
      * @param callable|null $callback
@@ -197,7 +197,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
      * @throws GuzzleException
      */
     public function getAllDiscountCodesAndProcess(
-        ?int $priceRuleId,
+        int|string|null $priceRuleId,
         ?int $limit = 250, // Max: 250,
         ?string $pageInfo = null,
         callable $callback = null,
@@ -219,7 +219,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
     }
 
     /**
-     * @param string|null $collectionId
+     * @param string|int|null $collectionId
      * @param string|null $createdAtMin
      * @param string|null $createdAtMax
      * @param array|null $fields
@@ -230,7 +230,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
      * @param string|null $productType
      * @param string|null $publishedAtMin
      * @param string|null $publishedAtMax
-     * @param int|null $sinceId
+     * @param int|string|null $sinceId
      * @param PublishedStatus|null $status
      * @param string|null $title
      * @param string|null $updatedAtMin
@@ -243,7 +243,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
      * @throws GuzzleException
      */
     public function getAllProductsAndProcess(
-        ?string $collectionId = null,
+        string|int|null $collectionId = null,
         ?string $createdAtMin = null,
         ?string $createdAtMax = null,
         ?array $fields = null,
@@ -254,7 +254,7 @@ class ShopifyApi extends \Anibalealvarezs\ShopifyApi\ShopifyApi
         ?string $productType = null,
         ?string $publishedAtMin = null,
         ?string $publishedAtMax = null,
-        ?int $sinceId = null,
+        int|string|null $sinceId = null,
         ?PublishedStatus $status = null,
         ?string $title = null,
         ?string $updatedAtMin = null,

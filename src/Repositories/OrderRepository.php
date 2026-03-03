@@ -23,6 +23,7 @@ class OrderRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => null,
         };
 
         return $query->addSelect('o')
@@ -47,7 +48,7 @@ class OrderRepository extends BaseRepository
 
     /**
      * @param string $orderId
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByOrderId(string $orderId): ?Entity
@@ -75,8 +76,8 @@ class OrderRepository extends BaseRepository
     }
 
     /**
-     * @param mixed $entity
-     * @return mixed
+     * @param array $entity
+     * @return array
      */
     protected function replaceChannelName(array $entity): array
     {

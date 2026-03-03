@@ -37,7 +37,7 @@ class CacheService
     {
         $cached = $this->redisClient->get($key);
         if ($cached !== null) {
-            $value = unserialize($cached, ['allowed_classes' => false]);
+            $value = @unserialize($cached, ['allowed_classes' => false]);
             if ($value !== false && !($value instanceof __PHP_Incomplete_Class)) {
                 return $value;
             }
@@ -103,7 +103,7 @@ class CacheService
      * @param string|null $channel Optional channel for channeled entities
      * @return void
      */
-    public function invalidateMultipleEntities(array $entities, ?string $channel = null): void
+    public function invalidateMultipleEntities(array $entities, string|int|null $channel = null): void
     {
         $cacheKeyGenerator = new CacheKeyGenerator();
         $entitiesConfig = Helpers::getEntitiesConfig();
@@ -172,7 +172,7 @@ class CacheService
      * @param string|null $channel Optional channel for channeled entities
      * @return bool
      */
-    public function invalidateEntityCache(string $entity, ?array $ids = null, bool $includeListAndCount = true, ?string $channel = null): bool
+    public function invalidateEntityCache(string $entity, ?array $ids = null, bool $includeListAndCount = true, string|int|null $channel = null): bool
     {
         try {
             $cacheKeyGenerator = new CacheKeyGenerator();

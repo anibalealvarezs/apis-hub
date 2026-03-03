@@ -101,7 +101,7 @@ class CrudControllerTest extends TestCase
         $this->cacheService->expects($this->once())
             ->method('get')
             ->with($cacheKey, $this->anything(), $this->anything())
-            ->willReturnCallback(function ($key, $callback) use ($data) {
+            ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
 
@@ -229,7 +229,7 @@ class CrudControllerTest extends TestCase
         $this->cacheService->expects($this->once())
             ->method('get')
             ->with($cacheKey, $this->anything(), $this->anything())
-            ->willReturnCallback(function ($key, $callback) use ($data) {
+            ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
 
@@ -281,7 +281,7 @@ class CrudControllerTest extends TestCase
         $this->cacheService->expects($this->once())
             ->method('get')
             ->with($cacheKey, $this->anything(), $this->anything())
-            ->willReturnCallback(function ($key, $callback) use ($exceptionMessage) {
+            ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
 
@@ -380,7 +380,7 @@ class CrudControllerTest extends TestCase
         $this->cacheService->expects($this->once())
             ->method('get')
             ->with($cacheKey, $this->anything(), $this->anything())
-            ->willReturnCallback(function ($key, $callback) use ($data) {
+            ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
 

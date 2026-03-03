@@ -18,7 +18,7 @@ class ChanneledPriceRule extends ChanneledEntity
 {
     // Relationships with channeled entities
 
-    #[ORM\OneToMany(mappedBy: 'channeledPriceRule', targetEntity: 'ChanneledDiscount', orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'channeledPriceRule', targetEntity: ChanneledDiscount::class, orphanRemoval: true)]
     protected Collection $channeledDiscounts;
 
     // Relationships with non-channeled entities

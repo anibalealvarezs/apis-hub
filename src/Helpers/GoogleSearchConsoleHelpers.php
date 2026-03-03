@@ -620,10 +620,11 @@ class GoogleSearchConsoleHelpers
     public static function getMetricsValues(mixed $row) : array
     {
         return [
-            $row['impressions'] ?? 0,
-            $row['clicks'] ?? 0,
-            $row['position'] ?? 0,
-            $row['ctr'] ?? 0,
+            (int)($row['impressions'] ?? 0),
+            (int)($row['clicks'] ?? 0),
+            (float)($row['position'] ?? 0),
+            (float)($row['ctr'] ?? 0),
         ];
     }
+
 }

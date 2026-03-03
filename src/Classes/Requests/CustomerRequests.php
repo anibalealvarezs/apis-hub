@@ -22,6 +22,8 @@ use Entities\Analytics\Channeled\ChanneledCustomer;
 use Entities\Analytics\Customer;
 use Entities\Entity;
 use Enums\Channel;
+use Repositories\CustomerRepository;
+use Repositories\Channeled\ChanneledCustomerRepository;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -31,22 +33,22 @@ use Symfony\Component\HttpFoundation\Response;
 class CustomerRequests implements RequestInterface
 {
     /**
-     * @return Channel[]
+     * @return \Enums\Channel[]
      */
     public static function supportedChannels(): array
     {
         return [
-            Channel::shopify->value,
-            Channel::klaviyo->value,
-            Channel::facebook->value,
-            Channel::bigcommerce->value,
-            Channel::netsuite->value,
-            Channel::amazon->value,
-            Channel::instagram->value,
-            Channel::google_analytics->value,
-            Channel::pinterest->value,
-            Channel::linkedin->value,
-            Channel::x->value,
+            Channel::shopify,
+            Channel::klaviyo,
+            Channel::facebook,
+            Channel::bigcommerce,
+            Channel::netsuite,
+            Channel::amazon,
+            Channel::instagram,
+            Channel::google_analytics,
+            Channel::pinterest,
+            Channel::linkedin,
+            Channel::x,
         ];
     }
 
@@ -61,10 +63,10 @@ class CustomerRequests implements RequestInterface
      * @throws NotSupported
      */
     public static function getListFromShopify(
-        string $createdAtMin = null,
-        string $createdAtMax = null,
-        array $fields = null,
-        object $filters = null,
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?array $fields = null,
+        ?object $filters = null,
         string|bool $resume = true
     ): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
@@ -75,6 +77,7 @@ class CustomerRequests implements RequestInterface
         );
 
         $manager = Helpers::getManager();
+        /** @var ChanneledCustomerRepository $channeledCustomerRepository */
         $channeledCustomerRepository = $manager->getRepository(ChanneledCustomer::class);
         $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformId(Channel::shopify->value);
 
@@ -105,10 +108,10 @@ class CustomerRequests implements RequestInterface
      * @throws NotSupported
      */
     public static function getListFromKlaviyo(
-        string $createdAtMin = null,
-        string $createdAtMax = null,
-        array $fields = null,
-        object $filters = null,
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?array $fields = null,
+        ?object $filters = null,
         string|bool $resume = true
     ): Response {
         $config = Helpers::getChannelsConfig()['klaviyo'];
@@ -117,6 +120,7 @@ class CustomerRequests implements RequestInterface
         );
 
         $manager = Helpers::getManager();
+        /** @var ChanneledCustomerRepository $channeledCustomerRepository */
         $channeledCustomerRepository = $manager->getRepository(ChanneledCustomer::class);
         $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformCreatedAt(Channel::klaviyo->value);
 
@@ -188,9 +192,9 @@ class CustomerRequests implements RequestInterface
      * @throws NotSupported
      */
     public static function getListFromNetSuite(
-        string $createdAtMin = null,
-        string $createdAtMax = null,
-        object $filters = null,
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?object $filters = null,
         string|bool $resume = true
     ): Response {
         $config = Helpers::getChannelsConfig()['netsuite'];
@@ -203,6 +207,7 @@ class CustomerRequests implements RequestInterface
         );
 
         $manager = Helpers::getManager();
+        /** @var ChanneledCustomerRepository $channeledCustomerRepository */
         $channeledCustomerRepository = $manager->getRepository(ChanneledCustomer::class);
         $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformId(Channel::netsuite->value);
 
@@ -363,14 +368,14 @@ class CustomerRequests implements RequestInterface
     }
 
     /**
-     * @param object $channeledCustomer
+     * @param \stdClass $channeledCustomer
      * @param array $repos
      * @param EntityManager $manager
      * @return void
      * @throws ORMException
      * @throws OptimisticLockException
      */
-    private static function processSingleCustomer(object $channeledCustomer, array $repos, EntityManager $manager): void
+    private static function processSingleCustomer(\stdClass $channeledCustomer, array $repos, EntityManager $manager): void
     {
         if (empty($channeledCustomer->email)) {
             return;
@@ -411,41 +416,46 @@ class CustomerRequests implements RequestInterface
     }
 
     /**
-     * @param object $customer
-     * @param EntityRepository $repository
+     * @param \stdClass $customer
+     * @param CustomerRepository $repository
      * @return Customer
      */
-    private static function getOrCreateCustomer(object $customer, EntityRepository $repository): Customer
+    private static function getOrCreateCustomer(\stdClass $customer, CustomerRepository $repository): Customer
     {
-        return $repository->getByEmail($customer->email)
+        $entity = $repository->getByEmail($customer->email)
             ?? $repository->create(
                 (object) ['email' => $customer->email],
                 true
             );
+        assert($entity instanceof Customer);
+        return $entity;
     }
 
     /**
      * @param Entity $customerEntity
-     * @param object $channeledCustomer
-     * @param EntityRepository $repository
+     * @param \stdClass $channeledCustomer
+     * @param ChanneledCustomerRepository $repository
      * @return ChanneledCustomer
      */
-    private static function getOrCreateChanneledCustomer(Entity $customerEntity, object $channeledCustomer, EntityRepository $repository): ChanneledCustomer
+    private static function getOrCreateChanneledCustomer(Entity $customerEntity, \stdClass $channeledCustomer, ChanneledCustomerRepository $repository): ChanneledCustomer
     {
         $channeledCustomer->customer = $customerEntity;
-        return $repository->getByPlatformId($channeledCustomer->platformId, $channeledCustomer->channel)
+        $entity = $repository->getByPlatformId($channeledCustomer->platformId, $channeledCustomer->channel)
             ?? $repository->create(
                 $channeledCustomer,
                 true
             );
+        assert($entity instanceof ChanneledCustomer);
+        return $entity;
     }
 
     /**
-     * @param object $channeledCustomer
+     * @param \stdClass $channeledCustomer
      * @param ChanneledCustomer $channeledCustomerEntity
      * @return ChanneledCustomer
      */
-    private static function updateChanneledCustomerData(object $channeledCustomer, ChanneledCustomer $channeledCustomerEntity): ChanneledCustomer
+    private static function updateChanneledCustomerData(\stdClass $channeledCustomer, ChanneledCustomer $channeledCustomerEntity): ChanneledCustomer
+
     {
         if (empty($channeledCustomerEntity->getData())) {
             $channeledCustomerEntity

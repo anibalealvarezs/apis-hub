@@ -14,7 +14,7 @@ class ChanneledCustomerRepository extends ChanneledBaseRepository
     /**
      * @param string $email
      * @param Channel|int $channel
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByEmail(string $email, Channel|int $channel /*, bool $useCached = false */): ?Entity

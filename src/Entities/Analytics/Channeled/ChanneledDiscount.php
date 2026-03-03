@@ -24,10 +24,10 @@ class ChanneledDiscount extends ChanneledEntity
 
     // Relationships with channeled entities
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledOrder', mappedBy: 'channeledDiscounts')]
+    #[ORM\ManyToMany(targetEntity: ChanneledOrder::class, mappedBy: 'channeledDiscounts')]
     protected Collection $channeledOrders;
 
-    #[ORM\ManyToOne(targetEntity: "ChanneledPriceRule", inversedBy: 'channeledDiscounts')]
+    #[ORM\ManyToOne(targetEntity: ChanneledPriceRule::class, inversedBy: 'channeledDiscounts')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected ChanneledPriceRule $channeledPriceRule;
 

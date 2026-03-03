@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Anibalealvarezs\FacebookGraphApi\Enums\MediaProductType;
 use Anibalealvarezs\FacebookGraphApi\Enums\MediaType;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricBreakdown;
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
@@ -12,7 +11,6 @@ use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Dimension;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\GroupType;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Operator;
 use Anibalealvarezs\KlaviyoApi\Enums\AggregatedMeasurement;
-use Anibalealvarezs\ShopifyApi\Enums\AccountType;
 use Carbon\Carbon;
 use Classes\Conversions\FacebookGraphConvert;
 use Classes\Conversions\GoogleSearchConsoleConvert;
@@ -58,6 +56,10 @@ use GuzzleHttp\Exception\GuzzleException;
 use Helpers\FacebookGraphHelpers;
 use Helpers\GoogleSearchConsoleHelpers;
 use Helpers\Helpers;
+use Repositories\Channeled\ChanneledMetricRepository;
+use Repositories\Channeled\ChanneledMetricDimensionRepository;
+use Repositories\QueryRepository;
+use Repositories\MetricRepository;
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
@@ -70,23 +72,23 @@ use Exception;
 class MetricRequests
 {
     /**
-     * @return Channel[]
+     * @return \Enums\Channel[]
      */
     public static function supportedChannels(): array
     {
         return [
-            Channel::shopify->value,
-            Channel::klaviyo->value,
-            Channel::facebook->value,
-            Channel::bigcommerce->value,
-            Channel::netsuite->value,
-            Channel::amazon->value,
-            Channel::instagram->value,
-            Channel::google_analytics->value,
-            Channel::google_search_console->value,
-            Channel::pinterest->value,
-            Channel::linkedin->value,
-            Channel::x->value,
+            Channel::shopify,
+            Channel::klaviyo,
+            Channel::facebook,
+            Channel::bigcommerce,
+            Channel::netsuite,
+            Channel::amazon,
+            Channel::instagram,
+            Channel::google_analytics,
+            Channel::google_search_console,
+            Channel::pinterest,
+            Channel::linkedin,
+            Channel::x,
         ];
     }
 
@@ -103,10 +105,10 @@ class MetricRequests
      * @throws NotSupported
      */
     public static function getListFromKlaviyo(
-        string $createdAtMin = null,
-        string $createdAtMax = null,
-        array $fields = null,
-        object $filters = null,
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?array $fields = null,
+        ?object $filters = null,
         string|bool $resume = true
     ): Response {
         $config = Helpers::getChannelsConfig()['klaviyo'];
@@ -128,6 +130,7 @@ class MetricRequests
         );
 
         $manager = Helpers::getManager();
+        /** @var \Repositories\Channeled\ChanneledMetricRepository $channeledMetricRepository */
         $channeledMetricRepository = $manager->getRepository(ChanneledMetric::class);
         $lastChanneledMetric = $channeledMetricRepository->getLastByPlatformCreatedAt(Channel::klaviyo->value);
 
@@ -205,7 +208,7 @@ class MetricRequests
      * @throws Exception
      */
     public static function getListFromFacebook(
-        string $startDate = null,
+        ?string $startDate = null,
         ?string $endDate = null,
         string|bool $resume = true,
         ?LoggerInterface $logger = null
@@ -376,7 +379,7 @@ class MetricRequests
                         logger: $logger,
                     );
                 } else {
-                    $logger->info("Skipping page metrics for page: " . $page['id']);
+                    $logger->info("Skipping ad account metrics for ad account: " . $adAccount['id']);
                 }
                 if ($adAccount['campaigns']) {
                     $campaignsMultiMap = self::fetchAdAccountCampaigns(
@@ -572,7 +575,7 @@ class MetricRequests
      * @throws Exception
      */
     public static function getListFromGoogleSearchConsole(
-        string $startDate = null,
+        ?string $startDate = null,
         ?string $endDate = null,
         ?object $filters = null,
         string|bool $resume = true,
@@ -593,6 +596,7 @@ class MetricRequests
             $api = self::initializeSearchConsoleApi($config, $logger);
 
             // Initialize repositories and settings
+            /** @var ChanneledMetricRepository $channeledMetricRepository */
             $channeledMetricRepository = $manager->getRepository(ChanneledMetric::class);
             $pageRepository = $manager->getRepository(Page::class);
             $countryRepository = $manager->getRepository(Country::class);
@@ -804,17 +808,17 @@ class MetricRequests
         while ($apiRetryCount < $maxApiRetries) {
             try {
                 $apiInstance = new FacebookGraphApi(
-                    userId: (string) $config['facebook']['user_id'] ?? null,
-                    appId: (string) $config['facebook']['app_id'] ?? null,
-                    appSecret: $config['facebook']['app_secret'] ?? null,
-                    redirectUrl: $config['facebook']['app_redirect_uri'] ?? null,
-                    userAccessToken: $config['facebook']['graph_user_access_token'] ?? null,
-                    longLivedUserAccessToken: $config['facebook']['graph_long_lived_user_access_token'] ?? null,
-                    appAccessToken: $config['facebook']['graph_app_access_token'] ?? null,
-                    pageAccesstoken: $config['facebook']['graph_page_access_token'] ?? null,
-                    longLivedPageAccesstoken: $config['facebook']['graph_long_lived_page_access_token'] ?? null,
-                    clientAccesstoken: $config['facebook']['graph_client_access_token'] ?? null,
-                    longLivedClientAccesstoken: $config['facebook']['graph_long_lived_client_access_token'] ?? null,
+                    userId: (string) $config['facebook']['user_id'],
+                    appId: (string) $config['facebook']['app_id'],
+                    appSecret: $config['facebook']['app_secret'],
+                    redirectUrl: $config['facebook']['app_redirect_uri'],
+                    userAccessToken: $config['facebook']['graph_user_access_token'],
+                    longLivedUserAccessToken: $config['facebook']['graph_long_lived_user_access_token'],
+                    appAccessToken: $config['facebook']['graph_app_access_token'],
+                    pageAccesstoken: $config['facebook']['graph_page_access_token'],
+                    longLivedPageAccesstoken: $config['facebook']['graph_long_lived_page_access_token'],
+                    clientAccesstoken: $config['facebook']['graph_client_access_token'],
+                    longLivedClientAccesstoken: $config['facebook']['graph_long_lived_client_access_token'],
                 );
                 $logger->info("Initialized FacebookGraphApi");
                 return $apiInstance;
@@ -840,7 +844,7 @@ class MetricRequests
      * @param string|bool $resume
      * @param SearchConsoleApi $api
      * @param EntityManager $manager
-     * @param EntityRepository $channeledMetricRepository
+     * @param ChanneledMetricRepository $channeledMetricRepository
      * @param EntityRepository $pageRepository
      * @param array $metricNames
      * @param object|null $filters
@@ -863,7 +867,7 @@ class MetricRequests
         string|bool $resume,
         SearchConsoleApi $api,
         EntityManager $manager,
-        EntityRepository $channeledMetricRepository,
+        ChanneledMetricRepository $channeledMetricRepository,
         EntityRepository $pageRepository,
         array $metricNames,
         ?object $filters,
@@ -1888,7 +1892,7 @@ class MetricRequests
         $params = [];
         $conditions = [];
 
-        $fields = ['postId', 'page_id'];
+        $fields = ['postId', 'page_id', 'account_id'];
 
         foreach ($posts['data'] as $post) {
             $platformId = $post['id'];
@@ -1899,7 +1903,6 @@ class MetricRequests
                     'postId' => $platformId,
                     'page_id' => $pageEntity->getId(),
                     'account_id' => $accountEntity->getId(),
-                    default => throw new Exception("Unknown field: $field"),
                 };
             }
             $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -1949,7 +1952,7 @@ class MetricRequests
             $reFetchParams = [];
             $conditions = [];
 
-            $fields = ['postId', 'page_id'];
+            $fields = ['postId', 'page_id', 'account_id'];
 
             foreach ($posts['data'] as $post) {
                 $platformId = $post['id'];
@@ -1960,7 +1963,6 @@ class MetricRequests
                         'postId' => $platformId,
                         'page_id' => $pageEntity->getId(),
                         'account_id' => $accountEntity->getId(),
-                        default => throw new Exception("Unknown field: $field"),
                     };
                 }
                 $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2027,7 +2029,6 @@ class MetricRequests
                     'page_id' => $pageEntity->getId(),
                     'account_id' => $accountEntity->getId(),
                     'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    default => throw new Exception("Unknown field: $field"),
                 };
             }
             $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2091,7 +2092,6 @@ class MetricRequests
                         'page_id' => $pageEntity->getId(),
                         'account_id' => $accountEntity->getId(),
                         'channeledAccount_id' => $channeledAccountEntity->getId(),
-                        default => throw new Exception("Unknown field: $field"),
                     };
                 }
                 $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2151,7 +2151,6 @@ class MetricRequests
                 $campaignParams[] = match($field) {
                     'campaignId' => $campaign['id'],
                     'name' => $campaign['name'],
-                    default => throw new Exception("Unknown field: $field"),
                 };
             }
             $campaignConditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2215,7 +2214,6 @@ class MetricRequests
                     $reFetchCampaignParams[] = match($field) {
                         'campaignId' => $campaign['id'],
                         'name' => $campaign['name'],
-                        default => throw new Exception("Unknown field: $field"),
                     };
                 }
                 $campaignConditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2251,7 +2249,6 @@ class MetricRequests
                     'campaign_id' => $campaignMap['map'][$campaign['id']],
                     'platformId' => $campaign['id'],
                     'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    default => throw new Exception("Unknown field: $field"),
                 };
             }
             $channeledCampaignConditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2303,7 +2300,6 @@ class MetricRequests
                         'campaign_id' => $campaignMap['map'][$campaign['id']],
                         'platformId' => $campaign['id'],
                         'channeledAccount_id' => $channeledAccountEntity->getId(),
-                        default => throw new Exception("Unknown field: $field"),
                     };
                 }
                 $channeledCampaignConditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2372,7 +2368,6 @@ class MetricRequests
                     'campaign_id' => $campaignMap['map'][$adset['campaign_id']],
                     'platformId' => $adset['id'],
                     'channeledCampaign_id' => $channeledCampaignMap['map'][$adset['campaign_id']],
-                    default => throw new Exception("Unknown field: $field"),
                 };
             }
             $adsetConditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2467,7 +2462,6 @@ class MetricRequests
                         'campaign_id' => $campaignMap['map'][$adset['campaign_id']],
                         'platformId' => $adset['id'],
                         'channeledCampaign_id' => $channeledCampaignMap['map'][$adset['campaign_id']],
-                        default => throw new Exception("Unknown field: $field"),
                     };
                 }
                 $adsetConditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2544,7 +2538,6 @@ class MetricRequests
                     'platformId' => $ad['id'],
                     'channeledCampaign_id' => $channeledCampaignMap['map'][$ad['campaign_id']],
                     'channeledAdGroup_id' => $channeledAdGroupMap['map'][$ad['adset_id']],
-                    default => throw new Exception("Unknown field: $field"),
                 };
             }
             $adConditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2612,7 +2605,6 @@ class MetricRequests
                         'platformId' => $ad['id'],
                         'channeledCampaign_id' => $channeledCampaignMap['map'][$ad['campaign_id']],
                         'channeledAdGroup_id' => $channeledAdGroupMap['map'][$ad['adset_id']],
-                        default => throw new Exception("Unknown field: $field"),
                     };
                 }
                 $adConditions[] = '(' . implode(' AND ', $subConditions) . ')';
@@ -2851,7 +2843,7 @@ class MetricRequests
                 $countryEnum = CountryEnum::tryFrom($metric->countryCode) ?? CountryEnum::UNK;
                 $metric->country = $countryMap['map'][$countryEnum->value];
 
-                $deviceEnum = DeviceEnum::from($metric->deviceType) ?? DeviceEnum::UNKNOWN;
+                $deviceEnum = DeviceEnum::from($metric->deviceType);
                 $metric->device = $deviceMap['map'][$deviceEnum->value];
 
                 $allMetrics->add($metric);
@@ -2989,19 +2981,22 @@ class MetricRequests
         int $totalDuplicates,
         LoggerInterface $logger,
         ?string $startDate,
-        ?string $endDate
+        ?string $endDate,
+        array $entitiesToInvalidate = [],
+        ?Channel $channel = null
     ): Response {
         $logger->info("Completed: metrics=$totalMetrics, rows=$totalRows, duplicates=$totalDuplicates");
 
-        $entitiesToInvalidate = ['metric' => [], 'channeledMetric' => [], 'query' => []];
-        $cacheService = CacheService::getInstance(Helpers::getRedisClient());
-        foreach ($entitiesToInvalidate as $entity => $ids) {
-            if (!empty($ids)) {
-                $cacheService->invalidateEntityCache(
-                    entity: $entity,
-                    ids: array_unique($ids),
-                    channel: Channel::google_search_console->getName()
-                );
+        if (!empty($entitiesToInvalidate)) {
+            $cacheService = CacheService::getInstance(Helpers::getRedisClient());
+            foreach ($entitiesToInvalidate as $entity => $ids) {
+                if (!empty($ids)) {
+                    $cacheService->invalidateEntityCache(
+                        entity: $entity,
+                        ids: array_unique($ids),
+                        channel: $channel ? $channel->getName() : Channel::google_search_console->getName()
+                    );
+                }
             }
         }
 
@@ -3111,10 +3106,11 @@ class MetricRequests
 
         if ($pageEntity && $pageEntity->getId()) {
             if (!$manager->contains($pageEntity)) {
-                $logger->warning("Page entity detached: ID=" . $pageEntity->getId() . ", URL=" . $pageEntity->getUrl());
-                $pageEntity = $manager->find(Page::class, $pageEntity->getId());
+                $pageId = $pageEntity->getId();
+                $logger->warning("Page entity detached: ID=" . $pageId . ", URL=" . $pageEntity->getUrl());
+                $pageEntity = $manager->find(Page::class, $pageId);
                 if (!$pageEntity) {
-                    $logger->error("Failed to reattach Page entity: ID=" . $pageEntity->getId());
+                    $logger->error("Failed to reattach Page entity: ID=" . $pageId);
                     throw new RuntimeException("Failed to reattach Page entity");
                 }
             }
@@ -3182,10 +3178,11 @@ class MetricRequests
 
             // Check if the metric entity is managed
             if (!$manager->contains($metricEntity)) {
-                $logger->warning("Metric entity detached: ID=" . $metricEntity->getId() . ", name={$metric->name}");
-                $metricEntity = $manager->find(Metric::class, $metricEntity->getId());
+                $metricId = $metricEntity->getId();
+                $logger->warning("Metric entity detached: ID=" . $metricId . ", name={$metric->name}");
+                $metricEntity = $manager->find(Metric::class, $metricId);
                 if (!$metricEntity) {
-                    $logger->error("Failed to reattach Metric entity: ID=" . $metricEntity->getId());
+                    $logger->error("Failed to reattach Metric entity: ID=" . $metricId);
                     throw new RuntimeException("Failed to reattach Metric entity");
                 }
             }
@@ -3210,10 +3207,11 @@ class MetricRequests
 
             // Check if the channeled metric entity is managed
             if (!$manager->contains($channeledMetricEntity)) {
-                $logger->warning("ChanneledMetric entity detached: ID=" . $channeledMetricEntity->getId());
-                $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricEntity->getId());
+                $channeledMetricId = $channeledMetricEntity->getId();
+                $logger->warning("ChanneledMetric entity detached: ID=" . $channeledMetricId);
+                $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricId);
                 if (!$channeledMetricEntity) {
-                    $logger->error("Failed to reattach ChanneledMetric entity: ID=" . $channeledMetricEntity->getId());
+                    $logger->error("Failed to reattach ChanneledMetric entity: ID=" . $channeledMetricId);
                     throw new RuntimeException("Failed to reattach ChanneledMetric entity");
                 }
             }
@@ -3240,16 +3238,17 @@ class MetricRequests
             // Invalidate caches
             $entitiesToInvalidate['metric'][] = $metricEntity->getId();
             $entitiesToInvalidate['channeledMetric'][] = $channeledMetricEntity->getId();
-            if ($metricEntity->getQuery()) {
-                $query = $metricEntity->getQuery();
+            if ($metricEntity->getMetricConfig()->getQuery()) {
+                $query = $metricEntity->getMetricConfig()->getQuery();
                 if (!$manager->contains($query)) {
-                    $logger->warning("Query entity detached: ID=" . $query->getId());
-                    $query = $manager->find(Query::class, $query->getId());
+                    $queryId = $query->getId();
+                    $logger->warning("Query entity detached: ID=" . $queryId);
+                    $query = $manager->find(Query::class, $queryId);
                     if (!$query) {
-                        $logger->error("Failed to reattach Query entity: ID=" . $query->getId());
+                        $logger->error("Failed to reattach Query entity: ID=" . $queryId);
                         throw new RuntimeException("Failed to reattach Query entity");
                     }
-                    $metricEntity->setQuery($query);
+                    $metricEntity->getMetricConfig()->addQuery($query);
                 }
                 $entitiesToInvalidate['query'][] = $query->getId();
             }
@@ -3469,8 +3468,8 @@ class MetricRequests
      * Gets or creates a Metric entity based on unique constraints.
      *
      * @param object $metric
-     * @param EntityRepository $repository
-     * @param EntityRepository $queryRepository
+     * @param MetricRepository $repository
+     * @param QueryRepository $queryRepository
      * @param LoggerInterface $logger
      * @param array $queryCache
      * @param array $metricCache
@@ -3483,8 +3482,8 @@ class MetricRequests
      */
     private static function getOrCreateMetric(
         object $metric,
-        EntityRepository $repository,
-        EntityRepository $queryRepository,
+        MetricRepository $repository,
+        QueryRepository $queryRepository,
         LoggerInterface $logger,
         array &$queryCache = [],
         array &$metricCache = [],
@@ -3576,14 +3575,17 @@ class MetricRequests
                     'customer' => null,
                     'order' => null
                 ];
-                if ($metricEntity = $repository->findOneBy($criteria)) {
+                /** @var Metric|null $metricEntity */
+                $metricEntity = $repository->findOneBy($criteria);
+                if ($metricEntity) {
                     $logger->info("Existing Metric found in database: ID=" . $metricEntity->getId() . ", name=$metric->name, query=$queryString");
                     if ($em && !$em->contains($metricEntity)) {
-                        $logger->warning("Metric entity detached: ID=" . $metricEntity->getId() . ", name=$metric->name");
-                        $metricEntity = $em->find(Metric::class, $metricEntity->getId());
+                        $metricId = $metricEntity->getId();
+                        $logger->warning("Metric entity detached: ID=" . $metricId . ", name=$metric->name");
+                        $metricEntity = $em->find(Metric::class, $metricId);
                         if (!$metricEntity) {
-                            $logger->error("Failed to reattach Metric: ID=" . $metricEntity->getId() . ", name=$metric->name");
-                            throw new Exception("Failed to reattach Metric ID=" . $metricEntity->getId());
+                            $logger->error("Failed to reattach Metric: ID=" . $metricId . ", name=$metric->name");
+                            throw new Exception("Failed to reattach Metric ID=" . $metricId);
                         }
                     }
                     $metricCache[$metricKey] = $metricEntity;
@@ -3594,6 +3596,7 @@ class MetricRequests
                 $logger->info("Creating new Metric for $metric->name, query=$queryString");
                 $metric->query = $queryEntity;
                 try {
+                    /** @var Metric $metricEntity */
                     $metricEntity = $repository->create(
                         (object) [
                             'channel' => $metric->channel,
@@ -3612,11 +3615,12 @@ class MetricRequests
                         $logger->error("Metric entity created but has no ID: name=$metric->name, query=$queryString");
                     }
                     if ($em && !$em->contains($metricEntity)) {
-                        $logger->warning("Metric entity detached after creation: ID=" . $metricEntity->getId() . ", name=$metric->name");
-                        $metricEntity = $em->find(Metric::class, $metricEntity->getId());
+                        $metricId = $metricEntity->getId();
+                        $logger->warning("Metric entity detached after creation: ID=" . $metricId . ", name=$metric->name");
+                        $metricEntity = $em->find(Metric::class, $metricId);
                         if (!$metricEntity) {
-                            $logger->error("Failed to reattach Metric after creation: ID=" . $metricEntity->getId() . ", name=$metric->name");
-                            throw new Exception("Failed to reattach Metric ID=" . $metricEntity->getId());
+                            $logger->error("Failed to reattach Metric after creation: ID=" . $metricId . ", name=$metric->name");
+                            throw new Exception("Failed to reattach Metric ID=" . $metricId);
                         }
                     }
                     $logger->info("Created new Metric: id={$metricEntity->getId()}, queryId=" . ($queryEntity ? $queryEntity->getId() : 'none'));
@@ -3625,15 +3629,17 @@ class MetricRequests
                 } catch (ORMException $e) {
                     if (str_contains($e->getMessage(), 'SQLSTATE[23000]')) {
                         $logger->warning("Duplicate metric for $metric->name, query=$queryString, retrying lookup");
+                        /** @var Metric|null $metricEntity */
                         $metricEntity = $repository->findOneBy($criteria);
                         if ($metricEntity) {
                             $logger->info("Existing Metric found on retry: id={$metricEntity->getId()}");
                             if ($em && !$em->contains($metricEntity)) {
-                                $logger->warning("Metric entity detached on retry: ID=" . $metricEntity->getId() . ", name=$metric->name");
-                                $metricEntity = $em->find(Metric::class, $metricEntity->getId());
+                                $metricId = $metricEntity->getId();
+                                $logger->warning("Metric entity detached on retry: ID=" . $metricId . ", name=$metric->name");
+                                $metricEntity = $em->find(Metric::class, $metricId);
                                 if (!$metricEntity) {
-                                    $logger->error("Failed to reattach Metric on retry: ID=" . $metricEntity->getId() . ", name=$metric->name");
-                                    throw new Exception("Failed to reattach Metric ID=" . $metricEntity->getId());
+                                    $logger->error("Failed to reattach Metric on retry: ID=" . $metricId . ", name=$metric->name");
+                                    throw new Exception("Failed to reattach Metric ID=" . $metricId);
                                 }
                             }
                             $metricCache[$metricKey] = $metricEntity;
@@ -3678,8 +3684,8 @@ class MetricRequests
      * @param Metric $metricEntity
      * @param object $channeledMetric
      * @param EntityManager $manager
-     * @param EntityRepository $repository
-     * @param EntityRepository $dimensionRepository
+     * @param ChanneledMetricRepository $repository
+     * @param ChanneledMetricDimensionRepository $dimensionRepository
      * @param LoggerInterface $logger
      * @param array $channeledMetricCache
      * @param array $dimensionCache
@@ -3692,8 +3698,8 @@ class MetricRequests
         Metric $metricEntity,
         object $channeledMetric,
         EntityManager $manager,
-        EntityRepository $repository,
-        EntityRepository $dimensionRepository,
+        ChanneledMetricRepository $repository,
+        ChanneledMetricDimensionRepository $dimensionRepository,
         LoggerInterface $logger,
         array &$channeledMetricCache = [],
         array &$dimensionCache = []
@@ -3805,7 +3811,7 @@ class MetricRequests
      * @param LoggerInterface $logger
      * @param mixed $channeledMetricEntity
      * @param array $dimensionCache
-     * @param EntityRepository $dimensionRepository
+     * @param ChanneledMetricDimensionRepository $dimensionRepository
      * @param array $dimensionsToPersist
      * @param EntityManager $manager
      * @return array
@@ -3816,7 +3822,7 @@ class MetricRequests
         LoggerInterface $logger,
         mixed $channeledMetricEntity,
         array $dimensionCache,
-        EntityRepository $dimensionRepository,
+        ChanneledMetricDimensionRepository $dimensionRepository,
         array $dimensionsToPersist,
         EntityManager $manager
     ): array {
@@ -3884,7 +3890,7 @@ class MetricRequests
      * @param object $channeledMetric
      * @param Metric $metricEntity
      * @param DateTime $platformCreatedAt
-     * @param EntityRepository $repository
+     * @param ChanneledMetricRepository $repository
      * @param EntityManager $manager
      * @return array
      * @throws ORMException
@@ -3899,7 +3905,7 @@ class MetricRequests
         object $channeledMetric,
         Metric $metricEntity,
         DateTime $platformCreatedAt,
-        EntityRepository $repository,
+        ChanneledMetricRepository $repository,
         EntityManager $manager
     ): array {
         // Check cache first
@@ -3932,11 +3938,12 @@ class MetricRequests
 
                 // Check if entity is managed
                 if (!$manager->contains($channeledMetricEntity)) {
-                    $logger->error("ChanneledMetric entity detached after update: ID=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
-                    $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricEntity->getId());
+                    $cmId = $channeledMetricEntity->getId();
+                    $logger->error("ChanneledMetric entity detached after update: ID=" . $cmId . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+                    $channeledMetricEntity = $manager->find(ChanneledMetric::class, $cmId);
                     if (!$channeledMetricEntity) {
-                        $logger->error("Failed to reattach ChanneledMetric: ID=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
-                        throw new Exception("Failed to reattach ChanneledMetric ID=" . $channeledMetricEntity->getId());
+                        $logger->error("Failed to reattach ChanneledMetric: ID=" . $cmId . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+                        throw new Exception("Failed to reattach ChanneledMetric ID=" . $cmId);
                     }
                     // Reapply updates
                     $channeledMetricEntity->addData($updatedData);
@@ -3954,11 +3961,12 @@ class MetricRequests
                     $logger->error("ChanneledMetric entity created but has no ID: platformId=" . ($channeledMetric->platformId ?? 'null'));
                 }
                 if (!$manager->contains($channeledMetricEntity)) {
-                    $logger->error("ChanneledMetric entity detached after creation: ID=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
-                    $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricEntity->getId());
+                    $cmId = $channeledMetricEntity->getId();
+                    $logger->error("ChanneledMetric entity detached after creation: ID=" . $cmId . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+                    $channeledMetricEntity = $manager->find(ChanneledMetric::class, $cmId);
                     if (!$channeledMetricEntity) {
-                        $logger->error("Failed to reattach ChanneledMetric after creation: ID=" . $channeledMetricEntity->getId() . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
-                        throw new Exception("Failed to reattach ChanneledMetric ID=" . $channeledMetricEntity->getId());
+                        $logger->error("Failed to reattach ChanneledMetric after creation: ID=" . $cmId . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+                        throw new Exception("Failed to reattach ChanneledMetric ID=" . $cmId);
                     }
                 }
                 $manager->persist($channeledMetricEntity); // Ensure persisted
@@ -3974,7 +3982,7 @@ class MetricRequests
      * @param mixed $queryString
      * @param LoggerInterface $logger
      * @param array $queryCache
-     * @param EntityRepository $queryRepository
+     * @param QueryRepository $queryRepository
      * @param EntityManager|null $em
      * @return array
      * @throws ORMException
@@ -3985,7 +3993,7 @@ class MetricRequests
         mixed $queryString,
         LoggerInterface $logger,
         array $queryCache,
-        EntityRepository $queryRepository,
+        QueryRepository $queryRepository,
         ?EntityManager $em
     ): array {
         $queryEntity = null;
@@ -4032,7 +4040,7 @@ class MetricRequests
      */
     protected static function getNormalizedDimensions(object $metric): array
     {
-        $dimensions = isset($metric->dimensions) ? array_column((array)$metric->dimensions ?? [], 'dimensionValue',
+        $dimensions = isset($metric->dimensions) ? array_column((array)$metric->dimensions, 'dimensionValue',
             'dimensionKey') : [];
         $normalizedDimensions = array_map(function ($value) {
             return is_string($value) ? strtolower(trim($value)) : ($value ?? 'unknown');

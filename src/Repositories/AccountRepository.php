@@ -44,7 +44,7 @@ class AccountRepository extends BaseRepository
 
     /**
      * @param string $name
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByName(string $name): ?Entity

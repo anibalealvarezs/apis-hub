@@ -74,24 +74,24 @@ class CacheControllerTest extends TestCase
     {
         $body = json_encode(['filters' => ['key' => 'value'], 'other' => 'data']);
         $params = ['extra' => 'param'];
+        // Note: The new implementation uses Reflection to filter params. 
+        // We'll mock a simple class to test this.
         $expected = [
-            'filters' => (object) ['key' => 'value'],
-            'other' => 'data',
-            'extra' => 'param'
+            'filters' => (object) ['key' => 'value', 'other' => 'data', 'extra' => 'param']
         ];
 
-        $result = $this->controller->prepareAnalyticsParams($params, $body);
+        $result = $this->controller->prepareAnalyticsParams($params, $body, \Classes\Requests\MetricRequests::class, 'getListFromKlaviyo');
 
         $this->assertEquals($expected, $result);
     }
 
     public function testPrepareAnalyticsParamsHandlesEmptyInputs(): void
     {
-        $result = $this->controller->prepareAnalyticsParams(null, null);
-        $this->assertEquals([], $result);
+        $result = $this->controller->prepareAnalyticsParams(null, null, \Classes\Requests\MetricRequests::class, 'getListFromKlaviyo');
+        $this->assertEquals(['filters' => (object) []], $result);
 
-        $result = $this->controller->prepareAnalyticsParams([], '');
-        $this->assertEquals([], $result);
+        $result = $this->controller->prepareAnalyticsParams([], '', \Classes\Requests\MetricRequests::class, 'getListFromKlaviyo');
+        $this->assertEquals(['filters' => (object) []], $result);
     }
 
     public function testListReturnsSuccessResponse(): void
@@ -171,7 +171,7 @@ class CacheControllerTest extends TestCase
         $params = ['key' => 'value'];
         $body = json_encode(['filters' => ['a' => 'b']]);
         $data = ['result' => $this->faker->word];
-        $requestsClassName = '\Classes\Requests\SomeClass';
+        $requestsClassName = \Classes\Requests\MetricRequests::class;
         $methodName = 'getListFrom' . $channel->getCommonName();
 
         $this->controller->setMockEntitiesConfig([
@@ -196,7 +196,7 @@ class CacheControllerTest extends TestCase
     {
         $entity = $this->faker->word;
         $channel = Channel::shopify;
-        $requestsClassName = '\Classes\Requests\SomeClass';
+        $requestsClassName = \Classes\Requests\MetricRequests::class;
         $methodName = 'getListFrom' . $channel->getCommonName();
 
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
@@ -220,27 +220,50 @@ class CacheControllerTest extends TestCase
         $entity = $this->faker->word;
         $channel = Channel::shopify;
         $params = ['invalid' => 'param'];
-        $requestsClassName = '\Classes\Requests\SomeClass';
+        $requestsClassName = \Classes\Requests\MetricRequests::class;
         $methodName = 'getListFrom' . $channel->getCommonName();
+        $data = ['result' => 'ok']; // Expected data
 
         $this->controller->setMockEntitiesConfig([
             strtolower($entity) => [
                 'class' => 'Entities\\' . $entity,
                 'repository_methods' => [
-                    $methodName => ['parameters' => ['key', 'filters']]
+                    $methodName => ['parameters' => ['filters']] // Only 'filters' is expected
                 ]
             ]
         ]);
-        $this->controller->setMockFetchData($requestsClassName, $methodName, []);
+        $this->controller->setMockFetchData($requestsClassName, $methodName, $data);
 
-        $response = $this->controller->fetchData($entity, $channel, $params, null);
+        $result = $this->controller->fetchData($entity, $channel, $params, null);
 
-        $this->assertInstanceOf(Response::class, $response);
-        $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
-        $this->assertEquals(
-            json_encode(['data' => null, 'status' => 'error', 'error' => 'Invalid parameters']),
-            $response->getContent()
-        );
+        $this->assertEquals($data, $result);
+    }
+
+    /**
+     * @throws ReflectionException
+     */
+    public function testFetchDataHandlesExtraParametersGracefully(): void
+    {
+        $entity = $this->faker->word;
+        $channel = Channel::shopify;
+        $params = ['extra' => 'param'];
+        $requestsClassName = \Classes\Requests\MetricRequests::class;
+        $methodName = 'getListFrom' . $channel->getCommonName();
+        $data = ['result' => 'ok'];
+
+        $this->controller->setMockEntitiesConfig([
+            strtolower($entity) => [
+                'class' => 'Entities\\' . $entity,
+                'repository_methods' => [
+                    $methodName => ['parameters' => ['filters']]
+                ]
+            ]
+        ]);
+        $this->controller->setMockFetchData($requestsClassName, $methodName, $data);
+
+        $result = $this->controller->fetchData($entity, $channel, $params, null);
+
+        $this->assertEquals($data, $result);
     }
 }
 
@@ -323,9 +346,9 @@ class ConcreteCacheController extends CacheController
         return parent::createResponse($data, $status, $error, $httpStatus);
     }
 
-    public function prepareAnalyticsParams(?array $params, ?string $body): array
+    public function prepareAnalyticsParams(?array $params, ?string $body, string $className = \Classes\Requests\MetricRequests::class, string $methodName = 'getListFromKlaviyo'): array
     {
-        return parent::prepareAnalyticsParams($params, $body);
+        return parent::prepareAnalyticsParams($params, $body, $className, $methodName);
     }
 
     public function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
@@ -375,7 +398,7 @@ class ConcreteCacheController extends CacheController
             );
         }
 
-        $parameters = $this->prepareAnalyticsParams($params, $body);
+        $parameters = $this->prepareAnalyticsParams($params, $body, $className, $methodName);
         if (!$validParams || !$this->validateParams(array_keys($parameters), $entity, $methodName)) {
             return $this->createResponse(
                 data: null,

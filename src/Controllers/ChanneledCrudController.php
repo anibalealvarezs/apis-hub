@@ -100,12 +100,8 @@ class ChanneledCrudController extends BaseController
         ?string $body,
         Channel $channel
     ): array {
-        if (!empty($params) && !$this->validateParams(params: array_keys(array: $params), entity: $repositoryClass, method: 'readMultiple')) {
-            throw new InvalidArgumentException(message: 'Invalid parameters');
-        }
+        $params = $this->prepareCrudParams(params: $params, body: $body);
 
-        $params = $params ?? [];
-        $params['filters'] = Helpers::bodyToObject(data: $body) ?? new stdClass();
         if (!isset($params['filters']->channel)) {
             $params['filters']->channel = $channel->value;
         }

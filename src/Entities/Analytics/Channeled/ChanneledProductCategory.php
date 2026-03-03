@@ -21,7 +21,7 @@ class ChanneledProductCategory extends ChanneledEntity
 
     // Relationships with channeled entities
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledProduct', inversedBy: 'channeledProductCategories', cascade: ['persist'])]
+    #[ORM\ManyToMany(targetEntity: ChanneledProduct::class, inversedBy: 'channeledProductCategories', cascade: ['persist'])]
     #[ORM\JoinTable(name: 'channeled_product_categories_channeled_products')]
     protected Collection $channeledProducts;
 
@@ -46,9 +46,9 @@ class ChanneledProductCategory extends ChanneledEntity
 
     /**
      * @param bool $isSmartCollection
-     * @return ChanneledProductCategory
+     * @return static
      */
-    public function addIsSmartCollection(bool $isSmartCollection): self
+    public function addIsSmartCollection(bool $isSmartCollection): static
     {
         $this->isSmartCollection = $isSmartCollection;
 
@@ -65,9 +65,9 @@ class ChanneledProductCategory extends ChanneledEntity
 
     /**
      * @param ChanneledProduct $channeledProduct
-     * @return ChanneledProductCategory
+     * @return static
      */
-    public function addChanneledProduct(ChanneledProduct $channeledProduct): self
+    public function addChanneledProduct(ChanneledProduct $channeledProduct): static
     {
         if ($this->channeledProducts->contains($channeledProduct)) {
             return $this;
@@ -81,9 +81,9 @@ class ChanneledProductCategory extends ChanneledEntity
 
     /**
      * @param Collection $channeledProducts
-     * @return ChanneledProductCategory
+     * @return static
      */
-    public function addChanneledProducts(Collection $channeledProducts): self
+    public function addChanneledProducts(Collection $channeledProducts): static
     {
         foreach ($channeledProducts as $channeledProduct) {
             $this->addChanneledProduct($channeledProduct);
@@ -94,9 +94,9 @@ class ChanneledProductCategory extends ChanneledEntity
 
     /**
      * @param ChanneledProduct $channeledProduct
-     * @return ChanneledProductCategory
+     * @return static
      */
-    public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
+    public function removeChanneledProduct(ChanneledProduct $channeledProduct): static
     {
         if (!$this->channeledProducts->contains($channeledProduct)) {
             return $this;
@@ -115,9 +115,9 @@ class ChanneledProductCategory extends ChanneledEntity
 
     /**
      * @param Collection $channeledProducts
-     * @return ChanneledProductCategory
+     * @return static
      */
-    public function removeChanneledProducts(Collection $channeledProducts): self
+    public function removeChanneledProducts(Collection $channeledProducts): static
     {
         foreach ($channeledProducts as $channeledProduct) {
             $this->removeChanneledProduct($channeledProduct);
@@ -136,9 +136,9 @@ class ChanneledProductCategory extends ChanneledEntity
 
     /**
      * @param ProductCategory|null $productCategory
-     * @return ChanneledProductCategory
+     * @return static
      */
-    public function addProductCategory(?ProductCategory $productCategory): self
+    public function addProductCategory(?ProductCategory $productCategory): static
     {
         $this->productCategory = $productCategory;
 

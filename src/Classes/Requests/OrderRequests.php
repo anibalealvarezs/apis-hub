@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Classes\Requests;
 
 use Carbon\Carbon;
@@ -10,7 +12,6 @@ use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
@@ -21,6 +22,12 @@ use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductVariant;
 use Entities\Analytics\Order;
 use Enums\Channel;
+use Repositories\OrderRepository;
+use Repositories\Channeled\ChanneledOrderRepository;
+use Repositories\Channeled\ChanneledDiscountRepository;
+use Repositories\Channeled\ChanneledProductRepository;
+use Repositories\Channeled\ChanneledProductVariantRepository;
+use Repositories\Channeled\ChanneledCustomerRepository;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -35,11 +42,11 @@ class OrderRequests implements RequestInterface
     public static function supportedChannels(): array
     {
         return [
-            Channel::shopify->value,
-            Channel::klaviyo->value,
-            Channel::bigcommerce->value,
-            Channel::netsuite->value,
-            Channel::amazon->value,
+            Channel::shopify,
+            Channel::klaviyo,
+            Channel::bigcommerce,
+            Channel::netsuite,
+            Channel::amazon,
         ];
     }
 
@@ -55,8 +62,13 @@ class OrderRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromShopify(string $processedAtMin = null, string $processedAtMax = null, array $fields = null, object $filters = null, string|bool $resume = true): Response
-    {
+    public static function getListFromShopify(
+        ?string $processedAtMin = null,
+        ?string $processedAtMax = null,
+        ?array $fields = null,
+        ?object $filters = null,
+        string|bool $resume = true
+    ): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -65,6 +77,7 @@ class OrderRequests implements RequestInterface
         );
 
         $manager = Helpers::getManager();
+        /** @var ChanneledOrderRepository $channeledOrderRepository */
         $channeledOrderRepository = $manager->getRepository(entityName: ChanneledOrder::class);
         $lastChanneledOrder = $channeledOrderRepository->getLastByPlatformId(channel: Channel::shopify->value);
 
@@ -120,8 +133,11 @@ class OrderRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(string $fromDate = '01/01/1999', object $filters = null, string|bool $resume = true): Response
-    {
+    public static function getListFromNetsuite(
+        string $fromDate = '01/01/1999',
+        ?object $filters = null,
+        string|bool $resume = true
+    ): Response {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
             consumerId: $config['netsuite_consumer_id'],
@@ -132,6 +148,7 @@ class OrderRequests implements RequestInterface
         );
 
         $manager = Helpers::getManager();
+        /** @var ChanneledOrderRepository $channeledOrderRepository */
         $channeledOrderRepository = $manager->getRepository(entityName: ChanneledOrder::class);
         $lastChanneledOrder = $channeledOrderRepository->getLastByPlatformId(channel: Channel::netsuite->value);
 
@@ -283,7 +300,7 @@ class OrderRequests implements RequestInterface
     }
 
     /**
-     * @param object $order
+     * @param \stdClass|object{channel: int, platformId: string|int, discountCodes: array, lineItems: array, customer: object} $order
      * @param array $repos
      * @param EntityManager $manager
      * @return void
@@ -352,31 +369,42 @@ class OrderRequests implements RequestInterface
     }
 
     /**
-     * @param object $order
-     * @param EntityRepository $repository
+     * @param \stdClass|object{platformId: string|int} $order
+     * @param OrderRepository $repository
      * @return Order
      */
-    private static function getOrCreateOrder(object $order, EntityRepository $repository): Order
+    private static function getOrCreateOrder(object $order, OrderRepository $repository): Order
     {
-        $orderEntity = $repository->getByOrderId(orderId: $order->platformId);
+        /** @var Order|null $orderEntity */
+        $orderEntity = $repository->getByOrderId(orderId: (string) $order->platformId);
 
-        return $orderEntity ?? $repository->create(
-            data: (object) ['orderId' => $order->platformId],
+        if ($orderEntity) {
+            return $orderEntity;
+        }
+
+        /** @var Order $newOrder */
+        $newOrder = $repository->create(
+            data: (object) ['orderId' => (string) $order->platformId],
             returnEntity: true
         );
+
+        return $newOrder;
     }
 
     /**
-     * @param object $order
-     * @param EntityRepository $repository
+     * @param \stdClass|object{platformId: string|int, channel: int, data: array} $order
+     * @param ChanneledOrderRepository $repository
      * @return ChanneledOrder
      */
-    private static function getOrCreateChanneledOrder(object $order, EntityRepository $repository): ChanneledOrder
+    private static function getOrCreateChanneledOrder(object $order, ChanneledOrderRepository $repository): ChanneledOrder
     {
+        /** @var ChanneledOrder|null $entity */
         $entity = $repository->getByPlatformId(platformId: $order->platformId, channel: $order->channel);
 
         if (!$entity) {
-            return $repository->create(data: $order, returnEntity: true);
+            /** @var ChanneledOrder $newEntity */
+            $newEntity = $repository->create(data: $order, returnEntity: true);
+            return $newEntity;
         }
 
         if ($order->channel === Channel::netsuite->value) {
@@ -392,9 +420,9 @@ class OrderRequests implements RequestInterface
     }
 
     /**
-     * @param object $order
+     * @param \stdClass|object{channel: int, discountCodes: array} $order
      * @param ChanneledOrder $channeledOrderEntity
-     * @param EntityRepository $repository
+     * @param ChanneledDiscountRepository $repository
      * @param EntityManager $manager
      * @return array
      * @throws ORMException
@@ -403,18 +431,19 @@ class OrderRequests implements RequestInterface
     private static function processOrderDiscounts(
         object $order,
         ChanneledOrder $channeledOrderEntity,
-        EntityRepository $repository,
+        ChanneledDiscountRepository $repository,
         EntityManager $manager
     ): array {
         $discountCodes = [];
         foreach ($order->discountCodes as $discountCode) {
+            /** @var ChanneledDiscount $discountEntity */
             $discountEntity = $repository->getByCode(code: $discountCode, channel: $order->channel)
                 ?? $repository->create(
                     data: (object) [
                         'code' => $discountCode,
                         'channel' => $order->channel,
-                        'platformId' => 0,
-                        'data' => [],
+                        'platformId' => '0',
+                        'data' => (object) [],
                     ],
                     returnEntity: true
                 );
@@ -459,6 +488,14 @@ class OrderRequests implements RequestInterface
                 repos: $repos
             );
 
+            if ($productEntity) {
+                $channeledOrderEntity->addChanneledProduct(channeledProduct: $productEntity);
+            }
+
+            if ($variantEntity) {
+                $channeledOrderEntity->addChanneledProductVariant(channeledProductVariant: $variantEntity);
+            }
+
             if ($productEntity && $variantEntity) {
                 $productEntity->addChanneledProductVariant(channeledProductVariant: $variantEntity);
                 $manager->persist(entity: $productEntity);
@@ -483,84 +520,99 @@ class OrderRequests implements RequestInterface
 
     /**
      * @param array $lineItem
-     * @param string $channel
-     * @param array $repos
+     * @param int $channel
+     * @param array{channeledProduct: ChanneledProductRepository} $repos
      * @return ChanneledProduct|null
      */
-    private static function getOrCreateChanneledProduct(array $lineItem, string $channel, array $repos): ?ChanneledProduct
+    private static function getOrCreateChanneledProduct(array $lineItem, int $channel, array $repos): ?ChanneledProduct
     {
         if (empty($lineItem['product_id'])) {
             return null;
         }
 
-        $entity = $repos['channeledProduct']->getByPlatformId(platformId: $lineItem['product_id'], channel: $channel)
-            ?? $repos['channeledProduct']->create(
+        /** @var ChanneledProduct|null $entity */
+        $entity = $repos['channeledProduct']->getByPlatformId(platformId: (string) $lineItem['product_id'], channel: $channel);
+
+        if (!$entity) {
+            /** @var ChanneledProduct $entity */
+            $entity = $repos['channeledProduct']->create(
                 data: (object) [
                     'channel' => $channel,
-                    'platformId' => $lineItem['product_id'],
-                    'data' => [],
+                    'platformId' => (string) $lineItem['product_id'],
+                    'data' => (object) [],
                 ],
                 returnEntity: true
             );
+        }
 
-        $repos['channeledOrder']->addChanneledProduct(channeledProduct: $entity);
         return $entity;
     }
 
     /**
      * @param array $lineItem
-     * @param string $channel
-     * @param array $repos
+     * @param int $channel
+     * @param array{channeledProductVariant: ChanneledProductVariantRepository} $repos
      * @return ChanneledProductVariant|null
      */
-    private static function getOrCreateChanneledProductVariant(array $lineItem, string $channel, array $repos): ?ChanneledProductVariant
+    private static function getOrCreateChanneledProductVariant(array $lineItem, int $channel, array $repos): ?ChanneledProductVariant
     {
         if (empty($lineItem['variant_id'])) {
             return null;
         }
 
-        return $repos['channeledProductVariant']->getByPlatformId(platformId: $lineItem['variant_id'], channel: $channel)
-            ?? $repos['channeledProductVariant']->create(
+        /** @var ChanneledProductVariant|null $entity */
+        $entity = $repos['channeledProductVariant']->getByPlatformId(platformId: (string) $lineItem['variant_id'], channel: $channel);
+
+        if (!$entity) {
+            /** @var ChanneledProductVariant $entity */
+            $entity = $repos['channeledProductVariant']->create(
                 data: (object) [
                     'channel' => $channel,
-                    'platformId' => $lineItem['variant_id'],
-                    'data' => [],
+                    'platformId' => (string) $lineItem['variant_id'],
+                    'data' => (object) [],
                 ],
                 returnEntity: true
             );
+        }
+
+        return $entity;
     }
 
     /**
-     * @param object $order
-     * @param EntityRepository $repository
+     * @param \stdClass|object{customer: object, channel: int} $order
+     * @param ChanneledCustomerRepository $repository
      * @return ChanneledCustomer|null
      */
-    private static function getOrCreateChanneledCustomer(object $order, EntityRepository $repository): ?ChanneledCustomer
+    private static function getOrCreateChanneledCustomer(object $order, ChanneledCustomerRepository $repository): ?ChanneledCustomer
     {
         if (isset($order->customer->id) && $order->customer->id) {
-            return $repository->getByPlatformId(platformId: $order->customer->id, channel: $order->channel)
+            /** @var ChanneledCustomer $entity */
+            $entity = $repository->getByPlatformId(platformId: $order->customer->id, channel: $order->channel)
                 ?? $repository->create(
                     data: (object) [
-                        'channel' => $order->channel,
+                        'channel' => (int) $order->channel,
                         'platformId' => $order->customer->id,
                         'email' => $order->customer->email ?? '',
-                        'data' => [],
+                        'data' => (object) [],
                     ],
                     returnEntity: true
                 );
+            return $entity;
         }
 
         if (isset($order->customer->email) && $order->customer->email) {
-            return $repository->getByEmail(email: $order->customer->email, channel: $order->channel)
+            /** @var ChanneledCustomer $entity */
+            $entity = $repository->getByEmail(email: $order->customer->email, channel: (int) $order->channel)
                 ?? $repository->create(
                     data: (object) [
-                        'channel' => $order->channel,
+                        'channel' => (int) $order->channel,
                         'platformId' => $order->customer->id ?? '',
                         'email' => $order->customer->email,
-                        'data' => [],
+                        'data' => (object) [],
                     ],
                     returnEntity: true
                 );
+            return $entity;
         }
 
         return null;

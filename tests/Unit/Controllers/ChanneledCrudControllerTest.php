@@ -165,7 +165,7 @@ class ChanneledCrudControllerTest extends TestCase
         $this->cacheService->expects($this->once())
             ->method('get')
             ->with($cacheKey, $this->anything(), $this->anything())
-            ->willReturnCallback(function ($key, $callback) use ($data) {
+            ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
 
@@ -309,7 +309,7 @@ class ChanneledCrudControllerTest extends TestCase
         $this->cacheService->expects($this->once())
             ->method('get')
             ->with($cacheKey, $this->anything(), $this->anything())
-            ->willReturnCallback(function ($key, $callback) use ($data) {
+            ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
 
@@ -368,7 +368,7 @@ class ChanneledCrudControllerTest extends TestCase
         $this->cacheService->expects($this->once())
             ->method('get')
             ->with($cacheKey, $this->anything(), $this->anything())
-            ->willReturnCallback(function ($key, $callback) use ($exceptionMessage) {
+            ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
 
@@ -421,7 +421,7 @@ class ChanneledCrudControllerTest extends TestCase
         $this->cacheService->expects($this->once())
             ->method('get')
             ->with($cacheKey, $this->anything(), 300)
-            ->willReturnCallback(function ($key, $callback) use ($count) {
+            ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
 
@@ -492,7 +492,7 @@ class ChanneledCrudControllerTest extends TestCase
         $this->cacheService->expects($this->once())
             ->method('get')
             ->with($cacheKey, $this->anything(), 600)
-            ->willReturnCallback(function ($key, $callback) use ($data) {
+            ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
 
@@ -968,9 +968,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         $repository = $this->entityManager->getRepository(
             entityName: $config[$entityKey][$configKey]
         );
-        if ($repository === null) {
-            throw new Exception("Repository for '$entity' not found");
-        }
+
         return $repository;
     }
 
@@ -996,7 +994,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
 
         $params = $params ?? [];
-        $params['filters'] = Helpers::bodyToObject($body) ?? new stdClass();
+        $params['filters'] = Helpers::bodyToObject($body);
         if (!isset($params['filters']->channel)) {
             $params['filters']->channel = $channel->value;
         }
@@ -1317,25 +1315,8 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
             'netsuite' => 5,
             'amazon' => 6,
         ];
-        $channelValue = $channelMap[$channel] ?? null;
-        if (!$channelValue) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: 'Invalid channel value',
-                httpStatus: Response::HTTP_NOT_FOUND
-            );
-        }
 
-        $channelEnum = Channel::tryFrom($channelValue);
-        if (!$channelEnum) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: 'Invalid channel enum',
-                httpStatus: Response::HTTP_NOT_FOUND
-            );
-        }
+        $channelEnum = Channel::tryFrom($channelMap[$channel]);
 
         if (!method_exists($this, $method)) {
             return $this->createResponse(

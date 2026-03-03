@@ -7,7 +7,7 @@ use Enums\Channel;
 use Enums\QueryBuilderType;
 use Exception;
 use RuntimeException;
-
+use Repositories\RepositoryInterface;
 class ChanneledPriceRuleRepository extends ChanneledBaseRepository
 {
     /**
@@ -17,13 +17,7 @@ class ChanneledPriceRuleRepository extends ChanneledBaseRepository
      */
     protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
-        if (!$this->_em) {
-            throw new RuntimeException("EntityManager is not initialized");
-        }
         $query = $this->_em->createQueryBuilder();
-        if (!$query) {
-            throw new RuntimeException("Failed to create QueryBuilder");
-        }
         match ($type) {
             QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),

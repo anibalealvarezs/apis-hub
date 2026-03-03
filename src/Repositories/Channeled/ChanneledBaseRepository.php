@@ -32,9 +32,6 @@ class ChanneledBaseRepository extends BaseRepository
      */
     protected function createBaseQueryBuilderNoJoins(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
-        if (!$this->_em) {
-            throw new RuntimeException("EntityManager is not initialized");
-        }
         $query = $this->_em->createQueryBuilder();
         match ($type) {
             QueryBuilderType::SELECT => $query->select('e'),

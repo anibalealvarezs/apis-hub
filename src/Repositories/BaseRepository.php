@@ -15,7 +15,7 @@ use Enums\QueryBuilderType;
 use Exception;
 use Helpers\Helpers;
 use ReflectionException;
-use stdClass;
+
 
 class BaseRepository extends EntityRepository
 {
@@ -47,7 +47,7 @@ class BaseRepository extends EntityRepository
     }
 
     /**
-     * @param stdClass|null $data
+     * @param object|null $data
      * @param bool $returnEntity
      * @return Entity|array|null
      * @throws MappingException
@@ -55,7 +55,7 @@ class BaseRepository extends EntityRepository
      * @throws ReflectionException
      * @throws OptimisticLockException
      */
-    public function create(stdClass $data = null, bool $returnEntity = false): Entity|array|null
+    public function create(?object $data = null, bool $returnEntity = false): Entity|array|null
     {
         $retryCount = 0;
         $maxRetries = 3;
@@ -65,7 +65,7 @@ class BaseRepository extends EntityRepository
                 $entity = new $entityName();
 
                 if ((array) $data) {
-                    foreach ($data as $key => $value) {
+                    foreach ((array) $data as $key => $value) {
                         if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
                             $entity->{'add' . Helpers::toCamelcase($key, true)}($value);
                         }
@@ -260,12 +260,12 @@ class BaseRepository extends EntityRepository
 
     /**
      * @param int $id
-     * @param stdClass|null $data
+     * @param object|null $data
      * @param bool $returnEntity
      * @return bool|array|Entity|null
      * @throws NonUniqueResultException
      */
-    public function update(int $id, stdClass $data = null, bool $returnEntity = false): bool|array|null|Entity
+    public function update(int $id, ?object $data = null, bool $returnEntity = false): bool|array|null|Entity
     {
         $entity = $this->_em->find($this->getEntityName(), $id);
 
@@ -274,7 +274,7 @@ class BaseRepository extends EntityRepository
         }
 
         if ((array) $data) {
-            foreach ($data as $key => $value) {
+            foreach ((array) $data as $key => $value) {
                 if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
                     $entity->{'add' . Helpers::toCamelcase($key)}($value);
                 }

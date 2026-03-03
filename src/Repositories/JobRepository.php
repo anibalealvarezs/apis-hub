@@ -16,8 +16,6 @@ use Faker\Factory;
 use InvalidArgumentException;
 use ReflectionEnum;
 use ReflectionException;
-use stdClass;
-
 class JobRepository extends BaseRepository
 {
     /**
@@ -38,40 +36,43 @@ class JobRepository extends BaseRepository
     }
 
     /**
-     * @param stdClass|null $data
+     * @param object|null $data
+     * @phpstan-param object{status?: int|string, entity?: string, channel?: string, uuid?: string}|null $data
      * @param bool $returnEntity
      * @return array|null
      * @throws NonUniqueResultException
      * @throws ReflectionException
      * @throws MappingException|OptimisticLockException
      */
-    public function create(stdClass $data = null, bool $returnEntity = false): ?array
+    public function create(?object $data = null, bool $returnEntity = false): ?array
     {
-        if (isset($data->status) && is_int($data->status) && $job = QueryBuilderType::from($data->status)) {
-            $data->status = $job->value;
+        $data = (array) ($data ?? []);
+
+        if (isset($data['status']) && is_int($data['status']) && $job = JobStatus::tryFrom($data['status'])) {
+            $data['status'] = $job->value;
         } else {
-            $data->status = JobStatus::scheduled->value;
+            $data['status'] = JobStatus::scheduled->value;
         }
 
-        if (!isset($data->entity) || !$data->entity) {
+        if (!isset($data['entity']) || !$data['entity']) {
             throw new InvalidArgumentException('Entity is required');
         }
-        if (!(new ReflectionEnum(AnalyticsEntity::class))->getConstant($data->entity)) {
+        if (!(new ReflectionEnum(AnalyticsEntity::class))->getConstant($data['entity'])) {
             throw new InvalidArgumentException('Invalid entity');
         }
 
-        if (!isset($data->channel)) {
+        if (!isset($data['channel'])) {
             throw new InvalidArgumentException('Channel is required');
         }
-        if (!(new ReflectionEnum(Channel::class))->getConstant($data->channel)) {
+        if (!(new ReflectionEnum(Channel::class))->getConstant($data['channel'])) {
             throw new InvalidArgumentException('Invalid channel');
         }
 
-        if (!isset($data->uuid)) {
-            $data->uuid = Factory::create()->uuid;
+        if (!isset($data['uuid'])) {
+            $data['uuid'] = Factory::create()->uuid;
         }
 
-        return parent::create($data);
+        return parent::create((object) $data);
     }
 
     /**
@@ -102,7 +103,7 @@ class JobRepository extends BaseRepository
         if ($filters) {
             foreach ($filters as $key => $value) {
                 if ($key === 'status' && !is_int($value)) {
-                    $value = (new ReflectionEnum(objectOrClass: QueryBuilderType::class))->getConstant($value);
+                    $value = (new ReflectionEnum(objectOrClass: JobStatus::class))->getConstant($value);
                 }
                 $query->andWhere('e.' . $key . ' = :' . $key)
                     ->setParameter($key, $value);
@@ -176,26 +177,28 @@ class JobRepository extends BaseRepository
      */
     public function getStatusName(int $status): string
     {
-        return QueryBuilderType::from($status)->getName();
+        return JobStatus::from($status)->getName();
     }
 
     /**
      * @param int $id
-     * @param stdClass|null $data
+     * @param object|null $data
+     * @phpstan-param object{status?: int|string}|null $data
      * @param bool $returnEntity
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function update(int $id, stdClass $data = null, bool $returnEntity = false): ?array
+    public function update(int $id, ?object $data = null, bool $returnEntity = false): ?array
     {
-        if (!isset($data->status) || !$data->status) {
-            return parent::update($id, $data);
+        $data = (array) ($data ?? []);
+        if (!isset($data['status']) || !$data['status']) {
+            return parent::update($id, (object) $data);
         }
 
-        if ($job = is_int($data->status) ? QueryBuilderType::from($data->status) : (new ReflectionEnum(QueryBuilderType::class))->getConstant($data->status)) {
-            $data->status = $job->value;
+        if ($job = is_int($data['status']) ? JobStatus::from($data['status']) : (new ReflectionEnum(JobStatus::class))->getConstant($data['status'])) {
+            $data['status'] = $job->value;
         }
 
-        return parent::update($id, $data);
+        return parent::update($id, (object) $data);
     }
 }

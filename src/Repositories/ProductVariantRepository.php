@@ -49,7 +49,7 @@ class ProductVariantRepository extends BaseRepository
 
     /**
      * @param string $productVariantId
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByProductVariantId(string $productVariantId): ?Entity
@@ -78,7 +78,7 @@ class ProductVariantRepository extends BaseRepository
 
     /**
      * @param string $sku
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getBySku(string $sku): ?Entity

@@ -401,7 +401,7 @@ class Helpers
 
     /**
      * Dump data as JSON for debugging purposes.
-     * @param mixed $data
+     * @param array $data
      * @return void
      */
     public static function dumpDebugJson(array $data){

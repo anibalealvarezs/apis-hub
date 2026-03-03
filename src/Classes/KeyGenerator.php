@@ -118,7 +118,7 @@ class KeyGenerator
 
         return match($channel) {
             Channel::google_search_console => md5(string: json_encode([
-                'channel' => $channel instanceof Channel ? $channel->getName() : (is_numeric($channel) ? Channel::from($channel)->getName() : $channel),
+                'channel' => $channel->getName(),
                 'name' => $name,
                 'period' => $period instanceof Period ? $period->value : $period,
                 'metricDate' => $metricDate instanceof DateTime ? $metricDate->format('Y-m-d') : $metricDate,

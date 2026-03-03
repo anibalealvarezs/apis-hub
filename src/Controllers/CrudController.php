@@ -5,7 +5,6 @@ namespace Controllers;
 use Doctrine\ORM\Exception\NotSupported;
 use Exception;
 use Helpers\Helpers;
-use InvalidArgumentException;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
@@ -70,14 +69,7 @@ class CrudController extends BaseController
         string $entityName,
         ?string $body
     ): array {
-        if (!empty($params) && !$this->validateParams(params: array_keys($params), entity: $entityName, method: 'readMultiple')) {
-            throw new InvalidArgumentException(message: 'Invalid parameters');
-        }
-
-        $params = $params ?? [];
-        $params['filters'] = Helpers::bodyToObject(data: $body) ?? [];
-
-        return $params;
+        return $this->prepareCrudParams(params: $params, body: $body);
     }
 
     /**

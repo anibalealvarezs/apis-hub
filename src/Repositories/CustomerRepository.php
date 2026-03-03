@@ -12,8 +12,6 @@ use Enums\QueryBuilderType;
 use Exception;
 use ReflectionException;
 use Entities\Entity;
-use stdClass;
-
 class CustomerRepository extends BaseRepository
 {
     /**
@@ -36,14 +34,14 @@ class CustomerRepository extends BaseRepository
     }
 
     /**
-     * @param stdClass|null $data
+     * @param object|null $data
      * @param bool $returnEntity
      * @return Entity|array|null
      * @throws MappingException
      * @throws NonUniqueResultException
      * @throws ReflectionException
      */
-    public function create(stdClass $data = null, bool $returnEntity = false): Entity|array|null
+    public function create(?object $data = null, bool $returnEntity = false): Entity|array|null
     {
         if (!$data || !isset($data->email)) {
             return null; // Or throw new \InvalidArgumentException('Email is required')
@@ -53,7 +51,7 @@ class CustomerRepository extends BaseRepository
 
     /**
      * @param string $email
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByEmail(string $email /*, bool $useCached = false */): ?Entity

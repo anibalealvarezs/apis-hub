@@ -24,9 +24,9 @@ class Job extends Entity
     protected string $channel;
 
     /**
-     * @return string
+     * @return int
      */
-    public function getStatus(): string
+    public function getStatus(): int
     {
         return $this->status;
     }
