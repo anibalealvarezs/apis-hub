@@ -60,7 +60,8 @@ abstract class BaseController
      * Anything not in this list will be treated as a filter.
      */
     protected const CRUD_TOP_LEVEL_PARAMS = [
-        'limit', 'pagination', 'ids', 'filters', 'orderBy', 'orderDir'
+        'limit', 'pagination', 'ids', 'filters', 'orderBy', 'orderDir',
+        'startDate', 'endDate'
     ];
 
     /**
@@ -90,17 +91,33 @@ abstract class BaseController
         $bodyData = (array) Helpers::bodyToObject(data: $body);
 
         $finalParams = [];
-        $filters = (array) ($bodyData['filters'] ?? $bodyData);
+        $queryFilters = [];
 
+        // 1. Extract Control Parameters EXCLUSIVELY from the URL (query params)
         foreach ($params as $key => $value) {
             if (in_array($key, self::CRUD_TOP_LEVEL_PARAMS)) {
-                $finalParams[$key] = $value;
+                if ($key === 'filters') {
+                    // If they send ?filters[field]=value, merge it later
+                    $queryFilters = array_merge($queryFilters, (array) $value);
+                } else {
+                    $finalParams[$key] = $value;
+                }
             } else {
-                $filters[$key] = $value;
+                // Any other query parameter is treated as a high-priority filter
+                $queryFilters[$key] = $value;
             }
         }
 
-        $finalParams['filters'] = (object) $filters;
+        // 2. Extract Business Filters from the Body (ignore control params here)
+        $bodyFilters = (array) ($bodyData['filters'] ?? $bodyData);
+        
+        // Remove any control params that might have been sent in the body to avoid accidents
+        foreach (self::CRUD_TOP_LEVEL_PARAMS as $controlParam) {
+            unset($bodyFilters[$controlParam]);
+        }
+
+        // 3. Merge: URL filters/parameters override Body filters
+        $finalParams['filters'] = (object) array_merge($bodyFilters, $queryFilters);
 
         return $finalParams;
     }

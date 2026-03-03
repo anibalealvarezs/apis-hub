@@ -82,6 +82,8 @@ class JobRepository extends BaseRepository
      * @param string $orderDir
      * @param int $limit
      * @param int $pagination
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @return QueryBuilder
      */
     protected function buildReadMultipleQuery(
@@ -90,9 +92,10 @@ class JobRepository extends BaseRepository
         string $orderBy,
         string $orderDir,
         int $limit,
-        int $pagination
-    ): QueryBuilder
-    {
+        int $pagination,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): QueryBuilder {
         $query = $this->createBaseQueryBuilder();
 
         if ($ids) {
@@ -109,6 +112,8 @@ class JobRepository extends BaseRepository
                     ->setParameter($key, $value);
             }
         }
+
+        $this->applyDateFilters($query, $startDate, $endDate);
 
         $query->orderBy("e.$orderBy", strtoupper($orderDir))
             ->setMaxResults($limit)

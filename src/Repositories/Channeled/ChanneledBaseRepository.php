@@ -87,8 +87,11 @@ class ChanneledBaseRepository extends BaseRepository
      * @throws NoResultException
      * @throws NonUniqueResultException
      */
-    public function countElements(object $filters = null): int
-    {
+    public function countElements(
+        ?object $filters = null,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): int {
         if ($filters && property_exists($filters, 'channel') && !is_int($filters->channel)) {
             try {
                 $this->validateChannelName($filters->channel);
@@ -106,6 +109,9 @@ class ChanneledBaseRepository extends BaseRepository
                     ->setParameter($key, $value);
             }
         }
+
+        $this->applyDateFilters($query, $startDate, $endDate);
+
         return $query->getQuery()->getSingleScalarResult();
     }
 

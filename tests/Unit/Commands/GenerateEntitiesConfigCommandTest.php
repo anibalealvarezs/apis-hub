@@ -428,11 +428,11 @@ class GenerateEntitiesConfigCommandTest extends TestCase
                     'return_type' => 'int'
                 ],
                 'countElements' => [
-                    'parameters' => ['filters'],
+                    'parameters' => ['filters', 'startDate', 'endDate'],
                     'return_type' => 'int'
                 ],
                 'readMultiple' => [
-                    'parameters' => ['limit', 'pagination', 'ids', 'filters', 'orderBy', 'orderDir'],
+                    'parameters' => ['limit', 'pagination', 'ids', 'filters', 'orderBy', 'orderDir', 'startDate', 'endDate'],
                     'return_type' => 'Doctrine\Common\Collections\ArrayCollection'
                 ],
                 'update' => [

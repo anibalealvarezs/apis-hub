@@ -122,11 +122,17 @@ class BaseRepository extends EntityRepository
     /**
      * @param int $id
      * @param object|null $filters
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @return QueryBuilder
      * @throws Exception
      */
-    protected function buildReadQuery(int $id, ?object $filters = null): QueryBuilder
-    {
+    protected function buildReadQuery(
+        int $id,
+        ?object $filters = null,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): QueryBuilder {
         $query = $this->createBaseQueryBuilder()
             ->where('e.id = :id')
             ->setParameter('id', $id);
@@ -137,6 +143,8 @@ class BaseRepository extends EntityRepository
                     ->setParameter($key, $value);
             }
         }
+
+        $this->applyDateFilters($query, $startDate, $endDate);
 
         return $query;
     }
@@ -155,19 +163,27 @@ class BaseRepository extends EntityRepository
 
     /**
      * @param object|null $filters
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @return int
      * @throws NoResultException
      * @throws NonUniqueResultException
      */
-    public function countElements(object $filters = null): int
-    {
+    public function countElements(
+        ?object $filters = null,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): int {
         $query = $this->createBaseQueryBuilder(QueryBuilderType::COUNT);
         if ($filters) {
-            foreach($filters as $key => $value) {
+            foreach ($filters as $key => $value) {
                 $query->andWhere('e.' . $key . ' = :' . $key)
                     ->setParameter($key, $value);
             }
         }
+
+        $this->applyDateFilters($query, $startDate, $endDate);
+
         return $query->getQuery()->getSingleScalarResult();
     }
 
@@ -178,6 +194,8 @@ class BaseRepository extends EntityRepository
      * @param object|null $filters
      * @param string $orderBy
      * @param string $orderDir
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @return ArrayCollection
      * @throws Exception
      */
@@ -187,16 +205,19 @@ class BaseRepository extends EntityRepository
         ?array $ids = null,
         ?object $filters = null,
         string $orderBy = 'id',
-        string $orderDir = 'DESC'
-    ): ArrayCollection
-    {
+        string $orderDir = 'DESC',
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): ArrayCollection {
         $query = $this->buildReadMultipleQuery(
             ids: $ids,
             filters: $filters,
             orderBy: $orderBy,
             orderDir: $orderDir,
             limit: $limit,
-            pagination: $pagination
+            pagination: $pagination,
+            startDate: $startDate,
+            endDate: $endDate
         );
 
         $list = $query->getQuery()->getResult(AbstractQuery::HYDRATE_ARRAY);
@@ -216,6 +237,8 @@ class BaseRepository extends EntityRepository
      * @param string $orderDir
      * @param int $limit
      * @param int $pagination
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @return QueryBuilder
      * @throws Exception
      */
@@ -225,9 +248,10 @@ class BaseRepository extends EntityRepository
         string $orderBy,
         string $orderDir,
         int $limit,
-        int $pagination
-    ): QueryBuilder
-    {
+        int $pagination,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): QueryBuilder {
         $query = $this->createBaseQueryBuilder();
 
         if ($ids) {
@@ -242,11 +266,47 @@ class BaseRepository extends EntityRepository
             }
         }
 
+        $this->applyDateFilters($query, $startDate, $endDate);
+
         $query->orderBy("e.$orderBy", strtoupper($orderDir))
             ->setMaxResults($limit)
             ->setFirstResult($limit * $pagination);
 
         return $query;
+    }
+
+    /**
+     * Apply date range filters if appropriate fields exist in the entity.
+     * 
+     * @param QueryBuilder $query
+     * @param string|null $startDate
+     * @param string|null $endDate
+     */
+    protected function applyDateFilters(QueryBuilder $query, ?string $startDate, ?string $endDate): void
+    {
+        if (!$startDate && !$endDate) {
+            return;
+        }
+
+        $dateField = null;
+        if ($this->_class->hasField('platformCreatedAt')) {
+            $dateField = 'platformCreatedAt';
+        } elseif ($this->_class->hasField('createdAt')) {
+            $dateField = 'createdAt';
+        } elseif ($this->_class->hasField('date')) {
+            $dateField = 'date';
+        }
+
+        if ($dateField) {
+            if ($startDate) {
+                $query->andWhere("e.$dateField >= :startDate")
+                    ->setParameter('startDate', $startDate);
+            }
+            if ($endDate) {
+                $query->andWhere("e.$dateField <= :endDate")
+                    ->setParameter('endDate', $endDate);
+            }
+        }
     }
 
     /**
