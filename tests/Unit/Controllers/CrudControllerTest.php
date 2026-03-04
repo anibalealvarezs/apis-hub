@@ -515,7 +515,7 @@ class CrudControllerTest extends TestCase
     public function testUpdateReturnsUpdatedEntity(): void
     {
         $entity = 'customer';
-        $id = $this->faker->randomNumber();
+        $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
         $body = json_encode(['name' => $this->faker->word]);
         $data = ['id' => $id, 'name' => $this->faker->word];
         $channel = 'shopify';
@@ -599,7 +599,7 @@ class CrudControllerTest extends TestCase
     public function testDeleteReturnsSuccess(): void
     {
         $entity = 'customer';
-        $id = $this->faker->randomNumber();
+        $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
 
         // Mock custom repository
         $repository = $this->getMockBuilder(stdClass::class)
