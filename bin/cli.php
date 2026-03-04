@@ -32,7 +32,9 @@ $cli->addCommands([
     new ReadEntityCommand(),
     new UpdateEntityCommand(),
     new GenerateEntitiesConfigCommand(),
-    new InitializeEntitiesCommand(Helpers::getManager())
+    new InitializeEntitiesCommand(Helpers::getManager()),
+    new \Commands\Analytics\CacheEntityCommand(),
+    new \Commands\Analytics\ProcessJobsCommand()
 ]);
 
 // Runs console application
