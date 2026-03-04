@@ -62,7 +62,8 @@ class ProcessJobsCommand extends Command
 
                 // Iniciar el caching de data via fetchData
                 $payload = $job->getPayload() ?? [];
-                $params = $payload['params'] ?? null;
+                $params = $payload['params'] ?? [];
+                $params['jobId'] = $job->getId();
                 $body = $payload['body'] ?? null;
                 
                 $controller->fetchData($job->getEntity(), $channelEnum, $params, $body);

@@ -409,4 +409,28 @@ class Helpers
         echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         die();
     }
+
+    /**
+     * @param int|null $jobId
+     * @return void
+     * @throws \Exceptions\JobCancelledException
+     */
+    public static function checkJobStatus(?int $jobId): void
+    {
+        if (!$jobId) {
+            return;
+        }
+
+        $jobRepo = self::getManager()->getRepository(\Entities\Job::class);
+        $status = $jobRepo->createQueryBuilder('j')
+            ->select('j.status')
+            ->where('j.id = :id')
+            ->setParameter('id', $jobId)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if ($status == \Enums\JobStatus::failed->value) {
+            throw new \Exceptions\JobCancelledException("El Job #{$jobId} fue interrumpido manualmente.");
+        }
+    }
 }

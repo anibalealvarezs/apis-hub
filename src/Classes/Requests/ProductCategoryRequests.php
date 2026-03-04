@@ -60,8 +60,7 @@ class ProductCategoryRequests implements RequestInterface
         ?string $publishedAtMax = null,
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true
-    ): Response {
+        string|bool $resume = true, ?int $jobId = null): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -108,7 +107,7 @@ class ProductCategoryRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -120,7 +119,7 @@ class ProductCategoryRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -134,7 +133,7 @@ class ProductCategoryRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromNetsuite(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
@@ -153,7 +152,8 @@ class ProductCategoryRequests implements RequestInterface
         $query = "SELECT * FROM CommerceCategory WHERE id >= " . (isset($lastChanneledProductCategory['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledProductCategory['platformId'] : 0) . " ORDER BY id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
             query: $query,
-            callback: function($productCategories) {
+            callback: function($productCategories) use ($jobId) {
+                Helpers::checkJobStatus($jobId);
                 self::process(NetSuiteConvert::productCategories($productCategories));
             }
         );
@@ -167,7 +167,7 @@ class ProductCategoryRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }

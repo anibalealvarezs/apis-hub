@@ -67,8 +67,7 @@ class CustomerRequests implements RequestInterface
         ?string $createdAtMax = null,
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true
-    ): Response {
+        string|bool $resume = true, ?int $jobId = null): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -90,7 +89,8 @@ class CustomerRequests implements RequestInterface
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
             pageInfo: $filters->pageInfo ?? null,
-            callback: function($customers) {
+            callback: function($customers) use ($jobId) {
+                Helpers::checkJobStatus($jobId);
                 self::process(ShopifyConvert::customers($customers));
             }
         );
@@ -112,8 +112,7 @@ class CustomerRequests implements RequestInterface
         ?string $createdAtMax = null,
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true
-    ): Response {
+        string|bool $resume = true, ?int $jobId = null): Response {
         $config = Helpers::getChannelsConfig()['klaviyo'];
         $klaviyoClient = new KlaviyoApi(
             apiKey: $config['klaviyo_api_key'],
@@ -155,7 +154,8 @@ class CustomerRequests implements RequestInterface
                 ]
             ],
             sortField: 'created',
-            callback: function($customers) {
+            callback: function($customers) use ($jobId) {
+                Helpers::checkJobStatus($jobId);
                 self::process(KlaviyoConvert::customers($customers));
             }
         );
@@ -167,7 +167,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromFacebook(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromFacebook(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -177,7 +177,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -195,8 +195,7 @@ class CustomerRequests implements RequestInterface
         ?string $createdAtMin = null,
         ?string $createdAtMax = null,
         ?object $filters = null,
-        string|bool $resume = true
-    ): Response {
+        string|bool $resume = true, ?int $jobId = null): Response {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
             consumerId: $config['netsuite_consumer_id'],
@@ -262,7 +261,8 @@ class CustomerRequests implements RequestInterface
         $query .= " ORDER BY Entity.id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
             query: $query,
-            callback: function($customers) {
+            callback: function($customers) use ($jobId) {
+                Helpers::checkJobStatus($jobId);
                 self::process(NetSuiteConvert::customers($customers));
             }
         );
@@ -274,7 +274,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -284,7 +284,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromInstagram(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromInstagram(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -294,7 +294,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromGoogleAnalytics(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromGoogleAnalytics(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -304,7 +304,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromPinterest(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromPinterest(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -314,12 +314,12 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromLinkedIn(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromLinkedIn(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
 
-    public static function getListFromX(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromX(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }

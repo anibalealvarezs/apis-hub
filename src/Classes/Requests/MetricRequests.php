@@ -109,7 +109,8 @@ class MetricRequests
         ?string $createdAtMax = null,
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true
+        string|bool $resume = true,
+        ?int $jobId = null
     ): Response {
         $config = Helpers::getChannelsConfig()['klaviyo'];
         $klaviyoClient = new KlaviyoApi(
@@ -120,7 +121,8 @@ class MetricRequests
         $metricIds = [];
         $klaviyoClient->getAllMetricsAndProcess(
             metricFields: ['id', 'name'],
-            callback: function($metrics) use (&$metricIds, $metricNames) {
+            callback: function($metrics) use (&$metricIds, $metricNames, $jobId) {
+                Helpers::checkJobStatus($jobId);
                 foreach ($metrics as $metric) {
                     if (empty($metricNames) || in_array($metric['attributes']['name'], $metricNames)) {
                         $metricIds[] = $metric['id'];
@@ -174,7 +176,8 @@ class MetricRequests
                 measurements: [AggregatedMeasurement::count],
                 filter: $formattedFilters,
                 sortField: 'datetime',
-                callback: function($aggregates) use ($metricId) {
+                callback: function($aggregates) use ($metricId, $jobId) {
+                    Helpers::checkJobStatus($jobId);
                     self::process(KlaviyoConvert::metricAggregates($aggregates, $metricId));
                 }
             );
@@ -190,7 +193,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromShopify(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromShopify(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         /* Placeholder for ShopifyApi integration */
         return new Response(json_encode([]));
@@ -211,7 +214,8 @@ class MetricRequests
         ?string $startDate = null,
         ?string $endDate = null,
         string|bool $resume = true,
-        ?LoggerInterface $logger = null
+        ?LoggerInterface $logger = null,
+        ?int $jobId = null
     ): Response {
         if (!$logger) {
             $logger = new Logger('gsc');
@@ -259,6 +263,8 @@ class MetricRequests
 
             // Process everything
             foreach($config['facebook']['pages'] as $page) {
+                Helpers::checkJobStatus($jobId);
+
                 if (!$page['enabled']) {
                     $logger->info("Skipping disabled page: " . $page['id']);
                     continue;
@@ -361,6 +367,8 @@ class MetricRequests
             }
 
             foreach ($config['facebook']['ad_accounts'] as $adAccount) {
+                Helpers::checkJobStatus($jobId);
+
                 $channeledAccountEntity = $channeledAccountRepository->findOneBy([
                     'platformId' => $adAccount['id'],
                     'account' => $accountEntity,
@@ -393,6 +401,7 @@ class MetricRequests
                     if ($adAccount['campaign_metrics']) {
                         $hasResults = true;
                         foreach ($channeledCampaignMap['mapReverse'] as $channeledCampaign) {
+                            Helpers::checkJobStatus($jobId);
                             if (!$hasResults) {
                                 break;
                             }
@@ -423,6 +432,7 @@ class MetricRequests
                         if ($adAccount['adset_metrics']) {
                             $hasResults = true;
                             foreach ($channeledAdGroupMap['mapCampaign'] as $key => $campaignId) {
+                                Helpers::checkJobStatus($jobId);
                                 if (!$hasResults) {
                                     break;
                                 }
@@ -458,6 +468,7 @@ class MetricRequests
                             if ($adAccount['ad_metrics']) {
                                 $hasResults = true;
                                 foreach ($channeledAdMap['mapAdGroup'] as $key => $adGroupId) {
+                                    Helpers::checkJobStatus($jobId);
                                     if (!$hasResults) {
                                         break;
                                     }
@@ -517,7 +528,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -527,7 +538,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromNetSuite(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromNetSuite(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -537,7 +548,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -547,7 +558,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromInstagram(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromInstagram(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -557,7 +568,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromGoogleAnalytics(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromGoogleAnalytics(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -579,7 +590,8 @@ class MetricRequests
         ?string $endDate = null,
         ?object $filters = null,
         string|bool $resume = true,
-        ?LoggerInterface $logger = null
+        ?LoggerInterface $logger = null,
+        ?int $jobId = null
     ): Response {
         if (!$logger) {
             $logger = new Logger('gsc');
@@ -650,6 +662,8 @@ class MetricRequests
 
             // Process each site
             foreach ($config['google_search_console']['sites'] as $site) {
+                Helpers::checkJobStatus($jobId);
+
                 if (!$site['enabled']) {
                     $logger->info("Skipping disabled site: " . $site['url']);
                     continue;
@@ -706,7 +720,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromPinterest(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromPinterest(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -716,7 +730,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromLinkedIn(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromLinkedIn(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -726,7 +740,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromX(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromX(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }

@@ -16,3 +16,5 @@ test_redis.php
 *.log
 /phpstan.neon
 /.vscode/
+fix_callbacks.php
+fix_signatures.php

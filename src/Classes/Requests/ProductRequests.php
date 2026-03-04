@@ -75,8 +75,7 @@ class ProductRequests implements RequestInterface
         string|int|null $collectionId = null,
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true
-    ): Response {
+        string|bool $resume = true, ?int $jobId = null): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -107,7 +106,8 @@ class ProductRequests implements RequestInterface
             updatedAtMax: $filters->updatedAtMax ?? null,
             vendor: $filters->vendor ?? null,
             pageInfo: $filters->pageInfo ?? null,
-            callback: function($products) {
+            callback: function($products) use ($jobId) {
+                Helpers::checkJobStatus($jobId);
                 self::process(ShopifyConvert::products($products));
             }
         );
@@ -124,8 +124,7 @@ class ProductRequests implements RequestInterface
     public static function getListFromKlaviyo(
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true
-    ): Response {
+        string|bool $resume = true, ?int $jobId = null): Response {
         $config = Helpers::getChannelsConfig()['klaviyo'];
         $klaviyoClient = new KlaviyoApi(
             apiKey: $config['klaviyo_api_key'],
@@ -145,7 +144,8 @@ class ProductRequests implements RequestInterface
         $klaviyoClient->getAllCatalogItemsAndProcess(
             catalogItemsFields: $fields,
             filter: $formattedFilters,
-            callback: function ($products) {
+            callback: function ($products) use ($jobId) {
+                Helpers::checkJobStatus($jobId);
                 self::process(KlaviyoConvert::products($products));
             }
         );
@@ -158,7 +158,7 @@ class ProductRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -172,7 +172,7 @@ class ProductRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(?object $filters = null, string|bool $resume = true): Response
+    public static function getListFromNetsuite(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
@@ -247,7 +247,8 @@ class ProductRequests implements RequestInterface
         $query .= " ORDER BY Item.id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
             query: $query,
-            callback: function($products) use ($netsuiteClient, $config) {
+            callback: function($products) use ($netsuiteClient, $config, $jobId) {
+                Helpers::checkJobStatus($jobId);
                 $convertedProductsArray = NetSuiteConvert::products($products)->toArray();
                 $productsIds = array_map(function($product) {
                     return $product->platformId;
@@ -301,7 +302,7 @@ class ProductRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
