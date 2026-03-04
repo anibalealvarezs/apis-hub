@@ -335,13 +335,22 @@ class CustomerRequests implements RequestInterface
     {
         try {
             $manager = Helpers::getManager();
-            $repos = self::initializeRepositories($manager);
-
-            foreach ($channeledCollection as $channeledCustomer) {
-                self::processSingleCustomer(
-                    channeledCustomer: $channeledCustomer,
-                    repos: $repos,
-                    manager: $manager
+            
+            $result = \Classes\CustomerProcessor::processCustomers($channeledCollection, $manager);
+            
+            if (!empty($result)) {
+                $cacheService = CacheService::getInstance(Helpers::getRedisClient());
+                $entities = [
+                    'Customer' => $result['emails'],
+                    'ChanneledCustomer' => $result['platformIds'],
+                ];
+                
+                // Taking the first channel processed
+                $channelName = Channel::from(reset($result['channels']))->getName(); 
+                
+                $cacheService->invalidateMultipleEntities(
+                    array_filter($entities, fn($value) => !empty($value)),
+                    $channelName
                 );
             }
 
@@ -352,144 +361,5 @@ class CustomerRequests implements RequestInterface
                 Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }
-    }
-
-    /**
-     * @param EntityManager $manager
-     * @return array
-     * @throws NotSupported
-     */
-    private static function initializeRepositories(EntityManager $manager): array
-    {
-        return [
-            'customer' => $manager->getRepository(Customer::class),
-            'channeledCustomer' => $manager->getRepository(ChanneledCustomer::class),
-        ];
-    }
-
-    /**
-     * @param \stdClass $channeledCustomer
-     * @param array $repos
-     * @param EntityManager $manager
-     * @return void
-     * @throws ORMException
-     * @throws OptimisticLockException
-     */
-    private static function processSingleCustomer(\stdClass $channeledCustomer, array $repos, EntityManager $manager): void
-    {
-        if (empty($channeledCustomer->email)) {
-            return;
-        }
-
-        $cacheService = CacheService::getInstance(Helpers::getRedisClient());
-
-        $customerEntity = self::getOrCreateCustomer(
-            customer: $channeledCustomer,
-            repository: $repos['customer']
-        );
-
-        $channeledCustomerEntity = self::getOrCreateChanneledCustomer(
-            customerEntity: $customerEntity,
-            channeledCustomer: $channeledCustomer,
-            repository: $repos['channeledCustomer']
-        );
-
-        $channeledCustomerEntity = self::updateChanneledCustomerData(
-            channeledCustomer: $channeledCustomer,
-            channeledCustomerEntity: $channeledCustomerEntity
-        );
-
-        self::finalizeCustomerRelationships(
-            customerEntity: $customerEntity,
-            channeledCustomerEntity: $channeledCustomerEntity,
-            manager: $manager
-        );
-
-        $entities = [
-            'Customer' => $customerEntity->getEmail(),
-            'ChanneledCustomer' => $channeledCustomerEntity->getPlatformId(),
-        ];
-        $cacheService->invalidateMultipleEntities(
-            array_filter($entities, fn($value) => !empty($value)),
-            Channel::from($channeledCustomer->channel)->getName()
-        );
-    }
-
-    /**
-     * @param \stdClass $customer
-     * @param CustomerRepository $repository
-     * @return Customer
-     */
-    private static function getOrCreateCustomer(\stdClass $customer, CustomerRepository $repository): Customer
-    {
-        $entity = $repository->getByEmail($customer->email)
-            ?? $repository->create(
-                (object) ['email' => $customer->email],
-                true
-            );
-        assert($entity instanceof Customer);
-        return $entity;
-    }
-
-    /**
-     * @param Entity $customerEntity
-     * @param \stdClass $channeledCustomer
-     * @param ChanneledCustomerRepository $repository
-     * @return ChanneledCustomer
-     */
-    private static function getOrCreateChanneledCustomer(Entity $customerEntity, \stdClass $channeledCustomer, ChanneledCustomerRepository $repository): ChanneledCustomer
-    {
-        $channeledCustomer->customer = $customerEntity;
-        $entity = $repository->getByPlatformId($channeledCustomer->platformId, $channeledCustomer->channel)
-            ?? $repository->create(
-                $channeledCustomer,
-                true
-            );
-        assert($entity instanceof ChanneledCustomer);
-        return $entity;
-    }
-
-    /**
-     * @param \stdClass $channeledCustomer
-     * @param ChanneledCustomer $channeledCustomerEntity
-     * @return ChanneledCustomer
-     */
-    private static function updateChanneledCustomerData(\stdClass $channeledCustomer, ChanneledCustomer $channeledCustomerEntity): ChanneledCustomer
-
-    {
-        if (empty($channeledCustomerEntity->getData())) {
-            $channeledCustomerEntity
-                ->addPlatformId($channeledCustomer->platformId)
-                ->addPlatformCreatedAt($channeledCustomer->platformCreatedAt)
-                ->addData($channeledCustomer->data);
-        } else {
-            $data = $channeledCustomerEntity->getData();
-            $data['addresses'] = Helpers::multiDimensionalArrayUnique(
-                array_merge(
-                    $data['addresses'] ?? [],
-                    $channeledCustomer->data['addresses'] ?? []
-                )
-            );
-            $channeledCustomerEntity->addData($data);
-        }
-        return $channeledCustomerEntity;
-    }
-
-    /**
-     * @param Customer $customerEntity
-     * @param ChanneledCustomer $channeledCustomerEntity
-     * @param EntityManager $manager
-     * @return void
-     * @throws ORMException
-     * @throws OptimisticLockException
-     */
-    private static function finalizeCustomerRelationships(
-        Customer $customerEntity,
-        ChanneledCustomer $channeledCustomerEntity,
-        EntityManager $manager
-    ): void {
-        $manager->persist($customerEntity);
-        $manager->persist($channeledCustomerEntity);
-        $manager->flush();
     }
 }

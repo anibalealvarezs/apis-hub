@@ -345,4 +345,207 @@ class MapGenerator
 
         return $channeledMetricMap;
     }
+
+    /**
+     * @param EntityManager $manager
+     * @param string $sql
+     * @param array $params
+     * @return array
+     * @throws Exception
+     */
+    public static function getCustomerMap(
+        EntityManager $manager,
+        string $sql,
+        array $params
+    ): array {
+        $existingCustomers = $manager->getConnection()
+            ->executeQuery($sql, $params)
+            ->fetchAllAssociative();
+
+        $customerMap = [];
+        foreach ($existingCustomers as $customer) {
+            $key = KeyGenerator::generateCustomerKey($customer['email']);
+            $customerMap[$key] = [
+                'id' => (int)$customer['id'],
+                'email' => $customer['email'],
+            ];
+        }
+
+        return $customerMap;
+    }
+
+    /**
+     * @param EntityManager $manager
+     * @param string $sql
+     * @param array $params
+     * @return array
+     * @throws Exception
+     */
+    public static function getChanneledCustomerMap(
+        EntityManager $manager,
+        string $sql,
+        array $params
+    ): array {
+        $existingChanneledCustomers = $manager->getConnection()
+            ->executeQuery($sql, $params)
+            ->fetchAllAssociative();
+
+        $channeledCustomerMap = [];
+        foreach ($existingChanneledCustomers as $channeledCustomer) {
+            $key = KeyGenerator::generateChanneledCustomerKey((string) $channeledCustomer['channel'], (string) $channeledCustomer['platformId']);
+            $channeledCustomerMap[$key] = [
+                'id' => (int)$channeledCustomer['id'],
+                'data' => $channeledCustomer['data'],
+            ];
+        }
+
+        return $channeledCustomerMap;
+    }
+
+    public static function getProductMap(EntityManager $manager, string $sql, array $params): array {
+        $existingProducts = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = ['map' => [], 'mapReverse' => []];
+        foreach ($existingProducts as $product) {
+            $key = KeyGenerator::generateProductKey($product['productId']);
+            $map['map'][$key] = ['id' => (int)$product['id'], 'productId' => $product['productId'], 'sku' => $product['sku']];
+            $map['mapReverse'][$product['id']] = $key;
+        }
+        return $map;
+    }
+
+    public static function getChanneledProductMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = [];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateChanneledProductKey((string)$item['channel'], (string)$item['platformId']);
+            $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
+        }
+        return $map;
+    }
+
+    public static function getVendorMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = ['map' => [], 'mapReverse' => []];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateVendorKey($item['name']);
+            $map['map'][$key] = ['id' => (int)$item['id'], 'name' => $item['name']];
+            $map['mapReverse'][$item['id']] = $key;
+        }
+        return $map;
+    }
+
+    public static function getChanneledVendorMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = [];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateChanneledVendorKey((string)$item['channel'], (string)$item['name']);
+            $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
+        }
+        return $map;
+    }
+
+    public static function getProductVariantMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = ['map' => [], 'mapReverse' => []];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateProductVariantKey($item['productVariantId']);
+            $map['map'][$key] = ['id' => (int)$item['id'], 'productVariantId' => $item['productVariantId'], 'sku' => $item['sku']];
+            $map['mapReverse'][$item['id']] = $key;
+        }
+        return $map;
+    }
+
+    public static function getChanneledProductVariantMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = [];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateChanneledProductVariantKey((string)$item['channel'], (string)$item['platformId']);
+            $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
+        }
+        return $map;
+    }
+
+    public static function getProductCategoryMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = ['map' => [], 'mapReverse' => []];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateProductCategoryKey($item['productCategoryId']);
+            $map['map'][$key] = ['id' => (int)$item['id'], 'productCategoryId' => $item['productCategoryId']];
+            $map['mapReverse'][$item['id']] = $key;
+        }
+        return $map;
+    }
+
+    public static function getChanneledProductCategoryMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = [];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateChanneledProductCategoryKey((string)$item['channel'], (string)$item['platformId']);
+            $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
+        }
+        return $map;
+    }
+
+    public static function getOrderMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = ['map' => [], 'mapReverse' => []];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateOrderKey((string)$item['orderId']);
+            $map['map'][$key] = ['id' => (int)$item['id'], 'orderId' => $item['orderId']];
+            $map['mapReverse'][$item['id']] = $key;
+        }
+        return $map;
+    }
+
+    public static function getChanneledOrderMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = [];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateChanneledOrderKey((string)$item['channel'], (string)$item['platformId']);
+            $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
+        }
+        return $map;
+    }
+
+    public static function getChanneledDiscountMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = [];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateChanneledDiscountKey((string)$item['channel'], (string)$item['code']);
+            $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
+        }
+        return $map;
+    }
+
+    public static function getDiscountMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = ['map' => [], 'mapReverse' => []];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateDiscountKey((string)$item['code']);
+            $map['map'][$key] = ['id' => (int)$item['id'], 'code' => $item['code']];
+            $map['mapReverse'][$item['id']] = $key;
+        }
+        return $map;
+    }
+
+    public static function getPriceRuleMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = ['map' => [], 'mapReverse' => []];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generatePriceRuleKey((string)$item['priceRuleId']);
+            $map['map'][$key] = ['id' => (int)$item['id'], 'priceRuleId' => $item['priceRuleId']];
+            $map['mapReverse'][$item['id']] = $key;
+        }
+        return $map;
+    }
+
+    public static function getChanneledPriceRuleMap(EntityManager $manager, string $sql, array $params): array {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = [];
+        foreach ($existing as $item) {
+            $key = KeyGenerator::generateChanneledPriceRuleKey((string)$item['channel'], (string)$item['platformId']);
+            $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
+        }
+        return $map;
+    }
 }

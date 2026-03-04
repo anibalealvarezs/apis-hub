@@ -214,8 +214,8 @@ class KeyGenerator
         Country|CountryEnum|string|null $country = null,
         Device|DeviceEnum|string|null $device = null,
         array $dimensions = [],
-        string $dimensionsHash = null,
-        string $metricConfigKey = null,
+        ?string $dimensionsHash = null,
+        ?string $metricConfigKey = null,
     ): string
     {
         if (is_null($metricConfigKey)) {
@@ -286,5 +286,85 @@ class KeyGenerator
         ?string $dimensionValue
     ): string {
         return md5(($channeledMetric instanceof ChanneledMetric ? $channeledMetric->getId() : $channeledMetric) . $dimensionKey . $dimensionValue);
+    }
+
+    public static function generateCustomerKey(string $email): string
+    {
+        return md5(strtolower(trim($email)));
+    }
+
+    public static function generateChanneledCustomerKey(string $channel, string $platformId): string
+    {
+        return md5($channel . '_' . $platformId);
+    }
+
+    public static function generateProductKey(string $productId): string
+    {
+        return md5((string)$productId);
+    }
+
+    public static function generateChanneledProductKey(string $channel, string $platformId): string
+    {
+        return md5($channel . '_' . $platformId);
+    }
+
+    public static function generateVendorKey(string $name): string
+    {
+        return md5(strtolower(trim($name)));
+    }
+
+    public static function generateChanneledVendorKey(string $channel, string $name): string
+    {
+        return md5($channel . '_' . strtolower(trim($name)));
+    }
+
+    public static function generateProductVariantKey(string $productVariantId): string
+    {
+        return md5((string)$productVariantId);
+    }
+
+    public static function generateChanneledProductVariantKey(string $channel, string $platformId): string
+    {
+        return md5($channel . '_' . $platformId);
+    }
+
+    public static function generateProductCategoryKey(string $productCategoryId): string
+    {
+        return md5((string)$productCategoryId);
+    }
+
+    public static function generateChanneledProductCategoryKey(string $channel, string $platformId): string
+    {
+        return md5($channel . '_' . $platformId);
+    }
+
+    public static function generateOrderKey(string $orderId): string
+    {
+        return md5((string)$orderId);
+    }
+
+    public static function generateChanneledOrderKey(string $channel, string $platformId): string
+    {
+        return md5($channel . '_' . $platformId);
+    }
+
+    public static function generateDiscountKey(string $code): string
+    {
+        return md5((string)$code);
+    }
+
+    public static function generateChanneledDiscountKey(string $channel, string $code): string
+    {
+        return md5($channel . '_' . $code);
+    }
+
+    public static function generatePriceRuleKey(string $priceRuleId): string
+    {
+        return md5((string)$priceRuleId);
+    }
+
+    public static function generateChanneledPriceRuleKey(string $channel, string $platformId): string
+    {
+        return md5($channel . '_' . $platformId);
     }
 }
