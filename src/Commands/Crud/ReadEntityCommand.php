@@ -28,8 +28,10 @@ class ReadEntityCommand extends Command
             ->setDescription('Read entity records')
             ->setHelp('This command allows you to get entities data')
             ->addOption('entity', 'e', InputOption::VALUE_REQUIRED, 'The entity which the data will be retrieved from')
+            ->addOption('channel', 'c', InputOption::VALUE_OPTIONAL, 'The channel for the entity (e.g., google_search_console)')
             ->addOption('id', 'i', InputOption::VALUE_OPTIONAL, 'The id of the entity record')
-            ->addOption('filters', 'f', InputOption::VALUE_OPTIONAL, 'The fields which will be used to filter the data');
+            ->addOption('filters', 'f', InputOption::VALUE_OPTIONAL, 'The fields which will be used to filter the data (JSON body)')
+            ->addOption('params', 'p', InputOption::VALUE_OPTIONAL, 'The query parameters like limit, pagination, hideFields (JSON or query string)');
     }
 
     /**
@@ -40,21 +42,50 @@ class ReadEntityCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        if ($input->getOption('id')) {
-            $result = (new CrudController())(
-                entity: $input->getOption('entity'),
-                method: 'read',
-                id: $input->getOption('id'),
+        $entity = $input->getOption('entity');
+        $channel = $input->getOption('channel');
+        $id = $input->getOption('id');
+        $body = $input->getOption('filters');
+        $paramsString = $input->getOption('params');
+        
+        $params = [];
+        if ($paramsString) {
+            $paramsArray = json_decode($paramsString, true);
+            if (is_array($paramsArray)) {
+                $params = $paramsArray;
+            } else {
+                parse_str($paramsString, $params);
+            }
+        }
+
+        if ($channel) {
+            $controller = new \Controllers\ChanneledCrudController();
+            $result = $controller(
+                entity: $entity,
+                channel: $channel,
+                method: $id ? 'read' : 'list',
+                id: $id,
+                body: $body,
+                params: $params
             );
         } else {
-            $result = (new CrudController())(
-                entity: $input->getOption('entity'),
-                method: 'list',
-                body: $input->getOption('filters'),
+            $controller = new CrudController();
+            $result = $controller(
+                entity: $entity,
+                method: $id ? 'read' : 'list',
+                id: $id,
+                body: $body,
+                params: $params
             );
         }
 
-        $output->writeln('<info>' . $result->getContent() . '</info>');
-        return Command::SUCCESS;
+        if ($result->getStatusCode() >= 200 && $result->getStatusCode() < 300) {
+            $content = json_decode($result->getContent(), true) ?? $result->getContent();
+            $output->writeln('<info>' . (is_array($content) ? json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : $content) . '</info>');
+            return Command::SUCCESS;
+        }
+
+        $output->writeln('<error>' . $result->getContent() . '</error>');
+        return Command::FAILURE;
     }
 }
