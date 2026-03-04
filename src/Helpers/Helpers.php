@@ -91,6 +91,15 @@ class Helpers
                 if (!is_array($config)) {
                     throw new RuntimeException("Invalid database configuration: $filePath must return an array");
                 }
+
+                // Override with environment variables if present
+                $config['driver'] = getenv('DB_DRIVER') ?: ($config['driver'] ?? 'pdo_mysql');
+                $config['host'] = getenv('DB_HOST') ?: ($config['host'] ?? '127.0.0.1');
+                $config['port'] = getenv('DB_PORT') ?: ($config['port'] ?? 3306);
+                $config['user'] = getenv('DB_USER') ?: ($config['user'] ?? 'root');
+                $config['password'] = getenv('DB_PASSWORD') !== false ? getenv('DB_PASSWORD') : ($config['password'] ?? '');
+                $config['dbname'] = getenv('DB_NAME') ?: ($config['dbname'] ?? 'apis-hub');
+
                 self::$dbConfig = $config;
             } catch (Exception $e) {
                 throw new RuntimeException("Failed to load database configuration: " . $e->getMessage());
@@ -114,6 +123,15 @@ class Helpers
                 if (!is_array($config)) {
                     throw new RuntimeException("Invalid channels configuration: $filePath must return an array");
                 }
+
+                // Override with environment variables if present
+                if ($envChannelsJson = getenv('CHANNELS_CONFIG')) {
+                    $envChannels = json_decode($envChannelsJson, true);
+                    if (is_array($envChannels)) {
+                        $config = array_replace_recursive($config, $envChannels);
+                    }
+                }
+
                 self::$channelsConfig = $config;
             } catch (Exception $e) {
                 throw new RuntimeException("Failed to load channels configuration: " . $e->getMessage());
@@ -160,6 +178,17 @@ class Helpers
                 if (!is_array($config)) {
                     throw new RuntimeException("Invalid cache configuration: $filePath must return an array");
                 }
+
+                // Override with environment variables if present
+                if (!isset($config['redis'])) {
+                    $config['redis'] = [];
+                }
+                $config['redis']['host'] = getenv('REDIS_HOST') ?: ($config['redis']['host'] ?? '127.0.0.1');
+                $config['redis']['port'] = getenv('REDIS_PORT') ? (int)getenv('REDIS_PORT') : ($config['redis']['port'] ?? 6379);
+                if (getenv('REDIS_PASSWORD') !== false) {
+                    $config['redis']['password'] = getenv('REDIS_PASSWORD');
+                }
+
                 self::$cacheConfig = $config;
             } catch (Exception $e) {
                 throw new RuntimeException("Failed to load cache configuration: " . $e->getMessage());

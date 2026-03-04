@@ -77,7 +77,7 @@ class ReadEntityCommandTest extends TestCase
         $filtersOption = $definition->getOption('filters');
         $this->assertEquals('f', $filtersOption->getShortcut());
         $this->assertTrue($filtersOption->isValueOptional());
-        $this->assertEquals('The fields which will be used to filter the data', $filtersOption->getDescription());
+        $this->assertEquals('The fields which will be used to filter the data (JSON body)', $filtersOption->getDescription());
     }
 
     /**
