@@ -349,13 +349,18 @@ class MetricConfigRepository extends BaseRepository
      */
     protected function stripPositionWeighted(array $entity): array
     {
-        $entity['metrics'] = array_map(function($metric) {
-            $metric['channeledMetrics'] = array_map(function($channelMetric) {
-                unset($channelMetric['data']['position_weighted']);
-                return $channelMetric;
-            }, $metric['channeledMetrics']);
-            unset($metric['query']['data']['position_weighted']);
-        }, $entity['metrics']);
+        if (isset($entity['metrics'])) {
+            $entity['metrics'] = array_map(function($metric) {
+                if (isset($metric['channeledMetrics'])) {
+                    $metric['channeledMetrics'] = array_map(function($channelMetric) {
+                        unset($channelMetric['data']['position_weighted']);
+                        return $channelMetric;
+                    }, $metric['channeledMetrics']);
+                }
+                return $metric;
+            }, $entity['metrics']);
+        }
+        unset($entity['query']['data']['position_weighted']);
         return $entity;
     }
 }
