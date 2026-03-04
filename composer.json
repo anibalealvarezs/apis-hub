@@ -15,6 +15,7 @@
         "anibalealvarezs/facebook-graph-api": "@dev",
         "anibalealvarezs/google-api": "@dev",
         "anibalealvarezs/klaviyo-api": "@dev",
+        "anibalealvarezs/mailchimp-api": "@dev",
         "anibalealvarezs/netsuite-api": "@dev",
         "anibalealvarezs/shopify-api": "@dev",
         "anibalealvarezs/triple-whale-api": "@dev",
@@ -51,6 +52,83 @@
         "phpstan/phpstan": "^1.10"
     },
     "repositories": [
+        {
+            "type": "path",
+            "url": "../OAuth-v1",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../api-client-skeleton",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../amazon-api-anibal",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../facebook-graph-api",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../google-api-anibal",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../klaviyo-api-anibal",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../mailchimp-api-anibal",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../netsuite-api-anibal",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../shipstation-api-anibal",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../shopify-api-anibal",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../triple-whale-api-anibal",
+            "options": {
+                "symlink": true
+            }
+        },
         {
             "type": "composer", "url": "https://satis.anibalalvarez.com/"
         }
