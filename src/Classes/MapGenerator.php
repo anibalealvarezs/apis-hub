@@ -402,7 +402,8 @@ class MapGenerator
         return $channeledCustomerMap;
     }
 
-    public static function getProductMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getProductMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existingProducts = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existingProducts as $product) {
@@ -413,7 +414,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getChanneledProductMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getChanneledProductMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
@@ -423,7 +425,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getVendorMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getVendorMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existing as $item) {
@@ -434,7 +437,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getChanneledVendorMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getChanneledVendorMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
@@ -444,7 +448,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getProductVariantMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getProductVariantMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existing as $item) {
@@ -455,7 +460,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getChanneledProductVariantMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getChanneledProductVariantMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
@@ -465,7 +471,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getProductCategoryMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getProductCategoryMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existing as $item) {
@@ -476,7 +483,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getChanneledProductCategoryMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getChanneledProductCategoryMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
@@ -486,7 +494,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getOrderMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getOrderMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existing as $item) {
@@ -497,7 +506,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getChanneledOrderMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getChanneledOrderMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
@@ -507,7 +517,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getChanneledDiscountMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getChanneledDiscountMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
@@ -517,7 +528,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getDiscountMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getDiscountMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existing as $item) {
@@ -528,7 +540,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getPriceRuleMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getPriceRuleMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existing as $item) {
@@ -539,7 +552,8 @@ class MapGenerator
         return $map;
     }
 
-    public static function getChanneledPriceRuleMap(EntityManager $manager, string $sql, array $params): array {
+    public static function getChanneledPriceRuleMap(EntityManager $manager, string $sql, array $params): array
+    {
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {

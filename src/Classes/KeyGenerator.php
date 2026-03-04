@@ -73,8 +73,7 @@ class KeyGenerator
         Order|string|null $order = null,
         Country|CountryEnum|string|null $country = null,
         Device|DeviceEnum|string|null $device = null
-    ): string
-    {
+    ): string {
         /* Helpers::dumpDebugJson([
             'channel' => $channel instanceof Channel ? $channel->getName() : $channel,
             'name' => $name,
@@ -216,8 +215,7 @@ class KeyGenerator
         array $dimensions = [],
         ?string $dimensionsHash = null,
         ?string $metricConfigKey = null,
-    ): string
-    {
+    ): string {
         if (is_null($metricConfigKey)) {
             if (is_null($channel) || is_null($name) || is_null($period) || is_null($metricDate)) {
                 throw new InvalidArgumentException('Channel, name, period and metricDate are required to generate a metric key.');
@@ -260,7 +258,8 @@ class KeyGenerator
         });
     }
 
-    public static function generateDimensionsHash(array $dimensions): string {
+    public static function generateDimensionsHash(array $dimensions): string
+    {
         return md5(string: json_encode($dimensions, JSON_UNESCAPED_UNICODE));
     }
 

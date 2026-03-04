@@ -47,7 +47,7 @@ class HelpersTest extends TestCase
      */
     public function testListPrivateProperties(): void
     {
-        $testObject = new class {
+        $testObject = new class () {
             /** @phpstan-ignore-next-line */
             private $privateProp;
             protected $protectedProp;
@@ -86,10 +86,10 @@ class HelpersTest extends TestCase
      */
     public function testGetManager(): void
     {
-        // We avoid hardcoding credentials in the test file. 
+        // We avoid hardcoding credentials in the test file.
         // Helpers::getManager() will load the configuration from config/yaml/dbconfig.yaml
         $entityManager = Helpers::getManager();
-        
+
         $this->assertInstanceOf(EntityManager::class, $entityManager);
         $this->assertTrue($entityManager->isOpen());
     }
@@ -136,19 +136,24 @@ class HelpersTest extends TestCase
 
             public function getId(): ?int
             {
-                return $this->id; }
+                return $this->id;
+            }
             public function getName(): string
             {
-                return $this->name; }
+                return $this->name;
+            }
             public function getCreatedAt(): DateTime
             {
-                return $this->createdAt; }
+                return $this->createdAt;
+            }
             public function getUpdatedAt(): ?DateTime
             {
-                return $this->updatedAt; }
+                return $this->updatedAt;
+            }
             public function getDeletedAt(): ?DateTime
             {
-                return $this->deletedAt; }
+                return $this->deletedAt;
+            }
         };
 
         $result = Helpers::jsonSerialize($entity);

@@ -161,7 +161,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         ];
 
         foreach ($entityDirs as $type => $dir) {
-            $filteredFiles = array_filter($fileList, fn($file) => str_contains($file, $dir));
+            $filteredFiles = array_filter($fileList, fn ($file) => str_contains($file, $dir));
             foreach ($filteredFiles as $file) {
                 $config = $processEntityFile->invoke($command, $file, $type, $output);
                 if ($config) {
@@ -314,7 +314,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         ];
 
         foreach ($entityDirs as $type => $dir) {
-            $filteredFiles = array_filter($fileList, fn($file) => str_contains($file, $dir));
+            $filteredFiles = array_filter($fileList, fn ($file) => str_contains($file, $dir));
             foreach ($filteredFiles as $file) {
                 $config = $processEntityFile->invoke($command, $file, $type, $output);
                 if ($config) {
@@ -360,8 +360,8 @@ class GenerateEntitiesConfigCommandTest extends TestCase
             $this->vfs->url() . '/src/Entities/ProductVariant.php',
             $this->vfs->url() . '/src/Entities/Vendor.php'
         ];
-        $result = array_map(fn($path) => str_replace('\\', '/', $path), $result);
-        $expected = array_map(fn($path) => str_replace('\\', '/', $path), $expected);
+        $result = array_map(fn ($path) => str_replace('\\', '/', $path), $result);
+        $expected = array_map(fn ($path) => str_replace('\\', '/', $path), $expected);
         sort($result);
         sort($expected);
         $this->assertSame($expected, $result, 'Expected files: ' . implode(', ', $expected) . '; Got: ' . implode(', ', $result));

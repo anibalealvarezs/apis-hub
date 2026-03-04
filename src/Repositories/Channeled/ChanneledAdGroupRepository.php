@@ -4,7 +4,6 @@ namespace Repositories\Channeled;
 
 use Entities\Entity;
 
-
 class ChanneledAdGroupRepository extends ChanneledBaseRepository
 {
     /**

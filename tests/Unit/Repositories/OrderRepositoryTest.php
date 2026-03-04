@@ -74,7 +74,7 @@ class OrderRepositoryTest extends TestCase
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(4))
             ->method('addSelect')
-            ->with($this->callback(function ($arg) use (&$addSelectCallCount,) {
+            ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
                 $addSelectExpected = ['o', 'c', 'p', 'd'];
                 error_log("testCreateBaseQueryBuilderSelect: addSelect call #$addSelectCallCount with arg=" . json_encode($arg));
                 $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg, "addSelect does not match for call #$addSelectCallCount");
@@ -116,7 +116,7 @@ class OrderRepositoryTest extends TestCase
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(4))
             ->method('addSelect')
-            ->with($this->callback(function ($arg) use (&$addSelectCallCount,) {
+            ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
                 $addSelectExpected = ['o', 'c', 'p', 'd'];
                 error_log("testCreateBaseQueryBuilderCount: addSelect call #$addSelectCallCount with arg=" . json_encode($arg));
                 $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg, "addSelect does not match for call #$addSelectCallCount");

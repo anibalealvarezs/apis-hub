@@ -56,11 +56,14 @@ class PriceRuleProcessor
         if (!empty($uPR)) {
             $prIds = array_column($uPR, 'priceRuleId');
             $priceRuleMap = self::fetchAndInsertEntities(
-                $conn, 'price_rules', 'priceRuleId', $prIds,
+                $conn,
+                'price_rules',
+                'priceRuleId',
+                $prIds,
                 ['priceRuleId'],
-                [$uPR, fn($p) => [$p['priceRuleId']]],
-                fn($chunk) => "SELECT id, priceRuleId FROM price_rules WHERE priceRuleId IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
-                fn($conn, $sql, $params) => MapGenerator::getPriceRuleMap($manager, $sql, $params)
+                [$uPR, fn ($p) => [$p['priceRuleId']]],
+                fn ($chunk) => "SELECT id, priceRuleId FROM price_rules WHERE priceRuleId IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
+                fn ($conn, $sql, $params) => MapGenerator::getPriceRuleMap($manager, $sql, $params)
             );
         }
 
@@ -73,9 +76,11 @@ class PriceRuleProcessor
             }
 
             $cprMap = self::fetchChanneledEntities(
-                $conn, $cprKeys, 'platformId',
-                fn($chunk) => "SELECT id, channel, platformId, data FROM channeled_price_rules WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
-                fn($conn, $sql, $params) => MapGenerator::getChanneledPriceRuleMap($manager, $sql, $params)
+                $conn,
+                $cprKeys,
+                'platformId',
+                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_price_rules WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                fn ($conn, $sql, $params) => MapGenerator::getChanneledPriceRuleMap($manager, $sql, $params)
             );
 
             $insertRows = [];
@@ -83,7 +88,9 @@ class PriceRuleProcessor
 
             foreach ($uCPR as $k => $cpr) {
                 $prKey = KeyGenerator::generatePriceRuleKey($cpr['priceRuleId']);
-                if (!isset($priceRuleMap['map'][$prKey])) continue;
+                if (!isset($priceRuleMap['map'][$prKey])) {
+                    continue;
+                }
                 $prId = $priceRuleMap['map'][$prKey]['id'];
 
                 $row = [
@@ -106,9 +113,11 @@ class PriceRuleProcessor
             self::bulkUpsert($conn, 'channeled_price_rules', ['id', 'price_rule_id', 'channel', 'platformId', 'platformCreatedAt', 'data'], ['price_rule_id', 'channel', 'platformId', 'platformCreatedAt', 'data', 'updatedAt' => 'CURRENT_TIMESTAMP'], $updateRows);
 
             $cprMap = self::fetchChanneledEntities(
-                $conn, $cprKeys, 'platformId',
-                fn($chunk) => "SELECT id, channel, platformId, data FROM channeled_price_rules WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
-                fn($conn, $sql, $params) => MapGenerator::getChanneledPriceRuleMap($manager, $sql, $params)
+                $conn,
+                $cprKeys,
+                'platformId',
+                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_price_rules WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                fn ($conn, $sql, $params) => MapGenerator::getChanneledPriceRuleMap($manager, $sql, $params)
             );
         }
 
@@ -130,7 +139,7 @@ class PriceRuleProcessor
 
     /**
      * Process discounts for a specific channeled price rule
-     * 
+     *
      * @param ArrayCollection $channeledCollection
      * @param string $priceRulePlatformId
      * @param int $channeledPriceRuleDbId
@@ -180,11 +189,14 @@ class PriceRuleProcessor
         if (!empty($uDisc)) {
             $codes = array_column($uDisc, 'code');
             $discountMap = self::fetchAndInsertEntities(
-                $conn, 'discounts', 'code', $codes,
+                $conn,
+                'discounts',
+                'code',
+                $codes,
                 ['code'],
-                [$uDisc, fn($d) => [$d['code']]],
-                fn($chunk) => "SELECT id, code FROM discounts WHERE code IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
-                fn($conn, $sql, $params) => MapGenerator::getDiscountMap($manager, $sql, $params)
+                [$uDisc, fn ($d) => [$d['code']]],
+                fn ($chunk) => "SELECT id, code FROM discounts WHERE code IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
+                fn ($conn, $sql, $params) => MapGenerator::getDiscountMap($manager, $sql, $params)
             );
         }
 
@@ -197,9 +209,11 @@ class PriceRuleProcessor
             }
 
             $cdMap = self::fetchChanneledEntities(
-                $conn, $cdKeys, 'code',
-                fn($chunk) => "SELECT id, channel, code, data FROM channeled_discounts WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND code = ?)")),
-                fn($conn, $sql, $params) => MapGenerator::getChanneledDiscountMap($manager, $sql, $params)
+                $conn,
+                $cdKeys,
+                'code',
+                fn ($chunk) => "SELECT id, channel, code, data FROM channeled_discounts WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND code = ?)")),
+                fn ($conn, $sql, $params) => MapGenerator::getChanneledDiscountMap($manager, $sql, $params)
             );
 
             $insertRows = [];
@@ -207,7 +221,9 @@ class PriceRuleProcessor
 
             foreach ($uCDisc as $k => $cd) {
                 $dKey = KeyGenerator::generateDiscountKey($cd['code']);
-                if (!isset($discountMap['map'][$dKey])) continue;
+                if (!isset($discountMap['map'][$dKey])) {
+                    continue;
+                }
                 $dId = $discountMap['map'][$dKey]['id'];
 
                 $row = [
@@ -302,7 +318,9 @@ class PriceRuleProcessor
 
     private static function bulkInsert(\Doctrine\DBAL\Connection $conn, string $table, array $columns, array $rows, int $chunkSize = 500): void
     {
-        if (empty($rows)) return;
+        if (empty($rows)) {
+            return;
+        }
         $chunks = array_chunk($rows, $chunkSize);
         $colStr = implode(', ', $columns);
         foreach ($chunks as $chunk) {
@@ -319,10 +337,12 @@ class PriceRuleProcessor
 
     private static function bulkUpsert(\Doctrine\DBAL\Connection $conn, string $table, array $columns, array $updateMap, array $rows, int $chunkSize = 500): void
     {
-        if (empty($rows)) return;
+        if (empty($rows)) {
+            return;
+        }
         $chunks = array_chunk($rows, $chunkSize);
         $colStr = implode(', ', $columns);
-        
+
         $updateStrings = [];
         foreach ($updateMap as $key => $val) {
             if (is_int($key)) {

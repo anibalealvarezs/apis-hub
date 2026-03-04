@@ -23,7 +23,7 @@ class GoogleSearchConsoleProcessor
             $this->logger->info("Processing combination: " . implode(',', $dims) . ", rows=" . count($result['rows']));
             foreach ($result['rows'] as $row) {
                 $uniqueMetrics[] = $row;
-                $keyParts = array_map(fn($k) => $k ?? 'null', $row['keys']);
+                $keyParts = array_map(fn ($k) => $k ?? 'null', $row['keys']);
                 $metricKey = implode(':', $keyParts);
                 $this->logger->info("Preserved row: key=$metricKey, impressions={$row['impressions']}, clicks={$row['clicks']}, dimensions=" . implode(',', $dims));
             }

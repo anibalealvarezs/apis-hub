@@ -10,7 +10,7 @@ class ShopifyConvert
 {
     public static function customers(array $customers): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($customer) {
+        return new ArrayCollection(array_map(function ($customer) {
             return (object) [
                 'platformId' => $customer['id'],
                 'platformCreatedAt' => Carbon::parse($customer['created_at']),
@@ -27,7 +27,7 @@ class ShopifyConvert
      */
     public static function discounts(array $discounts): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($discount) {
+        return new ArrayCollection(array_map(function ($discount) {
             return (object) [
                 'platformId' => $discount['id'],
                 'platformCreatedAt' => Carbon::parse($discount['created_at']),
@@ -40,7 +40,7 @@ class ShopifyConvert
 
     public static function priceRules(array $priceRules): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($priceRule) {
+        return new ArrayCollection(array_map(function ($priceRule) {
             return (object) [
                 'platformId' => $priceRule['id'],
                 'platformCreatedAt' => Carbon::parse($priceRule['created_at']),
@@ -52,7 +52,7 @@ class ShopifyConvert
 
     public static function orders(array $orders): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($order) {
+        return new ArrayCollection(array_map(function ($order) {
             return (object) [
                 'platformId' => $order['id'],
                 'platformCreatedAt' => Carbon::parse($order['created_at']),
@@ -60,7 +60,7 @@ class ShopifyConvert
                 'data' => $order,
                 'customer' => (object) $order['customer'],
                 'discountCodes' => !empty($order['discount_codes']) ?
-                    array_map(function($discountCode) {
+                    array_map(function ($discountCode) {
                         return $discountCode['code'];
                     }, $order['discount_codes']) :
                     [],
@@ -71,7 +71,7 @@ class ShopifyConvert
 
     public static function products(array $products): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($product) {
+        return new ArrayCollection(array_map(function ($product) {
             return (object) [
                 'platformId' => $product['id'],
                 'sku' => $product['sku'] ?? '',
@@ -86,7 +86,7 @@ class ShopifyConvert
 
     public static function productVariants(array $productVariants): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($productVariant) {
+        return new ArrayCollection(array_map(function ($productVariant) {
             return (object) [
                 'platformId' => $productVariant['id'],
                 'sku' => $productVariant['sku'] ?? '',
@@ -99,7 +99,7 @@ class ShopifyConvert
 
     public static function productCategories(array $productCategories, bool $isSmartCollection = false): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($productCategory) use ($isSmartCollection) {
+        return new ArrayCollection(array_map(function ($productCategory) use ($isSmartCollection) {
             return (object) [
                 'platformId' => $productCategory['id'],
                 'platformCreatedAt' => Carbon::parse($productCategory['published_at']),

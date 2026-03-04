@@ -90,7 +90,7 @@ class CrudController extends BaseController
             $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id) . ($hideFields ? '_' . implode('_', $hideFields) : '');
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->read(id: $id)
+                callback: fn () => $repository->read(id: $id)
             );
 
             return $this->createResponse(
@@ -132,7 +132,7 @@ class CrudController extends BaseController
                 $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
                 $count = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn() => $repository->countElements(filters: $params['filters'])
+                    callback: fn () => $repository->countElements(filters: $params['filters'])
                 );
             }
 
@@ -178,13 +178,13 @@ class CrudController extends BaseController
                 $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params)) . ($hideFields ? '_' . implode('_', $hideFields) : '');
                 $data = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn() => $repository->readMultiple(...$params)->toArray()
+                    callback: fn () => $repository->readMultiple(...$params)->toArray()
                 );
             }
 
             $meta = array_filter(
                 $params,
-                fn($k) => !in_array($k, ['filters', 'extra']),
+                fn ($k) => !in_array($k, ['filters', 'extra']),
                 ARRAY_FILTER_USE_KEY
             );
 

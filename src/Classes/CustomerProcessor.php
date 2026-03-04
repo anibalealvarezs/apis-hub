@@ -76,15 +76,15 @@ class CustomerProcessor
 
         // 2. Fetch or Insert basic Customers
         $customerEmails = array_column($uniqueCustomers, 'email');
-        
+
         // chunking queries to avoid limits
         $chunks = array_chunk($customerEmails, 1000);
         $customerMap = [];
-        
+
         foreach ($chunks as $chunk) {
             $selectPlaceholders = implode(', ', array_fill(0, count($chunk), '?'));
             $sql = "SELECT id, email FROM customers WHERE email IN ($selectPlaceholders)";
-            
+
             $map = MapGenerator::getCustomerMap($manager, $sql, $chunk);
             $customerMap = array_merge($customerMap, $map);
         }
@@ -111,7 +111,7 @@ class CustomerProcessor
             foreach ($insertChunks as $chunk) {
                 $selectPlaceholders = implode(', ', array_fill(0, count($chunk), '?'));
                 $sql = "SELECT id, email FROM customers WHERE email IN ($selectPlaceholders)";
-                
+
                 $map = MapGenerator::getCustomerMap($manager, $sql, $chunk);
                 $customerMap = array_merge($customerMap, $map);
             }
@@ -138,7 +138,7 @@ class CustomerProcessor
                 $params[] = $cc['platformId'];
             }
             $sql = "SELECT id, channel, platformId, data FROM channeled_customers WHERE " . implode(' OR ', $conditions);
-            
+
             $map = MapGenerator::getChanneledCustomerMap($manager, $sql, $params);
             $channeledCustomerMap = array_merge($channeledCustomerMap, $map);
         }
@@ -151,14 +151,14 @@ class CustomerProcessor
             $customerKey = KeyGenerator::generateCustomerKey($cc['customer_email']);
             // Fallback in case something weird happens
             if (!isset($customerMap[$customerKey])) {
-                continue; 
+                continue;
             }
             $customerId = $customerMap[$customerKey]['id'];
 
             if (isset($channeledCustomerMap[$key])) {
                 // Determine if data update is necessary
-                $existingData = is_string($channeledCustomerMap[$key]['data']) 
-                                ? json_decode($channeledCustomerMap[$key]['data'], true) 
+                $existingData = is_string($channeledCustomerMap[$key]['data'])
+                                ? json_decode($channeledCustomerMap[$key]['data'], true)
                                 : $channeledCustomerMap[$key]['data'];
                 if (is_array($existingData)) {
                     $mergedData = $existingData;

@@ -55,7 +55,7 @@ class FacebookGraphConvert
         $elements = [];
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
-            foreach($row['values'] as $value) {
+            foreach ($row['values'] as $value) {
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook->value,
                     name: $row['name'],
@@ -93,9 +93,9 @@ class FacebookGraphConvert
             }
         }
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -142,7 +142,7 @@ class FacebookGraphConvert
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
             $dimensions = [];
-            foreach($breakdowns as $breakdown) {
+            foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
                     $logger?->warning("Skipping breakdown $breakdown for row $index of Ad Account metrics due to missing value");
                     continue;
@@ -155,7 +155,7 @@ class FacebookGraphConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach($row as $key => $value) {
+            foreach ($row as $key => $value) {
                 if (!in_array($key, $metricsList)) {
                     continue;
                 }
@@ -194,9 +194,9 @@ class FacebookGraphConvert
             }
         }
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -272,10 +272,10 @@ class FacebookGraphConvert
             if (isset($row['total_value']['breakdowns'])) {
                 $breakdowns = $row['total_value']['breakdowns'][0]['dimension_keys'];
                 if (isset($row['total_value']['breakdowns'][0]['results'])) {
-                    foreach($row['total_value']['breakdowns'][0]['results'] as $vector) {
+                    foreach ($row['total_value']['breakdowns'][0]['results'] as $vector) {
                         $channeledMetric->value = $vector['value'];
                         $dimensions = [];
-                        foreach($breakdowns as $key => $breakdown) {
+                        foreach ($breakdowns as $key => $breakdown) {
                             $dimensions[] = [
                                 'dimensionKey' => $breakdown,
                                 'dimensionValue' => $vector['dimension_values'][$key],
@@ -313,9 +313,9 @@ class FacebookGraphConvert
             }
         }
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -400,9 +400,9 @@ class FacebookGraphConvert
             }
         }
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -451,7 +451,7 @@ class FacebookGraphConvert
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
             $dimensions = [];
-            foreach($breakdowns as $breakdown) {
+            foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
                     $logger?->warning("Skipping breakdown $breakdown for row $index of Campaign metrics due to missing value");
                     continue;
@@ -464,7 +464,7 @@ class FacebookGraphConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach($row as $key => $value) {
+            foreach ($row as $key => $value) {
                 if (!in_array($key, $metricsList)) {
                     continue;
                 }
@@ -506,9 +506,9 @@ class FacebookGraphConvert
 
         // Helpers::dumpDebugJson($elements);
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -561,7 +561,7 @@ class FacebookGraphConvert
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
             $dimensions = [];
-            foreach($breakdowns as $breakdown) {
+            foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
                     $logger?->warning("Skipping breakdown $breakdown for row $index of Adset metrics due to missing value");
                     continue;
@@ -574,7 +574,7 @@ class FacebookGraphConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach($row as $key => $value) {
+            foreach ($row as $key => $value) {
                 if (!in_array($key, $metricsList)) {
                     continue;
                 }
@@ -617,9 +617,9 @@ class FacebookGraphConvert
 
         // Helpers::dumpDebugJson($elements);
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -674,7 +674,7 @@ class FacebookGraphConvert
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
             $dimensions = [];
-            foreach($breakdowns as $breakdown) {
+            foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
                     $logger?->warning("Skipping breakdown $breakdown for row $index of Adset metrics due to missing value");
                     continue;
@@ -687,7 +687,7 @@ class FacebookGraphConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach($row as $key => $value) {
+            foreach ($row as $key => $value) {
                 if (!in_array($key, $metricsList)) {
                     continue;
                 }
@@ -731,9 +731,9 @@ class FacebookGraphConvert
 
         // Helpers::dumpDebugJson($elements);
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }

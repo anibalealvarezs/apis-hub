@@ -385,13 +385,13 @@ class Helpers
     public static function multiDimensionalArrayUnique(array $multiDimensionalArray): array
     {
         // Apply array_map() to each sub-array to convert it to a string representation
-        $stringMatrix = array_map(function($array) {
+        $stringMatrix = array_map(function ($array) {
             return json_encode($array);
         }, $multiDimensionalArray);
         // Remove duplicates based on the string representation
         $uniqueStringMatrix = array_unique($stringMatrix);
         // Convert back to the original multidimensional array
-        return array_map(function($variant) {
+        return array_map(function ($variant) {
             return json_decode($variant, true);
         }, $uniqueStringMatrix);
     }
@@ -423,7 +423,7 @@ class Helpers
      */
     public static function str_contains_any(string $haystack, array $needles): bool
     {
-        return array_reduce($needles, fn($a, $n) => $a || str_contains($haystack, $n), false);
+        return array_reduce($needles, fn ($a, $n) => $a || str_contains($haystack, $n), false);
     }
 
     /**
@@ -433,7 +433,7 @@ class Helpers
      */
     public static function str_contains_all(string $haystack, array $needles): bool
     {
-        return array_reduce($needles, fn($a, $n) => $a && str_contains($haystack, $n), true);
+        return array_reduce($needles, fn ($a, $n) => $a && str_contains($haystack, $n), true);
     }
 
     /**
@@ -441,7 +441,8 @@ class Helpers
      * @param array $data
      * @return void
      */
-    public static function dumpDebugJson(array $data){
+    public static function dumpDebugJson(array $data)
+    {
         header('Content-Type: application/json');
         echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         die();

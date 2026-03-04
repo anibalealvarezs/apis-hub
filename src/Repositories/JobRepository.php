@@ -16,6 +16,7 @@ use Faker\Factory;
 use InvalidArgumentException;
 use ReflectionEnum;
 use ReflectionException;
+
 class JobRepository extends BaseRepository
 {
     /**

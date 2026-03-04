@@ -15,7 +15,6 @@ use Entities\Entity;
 use Enums\Channel;
 use Enums\QueryBuilderType;
 
-
 class ChanneledMetricRepository extends ChanneledBaseRepository
 {
     /** Controls whether the raw JSON `data` field is included in results */

@@ -124,7 +124,7 @@ abstract class BaseController
 
         // 2. Extract Business Filters from the Body (ignore control params here)
         $bodyFilters = (array) ($bodyData['filters'] ?? $bodyData);
-        
+
         // Remove any control params that might have been sent in the body to avoid accidents
         foreach (self::CRUD_TOP_LEVEL_PARAMS as $controlParam) {
             unset($bodyFilters[$controlParam]);

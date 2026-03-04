@@ -12,6 +12,7 @@ use Enums\QueryBuilderType;
 use Exception;
 use ReflectionException;
 use Entities\Entity;
+
 class CustomerRepository extends BaseRepository
 {
     /**
@@ -94,7 +95,7 @@ class CustomerRepository extends BaseRepository
      */
     protected function replaceChannelName(array $entity): array
     {
-        $entity['channeledCustomers'] = array_map(function($channelCustomer) {
+        $entity['channeledCustomers'] = array_map(function ($channelCustomer) {
             $channelCustomer['channel'] = Channel::from($channelCustomer['channel'])->getName();
             return $channelCustomer;
         }, $entity['channeledCustomers']);

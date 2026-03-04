@@ -136,13 +136,13 @@ class ChanneledCrudController extends BaseController
                 ],
             ];
 
-            $cacheKey = $this->cacheKeyGenerator->forChanneledEntity($channel->value, $entity, $id) 
-                . ($rawData ? '_raw' : '') 
+            $cacheKey = $this->cacheKeyGenerator->forChanneledEntity($channel->value, $entity, $id)
+                . ($rawData ? '_raw' : '')
                 . ($hideFields ? '_' . implode('_', $hideFields) : '');
 
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->read(...$params)
+                callback: fn () => $repository->read(...$params)
             );
 
             return $this->createResponse(
@@ -187,7 +187,7 @@ class ChanneledCrudController extends BaseController
 
                 $count = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn() => $repository->countElements(filters: $params['filters']),
+                    callback: fn () => $repository->countElements(filters: $params['filters']),
                     ttl: 300
                 );
             }
@@ -245,20 +245,20 @@ class ChanneledCrudController extends BaseController
             if ($hasBodyFilters) {
                 $data = $repository->readMultiple(...$params)->toArray();
             } else {
-                $cacheKey = 'channeled_list_' . $entity . '_' . $channel->value . '_' . md5(serialize($params['filters'])) 
-                    . ($rawData ? '_raw' : '') 
+                $cacheKey = 'channeled_list_' . $entity . '_' . $channel->value . '_' . md5(serialize($params['filters']))
+                    . ($rawData ? '_raw' : '')
                     . ($hideFields ? '_' . implode('_', $hideFields) : '');
 
                 $data = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn() => $repository->readMultiple(...$params)->toArray(),
+                    callback: fn () => $repository->readMultiple(...$params)->toArray(),
                     ttl: 600
                 );
             }
 
             $meta = array_filter(
                 $params,
-                fn($k) => !in_array($k, ['filters', 'extra']),
+                fn ($k) => !in_array($k, ['filters', 'extra']),
                 ARRAY_FILTER_USE_KEY
             );
 

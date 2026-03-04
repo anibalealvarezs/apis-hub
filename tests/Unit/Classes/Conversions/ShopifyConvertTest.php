@@ -132,7 +132,7 @@ class ShopifyConvertTest extends TestCase
         $this->assertEquals(Channel::shopify->value, $product->channel);
         $this->assertEquals('2026-03-04 01:00:00', $product->platformCreatedAt->setTimezone('UTC')->format('Y-m-d H:i:s'));
         $this->assertEquals($input[0], $product->data);
-        
+
         $this->assertInstanceOf(ArrayCollection::class, $product->variants);
         $this->assertCount(1, $product->variants);
         $this->assertEquals(404, $product->variants->first()->platformId);

@@ -76,7 +76,7 @@ class VendorRequests implements RequestInterface
      * @param ArrayCollection $channeledCollection
      * @return Response
      */
-    static function process(ArrayCollection $channeledCollection): Response
+    public static function process(ArrayCollection $channeledCollection): Response
     {
         // TODO: Implement process() method.
 

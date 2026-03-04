@@ -74,7 +74,7 @@ class CacheControllerTest extends TestCase
     {
         $body = json_encode(['filters' => ['key' => 'value'], 'other' => 'data']);
         $params = ['extra' => 'param'];
-        // Note: The new implementation uses Reflection to filter params. 
+        // Note: The new implementation uses Reflection to filter params.
         // We'll mock a simple class to test this.
         $expected = [
             'filters' => (object) ['key' => 'value', 'other' => 'data', 'extra' => 'param']

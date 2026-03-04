@@ -34,7 +34,7 @@ class ProcessJobsCommand extends Command
     {
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
-        
+
         $output->writeln("Querying scheduled jobs...");
 
         // Note: findBy is provided by Doctrine EntityRepository
@@ -54,7 +54,7 @@ class ProcessJobsCommand extends Command
             try {
                 // Update to processing
                 $jobRepo->update($job->getId(), (object)['status' => JobStatus::processing->value]);
-                
+
                 $channelEnum = Channel::tryFromName($job->getChannel());
                 if (!$channelEnum) {
                     throw new \Exception("Invalid channel enum: " . $job->getChannel());
@@ -65,13 +65,13 @@ class ProcessJobsCommand extends Command
                 $params = $payload['params'] ?? [];
                 $params['jobId'] = $job->getId();
                 $body = $payload['body'] ?? null;
-                
+
                 $controller->fetchData($job->getEntity(), $channelEnum, $params, $body);
 
                 // Update to completed
                 $jobRepo->update($job->getId(), (object)['status' => JobStatus::completed->value]);
                 $output->writeln("<info>Successfully completed job {$job->getUuid()}</info>");
-                
+
             } catch (Throwable $e) {
                 // Update to failed
                 $jobRepo->update($job->getId(), (object)['status' => JobStatus::failed->value]);

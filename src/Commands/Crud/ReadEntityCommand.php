@@ -47,7 +47,7 @@ class ReadEntityCommand extends Command
         $id = $input->getOption('id');
         $body = $input->getOption('filters');
         $paramsString = $input->getOption('params');
-        
+
         $params = [];
         if ($paramsString) {
             $paramsArray = json_decode($paramsString, true);

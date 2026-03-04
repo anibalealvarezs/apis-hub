@@ -355,10 +355,12 @@ class CrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
         };
@@ -420,16 +422,20 @@ class CrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
-            public function getId() {
+            public function getId()
+            {
                 return $this->data['id'];
             }
-            public function getChannel(): string {
+            public function getChannel(): string
+            {
                 return 'shopify';
             }
         };
@@ -522,16 +528,20 @@ class CrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
-            public function getId() {
+            public function getId()
+            {
                 return $this->data['id'];
             }
-            public function getChannel(): string {
+            public function getChannel(): string
+            {
                 return 'shopify';
             }
         };
@@ -662,10 +672,12 @@ class CrudControllerTest extends TestCase
         $id = $this->faker->randomNumber();
         $result = new class ($id) {
             private int $id;
-            public function __construct(int $id) {
+            public function __construct(int $id)
+            {
                 $this->id = $id;
             }
-            public function getId(): int {
+            public function getId(): int
+            {
                 return $this->id;
             }
         };
@@ -690,10 +702,12 @@ class CrudControllerTest extends TestCase
         $channel = 'shopify';
         $result = new class ($channel) {
             private string $channel;
-            public function __construct(string $channel) {
+            public function __construct(string $channel)
+            {
                 $this->channel = $channel;
             }
-            public function getChannel(): string {
+            public function getChannel(): string
+            {
                 return $this->channel;
             }
         };
@@ -798,7 +812,7 @@ class ConcreteCrudController extends CrudController
             $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id);
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->read($id)
+                callback: fn () => $repository->read($id)
             );
 
             return $this->createResponse(
@@ -827,7 +841,7 @@ class ConcreteCrudController extends CrudController
                 $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
                 $count = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn() => $repository->countElements($filters)
+                    callback: fn () => $repository->countElements($filters)
                 );
             }
 
@@ -854,7 +868,7 @@ class ConcreteCrudController extends CrudController
             $cacheKey = 'list_' . $entity . '_' . md5(json_encode(['filters' => $filters, 'extra' => $extra]));
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->readMultiple($filters, $extra)->toArray()
+                callback: fn () => $repository->readMultiple($filters, $extra)->toArray()
             );
 
             return $this->createResponse(

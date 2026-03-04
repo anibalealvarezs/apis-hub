@@ -78,7 +78,7 @@ class ChanneledVendorRepository extends ChanneledBaseRepository
     protected function replaceChannelName(array $entity): array
     {
         $entity['channel'] = Channel::from($entity['channel'])->getName();
-        $entity['channeledProducts'] = array_map(function($channeledProduct) {
+        $entity['channeledProducts'] = array_map(function ($channeledProduct) {
             unset($channeledProduct['channel']);
             return $channeledProduct;
         }, $entity['channeledProducts']);

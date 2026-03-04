@@ -87,11 +87,11 @@ class ChanneledProductRepository extends ChanneledBaseRepository
     {
         $entity['channel'] = Channel::from($entity['channel'])->getName();
         unset($entity['channeledVendor']['channel']);
-        $entity['channeledProductCategories'] = array_map(function($channeledProductCategory) {
+        $entity['channeledProductCategories'] = array_map(function ($channeledProductCategory) {
             unset($channeledProductCategory['channel']);
             return $channeledProductCategory;
         }, $entity['channeledProductCategories']);
-        $entity['channeledProductVariants'] = array_map(function($channeledProductVariant) {
+        $entity['channeledProductVariants'] = array_map(function ($channeledProductVariant) {
             unset($channeledProductVariant['channel']);
             return $channeledProductVariant;
         }, $entity['channeledProductVariants']);

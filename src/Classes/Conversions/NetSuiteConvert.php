@@ -30,7 +30,7 @@ class NetSuiteConvert
         $customersArray = [];
         foreach ($customers as $customer) {
             // Identify Customers
-            if (!isset($customersArray[$customer['entityid']])){
+            if (!isset($customersArray[$customer['entityid']])) {
                 $customerWithoutAddress = array_diff_key($customer, array_flip($addressLineKeys));
                 $customerWithoutAddress['addresses'] = [];
                 $customersArray[$customer['entityid']] = [
@@ -44,7 +44,7 @@ class NetSuiteConvert
             $customersArray[$customer['entityid']]['data']['addresses'][] = $address;
         }
 
-        return new ArrayCollection(array_map(function($customer) {
+        return new ArrayCollection(array_map(function ($customer) {
             return (object) [
                 'platformId' => $customer['entityid'],
                 'platformCreatedAt' => $customer['datecreated'] ? Carbon::parse($customer['datecreated']) : null,
@@ -61,7 +61,7 @@ class NetSuiteConvert
      */
     public static function discounts(array $discounts): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($discount) {
+        return new ArrayCollection(array_map(function ($discount) {
             return (object) [
                 'platformId' => $discount['id'],
                 'platformCreatedAt' => Carbon::parse($discount['created_at']),
@@ -74,7 +74,7 @@ class NetSuiteConvert
 
     public static function priceRules(array $priceRules): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($priceRule) {
+        return new ArrayCollection(array_map(function ($priceRule) {
             return (object) [
                 'platformId' => $priceRule['id'],
                 'platformCreatedAt' => Carbon::parse($priceRule['created_at']),
@@ -129,7 +129,7 @@ class NetSuiteConvert
         $ordersArray = [];
         foreach ($orders as $order) {
             // Identify Orders
-            if (!isset($ordersArray[$order['id']])){
+            if (!isset($ordersArray[$order['id']])) {
                 $orderWithoutTransactionLine = array_diff_key($order, array_flip($transactionLineKeys));
                 $ordersArray[$order['id']] = [
                     'id' => $orderWithoutTransactionLine['id'],
@@ -150,7 +150,7 @@ class NetSuiteConvert
                 ];
             }
             $transactionLine = array_intersect_key($order, array_flip($transactionLineKeys));
-            switch($transactionLine[strtolower('TransactionLineItemType')]) {
+            switch ($transactionLine[strtolower('TransactionLineItemType')]) {
                 case 'TaxItem':
                     $ordersArray[$order['id']]['data']['taxTotal'] -= $transactionLine[strtolower('TransactionLineForeignAmount')];
                     break;
@@ -191,7 +191,7 @@ class NetSuiteConvert
             $ordersArray[$order['id']]['data']['subtotalBeforeDiscounts'] = $ordersArray[$order['id']]['data']['subtotalAfterDiscounts'] + $ordersArray[$order['id']]['data']['discountTotal'];
         }
 
-        return new ArrayCollection(array_map(function($order) {
+        return new ArrayCollection(array_map(function ($order) {
             return (object) [
                 'platformId' => $order['id'],
                 'platformCreatedAt' => $order['created_at'] ? Carbon::parse($order['created_at']) : null,
@@ -218,7 +218,7 @@ class NetSuiteConvert
             }
             // Identify Parents
             if ($product['itemtype'] === 'NonInvtPart') {
-                if (!isset($productsArray[$product['id']])){
+                if (!isset($productsArray[$product['id']])) {
                     $productsArray[$product['id']] = [
                         'id' => $product['id'],
                         'sku' => $product['itemid'] ?? '',
@@ -275,13 +275,13 @@ class NetSuiteConvert
         }
 
         $fixedProductsArray = [];
-        foreach($productsArray as $key => $product) {
+        foreach ($productsArray as $key => $product) {
             // Remove duplicates
             $product['variants'] = Helpers::multiDimensionalArrayUnique($product['variants']);
             $fixedProductsArray[$key] = $product;
         }
 
-        return new ArrayCollection(array_map(function($product) {
+        return new ArrayCollection(array_map(function ($product) {
             return (object) [
                 'platformId' => $product['id'],
                 'sku' => $product['sku'],
@@ -297,7 +297,7 @@ class NetSuiteConvert
 
     public static function productVariants(array $productVariants): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($productVariant) {
+        return new ArrayCollection(array_map(function ($productVariant) {
             return (object) [
                 'platformId' => $productVariant['id'],
                 'sku' => $productVariant['itemid'] ?? '',
@@ -310,7 +310,7 @@ class NetSuiteConvert
 
     public static function productCategories(array $productCategories): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($productCategory) {
+        return new ArrayCollection(array_map(function ($productCategory) {
             return (object) [
                 'platformId' => $productCategory['id'],
                 'platformCreatedAt' => isset($productCategory['created']) ? Carbon::parse($productCategory['created']) : null,
@@ -323,7 +323,7 @@ class NetSuiteConvert
 
     public static function vendors(array $vendors): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($vendor) {
+        return new ArrayCollection(array_map(function ($vendor) {
             return (object) [
                 'platformId' => $vendor['id'] ?? '',
                 'name' => $vendor['name'] ?? '',

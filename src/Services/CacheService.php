@@ -127,7 +127,7 @@ class CacheService
             // Invalidate single-entity caches
             if (!str_starts_with($entity, 'Channeled') && !empty($ids)) {
                 $cacheKeys = array_map(
-                    fn($id) => $cacheKeyGenerator->forEntity(entityType: $entity, id: $id),
+                    fn ($id) => $cacheKeyGenerator->forEntity(entityType: $entity, id: $id),
                     $ids
                 );
                 $this->redisClient->del($cacheKeys);
@@ -147,7 +147,7 @@ class CacheService
                     if (!empty($entities[$channeledEntity])) {
                         $channeledIds = is_array($entities[$channeledEntity]) ? array_filter($entities[$channeledEntity]) : [$entities[$channeledEntity]];
                         $channeledCacheKeys = array_map(
-                            fn($id) => $cacheKeyGenerator->forChanneledEntity(channel: $channel, entityType: $channeledEntity, id: $id),
+                            fn ($id) => $cacheKeyGenerator->forChanneledEntity(channel: $channel, entityType: $channeledEntity, id: $id),
                             $channeledIds
                         );
                         $this->redisClient->del($channeledCacheKeys);
@@ -181,7 +181,7 @@ class CacheService
             if ($ids !== null) {
                 $ids = array_filter($ids);
                 if (!empty($ids)) {
-                    $keys = array_map(fn($id) => $cacheKeyGenerator->forEntity($entity, $id), $ids);
+                    $keys = array_map(fn ($id) => $cacheKeyGenerator->forEntity($entity, $id), $ids);
                     $this->redisClient->del($keys);
                 }
             }
@@ -196,7 +196,7 @@ class CacheService
             if ($channel) {
                 if (!empty($ids)) {
                     $channeledKeys = array_map(
-                        fn($id) => $cacheKeyGenerator->forChanneledEntity($channel, $entity, $id),
+                        fn ($id) => $cacheKeyGenerator->forChanneledEntity($channel, $entity, $id),
                         $ids
                     );
                     $this->redisClient->del($channeledKeys);

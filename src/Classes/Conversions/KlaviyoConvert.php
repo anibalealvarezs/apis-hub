@@ -16,7 +16,7 @@ class KlaviyoConvert
 {
     public static function customers(array $customers): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($customer) {
+        return new ArrayCollection(array_map(function ($customer) {
             return (object) [
                 'platformId' => $customer['id'],
                 'platformCreatedAt' => Carbon::parse($customer['attributes']['created']),
@@ -29,7 +29,7 @@ class KlaviyoConvert
 
     public static function products(array $products): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($product) {
+        return new ArrayCollection(array_map(function ($product) {
             return (object) [
                 'platformId' => $product['id'],
                 'sku' => $product['sku'] ?? '',
@@ -44,7 +44,7 @@ class KlaviyoConvert
 
     public static function productVariants(array $productVariants): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($productVariant) {
+        return new ArrayCollection(array_map(function ($productVariant) {
             return (object) [
                 'platformId' => $productVariant['id'],
                 'sku' => $productVariant['sku'] ?? '',
@@ -57,7 +57,7 @@ class KlaviyoConvert
 
     public static function productCategories(array $productCategories): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($productCategory) {
+        return new ArrayCollection(array_map(function ($productCategory) {
             return (object) [
                 'platformId' => $productCategory['id'],
                 'platformCreatedAt' => isset($productCategory['attributes']['created']) ? Carbon::parse($productCategory['attributes']['created']) : null,
@@ -81,7 +81,7 @@ class KlaviyoConvert
         $cacheKey = 'klaviyo_metric_names_' . md5($metricId);
         $metricName = $cacheService->get(
             key: $cacheKey,
-            callback: function() use ($metricId) {
+            callback: function () use ($metricId) {
                 $klaviyoClient = new KlaviyoApi(
                     apiKey: Helpers::getChannelsConfig()['klaviyo']['klaviyo_api_key']
                 );

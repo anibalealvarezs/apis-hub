@@ -71,7 +71,7 @@ class PriceRuleRepositoryTest extends TestCase
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(2))
             ->method('addSelect')
-            ->with($this->callback(function ($arg) use (&$addSelectCallCount,) {
+            ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
                 $addSelectExpected = ['p', 'd'];
                 error_log("testCreateBaseQueryBuilderSelect: addSelect call #$addSelectCallCount with arg=" . json_encode($arg));
                 $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg, "addSelect does not match for call #$addSelectCallCount");
@@ -113,7 +113,7 @@ class PriceRuleRepositoryTest extends TestCase
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(2))
             ->method('addSelect')
-            ->with($this->callback(function ($arg) use (&$addSelectCallCount,) {
+            ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
                 $addSelectExpected = ['p', 'd'];
                 error_log("testCreateBaseQueryBuilderCount: addSelect call #$addSelectCallCount with arg=" . json_encode($arg));
                 $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg, "addSelect does not match for call #$addSelectCallCount");

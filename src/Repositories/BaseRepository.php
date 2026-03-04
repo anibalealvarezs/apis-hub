@@ -16,7 +16,6 @@ use Exception;
 use Helpers\Helpers;
 use ReflectionException;
 
-
 class BaseRepository extends EntityRepository
 {
     /**
@@ -255,7 +254,7 @@ class BaseRepository extends EntityRepository
         $list = $query->getQuery()->getResult(AbstractQuery::HYDRATE_ARRAY);
 
         $processedList = array_map(
-            fn($item) => $this->processResult($item),
+            fn ($item) => $this->processResult($item),
             $list
         );
 
@@ -309,7 +308,7 @@ class BaseRepository extends EntityRepository
 
     /**
      * Apply date range filters if appropriate fields exist in the entity.
-     * 
+     *
      * @param QueryBuilder $query
      * @param string|null $startDate
      * @param string|null $endDate

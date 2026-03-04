@@ -627,7 +627,7 @@ class MetricsProcessor
         $uniqueMetrics = [];
         /** @var \stdClass&object{dimensions: array, metricConfigKey: string, value: float|int, metadata?: array} $metric */
         foreach ($metrics->toArray() as $metric) {
-            $dimensions = array_map(function($dimension){
+            $dimensions = array_map(function ($dimension) {
                 return [ 'dimensionKey' => $dimension['dimensionKey'], 'dimensionValue' => $dimension['dimensionValue'] ];
             }, $metric->dimensions);
             $dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
@@ -1003,7 +1003,7 @@ class MetricsProcessor
     ): void {
         // $logger->info("Processing " . count($metrics->toArray()) . " metrics in processChanneledMetricDimensions");
         // Extract dimensions from metrics
-        
+
         $uniqueDimensions = [];
         /** @var \stdClass&object{dimensions: array, dimensionsHash: string, metricConfigKey: string, channel: string, platformId: string, platformCreatedAt: string|\DateTime} $metric */
         foreach ($metrics->toArray() as $metric) {
@@ -1063,10 +1063,14 @@ class MetricsProcessor
                 $selectParams[] = $channeledMetricId;
 
                 $conditions[] = $dimensionKey === null ? 'dimensionKey IS NULL' : 'dimensionKey = ?';
-                if ($dimensionKey !== null) $selectParams[] = $dimensionKey;
+                if ($dimensionKey !== null) {
+                    $selectParams[] = $dimensionKey;
+                }
 
                 $conditions[] = $dimensionValue === null ? 'dimensionValue IS NULL' : 'dimensionValue = ?';
-                if ($dimensionValue !== null) $selectParams[] = $dimensionValue;
+                if ($dimensionValue !== null) {
+                    $selectParams[] = $dimensionValue;
+                }
 
                 $nullConditions[] = '(' . implode(' AND ', $conditions) . ')';
             } else {
@@ -1128,7 +1132,8 @@ class MetricsProcessor
             $manager->getConnection()->executeStatement(
                 "INSERT INTO channeled_metric_dimensions (channeledMetric_id, dimensionKey, dimensionValue)
                     VALUES $insertPlaceholders",
-                $insertParams);
+                $insertParams
+            );
         }
     }
 }

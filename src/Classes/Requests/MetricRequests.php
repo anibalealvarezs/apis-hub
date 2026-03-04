@@ -121,7 +121,7 @@ class MetricRequests
         $metricIds = [];
         $klaviyoClient->getAllMetricsAndProcess(
             metricFields: ['id', 'name'],
-            callback: function($metrics) use (&$metricIds, $metricNames, $jobId) {
+            callback: function ($metrics) use (&$metricIds, $metricNames, $jobId) {
                 Helpers::checkJobStatus($jobId);
                 foreach ($metrics as $metric) {
                     if (empty($metricNames) || in_array($metric['attributes']['name'], $metricNames)) {
@@ -176,7 +176,7 @@ class MetricRequests
                 measurements: [AggregatedMeasurement::count],
                 filter: $formattedFilters,
                 sortField: 'datetime',
-                callback: function($aggregates) use ($metricId, $jobId) {
+                callback: function ($aggregates) use ($metricId, $jobId) {
                     Helpers::checkJobStatus($jobId);
                     self::process(KlaviyoConvert::metricAggregates($aggregates, $metricId));
                 }
@@ -243,7 +243,7 @@ class MetricRequests
             $channeledAdRepository = $manager->getRepository(ChanneledAd::class);
 
             // Load global entities
-            $accountEntity = $accountRepository->findOneBy(['name' =>$config['facebook']['accounts_group_name']]);
+            $accountEntity = $accountRepository->findOneBy(['name' => $config['facebook']['accounts_group_name']]);
 
             // Load pages and create a map
             /** @var Page[] $pages */
@@ -262,7 +262,7 @@ class MetricRequests
             $totalDuplicates = 0;
 
             // Process everything
-            foreach($config['facebook']['pages'] as $page) {
+            foreach ($config['facebook']['pages'] as $page) {
                 Helpers::checkJobStatus($jobId);
 
                 if (!$page['enabled']) {
@@ -1270,7 +1270,7 @@ class MetricRequests
                     'data' => [],
                 ];
                 $option = 1;
-                While ($option <= 5) {
+                while ($option <= 5) {
                     // OPTIONS LIST:
                     // 1. Get REACH and VIEWS broken by FOLLOW_TYPE and MEDIA_PRODUCT_TYPE (Default)
                     // 2. Get FOLLOWS_AND_UNFOLLOWS broken by FOLLOW_TYPE
@@ -1930,7 +1930,8 @@ class MetricRequests
             manager: $manager,
             sql: $sql,
             params: $params,
-        ); $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        );
+        $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
 
         // Get the list of metrics that need to be inserted
         $postsToInsert = [];
@@ -2820,9 +2821,9 @@ class MetricRequests
                 ];
             }
 
-            foreach($subsetRows as $rows) {
+            foreach ($subsetRows as $rows) {
                 foreach ($rows as $row) {
-                    foreach($row as $element) {
+                    foreach ($row as $element) {
                         if (is_string($element)) {
                             continue;
                         }
@@ -3623,8 +3624,9 @@ class MetricRequests
                             'device' => $metric->device,
                             'value' => $metric->value ?: 0.0, // Ensure non-NULL
                             'metadata' => $metric->metadata ?? []
-                        ]
-                    , true);
+                        ],
+                        true
+                    );
                     if (!$metricEntity->getId()) {
                         $logger->error("Metric entity created but has no ID: name=$metric->name, query=$queryString");
                     }
@@ -3745,8 +3747,16 @@ class MetricRequests
                 $logger->info("Attempting to find ChanneledMetric: platformId=" . ($channeledMetric->platformId ?? 'null') . ", channel=" . ($channeledMetric->channel ?? 'null') . ", metricId={$metricEntity->getId()}, platformCreatedAt={$platformCreatedAt->format('Y-m-d')}");
 
                 // Attempt to find existing channeled metric
-                list($channeledMetricCache, $channeledMetricEntity) = self::processChanneledMetric($channeledMetricCache,
-                    $cacheKey, $logger, $channeledMetric, $metricEntity, $platformCreatedAt, $repository, $manager);
+                list($channeledMetricCache, $channeledMetricEntity) = self::processChanneledMetric(
+                    $channeledMetricCache,
+                    $cacheKey,
+                    $logger,
+                    $channeledMetric,
+                    $metricEntity,
+                    $platformCreatedAt,
+                    $repository,
+                    $manager
+                );
 
                 // Process dimensions
                 list($dimensionCache) = self::processDimensions(
@@ -3806,7 +3816,7 @@ class MetricRequests
         $origin = Carbon::parse("2000-01-01");
         $now = Carbon::now();
         $min = $startDate ? Carbon::parse($startDate) : (
-        $lastChanneledMetric && filter_var($resume, FILTER_VALIDATE_BOOLEAN)
+            $lastChanneledMetric && filter_var($resume, FILTER_VALIDATE_BOOLEAN)
             ? Carbon::parse($lastChanneledMetric['platformCreatedAt'])
             : $origin
         );
@@ -3940,8 +3950,10 @@ class MetricRequests
                 $updatedData = [
                     'impressions' => max($channeledMetricData['impressions'] ?? 0, $newData['impressions'] ?? 0),
                     'clicks' => max($channeledMetricData['clicks'] ?? 0, $newData['clicks'] ?? 0),
-                    'position_weighted' => max($channeledMetricData['position_weighted'] ?? 0,
-                        $newData['position_weighted'] ?? 0),
+                    'position_weighted' => max(
+                        $channeledMetricData['position_weighted'] ?? 0,
+                        $newData['position_weighted'] ?? 0
+                    ),
                     'ctr' => max($channeledMetricData['ctr'] ?? 0, $newData['ctr'] ?? 0)
                 ];
 
@@ -4054,8 +4066,11 @@ class MetricRequests
      */
     protected static function getNormalizedDimensions(object $metric): array
     {
-        $dimensions = isset($metric->dimensions) ? array_column((array)$metric->dimensions, 'dimensionValue',
-            'dimensionKey') : [];
+        $dimensions = isset($metric->dimensions) ? array_column(
+            (array)$metric->dimensions,
+            'dimensionValue',
+            'dimensionKey'
+        ) : [];
         $normalizedDimensions = array_map(function ($value) {
             return is_string($value) ? strtolower(trim($value)) : ($value ?? 'unknown');
         }, $dimensions);
@@ -4082,7 +4097,7 @@ class MetricRequests
         $dimensionFilterGroups = [];
         if ($includeKeywords) {
             $dimensionFilterGroups[] = [
-                'filters' => array_map(fn($kw) => [
+                'filters' => array_map(fn ($kw) => [
                     'dimension' => Dimension::QUERY,
                     'operator' => Operator::CONTAINS,
                     'expression' => $kw
@@ -4091,7 +4106,7 @@ class MetricRequests
             ];
         } elseif ($excludeKeywords) {
             $dimensionFilterGroups[] = [
-                'filters' => array_map(fn($kw) => [
+                'filters' => array_map(fn ($kw) => [
                     'dimension' => Dimension::QUERY,
                     'operator' => Operator::NOT_CONTAINS,
                     'expression' => $kw
@@ -4101,7 +4116,7 @@ class MetricRequests
         }
         if ($includeCountries) {
             $dimensionFilterGroups[] = [
-                'filters' => array_map(fn($country) => [
+                'filters' => array_map(fn ($country) => [
                     'dimension' => Dimension::COUNTRY,
                     'operator' => Operator::EQUALS,
                     'expression' => $country
@@ -4110,7 +4125,7 @@ class MetricRequests
             ];
         } elseif ($excludeCountries) {
             $dimensionFilterGroups[] = [
-                'filters' => array_map(fn($country) => [
+                'filters' => array_map(fn ($country) => [
                     'dimension' => Dimension::COUNTRY,
                     'operator' => Operator::NOT_EQUALS,
                     'expression' => $country
@@ -4120,7 +4135,7 @@ class MetricRequests
         }
         if ($includePages) {
             $dimensionFilterGroups[] = [
-                'filters' => array_map(fn($page) => [
+                'filters' => array_map(fn ($page) => [
                     'dimension' => Dimension::PAGE,
                     'operator' => Operator::CONTAINS,
                     'expression' => $page
@@ -4129,7 +4144,7 @@ class MetricRequests
             ];
         } elseif ($excludePages) {
             $dimensionFilterGroups[] = [
-                'filters' => array_map(fn($page) => [
+                'filters' => array_map(fn ($page) => [
                     'dimension' => Dimension::PAGE,
                     'operator' => Operator::NOT_CONTAINS,
                     'expression' => $page

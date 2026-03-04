@@ -34,7 +34,7 @@ class GoogleSearchConsoleClient
             }
             $combinations[] = $combo;
         }
-        usort($combinations, fn($a, $b) => count($b) <=> count($a));
+        usort($combinations, fn ($a, $b) => count($b) <=> count($a));
         $this->logger->info("Generated " . count($combinations) . " dimension combinations");
         return $combinations;
     }

@@ -199,8 +199,8 @@ class GoogleSearchConsoleConvert
             }
         }
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
                 $collection->add($metricNameElement);
             }
         }
@@ -219,7 +219,8 @@ class GoogleSearchConsoleConvert
      * @param array $new New data to aggregate
      * @return array Aggregated data
      */
-    public static function aggregateMetrics(array $data, array $new): array {
+    public static function aggregateMetrics(array $data, array $new): array
+    {
         // Sum additive metrics
         $totalImpressions = (int)($data['impressions'] ?? 0) + (int)($new['impressions'] ?? 0);
         $totalClicks = (int)($data['clicks'] ?? 0) + (int)($new['clicks'] ?? 0);

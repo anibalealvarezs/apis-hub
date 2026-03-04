@@ -20,6 +20,7 @@ use Enums\QueryBuilderType;
 use Exception;
 use Helpers\Helpers;
 use ReflectionException;
+
 class MetricConfigRepository extends BaseRepository
 {
     /**
@@ -146,8 +147,7 @@ class MetricConfigRepository extends BaseRepository
         string $name,
         Period $period,
         DateTime $metricDate
-    ): ?Metric
-    {
+    ): ?Metric {
         return $this->createQueryBuilder('m')
             ->where('m.channel = :channel')
             ->andWhere('m.name = :name')
@@ -350,9 +350,9 @@ class MetricConfigRepository extends BaseRepository
     protected function stripPositionWeighted(array $entity): array
     {
         if (isset($entity['metrics'])) {
-            $entity['metrics'] = array_map(function($metric) {
+            $entity['metrics'] = array_map(function ($metric) {
                 if (isset($metric['channeledMetrics'])) {
-                    $metric['channeledMetrics'] = array_map(function($channelMetric) {
+                    $metric['channeledMetrics'] = array_map(function ($channelMetric) {
                         unset($channelMetric['data']['position_weighted']);
                         return $channelMetric;
                     }, $metric['channeledMetrics']);

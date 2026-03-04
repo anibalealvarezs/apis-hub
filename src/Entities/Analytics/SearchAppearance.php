@@ -1,4 +1,5 @@
 <?php
+
 namespace Entities\Analytics;
 
 use Doctrine\Common\Collections\ArrayCollection;

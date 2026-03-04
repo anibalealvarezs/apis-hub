@@ -467,10 +467,12 @@ class ChanneledCrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
         };
@@ -535,13 +537,16 @@ class ChanneledCrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
-            public function getId() {
+            public function getId()
+            {
                 return $this->data['id'];
             }
         };
@@ -641,13 +646,16 @@ class ChanneledCrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
-            public function getId() {
+            public function getId()
+            {
                 return $this->data['id'];
             }
         };
@@ -792,10 +800,12 @@ class ChanneledCrudControllerTest extends TestCase
         $id = $this->faker->randomNumber();
         $result = new class ($id) {
             private int $id;
-            public function __construct(int $id) {
+            public function __construct(int $id)
+            {
                 $this->id = $id;
             }
-            public function getId(): int {
+            public function getId(): int
+            {
                 return $this->id;
             }
         };
@@ -810,10 +820,12 @@ class ChanneledCrudControllerTest extends TestCase
         $id = $this->faker->randomNumber();
         $result = new class ($id) {
             private int $id;
-            public function __construct(int $id) {
+            public function __construct(int $id)
+            {
                 $this->id = $id;
             }
-            public function getPlatformId(): int {
+            public function getPlatformId(): int
+            {
                 return $this->id;
             }
         };
@@ -828,14 +840,17 @@ class ChanneledCrudControllerTest extends TestCase
         $code = $this->faker->word;
         $result = new class ($code) extends ChanneledDiscount {
             protected string $code;
-            public function __construct(string $code) {
+            public function __construct(string $code)
+            {
                 parent::__construct();
                 $this->code = $code;
             }
-            public function getCode(): string {
+            public function getCode(): string
+            {
                 return $this->code;
             }
-            public function getId(): ?int {
+            public function getId(): ?int
+            {
                 return null; // Override to prevent Entity::$id access
             }
         };
@@ -1020,7 +1035,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
 
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->read($id, false, $filters)
+                callback: fn () => $repository->read($id, false, $filters)
             );
 
             return $this->createResponse(
@@ -1052,7 +1067,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
 
             $count = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->countElements($params['filters']),
+                callback: fn () => $repository->countElements($params['filters']),
                 ttl: 300
             );
 
@@ -1092,7 +1107,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
 
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->readMultiple($params['filters'], $params['extra'] ?? null)->toArray(),
+                callback: fn () => $repository->readMultiple($params['filters'], $params['extra'] ?? null)->toArray(),
                 ttl: 600
             );
 
@@ -1274,8 +1289,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         ?string $body = null,
         ?array $params = null,
         ...$extraArgs
-    ): Response
-    {
+    ): Response {
         $channelsConfig = $this->getChannelsConfig();
         $validChannels = ['shopify', 'klaviyo', 'facebook', 'bigcommerce', 'netsuite', 'amazon'];
         $channelEnum = Channel::tryFromName($channel);

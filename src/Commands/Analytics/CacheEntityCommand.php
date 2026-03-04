@@ -53,7 +53,7 @@ class CacheEntityCommand extends Command
         $entity = $input->getArgument('entity');
         $body = $input->getOption('data');
         $paramsString = $input->getOption('params');
-        
+
         $params = [];
         if ($paramsString) {
             $paramsArray = json_decode($paramsString, true);
@@ -74,7 +74,7 @@ class CacheEntityCommand extends Command
         );
 
         $content = json_decode($response->getContent(), true) ?? $response->getContent();
-        
+
         if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
             $output->writeln('<info>Success (' . $response->getStatusCode() . '): ' . (is_array($content) ? json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : $content) . '</info>');
             return Command::SUCCESS;
