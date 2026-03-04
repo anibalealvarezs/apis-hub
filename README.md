@@ -51,7 +51,25 @@ REDIS_PORT=6379
 
 # Example of JSON injected channel config
 CHANNELS_CONFIG={"shopify":{"enabled":true,"api_key":"your-key", ...}}
+
+# Security Key for your API
+APP_API_KEY=your-super-secure-random-key
 ```
+
+---
+
+## 🔐 Security & Access
+
+To protect your public endpoints on Google Cloud, the application requires an **API Key** if the environment variable `APP_API_KEY` is set.
+
+All requests must include the following header:
+
+- **Header Name:** `X-API-Key`
+- **Header Value:** The value you defined in `APP_API_KEY`.
+
+If the header is missing or incorrect, the API will return a `401 Unauthorized` response.
+
+---
 
 ### 3. Database Initialization
 

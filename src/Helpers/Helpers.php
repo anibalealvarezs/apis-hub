@@ -198,6 +198,14 @@ class Helpers
     }
 
     /**
+     * @return string|null
+     */
+    public static function getAppApiKey(): ?string
+    {
+        return getenv('APP_API_KEY') ?: null;
+    }
+
+    /**
      * @return ClientInterface
      * @throws RuntimeException
      */

@@ -39,6 +39,19 @@ class RoutingCore implements HttpKernelInterface
         $context = new RequestContext();
         $context->fromRequest($request);
 
+        // Security Check: API Key validation
+        $expectedKeysRaw = \Helpers\Helpers::getAppApiKey();
+        if ($expectedKeysRaw !== null) {
+            $expectedKeys = array_map('trim', explode(',', $expectedKeysRaw));
+            $providedKey = $request->headers->get('X-API-Key');
+            if ($providedKey === null || !in_array($providedKey, $expectedKeys, true)) {
+                return new Response(json_encode([
+                    'status' => 'error',
+                    'error' => 'Unauthorized: Invalid or missing API Key'
+                ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
+            }
+        }
+
         $matcher = new UrlMatcher($this->routes, $context);
 
         try {
