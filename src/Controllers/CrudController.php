@@ -123,11 +123,18 @@ class CrudController extends BaseController
                 entityName: $entity,
                 body: $body
             );
-            $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
-            $count = $this->cacheService->get(
-                key: $cacheKey,
-                callback: fn() => $repository->countElements(filters: $params['filters'])
-            );
+
+            $hasBodyFilters = !empty($body) && trim($body) !== '{}' && trim($body) !== '[]';
+
+            if ($hasBodyFilters) {
+                $count = $repository->countElements(filters: $params['filters']);
+            } else {
+                $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
+                $count = $this->cacheService->get(
+                    key: $cacheKey,
+                    callback: fn() => $repository->countElements(filters: $params['filters'])
+                );
+            }
 
             return $this->createResponse(
                 data: ['count' => $count],
@@ -162,11 +169,18 @@ class CrudController extends BaseController
                 entityName: $entity,
                 body: $body
             );
-            $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params)) . ($hideFields ? '_' . implode('_', $hideFields) : '');
-            $data = $this->cacheService->get(
-                key: $cacheKey,
-                callback: fn() => $repository->readMultiple(...$params)->toArray()
-            );
+
+            $hasBodyFilters = !empty($body) && trim($body) !== '{}' && trim($body) !== '[]';
+
+            if ($hasBodyFilters) {
+                $data = $repository->readMultiple(...$params)->toArray();
+            } else {
+                $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params)) . ($hideFields ? '_' . implode('_', $hideFields) : '');
+                $data = $this->cacheService->get(
+                    key: $cacheKey,
+                    callback: fn() => $repository->readMultiple(...$params)->toArray()
+                );
+            }
 
             $meta = array_filter(
                 $params,

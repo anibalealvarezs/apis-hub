@@ -178,13 +178,19 @@ class ChanneledCrudController extends BaseController
                 channel: $channel
             );
 
-            $cacheKey = 'channeled_count_' . $entity . '_' . $channel->value . '_' . md5(serialize($params['filters']));
+            $hasBodyFilters = !empty($body) && trim($body) !== '{}' && trim($body) !== '[]';
 
-            $count = $this->cacheService->get(
-                key: $cacheKey,
-                callback: fn() => $repository->countElements(filters: $params['filters']),
-                ttl: 300
-            );
+            if ($hasBodyFilters) {
+                $count = $repository->countElements(filters: $params['filters']);
+            } else {
+                $cacheKey = 'channeled_count_' . $entity . '_' . $channel->value . '_' . md5(serialize($params['filters']));
+
+                $count = $this->cacheService->get(
+                    key: $cacheKey,
+                    callback: fn() => $repository->countElements(filters: $params['filters']),
+                    ttl: 300
+                );
+            }
 
             return $this->createResponse(
                 data: ['count' => $count],
@@ -234,15 +240,21 @@ class ChanneledCrudController extends BaseController
                 channel: $channel
             );
 
-            $cacheKey = 'channeled_list_' . $entity . '_' . $channel->value . '_' . md5(serialize($params['filters'])) 
-                . ($rawData ? '_raw' : '') 
-                . ($hideFields ? '_' . implode('_', $hideFields) : '');
+            $hasBodyFilters = !empty($body) && trim($body) !== '{}' && trim($body) !== '[]';
 
-            $data = $this->cacheService->get(
-                key: $cacheKey,
-                callback: fn() => $repository->readMultiple(...$params)->toArray(),
-                ttl: 600
-            );
+            if ($hasBodyFilters) {
+                $data = $repository->readMultiple(...$params)->toArray();
+            } else {
+                $cacheKey = 'channeled_list_' . $entity . '_' . $channel->value . '_' . md5(serialize($params['filters'])) 
+                    . ($rawData ? '_raw' : '') 
+                    . ($hideFields ? '_' . implode('_', $hideFields) : '');
+
+                $data = $this->cacheService->get(
+                    key: $cacheKey,
+                    callback: fn() => $repository->readMultiple(...$params)->toArray(),
+                    ttl: 600
+                );
+            }
 
             $meta = array_filter(
                 $params,
