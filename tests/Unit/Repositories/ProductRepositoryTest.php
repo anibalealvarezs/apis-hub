@@ -75,12 +75,13 @@ class ProductRepositoryTest extends TestCase
             ->getMock();
 
         $this->repository->method('createBaseQueryBuilderNoJoins')
-            ->willReturnCallback(function ($type) {
+            ->willReturnCallback(function (QueryBuilderType $type) {
                 error_log("Mocked createBaseQueryBuilderNoJoins with type=" . $type->name);
                 $query = $this->entityManager->createQueryBuilder();
                 match ($type) {
                     QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
                     QueryBuilderType::COUNT => $query->select('count(e.id)'),
+                    default => clone $query,
                 };
                 return $query->from($this->entityName, 'e');
             });

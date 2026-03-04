@@ -9,7 +9,7 @@ class CacheKeyGenerator
         return 'entity:' . $entityType . ':' . $id;
     }
 
-    public function forChanneledEntity(string $channel, string $entityType, int|string $id): string
+    public function forChanneledEntity(string|int $channel, string $entityType, int|string $id): string
     {
         return 'entity:' . $channel . ':' . $entityType . ':' . $id;
     }

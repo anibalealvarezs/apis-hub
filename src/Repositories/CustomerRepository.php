@@ -7,17 +7,17 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
+use Exception;
 use ReflectionException;
 use Entities\Entity;
-use stdClass;
-
 class CustomerRepository extends BaseRepository
 {
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
+     * @throws Exception
      */
     protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
@@ -25,6 +25,7 @@ class CustomerRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => throw new Exception('To be implemented'),
         };
 
         return $query->addSelect('c')
@@ -33,14 +34,14 @@ class CustomerRepository extends BaseRepository
     }
 
     /**
-     * @param stdClass|null $data
+     * @param object|null $data
      * @param bool $returnEntity
      * @return Entity|array|null
      * @throws MappingException
      * @throws NonUniqueResultException
      * @throws ReflectionException
      */
-    public function create(stdClass $data = null, bool $returnEntity = false): Entity|array|null
+    public function create(?object $data = null, bool $returnEntity = false): Entity|array|null
     {
         if (!$data || !isset($data->email)) {
             return null; // Or throw new \InvalidArgumentException('Email is required')
@@ -50,7 +51,7 @@ class CustomerRepository extends BaseRepository
 
     /**
      * @param string $email
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByEmail(string $email /*, bool $useCached = false */): ?Entity
@@ -83,7 +84,8 @@ class CustomerRepository extends BaseRepository
      */
     protected function processResult(array $result): array
     {
-        return $this->replaceChannelName($result);
+        $result = $this->replaceChannelName($result);
+        return parent::processResult($result);
     }
 
     /**
@@ -93,7 +95,7 @@ class CustomerRepository extends BaseRepository
     protected function replaceChannelName(array $entity): array
     {
         $entity['channeledCustomers'] = array_map(function($channelCustomer) {
-            $channelCustomer['channel'] = Channels::from($channelCustomer['channel'])->getName();
+            $channelCustomer['channel'] = Channel::from($channelCustomer['channel'])->getName();
             return $channelCustomer;
         }, $entity['channeledCustomers']);
         return $entity;

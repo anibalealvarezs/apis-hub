@@ -48,6 +48,7 @@ class HelpersTest extends TestCase
     public function testListPrivateProperties(): void
     {
         $testObject = new class {
+            /** @phpstan-ignore-next-line */
             private $privateProp;
             protected $protectedProp;
             public $publicProp;
@@ -63,25 +64,14 @@ class HelpersTest extends TestCase
      */
     public function testGetRedisClient(): void
     {
-        $config = [
-            'redis' => [
-                'scheme' => 'tcp',
-                'host' => '127.0.0.1',
-                'port' => 6379,
-                'timeout' => 2.5,
-            ]
-        ];
-
-        $this->setPrivateStaticProperty('cacheConfig', $config);
-
+        // We avoid hardcoding Redis credentials in the test file.
+        // Helpers::getRedisClient() will load the configuration from config/yaml/cacheconfig.yaml
         try {
             $client = Helpers::getRedisClient();
             $this->assertInstanceOf(ClientInterface::class, $client);
 
-            // Always perform at least one assertion before potential skip
             $this->assertTrue(true, 'Redis client created successfully');
 
-            // Additional connection test if possible
             if (method_exists($client, 'ping')) {
                 $response = $client->ping();
                 $this->assertTrue($response === true || $response === 'PONG', 'Redis ping successful');
@@ -96,14 +86,12 @@ class HelpersTest extends TestCase
      */
     public function testGetManager(): void
     {
-        $config = [
-            'driver' => 'pdo_sqlite',
-            'memory' => true,
-            'path' => ':memory:',
-        ];
-
-        $this->setPrivateStaticProperty('dbConfig', $config);
-        $this->assertInstanceOf(EntityManager::class, Helpers::getManager());
+        // We avoid hardcoding credentials in the test file. 
+        // Helpers::getManager() will load the configuration from config/yaml/dbconfig.yaml
+        $entityManager = Helpers::getManager();
+        
+        $this->assertInstanceOf(EntityManager::class, $entityManager);
+        $this->assertTrue($entityManager->isOpen());
     }
 
     public function testToCamelcase(): void
@@ -130,14 +118,15 @@ class HelpersTest extends TestCase
         $name = $this->faker->word;
         $now = new DateTime();
 
-        $entity = new class($id, $name, $now) extends Entity {
-            protected int $id;
+        $entity = new class ($id, $name, $now) extends Entity {
+            protected ?int $id;
             private string $name;
             protected DateTime $createdAt;
             protected DateTime $updatedAt;
             private ?DateTime $deletedAt;
 
-            public function __construct(int $id, string $name, DateTime $createdAt) {
+            public function __construct(int $id, string $name, DateTime $createdAt)
+            {
                 $this->id = $id;
                 $this->name = $name;
                 $this->createdAt = $createdAt;
@@ -145,11 +134,21 @@ class HelpersTest extends TestCase
                 $this->deletedAt = null;
             }
 
-            public function getId(): int { return $this->id; }
-            public function getName(): string { return $this->name; }
-            public function getCreatedAt(): DateTime { return $this->createdAt; }
-            public function getUpdatedAt(): ?DateTime { return $this->updatedAt; }
-            public function getDeletedAt(): ?DateTime { return $this->deletedAt; }
+            public function getId(): ?int
+            {
+                return $this->id; }
+            public function getName(): string
+            {
+                return $this->name; }
+            public function getCreatedAt(): DateTime
+            {
+                return $this->createdAt; }
+            public function getUpdatedAt(): ?DateTime
+            {
+                return $this->updatedAt; }
+            public function getDeletedAt(): ?DateTime
+            {
+                return $this->deletedAt; }
         };
 
         $result = Helpers::jsonSerialize($entity);
@@ -173,7 +172,7 @@ class HelpersTest extends TestCase
 
         $emptyResult = Helpers::dataToObject();
         $this->assertIsObject($emptyResult);
-        $this->assertEmpty((array)$emptyResult);
+        $this->assertEmpty((array) $emptyResult);
     }
 
     public function testBodyToObject(): void
@@ -186,7 +185,7 @@ class HelpersTest extends TestCase
 
         $emptyResult = Helpers::bodyToObject();
         $this->assertIsObject($emptyResult);
-        $this->assertEmpty((array)$emptyResult);
+        $this->assertEmpty((array) $emptyResult);
     }
 
     public function testMultiDimensionalArrayUnique(): void

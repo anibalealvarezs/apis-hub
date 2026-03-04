@@ -7,7 +7,9 @@ use Commands\Crud\DeleteEntityCommand;
 use Commands\Crud\ReadEntityCommand;
 use Commands\Crud\UpdateEntityCommand;
 use Commands\GenerateEntitiesConfigCommand;
+use Commands\InitializeEntitiesCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
+use Helpers\Helpers;
 use Symfony\Component\Console\Application;
 
 $entityManager = require_once __DIR__ . "/../app/bootstrap.php";
@@ -29,7 +31,8 @@ $cli->addCommands([
     new DeleteEntityCommand(),
     new ReadEntityCommand(),
     new UpdateEntityCommand(),
-    new GenerateEntitiesConfigCommand()
+    new GenerateEntitiesConfigCommand(),
+    new InitializeEntitiesCommand(Helpers::getManager())
 ]);
 
 // Runs console application

@@ -3,6 +3,7 @@
 namespace Interfaces;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Enums\Channel;
 use Symfony\Component\HttpFoundation\Response;
 
 interface RequestInterface
@@ -12,4 +13,9 @@ interface RequestInterface
      * @return Response
      */
     static function process(ArrayCollection $channeledCollection): Response;
+
+    /**
+     * @return Channel[]
+     */
+    public static function supportedChannels(): array;
 }

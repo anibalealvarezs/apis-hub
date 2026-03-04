@@ -81,6 +81,7 @@ class ProductVariantRepositoryTest extends TestCase
                 match ($type) {
                     QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
                     QueryBuilderType::COUNT => $query->select('count(e.id)'),
+                    default => clone $query,
                 };
                 return $query->from($this->entityName, 'e');
             });

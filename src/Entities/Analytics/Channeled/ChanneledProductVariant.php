@@ -20,14 +20,14 @@ class ChanneledProductVariant extends ChanneledEntity
     protected int|string $platformId;
 
     #[ORM\Column(type: 'string', nullable: true)]
-    protected int|string $sku;
+    protected int|string|null $sku;
 
     // Relationships with channeled entities
 
-    #[ORM\ManyToMany(targetEntity: 'ChanneledOrder', mappedBy: 'channeledProductVariants')]
+    #[ORM\ManyToMany(targetEntity: ChanneledOrder::class, mappedBy: 'channeledProductVariants')]
     protected Collection $channeledOrders;
 
-    #[ORM\ManyToOne(targetEntity:"ChanneledProduct", inversedBy: 'channeledProductVariants')]
+    #[ORM\ManyToOne(targetEntity:ChanneledProduct::class, inversedBy: 'channeledProductVariants')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected ChanneledProduct $channeledProduct;
 
@@ -54,10 +54,10 @@ class ChanneledProductVariant extends ChanneledEntity
     }
 
     /**
-     * @param string $sku
+     * @param string|null $sku
      * @return ChanneledProductVariant
      */
-    public function addSku(string $sku): self
+    public function addSku(?string $sku): self
     {
         $this->sku = $sku;
 
@@ -128,11 +128,18 @@ class ChanneledProductVariant extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return ChanneledProduct
+     */
     public function getChanneledProduct(): ChanneledProduct
     {
         return $this->channeledProduct;
     }
 
+    /**
+     * @param ChanneledProduct|null $channeledProduct
+     * @return ChanneledProductVariant
+     */
     public function addChanneledProduct(?ChanneledProduct $channeledProduct): self
     {
         $this->channeledProduct = $channeledProduct;
@@ -140,11 +147,18 @@ class ChanneledProductVariant extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return ProductVariant
+     */
     public function getProductVariant(): ProductVariant
     {
         return $this->productVariant;
     }
 
+    /**
+     * @param ProductVariant|null $productVariant
+     * @return ChanneledProductVariant
+     */
     public function addProductVariant(?ProductVariant $productVariant): self
     {
         $this->productVariant = $productVariant;

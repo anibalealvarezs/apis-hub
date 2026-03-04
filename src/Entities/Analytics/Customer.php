@@ -21,9 +21,13 @@ class Customer extends Entity
     #[ORM\OneToMany(mappedBy: 'customer', targetEntity: ChanneledCustomer::class, orphanRemoval: true)]
     protected Collection $channeledCustomers;
 
+    #[ORM\OneToMany(mappedBy: 'customer', targetEntity: MetricConfig::class, orphanRemoval: true)]
+    protected Collection $metricConfigs;
+
     public function __construct()
     {
         $this->channeledCustomers = new ArrayCollection();
+        $this->metricConfigs = new ArrayCollection();
     }
 
     /**
@@ -45,11 +49,18 @@ class Customer extends Entity
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledCustomers(): ?Collection
     {
         return $this->channeledCustomers;
     }
 
+    /**
+     * @param ChanneledCustomer $channeledCustomer
+     * @return Customer
+     */
     public function addChanneledCustomer(ChanneledCustomer $channeledCustomer): self
     {
         if ($this->channeledCustomers->contains($channeledCustomer)) {
@@ -62,6 +73,10 @@ class Customer extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledCustomers
+     * @return Customer
+     */
     public function addChanneledCustomers(Collection $channeledCustomers): self
     {
         foreach ($channeledCustomers as $channeledCustomer) {
@@ -71,6 +86,10 @@ class Customer extends Entity
         return $this;
     }
 
+    /**
+     * @param ChanneledCustomer $channeledCustomer
+     * @return Customer
+     */
     public function removeChanneledCustomer(ChanneledCustomer $channeledCustomer): self
     {
         if (!$this->channeledCustomers->contains($channeledCustomer)) {
@@ -88,12 +107,55 @@ class Customer extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledCustomers
+     * @return Customer
+     */
     public function removeChanneledCustomers(Collection $channeledCustomers): self
     {
         foreach ($channeledCustomers as $channeledCustomer) {
             $this->removeChanneledCustomer($channeledCustomer);
         }
 
+        return $this;
+    }
+
+    /**
+     * Gets the collection of metric configs.
+     * @return Collection
+     */
+    public function getMetricConfigs(): Collection
+    {
+        return $this->metricConfigs;
+    }
+
+    /**
+     * Adds a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function addMetricConfig(MetricConfig $metricConfig): self
+    {
+        if (!$this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->add($metricConfig);
+            $metricConfig->addCustomer($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function removeMetricConfig(MetricConfig $metricConfig): self
+    {
+        if ($this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->removeElement($metricConfig);
+            if ($metricConfig->getCustomer() === $this) {
+                $metricConfig->addCustomer(null);
+            }
+        }
         return $this;
     }
 }

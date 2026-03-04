@@ -8,7 +8,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 
 class DiscountRepository extends BaseRepository
@@ -23,6 +23,7 @@ class DiscountRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => null,
         };
 
         return $query->addSelect('d')
@@ -40,12 +41,13 @@ class DiscountRepository extends BaseRepository
      */
     protected function processResult(array $result): array
     {
-        return $this->replaceChannelName($result);
+        $result = $this->replaceChannelName($result);
+        return parent::processResult($result);
     }
 
     /**
      * @param string $code
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByCode(string $code): ?Entity
@@ -79,7 +81,7 @@ class DiscountRepository extends BaseRepository
     protected function replaceChannelName(array $entity): array
     {
         $entity['channeledDiscounts'] = array_map(function ($channelDiscount) {
-            $channelDiscount['channel'] = Channels::from($channelDiscount['channel'])->getName();
+            $channelDiscount['channel'] = Channel::from($channelDiscount['channel'])->getName();
             unset($channelDiscount['channeledPriceRule']['channel']);
             /* $channelDiscount['channeledOrders'] = array_map(function ($channeledOrder) {
                 unset($channeledOrder['channel']);

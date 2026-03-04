@@ -9,10 +9,11 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use Faker\Generator;
+use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use ReflectionException;
@@ -216,7 +217,7 @@ class ChanneledOrderRepositoryTest extends TestCase
     public function testGetByOrderIdReturnsEntity(): void
     {
         $orderId = $this->faker->uuid;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
         $entity = new Entity();
 
         $parameterCalls = [];
@@ -267,7 +268,7 @@ class ChanneledOrderRepositoryTest extends TestCase
             ->with(AbstractQuery::HYDRATE_OBJECT)
             ->willReturn($entity);
 
-        $result = $this->repository->getByOrderId($orderId, $channel);
+        $result = $this->repository->getByPlatformId($orderId, $channel->value);
 
         $this->assertSame($entity, $result);
         $this->assertCount(2, $parameterCalls);
@@ -287,7 +288,7 @@ class ChanneledOrderRepositoryTest extends TestCase
     public function testGetByOrderIdReturnsNull(): void
     {
         $orderId = $this->faker->uuid;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
 
         $parameterCalls = [];
         $this->queryBuilder->expects($this->exactly(2))
@@ -337,7 +338,7 @@ class ChanneledOrderRepositoryTest extends TestCase
             ->with(AbstractQuery::HYDRATE_OBJECT)
             ->willReturn(null);
 
-        $result = $this->repository->getByOrderId($orderId, $channel);
+        $result = $this->repository->getByPlatformId($orderId, $channel->value);
 
         $this->assertNull($result);
         $this->assertCount(2, $parameterCalls);
@@ -370,10 +371,10 @@ class ChanneledOrderRepositoryTest extends TestCase
         $this->queryBuilder->expects($this->never())
             ->method('andWhere');
 
-        $this->expectException(TypeError::class);
-        $this->expectExceptionMessageMatches('/Argument #2 \(\$channel\) must be of type Enums\\\Channels, int given/');
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Invalid channel: .*/');
 
-        $this->repository->getByOrderId($orderId, $channel);
+        $this->repository->getByPlatformId($orderId, $channel);
     }
 
     /**
@@ -383,7 +384,7 @@ class ChanneledOrderRepositoryTest extends TestCase
     public function testExistsByOrderIdReturnsTrue(): void
     {
         $orderId = $this->faker->uuid;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
 
         $parameterCalls = [];
         $this->queryBuilder->expects($this->exactly(2))
@@ -416,7 +417,7 @@ class ChanneledOrderRepositoryTest extends TestCase
             ->method('getSingleScalarResult')
             ->willReturn(1);
 
-        $result = $this->repository->existsByOrderId($orderId, $channel);
+        $result = $this->repository->existsByPlatformId($orderId, $channel->value);
 
         $this->assertTrue($result);
         $this->assertCount(2, $parameterCalls);
@@ -431,7 +432,7 @@ class ChanneledOrderRepositoryTest extends TestCase
     public function testExistsByOrderIdReturnsFalse(): void
     {
         $orderId = $this->faker->uuid;
-        $channel = Channels::shopify;
+        $channel = Channel::shopify;
 
         $parameterCalls = [];
         $this->queryBuilder->expects($this->exactly(2))
@@ -464,7 +465,7 @@ class ChanneledOrderRepositoryTest extends TestCase
             ->method('getSingleScalarResult')
             ->willReturn(0);
 
-        $result = $this->repository->existsByOrderId($orderId, $channel);
+        $result = $this->repository->existsByPlatformId($orderId, $channel->value);
 
         $this->assertFalse($result);
         $this->assertCount(2, $parameterCalls);
@@ -492,9 +493,9 @@ class ChanneledOrderRepositoryTest extends TestCase
         $this->queryBuilder->expects($this->never())
             ->method('andWhere');
 
-        $this->expectException(TypeError::class);
-        $this->expectExceptionMessageMatches('/Argument #2 \(\$channel\) must be of type Enums\\\Channels, int given/');
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Invalid channel: .*/');
 
-        $this->repository->existsByOrderId($orderId, $channel);
+        $this->repository->existsByPlatformId($orderId, $channel);
     }
 }

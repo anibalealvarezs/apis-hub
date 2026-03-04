@@ -5,7 +5,6 @@ namespace Controllers;
 use Doctrine\ORM\Exception\NotSupported;
 use Exception;
 use Helpers\Helpers;
-use InvalidArgumentException;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
@@ -43,14 +42,16 @@ class CrudController extends BaseController
             );
         }
 
+        $hideFields = array_filter(array_map('trim', explode(',', $params['hideFields'] ?? '')));
+
         return match ($method) {
-            'read' => $this->read(entity: $entity, id: $id),
-            'count' => $this->count(entity: $entity, body: $body, params: $params),
-            'list' => $this->list(entity: $entity, body: $body, params: $params),
+            'read'   => $this->read(entity: $entity, id: $id, hideFields: $hideFields),
+            'count'  => $this->count(entity: $entity, body: $body, params: $params),
+            'list'   => $this->list(entity: $entity, body: $body, params: $params, hideFields: $hideFields),
             'create' => $this->create(entity: $entity, body: $body),
             'update' => $this->update(entity: $entity, id: $id, body: $body),
             'delete' => $this->delete(entity: $entity, id: $id),
-            default => $this->createResponse(
+            default  => $this->createResponse(
                 data: null,
                 status: 'error',
                 error: 'Method not found',
@@ -61,23 +62,16 @@ class CrudController extends BaseController
 
     /**
      * @param array|null $params
-     * @param string $repositoryClass
+     * @param string $entityName
      * @param string|null $body
      * @return array
      */
     protected function prepareReadMultipleParams(
         ?array $params,
-        string $repositoryClass,
+        string $entityName,
         ?string $body
     ): array {
-        if (!empty($params) && !$this->validateParams(params: array_keys(array: $params), entity: $repositoryClass, method: 'readMultiple')) {
-            throw new InvalidArgumentException(message: 'Invalid parameters');
-        }
-
-        $params = $params ?? [];
-        $params['filters'] = Helpers::bodyToObject(data: $body) ?? [];
-
-        return $params;
+        return $this->prepareCrudParams(params: $params, body: $body);
     }
 
     /**
@@ -86,11 +80,14 @@ class CrudController extends BaseController
      * @return Response
      * @throws NotSupported
      */
-    protected function read(string $entity, ?int $id = null): Response
+    protected function read(string $entity, ?int $id = null, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity);
-            $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id);
+            if ($hideFields) {
+                $repository->setHideFields($hideFields);
+            }
+            $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id) . ($hideFields ? '_' . implode('_', $hideFields) : '');
             $data = $this->cacheService->get(
                 key: $cacheKey,
                 callback: fn() => $repository->read(id: $id)
@@ -123,14 +120,21 @@ class CrudController extends BaseController
             $repository = $this->getRepository(entity: $entity);
             $params = $this->prepareReadMultipleParams(
                 params: $params,
-                repositoryClass: $repository::class,
+                entityName: $entity,
                 body: $body
             );
-            $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
-            $count = $this->cacheService->get(
-                key: $cacheKey,
-                callback: fn() => $repository->countElements(filters: $params['filters'])
-            );
+
+            $hasBodyFilters = !empty($body) && trim($body) !== '{}' && trim($body) !== '[]';
+
+            if ($hasBodyFilters) {
+                $count = $repository->countElements(filters: $params['filters']);
+            } else {
+                $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
+                $count = $this->cacheService->get(
+                    key: $cacheKey,
+                    callback: fn() => $repository->countElements(filters: $params['filters'])
+                );
+            }
 
             return $this->createResponse(
                 data: ['count' => $count],
@@ -153,24 +157,41 @@ class CrudController extends BaseController
      * @return Response
      * @throws NotSupported|ReflectionException
      */
-    protected function list(string $entity, ?string $body = null, ?array $params = null): Response
+    protected function list(string $entity, ?string $body = null, ?array $params = null, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity);
+            if ($hideFields) {
+                $repository->setHideFields($hideFields);
+            }
             $params = $this->prepareReadMultipleParams(
                 params: $params,
-                repositoryClass: $repository::class,
+                entityName: $entity,
                 body: $body
             );
-            $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params));
-            $data = $this->cacheService->get(
-                key: $cacheKey,
-                callback: fn() => $repository->readMultiple(...$params)->toArray()
+
+            $hasBodyFilters = !empty($body) && trim($body) !== '{}' && trim($body) !== '[]';
+
+            if ($hasBodyFilters) {
+                $data = $repository->readMultiple(...$params)->toArray();
+            } else {
+                $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params)) . ($hideFields ? '_' . implode('_', $hideFields) : '');
+                $data = $this->cacheService->get(
+                    key: $cacheKey,
+                    callback: fn() => $repository->readMultiple(...$params)->toArray()
+                );
+            }
+
+            $meta = array_filter(
+                $params,
+                fn($k) => !in_array($k, ['filters', 'extra']),
+                ARRAY_FILTER_USE_KEY
             );
 
             return $this->createResponse(
                 data: $data ?: [],
-                status: 'success'
+                status: 'success',
+                meta: $meta ?: null
             );
         } catch (Exception $e) {
             return $this->createResponse(

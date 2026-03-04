@@ -21,14 +21,18 @@ class Product extends Entity
     protected int|string $productId;
 
     #[ORM\Column(type: 'string', nullable: true)]
-    protected int|string $sku;
+    protected int|string|null $sku;
 
     #[ORM\OneToMany(mappedBy: 'product', targetEntity: ChanneledProduct::class, orphanRemoval: true)]
     protected Collection $channeledProducts;
 
+    #[ORM\OneToMany(mappedBy: 'product', targetEntity: MetricConfig::class, orphanRemoval: true)]
+    protected Collection $metricConfigs;
+
     public function __construct()
     {
         $this->channeledProducts = new ArrayCollection();
+        $this->metricConfigs = new ArrayCollection();
     }
 
     /**
@@ -59,21 +63,28 @@ class Product extends Entity
     }
 
     /**
-     * @param string $sku
+     * @param string|null $sku
      * @return Product
      */
-    public function addSku(string $sku): self
+    public function addSku(?string $sku): self
     {
         $this->sku = $sku;
 
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledProducts(): ?Collection
     {
         return $this->channeledProducts;
     }
 
+    /**
+     * @param ChanneledProduct $channeledProduct
+     * @return Product
+     */
     public function addChanneledProduct(ChanneledProduct $channeledProduct): self
     {
         if ($this->channeledProducts->contains($channeledProduct)) {
@@ -86,6 +97,10 @@ class Product extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledProducts
+     * @return Product
+     */
     public function addChanneledProducts(Collection $channeledProducts): self
     {
         foreach ($channeledProducts as $channeledProduct) {
@@ -95,6 +110,10 @@ class Product extends Entity
         return $this;
     }
 
+    /**
+     * @param ChanneledProduct $channeledProduct
+     * @return Product
+     */
     public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
     {
         if (!$this->channeledProducts->contains($channeledProduct)) {
@@ -112,12 +131,55 @@ class Product extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledProducts
+     * @return Product
+     */
     public function removeChanneledProducts(Collection $channeledProducts): self
     {
         foreach ($channeledProducts as $channeledProduct) {
             $this->removeChanneledProduct($channeledProduct);
         }
 
+        return $this;
+    }
+
+    /**
+     * Gets the collection of metric configs.
+     * @return Collection
+     */
+    public function getMetricConfigs(): Collection
+    {
+        return $this->metricConfigs;
+    }
+
+    /**
+     * Adds a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function addMetricConfig(MetricConfig $metricConfig): self
+    {
+        if (!$this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->add($metricConfig);
+            $metricConfig->addProduct($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a metric config.
+     * @param MetricConfig $metricConfig
+     * @return self
+     */
+    public function removeMetricConfig(MetricConfig $metricConfig): self
+    {
+        if ($this->metricConfigs->contains($metricConfig)) {
+            $this->metricConfigs->removeElement($metricConfig);
+            if ($metricConfig->getProduct() === $this) {
+                $metricConfig->addProduct(null);
+            }
+        }
         return $this;
     }
 }

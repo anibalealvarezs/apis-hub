@@ -39,8 +39,8 @@ class UpdateEntityCommandTest extends TestCase
         $this->vfs = vfsStream::setup('project', null, $structure);
 
         // Verify directory existence
-        $entitiesDir = vfsStream::url('project/src/Entities');
-        $configDir = vfsStream::url('project/config/yaml');
+        $entitiesDir = $this->vfs->url() . '/src/Entities';
+        $configDir = $this->vfs->url() . '/config/yaml';
         $this->assertDirectoryExists($entitiesDir, 'Entities directory missing');
         $this->assertDirectoryExists($configDir, 'Config directory missing');
     }

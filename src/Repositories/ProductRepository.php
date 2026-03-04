@@ -7,7 +7,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 
 class ProductRepository extends BaseRepository
@@ -22,6 +22,7 @@ class ProductRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => null,
         };
 
         return $query->addSelect('p')
@@ -41,12 +42,13 @@ class ProductRepository extends BaseRepository
      */
     protected function processResult(array $result): array
     {
-        return $this->replaceChannelName($result);
+        $result = $this->replaceChannelName($result);
+        return parent::processResult($result);
     }
 
     /**
      * @param string $productId
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByProductId(string $productId): ?Entity
@@ -75,7 +77,7 @@ class ProductRepository extends BaseRepository
 
     /**
      * @param string $sku
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getBySku(string $sku): ?Entity
@@ -109,7 +111,7 @@ class ProductRepository extends BaseRepository
     protected function replaceChannelName(mixed $entity): mixed
     {
         $entity['channeledProducts'] = array_map(function ($channelProduct) {
-            $channelProduct['channel'] = Channels::from($channelProduct['channel'])->getName();
+            $channelProduct['channel'] = Channel::from($channelProduct['channel'])->getName();
             unset($channelProduct['channeledVendor']['channel']);
             $channelProduct['channeledProductCategories'] = array_map(function ($channeledProductCategory) {
                 unset($channeledProductCategory['channel']);

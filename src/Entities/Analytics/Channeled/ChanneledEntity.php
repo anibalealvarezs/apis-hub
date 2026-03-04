@@ -2,11 +2,11 @@
 
 namespace Entities\Analytics\Channeled;
 
-use DateTime;
 use Entities\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Interfaces\ChannelInterface;
 
+#[ORM\MappedSuperclass]
 class ChanneledEntity extends Entity implements ChannelInterface
 {
     #[ORM\Column(type: 'string')]
@@ -15,11 +15,11 @@ class ChanneledEntity extends Entity implements ChannelInterface
     #[ORM\Column(type: 'integer')]
     protected int $channel;
 
-    #[ORM\Column(type: 'json')]
-    protected array $data;
+    #[ORM\Column(type: 'json', nullable: true)]
+    protected ?array $data = null;
 
     #[ORM\Column(type: 'datetime', nullable: true)]
-    protected ?DateTime $platformCreatedAt;
+    protected ?\DateTimeInterface $platformCreatedAt = null;
 
     /**
      * @return int|string
@@ -31,68 +31,65 @@ class ChanneledEntity extends Entity implements ChannelInterface
 
     /**
      * @param int|string $platformId
-     * @return ChanneledEntity
+     * @return static
      */
-    public function addPlatformId(int|string $platformId): self
+    public function addPlatformId(int|string $platformId): static
     {
         $this->platformId = $platformId;
-
         return $this;
     }
 
     /**
-     * @return DateTime|null
+     * @return \DateTimeInterface|null
      */
-    public function getPlatformCreatedAt(): ?DateTime
+    public function getPlatformCreatedAt(): ?\DateTimeInterface
     {
         return $this->platformCreatedAt;
     }
 
     /**
-     * @param DateTime|null $platformCreatedAt
-     * @return ChanneledEntity
+     * @param \DateTimeInterface|null $platformCreatedAt
+     * @return static
      */
-    public function addPlatformCreatedAt(?DateTime $platformCreatedAt): self
+    public function addPlatformCreatedAt(?\DateTimeInterface $platformCreatedAt): static
     {
         $this->platformCreatedAt = $platformCreatedAt;
-
         return $this;
     }
 
     /**
-     * @return string
+     * @return int
      */
-    public function getChannel(): string
+    public function getChannel(): int
     {
         return $this->channel;
     }
 
     /**
      * @param int $channel
-     * @return ChanneledEntity
+     * @return static
      */
-    public function addChannel(int $channel): self
+    public function addChannel(int $channel): static
     {
         $this->channel = $channel;
-
         return $this;
     }
 
     /**
-     * @return array
+     * @return array|null
      */
-    public function getData(): array
+    public function getData(): ?array
     {
         return $this->data;
     }
 
     /**
-     * @param mixed $data
+     * @param array|null $data
+     * @return static
      */
-    public function addData(array $data): self
+    public function addData(?array $data): static
     {
         $this->data = $data;
-
         return $this;
     }
 }

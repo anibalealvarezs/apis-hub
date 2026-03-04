@@ -67,11 +67,18 @@ class ProductCategory extends Entity
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledProductCategories(): ?Collection
     {
         return $this->channeledProductCategories;
     }
 
+    /**
+     * @param ChanneledProductCategory $channeledProductCategory
+     * @return ProductCategory
+     */
     public function addChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
         if ($this->channeledProductCategories->contains($channeledProductCategory)) {
@@ -84,6 +91,10 @@ class ProductCategory extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledProductCategories
+     * @return ProductCategory
+     */
     public function addChanneledProductCategories(Collection $channeledProductCategories): self
     {
         foreach ($channeledProductCategories as $channeledProductCategory) {
@@ -93,6 +104,10 @@ class ProductCategory extends Entity
         return $this;
     }
 
+    /**
+     * @param ChanneledProductCategory $channeledProductCategory
+     * @return ProductCategory
+     */
     public function removeChanneledProductCategory(ChanneledProductCategory $channeledProductCategory): self
     {
         if (!$this->channeledProductCategories->contains($channeledProductCategory)) {
@@ -110,6 +125,10 @@ class ProductCategory extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledProductCategories
+     * @return ProductCategory
+     */
     public function removeChanneledProductCategories(Collection $channeledProductCategories): self
     {
         foreach ($channeledProductCategories as $channeledProductCategory) {
