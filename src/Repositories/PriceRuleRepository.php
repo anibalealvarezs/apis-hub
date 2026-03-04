@@ -7,7 +7,7 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 
 class PriceRuleRepository extends BaseRepository
@@ -22,6 +22,7 @@ class PriceRuleRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => null,
         };
 
         return $query->addSelect('p')
@@ -37,13 +38,14 @@ class PriceRuleRepository extends BaseRepository
      */
     protected function processResult(array $result): array
     {
-        return $this->replaceChannelName($result);
+        $result = $this->replaceChannelName($result);
+        return parent::processResult($result);
     }
 
     private function replaceChannelName(array $entity): array
     {
         $entity['channeledPriceRules'] = array_map(function($channelPriceRule) {
-            $channelPriceRule['channel'] = Channels::from($channelPriceRule['channel'])->getName();
+            $channelPriceRule['channel'] = Channel::from($channelPriceRule['channel'])->getName();
             $channelPriceRule['channeledDiscounts'] = array_map(function($channeledDiscount) {
                 unset($channeledDiscount['channel']);
                 return $channeledDiscount;

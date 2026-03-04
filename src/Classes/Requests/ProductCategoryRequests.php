@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Classes\Requests;
 
 use Classes\Conversions\NetSuiteConvert;
@@ -9,14 +11,16 @@ use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
 use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductCategory;
 use Entities\Analytics\ProductCategory;
-use Enums\Channels;
+use Enums\Channel;
+use Repositories\Channeled\ChanneledProductCategoryRepository;
+use Repositories\Channeled\ChanneledProductRepository;
+use Repositories\ProductCategoryRepository;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -25,6 +29,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ProductCategoryRequests implements RequestInterface
 {
+    /**
+     * @return \Enums\Channel[]
+     */
+    public static function supportedChannels(): array
+    {
+        return [
+            Channel::shopify,
+            Channel::klaviyo,
+            Channel::bigcommerce,
+            Channel::netsuite,
+            Channel::amazon,
+        ];
+    }
+
     /**
      * @param string|null $publishedAtMin
      * @param string|null $publishedAtMax
@@ -37,8 +55,12 @@ class ProductCategoryRequests implements RequestInterface
      * @throws ORMException
      * @throws OptimisticLockException
      */
-    public static function getListFromShopify(string $publishedAtMin = null, string $publishedAtMax = null, array $fields = null, object $filters = null, string|bool $resume = true): Response
-    {
+    public static function getListFromShopify(
+        ?string $publishedAtMin = null,
+        ?string $publishedAtMax = null,
+        ?array $fields = null,
+        ?object $filters = null,
+        string|bool $resume = true, ?int $jobId = null): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -85,7 +107,7 @@ class ProductCategoryRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -97,7 +119,7 @@ class ProductCategoryRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -111,7 +133,7 @@ class ProductCategoryRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(object $filters = null, string|bool $resume = true): Response
+    public static function getListFromNetsuite(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
@@ -123,13 +145,15 @@ class ProductCategoryRequests implements RequestInterface
         );
 
         $manager = Helpers::getManager();
+        /** @var ChanneledProductCategoryRepository $channeledProductCategoryRepository */
         $channeledProductCategoryRepository = $manager->getRepository(entityName: ChanneledProductCategory::class);
-        $lastChanneledProductCategory = $channeledProductCategoryRepository->getLastByPlatformId(channel: Channels::netsuite->value);
+        $lastChanneledProductCategory = $channeledProductCategoryRepository->getLastByPlatformId(channel: Channel::netsuite->value);
 
         $query = "SELECT * FROM CommerceCategory WHERE id >= " . (isset($lastChanneledProductCategory['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledProductCategory['platformId'] : 0) . " ORDER BY id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
             query: $query,
-            callback: function($productCategories) {
+            callback: function($productCategories) use ($jobId) {
+                Helpers::checkJobStatus($jobId);
                 self::process(NetSuiteConvert::productCategories($productCategories));
             }
         );
@@ -143,7 +167,7 @@ class ProductCategoryRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -158,14 +182,22 @@ class ProductCategoryRequests implements RequestInterface
     {
         try {
             $manager = Helpers::getManager();
-            $repos = self::initializeRepositories(manager: $manager);
+            
+            $result = \Classes\ProductCategoryProcessor::processCategories($channeledCollection, $collects, $manager);
 
-            foreach ($channeledCollection as $productCategory) {
-                self::processSingleProductCategory(
-                    productCategory: $productCategory,
-                    collects: $collects,
-                    repos: $repos,
-                    manager: $manager
+            if (!empty($result)) {
+                $cacheService = CacheService::getInstance(redisClient: Helpers::getRedisClient());
+                $entities = [
+                    'ProductCategory' => $result['productCategories'],
+                    'ChanneledProductCategory' => $result['channeledProductCategories'],
+                    'ChanneledProduct' => $result['channeledProducts'],
+                ];
+                
+                $channelName = Channel::from(reset($result['channels']))->getName(); 
+                
+                $cacheService->invalidateMultipleEntities(
+                    entities: array_filter($entities, fn($value) => !empty($value)),
+                    channel: $channelName
                 );
             }
 
@@ -176,186 +208,5 @@ class ProductCategoryRequests implements RequestInterface
                 status: Response::HTTP_INTERNAL_SERVER_ERROR
             );
         }
-    }
-
-    /**
-     * @param EntityManager $manager
-     * @return array
-     * @throws NotSupported
-     */
-    private static function initializeRepositories(EntityManager $manager): array
-    {
-        return [
-            'productCategory' => $manager->getRepository(entityName: ProductCategory::class),
-            'channeledProductCategory' => $manager->getRepository(entityName: ChanneledProductCategory::class),
-            'channeledProduct' => $manager->getRepository(entityName: ChanneledProduct::class),
-        ];
-    }
-
-    /**
-     * @param object $productCategory
-     * @param array|null $collects
-     * @param array $repos
-     * @param EntityManager $manager
-     * @return void
-     * @throws ORMException
-     * @throws OptimisticLockException
-     */
-    private static function processSingleProductCategory(object $productCategory, ?array $collects, array $repos, EntityManager $manager): void
-    {
-        $cacheService = CacheService::getInstance(redisClient: Helpers::getRedisClient());
-
-        $productCategoryEntity = self::getOrCreateProductCategory(
-            productCategory: $productCategory,
-            repository: $repos['productCategory']
-        );
-
-        $channeledProductCategoryEntity = self::getOrCreateChanneledProductCategory(
-            productCategory: $productCategory,
-            repository: $repos['channeledProductCategory']
-        );
-
-        self::updateChanneledProductCategoryData(
-            productCategory: $productCategory,
-            channeledProductCategoryEntity: $channeledProductCategoryEntity
-        );
-
-        $productIds = [];
-        if ($collects && isset($collects[$productCategory->platformId])) {
-            $productIds = self::processCollects(
-                productIds: $collects[$productCategory->platformId],
-                channeledProductCategoryEntity: $channeledProductCategoryEntity,
-                channel: $productCategory->channel,
-                repository: $repos['channeledProduct'],
-                manager: $manager
-            );
-        }
-
-        self::finalizeCategoryRelationships(
-            productCategoryEntity: $productCategoryEntity,
-            channeledProductCategoryEntity: $channeledProductCategoryEntity,
-            manager: $manager
-        );
-
-        // Invalidate caches for all affected entities
-        $entities = [
-            'ProductCategory' => $productCategoryEntity->getProductCategoryId(),
-            'ChanneledProductCategory' => $channeledProductCategoryEntity->getPlatformId(),
-            'ChanneledProduct' => $productIds,
-        ];
-        $cacheService->invalidateMultipleEntities(
-            entities: array_filter($entities, fn($value) => !empty($value)),
-            channel: $productCategory->channel
-        );
-    }
-
-    /**
-     * @param object $productCategory
-     * @param EntityRepository $repository
-     * @return ProductCategory
-     */
-    private static function getOrCreateProductCategory(object $productCategory, EntityRepository $repository): ProductCategory
-    {
-        return $repository->existsByProductCategoryId(productCategoryId: $productCategory->platformId)
-            ? $repository->getByProductCategoryId(productCategoryId: $productCategory->platformId)
-            : $repository->create(
-                data: (object) [
-                    'productCategoryId' => $productCategory->platformId,
-                    'isSmartCollection' => $productCategory->isSmartCollection,
-                ],
-                returnEntity: true
-            );
-    }
-
-    /**
-     * @param object $productCategory
-     * @param EntityRepository $repository
-     * @return ChanneledProductCategory
-     */
-    private static function getOrCreateChanneledProductCategory(object $productCategory, EntityRepository $repository): ChanneledProductCategory
-    {
-        return $repository->existsByPlatformId(platformId: $productCategory->platformId, channel: $productCategory->channel)
-            ? $repository->getByPlatformId(platformId: $productCategory->platformId, channel: $productCategory->channel)
-            : $repository->create(
-                data: $productCategory,
-                returnEntity: true
-            );
-    }
-
-    /**
-     * @param object $productCategory
-     * @param ChanneledProductCategory $channeledProductCategoryEntity
-     * @return void
-     */
-    private static function updateChanneledProductCategoryData(object $productCategory, ChanneledProductCategory $channeledProductCategoryEntity): void
-    {
-        if (empty($channeledProductCategoryEntity->getData())) {
-            $channeledProductCategoryEntity
-                ->addPlatformId(platformId: $productCategory->platformId)
-                ->addIsSmartCollection(isSmartCollection: $productCategory->isSmartCollection)
-                ->addPlatformCreatedAt(platformCreatedAt: $productCategory->platformCreatedAt)
-                ->addData(data: $productCategory->data);
-        }
-    }
-
-    /**
-     * @param array $productIds
-     * @param ChanneledProductCategory $channeledProductCategoryEntity
-     * @param string $channel
-     * @param EntityRepository $repository
-     * @param EntityManager $manager
-     * @return array
-     * @throws ORMException
-     * @throws OptimisticLockException
-     */
-    private static function processCollects(
-        array $productIds,
-        ChanneledProductCategory $channeledProductCategoryEntity,
-        string $channel,
-        EntityRepository $repository,
-        EntityManager $manager
-    ): array {
-        $collectedProductIds = [];
-
-        foreach ($productIds as $productId) {
-            $channeledProductEntity = $repository->existsByPlatformId(platformId: $productId, channel: $channel)
-                ? $repository->getByPlatformId(platformId: $productId, channel: $channel)
-                : $repository->create(
-                    data: (object) [
-                        'channel' => $channel,
-                        'platformId' => $productId,
-                        'data' => [],
-                    ],
-                    returnEntity: true
-                );
-
-            $channeledProductCategoryEntity->addChanneledProduct(channeledProduct: $channeledProductEntity);
-            $manager->persist(entity: $channeledProductEntity);
-            $manager->persist(entity: $channeledProductCategoryEntity);
-            $manager->flush();
-
-            $collectedProductIds[] = $productId;
-        }
-
-        return array_unique($collectedProductIds);
-    }
-
-    /**
-     * @param ProductCategory $productCategoryEntity
-     * @param ChanneledProductCategory $channeledProductCategoryEntity
-     * @param EntityManager $manager
-     * @return void
-     * @throws ORMException
-     * @throws OptimisticLockException
-     */
-    private static function finalizeCategoryRelationships(
-        ProductCategory $productCategoryEntity,
-        ChanneledProductCategory $channeledProductCategoryEntity,
-        EntityManager $manager
-    ): void {
-        $productCategoryEntity->addChanneledProductCategory(channeledProductCategory: $channeledProductCategoryEntity);
-        $manager->persist(entity: $productCategoryEntity);
-        $manager->persist(entity: $channeledProductCategoryEntity);
-        $manager->flush();
     }
 }

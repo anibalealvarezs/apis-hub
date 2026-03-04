@@ -25,7 +25,7 @@ class ChanneledCustomer extends ChanneledEntity
 
     // Relationships with channeled entities
 
-    #[ORM\OneToMany(mappedBy: 'channeledCustomer', targetEntity: 'ChanneledOrder', orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'channeledCustomer', targetEntity: ChanneledOrder::class, orphanRemoval: true)]
     protected Collection $channeledOrders;
 
     // Relationships with non-channeled entities
@@ -49,21 +49,28 @@ class ChanneledCustomer extends ChanneledEntity
 
     /**
      * @param string $email
-     * @return ChanneledCustomer
+     * @return static
      */
-    public function addEmail(string $email): self
+    public function addEmail(string $email): static
     {
         $this->email = $email;
 
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledOrders(): ?Collection
     {
         return $this->channeledOrders;
     }
 
-    public function addChanneledOrder(ChanneledOrder $channeledOrder): self
+    /**
+     * @param ChanneledOrder $channeledOrder
+     * @return static
+     */
+    public function addChanneledOrder(ChanneledOrder $channeledOrder): static
     {
         if ($this->channeledOrders->contains($channeledOrder)) {
             return $this;
@@ -75,7 +82,11 @@ class ChanneledCustomer extends ChanneledEntity
         return $this;
     }
 
-    public function addChanneledOrders(Collection $channeledOrders): self
+    /**
+     * @param Collection $channeledOrders
+     * @return static
+     */
+    public function addChanneledOrders(Collection $channeledOrders): static
     {
         foreach ($channeledOrders as $channeledOrder) {
             $this->addChanneledOrder($channeledOrder);
@@ -84,7 +95,11 @@ class ChanneledCustomer extends ChanneledEntity
         return $this;
     }
 
-    public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
+    /**
+     * @param ChanneledOrder $channeledOrder
+     * @return static
+     */
+    public function removeChanneledOrder(ChanneledOrder $channeledOrder): static
     {
         if (!$this->channeledOrders->contains($channeledOrder)) {
             return $this;
@@ -101,7 +116,11 @@ class ChanneledCustomer extends ChanneledEntity
         return $this;
     }
 
-    public function removeChanneledOrders(Collection $channeledOrders): self
+    /**
+     * @param Collection $channeledOrders
+     * @return static
+     */
+    public function removeChanneledOrders(Collection $channeledOrders): static
     {
         foreach ($channeledOrders as $channeledOrder) {
             $this->removeChanneledOrder($channeledOrder);
@@ -110,12 +129,19 @@ class ChanneledCustomer extends ChanneledEntity
         return $this;
     }
 
+    /**
+     * @return Customer
+     */
     public function getCustomer(): Customer
     {
         return $this->customer;
     }
 
-    public function addCustomer(?Customer $customer): self
+    /**
+     * @param Customer|null $customer
+     * @return static
+     */
+    public function addCustomer(?Customer $customer): static
     {
         $this->customer = $customer;
 

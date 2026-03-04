@@ -37,7 +37,7 @@ class BaseControllerTest extends TestCase
         $error = null;
         $httpStatus = Response::HTTP_OK;
 
-        $response = $this->controller->createResponse($data, $status, $error, $httpStatus);
+        $response = $this->controller->createResponse($data, $status, $error, $httpStatus, null);
 
         $this->assertEquals($httpStatus, $response->getStatusCode());
         $this->assertEquals('application/json', $response->headers->get('Content-Type'));
@@ -57,7 +57,7 @@ class BaseControllerTest extends TestCase
         $error = $this->faker->sentence;
         $httpStatus = Response::HTTP_BAD_REQUEST;
 
-        $response = $this->controller->createResponse($data, $status, $error, $httpStatus);
+        $response = $this->controller->createResponse($data, $status, $error, $httpStatus, null);
 
         $this->assertEquals($httpStatus, $response->getStatusCode());
         $this->assertEquals('application/json', $response->headers->get('Content-Type'));
@@ -194,9 +194,9 @@ class ConcreteBaseController extends BaseController
     }
 
     // Expose and override methods as public for testing with mock data
-    public function createResponse(mixed $data, string $status, ?string $error = null, int $httpStatus = Response::HTTP_OK): Response
+    public function createResponse(mixed $data, string $status, ?string $error = null, int $httpStatus = Response::HTTP_OK, ?array $meta = null): Response
     {
-        return parent::createResponse($data, $status, $error, $httpStatus);
+        return parent::createResponse($data, $status, $error, $httpStatus, $meta);
     }
 
     public function isValidCrudableEntity(string $entity): bool

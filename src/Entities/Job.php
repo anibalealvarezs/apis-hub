@@ -24,9 +24,9 @@ class Job extends Entity
     protected string $channel;
 
     /**
-     * @return string
+     * @return int
      */
-    public function getStatus(): string
+    public function getStatus(): int
     {
         return $this->status;
     }
@@ -85,5 +85,24 @@ class Job extends Entity
     public function addChannel(string $channel): void
     {
         $this->channel = $channel;
+    }
+
+    #[ORM\Column(type: 'json', nullable: true)]
+    protected ?array $payload = null;
+
+    /**
+     * @return array|null
+     */
+    public function getPayload(): ?array
+    {
+        return $this->payload;
+    }
+
+    /**
+     * @param array|null $payload
+     */
+    public function addPayload(?array $payload): void
+    {
+        $this->payload = $payload;
     }
 }

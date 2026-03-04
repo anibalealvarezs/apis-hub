@@ -8,7 +8,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 
 class OrderRepository extends BaseRepository
@@ -23,6 +23,7 @@ class OrderRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => null,
         };
 
         return $query->addSelect('o')
@@ -42,12 +43,13 @@ class OrderRepository extends BaseRepository
      */
     protected function processResult(array $result): array
     {
-        return $this->replaceChannelName($result);
+        $result = $this->replaceChannelName($result);
+        return parent::processResult($result);
     }
 
     /**
      * @param string $orderId
-     * @return array|null
+     * @return Entity|null
      * @throws NonUniqueResultException
      */
     public function getByOrderId(string $orderId): ?Entity
@@ -75,13 +77,13 @@ class OrderRepository extends BaseRepository
     }
 
     /**
-     * @param mixed $entity
-     * @return mixed
+     * @param array $entity
+     * @return array
      */
     protected function replaceChannelName(array $entity): array
     {
         $entity['channeledOrders'] = array_map(function ($channeledOrder) {
-            $channeledOrder['channel'] = Channels::from($channeledOrder['channel'])->getName();
+            $channeledOrder['channel'] = Channel::from($channeledOrder['channel'])->getName();
             unset($channeledOrder['channeledCustomer']['channel']);
             $channeledOrder['channeledProducts'] = array_map(function ($channeledProduct) {
                 unset($channeledProduct['channel']);

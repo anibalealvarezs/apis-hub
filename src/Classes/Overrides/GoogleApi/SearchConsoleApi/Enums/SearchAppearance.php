@@ -1,0 +1,36 @@
+<?php
+
+namespace Classes\Overrides\GoogleApi\SearchConsoleApi\Enums;
+
+enum SearchAppearance: string
+{
+    case AMP_TOP_STORIES = 'AMP_TOP_STORIES';
+    case AMP_BLUE_LINK = 'AMP_BLUE_LINK';
+    case AMP_IMAGE_RESULT = 'AMP_IMAGE_RESULT';
+    case ANDROID_SEARCH_ = 'SEARCH_';
+    case ANDROID_APPEARANCE_ = 'APPEARANCE_';
+    case ANDROID_ANDROID_APP = 'ANDROID_APP';
+    case EDU_Q_AND_A = 'EDU_Q_AND_A';
+    case TPF_FAQ = 'TPF_FAQ';
+    case JOB_DETAILS = 'JOB_DETAILS';
+    case JOB_LISTING = 'JOB_LISTING';
+    case LEARNING_VIDEOS = 'LEARNING_VIDEOS';
+    case MATH_SOLVERS = 'MATH_SOLVERS';
+    case ACTION = 'ACTION';
+    case MERCHANT_LISTINGS = 'MERCHANT_LISTINGS';
+    case PRACTICE_PROBLEMS = 'PRACTICE_PROBLEMS';
+    case PRODUCT_SNIPPETS = 'PRODUCT_SNIPPETS';
+    case TPF_QA = 'TPF_QA';
+    case RECIPE_FEATURE = 'RECIPE_FEATURE';
+    case RECIPE_RICH_ = 'RECIPE_RICH_';
+    case RECIPE_SNIPPET = 'SNIPPET';
+    case REVIEW_SNIPPET = 'REVIEW_SNIPPET';
+    case SPECIAL_ANNOUNCEMENT = 'SPECIAL_';
+    case ANNOUNCEMENT = 'ANNOUNCEMENT';
+    case SUBSCRIBED_ = 'SUBSCRIBED_';
+    case SUBSCRIBED_CONTENT = 'CONTENT';
+    case TRANSLATED_RESULT = 'TRANSLATED_RESULT';
+    case VIDEO = 'VIDEO';
+    case AMP_STORY = 'AMP_STORY';
+    case UNKNOWN = 'UNKNOWN';
+}

@@ -1,13 +1,29 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Classes\Requests;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Enums\Channel;
 use Interfaces\RequestInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class VendorRequests implements RequestInterface
 {
+    /**
+     * @return \Enums\Channel[]
+     */
+    public static function supportedChannels(): array
+    {
+        return [
+            Channel::shopify,
+            Channel::bigcommerce,
+            Channel::netsuite,
+            Channel::amazon,
+        ];
+    }
+
     /**
      * @param int $limit
      * @param int $pagination
@@ -15,7 +31,7 @@ class VendorRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode(['Vendors are not supported in Shopify. They\'re retrieved along with Products.']));
     }
@@ -27,7 +43,7 @@ class VendorRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -39,7 +55,7 @@ class VendorRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -51,7 +67,7 @@ class VendorRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }

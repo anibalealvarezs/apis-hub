@@ -8,14 +8,15 @@ use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
-use Entities\Entity;
-use Enums\Channels;
+use Entities\Analytics\Channeled\ChanneledPriceRule;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use Faker\Generator;
 use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use ReflectionException;
 use ReflectionMethod;
 use Repositories\Channeled\ChanneledPriceRuleRepository;
 
@@ -26,7 +27,7 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
     private MockObject|QueryBuilder $queryBuilder;
     private MockObject|AbstractQuery $query;
     private ChanneledPriceRuleRepository $repository;
-    private string $entityName = 'Entities\Entity';
+    private string $entityName = 'Entities\Analytics\Channeled\ChanneledPriceRule';
 
     protected function setUp(): void
     {
@@ -34,7 +35,6 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
         $this->entityManager = $this->createMock(EntityManager::class);
         $this->queryBuilder = $this->createMock(QueryBuilder::class);
         $this->query = $this->createMock(AbstractQuery::class);
-        $this->entityName = 'Entities\Entity';
         $classMetadata = $this->createMock(ClassMetadata::class);
         $classMetadata->name = $this->entityName;
         $this->entityManager->expects($this->any())
@@ -49,7 +49,7 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
     }
 
     /**
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function testCreateBaseQueryBuilderSelect(): void
     {
@@ -87,7 +87,7 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
     }
 
     /**
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function testCreateBaseQueryBuilderCount(): void
     {
@@ -125,7 +125,7 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
     }
 
     /**
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function testCreateBaseQueryBuilderLast(): void
     {
@@ -163,21 +163,23 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
     }
 
     /**
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function testReplaceChannelName(): void
     {
         $input = [
             'id' => 1,
-            'channel' => 1,
+            'channel' => Channel::shopify->value,
+            'platformId' => 'PR123',
             'channeledDiscounts' => [
-                ['id' => 2, 'channel' => 1],
-                ['id' => 3, 'channel' => 1]
+                ['id' => 2, 'channel' => Channel::shopify->value],
+                ['id' => 3, 'channel' => Channel::shopify->value]
             ]
         ];
         $expected = [
             'id' => 1,
-            'channel' => 'shopify',
+            'channel' => Channel::shopify->getName(),
+            'platformId' => 'PR123',
             'channeledDiscounts' => [
                 ['id' => 2],
                 ['id' => 3]
@@ -195,49 +197,36 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
      */
     public function testGetByPlatformIdReturnsEntity(): void
     {
-        $platformId = $this->faker->uuid;
-        $channel = 1; // Assuming Channels::shopify->value = 1
-        $entity = new Entity();
-
-        $parameterCalls = [];
-        $this->queryBuilder->expects($this->exactly(2))
-            ->method('setParameter')
-            ->willReturnCallback(function ($key, $value) use (&$parameterCalls) {
-                $parameterCalls[] = [$key, $value];
-                return $this->queryBuilder;
-            });
-
-        $addSelectCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('addSelect')
-            ->willReturnCallback(function ($alias) use (&$addSelectCalls) {
-                $addSelectCalls[] = $alias;
-                return $this->queryBuilder;
-            });
-
-        $leftJoinCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('leftJoin')
-            ->willReturnCallback(function ($join, $alias) use (&$leftJoinCalls) {
-                $leftJoinCalls[] = [$join, $alias];
-                return $this->queryBuilder;
-            });
+        $platformId = 'PR123';
+        $channel = Channel::shopify->value;
+        $result = new ChanneledPriceRule();
 
         $this->queryBuilder->expects($this->once())
             ->method('select')
             ->with('e')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
+            ->method('addSelect')
+            ->with('d')
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->once())
             ->method('from')
             ->with($this->entityName, 'e')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
+            ->method('leftJoin')
+            ->with('e.channeledDiscounts', 'd')
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->exactly(1))
             ->method('where')
             ->with('e.platformId = :platformId')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
+        $this->queryBuilder->expects($this->exactly(1))
             ->method('andWhere')
             ->with('e.channel = :channel')
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->exactly(2))
+            ->method('setParameter')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('getQuery')
@@ -245,16 +234,10 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
         $this->query->expects($this->once())
             ->method('getOneOrNullResult')
             ->with(AbstractQuery::HYDRATE_OBJECT)
-            ->willReturn($entity);
+            ->willReturn($result);
 
-        $result = $this->repository->getByPlatformId($platformId, $channel);
-
-        $this->assertSame($entity, $result);
-        $this->assertCount(2, $parameterCalls);
-        $this->assertEquals(['platformId', $platformId], $parameterCalls[0]);
-        $this->assertEquals(['channel', $channel], $parameterCalls[1]);
-        $this->assertEquals(['d'], $addSelectCalls);
-        $this->assertEquals([['e.channeledDiscounts', 'd']], $leftJoinCalls);
+        $actual = $this->repository->getByPlatformId($platformId, $channel);
+        $this->assertEquals($result, $actual);
     }
 
     /**
@@ -262,48 +245,35 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
      */
     public function testGetByPlatformIdReturnsNull(): void
     {
-        $platformId = $this->faker->uuid;
-        $channel = 1;
-
-        $parameterCalls = [];
-        $this->queryBuilder->expects($this->exactly(2))
-            ->method('setParameter')
-            ->willReturnCallback(function ($key, $value) use (&$parameterCalls) {
-                $parameterCalls[] = [$key, $value];
-                return $this->queryBuilder;
-            });
-
-        $addSelectCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('addSelect')
-            ->willReturnCallback(function ($alias) use (&$addSelectCalls) {
-                $addSelectCalls[] = $alias;
-                return $this->queryBuilder;
-            });
-
-        $leftJoinCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('leftJoin')
-            ->willReturnCallback(function ($join, $alias) use (&$leftJoinCalls) {
-                $leftJoinCalls[] = [$join, $alias];
-                return $this->queryBuilder;
-            });
+        $platformId = 'PR123';
+        $channel = Channel::shopify->value;
 
         $this->queryBuilder->expects($this->once())
             ->method('select')
             ->with('e')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
+            ->method('addSelect')
+            ->with('d')
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->once())
             ->method('from')
             ->with($this->entityName, 'e')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
+            ->method('leftJoin')
+            ->with('e.channeledDiscounts', 'd')
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->exactly(1))
             ->method('where')
             ->with('e.platformId = :platformId')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
+        $this->queryBuilder->expects($this->exactly(1))
             ->method('andWhere')
             ->with('e.channel = :channel')
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->exactly(2))
+            ->method('setParameter')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('getQuery')
@@ -313,14 +283,8 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
             ->with(AbstractQuery::HYDRATE_OBJECT)
             ->willReturn(null);
 
-        $result = $this->repository->getByPlatformId($platformId, $channel);
-
-        $this->assertNull($result);
-        $this->assertCount(2, $parameterCalls);
-        $this->assertEquals(['platformId', $platformId], $parameterCalls[0]);
-        $this->assertEquals(['channel', $channel], $parameterCalls[1]);
-        $this->assertEquals(['d'], $addSelectCalls);
-        $this->assertEquals([['e.channeledDiscounts', 'd']], $leftJoinCalls);
+        $actual = $this->repository->getByPlatformId($platformId, $channel);
+        $this->assertNull($actual);
     }
 
     /**
@@ -355,7 +319,7 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
     public function testExistsByPlatformIdReturnsTrue(): void
     {
         $platformId = $this->faker->uuid;
-        $channel = 1;
+        $channel = Channel::shopify->value;
 
         $parameterCalls = [];
         $this->queryBuilder->expects($this->exactly(2))
@@ -403,7 +367,7 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
     public function testExistsByPlatformIdReturnsFalse(): void
     {
         $platformId = $this->faker->uuid;
-        $channel = 1;
+        $channel = Channel::shopify->value;
 
         $parameterCalls = [];
         $this->queryBuilder->expects($this->exactly(2))
@@ -475,47 +439,28 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
      */
     public function testGetLastByPlatformId(): void
     {
-        $channel = 1;
-        $data = ['id' => 1, 'channel' => 1, 'channeledDiscounts' => [['id' => 2, 'channel' => 1]]];
-        // Expect parent’s replaceChannelName behavior
-        $expected = ['id' => 1, 'channel' => 'shopify', 'channeledDiscounts' => [['id' => 2]]];
-
-        $parameterCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->willReturnCallback(function ($key, $value) use (&$parameterCalls) {
-                $parameterCalls[] = [$key, $value];
-                return $this->queryBuilder;
-            });
-
-        $addSelectCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('addSelect')
-            ->willReturnCallback(function ($alias) use (&$addSelectCalls) {
-                $addSelectCalls[] = $alias;
-                return $this->queryBuilder;
-            });
-
-        $leftJoinCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('leftJoin')
-            ->willReturnCallback(function ($join, $alias) use (&$leftJoinCalls) {
-                $leftJoinCalls[] = [$join, $alias];
-                return $this->queryBuilder;
-            });
-
-        $orderByCalls = [];
-        $this->queryBuilder->expects($this->exactly(2))
-            ->method('addOrderBy')
-            ->willReturnCallback(function ($sort, $order) use (&$orderByCalls) {
-                $orderByCalls[] = [$sort, $order];
-                return $this->queryBuilder;
-            });
+        $channel = Channel::shopify->value;
+        $result = [
+            'id' => 1,
+            'channel' => $channel,
+            'platformId' => 'PR123',
+            'platformCreatedAt' => '2025-05-18 12:00:00'
+        ];
+        $expected = [
+            'id' => 1,
+            'channel' => $channel,
+            'platformId' => 'PR123',
+            'platformCreatedAt' => '2025-05-18 12:00:00'
+        ];
 
         $this->queryBuilder->expects($this->once())
             ->method('select')
             ->with('e, LENGTH(e.platformId) AS HIDDEN length')
             ->willReturnSelf();
+        $this->queryBuilder->expects($this->never())
+            ->method('addSelect');
+        $this->queryBuilder->expects($this->never())
+            ->method('leftJoin');
         $this->queryBuilder->expects($this->once())
             ->method('from')
             ->with($this->entityName, 'e')
@@ -523,6 +468,13 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
         $this->queryBuilder->expects($this->once())
             ->method('where')
             ->with('e.channel = :channel')
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->once())
+            ->method('setParameter')
+            ->with('channel', $channel)
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->exactly(2))
+            ->method('addOrderBy')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('setMaxResults')
@@ -534,18 +486,10 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
         $this->query->expects($this->once())
             ->method('getOneOrNullResult')
             ->with(AbstractQuery::HYDRATE_ARRAY)
-            ->willReturn($data);
+            ->willReturn($result);
 
-        $result = $this->repository->getLastByPlatformId($channel);
-
-        $this->assertEquals($expected, $result);
-        $this->assertCount(1, $parameterCalls);
-        $this->assertEquals(['channel', $channel], $parameterCalls[0]);
-        $this->assertEquals(['d'], $addSelectCalls);
-        $this->assertEquals([['e.channeledDiscounts', 'd']], $leftJoinCalls);
-        $this->assertCount(2, $orderByCalls);
-        $this->assertEquals(['length', 'DESC'], $orderByCalls[0]);
-        $this->assertEquals(['e.platformId', 'DESC'], $orderByCalls[1]);
+        $actual = $this->repository->getLastByPlatformId($channel);
+        $this->assertEquals($expected, $actual);
     }
 
     /**
@@ -553,39 +497,22 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
      */
     public function testGetLastByPlatformCreatedAt(): void
     {
-        $channel = 1;
-        $data = ['id' => 1, 'channel' => 1, 'channeledDiscounts' => [['id' => 2, 'channel' => 1]]];
-        // Expect parent’s replaceChannelName behavior
-        $expected = ['id' => 1, 'channel' => 'shopify', 'channeledDiscounts' => [['id' => 2]]];
-
-        $parameterCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->willReturnCallback(function ($key, $value) use (&$parameterCalls) {
-                $parameterCalls[] = [$key, $value];
-                return $this->queryBuilder;
-            });
-
-        $addSelectCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('addSelect')
-            ->willReturnCallback(function ($alias) use (&$addSelectCalls) {
-                $addSelectCalls[] = $alias;
-                return $this->queryBuilder;
-            });
-
-        $leftJoinCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('leftJoin')
-            ->willReturnCallback(function ($join, $alias) use (&$leftJoinCalls) {
-                $leftJoinCalls[] = [$join, $alias];
-                return $this->queryBuilder;
-            });
+        $channel = Channel::shopify->value;
+        $result = [
+            'platformCreatedAt' => '2025-05-18 12:00:00'
+        ];
+        $expected = [
+            'platformCreatedAt' => '2025-05-18 12:00:00'
+        ];
 
         $this->queryBuilder->expects($this->once())
             ->method('select')
-            ->with('e')
+            ->with('e, LENGTH(e.platformId) AS HIDDEN length')
             ->willReturnSelf();
+        $this->queryBuilder->expects($this->never())
+            ->method('addSelect');
+        $this->queryBuilder->expects($this->never())
+            ->method('leftJoin');
         $this->queryBuilder->expects($this->once())
             ->method('from')
             ->with($this->entityName, 'e')
@@ -595,6 +522,10 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
             ->with('e.channel = :channel')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
+            ->method('setParameter')
+            ->with('channel', $channel)
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this::once())
             ->method('addOrderBy')
             ->with('e.platformCreatedAt', 'DESC')
             ->willReturnSelf();
@@ -608,15 +539,10 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
         $this->query->expects($this->once())
             ->method('getOneOrNullResult')
             ->with(AbstractQuery::HYDRATE_ARRAY)
-            ->willReturn($data);
+            ->willReturn($result);
 
-        $result = $this->repository->getLastByPlatformCreatedAt($channel);
-
-        $this->assertEquals($expected, $result);
-        $this->assertCount(1, $parameterCalls);
-        $this->assertEquals(['channel', $channel], $parameterCalls[0]);
-        $this->assertEquals(['d'], $addSelectCalls);
-        $this->assertEquals([['e.channeledDiscounts', 'd']], $leftJoinCalls);
+        $actual = $this->repository->getLastByPlatformCreatedAt($channel);
+        $this->assertEquals($expected, $actual);
     }
 
     /**
@@ -625,37 +551,17 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
      */
     public function testCountElements(): void
     {
-        $filters = (object) ['channel' => 1];
-        $count = $this->faker->numberBetween(1, 100);
-
-        $parameterCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->willReturnCallback(function ($key, $value) use (&$parameterCalls) {
-                $parameterCalls[] = [$key, $value];
-                return $this->queryBuilder;
-            });
-
-        $addSelectCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('addSelect')
-            ->willReturnCallback(function ($alias) use (&$addSelectCalls) {
-                $addSelectCalls[] = $alias;
-                return $this->queryBuilder;
-            });
-
-        $leftJoinCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('leftJoin')
-            ->willReturnCallback(function ($join, $alias) use (&$leftJoinCalls) {
-                $leftJoinCalls[] = [$join, $alias];
-                return $this->queryBuilder;
-            });
+        $filters = (object)['channel' => Channel::shopify->value];
+        $result = 42;
 
         $this->queryBuilder->expects($this->once())
             ->method('select')
             ->with('count(e.id)')
             ->willReturnSelf();
+        $this->queryBuilder->expects($this->never())
+            ->method('addSelect');
+        $this->queryBuilder->expects($this->never())
+            ->method('leftJoin');
         $this->queryBuilder->expects($this->once())
             ->method('from')
             ->with($this->entityName, 'e')
@@ -665,19 +571,18 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
             ->with('e.channel = :channel')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
+            ->method('setParameter')
+            ->with('channel', $filters->channel)
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->once())
             ->method('getQuery')
             ->willReturn($this->query);
         $this->query->expects($this->once())
             ->method('getSingleScalarResult')
-            ->willReturn($count);
+            ->willReturn($result);
 
-        $result = $this->repository->countElements($filters);
-
-        $this->assertEquals($count, $result);
-        $this->assertCount(1, $parameterCalls);
-        $this->assertEquals(['channel', $filters->channel], $parameterCalls[0]);
-        $this->assertEquals(['d'], $addSelectCalls);
-        $this->assertEquals([['e.channeledDiscounts', 'd']], $leftJoinCalls);
+        $actual = $this->repository->countElements($filters);
+        $this->assertEquals($result, $actual);
     }
 
     /**
@@ -686,45 +591,20 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
      */
     public function testCountElementsWithInvalidChannelName(): void
     {
-        $filters = (object) ['channel' => 'invalid'];
-
-        $addSelectCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('addSelect')
-            ->willReturnCallback(function ($alias) use (&$addSelectCalls) {
-                $addSelectCalls[] = $alias;
-                return $this->queryBuilder;
-            });
-
-        $leftJoinCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('leftJoin')
-            ->willReturnCallback(function ($join, $alias) use (&$leftJoinCalls) {
-                $leftJoinCalls[] = [$join, $alias];
-                return $this->queryBuilder;
-            });
-
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->never())
-            ->method('andWhere');
-        $this->queryBuilder->expects($this->never())
-            ->method('setParameter');
-        $this->queryBuilder->expects($this->never())
-            ->method('getQuery');
+        $filters = (object)['channel' => 'invalid'];
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid channel name: invalid');
 
-        $this->repository->countElements($filters);
+        $this->queryBuilder->expects($this::never())
+            ->method('select');
+        $this->queryBuilder->expects($this->never())
+            ->method('from');
+        $this->queryBuilder->expects($this->never())
+            ->method('andWhere');
+        $this->queryBuilder->expects($this->never())
+            ->method('setParameter');
 
-        $this->assertEquals(['d'], $addSelectCalls);
-        $this->assertEquals([['e.channeledDiscounts', 'd']], $leftJoinCalls);
+        $this->repository->countElements($filters);
     }
 }

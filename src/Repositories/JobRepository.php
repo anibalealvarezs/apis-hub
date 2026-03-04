@@ -4,25 +4,24 @@ namespace Repositories;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\AbstractQuery;
+use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
-use Entities\Entity;
-use Enums\AnalyticsEntities;
-use Enums\Channels;
+use Enums\AnalyticsEntity;
+use Enums\Channel;
 use Enums\JobStatus;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use InvalidArgumentException;
 use ReflectionEnum;
 use ReflectionException;
-use stdClass;
-
 class JobRepository extends BaseRepository
 {
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
+     * @throws \Exception
      */
     protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
@@ -30,46 +29,50 @@ class JobRepository extends BaseRepository
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
+            QueryBuilderType::CUSTOM => throw new \Exception('To be implemented'),
         };
 
         return $query->from($this->getEntityName(), 'e');
     }
 
     /**
-     * @param stdClass|null $data
+     * @param object|null $data
+     * @phpstan-param object{status?: int|string, entity?: string, channel?: string, uuid?: string, payload?: array}|null $data
      * @param bool $returnEntity
      * @return array|null
      * @throws NonUniqueResultException
      * @throws ReflectionException
-     * @throws MappingException
+     * @throws MappingException|OptimisticLockException
      */
-    public function create(stdClass $data = null, bool $returnEntity = false): ?array
+    public function create(?object $data = null, bool $returnEntity = false): ?array
     {
-        if (isset($data->status) && is_int($data->status) && $job = QueryBuilderType::from($data->status)) {
-            $data->status = $job->value;
+        $data = (array) ($data ?? []);
+
+        if (isset($data['status']) && is_int($data['status']) && $job = JobStatus::tryFrom($data['status'])) {
+            $data['status'] = $job->value;
         } else {
-            $data->status = JobStatus::scheduled->value;
+            $data['status'] = JobStatus::scheduled->value;
         }
 
-        if (!isset($data->entity) || !$data->entity) {
+        if (!isset($data['entity']) || !$data['entity']) {
             throw new InvalidArgumentException('Entity is required');
         }
-        if (!(new ReflectionEnum(AnalyticsEntities::class))->getConstant($data->entity)) {
+        if (!(new ReflectionEnum(AnalyticsEntity::class))->getConstant($data['entity'])) {
             throw new InvalidArgumentException('Invalid entity');
         }
 
-        if (!isset($data->channel)) {
+        if (!isset($data['channel'])) {
             throw new InvalidArgumentException('Channel is required');
         }
-        if (!(new ReflectionEnum(Channels::class))->getConstant($data->channel)) {
+        if (!(new ReflectionEnum(Channel::class))->getConstant($data['channel'])) {
             throw new InvalidArgumentException('Invalid channel');
         }
 
-        if (!isset($data->uuid)) {
-            $data->uuid = Factory::create()->uuid;
+        if (!isset($data['uuid'])) {
+            $data['uuid'] = Factory::create()->uuid;
         }
 
-        return parent::create($data);
+        return parent::create((object) $data);
     }
 
     /**
@@ -79,6 +82,8 @@ class JobRepository extends BaseRepository
      * @param string $orderDir
      * @param int $limit
      * @param int $pagination
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @return QueryBuilder
      */
     protected function buildReadMultipleQuery(
@@ -87,9 +92,10 @@ class JobRepository extends BaseRepository
         string $orderBy,
         string $orderDir,
         int $limit,
-        int $pagination
-    ): QueryBuilder
-    {
+        int $pagination,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): QueryBuilder {
         $query = $this->createBaseQueryBuilder();
 
         if ($ids) {
@@ -100,12 +106,14 @@ class JobRepository extends BaseRepository
         if ($filters) {
             foreach ($filters as $key => $value) {
                 if ($key === 'status' && !is_int($value)) {
-                    $value = (new ReflectionEnum(objectOrClass: QueryBuilderType::class))->getConstant($value);
+                    $value = (new ReflectionEnum(objectOrClass: JobStatus::class))->getConstant($value);
                 }
                 $query->andWhere('e.' . $key . ' = :' . $key)
                     ->setParameter($key, $value);
             }
         }
+
+        $this->applyDateFilters($query, $startDate, $endDate);
 
         $query->orderBy("e.$orderBy", strtoupper($orderDir))
             ->setMaxResults($limit)
@@ -121,7 +129,7 @@ class JobRepository extends BaseRepository
     protected function processResult(array $result): array
     {
         $result['status'] = $this->getStatusName($result['status']);
-        return $result;
+        return parent::processResult($result);
     }
 
     /**
@@ -174,26 +182,28 @@ class JobRepository extends BaseRepository
      */
     public function getStatusName(int $status): string
     {
-        return QueryBuilderType::from($status)->getName();
+        return JobStatus::from($status)->getName();
     }
 
     /**
      * @param int $id
-     * @param stdClass|null $data
+     * @param object|null $data
+     * @phpstan-param object{status?: int|string}|null $data
      * @param bool $returnEntity
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function update(int $id, stdClass $data = null, bool $returnEntity = false): ?array
+    public function update(int $id, ?object $data = null, bool $returnEntity = false): ?array
     {
-        if (!isset($data->status) || !$data->status) {
-            return parent::update($id, $data);
+        $data = (array) ($data ?? []);
+        if (!isset($data['status']) || !$data['status']) {
+            return parent::update($id, (object) $data);
         }
 
-        if ($job = is_int($data->status) ? QueryBuilderType::from($data->status) : (new ReflectionEnum(QueryBuilderType::class))->getConstant($data->status)) {
-            $data->status = $job->value;
+        if ($job = is_int($data['status']) ? JobStatus::from($data['status']) : (new ReflectionEnum(JobStatus::class))->getConstant($data['status'])) {
+            $data['status'] = $job->value;
         }
 
-        return parent::update($id, $data);
+        return parent::update($id, (object) $data);
     }
 }

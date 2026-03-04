@@ -45,11 +45,18 @@ class Discount extends Entity
         return $this;
     }
 
+    /**
+     * @return Collection|null
+     */
     public function getChanneledDiscounts(): ?Collection
     {
         return $this->channeledDiscounts;
     }
 
+    /**
+     * @param ChanneledDiscount $channeledDiscount
+     * @return Discount
+     */
     public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
         if ($this->channeledDiscounts->contains($channeledDiscount)) {
@@ -62,6 +69,10 @@ class Discount extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledDiscounts
+     * @return Discount
+     */
     public function addChanneledDiscounts(Collection $channeledDiscounts): self
     {
         foreach ($channeledDiscounts as $channeledDiscount) {
@@ -71,6 +82,10 @@ class Discount extends Entity
         return $this;
     }
 
+    /**
+     * @param ChanneledDiscount $channeledDiscount
+     * @return Discount
+     */
     public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): self
     {
         if (!$this->channeledDiscounts->contains($channeledDiscount)) {
@@ -88,6 +103,10 @@ class Discount extends Entity
         return $this;
     }
 
+    /**
+     * @param Collection $channeledDiscounts
+     * @return Discount
+     */
     public function removeChanneledDiscounts(Collection $channeledDiscounts): self
     {
         foreach ($channeledDiscounts as $channeledDiscount) {

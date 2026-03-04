@@ -39,8 +39,8 @@ class ReadEntityCommandTest extends TestCase
         $this->vfs = vfsStream::setup('project', null, $structure);
 
         // Verify directory existence
-        $entitiesDir = vfsStream::url('project/src/Entities');
-        $configDir = vfsStream::url('project/config/yaml');
+        $entitiesDir = $this->vfs->url() . '/src/Entities';
+        $configDir = $this->vfs->url() . '/config/yaml';
         $this->assertDirectoryExists($entitiesDir, 'Entities directory missing');
         $this->assertDirectoryExists($configDir, 'Config directory missing');
     }
@@ -77,7 +77,7 @@ class ReadEntityCommandTest extends TestCase
         $filtersOption = $definition->getOption('filters');
         $this->assertEquals('f', $filtersOption->getShortcut());
         $this->assertTrue($filtersOption->isValueOptional());
-        $this->assertEquals('The fields which will be used to filter the data', $filtersOption->getDescription());
+        $this->assertEquals('The fields which will be used to filter the data (JSON body)', $filtersOption->getDescription());
     }
 
     /**

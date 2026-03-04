@@ -9,6 +9,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
+use Enums\Channel;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use Faker\Generator;
@@ -496,45 +497,17 @@ class ChanneledVendorRepositoryTest extends TestCase
      */
     public function testGetLastByPlatformId(): void
     {
-        $channel = 1;
-        $data = [
+        $channel = Channel::shopify->value;
+        $result = [
             'id' => 1,
-            'channel' => 1,
-            'channeledProducts' => [
-                ['id' => 2, 'channel' => 1]
-            ]
+            'channel' => Channel::shopify->value,
+            'platformId' => 'PR123'
         ];
         $expected = [
             'id' => 1,
-            'channel' => 'shopify',
-            'channeledProducts' => [
-                ['id' => 2]
-            ]
+            'channel' => Channel::shopify->value,
+            'platformId' => 'PR123'
         ];
-
-        $parameterCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->willReturnCallback(function ($key, $value) use (&$parameterCalls) {
-                $parameterCalls[] = [$key, $value];
-                return $this->queryBuilder;
-            });
-
-        $this->queryBuilder->expects($this->once())
-            ->method('addSelect')
-            ->with('p')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('leftJoin')
-            ->with('e.channeledProducts', 'p')
-            ->willReturnSelf();
-        $orderByCalls = [];
-        $this->queryBuilder->expects($this->exactly(2))
-            ->method('addOrderBy')
-            ->willReturnCallback(function ($sort, $order) use (&$orderByCalls) {
-                $orderByCalls[] = [$sort, $order];
-                return $this->queryBuilder;
-            });
 
         $this->queryBuilder->expects($this->once())
             ->method('select')
@@ -549,6 +522,13 @@ class ChanneledVendorRepositoryTest extends TestCase
             ->with('e.channel = :channel')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
+            ->method('setParameter')
+            ->with('channel', $channel)
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->exactly(2))
+            ->method('addOrderBy')
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->once())
             ->method('setMaxResults')
             ->with(1)
             ->willReturnSelf();
@@ -558,66 +538,42 @@ class ChanneledVendorRepositoryTest extends TestCase
         $this->query->expects($this->once())
             ->method('getOneOrNullResult')
             ->with(AbstractQuery::HYDRATE_ARRAY)
-            ->willReturn($data);
+            ->willReturn($result);
 
-        $result = $this->repository->getLastByPlatformId($channel);
+        $actual = $this->repository->getLastByPlatformId($channel);
 
-        $this->assertEquals($expected, $result);
-        $this->assertCount(1, $parameterCalls);
-        $this->assertEquals(['channel', $channel], $parameterCalls[0]);
-        $this->assertCount(2, $orderByCalls);
-        $this->assertEquals(['length', 'DESC'], $orderByCalls[0]);
-        $this->assertEquals(['e.platformId', 'DESC'], $orderByCalls[1]);
+        $this->assertEquals($expected, $actual);
     }
 
-    /**
-     * @throws NonUniqueResultException
-     */
     public function testGetLastByPlatformCreatedAt(): void
     {
-        $channel = 1;
-        $data = [
-            'id' => 1,
-            'channel' => 1,
-            'channeledProducts' => [
-                ['id' => 2, 'channel' => 1]
-            ]
+        $channel = Channel::shopify->value;
+        $result = [
+            'platformCreatedAt' => '2025-05-18 12:00:00'
         ];
         $expected = [
-            'id' => 1,
-            'channel' => 'shopify',
-            'channeledProducts' => [
-                ['id' => 2]
-            ]
+            'platformCreatedAt' => '2025-05-18 12:00:00'
         ];
 
-        $parameterCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->willReturnCallback(function ($key, $value) use (&$parameterCalls) {
-                $parameterCalls[] = [$key, $value];
-                return $this->queryBuilder;
-            });
-
-        $this->queryBuilder->expects($this->once())
-            ->method('addSelect')
-            ->with('p')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('leftJoin')
-            ->with('e.channeledProducts', 'p')
-            ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('select')
-            ->with('e')
+            ->with('e, LENGTH(e.platformId) AS HIDDEN length')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
+        $this->queryBuilder->expects($this->never())
+            ->method('addSelect');
+        $this->queryBuilder->expects($this->never())
+            ->method('leftJoin');
+        $this->queryBuilder->expects($this::once())
             ->method('from')
             ->with($this->entityName, 'e')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('where')
             ->with('e.channel = :channel')
+            ->willReturnSelf();
+        $this->queryBuilder->expects($this->once())
+            ->method('setParameter')
+            ->with('channel', $channel)
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('addOrderBy')
@@ -633,13 +589,10 @@ class ChanneledVendorRepositoryTest extends TestCase
         $this->query->expects($this->once())
             ->method('getOneOrNullResult')
             ->with(AbstractQuery::HYDRATE_ARRAY)
-            ->willReturn($data);
+            ->willReturn($result);
 
-        $result = $this->repository->getLastByPlatformCreatedAt($channel);
-
-        $this->assertEquals($expected, $result);
-        $this->assertCount(1, $parameterCalls);
-        $this->assertEquals(['channel', $channel], $parameterCalls[0]);
+        $actual = $this->repository->getLastByPlatformCreatedAt($channel);
+        $this->assertEquals($expected, $actual);
     }
 
     /**
@@ -648,29 +601,17 @@ class ChanneledVendorRepositoryTest extends TestCase
      */
     public function testCountElements(): void
     {
-        $filters = (object) ['channel' => 1];
-        $count = $this->faker->numberBetween(1, 100);
+        $filters = (object)['channel' => Channel::shopify->value];
+        $result = 42;
 
-        $parameterCalls = [];
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->willReturnCallback(function ($key, $value) use (&$parameterCalls) {
-                $parameterCalls[] = [$key, $value];
-                return $this->queryBuilder;
-            });
-
-        $this->queryBuilder->expects($this->once())
-            ->method('addSelect')
-            ->with('p')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('leftJoin')
-            ->with('e.channeledProducts', 'p')
-            ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('select')
             ->with('count(e.id)')
             ->willReturnSelf();
+        $this->queryBuilder->expects($this->never())
+            ->method('addSelect');
+        $this->queryBuilder->expects($this::never())
+            ->method('leftJoin');
         $this->queryBuilder->expects($this->once())
             ->method('from')
             ->with($this->entityName, 'e')
@@ -679,18 +620,19 @@ class ChanneledVendorRepositoryTest extends TestCase
             ->method('andWhere')
             ->with('e.channel = :channel')
             ->willReturnSelf();
+        $this->queryBuilder->expects($this::once())
+            ->method('setParameter')
+            ->with('channel', $filters->channel)
+            ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('getQuery')
             ->willReturn($this->query);
         $this->query->expects($this->once())
             ->method('getSingleScalarResult')
-            ->willReturn($count);
+            ->willReturn($result);
 
-        $result = $this->repository->countElements($filters);
-
-        $this->assertEquals($count, $result);
-        $this->assertCount(1, $parameterCalls);
-        $this->assertEquals(['channel', $filters->channel], $parameterCalls[0]);
+        $actual = $this->repository->countElements($filters);
+        $this::assertEquals($result, $actual);
     }
 
     /**
@@ -699,33 +641,23 @@ class ChanneledVendorRepositoryTest extends TestCase
      */
     public function testCountElementsWithInvalidChannelName(): void
     {
-        $filters = (object) ['channel' => 'invalid'];
+        $filters = (object)['channel' => 'invalid'];
 
-        $this->queryBuilder->expects($this->once())
-            ->method('addSelect')
-            ->with('p')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('leftJoin')
-            ->with('e.channeledProducts', 'p')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
+        $this->expectException(InvalidArgumentException::class);
+        $this::expectExceptionMessage('Invalid channel name: invalid');
+
+        $this->queryBuilder->expects($this->never())
+            ->method('select');
+        $this->queryBuilder->expects($this->never())
+            ->method('addSelect');
+        $this->queryBuilder->expects($this->never())
+            ->method('from');
+        $this->queryBuilder->expects($this->never())
+            ->method('leftJoin');
         $this->queryBuilder->expects($this->never())
             ->method('andWhere');
         $this->queryBuilder->expects($this->never())
             ->method('setParameter');
-        $this->queryBuilder->expects($this->never())
-            ->method('getQuery');
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid channel name: invalid');
 
         $this->repository->countElements($filters);
     }

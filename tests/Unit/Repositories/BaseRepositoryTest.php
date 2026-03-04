@@ -746,9 +746,13 @@ class ConcreteBaseRepository extends BaseRepository
         return parent::createBaseQueryBuilderNoJoins($type);
     }
 
-    public function buildReadQuery(int $id, ?object $filters = null): QueryBuilder
-    {
-        return parent::buildReadQuery($id, $filters);
+    public function buildReadQuery(
+        int $id,
+        ?object $filters = null,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): QueryBuilder {
+        return parent::buildReadQuery($id, $filters, $startDate, $endDate);
     }
 
     public function buildReadMultipleQuery(
@@ -757,9 +761,11 @@ class ConcreteBaseRepository extends BaseRepository
         string $orderBy,
         string $orderDir,
         int $limit,
-        int $pagination
+        int $pagination,
+        ?string $startDate = null,
+        ?string $endDate = null
     ): QueryBuilder {
-        return parent::buildReadMultipleQuery($ids, $filters, $orderBy, $orderDir, $limit, $pagination);
+        return parent::buildReadMultipleQuery($ids, $filters, $orderBy, $orderDir, $limit, $pagination, $startDate, $endDate);
     }
 
     public function processResult(array $result): array

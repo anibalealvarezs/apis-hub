@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Classes\Requests;
 
 use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
 use Classes\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
+use Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -13,13 +16,27 @@ use Symfony\Component\HttpFoundation\Response;
 class ProductVariantRequests implements RequestInterface
 {
     /**
+     * @return \Enums\Channel[]
+     */
+    public static function supportedChannels(): array
+    {
+        return [
+            Channel::shopify,
+            Channel::klaviyo,
+            Channel::bigcommerce,
+            Channel::netsuite,
+            Channel::amazon,
+        ];
+    }
+
+    /**
      * @param int $limit
      * @param int $pagination
      * @param object|null $filters
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode(['Product variants are retrieved along with Products.']));
     }
@@ -31,7 +48,7 @@ class ProductVariantRequests implements RequestInterface
      * @return Response
      * @throws GuzzleException
      */
-    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         $config = Helpers::getChannelsConfig()['klaviyo'];
         $klaviyoClient = new KlaviyoApi(
@@ -61,7 +78,7 @@ class ProductVariantRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -73,7 +90,7 @@ class ProductVariantRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -85,7 +102,7 @@ class ProductVariantRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }

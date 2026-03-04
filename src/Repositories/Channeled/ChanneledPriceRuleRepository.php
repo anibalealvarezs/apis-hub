@@ -2,17 +2,18 @@
 
 namespace Repositories\Channeled;
 
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\QueryBuilder;
-use Enums\Channels;
+use Enums\Channel;
 use Enums\QueryBuilderType;
-
+use Exception;
+use RuntimeException;
+use Repositories\RepositoryInterface;
 class ChanneledPriceRuleRepository extends ChanneledBaseRepository
 {
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
+     * @throws Exception
      */
     protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
@@ -21,8 +22,8 @@ class ChanneledPriceRuleRepository extends ChanneledBaseRepository
             QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
             QueryBuilderType::LAST => $query->select('e, LENGTH(e.platformId) AS HIDDEN length'),
+            QueryBuilderType::CUSTOM => null,
         };
-
         return $query
             ->addSelect('d')
             ->from($this->getEntityName(), 'e')
@@ -30,16 +31,20 @@ class ChanneledPriceRuleRepository extends ChanneledBaseRepository
     }
 
     /**
-     * @param mixed $entity
-     * @return mixed
+     * @param array $entity
+     * @return array
      */
     protected function replaceChannelName(array $entity): array
     {
-        $entity['channel'] = Channels::from($entity['channel'])->getName();
-        $entity['channeledDiscounts'] = array_map(function($channeledDiscount) {
-            unset($channeledDiscount['channel']);
-            return $channeledDiscount;
-        }, $entity['channeledDiscounts']);
+        if (isset($entity['channel'])) {
+            $entity['channel'] = Channel::from($entity['channel'])->getName();
+        }
+        if (isset($entity['channeledDiscounts'])) {
+            $entity['channeledDiscounts'] = array_map(function($channeledDiscount) {
+                unset($channeledDiscount['channel']);
+                return $channeledDiscount;
+            }, $entity['channeledDiscounts']);
+        }
         return $entity;
     }
 }

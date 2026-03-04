@@ -12,6 +12,8 @@ use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\Persistence\Proxy;
 use Entities\Entity;
 use Exception;
+use Monolog\Handler\ErrorLogHandler;
+use Monolog\Logger;
 use Predis\Client;
 use Predis\ClientInterface;
 use ReflectionClass;
@@ -89,6 +91,15 @@ class Helpers
                 if (!is_array($config)) {
                     throw new RuntimeException("Invalid database configuration: $filePath must return an array");
                 }
+
+                // Override with environment variables if present
+                $config['driver'] = getenv('DB_DRIVER') ?: ($config['driver'] ?? 'pdo_mysql');
+                $config['host'] = getenv('DB_HOST') ?: ($config['host'] ?? '127.0.0.1');
+                $config['port'] = getenv('DB_PORT') ?: ($config['port'] ?? 3306);
+                $config['user'] = getenv('DB_USER') ?: ($config['user'] ?? 'root');
+                $config['password'] = getenv('DB_PASSWORD') !== false ? getenv('DB_PASSWORD') : ($config['password'] ?? '');
+                $config['dbname'] = getenv('DB_NAME') ?: ($config['dbname'] ?? 'apis-hub');
+
                 self::$dbConfig = $config;
             } catch (Exception $e) {
                 throw new RuntimeException("Failed to load database configuration: " . $e->getMessage());
@@ -112,6 +123,15 @@ class Helpers
                 if (!is_array($config)) {
                     throw new RuntimeException("Invalid channels configuration: $filePath must return an array");
                 }
+
+                // Override with environment variables if present
+                if ($envChannelsJson = getenv('CHANNELS_CONFIG')) {
+                    $envChannels = json_decode($envChannelsJson, true);
+                    if (is_array($envChannels)) {
+                        $config = array_replace_recursive($config, $envChannels);
+                    }
+                }
+
                 self::$channelsConfig = $config;
             } catch (Exception $e) {
                 throw new RuntimeException("Failed to load channels configuration: " . $e->getMessage());
@@ -158,12 +178,31 @@ class Helpers
                 if (!is_array($config)) {
                     throw new RuntimeException("Invalid cache configuration: $filePath must return an array");
                 }
+
+                // Override with environment variables if present
+                if (!isset($config['redis'])) {
+                    $config['redis'] = [];
+                }
+                $config['redis']['host'] = getenv('REDIS_HOST') ?: ($config['redis']['host'] ?? '127.0.0.1');
+                $config['redis']['port'] = getenv('REDIS_PORT') ? (int)getenv('REDIS_PORT') : ($config['redis']['port'] ?? 6379);
+                if (getenv('REDIS_PASSWORD') !== false) {
+                    $config['redis']['password'] = getenv('REDIS_PASSWORD');
+                }
+
                 self::$cacheConfig = $config;
             } catch (Exception $e) {
                 throw new RuntimeException("Failed to load cache configuration: " . $e->getMessage());
             }
         }
         return self::$cacheConfig;
+    }
+
+    /**
+     * @return string|null
+     */
+    public static function getAppApiKey(): ?string
+    {
+        return getenv('APP_API_KEY') ?: null;
     }
 
     /**
@@ -198,18 +237,39 @@ class Helpers
     {
         if (self::$entityManager === null || !self::$entityManager->isOpen()) {
             try {
-                $connection = DriverManager::getConnection(self::getDbConfig());
-                $config = ORMSetup::createAttributeMetadataConfiguration(
+                $config = self::getDbConfig();
+                $connection = DriverManager::getConnection($config);
+
+                // Set connection charset and collation
+                $connection->executeStatement("SET NAMES utf8mb4 COLLATE utf8mb4_bin");
+
+                // Create attribute metadata configuration
+                $ormConfig = ORMSetup::createAttributeMetadataConfiguration(
                     paths: [__DIR__ . '/..'],
                     isDevMode: true
                 );
-                self::$entityManager = new EntityManager($connection, $config);
+
+                // Create EntityManager
+                self::$entityManager = new EntityManager($connection, $ormConfig);
             } catch (Exception $e) {
                 throw new RuntimeException('Failed to initialize EntityManager: ' . $e->getMessage());
             }
         }
-
         return self::$entityManager;
+    }
+
+    public static function getAllSubsets($elements): array
+    {
+        $subsets = [[]]; // Include the emtpy subset
+        foreach ($elements as $element) {
+            $newSubsets = [];
+            foreach ($subsets as $subset) {
+                $newSubsets[] = $subset; // Copy the existing subset
+                $newSubsets[] = array_merge($subset, [$element]); // Add the element to the existing subset
+            }
+            $subsets = $newSubsets;
+        }
+        return $subsets;
     }
 
     /**
@@ -227,9 +287,10 @@ class Helpers
 
     /**
      * @param string $string
+     * @param bool $capitalizeFirst
      * @return string
      */
-    public static function toCamelcase(string $string): string
+    public static function toCamelcase(string $string, bool $capitalizeFirst = false): string
     {
         $str = str_replace(
             search: ' ',
@@ -242,8 +303,16 @@ class Helpers
                 )
             )
         );
-        $str[0] = strtolower($str[0]);
+        if (!$capitalizeFirst) {
+            $str[0] = strtolower($str[0]);
+        }
         return $str;
+    }
+
+    public static function toSnakeCase(string $string): string
+    {
+        $string = preg_replace('/([a-z])([A-Z])/', '$1_$2', $string);
+        return strtolower($string);
     }
 
     /**
@@ -345,5 +414,60 @@ class Helpers
         }
 
         return null;
+    }
+
+    /**
+     * @param string $haystack
+     * @param array $needles
+     * @return bool
+     */
+    public static function str_contains_any(string $haystack, array $needles): bool
+    {
+        return array_reduce($needles, fn($a, $n) => $a || str_contains($haystack, $n), false);
+    }
+
+    /**
+     * @param string $haystack
+     * @param array $needles
+     * @return bool
+     */
+    public static function str_contains_all(string $haystack, array $needles): bool
+    {
+        return array_reduce($needles, fn($a, $n) => $a && str_contains($haystack, $n), true);
+    }
+
+    /**
+     * Dump data as JSON for debugging purposes.
+     * @param array $data
+     * @return void
+     */
+    public static function dumpDebugJson(array $data){
+        header('Content-Type: application/json');
+        echo json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        die();
+    }
+
+    /**
+     * @param int|null $jobId
+     * @return void
+     * @throws \Exceptions\JobCancelledException
+     */
+    public static function checkJobStatus(?int $jobId): void
+    {
+        if (!$jobId) {
+            return;
+        }
+
+        $jobRepo = self::getManager()->getRepository(\Entities\Job::class);
+        $status = $jobRepo->createQueryBuilder('j')
+            ->select('j.status')
+            ->where('j.id = :id')
+            ->setParameter('id', $jobId)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if ($status == \Enums\JobStatus::failed->value) {
+            throw new \Exceptions\JobCancelledException("El Job #{$jobId} fue interrumpido manualmente.");
+        }
     }
 }

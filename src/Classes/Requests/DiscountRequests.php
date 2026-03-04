@@ -1,13 +1,30 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Classes\Requests;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Enums\Channel;
 use Interfaces\RequestInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class DiscountRequests implements RequestInterface
 {
+    /**
+     * @return \Enums\Channel[]
+     */
+    public static function supportedChannels(): array
+    {
+        return [
+            Channel::shopify,
+            Channel::klaviyo,
+            Channel::bigcommerce,
+            Channel::netsuite,
+            Channel::amazon,
+        ];
+    }
+
     /**
      * @param int $limit
      * @param int $pagination
@@ -15,7 +32,7 @@ class DiscountRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode(['Discounts are retrieved along with Price Rules.']));
     }
@@ -27,7 +44,7 @@ class DiscountRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -39,7 +56,17 @@ class DiscountRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true): Response
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    {
+        return new Response(json_encode([]));
+    }
+
+    /**
+     * @param object|null $filters
+     * @param string|bool $resume
+     * @return Response
+     */
+    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
