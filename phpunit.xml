@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit bootstrap="vendor/autoload.php"
+<phpunit bootstrap="tests/bootstrap.php"
          colors="true"
          verbose="true"
          stopOnFailure="false">
@@ -21,6 +21,9 @@
         </testsuite>
         <testsuite name="Commands Tests">
             <directory>tests/Unit/Commands</directory>
+        </testsuite>
+        <testsuite name="Integration Tests">
+            <directory>tests/Integration</directory>
         </testsuite>
     </testsuites>
 </phpunit>
