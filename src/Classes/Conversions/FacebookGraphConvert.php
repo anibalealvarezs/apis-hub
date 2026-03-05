@@ -247,7 +247,7 @@ class FacebookGraphConvert
                 metricDate: Carbon::parse($date)->toDateString(),
                 account: $accountEntity->getName(),
                 channeledAccount:  $channeledAccountEntity->getPlatformId(),
-                page:  $pageEntity->getUrl(),
+                page:  $pageEntity?->getUrl(),
             );
             if (!isset($elements[$metricConfigKey])) {
                 $elements[$metricConfigKey] = [];
