@@ -62,6 +62,14 @@ abstract class BaseIntegrationTestCase extends TestCase
             $schemaTool->dropSchema($classes);
             $schemaTool->createSchema($classes);
         }
+
+        // Force the main application to use our transactional test EntityManager
+        if (class_exists(\Helpers\Helpers::class)) {
+            $reflection = new \ReflectionClass(\Helpers\Helpers::class);
+            $property = $reflection->getProperty('entityManager');
+            $property->setAccessible(true);
+            $property->setValue(null, $this->entityManager);
+        }
     }
 
     protected function tearDown(): void
