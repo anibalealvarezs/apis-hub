@@ -3,13 +3,9 @@
 namespace Classes\Conversions;
 
 use Carbon\Carbon;
-use Classes\Overrides\KlaviyoApi\KlaviyoApi;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use Enums\Period;
-use GuzzleHttp\Exception\GuzzleException;
-use Helpers\Helpers;
-use Services\CacheService;
 use stdClass;
 
 class KlaviyoConvert
@@ -72,24 +68,12 @@ class KlaviyoConvert
      *
      * @param array $aggregates
      * @param string $metricId
+     * @param array $metricNamesMap Mapping of metricId to metricName.
      * @return ArrayCollection
-     * @throws GuzzleException
      */
-    public static function metricAggregates(array $aggregates, string $metricId): ArrayCollection
+    public static function metricAggregates(array $aggregates, string $metricId, array $metricNamesMap = []): ArrayCollection
     {
-        $cacheService = CacheService::getInstance(Helpers::getRedisClient());
-        $cacheKey = 'klaviyo_metric_names_' . md5($metricId);
-        $metricName = $cacheService->get(
-            key: $cacheKey,
-            callback: function () use ($metricId) {
-                $klaviyoClient = new KlaviyoApi(
-                    apiKey: Helpers::getChannelsConfig()['klaviyo']['klaviyo_api_key']
-                );
-                $response = $klaviyoClient->getMetricData($metricId);
-                return $response['data']['attributes']['name'] ?? 'Unknown Metric';
-            },
-            ttl: Helpers::getChannelsConfig()['klaviyo']['metrics_cache_ttl'] ?? 86400
-        );
+        $metricName = $metricNamesMap[$metricId] ?? 'Unknown Metric';
 
         $collection = new ArrayCollection();
         $dates = $aggregates['dates'] ?? [];

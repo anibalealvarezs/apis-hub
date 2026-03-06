@@ -119,13 +119,15 @@ class MetricRequests
 
         $metricNames = $filters->metricNames ?? ($config['metrics'] ?? []);
         $metricIds = [];
+        $metricMap = [];
         $klaviyoClient->getAllMetricsAndProcess(
             metricFields: ['id', 'name'],
-            callback: function ($metrics) use (&$metricIds, $metricNames, $jobId) {
+            callback: function ($metrics) use (&$metricIds, &$metricMap, $metricNames, $jobId) {
                 Helpers::checkJobStatus($jobId);
                 foreach ($metrics as $metric) {
                     if (empty($metricNames) || in_array($metric['attributes']['name'], $metricNames)) {
                         $metricIds[] = $metric['id'];
+                        $metricMap[$metric['id']] = $metric['attributes']['name'];
                     }
                 }
             }
@@ -176,9 +178,9 @@ class MetricRequests
                 measurements: [AggregatedMeasurement::count],
                 filter: $formattedFilters,
                 sortField: 'datetime',
-                callback: function ($aggregates) use ($metricId, $jobId) {
+                callback: function ($aggregates) use ($metricId, $metricMap, $jobId) {
                     Helpers::checkJobStatus($jobId);
-                    self::process(KlaviyoConvert::metricAggregates($aggregates, $metricId));
+                    self::process(KlaviyoConvert::metricAggregates($aggregates, $metricId, $metricMap));
                 }
             );
         }
