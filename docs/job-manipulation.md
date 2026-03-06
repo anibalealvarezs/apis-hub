@@ -1,0 +1,57 @@
+# ⚙️ Job Manipulation & Lifecycle
+
+This guide explains how to create, monitor, and control caching jobs using the CLI. These actions are equivalent to the API endpoints and can be used as a backend reference for a future frontend.
+
+## 1. Creating a Job
+Jobs are created when you request data to be cached. You can trigger this manually for any channel/entity.
+
+```bash
+# Example: Schedule a Facebook Ads sync
+php bin/cli.php apis-hub:cache facebook metric -p '{"start_date":"-3 days","end_date":"yesterday"}'
+```
+*   **Response**: Returns a JSON object containing the `job_id` (a UUID).
+
+---
+
+## 2. Checking Job Status
+You can check the status of a specific job or list recent ones using the CRUD commands on the `job` entity.
+
+### Check a specific Job by UUID
+```bash
+# Replace <UUID> with your actual job ID
+php bin/cli.php app:read --entity=job --filters='{"uuid":"<UUID>"}'
+```
+
+### List Recent Jobs
+```bash
+# Lists all jobs (use --params to limit/paginate)
+php bin/cli.php app:read --entity=job --params='limit=10'
+```
+
+### Status Reference
+The `status` field in the database follows these integer values:
+- `1`: **Scheduled** (Waiting in queue)
+- `2`: **Processing** (Currently fetching data)
+- `3`: **Completed** (Finished successfully)
+- `4`: **Failed** (Error occurred during execution)
+
+---
+
+## 3. Manually Suspending/Cancelling a Job
+If a job is **Scheduled** but not yet running, or if it's currently **Processing** and you want to stop it, you can change its status to **Failed (4)**.
+
+The `ProcessJobsCommand` checks the status of the job at key intervals. If it sees the status has changed to `failed` (4), it will throw a `JobCancelledException` and stop the sync.
+
+### Cancel a Job
+```bash
+# Replace <ID> with the internal numerical ID of the job
+php bin/cli.php app:update --entity=job --id=<ID> --data='{"status":4}'
+```
+
+---
+
+## 4. Automation & Monitoring
+Jobs are automatically processed in the background by the `ProcessJobsCommand`, which is usually triggered via Cron.
+
+- **Worker Command**: `php bin/cli.php jobs:process`
+- **Automation Logic**: See [entrypoint.sh](../entrypoint.sh) to see how the worker is bootstrapped in a container.
