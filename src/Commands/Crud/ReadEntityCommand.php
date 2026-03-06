@@ -43,7 +43,8 @@ class ReadEntityCommand extends Command
             ->addOption('channel', 'c', InputOption::VALUE_OPTIONAL, 'The channel for the entity (e.g., google_search_console)')
             ->addOption('id', 'i', InputOption::VALUE_OPTIONAL, 'The id of the entity record')
             ->addOption('filters', 'f', InputOption::VALUE_OPTIONAL, 'The fields which will be used to filter the data (JSON body)')
-            ->addOption('params', 'p', InputOption::VALUE_OPTIONAL, 'The query parameters like limit, pagination, hideFields (JSON or query string)');
+            ->addOption('params', 'p', InputOption::VALUE_OPTIONAL, 'The query parameters like limit, pagination, hideFields (JSON or query string)')
+            ->addOption('pretty', null, InputOption::VALUE_NONE, 'Pretty print the JSON response');
     }
 
     /**
@@ -59,6 +60,7 @@ class ReadEntityCommand extends Command
         $id = $input->getOption('id');
         $body = $input->getOption('filters');
         $paramsString = $input->getOption('params');
+        $pretty = $input->getOption('pretty');
 
         $params = [];
         if ($paramsString) {
@@ -94,7 +96,11 @@ class ReadEntityCommand extends Command
         $responseContent = $result->getContent();
         if ($result->getStatusCode() >= 200 && $result->getStatusCode() < 300) {
             $content = json_decode($responseContent, true) ?? $responseContent;
-            $output->writeln('<info>' . (is_array($content) ? json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : $content) . '</info>');
+            $jsonOptions = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+            if ($pretty) {
+                $jsonOptions |= JSON_PRETTY_PRINT;
+            }
+            $output->writeln('<info>' . (is_array($content) ? json_encode($content, $jsonOptions) : $content) . '</info>');
             return Command::SUCCESS;
         }
 

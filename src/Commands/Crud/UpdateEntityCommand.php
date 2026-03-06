@@ -37,7 +37,8 @@ class UpdateEntityCommand extends Command
             ->setHelp('This command allows you to get update an entity record')
             ->addOption('entity', 'e', InputOption::VALUE_REQUIRED, 'The entity which the record will be updated in')
             ->addOption('id', 'i', InputOption::VALUE_REQUIRED, 'The id of the entity record')
-            ->addOption('data', 'd', InputOption::VALUE_OPTIONAL, 'The data which will be used to update the record');
+            ->addOption('data', 'd', InputOption::VALUE_OPTIONAL, 'The data which will be used to update the record')
+            ->addOption('pretty', null, InputOption::VALUE_NONE, 'Pretty print the JSON response');
     }
 
     /**
@@ -49,6 +50,7 @@ class UpdateEntityCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $pretty = $input->getOption('pretty');
         $controller = $this->crudController ?? new CrudController();
         $result = ($controller)(
             entity: $input->getOption('entity'),
@@ -57,7 +59,15 @@ class UpdateEntityCommand extends Command
             body: $input->getOption('data'),
         );
 
-        $output->writeln('<info>' . $result->getContent() . '</info>');
+        $content = $result->getContent();
+        if ($pretty) {
+            $decoded = json_decode($content, true);
+            if (is_array($decoded)) {
+                $content = json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            }
+        }
+
+        $output->writeln('<info>' . $content . '</info>');
         return Command::SUCCESS;
     }
 }
