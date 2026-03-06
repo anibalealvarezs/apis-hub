@@ -10,7 +10,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use \Helpers\Helpers;
+use Helpers\Helpers;
 
 #[AsCommand(
     name: 'app:read',
@@ -105,10 +105,9 @@ class ReadEntityCommand extends Command
                     $responseContent = json_encode($content, $jsonOptions);
                 }
             }
-            
-            // Bypass Symfony Console Formatter to prevent Grapheme/Memory exhaustion on huge strings
-            // This writes directly to the standard output stream
-            fwrite(STDOUT, $responseContent . PHP_EOL);
+            // Use raw output to bypass Symfony Console Formatter (prevents memory issues) 
+            // while still allowing the CommandTester to capture output for tests.
+            $output->write($responseContent . PHP_EOL, false, OutputInterface::OUTPUT_RAW);
             return Command::SUCCESS;
         }
 

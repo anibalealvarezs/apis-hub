@@ -443,6 +443,10 @@ class GenerateEntitiesConfigCommandTest extends TestCase
                     'parameters' => ['id'],
                     'return_type' => 'bool'
                 ],
+                'aggregate' => [
+                    'parameters' => ['aggregations', 'groupBy', 'filters', 'startDate', 'endDate'],
+                    'return_type' => 'array'
+                ],
                 'createQueryBuilder' => [
                     'parameters' => ['alias', 'indexBy']
                 ],
