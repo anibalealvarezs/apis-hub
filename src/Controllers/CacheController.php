@@ -163,6 +163,13 @@ class CacheController extends BaseController
                 data: ['message' => 'Caching job successfully scheduled in background.'],
                 status: 'success'
             );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: "error",
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
         } catch (Exception $e) {
             return $this->createResponse(
                 data: null,
@@ -206,6 +213,13 @@ class CacheController extends BaseController
             return $this->createResponse(
                 data: ['message' => "$count caching jobs interrupted."],
                 status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: "error",
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -277,6 +291,13 @@ class CacheController extends BaseController
             } */
 
             return $requestsClassName::$methodName(...$parameters) ?: [];
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: "error",
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
         } catch (Exception $e) {
             throw $e;
         }

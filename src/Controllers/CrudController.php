@@ -5,6 +5,7 @@ namespace Controllers;
 use Doctrine\ORM\Exception\NotSupported;
 use Exception;
 use Helpers\Helpers;
+use InvalidArgumentException;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
@@ -94,9 +95,25 @@ class CrudController extends BaseController
                 callback: fn () => $repository->read(id: $id)
             );
 
+            if (!$data) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: "Record with ID " . ($id ?? 'unknown') . " not found",
+                    httpStatus: Response::HTTP_NOT_FOUND
+                );
+            }
+
             return $this->createResponse(
-                data: $data ?: [],
+                data: $data,
                 status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -140,6 +157,13 @@ class CrudController extends BaseController
             return $this->createResponse(
                 data: ['count' => $count],
                 status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -194,6 +218,13 @@ class CrudController extends BaseController
                 status: 'success',
                 meta: $meta ?: null
             );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
         } catch (Exception $e) {
             return $this->createResponse(
                 data: null,
@@ -241,6 +272,13 @@ class CrudController extends BaseController
                 data: $data,
                 status: 'success'
             );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
         } catch (Exception $e) {
             return $this->createResponse(
                 data: null,
@@ -286,6 +324,13 @@ class CrudController extends BaseController
                 data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
                 status: 'success',
                 httpStatus: Response::HTTP_CREATED
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -341,6 +386,13 @@ class CrudController extends BaseController
                 data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
                 status: 'success'
             );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
         } catch (Exception $e) {
             return $this->createResponse(
                 data: null,
@@ -389,6 +441,13 @@ class CrudController extends BaseController
             return $this->createResponse(
                 data: null,
                 status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(

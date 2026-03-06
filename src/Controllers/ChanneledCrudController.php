@@ -157,9 +157,25 @@ class ChanneledCrudController extends BaseController
                 callback: fn () => $repository->read(...$params)
             );
 
+            if (!$data) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: "Record with ID " . ($id ?? 'unknown') . " not found for for channel " . $channel->name,
+                    httpStatus: Response::HTTP_NOT_FOUND
+                );
+            }
+
             return $this->createResponse(
-                data: $data ?: [],
+                data: $data,
                 status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -339,6 +355,13 @@ class ChanneledCrudController extends BaseController
                 data: $data,
                 status: 'success'
             );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: "error",
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
         } catch (Exception $e) {
             return $this->createResponse(
                 data: null,
@@ -387,6 +410,13 @@ class ChanneledCrudController extends BaseController
                 data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
                 status: 'success',
                 httpStatus: Response::HTTP_CREATED
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: "error",
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -443,6 +473,13 @@ class ChanneledCrudController extends BaseController
                 data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
                 status: 'success'
             );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: "error",
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
         } catch (Exception $e) {
             return $this->createResponse(
                 data: null,
@@ -492,6 +529,13 @@ class ChanneledCrudController extends BaseController
             return $this->createResponse(
                 data: null,
                 status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: "error",
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
