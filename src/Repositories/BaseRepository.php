@@ -163,14 +163,22 @@ class BaseRepository extends EntityRepository
      */
     protected function mapFieldToSql(string $expr, bool $isAggregate = false): string
     {
-        // Handle aggregation functions if present e.g. SUM(metadata.clicks)
-        if ($isAggregate && preg_match('/^([A-Z]+)\((.+)\)$/i', trim($expr), $matches)) {
-            $func = strtoupper($matches[1]);
-            $inner = $this->mapFieldToSql($matches[2]);
-            return "$func($inner)";
-        }
-
         $field = trim($expr);
+
+        // If it's an aggregate expression, it might contain functions, arithmetic and multiple fields.
+        if ($isAggregate) {
+            // Find all potential field references and map them while leaving functions and operators intact.
+            $patterns = [
+                '/metadata\.[a-zA-Z0-9_]+/',
+                '/metric\.[a-zA-Z0-9_]+/',
+                '/metricConfig\.[a-zA-Z0-9_]+/',
+                '/\b(name|period|metricDate|value|platformCreatedAt|createdAt|date)\b/'
+            ];
+
+            return preg_replace_callback($patterns, function ($matches) {
+                return $this->mapFieldToSql($matches[0], false);
+            }, $field);
+        }
 
         // JSON Metadata extraction
         if (str_starts_with($field, 'metadata.')) {
