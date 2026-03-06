@@ -51,12 +51,15 @@ class CacheControllerTest extends BaseIntegrationTestCase
 
     public function testValidRequestSchedulesJob(): void
     {
+        $body = json_encode([$this->faker->word => $this->faker->sentence]);
+        $params = [$this->faker->word => $this->faker->word];
+
         // 1. Act: Provide a valid channel and entity
         $response = ($this->controller)(
             channel: 'facebook',
             entity: 'customer',
-            body: json_encode(['some' => 'body']),
-            params: ['some' => 'param']
+            body: $body,
+            params: $params
         );
 
         // 2. Assert HTTP Response
@@ -76,8 +79,8 @@ class CacheControllerTest extends BaseIntegrationTestCase
         $this->assertEquals(JobStatus::scheduled->value, $job->getStatus());
         
         $payload = $job->getPayload();
-        $this->assertEquals(json_encode(['some' => 'body']), $payload['body']);
-        $this->assertEquals(['some' => 'param'], $payload['params']);
+        $this->assertEquals($body, $payload['body']);
+        $this->assertEquals($params, $payload['params']);
 
         // 4. Act: Submitting another request while one is active should throw conflict
         $responseConflict = ($this->controller)(

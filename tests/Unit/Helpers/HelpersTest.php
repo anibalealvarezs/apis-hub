@@ -3,23 +3,20 @@
 namespace Tests\Unit\Helpers;
 
 use DateTime;
-use Faker\Factory;
-use Faker\Generator;
 use Helpers\Helpers;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 use Predis\ClientInterface;
 use ReflectionClass;
 use ReflectionException;
 use Doctrine\ORM\EntityManager;
 use Entities\Entity;
 
-class HelpersTest extends TestCase
+class HelpersTest extends BaseUnitTestCase
 {
-    private Generator $faker;
 
     protected function setUp(): void
     {
-        $this->faker = Factory::create();
+        parent::setUp();
 
         // Reset static properties before each test
         $reflection = new ReflectionClass(Helpers::class);

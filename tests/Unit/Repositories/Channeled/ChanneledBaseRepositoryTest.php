@@ -11,18 +11,15 @@ use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\Channel;
 use Enums\QueryBuilderType;
-use Faker\Factory;
-use Faker\Generator;
 use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 use ReflectionException;
 use ReflectionMethod;
 use Repositories\Channeled\ChanneledBaseRepository;
 
-class ChanneledBaseRepositoryTest extends TestCase
+class ChanneledBaseRepositoryTest extends BaseUnitTestCase
 {
-    private Generator $faker;
     private MockObject|QueryBuilder $queryBuilder;
     private MockObject|AbstractQuery $query;
     private ChanneledBaseRepository $repository;
@@ -45,7 +42,6 @@ class ChanneledBaseRepositoryTest extends TestCase
             ->method('createQueryBuilder')
             ->willReturn($this->queryBuilder); // Added to return mocked QueryBuilder
         $this->repository = new ChanneledBaseRepository($entityManager, $classMetadata);
-        $this->faker = Factory::create();
     }
 
     /**

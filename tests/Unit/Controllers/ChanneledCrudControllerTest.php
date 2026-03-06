@@ -7,21 +7,18 @@ use Doctrine\ORM\EntityManager;
 use Entities\Analytics\Channeled\ChanneledDiscount;
 use Enums\Channel;
 use Exception;
-use Faker\Factory;
-use Faker\Generator;
 use Helpers\Helpers;
 use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 
-class ChanneledCrudControllerTest extends TestCase
+class ChanneledCrudControllerTest extends BaseUnitTestCase
 {
-    private Generator $faker;
     private MockObject|EntityManager $entityManager;
     private MockObject|CacheService $cacheService;
     private MockObject|CacheKeyGenerator $cacheKeyGenerator;
@@ -29,7 +26,7 @@ class ChanneledCrudControllerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->faker = Factory::create();
+        parent::setUp();
 
         // Mock dependencies
         $this->entityManager = $this->createMock(EntityManager::class);

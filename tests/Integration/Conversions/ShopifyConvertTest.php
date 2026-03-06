@@ -12,11 +12,15 @@ class ShopifyConvertTest extends BaseIntegrationTestCase
 {
     public function testCustomersConvertsDataCorrectly(): void
     {
+        $platformId = $this->faker->numberBetween(1000, 99999);
+        $email = $this->faker->safeEmail;
+        $createdAt = $this->faker->iso8601;
+
         $rows = [
             [
-                'id' => 12345,
-                'created_at' => '2026-03-05T12:00:00Z',
-                'email' => 'test@example.com'
+                'id' => $platformId,
+                'created_at' => $createdAt,
+                'email' => $email
             ]
         ];
 
@@ -26,19 +30,21 @@ class ShopifyConvertTest extends BaseIntegrationTestCase
         $this->assertCount(1, $collection);
 
         $customer = $collection->first();
-        $this->assertEquals(12345, $customer->platformId);
+        $this->assertEquals($platformId, $customer->platformId);
         $this->assertEquals(Channel::shopify->value, $customer->channel);
-        $this->assertEquals('test@example.com', $customer->email);
+        $this->assertEquals($email, $customer->email);
         $this->assertInstanceOf(Carbon::class, $customer->platformCreatedAt);
     }
 
     public function testDiscountsConvertsDataCorrectly(): void
     {
+        $platformId = $this->faker->numberBetween(1000, 99999);
+        $code = strtoupper($this->faker->word . $this->faker->year);
         $rows = [
             [
-                'id' => 98765,
-                'created_at' => '2026-03-05T12:00:00Z',
-                'code' => 'SUMMER2026'
+                'id' => $platformId,
+                'created_at' => $this->faker->iso8601,
+                'code' => $code
             ]
         ];
 
@@ -48,17 +54,19 @@ class ShopifyConvertTest extends BaseIntegrationTestCase
         $this->assertCount(1, $collection);
 
         $discount = $collection->first();
-        $this->assertEquals(98765, $discount->platformId);
-        $this->assertEquals('SUMMER2026', $discount->code);
+        $this->assertEquals($platformId, $discount->platformId);
+        $this->assertEquals($code, $discount->code);
     }
 
     public function testPriceRulesConvertsDataCorrectly(): void
     {
+        $platformId = $this->faker->numberBetween(1000, 9999);
+        $type = $this->faker->randomElement(['percentage', 'fixed_amount']);
         $rows = [
             [
-                'id' => 1111,
-                'created_at' => '2026-03-05T12:00:00Z',
-                'value_type' => 'percentage'
+                'id' => $platformId,
+                'created_at' => $this->faker->iso8601,
+                'value_type' => $type
             ]
         ];
 
@@ -68,19 +76,24 @@ class ShopifyConvertTest extends BaseIntegrationTestCase
         $this->assertCount(1, $collection);
 
         $priceRule = $collection->first();
-        $this->assertEquals(1111, $priceRule->platformId);
-        $this->assertEquals('percentage', $priceRule->data['value_type']);
+        $this->assertEquals($platformId, $priceRule->platformId);
+        $this->assertEquals($type, $priceRule->data['value_type']);
     }
 
     public function testOrdersConvertsDataCorrectly(): void
     {
+        $orderId = $this->faker->numberBetween(1000, 9999);
+        $customerId = $this->faker->numberBetween(1000, 99999);
+        $code = strtoupper($this->faker->word);
+        $lineId = $this->faker->numberBetween(1, 100);
+
         $rows = [
             [
-                'id' => 2222,
-                'created_at' => '2026-03-05T12:00:00Z',
-                'customer' => ['id' => 12345],
-                'discount_codes' => [['code' => 'SUMMER2026']],
-                'line_items' => [['id' => 1]]
+                'id' => $orderId,
+                'created_at' => $this->faker->iso8601,
+                'customer' => ['id' => $customerId],
+                'discount_codes' => [['code' => $code]],
+                'line_items' => [['id' => $lineId]]
             ]
         ];
 
@@ -90,25 +103,31 @@ class ShopifyConvertTest extends BaseIntegrationTestCase
         $this->assertCount(1, $collection);
 
         $order = $collection->first();
-        $this->assertEquals(2222, $order->platformId);
-        $this->assertEquals(12345, $order->customer->id);
-        $this->assertEquals('SUMMER2026', $order->discountCodes[0]);
-        $this->assertEquals(1, $order->lineItems[0]['id']);
+        $this->assertEquals($orderId, $order->platformId);
+        $this->assertEquals($customerId, $order->customer->id);
+        $this->assertEquals($code, $order->discountCodes[0]);
+        $this->assertEquals($lineId, $order->lineItems[0]['id']);
     }
 
     public function testProductsAndVariantsConvertsDataCorrectly(): void
     {
+        $prodId = $this->faker->numberBetween(1000, 9999);
+        $prodSku = 'SKU-' . $this->faker->bothify('??-###');
+        $vendor = $this->faker->company;
+        $varId = $this->faker->numberBetween(1000, 9999);
+        $varSku = $prodSku . '-V1';
+
         $rows = [
             [
-                'id' => 3333,
-                'created_at' => '2026-03-05T12:00:00Z',
-                'sku' => 'PROD-1',
-                'vendor' => 'TestVendor',
+                'id' => $prodId,
+                'created_at' => $this->faker->iso8601,
+                'sku' => $prodSku,
+                'vendor' => $vendor,
                 'variants' => [
                     [
-                        'id' => 4444,
-                        'created_at' => '2026-03-05T12:00:00Z',
-                        'sku' => 'PROD-1-VAR-1',
+                        'id' => $varId,
+                        'created_at' => $this->faker->iso8601,
+                        'sku' => $varSku,
                     ]
                 ]
             ]
@@ -120,24 +139,25 @@ class ShopifyConvertTest extends BaseIntegrationTestCase
         $this->assertCount(1, $collection);
 
         $product = $collection->first();
-        $this->assertEquals(3333, $product->platformId);
-        $this->assertEquals('PROD-1', $product->sku);
-        $this->assertEquals('TestVendor', $product->vendor);
+        $this->assertEquals($prodId, $product->platformId);
+        $this->assertEquals($prodSku, $product->sku);
+        $this->assertEquals($vendor, $product->vendor);
 
         $this->assertInstanceOf(ArrayCollection::class, $product->variants);
         $this->assertCount(1, $product->variants);
 
         $variant = $product->variants->first();
-        $this->assertEquals(4444, $variant->platformId);
-        $this->assertEquals('PROD-1-VAR-1', $variant->sku);
+        $this->assertEquals($varId, $variant->platformId);
+        $this->assertEquals($varSku, $variant->sku);
     }
 
     public function testProductCategoriesConvertsDataCorrectly(): void
     {
+        $catId = $this->faker->numberBetween(1000, 9999);
         $rows = [
             [
-                'id' => 5555,
-                'published_at' => '2026-03-05T12:00:00Z',
+                'id' => $catId,
+                'published_at' => $this->faker->iso8601,
             ]
         ];
 
@@ -147,20 +167,24 @@ class ShopifyConvertTest extends BaseIntegrationTestCase
         $this->assertCount(1, $collection);
 
         $category = $collection->first();
-        $this->assertEquals(5555, $category->platformId);
+        $this->assertEquals($catId, $category->platformId);
         $this->assertTrue($category->isSmartCollection);
     }
 
     public function testCollectsConvertsDataCorrectly(): void
     {
+        $catId = $this->faker->numberBetween(1000, 9999);
+        $prodId1 = $this->faker->numberBetween(1000, 9999);
+        $prodId2 = $this->faker->numberBetween(1000, 9999);
+
         $rows = [
             [
-                'collection_id' => 5555,
-                'product_id' => 3333
+                'collection_id' => $catId,
+                'product_id' => $prodId1
             ],
             [
-                'collection_id' => 5555,
-                'product_id' => 3334
+                'collection_id' => $catId,
+                'product_id' => $prodId2
             ]
         ];
 
@@ -170,9 +194,9 @@ class ShopifyConvertTest extends BaseIntegrationTestCase
         // The resulting collection groups products by collection_id
         $this->assertCount(1, $collection);
         
-        $productsInCollection = $collection->get(5555);
+        $productsInCollection = $collection->get($catId);
         $this->assertCount(2, $productsInCollection);
-        $this->assertEquals(3333, $productsInCollection[0]);
-        $this->assertEquals(3334, $productsInCollection[1]);
+        $this->assertEquals($prodId1, $productsInCollection[0]);
+        $this->assertEquals($prodId2, $productsInCollection[1]);
     }
 }

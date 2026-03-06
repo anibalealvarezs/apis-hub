@@ -19,12 +19,13 @@ class ProcessJobsTest extends BaseIntegrationTestCase
         $jobRepo = $this->entityManager->getRepository(\Entities\Job::class);
 
         // We bypass JobRepository's creation checks to force a naked Job payload that won't pollute external endpoints
+        $uuid = $this->faker->uuid;
         $job = new Job();
         $job->addEntity('customer'); // Must be a valid AnalyticsEntity case value
         // Use facebook channel because getting customers from facebook returns an empty response immediately, preventing test hangs.
         $job->addChannel('facebook'); // Must be a valid Channel case value
         $job->addStatus(JobStatus::scheduled->value);
-        $job->addUuid('integration-test-uuid-xyz');
+        $job->addUuid($uuid);
         $job->addPayload([]);
         
         $this->entityManager->persist($job);
@@ -44,7 +45,7 @@ class ProcessJobsTest extends BaseIntegrationTestCase
         
         // Assert STDOUT log verifies it actually caught the job off the database
         $this->assertStringContainsString('Querying scheduled jobs', $outputContent);
-        $this->assertStringContainsString('Processing job integration-test-uuid-xyz', $outputContent);
+        $this->assertStringContainsString('Processing job ' . $uuid, $outputContent);
         
         // Refresh job
         $this->entityManager->refresh($job);

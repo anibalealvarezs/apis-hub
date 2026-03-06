@@ -11,13 +11,14 @@ use PHPUnit\Framework\TestCase;
 abstract class BaseIntegrationTestCase extends TestCase
 {
     protected ?EntityManager $entityManager = null;
+    protected \Faker\Generator $faker;
     protected array $config = [];
 
     protected function setUp(): void
     {
         parent::setUp();
         
-        // Load the actual configuration
+        $this->faker = \Faker\Factory::create();
         // In the real environment, bootstrap.php injects $GLOBALS['app_config']
         $this->config = $GLOBALS['app_config'] ?? [];
 

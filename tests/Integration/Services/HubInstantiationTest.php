@@ -13,7 +13,7 @@ class HubInstantiationTest extends BaseIntegrationTestCase
     {
         // 1. Arrange: Override the KLAVIYO configuration via Environment variable
         // This validates our integration with dynamic configurations.
-        $fakeApiKey = 'pk_test_1234567890abcdef';
+        $fakeApiKey = 'pk_test_' . $this->faker->uuid;
         $config = ['klaviyo' => ['enabled' => true, 'klaviyo_api_key' => $fakeApiKey]];
         putenv('CHANNELS_CONFIG=' . json_encode($config));
 

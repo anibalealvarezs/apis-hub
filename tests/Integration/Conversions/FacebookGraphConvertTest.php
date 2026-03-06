@@ -19,32 +19,35 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
     {
         // 1. Arrange: Create our Database Account entity
         $accountEntity = new Account();
-        $accountEntity->addName('Test FB Account');
+        $accountEntity->addName($this->faker->company . ' Account');
         $this->entityManager->persist($accountEntity);
         $this->entityManager->flush();
 
-        // Simulate 2 raw rows returned from Facebook Insights API
+        $dateStart = $this->faker->date();
+        $channeledAccountPlatformId = 'act_' . $this->faker->numerify('#########');
+
+        // Simulate 2 raw raw rows returned from Facebook Insights API
         $rows = [
             [
                 'age' => '18-24',
                 'gender' => 'male',
-                'date_start' => '2026-03-05',
-                'impressions' => '5000',
-                'clicks' => '100',
-                'spend' => '25.50',
+                'date_start' => $dateStart,
+                'impressions' => (string) $this->faker->numberBetween(1000, 10000),
+                'clicks' => (string) $this->faker->numberBetween(10, 500),
+                'spend' => (string) $this->faker->randomFloat(2, 5, 200),
                 'actions' => [
-                    ['action_type' => 'link_click', 'value' => '50']
+                    ['action_type' => 'link_click', 'value' => (string) $this->faker->numberBetween(5, 100)]
                 ]
             ],
             [
                 'age' => '25-34',
                 'gender' => 'female',
-                'date_start' => '2026-03-05',
-                'impressions' => '3000',
-                'clicks' => '45',
-                'spend' => '15.00',
+                'date_start' => $dateStart,
+                'impressions' => (string) $this->faker->numberBetween(1000, 10000),
+                'clicks' => (string) $this->faker->numberBetween(10, 500),
+                'spend' => (string) $this->faker->randomFloat(2, 5, 200),
                 'cost_per_unique_outbound_click' => [
-                     ['action_type' => 'cost_per_unique_outbound_click', 'value' => '0.33']
+                     ['action_type' => 'cost_per_unique_outbound_click', 'value' => (string) $this->faker->randomFloat(2, 0.1, 2.0)]
                 ]
             ]
         ];
@@ -54,7 +57,7 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
             rows: $rows,
             logger: null,
             accountEntity: $accountEntity,
-            channeledAccountPlatformId: 'act_123456789',
+            channeledAccountPlatformId: $channeledAccountPlatformId,
             period: Period::Daily
         );
 
@@ -82,26 +85,27 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
         $this->assertArrayHasKey('18-24_male_clicks', $metricsMap);
         $this->assertArrayHasKey('18-24_male_spend', $metricsMap);
 
-        $this->assertEquals('5000', $metricsMap['18-24_male_impressions']->value);
-        $this->assertEquals('act_123456789', $metricsMap['18-24_male_impressions']->platformId);
+        $this->assertEquals($rows[0]['impressions'], $metricsMap['18-24_male_impressions']->value);
+        $this->assertEquals($channeledAccountPlatformId, $metricsMap['18-24_male_impressions']->platformId);
         $this->assertEquals(\Enums\Channel::facebook->value, $metricsMap['18-24_male_impressions']->channel);
-        $this->assertEquals('2026-03-05', $metricsMap['18-24_male_impressions']->metricDate);
+        $this->assertEquals($dateStart, $metricsMap['18-24_male_impressions']->metricDate);
 
         // Ensure metadata extraction captures complex fields like actions natively
         $this->assertArrayHasKey('actions', $metricsMap['18-24_male_impressions']->metadata);
-        $this->assertEquals('50', $metricsMap['18-24_male_impressions']->metadata['actions'][0]['value']);
+        $this->assertEquals($rows[0]['actions'][0]['value'], $metricsMap['18-24_male_impressions']->metadata['actions'][0]['value']);
 
         // Validate Row 2 assertions
         $this->assertArrayHasKey('25-34_female_cost_per_unique_outbound_click', $metricsMap);
         // The Conversion script has a specific ternary for cost_per_unique_outbound_click checking array indexing:
-        $this->assertEquals('0.33', $metricsMap['25-34_female_cost_per_unique_outbound_click']->value); 
+        $this->assertEquals($rows[1]['cost_per_unique_outbound_click'][0]['value'], $metricsMap['25-34_female_cost_per_unique_outbound_click']->value); 
     }
 
     public function testPageMetricsTransformsDataCorrectly(): void
     {
+        $pagePlatformId = $this->faker->uuid;
         $pageEntity = new Page();
-        $pageEntity->addUrl('https://facebook.com/testpage');
-        $pageEntity->addPlatformId('page_123');
+        $pageEntity->addUrl($this->faker->url);
+        $pageEntity->addPlatformId($pagePlatformId);
         $this->entityManager->persist($pageEntity);
         $this->entityManager->flush();
 
@@ -109,15 +113,15 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
             [
                 'name' => 'page_impressions',
                 'values' => [
-                    ['value' => 5000, 'end_time' => '2026-03-05T07:00:00+0000'],
-                    ['value' => 6000, 'end_time' => '2026-03-06T07:00:00+0000']
+                    ['value' => $this->faker->numberBetween(100, 10000), 'end_time' => $this->faker->iso8601],
+                    ['value' => $this->faker->numberBetween(100, 10000), 'end_time' => $this->faker->iso8601]
                 ]
             ]
         ];
 
         $collection = FacebookGraphConvert::pageMetrics(
             rows: $rows,
-            pagePlatformId: 'page_123',
+            pagePlatformId: $pagePlatformId,
             postPlatformId: '',
             logger: null,
             pageEntity: $pageEntity,
@@ -132,12 +136,13 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
     public function testIgAccountMetricsTransformsDataCorrectly(): void
     {
         $accountEntity = new Account();
-        $accountEntity->addName('IG Account');
+        $accountEntity->addName($this->faker->name . ' Account');
         $this->entityManager->persist($accountEntity);
         
+        $igPlatformId = 'ig_' . $this->faker->numerify('#####');
         $channeledAccount = new ChanneledAccount();
-        $channeledAccount->addPlatformId('ig_123');
-        $channeledAccount->addName('IG Act');
+        $channeledAccount->addPlatformId($igPlatformId);
+        $channeledAccount->addName($this->faker->userName);
         $channeledAccount->addType(\Enums\Account::INSTAGRAM);
         $channeledAccount->addChannel(\Enums\Channel::facebook->value);
         $channeledAccount->addAccount($accountEntity);
@@ -152,8 +157,8 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
                         [
                             'dimension_keys' => ['country'],
                             'results' => [
-                                ['dimension_values' => ['US'], 'value' => 500],
-                                ['dimension_values' => ['CA'], 'value' => 200]
+                                ['dimension_values' => [$this->faker->countryCode], 'value' => $this->faker->numberBetween(1, 1000)],
+                                ['dimension_values' => [$this->faker->countryCode], 'value' => $this->faker->numberBetween(1, 1000)]
                             ]
                         ]
                     ]
@@ -161,13 +166,13 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
             ],
             [
                 'name' => 'impressions',
-                'total_value' => ['value' => 1000]
+                'total_value' => ['value' => $this->faker->numberBetween(1, 10000)]
             ]
         ];
 
         $collection = FacebookGraphConvert::igAccountMetrics(
             rows: $rows,
-            date: '2026-03-05',
+            date: $this->faker->date(),
             pageEntity: null,
             accountEntity: $accountEntity,
             channeledAccountEntity: $channeledAccount,
@@ -180,20 +185,21 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
 
     public function testCampaignMetricsTransformsDataCorrectly(): void
     {
+        $campaignPlatformId = $this->faker->uuid;
         $campaignEntity = new Campaign();
-        $campaignEntity->addCampaignId('camp_abc');
-        $campaignEntity->addName('Test Campaign');
+        $campaignEntity->addCampaignId($campaignPlatformId);
+        $campaignEntity->addName($this->faker->sentence(3));
         $this->entityManager->persist($campaignEntity);
         
         $channeledCampaign = new ChanneledCampaign();
-        $channeledCampaign->addPlatformId('c_123');
-        $channeledCampaign->addBudget(100.0);
+        $channeledCampaign->addPlatformId($this->faker->uuid);
+        $channeledCampaign->addBudget((float) $this->faker->numberBetween(50, 5000));
         $channeledCampaign->addChannel(\Enums\Channel::facebook->value);
         $channeledCampaign->addCampaign($campaignEntity);
         
         $channeledAccount = new ChanneledAccount();
-        $channeledAccount->addPlatformId('act_123');
-        $channeledAccount->addName('Account_Name');
+        $channeledAccount->addPlatformId('act_' . $this->faker->numerify('#########'));
+        $channeledAccount->addName($this->faker->company);
         $channeledAccount->addType(\Enums\Account::META_AD_ACCOUNT);
         $channeledAccount->addChannel(\Enums\Channel::facebook->value);
         // Campaign requires account technically in DB relations typically, but we only supply it direct for metric config signature
@@ -206,9 +212,9 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
             [
                 'age' => '18-24',
                 'gender' => 'male',
-                'date_start' => '2026-03-05',
-                'impressions' => '1000',
-                'clicks' => '50'
+                'date_start' => $this->faker->date(),
+                'impressions' => (string) $this->faker->numberBetween(100, 10000),
+                'clicks' => (string) $this->faker->numberBetween(1, 500)
             ]
         ];
 

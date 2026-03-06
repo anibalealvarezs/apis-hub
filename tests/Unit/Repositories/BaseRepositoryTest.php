@@ -9,17 +9,14 @@ use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\QueryBuilderType;
-use Faker\Factory;
-use Faker\Generator;
 use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 use Repositories\BaseRepository;
 use stdClass;
 use ReflectionProperty;
 
-class BaseRepositoryTest extends TestCase
+class BaseRepositoryTest extends BaseUnitTestCase
 {
-    private Generator $faker;
     private MockObject|EntityManager $entityManager;
     private MockObject|QueryBuilder $queryBuilder;
     private MockObject|AbstractQuery $query;
@@ -29,7 +26,7 @@ class BaseRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->faker = Factory::create();
+        parent::setUp();
 
         $this->entityManager = $this->createMock(EntityManager::class);
         $this->queryBuilder = $this->createMock(QueryBuilder::class);

@@ -12,20 +12,28 @@ class NetSuiteConvertTest extends BaseIntegrationTestCase
 {
     public function testCustomersConvertsDataCorrectly(): void
     {
+        $platformId = 'cust_' . $this->faker->numerify('###');
+        $email = $this->faker->safeEmail;
+        $createdAt = $this->faker->iso8601;
+        $addr1 = $this->faker->streetAddress;
+        $city1 = $this->faker->city;
+        $addr2 = $this->faker->streetAddress;
+        $city2 = $this->faker->city;
+
         $rows = [
             [
-                'entityid' => 'cust_001',
-                'email' => 'customer1@example.com',
-                'datecreated' => '2026-03-05T12:00:00Z',
-                'addressaddr1' => '123 Main St',
-                'addresscity' => 'New York'
+                'entityid' => $platformId,
+                'email' => $email,
+                'datecreated' => $createdAt,
+                'addressaddr1' => $addr1,
+                'addresscity' => $city1
             ],
             [
-                'entityid' => 'cust_001',
-                'email' => 'customer1@example.com',
-                'datecreated' => '2026-03-05T12:00:00Z',
-                'addressaddr1' => '456 Side St',
-                'addresscity' => 'Brooklyn'
+                'entityid' => $platformId,
+                'email' => $email,
+                'datecreated' => $createdAt,
+                'addressaddr1' => $addr2,
+                'addresscity' => $city2
             ]
         ];
 
@@ -35,20 +43,22 @@ class NetSuiteConvertTest extends BaseIntegrationTestCase
         $this->assertCount(1, $collection);
 
         $customer = $collection->first();
-        $this->assertEquals('cust_001', $customer->platformId);
-        $this->assertEquals('customer1@example.com', $customer->email);
+        $this->assertEquals($platformId, $customer->platformId);
+        $this->assertEquals($email, $customer->email);
         $this->assertCount(2, $customer->data['addresses']);
-        $this->assertEquals('123 Main St', $customer->data['addresses'][0]['addressaddr1']);
-        $this->assertEquals('456 Side St', $customer->data['addresses'][1]['addressaddr1']);
+        $this->assertEquals($addr1, $customer->data['addresses'][0]['addressaddr1']);
+        $this->assertEquals($addr2, $customer->data['addresses'][1]['addressaddr1']);
     }
 
     public function testDiscountsConvertsDataCorrectly(): void
     {
+        $platformId = 'disc_' . $this->faker->uuid;
+        $code = strtoupper($this->faker->bothify('SAVE##'));
         $rows = [
             [
-                'id' => 'disc_123',
-                'created_at' => '2026-03-05T12:00:00Z',
-                'code' => 'SAVE10'
+                'id' => $platformId,
+                'created_at' => $this->faker->iso8601,
+                'code' => $code
             ]
         ];
 
@@ -56,8 +66,8 @@ class NetSuiteConvertTest extends BaseIntegrationTestCase
 
         $this->assertCount(1, $collection);
         $discount = $collection->first();
-        $this->assertEquals('disc_123', $discount->platformId);
-        $this->assertEquals('SAVE10', $discount->code);
+        $this->assertEquals($platformId, $discount->platformId);
+        $this->assertEquals($code, $discount->code);
     }
 
     public function testPriceRulesConvertsDataCorrectly(): void
@@ -78,23 +88,29 @@ class NetSuiteConvertTest extends BaseIntegrationTestCase
 
     public function testProductsAndVariantsConvertsDataCorrectly(): void
     {
+        $parentId = 'parent_' . $this->faker->uuid;
+        $parentSku = 'SKU-P-' . $this->faker->bothify('??-###');
+        $childId = 'child_' . $this->faker->uuid;
+        $childSku = 'SKU-C-' . $this->faker->bothify('??-###');
+        $vendor = $this->faker->company;
+
         $rows = [
             [
-                'id' => 'parent_001',
-                'itemid' => 'SKU-PARENT-001',
-                'createddate' => '2026-03-05T12:00:00Z',
+                'id' => $parentId,
+                'itemid' => $parentSku,
+                'createddate' => $this->faker->iso8601,
                 'itemtype' => 'NonInvtPart',
-                'custitem_design_code' => 'DESIGN-X',
-                'vendorname' => 'Supplier A'
+                'custitem_design_code' => $this->faker->word,
+                'vendorname' => $vendor
             ],
             [
-                'id' => 'child_001',
-                'itemid' => 'SKU-CHILD-001',
-                'createddate' => '2026-03-05T12:05:00Z',
+                'id' => $childId,
+                'itemid' => $childSku,
+                'createddate' => $this->faker->iso8601,
                 'itemtype' => 'Assembly',
-                'custitem_web_store_design_item' => 'parent_001',
-                'parent' => 'some_internal_parent',
-                'custitem_design_code' => 'DESIGN-X-C1'
+                'custitem_web_store_design_item' => $parentId,
+                'parent' => $this->faker->uuid,
+                'custitem_design_code' => $this->faker->word
             ]
         ];
 
@@ -102,53 +118,62 @@ class NetSuiteConvertTest extends BaseIntegrationTestCase
 
         $this->assertCount(1, $collection);
         $product = $collection->first();
-        $this->assertEquals('parent_001', $product->platformId);
-        $this->assertEquals('SKU-PARENT-001', $product->sku);
-        $this->assertEquals('Supplier A', $product->vendor->name);
+        $this->assertEquals($parentId, $product->platformId);
+        $this->assertEquals($parentSku, $product->sku);
+        $this->assertEquals($vendor, $product->vendor->name);
         
         $this->assertCount(1, $product->variants);
         $variant = $product->variants->first();
-        $this->assertEquals('child_001', $variant->platformId);
-        $this->assertEquals('SKU-CHILD-001', $variant->sku);
+        $this->assertEquals($childId, $variant->platformId);
+        $this->assertEquals($childSku, $variant->sku);
     }
 
     public function testOrderProcessingConvertsDataCorrectly(): void
     {
+        $platformId = 'order_' . $this->faker->numerify('#####');
+        $email = $this->faker->safeEmail;
+        $customerId = 'cust_' . $this->faker->word;
+        $promo = strtoupper($this->faker->word);
+        $created = $this->faker->iso8601;
+        $total = $this->faker->randomFloat(2, 100, 1000);
+        $tax = $this->faker->randomFloat(2, 5, 50);
+        $discount = $this->faker->randomFloat(2, 5, 20);
+
         // NetSuite orders are rows from a single saved search, often repeating order headers for each line item
         $rows = [
             [
-                'id' => 'order_123',
-                'createddate' => '2026-03-05T12:00:00Z',
-                'entity' => 'customer_abc',
-                'customeremail' => 'cust@example.com',
-                'foreigntotal' => '100.00',
-                'promotioncodename' => 'PROMO1',
+                'id' => $platformId,
+                'createddate' => $created,
+                'entity' => $customerId,
+                'customeremail' => $email,
+                'foreigntotal' => (string) $total,
+                'promotioncodename' => $promo,
                 'transactionlineid' => '1',
-                'transactionlineforeignamount' => '-10.00',
+                'transactionlineforeignamount' => (string) (-$tax),
                 'transactionlineitemtype' => 'TaxItem'
             ],
             [
-                'id' => 'order_123',
-                'createddate' => '2026-03-05T12:00:00Z',
-                'entity' => 'customer_abc',
-                'customeremail' => 'cust@example.com',
-                'foreigntotal' => '100.00',
-                'promotioncodename' => 'PROMO1',
+                'id' => $platformId,
+                'createddate' => $created,
+                'entity' => $customerId,
+                'customeremail' => $email,
+                'foreigntotal' => (string) $total,
+                'promotioncodename' => $promo,
                 'transactionlineid' => '2',
-                'transactionlineforeignamount' => '50.00',
+                'transactionlineforeignamount' => (string) ($total / 2),
                 'transactionlineitemtype' => 'NonInvtPart',
-                'itemid' => 'prod_xyz',
-                'itemsku' => 'SKU-XYZ'
+                'itemid' => $this->faker->uuid,
+                'itemsku' => 'SKU-' . $this->faker->word
             ],
             [
-                'id' => 'order_123',
-                'createddate' => '2026-03-05T12:00:00Z',
-                'entity' => 'customer_abc',
-                'customeremail' => 'cust@example.com',
-                'foreigntotal' => '100.00',
-                'promotioncodename' => 'PROMO1',
+                'id' => $platformId,
+                'createddate' => $created,
+                'entity' => $customerId,
+                'customeremail' => $email,
+                'foreigntotal' => (string) $total,
+                'promotioncodename' => $promo,
                 'transactionlineid' => '3',
-                'transactionlineforeignamount' => '-5.00',
+                'transactionlineforeignamount' => (string) (-$discount),
                 'transactionlineitemtype' => 'Discount'
             ]
         ];
@@ -157,32 +182,29 @@ class NetSuiteConvertTest extends BaseIntegrationTestCase
 
         $this->assertCount(1, $collection);
         $order = $collection->first();
-        $this->assertEquals('order_123', $order->platformId);
-        $this->assertEquals('customer_abc', $order->customer->id);
-        $this->assertEquals('cust@example.com', $order->customer->email);
-        $this->assertContains('PROMO1', $order->discountCodes);
+        $this->assertEquals($platformId, $order->platformId);
+        $this->assertEquals($customerId, $order->customer->id);
+        $this->assertEquals($email, $order->customer->email);
+        $this->assertContains($promo, $order->discountCodes);
         
         // Assert sums
-        // Total = 100
-        // Tax = 10
-        // Discount = -5
-        // Ship = 0
-        $this->assertEquals(10.00, $order->data['taxTotal']);
-        $this->assertEquals(-5.00, $order->data['discountTotal']);
+        $this->assertEquals($tax, $order->data['taxTotal']);
+        $this->assertEquals(-$discount, $order->data['discountTotal']);
         
-        // subtotalAfterDiscounts = total(100) - tax(10) - ship(0) = 90
-        $this->assertEquals(90.00, $order->data['subtotalAfterDiscounts']);
-        // subtotalBeforeDiscounts = subafter(90) + discount(-5) = 85
-        $this->assertEquals(85.00, $order->data['subtotalBeforeDiscounts']);
+        $subAfter = $total - $tax; 
+        $this->assertEquals($subAfter, $order->data['subtotalAfterDiscounts']);
+        $this->assertEquals($subAfter - $discount, $order->data['subtotalBeforeDiscounts']);
     }
 
     public function testVendorsConvertsDataCorrectly(): void
     {
+        $platformId = 'vend_' . $this->faker->uuid;
+        $name = $this->faker->company;
         $rows = [
             [
-                'id' => 'vend_123',
-                'name' => 'Mega Corp',
-                'created' => '2026-03-05T12:00:00Z',
+                'id' => $platformId,
+                'name' => $name,
+                'created' => $this->faker->iso8601,
                 'data' => ['some' => 'info']
             ]
         ];
@@ -191,7 +213,7 @@ class NetSuiteConvertTest extends BaseIntegrationTestCase
 
         $this->assertCount(1, $collection);
         $vendor = $collection->first();
-        $this->assertEquals('vend_123', $vendor->platformId);
-        $this->assertEquals('Mega Corp', $vendor->name);
+        $this->assertEquals($platformId, $vendor->platformId);
+        $this->assertEquals($name, $vendor->name);
     }
 }

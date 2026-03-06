@@ -6,21 +6,18 @@ use Controllers\CrudController;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\NotSupported;
 use Exception;
-use Faker\Factory;
-use Faker\Generator;
 use InvalidArgumentException;
 use JsonException;
 use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 
-class CrudControllerTest extends TestCase
+class CrudControllerTest extends BaseUnitTestCase
 {
-    private Generator $faker;
     private MockObject|EntityManager $entityManager;
     private MockObject|CacheService $cacheService;
     private MockObject|CacheKeyGenerator $cacheKeyGenerator;
@@ -28,7 +25,7 @@ class CrudControllerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->faker = Factory::create();
+        parent::setUp();
 
         // Mock dependencies
         $this->entityManager = $this->createMock(EntityManager::class);

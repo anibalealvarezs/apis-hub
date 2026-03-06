@@ -12,7 +12,8 @@ class RoutingCoreTest extends BaseIntegrationTestCase
     public function testRoutingCoreRejectsRequestsWithoutApiKeyWhenConfigured(): void
     {
         // Arrange
-        putenv('APP_API_KEY=test-secret-key-123xyz');
+        $apiKey = $this->faker->password(20);
+        putenv('APP_API_KEY=' . $apiKey);
 
         $router = new RoutingCore();
         $router->map('/test-route', 'GET', function (?string $body, ?array $params) {
@@ -29,7 +30,7 @@ class RoutingCoreTest extends BaseIntegrationTestCase
 
         // Act - Request with wrong API Key
         $requestWrongKey = Request::create('/test-route', 'GET');
-        $requestWrongKey->headers->set('X-API-Key', 'wrong-key');
+        $requestWrongKey->headers->set('X-API-Key', 'wrong-' . $this->faker->word);
         $responseWrongKey = $router->handle($requestWrongKey);
 
         // Assert
@@ -37,7 +38,7 @@ class RoutingCoreTest extends BaseIntegrationTestCase
         
         // Act - Request with correct API Key
         $requestRightKey = Request::create('/test-route', 'GET');
-        $requestRightKey->headers->set('X-API-Key', 'test-secret-key-123xyz');
+        $requestRightKey->headers->set('X-API-Key', $apiKey);
         $responseRightKey = $router->handle($requestRightKey);
 
         // Assert

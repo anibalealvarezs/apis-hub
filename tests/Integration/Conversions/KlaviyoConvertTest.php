@@ -12,12 +12,16 @@ class KlaviyoConvertTest extends BaseIntegrationTestCase
 {
     public function testCustomersConvertsDataCorrectly(): void
     {
+        $platformId = 'profile_' . $this->faker->uuid;
+        $email = $this->faker->safeEmail;
+        $createdAt = $this->faker->iso8601;
+
         $rows = [
             [
-                'id' => 'profile_123',
+                'id' => $platformId,
                 'attributes' => [
-                    'created' => '2026-03-05T12:00:00Z',
-                    'email' => 'test@klaviyo.com'
+                    'created' => $createdAt,
+                    'email' => $email
                 ]
             ]
         ];
@@ -28,28 +32,34 @@ class KlaviyoConvertTest extends BaseIntegrationTestCase
         $this->assertCount(1, $collection);
 
         $customer = $collection->first();
-        $this->assertEquals('profile_123', $customer->platformId);
+        $this->assertEquals($platformId, $customer->platformId);
         $this->assertEquals(Channel::klaviyo->value, $customer->channel);
-        $this->assertEquals('test@klaviyo.com', $customer->email);
+        $this->assertEquals($email, $customer->email);
         $this->assertInstanceOf(Carbon::class, $customer->platformCreatedAt);
     }
 
     public function testProductsAndVariantsConvertsDataCorrectly(): void
     {
+        $prodId = 'prod_' . $this->faker->uuid;
+        $prodSku = 'SKU-' . $this->faker->bothify('??-###');
+        $prodCreated = $this->faker->iso8601;
+        $varId = 'var_' . $this->faker->uuid;
+        $varSku = $prodSku . '-V1';
+        $varCreated = $this->faker->iso8601;
+
         $rows = [
             [
-                'id' => 'prod_123',
-                'sku' => 'PROD-K-1',
+                'id' => $prodId,
+                'sku' => $prodSku,
                 'attributes' => [
-                    'created' => '2026-03-05T12:00:00Z',
+                    'created' => $prodCreated,
                 ],
-                // Klaviyo structure includes variants in an 'included' array
                 'included' => [
                     [
-                        'id' => 'var_123',
-                        'sku' => 'PROD-K-1-V1',
+                        'id' => $varId,
+                        'sku' => $varSku,
                         'attributes' => [
-                            'created' => '2026-03-05T12:01:00Z',
+                            'created' => $varCreated,
                         ]
                     ]
                 ]
@@ -62,25 +72,28 @@ class KlaviyoConvertTest extends BaseIntegrationTestCase
         $this->assertCount(1, $collection);
 
         $product = $collection->first();
-        $this->assertEquals('prod_123', $product->platformId);
-        $this->assertEquals('PROD-K-1', $product->sku);
+        $this->assertEquals($prodId, $product->platformId);
+        $this->assertEquals($prodSku, $product->sku);
         $this->assertNull($product->vendor);
 
         $this->assertInstanceOf(ArrayCollection::class, $product->variants);
         $this->assertCount(1, $product->variants);
 
         $variant = $product->variants->first();
-        $this->assertEquals('var_123', $variant->platformId);
-        $this->assertEquals('PROD-K-1-V1', $variant->sku);
+        $this->assertEquals($varId, $variant->platformId);
+        $this->assertEquals($varSku, $variant->sku);
     }
 
     public function testProductCategoriesConvertsDataCorrectly(): void
     {
+        $catId = 'cat_' . $this->faker->uuid;
+        $createdAt = $this->faker->iso8601;
+
         $rows = [
             [
-                'id' => 'cat_123',
+                'id' => $catId,
                 'attributes' => [
-                    'created' => '2026-03-05T12:00:00Z',
+                    'created' => $createdAt,
                 ]
             ]
         ];
@@ -91,37 +104,43 @@ class KlaviyoConvertTest extends BaseIntegrationTestCase
         $this->assertCount(1, $collection);
 
         $category = $collection->first();
-        $this->assertEquals('cat_123', $category->platformId);
+        $this->assertEquals($catId, $category->platformId);
         $this->assertInstanceOf(Carbon::class, $category->platformCreatedAt);
     }
 
     public function testMetricAggregatesConvertsDataCorrectlyWithoutLiveApi(): void
     {
+        $date = $this->faker->iso8601;
+        $count = $this->faker->numberBetween(1, 100);
+        $country = $this->faker->countryCode;
+        $metricId = 'met_' . $this->faker->uuid;
+        $metricName = $this->faker->words(3, true);
+
         $aggregates = [
-            'dates' => ['2026-03-05T00:00:00Z'],
+            'dates' => [$date],
             'data' => [
                 [
-                    'measurements' => ['count' => 45],
-                    'dimensions' => ['country' => 'US']
+                    'measurements' => ['count' => $count],
+                    'dimensions' => ['country' => $country]
                 ]
             ]
         ];
 
         // We provide a metric names map to bypass the Redis/Live API fallback inside the metricAggregates function
         $mockMetricNamesMap = [
-            'met_123' => 'Placed Order'
+            $metricId => $metricName
         ];
 
-        $collection = KlaviyoConvert::metricAggregates($aggregates, 'met_123', $mockMetricNamesMap);
+        $collection = KlaviyoConvert::metricAggregates($aggregates, $metricId, $mockMetricNamesMap);
 
         $this->assertInstanceOf(ArrayCollection::class, $collection);
         $this->assertCount(1, $collection);
 
         $metric = $collection->first();
-        $this->assertEquals('met_123', $metric->platformId);
-        $this->assertEquals('Placed Order', $metric->name);
+        $this->assertEquals($metricId, $metric->platformId);
+        $this->assertEquals($metricName, $metric->name);
         $this->assertEquals(Channel::klaviyo->value, $metric->channel);
-        $this->assertEquals(45, $metric->value);
-        $this->assertEquals('US', $metric->data['country']);
+        $this->assertEquals($count, $metric->value);
+        $this->assertEquals($country, $metric->data['country']);
     }
 }

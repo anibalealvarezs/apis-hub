@@ -5,9 +5,9 @@ namespace Tests\Unit\Classes\Requests;
 use Classes\Requests\VendorRequests;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 
-class VendorRequestsTest extends TestCase
+class VendorRequestsTest extends BaseUnitTestCase
 {
     public function testSupportedChannels(): void
     {

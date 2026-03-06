@@ -16,9 +16,9 @@ use Entities\Analytics\Post;
 use Enums\Channel;
 use Enums\Period;
 use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 
-class FacebookGraphConvertTest extends TestCase
+class FacebookGraphConvertTest extends BaseUnitTestCase
 {
     private MockObject|Page $page;
     private MockObject|Post $post;
@@ -31,40 +31,45 @@ class FacebookGraphConvertTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->page = $this->createMock(Page::class);
-        $this->page->method('getUrl')->willReturn('https://example.com');
+        $this->page->method('getUrl')->willReturn($this->faker->url);
 
         $this->post = $this->createMock(Post::class);
-        $this->post->method('getPostId')->willReturn('post123');
+        $this->post->method('getPostId')->willReturn('post' . $this->faker->randomNumber());
 
         $this->account = $this->createMock(Account::class);
-        $this->account->method('getName')->willReturn('account123');
+        $this->account->method('getName')->willReturn($this->faker->word);
 
         $this->channeledAccount = $this->createMock(ChanneledAccount::class);
-        $this->channeledAccount->method('getPlatformId')->willReturn('ca123');
+        $this->channeledAccount->method('getPlatformId')->willReturn('ca' . $this->faker->randomNumber());
 
         $this->campaign = $this->createMock(Campaign::class);
-        $this->campaign->method('getCampaignId')->willReturn('camp123');
+        $this->campaign->method('getCampaignId')->willReturn('camp' . $this->faker->randomNumber());
 
         $this->channeledCampaign = $this->createMock(ChanneledCampaign::class);
-        $this->channeledCampaign->method('getPlatformId')->willReturn('cc123');
+        $this->channeledCampaign->method('getPlatformId')->willReturn('cc' . $this->faker->randomNumber());
 
         $this->channeledAdGroup = $this->createMock(ChanneledAdGroup::class);
-        $this->channeledAdGroup->method('getPlatformId')->willReturn('cag123');
+        $this->channeledAdGroup->method('getPlatformId')->willReturn('cag' . $this->faker->randomNumber());
 
         $this->channeledAd = $this->createMock(ChanneledAd::class);
-        $this->channeledAd->method('getPlatformId')->willReturn('cad123');
+        $this->channeledAd->method('getPlatformId')->willReturn('cad' . $this->faker->randomNumber());
     }
 
     public function testPageMetrics(): void
     {
+        $value = $this->faker->numberBetween(1, 1000);
+        $platformId = 'page' . $this->faker->randomNumber();
+        $date = $this->faker->iso8601;
+
         $rows = [
             [
                 'name' => 'page_impressions',
                 'values' => [
                     [
-                        'value' => 100,
-                        'end_time' => '2026-03-03T07:00:00+0000'
+                        'value' => $value,
+                        'end_time' => $date
                     ]
                 ]
             ]
@@ -72,7 +77,7 @@ class FacebookGraphConvertTest extends TestCase
 
         $result = FacebookGraphConvert::pageMetrics(
             $rows,
-            'page123',
+            $platformId,
             '',
             null,
             $this->page,
@@ -84,18 +89,23 @@ class FacebookGraphConvertTest extends TestCase
         $this->assertCount(1, $result);
         $metric = $result->first();
         $this->assertEquals('page_impressions', $metric->name);
-        $this->assertEquals(100, $metric->value);
-        $this->assertEquals('page123', $metric->platformId);
+        $this->assertEquals($value, $metric->value);
+        $this->assertEquals($platformId, $metric->platformId);
         $this->assertEquals(Channel::facebook->value, $metric->channel);
     }
 
     public function testAdAccountMetrics(): void
     {
+        $impressions = $this->faker->numberBetween(1000, 5000);
+        $clicks = $this->faker->numberBetween(10, 100);
+        $date = $this->faker->date();
+        $platformId = 'ca' . $this->faker->randomNumber();
+
         $rows = [
             [
-                'impressions' => 1500,
-                'clicks' => 50,
-                'date_start' => '2026-03-03',
+                'impressions' => $impressions,
+                'clicks' => $clicks,
+                'date_start' => $date,
                 'age' => '18-24',
                 'gender' => 'male',
                 'actions' => []
@@ -106,33 +116,35 @@ class FacebookGraphConvertTest extends TestCase
             $rows,
             null,
             $this->account,
-            'ca123',
+            $platformId,
             Period::Daily
         );
 
         $this->assertInstanceOf(ArrayCollection::class, $result);
-        // expecting 2 metrics: impressions, clicks
         $this->assertCount(2, $result);
         $metric = $result->first();
         $this->assertContains($metric->name, ['impressions', 'clicks']);
-        $this->assertEquals('ca123', $metric->platformId);
-        $this->assertCount(2, $metric->dimensions); // age and gender
+        $this->assertEquals($platformId, $metric->platformId);
+        $this->assertCount(2, $metric->dimensions);
     }
 
     public function testIgAccountMetrics(): void
     {
+        $value = $this->faker->numberBetween(1000, 5000);
+        $date = $this->faker->date();
+
         $rows = [
             [
                 'name' => 'impressions',
                 'total_value' => [
-                    'value' => 2000
+                    'value' => $value
                 ]
             ]
         ];
 
         $result = FacebookGraphConvert::igAccountMetrics(
             $rows,
-            '2026-03-03',
+            $date,
             $this->page,
             $this->account,
             $this->channeledAccount,
@@ -144,18 +156,19 @@ class FacebookGraphConvertTest extends TestCase
         $this->assertCount(1, $result);
         $metric = $result->first();
         $this->assertEquals('impressions', $metric->name);
-        $this->assertEquals(2000, $metric->value);
-        $this->assertEquals('ca123', $metric->platformId);
+        $this->assertEquals($value, $metric->value);
+        $this->assertEquals($this->channeledAccount->getPlatformId(), $metric->platformId);
     }
 
     public function testIgMediaMetrics(): void
     {
+        $likes = $this->faker->numberBetween(1, 100);
         $rows = [
             [
                 'name' => 'likes',
                 'values' => [
                     [
-                        'value' => 50
+                        'value' => $likes
                     ]
                 ]
             ]
@@ -174,18 +187,22 @@ class FacebookGraphConvertTest extends TestCase
         $this->assertCount(1, $result);
         $metric = $result->first();
         $this->assertEquals('likes', $metric->name);
-        $this->assertEquals(50, $metric->value);
-        $this->assertEquals('ca123', $metric->platformId);
+        $this->assertEquals($likes, $metric->value);
+        $this->assertEquals($this->channeledAccount->getPlatformId(), $metric->platformId);
         $this->assertEquals(Period::Lifetime->value, $metric->period);
     }
 
     public function testCampaignMetrics(): void
     {
+        $impressions = $this->faker->numberBetween(1000, 5000);
+        $clicks = $this->faker->numberBetween(10, 100);
+        $date = $this->faker->date();
+
         $rows = [
             [
-                'impressions' => 1000,
-                'clicks' => 30,
-                'date_start' => '2026-03-03',
+                'impressions' => $impressions,
+                'clicks' => $clicks,
+                'date_start' => $date,
                 'age' => '25-34',
                 'gender' => 'female',
                 'actions' => []
@@ -207,11 +224,15 @@ class FacebookGraphConvertTest extends TestCase
 
     public function testAdsetMetrics(): void
     {
+        $impressions = $this->faker->numberBetween(100, 1000);
+        $clicks = $this->faker->numberBetween(1, 50);
+        $date = $this->faker->date();
+
         $rows = [
             [
-                'impressions' => 500,
-                'clicks' => 10,
-                'date_start' => '2026-03-03',
+                'impressions' => $impressions,
+                'clicks' => $clicks,
+                'date_start' => $date,
                 'age' => '35-44',
                 'gender' => 'unknown',
                 'actions' => []
@@ -234,11 +255,15 @@ class FacebookGraphConvertTest extends TestCase
 
     public function testAdMetrics(): void
     {
+        $impressions = $this->faker->numberBetween(10, 500);
+        $clicks = $this->faker->numberBetween(0, 20);
+        $date = $this->faker->date();
+
         $rows = [
             [
-                'impressions' => 200,
-                'clicks' => 5,
-                'date_start' => '2026-03-03',
+                'impressions' => $impressions,
+                'clicks' => $clicks,
+                'date_start' => $date,
                 'age' => '45-54',
                 'gender' => 'male',
                 'actions' => []

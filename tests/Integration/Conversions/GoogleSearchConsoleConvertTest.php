@@ -11,35 +11,55 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
 {
     public function testMetricsConversionAggregatesAndTransformsDataCorrectly(): void
     {
+        $siteUrl = $this->faker->url;
+        $siteKey = str_replace(['https://', 'http://', '.', '/'], ['', '', '_', ''], $siteUrl);
+        $pageUrl = $siteUrl . '/' . $this->faker->slug;
+        $pagePlatformId = $this->faker->uuid;
+        $date = $this->faker->date();
+        $query = $this->faker->word;
+        $country = $this->faker->countryCode;
+        $device = $this->faker->randomElement(['MOBILE', 'DESKTOP', 'TABLET']);
+
         // 1. Arrange: Create our Database Page entity
         $pageEntity = new Page();
-        $pageEntity->addUrl('https://example.com/page');
-        $pageEntity->addPlatformId('example_com_page_id');
+        $pageEntity->addUrl($pageUrl);
+        $pageEntity->addPlatformId($pagePlatformId);
         $this->entityManager->persist($pageEntity);
         $this->entityManager->flush();
+
+        $v1 = [
+            'impressions' => $this->faker->numberBetween(100, 1000),
+            'clicks' => $this->faker->numberBetween(10, 100),
+            'position' => $this->faker->randomFloat(2, 1, 50),
+        ];
+        $v2 = [
+            'impressions' => $this->faker->numberBetween(100, 1000),
+            'clicks' => $this->faker->numberBetween(10, 100),
+            'position' => $this->faker->randomFloat(2, 1, 50),
+        ];
 
         // Simulate 2 raw rows returned correctly mapped through Helpers layer
         $rows = [
             [
                 // Keys map to: ['date', 'query', 'country', 'page', 'device']
-                'keys' => ['2026-03-05', 'mock query', 'USA', 'https://example.com/page', 'MOBILE'],
+                'keys' => [$date, $query, $country, $pageUrl, $device],
                 'subset' => ['date', 'query', 'country', 'page', 'device'],
-                'impressions' => 100,
-                'clicks' => 10,
-                'position' => 5.5,
-                'ctr' => 0.1,
+                'impressions' => $v1['impressions'],
+                'clicks' => $v1['clicks'],
+                'position' => $v1['position'],
+                'ctr' => $v1['clicks'] / $v1['impressions'],
                 'impressions_difference' => 0,
                 'clicks_difference' => 0,
                 'synthetic' => false,
             ],
             [
                 // Perfectly matching keys to force an aggregation scenario!
-                'keys' => ['2026-03-05', 'mock query', 'USA', 'https://example.com/page', 'MOBILE'],
+                'keys' => [$date, $query, $country, $pageUrl, $device],
                 'subset' => ['date', 'query', 'country', 'page', 'device'],
-                'impressions' => 50,
-                'clicks' => 20,
-                'position' => 2.0,
-                'ctr' => 0.4,
+                'impressions' => $v2['impressions'],
+                'clicks' => $v2['clicks'],
+                'position' => $v2['position'],
+                'ctr' => $v2['clicks'] / $v2['impressions'],
                 'impressions_difference' => 0,
                 'clicks_difference' => 0,
                 'synthetic' => false,
@@ -49,8 +69,8 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
         // 2. Act: Pipe Data through the GoogleSearchConsoleConvert tool
         $collection = GoogleSearchConsoleConvert::metrics(
             rows: $rows,
-            siteUrl: 'https://example.com',
-            siteKey: 'example_com',
+            siteUrl: $siteUrl,
+            siteKey: $siteKey,
             logger: null,
             pageEntity: $pageEntity,
             em: $this->entityManager
@@ -59,42 +79,31 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
         // 3. Assert
         $this->assertInstanceOf(ArrayCollection::class, $collection);
         
+        $totalClicks = $v1['clicks'] + $v2['clicks'];
+        $totalImpressions = $v1['impressions'] + $v2['impressions'];
+        $weightedPosition = (($v1['position'] * $v1['impressions']) + ($v2['position'] * $v2['impressions'])) / $totalImpressions;
+        $totalCtr = $totalClicks / $totalImpressions;
+
         // Because the rows have identical metricConfigKey signatures, they should aggregate to EXACTLY 4 final metrics
         // 1 Impressions, 1 Clicks, 1 Position, 1 CTR.
         $this->assertCount(4, $collection);
 
         $metricsMap = [];
         foreach ($collection as $item) {
-            // These aren't raw rows anymore, they're objects formatted specifically for Doctrine entities natively!
             $metricsMap[$item->name] = $item;
         }
 
-        $this->assertArrayHasKey('impressions', $metricsMap);
-        $this->assertArrayHasKey('clicks', $metricsMap);
-        $this->assertArrayHasKey('position', $metricsMap);
-        $this->assertArrayHasKey('ctr', $metricsMap);
+        $this->assertEquals($totalClicks, $metricsMap['clicks']->value);
+        $this->assertEquals($totalImpressions, $metricsMap['impressions']->value);
+        $this->assertEquals($totalCtr, $metricsMap['ctr']->value);
+        $this->assertEquals($weightedPosition, $metricsMap['position']->value);
 
-        // Assert Math logic for aggregation:
-        // Clicks = 10 + 20 = 30
-        $this->assertEquals(30, $metricsMap['clicks']->value);
-        
-        // Impressions = 100 + 50 = 150
-        $this->assertEquals(150, $metricsMap['impressions']->value);
-        
-        // CTR = Clicks (30) / Impressions (150) = 0.2
-        $this->assertEquals(0.2, $metricsMap['ctr']->value);
-        
-        // Position Weighted = ((5.5 * 100) + (2.0 * 50)) / 150 = 650 / 150 = 4.3333333333333
-        $this->assertEquals(650 / 150, $metricsMap['position']->value);
-
-        // Validate Doctrine formatting parameters
         $this->assertEquals(\Enums\Channel::google_search_console->value, $metricsMap['impressions']->channel);
-        $this->assertStringStartsWith('gsc_example_com_', $metricsMap['impressions']->platformId);
-        $this->assertEquals('mock query', $metricsMap['impressions']->query);
-        $this->assertEquals('USA', $metricsMap['impressions']->countryCode);
-        $this->assertEquals('MOBILE', $metricsMap['impressions']->deviceType);
+        $this->assertStringStartsWith('gsc_' . $siteKey . '_', $metricsMap['impressions']->platformId);
+        $this->assertEquals($query, $metricsMap['impressions']->query);
+        $this->assertEquals($country, $metricsMap['impressions']->countryCode);
+        $this->assertEquals($device, $metricsMap['impressions']->deviceType);
         
-        // Assert the $pageEntity relational hydration successfully piped through
         $this->assertEquals($pageEntity->getId(), $metricsMap['impressions']->page->getId());
     }
 }
