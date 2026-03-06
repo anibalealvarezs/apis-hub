@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+ini_set('memory_limit', '1G');
+
 use Commands\Crud\CreateEntityCommand;
 use Commands\Crud\DeleteEntityCommand;
 use Commands\Crud\ReadEntityCommand;

@@ -55,6 +55,7 @@ class ReadEntityCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        ini_set('memory_limit', '1G');
         $entity = $input->getOption('entity');
         $channel = $input->getOption('channel');
         $id = $input->getOption('id');
@@ -95,12 +96,17 @@ class ReadEntityCommand extends Command
 
         $responseContent = $result->getContent();
         if ($result->getStatusCode() >= 200 && $result->getStatusCode() < 300) {
-            $content = json_decode($responseContent, true) ?? $responseContent;
-            $jsonOptions = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
             if ($pretty) {
-                $jsonOptions |= JSON_PRETTY_PRINT;
+                $content = json_decode($responseContent, true);
+                if (is_array($content)) {
+                    $jsonOptions = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT;
+                    $responseContent = json_encode($content, $jsonOptions);
+                }
             }
-            $output->writeln('<info>' . (is_array($content) ? json_encode($content, $jsonOptions) : $content) . '</info>');
+            
+            // Bypass Symfony Console Formatter to prevent Grapheme/Memory exhaustion on huge strings
+            // This writes directly to the standard output stream
+            fwrite(STDOUT, $responseContent . PHP_EOL);
             return Command::SUCCESS;
         }
 
