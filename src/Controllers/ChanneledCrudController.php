@@ -154,7 +154,9 @@ class ChanneledCrudController extends BaseController
 
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn () => $repository->read(...$params)
+                callback: function () use ($repository, $params) {
+                    return $repository->read(...$params);
+                }
             );
 
             if (!$data) {
@@ -215,7 +217,9 @@ class ChanneledCrudController extends BaseController
 
                 $count = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn () => $repository->countElements(filters: $params['filters']),
+                    callback: function () use ($repository, $params) {
+                        return $repository->countElements(filters: $params['filters']);
+                    },
                     ttl: 300
                 );
             }
@@ -279,7 +283,9 @@ class ChanneledCrudController extends BaseController
 
                 $data = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn () => $repository->readMultiple(...$params)->toArray(),
+                    callback: function () use ($repository, $params) {
+                        return $repository->readMultiple(...$params)->toArray();
+                    },
                     ttl: 600
                 );
             }

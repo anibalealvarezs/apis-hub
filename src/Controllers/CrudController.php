@@ -92,7 +92,9 @@ class CrudController extends BaseController
             $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id) . ($hideFields ? '_' . implode('_', $hideFields) : '');
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn () => $repository->read(id: $id)
+                callback: function () use ($repository, $id) {
+                    return $repository->read(id: $id);
+                }
             );
 
             if (!$data) {
@@ -150,7 +152,9 @@ class CrudController extends BaseController
                 $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
                 $count = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn () => $repository->countElements(filters: $params['filters'])
+                    callback: function () use ($repository, $params) {
+                        return $repository->countElements(filters: $params['filters']);
+                    }
                 );
             }
 
@@ -203,7 +207,9 @@ class CrudController extends BaseController
                 $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params)) . ($hideFields ? '_' . implode('_', $hideFields) : '');
                 $data = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn () => $repository->readMultiple(...$params)->toArray()
+                    callback: function () use ($repository, $params) {
+                        return $repository->readMultiple(...$params)->toArray();
+                    }
                 );
             }
 
