@@ -79,8 +79,9 @@ class ChanneledCrudController extends BaseController
         return match ($method) {
             'read'  => $this->read(entity: $entity, channel: $channelConstant, id: $id, rawData: $rawData, hideFields: $hideFields),
             'count' => $this->count(entity: $entity, channel: $channelConstant, body: $body, params: $params),
-            'list'  => $this->list(entity: $entity, channel: $channelConstant, body: $body, params: $params, rawData: $rawData, hideFields: $hideFields),
-            default => $this->createResponse(
+            'list'      => $this->list(entity: $entity, channel: $channelConstant, body: $body, params: $params, rawData: $rawData, hideFields: $hideFields),
+            'aggregate' => $this->aggregate(entity: $entity, channel: $channelConstant, body: $body, params: $params),
+            default     => $this->createResponse(
                 data: null,
                 status: 'error',
                 error: 'Method not found',
@@ -273,6 +274,59 @@ class ChanneledCrudController extends BaseController
                 status: 'error',
                 error: $e->getMessage(),
                 httpStatus: Response::HTTP_BAD_REQUEST
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * @param string $entity
+     * @param Channel $channel
+     * @param string|null $body
+     * @param array|null $params
+     * @return Response
+     * @throws ReflectionException
+     */
+    protected function aggregate(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
+    {
+        try {
+            $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
+            $params = $this->prepareChanneledReadMultipleParams(
+                params: $params,
+                repositoryClass: $repository::class,
+                body: $body,
+                channel: $channel
+            );
+
+            $aggregations = (array) ($params['aggregations'] ?? []);
+            $groupBy = (array) ($params['groupBy'] ?? []);
+
+            if (empty($aggregations)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Missing aggregations parameter',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $data = $repository->aggregate(
+                aggregations: $aggregations,
+                groupBy: $groupBy,
+                filters: $params['filters'] ?? null,
+                startDate: $params['startDate'] ?? null,
+                endDate: $params['endDate'] ?? null
+            );
+
+            return $this->createResponse(
+                data: $data,
+                status: 'success'
             );
         } catch (Exception $e) {
             return $this->createResponse(

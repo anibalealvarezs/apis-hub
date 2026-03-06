@@ -68,7 +68,7 @@ abstract class BaseController
      */
     protected const CRUD_TOP_LEVEL_PARAMS = [
         'limit', 'pagination', 'ids', 'filters', 'orderBy', 'orderDir',
-        'startDate', 'endDate', 'rawData', 'hideFields'
+        'startDate', 'endDate', 'rawData', 'hideFields', 'aggregations', 'groupBy'
     ];
 
     /**

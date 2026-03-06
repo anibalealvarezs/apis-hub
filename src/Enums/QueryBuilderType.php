@@ -9,6 +9,6 @@ enum QueryBuilderType: string
     case COUNT = 'count';
 
     case LAST = 'last';
-
+    case AGGREGATE = 'aggregate';
     case CUSTOM = 'custom';
 }

@@ -50,8 +50,9 @@ class CrudController extends BaseController
             'list'   => $this->list(entity: $entity, body: $body, params: $params, hideFields: $hideFields),
             'create' => $this->create(entity: $entity, body: $body),
             'update' => $this->update(entity: $entity, id: $id, body: $body),
-            'delete' => $this->delete(entity: $entity, id: $id),
-            default  => $this->createResponse(
+            'delete'    => $this->delete(entity: $entity, id: $id),
+            'aggregate' => $this->aggregate(entity: $entity, body: $body, params: $params),
+            default     => $this->createResponse(
                 data: null,
                 status: 'error',
                 error: 'Method not found',
@@ -192,6 +193,53 @@ class CrudController extends BaseController
                 data: $data ?: [],
                 status: 'success',
                 meta: $meta ?: null
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * @param string $entity
+     * @param string|null $body
+     * @param array|null $params
+     * @return Response
+     * @throws NotSupported
+     */
+    protected function aggregate(string $entity, ?string $body = null, ?array $params = null): Response
+    {
+        try {
+            $repository = $this->getRepository(entity: $entity);
+            $params = $this->prepareCrudParams(params: $params, body: $body);
+
+            $aggregations = (array) ($params['aggregations'] ?? []);
+            $groupBy = (array) ($params['groupBy'] ?? []);
+
+            if (empty($aggregations)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Missing aggregations parameter',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $data = $repository->aggregate(
+                aggregations: $aggregations,
+                groupBy: $groupBy,
+                filters: $params['filters'] ?? null,
+                startDate: $params['startDate'] ?? null,
+                endDate: $params['endDate'] ?? null
+            );
+
+            return $this->createResponse(
+                data: $data,
+                status: 'success'
             );
         } catch (Exception $e) {
             return $this->createResponse(
