@@ -1,12 +1,18 @@
 {
     "name": "anibalealvarezs/apis-hub",
-    "type": "project",
+    "description": "A headless data extraction and caching engine tailored for Analytics and E-commerce integrations.",
+    "license": "MIT",
+    "keywords": ["apis-hub", "headless", "etl", "analytics", "caching", "redis", "doctrine-orm", "php-cli"],
+    "homepage": "https://github.com/anibalealvarezs/apis-hub",
     "authors": [
         {
             "name": "Aníbal Álvarez",
             "email": "anibalealvarezs@gmail.com"
         }
     ],
+    "support": {
+        "issues": "https://github.com/anibalealvarezs/apis-hub/issues"
+    },
     "require": {
         "php": ">=8.1",
         "ext-json": "*",
