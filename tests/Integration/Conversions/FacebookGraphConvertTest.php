@@ -229,4 +229,23 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
 
         $this->assertCount(2, $collection); // Impressions and clicks
     }
+
+    public function testRobustness(): void
+    {
+        // 1. AdAccount with empty actions (should default to 0)
+        $accountEntity = new Account();
+        $accountEntity->addName($this->faker->company);
+        $this->entityManager->persist($accountEntity);
+        $this->entityManager->flush();
+
+        $rows = [['date_start' => $this->faker->date(), 'impressions' => '100', 'actions' => []]];
+        $collection = FacebookGraphConvert::adAccountMetrics($rows, null, $accountEntity);
+        $this->assertCount(1, $collection);
+        $this->assertEquals('100', $collection->first()->value);
+
+        // 2. AdAccount with missing spend (should be skipped by metrics filter typically, but let's check)
+        $rows = [['date_start' => $this->faker->date(), 'impressions' => '100']];
+        $collection = FacebookGraphConvert::adAccountMetrics($rows, null, $accountEntity);
+        $this->assertCount(1, $collection);
+    }
 }

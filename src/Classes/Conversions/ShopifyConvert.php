@@ -12,10 +12,10 @@ class ShopifyConvert
     {
         return new ArrayCollection(array_map(function ($customer) {
             return (object) [
-                'platformId' => $customer['id'],
-                'platformCreatedAt' => Carbon::parse($customer['created_at']),
+                'platformId' => $customer['id'] ?? null,
+                'platformCreatedAt' => Carbon::parse($customer['created_at'] ?? 'now'),
                 'channel' => Channel::shopify->value,
-                'email' => $customer['email'],
+                'email' => $customer['email'] ?? '',
                 'data' => $customer,
             ];
         }, $customers));
@@ -29,10 +29,10 @@ class ShopifyConvert
     {
         return new ArrayCollection(array_map(function ($discount) {
             return (object) [
-                'platformId' => $discount['id'],
-                'platformCreatedAt' => Carbon::parse($discount['created_at']),
+                'platformId' => $discount['id'] ?? null,
+                'platformCreatedAt' => Carbon::parse($discount['created_at'] ?? 'now'),
                 'channel' => Channel::shopify->value,
-                'code' => $discount['code'],
+                'code' => $discount['code'] ?? '',
                 'data' => $discount,
             ];
         }, $discounts));
@@ -54,11 +54,11 @@ class ShopifyConvert
     {
         return new ArrayCollection(array_map(function ($order) {
             return (object) [
-                'platformId' => $order['id'],
-                'platformCreatedAt' => Carbon::parse($order['created_at']),
+                'platformId' => $order['id'] ?? null,
+                'platformCreatedAt' => Carbon::parse($order['created_at'] ?? 'now'),
                 'channel' => Channel::shopify->value,
                 'data' => $order,
-                'customer' => (object) $order['customer'],
+                'customer' => isset($order['customer']) ? (object) $order['customer'] : null,
                 'discountCodes' => !empty($order['discount_codes']) ?
                     array_map(function ($discountCode) {
                         return $discountCode['code'];
@@ -73,13 +73,13 @@ class ShopifyConvert
     {
         return new ArrayCollection(array_map(function ($product) {
             return (object) [
-                'platformId' => $product['id'],
+                'platformId' => $product['id'] ?? null,
                 'sku' => $product['sku'] ?? '',
-                'platformCreatedAt' => Carbon::parse($product['created_at']),
+                'platformCreatedAt' => Carbon::parse($product['created_at'] ?? 'now'),
                 'channel' => Channel::shopify->value,
                 'data' => $product,
-                'vendor' => $product['vendor'],
-                'variants' => self::productVariants($product['variants']),
+                'vendor' => $product['vendor'] ?? '',
+                'variants' => self::productVariants($product['variants'] ?? []),
             ];
         }, $products));
     }
@@ -101,8 +101,8 @@ class ShopifyConvert
     {
         return new ArrayCollection(array_map(function ($productCategory) use ($isSmartCollection) {
             return (object) [
-                'platformId' => $productCategory['id'],
-                'platformCreatedAt' => Carbon::parse($productCategory['published_at']),
+                'platformId' => $productCategory['id'] ?? null,
+                'platformCreatedAt' => Carbon::parse($productCategory['published_at'] ?? 'now'),
                 'channel' => Channel::shopify->value,
                 'data' => $productCategory,
                 'isSmartCollection' => $isSmartCollection,
@@ -114,7 +114,9 @@ class ShopifyConvert
     {
         $collectionsProducts = [];
         foreach ($collects as $collect) {
-            $collectionsProducts[$collect['collection_id']][] = $collect['product_id'];
+            if (isset($collect['collection_id']) && isset($collect['product_id'])) {
+                $collectionsProducts[$collect['collection_id']][] = $collect['product_id'];
+            }
         }
 
         return new ArrayCollection($collectionsProducts);

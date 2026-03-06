@@ -103,4 +103,35 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
         $this->assertInstanceOf(ArrayCollection::class, $result);
         $this->assertCount(4, $result); // impressions, clicks, position, ctr
     }
+
+    public function testRobustness(): void
+    {
+        // 1. GSC metrics with missing 'keys' and differences
+        $rows = [
+            [
+                'clicks' => 5,
+                'impressions' => 100,
+                'ctr' => 0.05,
+                'position' => 3.5,
+                // 'keys' is missing here
+                'subset' => 'subset1',
+            ]
+        ];
+
+        $result = GoogleSearchConsoleConvert::metrics(
+            rows: $rows,
+            siteUrl: 'https://example.com',
+            siteKey: 'example',
+            logger: null,
+            pageEntity: $this->page,
+            em: $this->entityManager
+        );
+
+        $this->assertInstanceOf(ArrayCollection::class, $result);
+        $this->assertCount(4, $result);
+        $metric = $result->first();
+        $this->assertEquals(Channel::google_search_console->value, $metric->channel);
+        $this->assertEquals('unknown', $metric->query);
+        $this->assertEquals(Country::UNK->value, $metric->countryCode);
+    }
 }

@@ -216,4 +216,22 @@ class NetSuiteConvertTest extends BaseIntegrationTestCase
         $this->assertEquals($platformId, $vendor->platformId);
         $this->assertEquals($name, $vendor->name);
     }
+
+    public function testRobustness(): void
+    {
+        // 1. Customer with missing entityid (should be skipped)
+        $rows = [['email' => 'test@example.com']];
+        $result = NetSuiteConvert::customers($rows);
+        $this->assertCount(0, $result);
+
+        // 2. Order without id (should be skipped)
+        $rows = [['entity' => 'cust123']];
+        $result = NetSuiteConvert::orders($rows);
+        $this->assertCount(0, $result);
+
+        // 3. Product with missing itemid (SKU)
+        $rows = [['id' => 'p1', 'itemtype' => 'NonInvtPart']];
+        $result = NetSuiteConvert::products($rows);
+        $this->assertEquals('', $result->first()->sku);
+    }
 }

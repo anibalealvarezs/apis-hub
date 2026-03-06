@@ -13,6 +13,7 @@ abstract class BaseIntegrationTestCase extends TestCase
     protected ?EntityManager $entityManager = null;
     protected \Faker\Generator $faker;
     protected array $config = [];
+    protected static bool $schemaCreated = false;
 
     protected function setUp(): void
     {
@@ -59,9 +60,24 @@ abstract class BaseIntegrationTestCase extends TestCase
         $schemaTool = new SchemaTool($this->entityManager);
         $classes = $this->entityManager->getMetadataFactory()->getAllMetadata();
         
-        if (!empty($classes)) {
+        if (!empty($classes) && !self::$schemaCreated) {
             $schemaTool->dropSchema($classes);
             $schemaTool->createSchema($classes);
+            self::$schemaCreated = true;
+        }
+
+        // Truncate tables to ensure isolation between tests if not using a fresh schema
+        if (!empty($classes)) {
+            $connection = $this->entityManager->getConnection();
+            $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 0');
+            foreach ($classes as $class) {
+                $classMetadata = $this->entityManager->getClassMetadata($class->getName());
+                if ($classMetadata->isMappedSuperclass) {
+                    continue;
+                }
+                $this->entityManager->createQuery('DELETE FROM ' . $class->getName())->execute();
+            }
+            $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
         }
 
         // Force the main application to use our transactional test EntityManager

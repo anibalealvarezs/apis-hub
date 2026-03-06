@@ -163,4 +163,31 @@ class NetSuiteConvertTest extends BaseUnitTestCase
         $this->assertEquals('vendor123', $vendor->platformId);
         $this->assertEquals('Vendor A', $vendor->name);
     }
+
+    public function testRobustness(): void
+    {
+        // 1. Customer with missing entityid (should be skipped)
+        $rows = [['email' => 'test@example.com']];
+        $result = NetSuiteConvert::customers($rows);
+        $this->assertCount(0, $result);
+
+        // 2. Customer with missing datecreated or email
+        $rows = [['entityid' => 'cust123']];
+        $result = NetSuiteConvert::customers($rows);
+        $customer = $result->first();
+        $this->assertEquals('cust123', $customer->platformId);
+        $this->assertNull($customer->platformCreatedAt);
+        $this->assertEquals('', $customer->email);
+
+        // 3. Order without id (should be skipped)
+        $rows = [['entity' => 'cust123']];
+        $result = NetSuiteConvert::orders($rows);
+        $this->assertCount(0, $result);
+
+        // 4. Order with missing PromotionCodeName
+        $rows = [['id' => 'ord123', 'entity' => 'cust123']];
+        $result = NetSuiteConvert::orders($rows);
+        $this->assertCount(1, $result);
+        $this->assertCount(0, $result->first()->discountCodes);
+    }
 }

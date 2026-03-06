@@ -49,8 +49,9 @@ class GoogleSearchConsoleConvert
 
         $logger?->info("Starting metrics conversion for site $siteUrl, rows=$rowCount");
         // $logger?->warning("Note: 'searchAppearance' not fetched from GSC API due to dimension restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
-        // $logger?->info("Page entity for site $siteUrl: " . ($pageEntity ? "ID={$pageEntity->getId()}, URL={$pageEntity->getUrl()}" : 'none'));
-        $pageEntity = $em->find(Page::class, $pageEntity->getId());
+        if ($pageEntity) {
+            $pageEntity = $em->find(Page::class, $pageEntity->getId());
+        }
         $searchAppearance = 'WEB';
 
         $aggregatedMetrics = [];
@@ -81,7 +82,7 @@ class GoogleSearchConsoleConvert
                     name: 'impressions',
                     period: Period::Daily->value,
                     metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
-                    page:  $pageEntity->getUrl(),
+                    page:  $pageEntity?->getUrl() ?? $siteUrl,
                     query: $dimensionValues['query'],
                     country: $dimensionValues['country'],
                     device: $dimensionValues['device'],
@@ -91,7 +92,7 @@ class GoogleSearchConsoleConvert
                     name: 'clicks',
                     period: Period::Daily->value,
                     metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
-                    page:  $pageEntity->getUrl(),
+                    page:  $pageEntity?->getUrl() ?? $siteUrl,
                     query: $dimensionValues['query'],
                     country: $dimensionValues['country'],
                     device: $dimensionValues['device'],
@@ -101,7 +102,7 @@ class GoogleSearchConsoleConvert
                     name: 'position',
                     period: Period::Daily->value,
                     metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
-                    page:  $pageEntity->getUrl(),
+                    page:  $pageEntity?->getUrl() ?? $siteUrl,
                     query: $dimensionValues['query'],
                     country: $dimensionValues['country'],
                     device: $dimensionValues['device'],
@@ -111,7 +112,7 @@ class GoogleSearchConsoleConvert
                     name: 'ctr',
                     period: Period::Daily->value,
                     metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
-                    page:  $pageEntity->getUrl(),
+                    page:  $pageEntity?->getUrl() ?? $siteUrl,
                     query: $dimensionValues['query'],
                     country: $dimensionValues['country'],
                     device: $dimensionValues['device'],
@@ -132,11 +133,11 @@ class GoogleSearchConsoleConvert
                 );
                 $aggregatedMetadata[$metricConfigKeys['impressions']][] = [
                     ...$aggregatedMetrics[$metricConfigKeys['impressions']],
-                    'keys' => $row['keys'],
-                    'subset' => $row['subset'],
+                    'keys' => $row['keys'] ?? [],
+                    'subset' => $row['subset'] ?? null,
                     'synthetic' => $row['synthetic'] ?? false,
-                    'impressions_difference' => $row['impressions_difference'],
-                    'clicks_difference' => $row['clicks_difference'],
+                    'impressions_difference' => $row['impressions_difference'] ?? 0,
+                    'clicks_difference' => $row['clicks_difference'] ?? 0,
                 ];
             } else {
                 $aggregatedMetrics[$metricConfigKeys['impressions']] = [
@@ -148,11 +149,11 @@ class GoogleSearchConsoleConvert
                 ];
                 $aggregatedMetadata[$metricConfigKeys['impressions']] = [
                     ...$aggregatedMetrics[$metricConfigKeys['impressions']],
-                    'keys' => $row['keys'],
-                    'subset' => $row['subset'],
+                    'keys' => $row['keys'] ?? [],
+                    'subset' => $row['subset'] ?? null,
                     'synthetic' => $row['synthetic'] ?? false,
-                    'impressions_difference' => $row['impressions_difference'],
-                    'clicks_difference' => $row['clicks_difference'],
+                    'impressions_difference' => $row['impressions_difference'] ?? 0,
+                    'clicks_difference' => $row['clicks_difference'] ?? 0,
                 ];
             }
 
@@ -166,16 +167,16 @@ class GoogleSearchConsoleConvert
                 $channeledMetric->metricDate = Carbon::parse($row['keys'][$flippedDimensions['date']])->toDateString();
                 $channeledMetric->platformId = $platformId;
                 $channeledMetric->platformCreatedAt = Carbon::parse($row['keys'][$flippedDimensions['date']])->toDateTimeString();
-                $channeledMetric->query = $row['keys'][$flippedDimensions['query']];
-                $channeledMetric->countryCode = $row['keys'][$flippedDimensions['country']];
-                $channeledMetric->deviceType = $row['keys'][$flippedDimensions['device']];
+                $channeledMetric->query = $row['keys'][$flippedDimensions['query']] ?? 'unknown';
+                $channeledMetric->countryCode = $row['keys'][$flippedDimensions['country']] ?? Country::UNK->value;
+                $channeledMetric->deviceType = $row['keys'][$flippedDimensions['device']] ?? Device::UNKNOWN->value;
                 $channeledMetric->page = $pageEntity;
                 $channeledMetric->dimensions = [
-                    ['dimensionKey' => 'page', 'dimensionValue' => $row['keys'][$flippedDimensions['page']]],
+                    ['dimensionKey' => 'page', 'dimensionValue' => $row['keys'][$flippedDimensions['page']] ?? null],
                     ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $searchAppearance],
                 ];
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash([
-                    ['dimensionKey' => 'page', 'dimensionValue' => $row['keys'][$flippedDimensions['page']]],
+                    ['dimensionKey' => 'page', 'dimensionValue' => $row['keys'][$flippedDimensions['page']] ?? null],
                     ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $searchAppearance],
                 ]);
                 $channeledMetric->metricConfigKey = $metricConfigKeys[$metricName]; // Pass the actual metricConfigKey

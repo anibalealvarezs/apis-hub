@@ -130,4 +130,36 @@ class KlaviyoConvertTest extends BaseUnitTestCase
         $this->assertEquals(Channel::klaviyo->value, $category->channel);
         $this->assertEquals($input[0], $category->data);
     }
+
+    public function testRobustness(): void
+    {
+        // 1. Customer without email or created date
+        $rows = [
+            [
+                'id' => 'cust_123',
+                'attributes' => [
+                    // email and created are missing
+                ]
+            ]
+        ];
+        $result = KlaviyoConvert::customers($rows);
+        $customer = $result->first();
+        $this->assertEquals('', $customer->email);
+        $this->assertInstanceOf(\DateTime::class, $customer->platformCreatedAt->toDateTime());
+
+        // 2. Product without 'included' variants or 'created' attribute
+        $rows = [
+            [
+                'id' => 'prod_456',
+                'attributes' => [
+                    // created is missing
+                ]
+                // included is missing
+            ]
+        ];
+        $result = KlaviyoConvert::products($rows);
+        $product = $result->first();
+        $this->assertCount(0, $product->variants);
+        $this->assertNull($product->platformCreatedAt);
+    }
 }

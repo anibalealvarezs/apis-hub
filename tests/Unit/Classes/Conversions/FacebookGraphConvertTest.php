@@ -284,4 +284,30 @@ class FacebookGraphConvertTest extends BaseUnitTestCase
         $this->assertInstanceOf(ArrayCollection::class, $result);
         $this->assertCount(2, $result);
     }
+
+    public function testRobustness(): void
+    {
+        // 1. Page metrics with missing 'values'
+        $rows = [['name' => 'page_impressions']];
+        $result = FacebookGraphConvert::pageMetrics($rows, 'p123');
+        $this->assertCount(0, $result);
+
+        // 2. Ad account metrics with missing 'date_start'
+        $rows = [['impressions' => 100]];
+        $result = FacebookGraphConvert::adAccountMetrics($rows, null, $this->account, 'ca123');
+        $this->assertCount(1, $result);
+        $this->assertEquals(Carbon::now()->toDateString(), $result->first()->metricDate);
+
+        // 3. IG account metrics with missing 'total_value'
+        $rows = [['name' => 'impressions']];
+        $result = FacebookGraphConvert::igAccountMetrics($rows, '2023-01-01', $this->page, $this->account, $this->channeledAccount);
+        $this->assertCount(1, $result);
+        $this->assertEquals(0, $result->first()->value);
+
+        // 4. IG media metrics with empty 'values'
+        $rows = [['name' => 'likes', 'values' => []]];
+        $result = FacebookGraphConvert::igMediaMetrics($rows, $this->page, $this->post, $this->account, $this->channeledAccount);
+        $this->assertCount(1, $result);
+        $this->assertEquals(0, $result->first()->value);
+    }
 }

@@ -14,10 +14,10 @@ class KlaviyoConvert
     {
         return new ArrayCollection(array_map(function ($customer) {
             return (object) [
-                'platformId' => $customer['id'],
-                'platformCreatedAt' => Carbon::parse($customer['attributes']['created']),
+                'platformId' => $customer['id'] ?? null,
+                'platformCreatedAt' => isset($customer['attributes']['created']) ? Carbon::parse($customer['attributes']['created']) : Carbon::now(),
                 'channel' => Channel::klaviyo->value,
-                'email' => $customer['attributes']['email'],
+                'email' => $customer['attributes']['email'] ?? '',
                 'data' => $customer,
             ];
         }, $customers));
@@ -27,13 +27,13 @@ class KlaviyoConvert
     {
         return new ArrayCollection(array_map(function ($product) {
             return (object) [
-                'platformId' => $product['id'],
+                'platformId' => $product['id'] ?? null,
                 'sku' => $product['sku'] ?? '',
                 'platformCreatedAt' => isset($product['attributes']['created']) ? Carbon::parse($product['attributes']['created']) : null,
                 'channel' => Channel::klaviyo->value,
                 'data' => $product,
                 'vendor' => null,
-                'variants' => self::productVariants($product['included']),
+                'variants' => self::productVariants($product['included'] ?? []),
             ];
         }, $products));
     }
@@ -55,7 +55,7 @@ class KlaviyoConvert
     {
         return new ArrayCollection(array_map(function ($productCategory) {
             return (object) [
-                'platformId' => $productCategory['id'],
+                'platformId' => $productCategory['id'] ?? null,
                 'platformCreatedAt' => isset($productCategory['attributes']['created']) ? Carbon::parse($productCategory['attributes']['created']) : null,
                 'channel' => Channel::klaviyo->value,
                 'data' => $productCategory,

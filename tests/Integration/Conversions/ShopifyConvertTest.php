@@ -199,4 +199,17 @@ class ShopifyConvertTest extends BaseIntegrationTestCase
         $this->assertEquals($prodId1, $productsInCollection[0]);
         $this->assertEquals($prodId2, $productsInCollection[1]);
     }
+
+    public function testRobustness(): void
+    {
+        // 1. Order without customer
+        $rows = [['id' => 123, 'created_at' => $this->faker->iso8601]];
+        $result = ShopifyConvert::orders($rows);
+        $this->assertNull($result->first()->customer);
+
+        // 2. Product without variants
+        $rows = [['id' => 456, 'sku' => 'TEST']];
+        $result = ShopifyConvert::products($rows);
+        $this->assertCount(0, $result->first()->variants);
+    }
 }

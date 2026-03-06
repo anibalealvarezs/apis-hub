@@ -221,4 +221,44 @@ class ShopifyConvertTest extends BaseUnitTestCase
         $this->assertEquals([$prod1, $prod2], $result->get($cat1));
         $this->assertEquals([$prod3], $result->get($cat2));
     }
+
+    public function testRobustness(): void
+    {
+        // 1. Order without customer (POS/walk-in)
+        $rows = [
+            [
+                'id' => 123,
+                'created_at' => '2023-01-01T00:00:00Z',
+                // 'customer' is missing
+                'discount_codes' => [],
+                'line_items' => []
+            ]
+        ];
+        $result = ShopifyConvert::orders($rows);
+        $this->assertNull($result->first()->customer);
+
+        // 2. Product without variants or vendor
+        $rows = [
+            [
+                'id' => 456,
+                'created_at' => '2023-01-01T00:00:00Z',
+                // 'vendor' and 'variants' are missing
+            ]
+        ];
+        $result = ShopifyConvert::products($rows);
+        $product = $result->first();
+        $this->assertEquals('', $product->vendor);
+        $this->assertCount(0, $product->variants);
+
+        // 3. Customer without email
+        $rows = [
+            [
+                'id' => 789,
+                'created_at' => '2023-01-01T00:00:00Z',
+                // 'email' is missing
+            ]
+        ];
+        $result = ShopifyConvert::customers($rows);
+        $this->assertEquals('', $result->first()->email);
+    }
 }

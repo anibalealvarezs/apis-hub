@@ -143,4 +143,17 @@ class KlaviyoConvertTest extends BaseIntegrationTestCase
         $this->assertEquals($count, $metric->value);
         $this->assertEquals($country, $metric->data['country']);
     }
+
+    public function testRobustness(): void
+    {
+        // 1. Customer with missing email
+        $rows = [['id' => 'p1', 'attributes' => []]];
+        $result = KlaviyoConvert::customers($rows);
+        $this->assertEquals('', $result->first()->email);
+
+        // 2. Product without included variants
+        $rows = [['id' => 'prod1', 'attributes' => []]]; // Missing 'included'
+        $result = KlaviyoConvert::products($rows);
+        $this->assertCount(0, $result->first()->variants);
+    }
 }

@@ -106,4 +106,15 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
         
         $this->assertEquals($pageEntity->getId(), $metricsMap['impressions']->page->getId());
     }
+
+    public function testRobustness(): void
+    {
+        $siteUrl = 'https://example.com';
+        $rows = [['keys' => null, 'impressions' => 10, 'clicks' => 1]]; // Missing query/page/etc keys
+        $collection = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, 'example_com', null, null, $this->entityManager);
+        
+        // This should run and result in metrics with default values for dimensions
+        $this->assertCount(4, $collection);
+        $this->assertEquals('unknown', $collection->first()->query);
+    }
 }
