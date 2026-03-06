@@ -96,6 +96,7 @@ Detailed guides for setting up and maintaining the infrastructure:
 - [Infrastructure & Health Checks](docs/health-checks.md)
 - [Job Manipulation & Lifecycle](docs/job-manipulation.md)
 - [Cloud Architecture & Data Access Strategy](docs/cloud-architecture.md)
+- [Deployment Checklist](docs/deployment-checklist.md)
 
 ## 🛠 Installation
 
