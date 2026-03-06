@@ -11,6 +11,7 @@ use Helpers\Helpers;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Services\DateResolver;
 use Throwable;
 
 class ProcessJobsCommand extends Command
@@ -63,6 +64,10 @@ class ProcessJobsCommand extends Command
                 // Iniciar el caching de data via fetchData
                 $payload = $job->getPayload() ?? [];
                 $params = $payload['params'] ?? [];
+                
+                // Resolve relative dates (e.g. 'yesterday' -> '2024-03-05')
+                $params = DateResolver::resolveParams($params);
+                
                 $params['jobId'] = $job->getId();
                 $body = $payload['body'] ?? null;
 

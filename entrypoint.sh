@@ -5,22 +5,16 @@ set -e
 echo "Updating database schema..."
 php bin/cli.php orm:schema-tool:update --force || echo "Schema update failed, continuing..."
 
-# Configure Cron based on API_SOURCE
-if [ -n "$API_SOURCE" ] && [ -n "$API_ENTITY" ]; then
-    echo "Configuring cron for $API_SOURCE - $API_ENTITY..."
-    PARAMS=""
-    if [ -n "$START_DATE" ] && [ -n "$END_DATE" ]; then
-        PARAMS="--params=\"startDate=${START_DATE}&endDate=${END_DATE}\""
-    fi
+# Configure Cron based on project config
+if [ -n "$PROJECT_CONFIG_FILE" ]; then
+    # Extract project name from path (e.g. deploy/alimentos-bahia.yaml -> alimentos-bahia)
+    PROJECT_NAME=$(basename "$PROJECT_CONFIG_FILE" .yaml)
+    echo "Configuring dynamic cron for project: $PROJECT_NAME..."
+    php bin/setup-cron.php "$PROJECT_NAME" || echo "Cron setup failed, continuing..."
     
-    # Schedule every hour (adjust frequency if necessary)
-    CRON_LINE="0 * * * * cd /app && php bin/cli.php apis-hub:cache \"${API_SOURCE}\" \"${API_ENTITY}\" ${PARAMS} >> /var/log/cron.log 2>&1"
-    echo "$CRON_LINE" > /etc/cron.d/apis-hub-cron
-    chmod 0644 /etc/cron.d/apis-hub-cron
-    crontab /etc/cron.d/apis-hub-cron
-    touch /var/log/cron.log
-    
-    echo "Cron configured: $CRON_LINE"
+    # Ensure cron service is ready
+    touch /var/log/cron.log /var/log/jobs.log
+    crontab /etc/cron.d/apis-hub-cron || echo "Crontab load failed"
 fi
 
 # Start cron service

@@ -2976,9 +2976,9 @@ class MetricRequests
                 GROUP BY cm.metric_id, mc.name
             ) cm_agg ON m.id = cm_agg.metric_id
             SET m.value = CASE cm_agg.name
-                WHEN 'impressions' THEN COALESCE(cm_agg.total_impressions, 0)
-                WHEN 'clicks' THEN COALESCE(cm_agg.total_clicks, 0)
-                WHEN 'ctr' THEN COALESCE(cm_agg.total_ctr, 0)
+                WHEN 'impressions' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_impressions, 0))
+                WHEN 'clicks' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_clicks, 0))
+                WHEN 'ctr' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_ctr, 0))
                 WHEN 'position' THEN IF(cm_agg.total_impressions > 0, cm_agg.total_position_weighted / cm_agg.total_impressions, 0)
                 ELSE COALESCE(m.value, 0)
             END

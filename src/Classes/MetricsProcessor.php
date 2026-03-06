@@ -683,8 +683,9 @@ class MetricsProcessor
             metricConfigMap: $metricConfigMap
         );
 
-        // Get the list of metrics that need to be inserted
+        // Get the list of metrics that need to be inserted and updated
         $metricsToInsert = [];
+        $metricsToUpdate = [];
         foreach ($uniqueMetrics as $key => $metric) {
             if (!isset($metricMap[$key])) {
                 $metricsToInsert[] = [
@@ -693,6 +694,11 @@ class MetricsProcessor
                     'dimensionsHash' => $metric['dimensionsHash'],
                     'metricConfig_id' => $metric['metricConfig_id'],
                     'key' => $key,
+                ];
+            } else {
+                $metricsToUpdate[] = [
+                    'id' => $metricMap[$key],
+                    'value' => $metric['value']
                 ];
             }
         }
@@ -748,6 +754,33 @@ class MetricsProcessor
                 $metricMap[$metricKey] = (int)$metric['id'];
                 // $logger->info("Added metric to map: metricKey=$metricKey, metric_id={$metric['id']}");
             }
+        }
+
+        // Bulk Update metrics (High-Water Mark / Monotonic)
+        if (!empty($metricsToUpdate)) {
+            $updateCases = [];
+            $updateParams = [];
+            $ids = [];
+            foreach ($metricsToUpdate as $update) {
+                $id = (int)$update['id'];
+                $newValue = $update['value'];
+                $updateCases[] = "WHEN id = ? THEN GREATEST(COALESCE(value, 0), ?)";
+                $updateParams[] = $id;
+                $updateParams[] = $newValue;
+                $ids[] = $id;
+            }
+            $caseSql = implode("\n", $updateCases);
+            $idPlaceholders = implode(', ', array_fill(0, count($ids), '?'));
+            $finalParams = array_merge($updateParams, $ids);
+
+            $manager->getConnection()->executeStatement("
+                UPDATE metrics
+                SET value = CASE
+                    $caseSql
+                    ELSE value
+                END
+                WHERE id IN ($idPlaceholders)
+            ", $finalParams);
         }
 
         // Helpers::dumpDebugJson($metricMap);
