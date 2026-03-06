@@ -48,7 +48,7 @@ class ChanneledAdGroup extends ChanneledEntity
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $targeting = null;
 
-    #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'channeledCampaigns')]
+    #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'channeledAdGroups')]
     #[ORM\JoinColumn(onDelete: 'CASCADE')]
     protected ChanneledAccount $channeledAccount;
 

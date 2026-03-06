@@ -183,8 +183,8 @@ class Account extends Entity
      */
     public function addPost(Post $post): self
     {
-        if (!$this->metricConfigs->contains($post)) {
-            $this->metricConfigs->add($post);
+        if (!$this->posts->contains($post)) {
+            $this->posts->add($post);
             $post->addAccount($this);
         }
         return $this;
@@ -197,8 +197,8 @@ class Account extends Entity
      */
     public function removePost(Post $post): self
     {
-        if ($this->metricConfigs->contains($post)) {
-            $this->metricConfigs->removeElement($post);
+        if ($this->posts->contains($post)) {
+            $this->posts->removeElement($post);
             if ($post->getAccount() === $this) {
                 $post->addAccount(null);
             }
@@ -222,8 +222,8 @@ class Account extends Entity
      */
     public function addPage(Page $pages): self
     {
-        if (!$this->metricConfigs->contains($pages)) {
-            $this->metricConfigs->add($pages);
+        if (!$this->pages->contains($pages)) {
+            $this->pages->add($pages);
             $pages->addAccount($this);
         }
         return $this;
@@ -236,8 +236,8 @@ class Account extends Entity
      */
     public function removePage(Page $page): self
     {
-        if ($this->metricConfigs->contains($page)) {
-            $this->metricConfigs->removeElement($page);
+        if ($this->pages->contains($page)) {
+            $this->pages->removeElement($page);
             if ($page->getAccount() === $this) {
                 $page->addAccount(null);
             }
