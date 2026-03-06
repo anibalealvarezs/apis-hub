@@ -406,6 +406,53 @@ class CrudControllerTest extends BaseUnitTestCase
         );
     }
 
+    public function testAggregateReturnsData(): void
+    {
+        $entity = 'customer';
+        $body = json_encode(['filters' => ['status' => 'active']]);
+        $params = [
+            'aggregations' => ['total' => 'SUM(amount)'],
+            'groupBy' => ['category']
+        ];
+        $expectedData = [['total' => 1000, 'category' => 'finance']];
+
+        // Mock custom repository
+        $repository = $this->getMockBuilder(\stdClass::class)
+            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'aggregate'])
+            ->getMock();
+        $repository->expects($this->once())
+            ->method('aggregate')
+            ->with(
+                ['total' => 'SUM(amount)'],
+                ['category'],
+                $this->callback(fn($filters) => $filters->status === 'active')
+            )
+            ->willReturn($expectedData);
+
+        $this->entityManager->expects($this->once())
+            ->method('getRepository')
+            ->with('Entities\\' . $entity)
+            ->willReturn($repository);
+
+        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
+        $this->controller->setMockEntitiesConfig([
+            strtolower($entity) => [
+                'class' => 'Entities\\' . $entity,
+                'repository_methods' => [
+                    'aggregate' => ['parameters' => ['filters', 'aggregations', 'groupBy']]
+                ]
+            ]
+        ]);
+
+        $response = $this->controller->aggregate($entity, $body, $params);
+
+        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertEquals(
+            json_encode(['data' => $expectedData, 'status' => 'success', 'error' => null]),
+            $response->getContent()
+        );
+    }
+
     /**
      * @throws NotSupported
      */
@@ -802,6 +849,11 @@ class ConcreteCrudController extends CrudController
         return $params;
     }
 
+    public function prepareCrudParams(?array $params, ?string $body): array
+    {
+        return parent::prepareCrudParams($params, $body);
+    }
+
     public function read(string $entity, ?int $id = null, array $hideFields = []): Response
     {
         try {
@@ -1001,6 +1053,46 @@ class ConcreteCrudController extends CrudController
 
             return $this->createResponse(
                 data: null,
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    public function aggregate(string $entity, ?string $body = null, ?array $params = null): Response
+    {
+        try {
+            $repository = $this->getRepository($entity);
+            $params = $this->prepareCrudParams($params, $body);
+
+            $aggregations = (array) ($params['aggregations'] ?? []);
+            $groupBy = (array) ($params['groupBy'] ?? []);
+
+            if (empty($aggregations)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Missing aggregations parameter',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $data = $repository->aggregate(
+                $aggregations,
+                $groupBy,
+                $params['filters'] ?? null,
+                $params['startDate'] ?? null,
+                $params['endDate'] ?? null
+            );
+
+            return $this->createResponse(
+                data: $data,
                 status: 'success'
             );
         } catch (Exception $e) {

@@ -449,6 +449,57 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         );
     }
 
+    public function testAggregateReturnsData(): void
+    {
+        $entity = 'product_metric';
+        $channel = Channel::shopify;
+        $body = json_encode(['filters' => ['status' => 'active']]);
+        $params = [
+            'aggregations' => ['total' => 'SUM(value)'],
+            'groupBy' => ['metricDate']
+        ];
+        $expectedData = [['total' => 500, 'metricDate' => '2024-01-01']];
+
+        // Mock repository
+        $repository = $this->getMockBuilder(\stdClass::class)
+            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'aggregate'])
+            ->getMock();
+        $repository->expects($this->once())
+            ->method('aggregate')
+            ->with(
+                ['total' => 'SUM(value)'],
+                ['metricDate'],
+                $this->callback(fn($filters) => $filters->status === 'active' && $filters->channel === $channel->value)
+            )
+            ->willReturn($expectedData);
+
+        $this->entityManager->expects($this->once())
+            ->method('getRepository')
+            ->with('Entities\\Channeled\\' . $entity)
+            ->willReturn($repository);
+
+        $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
+        $this->controller->setMockEntitiesConfig([
+            strtolower($entity) => [
+                'channeled_class' => 'Entities\\Channeled\\' . $entity,
+                'repository_methods' => [
+                    'aggregate' => ['parameters' => ['filters', 'aggregations', 'groupBy']]
+                ]
+            ]
+        ]);
+        $this->controller->setMockChannelsConfig([
+            $channel->value => ['enabled' => true]
+        ]);
+
+        $response = $this->controller->aggregate($entity, $channel, $body, $params);
+
+        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertEquals(
+            json_encode(['data' => $expectedData, 'status' => 'success', 'error' => null]),
+            $response->getContent()
+        );
+    }
+
     /**
      * @throws ReflectionException
      */
@@ -995,6 +1046,11 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         return empty(array_diff($params, $validParams));
     }
 
+    public function prepareCrudParams(?array $params, ?string $body): array
+    {
+        return parent::prepareCrudParams($params, $body);
+    }
+
     public function prepareChanneledReadMultipleParams(
         ?array $params,
         string $repositoryClass,
@@ -1004,9 +1060,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         if (!empty($params) && !$this->validateParams(array_keys($params), $repositoryClass, 'readMultiple')) {
             throw new InvalidArgumentException('Invalid parameters');
         }
-
-        $params = $params ?? [];
-        $params['filters'] = Helpers::bodyToObject($body);
+        $params = $this->prepareCrudParams($params, $body);
         if (!isset($params['filters']->channel)) {
             $params['filters']->channel = $channel->value;
         }
@@ -1218,6 +1272,49 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
+    public function aggregate(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
+    {
+        try {
+            $repository = $this->getRepository($entity);
+            $params = $this->prepareCrudParams($params, $body);
+            if (!isset($params['filters']->channel)) {
+                $params['filters']->channel = $channel->value;
+            }
+
+            $aggregations = (array) ($params['aggregations'] ?? []);
+            $groupBy = (array) ($params['groupBy'] ?? []);
+
+            if (empty($aggregations)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Missing aggregations parameter',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $data = $repository->aggregate(
+                $aggregations,
+                $groupBy,
+                $params['filters'] ?? null,
+                $params['startDate'] ?? null,
+                $params['endDate'] ?? null
+            );
+
+            return $this->createResponse(
+                data: $data,
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
     public function delete(string $entity, Channel $channel, ?int $id = null): Response
     {
         try {
@@ -1344,7 +1441,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
                 'update' => $this->update($entity, $channelEnum, $id, $extraArgs[0] ?? null),
                 'delete' => $this->delete($entity, $channelEnum, $id),
                 'create' => $this->create($entity, $channelEnum, $extraArgs[0] ?? null),
-                'count', 'list' => $this->$method($entity, $channelEnum, ...$extraArgs),
+                'aggregate', 'count', 'list' => $this->$method($entity, $channelEnum, ...$extraArgs),
                 default => $this->createResponse(
                     data: null,
                     status: 'error',

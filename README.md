@@ -95,6 +95,7 @@ Detailed guides for setting up and maintaining the infrastructure:
 - [External Database Preparation](docs/external-db-prep.md)
 - [Infrastructure & Health Checks](docs/health-checks.md)
 - [Job Manipulation & Lifecycle](docs/job-manipulation.md)
+- [Data Aggregation Guide](docs/aggregations.md)
 - [Cloud Architecture & Data Access Strategy](docs/cloud-architecture.md)
 - [Deployment Checklist](docs/deployment-checklist.md)
 
@@ -144,6 +145,9 @@ php bin/cli.php app:read -e jobs -i 1
 
 # Read a channeled record (Google Search Console metric) with parameters
 php bin/cli.php app:read -c google_search_console -e metric -p "limit=100&pagination=3&rawData=1"
+
+# Aggregate data (e.g. Total Revenue from Shopify Orders)
+php bin/cli.php app:aggregate -e channeled_order -c shopify -a '{"revenue": "SUM(e.total_price)"}' --pretty
 ```
 
 ## 🧠 Core Architecture Highlights

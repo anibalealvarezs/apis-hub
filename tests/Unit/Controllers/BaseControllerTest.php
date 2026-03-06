@@ -185,6 +185,23 @@ class BaseControllerTest extends TestCase
         $this->assertEquals(['category'], (array) $result['groupBy']);
         $this->assertEquals('test', $result['filters']->name);
     }
+
+    public function testPrepareCrudParamsExtractsControlParamsFromFlatBody(): void
+    {
+        $body = json_encode([
+            'status' => 'active',
+            'aggregations' => ['total' => 'SUM(amount)'],
+            'limit' => 5
+        ]);
+
+        $result = $this->controller->prepareCrudParams([], $body);
+
+        $this->assertEquals(['total' => 'SUM(amount)'], (array) $result['aggregations']);
+        $this->assertEquals(5, $result['limit']);
+        $this->assertEquals('active', $result['filters']->status);
+        $this->assertFalse(isset($result['filters']->aggregations));
+        $this->assertFalse(isset($result['filters']->limit));
+    }
 }
 
 // Concrete class to test the abstract BaseController
