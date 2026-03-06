@@ -86,7 +86,7 @@ abstract class BaseController
         }
 
         if (!isset($config[$entityKey][$configKey])) {
-            throw new Exception("Entity configuration for '$entity' with key '$configKey' not found");
+            throw new Exception("The entity '$entity' is not correctly configured in your config/yaml/entitiesconfig.yaml. Missing '$configKey' entry.");
         }
         return $this->em->getRepository(
             entityName: $config[$entityKey][$configKey]

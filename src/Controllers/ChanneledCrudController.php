@@ -53,21 +53,32 @@ class ChanneledCrudController extends BaseController
         }
 
         $channelsConfig = Helpers::getChannelsConfig();
+        $isRegisteredInEnum = defined(constant_name: Channel::class . '::' . $channel);
+        $isConfigured = in_array(needle: $channel, haystack: array_keys(array: $channelsConfig));
 
-        if (!defined(constant_name: Channel::class . '::' . $channel) || !in_array(needle: $channel, haystack: array_keys(array: $channelsConfig))) {
+        if (!$isRegisteredInEnum) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
-                error: 'Invalid channel',
+                error: "The channel '$channel' is not a valid channel in the system. Please check the Channel enum.",
                 httpStatus: Response::HTTP_NOT_FOUND
             );
         }
 
-        if ($channelsConfig[$channel]['enabled'] === false) {
+        if (!$isConfigured) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
-                error: 'Channel disabled',
+                error: "The channel '$channel' is not configured in your project. Please add it to the 'channels' section in your deploy/project.yaml.",
+                httpStatus: Response::HTTP_NOT_FOUND
+            );
+        }
+
+        if (($channelsConfig[$channel]['enabled'] ?? false) === false) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: "The channel '$channel' is currently disabled in your project configuration.",
                 httpStatus: Response::HTTP_FORBIDDEN
             );
         }
