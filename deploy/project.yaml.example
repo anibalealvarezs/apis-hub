@@ -1,0 +1,147 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# apis-hub · Project deployment configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# Copy this file to deploy/project.yaml to start your local project configuration.
+# Fill in real values and run your application.
+#
+# This file supports environment variable interpolation using the following syntax:
+#   ${VAR_NAME:-default_value}
+#
+# This allows you to have a single configuration file that works both locally
+# and in a Dockerized environment.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# used as Docker image/container prefix (e.g. alimentos-bahia)
+project: my-project
+
+# ── Database ─────────────────────────────────────────────────────────────────
+# The application uses APP_ENV to switch between 'testing' and 'production'.
+# Defaults to 'testing' if APP_ENV is not set.
+database:
+  # Configuration for local development and test execution
+  testing:
+    driver: pdo_mysql
+    host: ${DB_HOST:-127.0.0.1}
+    port: 3306
+    user: root
+    password: YOUR_LOCAL_PASSWORD
+    name: ${DB_NAME:-apis-hub-testing}
+
+  # Configuration for production (e.g. Docker container networking)
+  production:
+    driver: pdo_mysql
+    host: ${PROD_DB_HOST:-host.docker.internal}
+    port: 3306
+    user: root
+    password: ${PROD_DB_PASSWORD:-YOUR_PROD_PASSWORD}
+    name: ${PROD_DB_NAME:-apis-hub-production}
+
+# ── Redis ────────────────────────────────────────────────────────────────────
+redis:
+  # Redis host (use 'redis' if running in Docker stack, or 127.0.0.1 for local)
+  host: ${REDIS_HOST:-127.0.0.1}
+  # Redis port (default 6379)
+  port: ${REDIS_PORT:-6379}
+
+# ── Worker instances ──────────────────────────────────────────────────────────
+# Each entry defines a worker container/process for a specific channel and entity.
+# - channel: must match a Channel enum value (gsc, facebook, klaviyo, shopify, etc.)
+# - entity: analytics entity to fetch/cache (metric, query, channeled_campaign, etc.)
+# - start_date / end_date: optional ISO dates (e.g. "2024-01-01") for time-bound fetches.
+instances:
+  - name: gsc-worker-example
+    port: 8081
+    channel: gsc
+    entity: metric
+    start_date: "2024-01-01"
+    end_date:   "2024-01-31"
+
+# ── Channel credentials & config ─────────────────────────────────────────────
+# Credentials and specific settings for each integration channel.
+# Only populate the channels you actually use; disabled ones will be ignored.
+channels:
+  # Google OAuth Main Configuration
+  google:
+    enabled: false
+    client_id: GOOGLE_CLIENT_ID
+    client_secret: GOOGLE_CLIENT_SECRET
+    # Usually https://oauth.pstmn.io/v1/browser-callback for development or your custom URL
+    redirect_uri: ${GOOGLE_REDIRECT_URI:-YOUR_REDIRECT_URI}
+    refresh_token: GOOGLE_REFRESH_TOKEN
+    user_id: you@example.com
+    # Path to store/read tokens persistently
+    token_path: ./config/google_tokens.json
+    # Scopes needed across all google services in this deployment
+    scopes:
+      - https://www.googleapis.com/auth/webmasters
+
+  # Google Search Console specific settings
+  google_search_console:
+    enabled: false
+    scope: https://www.googleapis.com/auth/webmasters
+    # sites: List of properties you want to track
+    sites:
+      - url: "sc-domain:yourdomain.com"
+        title: "Your Site Name"
+        hostname: "yourdomain.com"
+        # Optional filters
+        include_keywords: []
+        exclude_keywords: []
+        include_countries: []
+        exclude_countries: []
+        include_pages: []
+        exclude_pages: []
+        # Target metadata for specific reporting
+        target_countries: ["usa"]
+        target_keywords: ["seo", "brand"]
+        enabled: true
+    # Time to live for metrics cache in seconds (e.g. 86400 = 24h)
+    metrics_cache_ttl: 86400
+
+  # Facebook Marketing & Graph API settings
+  facebook:
+    enabled: false
+    app_id: FB_APP_ID
+    app_secret: FB_APP_SECRET
+    graph_user_access_token: FB_USER_ACCESS_TOKEN
+    graph_page_access_token: FB_PAGE_ACCESS_TOKEN
+    user_id: FB_USER_ID
+    accounts_group_name: "Your Project Name"
+    # Facebook Pages to track
+    pages:
+      - id: FB_PAGE_ID
+        url: https://www.facebook.com/yourpage
+        title: Your Page
+        hostname: yourdomain.com
+        page_metrics: true
+        posts: true
+        post_metrics: true
+        # Optional Instagram account linked to the FB page
+        ig_account: IG_ACCOUNT_ID
+        ig_account_metrics: true
+        enabled: true
+    # Ad Accounts to track
+    ad_accounts:
+      - id: AD_ACCOUNT_ID
+        ad_account_metrics: true
+        campaigns: true
+        campaign_metrics: true
+        enabled: true
+
+  # Klaviyo API settings
+  klaviyo:
+    enabled: false
+    klaviyo_api_key: KLAVIYO_API_KEY
+    # Metrics names as they appear in Klaviyo
+    metrics:
+      - Added to Cart
+      - Placed Order
+    metrics_cache_ttl: 86400
+
+  # Shopify API settings
+  shopify:
+    enabled: false
+    shopify_api_key: SHOPIFY_API_KEY
+    shopify_shop_name: your-shop-prefix
+    # API Version (e.g. "2024-04")
+    shopify_last_stable_revision: "2024-04"

@@ -32,6 +32,36 @@ class Helpers
     private static ?array $dbConfig = null;
     private static ?array $channelsConfig = null;
     private static ?array $entitiesConfig = null;
+    private static ?array $projectConfig = null;
+
+    /**
+     * @return array
+     */
+    public static function getProjectConfig(): array
+    {
+        if (self::$projectConfig === null) {
+            $projectConfigFile = getenv('PROJECT_CONFIG_FILE') ?: __DIR__ . '/../../deploy/project.yaml';
+            if ($projectConfigFile && file_exists($projectConfigFile)) {
+                try {
+                    $content = file_get_contents($projectConfigFile);
+                    // Interpolate environment variables: ${VAR:-default}
+                    $content = preg_replace_callback('/\$\{([^}:]+)(?::-([^}]+))?\}/', function($matches) {
+                        $envValue = getenv($matches[1]);
+                        return ($envValue !== false && $envValue !== '') ? $envValue : ($matches[2] ?? $matches[0]);
+                    }, $content);
+
+                    $config = Yaml::parse($content);
+                    self::$projectConfig = is_array($config) ? $config : [];
+                } catch (Exception) {
+                    self::$projectConfig = [];
+                }
+            } else {
+                self::$projectConfig = [];
+            }
+        }
+        return self::$projectConfig;
+    }
+
 
     /**
      * @param int $limit
@@ -82,23 +112,19 @@ class Helpers
     public static function getDbConfig(): array
     {
         if (self::$dbConfig === null) {
-            $filePath = __DIR__ . '/../../config/yaml/dbconfig.yaml';
-            try {
-                if (!file_exists($filePath)) {
-                    throw new RuntimeException("Database configuration file not found: $filePath");
-                }
-                $config = Yaml::parseFile($filePath);
-                if (!is_array($config)) {
-                    throw new RuntimeException("Invalid database configuration: $filePath must return an array");
-                }
+            $projectConfig = self::getProjectConfig();
+            $env = getenv('APP_ENV') ?: 'testing';
+            $baseConfig = $projectConfig['database'][$env] ?? [];
 
+            try {
                 // Override with environment variables if present
-                $config['driver'] = getenv('DB_DRIVER') ?: ($config['driver'] ?? 'pdo_mysql');
-                $config['host'] = getenv('DB_HOST') ?: ($config['host'] ?? '127.0.0.1');
-                $config['port'] = getenv('DB_PORT') ?: ($config['port'] ?? 3306);
-                $config['user'] = getenv('DB_USER') ?: ($config['user'] ?? 'root');
-                $config['password'] = getenv('DB_PASSWORD') !== false ? getenv('DB_PASSWORD') : ($config['password'] ?? '');
-                $config['dbname'] = getenv('DB_NAME') ?: ($config['dbname'] ?? 'apis-hub');
+                $config = [];
+                $config['driver'] = getenv('DB_DRIVER') ?: ($baseConfig['driver'] ?? 'pdo_mysql');
+                $config['host'] = getenv('DB_HOST') ?: ($baseConfig['host'] ?? '127.0.0.1');
+                $config['port'] = getenv('DB_PORT') ?: ($baseConfig['port'] ?? 3306);
+                $config['user'] = getenv('DB_USER') ?: ($baseConfig['user'] ?? 'root');
+                $config['password'] = getenv('DB_PASSWORD') !== false ? getenv('DB_PASSWORD') : ($baseConfig['password'] ?? '');
+                $config['dbname'] = getenv('DB_NAME') ?: ($baseConfig['name'] ?? 'apis-hub');
 
                 self::$dbConfig = $config;
             } catch (Exception $e) {
@@ -114,14 +140,16 @@ class Helpers
     public static function getChannelsConfig(): array
     {
         if (self::$channelsConfig === null) {
+            $projectConfig = self::getProjectConfig();
+            $config = $projectConfig['channels'] ?? [];
+
             $filePath = __DIR__ . '/../../config/yaml/channelsconfig.yaml';
             try {
-                if (!file_exists($filePath)) {
-                    throw new RuntimeException("Channels configuration file not found: $filePath");
-                }
-                $config = Yaml::parseFile($filePath);
-                if (!is_array($config)) {
-                    throw new RuntimeException("Invalid channels configuration: $filePath must return an array");
+                if (file_exists($filePath)) {
+                    $yamlConfig = Yaml::parseFile($filePath);
+                    if (is_array($yamlConfig)) {
+                        $config = array_replace_recursive($yamlConfig, $config);
+                    }
                 }
 
                 // Override with environment variables if present
@@ -129,6 +157,32 @@ class Helpers
                     $envChannels = json_decode($envChannelsJson, true);
                     if (is_array($envChannels)) {
                         $config = array_replace_recursive($config, $envChannels);
+                    }
+                }
+
+                // Explicit environment variable mappings
+                $envOverrides = [
+                    'GOOGLE_CLIENT_ID' => ['google', 'client_id'],
+                    'GOOGLE_CLIENT_SECRET' => ['google', 'client_secret'],
+                    'GOOGLE_REFRESH_TOKEN' => ['google', 'refresh_token'],
+                    'GOOGLE_REDIRECT_URI' => ['google', 'redirect_uri'],
+                    'GOOGLE_USER_ID' => ['google', 'user_id'],
+                    'GOOGLE_SEARCH_CONSOLE_CLIENT_ID' => ['google_search_console', 'client_id'],
+                    'GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET' => ['google_search_console', 'client_secret'],
+                    'GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN' => ['google_search_console', 'refresh_token'],
+                    'GOOGLE_SEARCH_CONSOLE_TOKEN' => ['google_search_console', 'token'],
+                    'FACEBOOK_APP_ID' => ['facebook', 'app_id'],
+                    'FACEBOOK_APP_SECRET' => ['facebook', 'app_secret'],
+                    'FACEBOOK_GRAPH_USER_ACCESS_TOKEN' => ['facebook', 'graph_user_access_token'],
+                    'FACEBOOK_GRAPH_PAGE_ACCESS_TOKEN' => ['facebook', 'graph_page_access_token'],
+                ];
+
+                foreach ($envOverrides as $envKey => $configPath) {
+                    $val = getenv($envKey);
+                    if ($val !== false && $val !== '') {
+                        if (count($configPath) === 2) {
+                            $config[$configPath[0]][$configPath[1]] = $val;
+                        }
                     }
                 }
 
@@ -169,20 +223,23 @@ class Helpers
     public static function getCacheConfig(): array
     {
         if (self::$cacheConfig === null) {
+            $projectConfig = self::getProjectConfig();
+            $config = $projectConfig['redis'] ?? [];
+
             $filePath = __DIR__ . '/../../config/yaml/cacheconfig.yaml';
             try {
-                if (!file_exists($filePath)) {
-                    throw new RuntimeException("Cache configuration file not found: $filePath");
-                }
-                $config = Yaml::parseFile($filePath);
-                if (!is_array($config)) {
-                    throw new RuntimeException("Invalid cache configuration: $filePath must return an array");
+                if (file_exists($filePath)) {
+                    $yamlConfig = Yaml::parseFile($filePath);
+                    if (is_array($yamlConfig)) {
+                        $config = array_replace_recursive($yamlConfig, $config);
+                    }
                 }
 
-                // Override with environment variables if present
                 if (!isset($config['redis'])) {
                     $config['redis'] = [];
                 }
+
+                // Override with environment variables if present
                 $config['redis']['host'] = getenv('REDIS_HOST') ?: ($config['redis']['host'] ?? '127.0.0.1');
                 $config['redis']['port'] = getenv('REDIS_PORT') ? (int)getenv('REDIS_PORT') : ($config['redis']['port'] ?? 6379);
                 if (getenv('REDIS_PASSWORD') !== false) {

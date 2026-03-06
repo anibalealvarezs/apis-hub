@@ -18,7 +18,19 @@ class HelpersTest extends BaseUnitTestCase
     {
         parent::setUp();
 
-        // Reset static properties before each test
+        $this->resetHelpers();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->resetHelpers();
+
+        parent::tearDown();
+    }
+
+    private function resetHelpers(): void
+    {
+        // Reset static properties before/after each test to prevent state leakage
         $reflection = new ReflectionClass(Helpers::class);
         foreach ($reflection->getProperties(\ReflectionProperty::IS_STATIC) as $property) {
             $property->setValue(null, null);

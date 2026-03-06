@@ -19,6 +19,18 @@ use Symfony\Component\Console\Output\OutputInterface;
 )]
 class ReadEntityCommand extends Command
 {
+    private ?CrudController $crudController;
+    private ?\Controllers\ChanneledCrudController $channeledCrudController;
+
+    public function __construct(
+        ?CrudController $crudController = null,
+        ?\Controllers\ChanneledCrudController $channeledCrudController = null
+    ) {
+        parent::__construct();
+        $this->crudController = $crudController;
+        $this->channeledCrudController = $channeledCrudController;
+    }
+
     /**
      * @return void
      */
@@ -59,7 +71,7 @@ class ReadEntityCommand extends Command
         }
 
         if ($channel) {
-            $controller = new \Controllers\ChanneledCrudController();
+            $controller = $this->channeledCrudController ?? new \Controllers\ChanneledCrudController();
             $result = $controller(
                 entity: $entity,
                 channel: $channel,
@@ -69,7 +81,7 @@ class ReadEntityCommand extends Command
                 params: $params
             );
         } else {
-            $controller = new CrudController();
+            $controller = $this->crudController ?? new CrudController();
             $result = $controller(
                 entity: $entity,
                 method: $id ? 'read' : 'list',
@@ -79,13 +91,14 @@ class ReadEntityCommand extends Command
             );
         }
 
+        $responseContent = $result->getContent();
         if ($result->getStatusCode() >= 200 && $result->getStatusCode() < 300) {
-            $content = json_decode($result->getContent(), true) ?? $result->getContent();
+            $content = json_decode($responseContent, true) ?? $responseContent;
             $output->writeln('<info>' . (is_array($content) ? json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : $content) . '</info>');
             return Command::SUCCESS;
         }
 
-        $output->writeln('<error>' . $result->getContent() . '</error>');
+        $output->writeln('<error>' . $responseContent . '</error>');
         return Command::FAILURE;
     }
 }

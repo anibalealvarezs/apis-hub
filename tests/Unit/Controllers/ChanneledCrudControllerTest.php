@@ -727,7 +727,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
     {
         $entity = 'customer';
         $channel = Channel::shopify;
-        $id = $this->faker->randomNumber();
+        $id = $this->faker->numberBetween(1, 1000);
 
         // Mock repository
         $repository = $this->getMockBuilder(stdClass::class)

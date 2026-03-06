@@ -19,6 +19,14 @@ use Symfony\Component\Console\Output\OutputInterface;
 )]
 class DeleteEntityCommand extends Command
 {
+    private ?CrudController $crudController;
+    
+    public function __construct(?CrudController $crudController = null)
+    {
+        parent::__construct();
+        $this->crudController = $crudController;
+    }
+
     /**
      * @return void
      */
@@ -40,13 +48,14 @@ class DeleteEntityCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $result = (new CrudController())(
+        $controller = $this->crudController ?? new CrudController();
+        $result = ($controller)(
             entity: $input->getOption('entity'),
             method: 'delete',
             id: $input->getOption('id'),
         );
 
-        $output->writeln('<info>' . $result . '</info>');
+        $output->writeln('<info>' . $result->getContent() . '</info>');
         return Command::SUCCESS;
     }
 }

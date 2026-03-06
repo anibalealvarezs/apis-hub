@@ -26,4 +26,13 @@
             <directory>tests/Integration</directory>
         </testsuite>
     </testsuites>
+
+    <php>
+        <!-- Path to the YAML config file for tests.
+             Leave empty to try config/config.yaml; if absent the suite continues.
+               DB:      TEST_DB_DRIVER / TEST_DB_HOST / TEST_DB_PORT / TEST_DB_USER / TEST_DB_PASSWORD / TEST_DB_NAME
+               Redis:   REDIS_HOST / REDIS_PORT / REDIS_PASSWORD
+               Channels: CHANNELS_CONFIG (JSON blob) or individual GOOGLE_* / FACEBOOK_* env vars -->
+        <env name="CONFIG_FILE" value=""/>
+    </php>
 </phpunit>

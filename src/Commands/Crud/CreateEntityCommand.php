@@ -19,6 +19,14 @@ use Symfony\Component\Console\Output\OutputInterface;
 )]
 class CreateEntityCommand extends Command
 {
+    private ?CrudController $crudController;
+    
+    public function __construct(?CrudController $crudController = null)
+    {
+        parent::__construct();
+        $this->crudController = $crudController;
+    }
+
     /**
      * @return void
      */
@@ -39,13 +47,14 @@ class CreateEntityCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $result = (new CrudController())(
+        $controller = $this->crudController ?? new CrudController();
+        $result = ($controller)(
             entity: $input->getOption('entity'),
             method: 'create',
             body: $input->getOption('data'),
         );
 
-        $output->writeln('<info>' . $result . '</info>');
+        $output->writeln('<info>' . $result->getContent() . '</info>');
         return Command::SUCCESS;
     }
 }

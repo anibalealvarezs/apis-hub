@@ -520,6 +520,10 @@ class GoogleSearchConsoleHelpers
             $logger->error("Missing 'google_search_console' configuration in channels config");
             throw new Exception("Missing 'google_search_console' configuration in channels config");
         }
+        if (!isset($scConfig['sites']) || !is_array($scConfig['sites'])) {
+            $logger->error("Missing or invalid 'sites' configuration in 'google_search_console'");
+            throw new Exception("Missing or invalid 'sites' configuration in 'google_search_console'");
+        }
         $logger->info("Loaded GSC config: sites=" . count($scConfig['sites']));
         return [
             'google' => $config,

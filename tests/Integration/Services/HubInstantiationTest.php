@@ -57,13 +57,15 @@ class HubInstantiationTest extends BaseIntegrationTestCase
                 'client_id' => 'global_client_id',
                 'client_secret' => 'global_secret',
                 'refresh_token' => $globalRefToken,
-                'user_id' => 'global@example.com'
+                'user_id' => 'global@example.com',
+                'redirect_uri' => 'http://localhost'
             ],
             'google_search_console' => [
                 'enabled' => true,
                 'client_id' => $specificClientId,
                 'scope' => $scopes,
-                'token_path' => '/tmp/google_tokens.json'
+                'token_path' => '/tmp/google_tokens.json',
+                'sites' => []
             ]
         ];
         putenv('CHANNELS_CONFIG=' . json_encode($config));

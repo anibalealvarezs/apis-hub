@@ -1,4 +1,6 @@
 vendor/
+config/channelsconfig.env
+config/google_tokens.json
 .git/
 .idea/
 .vscode/

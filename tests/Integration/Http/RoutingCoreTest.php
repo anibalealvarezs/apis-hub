@@ -12,7 +12,7 @@ class RoutingCoreTest extends BaseIntegrationTestCase
     public function testRoutingCoreRejectsRequestsWithoutApiKeyWhenConfigured(): void
     {
         // Arrange
-        $apiKey = $this->faker->password(20);
+        $apiKey = $this->faker->uuid;
         putenv('APP_API_KEY=' . $apiKey);
 
         $router = new RoutingCore();

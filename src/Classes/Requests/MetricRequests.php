@@ -785,9 +785,15 @@ class MetricRequests
         $apiRetryCount = 0;
         while ($apiRetryCount < $maxApiRetries) {
             try {
-                $scopes = $config['google_search_console']['scope'] ?? ["https://www.googleapis.com/auth/webmasters"];
+                // Scope resolution: service-level → global google → default
+                $scopes = $config['google_search_console']['scope']
+                    ?? $config['google_search_console']['scopes']
+                    ?? $config['google']['scopes']
+                    ?? $config['google']['scope']
+                    ?? ["https://www.googleapis.com/auth/webmasters"];
                 if (is_string($scopes)) {
-                    $scopes = array_map('trim', explode(',', $scopes));
+                    // Accept space-separated (OAuth standard) or comma-separated
+                    $scopes = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $scopes))));
                 }
 
                 $apiInstance = new SearchConsoleApi(
@@ -797,7 +803,7 @@ class MetricRequests
                     refreshToken: $config['google_search_console']['refresh_token'] ?? ($config['google']['refresh_token'] ?? null),
                     userId: $config['google_search_console']['user_id'] ?? ($config['google']['user_id'] ?? null),
                     scopes: $scopes,
-                    token: $config['google_search_console']['token'] ?? null,
+                    token: $config['google_search_console']['token'] ?? "",
                     tokenPath: $config['google_search_console']['token_path'] ?? ($config['google']['token_path'] ?? "")
                 );
                 $logger->info("Initialized SearchConsoleApi");
