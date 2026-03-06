@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 #[AsCommand(
-    name: 'analytics:cache',
+    name: 'apis-hub:cache',
     description: 'Schedules a caching job for an analytics entity.',
     aliases: ['app:cache'],
     hidden: false

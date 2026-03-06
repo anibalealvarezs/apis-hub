@@ -51,7 +51,7 @@ enum Channel: int
         return match (strtolower($name)) {
             'shopify' => self::shopify,
             'klaviyo' => self::klaviyo,
-            'facebook' => self::facebook,
+            'facebook', 'facebook-ads', 'fb-ads' => self::facebook,
             'bigcommerce' => self::bigcommerce,
             'netsuite' => self::netsuite,
             'amazon' => self::amazon,

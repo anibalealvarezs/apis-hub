@@ -277,13 +277,8 @@ class CacheController extends BaseController
             } */
 
             return $requestsClassName::$methodName(...$parameters) ?: [];
-        } catch (Exception) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: "Entity " . $entity . " not found in AnalyticsEntities",
-                httpStatus: Response::HTTP_NOT_FOUND
-            );
+        } catch (Exception $e) {
+            throw $e;
         }
     }
 }

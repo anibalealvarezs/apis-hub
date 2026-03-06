@@ -245,7 +245,7 @@ class Helpers
 
                 // Create attribute metadata configuration
                 $ormConfig = ORMSetup::createAttributeMetadataConfiguration(
-                    paths: [__DIR__ . '/..'],
+                    paths: [__DIR__ . '/../Entities'],
                     isDevMode: true
                 );
 

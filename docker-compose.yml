@@ -1,46 +1,87 @@
 version: '3.8'
 
 services:
-  app:
+  gsc-jan:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       - PORT=8080
+      - API_SOURCE=gsc
+      - API_ENTITY=query
+      - START_DATE=2026-01-01
+      - END_DATE=2026-01-31
       - DB_DRIVER=pdo_mysql
-      - DB_HOST=db
+      - DB_HOST=host.docker.internal
       - DB_PORT=3306
       - DB_USER=root
-      - DB_PASSWORD=root
-      - DB_NAME=apis-hub
+      - DB_PASSWORD=NoEntiendo2321
+      - DB_NAME=apis-hub-3
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-        # Montar código local para desarrollo dinámico
       - ./:/app
+      - /app/vendor
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
-  db:
-    image: mysql:8.0
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: apis-hub
+  gsc-feb:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "3306:3306"
+      - "8082:8080"
+    environment:
+      - PORT=8080
+      - API_SOURCE=gsc
+      - API_ENTITY=query
+      - START_DATE=2026-02-01
+      - END_DATE=2026-02-28
+      - DB_DRIVER=pdo_mysql
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=NoEntiendo2321
+      - DB_NAME=apis-hub-3
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     volumes:
-      - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - ./:/app
+      - /app/vendor
+    depends_on:
+      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  fb-ads:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8080"
+    environment:
+      - PORT=8080
+      - API_SOURCE=fb-ads
+      - API_ENTITY=channeled_campaign
+      - DB_DRIVER=pdo_mysql
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=NoEntiendo2321
+      - DB_NAME=apis-hub-3
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./:/app
+      - /app/vendor
+    depends_on:
+      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   redis:
     image: redis:alpine
@@ -51,5 +92,4 @@ services:
       - redis_data:/data
 
 volumes:
-  db_data:
   redis_data:
