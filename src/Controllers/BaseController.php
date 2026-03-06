@@ -79,6 +79,12 @@ abstract class BaseController
     {
         $config = Helpers::getEntitiesConfig();
         $entityKey = strtolower($entity);
+
+        // Fallback for channeled_class if missing (useful for entities that are already channeled)
+        if ($configKey === 'channeled_class' && !isset($config[$entityKey][$configKey])) {
+            $configKey = 'class';
+        }
+
         if (!isset($config[$entityKey][$configKey])) {
             throw new Exception("Entity configuration for '$entity' with key '$configKey' not found");
         }
