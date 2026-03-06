@@ -1,7 +1,6 @@
-<div align="center">
-  <h1>🚀 APIs Hub</h1>
-  <p><strong>A headless data extraction and caching engine tailored for Analytics and E-commerce integrations.</strong></p>
-</div>
+# 🚀 APIs Hub
+
+**A headless data extraction and caching engine tailored for Analytics and E-commerce integrations.**
 
 ---
 
@@ -40,7 +39,7 @@ The application uses a unified configuration system centered at `deploy/project.
 2. **Set Environment Variables**: You can override any value in the YAML using environment variables. The YAML uses `${VAR:-default}` syntax.
 3. **Switch Environments**: Set the `APP_ENV` variable to switch between `testing` (default) and `production` database blocks.
 
-#### Common Environment Variables:
+#### Common Environment Variables
 
 ```env
 # Environment Switching (defaults to 'testing')
@@ -67,12 +66,12 @@ APP_API_KEY=your-super-secure-random-key
 ## 🏗 Configuration Architecture
 
 The `deploy/project.yaml` is the single source of truth. It allows you to define:
+
 - **Database Contexts**: Separate credentials for local development vs. Docker containers.
 - **Worker Instances**: Define which channels and entities each worker should process.
 - **Channel Credentials**: Centralized storage for API keys (Google, FB, Shopify, etc.).
 
 All values in the YAML can be dynamic. For example, `host: ${DB_HOST:-127.0.0.1}` will use the `DB_HOST` environment variable if present, otherwise it defaults to `127.0.0.1`.
-
 
 ---
 
@@ -147,13 +146,12 @@ We heavily rely on Redis caching to prevent API explosions and respect strict th
 - **Body Filter Bypass:** To avoid Memory exhaustion, any specific request containing `filters` in their HTTP Body completely bypasses Redis, polling data synchronously for specialized needs.
 - **Auto-Invalidation:** Every Create, Update, or Delete operation executed against a repository implicitly runs a SCAN wildcard deletion on Redis arrays preventing stale views.
 
-
 ## 🏗 Worker Containerization & Deployment
 
 APIs Hub is designed to scale horizontally through **dedicated worker containers**. Each worker is a specialized instance focused on a specific Channel and Entity.
 
-
 ### 1. Defining Instances
+
 In your `deploy/project.yaml`, you define a list of `instances`. Each instance becomes a standalone Docker service:
 
 ```yaml
@@ -166,8 +164,8 @@ instances:
     end_date: "..."
 ```
 
-
 ### 2. Generating Infrastructure
+
 Instead of writing complex `docker-compose.yml` files manually, use the built-in deployment builder:
 
 ```bash
@@ -177,8 +175,8 @@ php bin/build-deployment.php project
 
 This script reads your YAML and automatically generates a `docker-compose.yml` tailored to your defined instances, injecting all necessary environment variables and database credentials.
 
-
 ### 3. Execution
+
 Once generated, deploy your cluster with standard Docker commands:
 
 ```bash
@@ -186,9 +184,6 @@ docker compose up -d --build
 ```
 
 Each container will boot up, initialize its specific context, and begin processing the data pipeline according to its configuration.
-
----
-
 
 ## 🧪 Testing
 
@@ -204,6 +199,4 @@ vendor/bin/phpunit tests/
 
 ---
 
-<div align="center">
-  <i>Maintained with ❤️ for elite Data Analytics pipelines.</i>
-</div>
+*Maintained with ❤️ for elite Data Analytics pipelines.*
