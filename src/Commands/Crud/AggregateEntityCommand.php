@@ -44,6 +44,8 @@ class AggregateEntityCommand extends Command
             ->addOption('channel', 'c', InputOption::VALUE_OPTIONAL, 'The channel for the entity')
             ->addOption('aggregations', 'a', InputOption::VALUE_REQUIRED, 'JSON map of aggregations. e.g. {"clicks": "SUM(metadata.clicks)"}')
             ->addOption('group-by', 'g', InputOption::VALUE_OPTIONAL, 'Comma separated list of fields to group by')
+            ->addOption('start-date', 's', InputOption::VALUE_OPTIONAL, 'Start date (Y-m-d)')
+            ->addOption('end-date', 'd', InputOption::VALUE_OPTIONAL, 'End date (Y-m-d)')
             ->addOption('filters', 'f', InputOption::VALUE_OPTIONAL, 'The fields which will be used to filter the data (JSON body)')
             ->addOption('params', 'p', InputOption::VALUE_OPTIONAL, 'Additional query parameters (JSON or query string)')
             ->addOption('pretty', null, InputOption::VALUE_NONE, 'Pretty print the JSON response');
