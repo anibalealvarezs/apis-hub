@@ -112,31 +112,43 @@ abstract class BaseController
         $finalParams = [];
         $queryFilters = [];
 
-        // 1. Extract Control Parameters EXCLUSIVELY from the URL (query params)
+        // 1. Extract Control Parameters from the URL (query params)
         foreach ($params as $key => $value) {
             if (in_array($key, self::CRUD_TOP_LEVEL_PARAMS)) {
                 if ($key === 'filters') {
-                    // If they send ?filters[field]=value, merge it later
                     $queryFilters = array_merge($queryFilters, (array) $value);
                 } elseif (!in_array($key, self::CONTROLLER_ONLY_PARAMS)) {
-                    // Only forward params that the repository actually accepts
                     $finalParams[$key] = $value;
                 }
             } else {
-                // Any other query parameter is treated as a high-priority filter
                 $queryFilters[$key] = $value;
             }
         }
 
-        // 2. Extract Business Filters from the Body (ignore control params here)
+        // 2. Extract Business Filters and Control Params from the Body
         $bodyFilters = (array) ($bodyData['filters'] ?? $bodyData);
+        $bodyHasTopLevel = isset($bodyData['filters']);
 
-        // Remove any control params that might have been sent in the body to avoid accidents
-        foreach (self::CRUD_TOP_LEVEL_PARAMS as $controlParam) {
-            unset($bodyFilters[$controlParam]);
+        if ($bodyHasTopLevel) {
+            // If body has 'filters' key, treat other top-level keys as control params if not already set by URL
+            foreach ($bodyData as $key => $value) {
+                if ($key !== 'filters' && in_array($key, self::CRUD_TOP_LEVEL_PARAMS) && !isset($finalParams[$key])) {
+                    $finalParams[$key] = $value;
+                }
+            }
+        } else {
+            // Otherwise, check all keys in bodyData. If it's a control param, move it to finalParams.
+            foreach ($bodyFilters as $key => $value) {
+                if (in_array($key, self::CRUD_TOP_LEVEL_PARAMS)) {
+                    if (!isset($finalParams[$key])) {
+                        $finalParams[$key] = $value;
+                    }
+                    unset($bodyFilters[$key]);
+                }
+            }
         }
 
-        // 3. Merge: URL filters/parameters override Body filters
+        // 3. Merge: URL filters override Body filters
         $finalParams['filters'] = (object) array_merge($bodyFilters, $queryFilters);
 
         return $finalParams;
