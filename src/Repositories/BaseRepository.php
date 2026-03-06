@@ -170,6 +170,7 @@ class BaseRepository extends EntityRepository
             // Find all potential field references and map them while leaving functions and operators intact.
             $patterns = [
                 '/metadata\.[a-zA-Z0-9_]+/',
+                '/data\.[a-zA-Z0-9_]+/',
                 '/metric\.[a-zA-Z0-9_]+/',
                 '/metricConfig\.[a-zA-Z0-9_]+/',
                 '/\b(name|period|metricDate|value|platformCreatedAt|createdAt|date)\b/'
@@ -180,11 +181,13 @@ class BaseRepository extends EntityRepository
             }, $field);
         }
 
-        // JSON Metadata extraction
-        if (str_starts_with($field, 'metadata.')) {
-            $path = substr($field, 9);
-            $source = 'e.metadata';
-            if (str_ends_with($this->getEntityName(), 'ChanneledMetric')) {
+        // JSON extraction (metadata.field or data.field)
+        if (str_starts_with($field, 'metadata.') || str_starts_with($field, 'data.')) {
+            $isData = str_starts_with($field, 'data.');
+            $path = substr($field, $isData ? 5 : 9);
+            $source = $isData ? 'e.data' : 'e.metadata';
+            
+            if (!$isData && str_ends_with($this->getEntityName(), 'ChanneledMetric')) {
                 $source = 'm.metadata';
             }
             return "JSON_UNQUOTE(JSON_EXTRACT($source, '$.$path'))";
