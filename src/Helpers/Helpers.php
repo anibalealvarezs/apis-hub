@@ -3,17 +3,12 @@
 namespace Helpers;
 
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Exception\MissingMappingDriverImplementation;
-use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\ORMSetup;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\Persistence\Proxy;
 use Entities\Entity;
 use Exception;
-use Monolog\Handler\ErrorLogHandler;
-use Monolog\Logger;
 use Predis\Client;
 use Predis\ClientInterface;
 use ReflectionClass;
@@ -60,6 +55,14 @@ class Helpers
             }
         }
         return self::$projectConfig;
+    }
+    /**
+     * @return array
+     */
+    public static function getCliConfig(): array
+    {
+        $projectConfig = self::getProjectConfig();
+        return (array) ($projectConfig['cli'] ?? ['memory_limit' => '1G']);
     }
 
 

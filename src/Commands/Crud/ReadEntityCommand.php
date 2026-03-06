@@ -10,6 +10,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use \Helpers\Helpers;
 
 #[AsCommand(
     name: 'app:read',
@@ -55,7 +56,8 @@ class ReadEntityCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        ini_set('memory_limit', '1G');
+        $cliConfig = Helpers::getCliConfig();
+        ini_set('memory_limit', $cliConfig['memory_limit'] ?? '1G');
         $entity = $input->getOption('entity');
         $channel = $input->getOption('channel');
         $id = $input->getOption('id');

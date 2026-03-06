@@ -175,3 +175,9 @@ channels:
     shopify_shop_name: your-shop-prefix    # The 'my-shop' part of my-shop.myshopify.com
     # API Version (e.g. "2024-04")
     shopify_last_stable_revision: "2024-04" # Recommended Shopify API version
+# ── CLI Settings ──────────────────────────────────────────────────────────────
+# Global settings for CLI commands (bin/cli.php).
+cli:
+  # Memory limit for all database-heavy CLI operations (e.g. 512M, 1G, 2G).
+  # Use ${CLI_MEMORY_LIMIT:-1G} to override via environment variable.
+  memory_limit: ${CLI_MEMORY_LIMIT:-1G}

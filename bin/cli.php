@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-ini_set('memory_limit', '1G');
+require_once __DIR__ . "/../vendor/autoload.php";
+
+$cliConfig = \Helpers\Helpers::getCliConfig();
+ini_set('memory_limit', $cliConfig['memory_limit'] ?? '1G');
 
 use Commands\Crud\CreateEntityCommand;
 use Commands\Crud\DeleteEntityCommand;
