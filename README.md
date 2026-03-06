@@ -34,27 +34,45 @@ You can run this application locally or via Docker. The easiest way is using Doc
 
 ### 2. Environment Configuration
 
-The application gracefully falls back to YAML files, but the absolute **best practice** is managing configurations using Environment Variables.
+The application uses a unified configuration system centered at `deploy/project.yaml`. It supports **Environment Variable Interpolation** and **Multi-Environment Blocks**.
 
-Copy the example configuration or create your own `.env` file structure matching the keys used in `docker-compose.yml`:
+1. **Create your config**: Copy `deploy/project.yaml.example` to `deploy/project.yaml`.
+2. **Set Environment Variables**: You can override any value in the YAML using environment variables. The YAML uses `${VAR:-default}` syntax.
+3. **Switch Environments**: Set the `APP_ENV` variable to switch between `testing` (default) and `production` database blocks.
+
+#### Common Environment Variables:
 
 ```env
-DB_DRIVER=pdo_mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=secret
-DB_NAME=apis-hub
+# Environment Switching (defaults to 'testing')
+APP_ENV=testing
 
+# Database Overrides (Testing Block)
+DB_HOST=127.0.0.1
+DB_NAME=apis-hub-testing
+
+# Database Overrides (Production Block)
+PROD_DB_HOST=host.docker.internal
+PROD_DB_NAME=apis-hub-production
+
+# Redis Configuration
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
-
-# Example of JSON injected channel config
-CHANNELS_CONFIG={"shopify":{"enabled":true,"api_key":"your-key", ...}}
 
 # Security Key for your API
 APP_API_KEY=your-super-secure-random-key
 ```
+
+---
+
+## 🏗 Configuration Architecture
+
+The `deploy/project.yaml` is the single source of truth. It allows you to define:
+- **Database Contexts**: Separate credentials for local development vs. Docker containers.
+- **Worker Instances**: Define which channels and entities each worker should process.
+- **Channel Credentials**: Centralized storage for API keys (Google, FB, Shopify, etc.).
+
+All values in the YAML can be dynamic. For example, `host: ${DB_HOST:-127.0.0.1}` will use the `DB_HOST` environment variable if present, otherwise it defaults to `127.0.0.1`.
+
 
 ---
 
@@ -129,11 +147,48 @@ We heavily rely on Redis caching to prevent API explosions and respect strict th
 - **Body Filter Bypass:** To avoid Memory exhaustion, any specific request containing `filters` in their HTTP Body completely bypasses Redis, polling data synchronously for specialized needs.
 - **Auto-Invalidation:** Every Create, Update, or Delete operation executed against a repository implicitly runs a SCAN wildcard deletion on Redis arrays preventing stale views.
 
-### Distributed Workers Support
 
-Because state depends solely on Environment Variables and persistence falls to decoupled MySQL/Redis shards, you can confidently run **10 concurrent instances/containers** of `APIs Hub` to drastically accelerate your job ingestion times.
+## 🏗 Worker Containerization & Deployment
+
+APIs Hub is designed to scale horizontally through **dedicated worker containers**. Each worker is a specialized instance focused on a specific Channel and Entity.
+
+
+### 1. Defining Instances
+In your `deploy/project.yaml`, you define a list of `instances`. Each instance becomes a standalone Docker service:
+
+```yaml
+instances:
+  - name: gsc-jan    # Docker service name
+    port: 8081       # External port (optional)
+    channel: gsc     # Integration channel
+    entity: metric   # Data entity
+    start_date: "..."
+    end_date: "..."
+```
+
+
+### 2. Generating Infrastructure
+Instead of writing complex `docker-compose.yml` files manually, use the built-in deployment builder:
+
+```bash
+# Usage: php bin/build-deployment.php <project-filename-without-extension>
+php bin/build-deployment.php project
+```
+
+This script reads your YAML and automatically generates a `docker-compose.yml` tailored to your defined instances, injecting all necessary environment variables and database credentials.
+
+
+### 3. Execution
+Once generated, deploy your cluster with standard Docker commands:
+
+```bash
+docker compose up -d --build
+```
+
+Each container will boot up, initialize its specific context, and begin processing the data pipeline according to its configuration.
 
 ---
+
 
 ## 🧪 Testing
 
