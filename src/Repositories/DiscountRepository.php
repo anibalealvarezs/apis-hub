@@ -32,7 +32,7 @@ class DiscountRepository extends BaseRepository
             ->from($this->getEntityName(), 'e')
             ->leftJoin('e.channeledDiscounts', 'd')
             ->leftJoin('d.channeledPriceRule', 'pr');
-            // ->leftJoin('d.channeledOrders', 'o');
+        // ->leftJoin('d.channeledOrders', 'o');
     }
 
     /**

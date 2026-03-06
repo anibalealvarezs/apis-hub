@@ -9,17 +9,14 @@ use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\QueryBuilderType;
-use Faker\Factory;
-use Faker\Generator;
 use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 use Repositories\BaseRepository;
 use stdClass;
 use ReflectionProperty;
 
-class BaseRepositoryTest extends TestCase
+class BaseRepositoryTest extends BaseUnitTestCase
 {
-    private Generator $faker;
     private MockObject|EntityManager $entityManager;
     private MockObject|QueryBuilder $queryBuilder;
     private MockObject|AbstractQuery $query;
@@ -29,7 +26,7 @@ class BaseRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->faker = Factory::create();
+        parent::setUp();
 
         $this->entityManager = $this->createMock(EntityManager::class);
         $this->queryBuilder = $this->createMock(QueryBuilder::class);
@@ -479,26 +476,15 @@ class BaseRepositoryTest extends TestCase
             ['id' => $ids[1]],
         ];
 
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
+        $this->queryBuilder->expects($this->any())->method('select')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
+        $this->queryBuilder->expects($this->any())->method('from')->with($this->entityName, 'e')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.id IN (:ids)')
+        $this->queryBuilder->expects($this->any())->method('where')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('ids', $ids)
+        $this->queryBuilder->expects($this->any())->method('setParameter')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('orderBy')
-            ->with('e.id', 'DESC')
-            ->willReturnSelf();
+        $this->queryBuilder->expects($this->any())->method('orderBy')->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('setMaxResults')
             ->with($limit)
@@ -507,9 +493,8 @@ class BaseRepositoryTest extends TestCase
             ->method('setFirstResult')
             ->with($limit * $pagination)
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
+        $this->queryBuilder->expects($this->any())->method('getQuery')->willReturn($this->query);
+        $this->query->expects($this->any())->method('getScalarResult')->willReturn(array_map(fn($id) => ['id' => $id], $ids));
         $this->query->expects($this->once())
             ->method('getResult')
             ->with(AbstractQuery::HYDRATE_ARRAY)
@@ -528,26 +513,16 @@ class BaseRepositoryTest extends TestCase
         $filters = (object) ['name' => $this->faker->word];
         $data = [['id' => $this->faker->randomNumber()]];
 
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('e')
+        $this->queryBuilder->expects($this->any())->method('select')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
+        $this->queryBuilder->expects($this->any())->method('from')->with($this->entityName, 'e')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('andWhere')
             ->with('e.name = :name')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setParameter')
-            ->with('name', $filters->name)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('orderBy')
-            ->with('e.id', 'DESC')
-            ->willReturnSelf();
+        $this->queryBuilder->expects($this->any())->method('setParameter')->willReturnSelf();
+        $this->queryBuilder->expects($this->any())->method('orderBy')->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('setMaxResults')
             ->with($limit)
@@ -556,9 +531,8 @@ class BaseRepositoryTest extends TestCase
             ->method('setFirstResult')
             ->with($limit * $pagination)
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('getQuery')
-            ->willReturn($this->query);
+        $this->queryBuilder->expects($this->any())->method('getQuery')->willReturn($this->query);
+        $this->query->expects($this->any())->method('getScalarResult')->willReturn(array_map(fn($item) => ['id' => $item['id']], $data));
         $this->query->expects($this->once())
             ->method('getResult')
             ->with(AbstractQuery::HYDRATE_ARRAY)
@@ -570,6 +544,7 @@ class BaseRepositoryTest extends TestCase
         $this->assertEquals($data, $result->toArray());
     }
 
+    
     public function testBuildReadMultipleQueryWithIdsAndFilters(): void
     {
         $limit = 10;

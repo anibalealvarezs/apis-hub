@@ -67,7 +67,9 @@ class CustomerRequests implements RequestInterface
         ?string $createdAtMax = null,
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true, ?int $jobId = null): Response {
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -89,7 +91,7 @@ class CustomerRequests implements RequestInterface
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
             pageInfo: $filters->pageInfo ?? null,
-            callback: function($customers) use ($jobId) {
+            callback: function ($customers) use ($jobId) {
                 Helpers::checkJobStatus($jobId);
                 self::process(ShopifyConvert::customers($customers));
             }
@@ -112,7 +114,9 @@ class CustomerRequests implements RequestInterface
         ?string $createdAtMax = null,
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true, ?int $jobId = null): Response {
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
         $config = Helpers::getChannelsConfig()['klaviyo'];
         $klaviyoClient = new KlaviyoApi(
             apiKey: $config['klaviyo_api_key'],
@@ -154,7 +158,7 @@ class CustomerRequests implements RequestInterface
                 ]
             ],
             sortField: 'created',
-            callback: function($customers) use ($jobId) {
+            callback: function ($customers) use ($jobId) {
                 Helpers::checkJobStatus($jobId);
                 self::process(KlaviyoConvert::customers($customers));
             }
@@ -195,7 +199,9 @@ class CustomerRequests implements RequestInterface
         ?string $createdAtMin = null,
         ?string $createdAtMax = null,
         ?object $filters = null,
-        string|bool $resume = true, ?int $jobId = null): Response {
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
             consumerId: $config['netsuite_consumer_id'],
@@ -261,7 +267,7 @@ class CustomerRequests implements RequestInterface
         $query .= " ORDER BY Entity.id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
             query: $query,
-            callback: function($customers) use ($jobId) {
+            callback: function ($customers) use ($jobId) {
                 Helpers::checkJobStatus($jobId);
                 self::process(NetSuiteConvert::customers($customers));
             }
@@ -335,21 +341,21 @@ class CustomerRequests implements RequestInterface
     {
         try {
             $manager = Helpers::getManager();
-            
+
             $result = \Classes\CustomerProcessor::processCustomers($channeledCollection, $manager);
-            
+
             if (!empty($result)) {
                 $cacheService = CacheService::getInstance(Helpers::getRedisClient());
                 $entities = [
                     'Customer' => $result['emails'],
                     'ChanneledCustomer' => $result['platformIds'],
                 ];
-                
+
                 // Taking the first channel processed
-                $channelName = Channel::from(reset($result['channels']))->getName(); 
-                
+                $channelName = Channel::from(reset($result['channels']))->getName();
+
                 $cacheService->invalidateMultipleEntities(
-                    array_filter($entities, fn($value) => !empty($value)),
+                    array_filter($entities, fn ($value) => !empty($value)),
                     $channelName
                 );
             }

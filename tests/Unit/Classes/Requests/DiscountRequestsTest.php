@@ -5,9 +5,9 @@ namespace Tests\Unit\Classes\Requests;
 use Classes\Requests\DiscountRequests;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 
-class DiscountRequestsTest extends TestCase
+class DiscountRequestsTest extends BaseUnitTestCase
 {
     public function testSupportedChannels(): void
     {

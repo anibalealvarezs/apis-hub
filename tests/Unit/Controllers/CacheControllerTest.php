@@ -6,20 +6,17 @@ use Controllers\CacheController;
 use Doctrine\ORM\EntityManager;
 use Enums\Channel;
 use Exception;
-use Faker\Factory;
-use Faker\Generator;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 use ReflectionException;
 use Symfony\Component\HttpFoundation\Response;
 
-class CacheControllerTest extends TestCase
+class CacheControllerTest extends BaseUnitTestCase
 {
-    private Generator $faker;
     private ConcreteCacheController $controller;
 
     protected function setUp(): void
     {
-        $this->faker = Factory::create();
+        parent::setUp();
 
         // Mock EntityManager
         $entityManager = $this->createMock(EntityManager::class);
@@ -74,7 +71,7 @@ class CacheControllerTest extends TestCase
     {
         $body = json_encode(['filters' => ['key' => 'value'], 'other' => 'data']);
         $params = ['extra' => 'param'];
-        // Note: The new implementation uses Reflection to filter params. 
+        // Note: The new implementation uses Reflection to filter params.
         // We'll mock a simple class to test this.
         $expected = [
             'filters' => (object) ['key' => 'value', 'other' => 'data', 'extra' => 'param']

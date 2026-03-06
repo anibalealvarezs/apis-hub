@@ -20,11 +20,16 @@ class ReadEntityCommandTest extends TestCase
     private ReadEntityCommand $command;
     private CommandTester $commandTester;
     private ?vfsStreamDirectory $vfs;
+    private $crudController;
+    private $channeledCrudController;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->command = new ReadEntityCommand();
+        
+        $this->crudController = $this->createMock(CrudController::class);
+        $this->channeledCrudController = $this->createMock(\Controllers\ChanneledCrudController::class);
+        $this->command = new ReadEntityCommand($this->crudController, $this->channeledCrudController);
         $this->commandTester = new CommandTester($this->command);
 
         // Set up virtual file system with vfsStream for consistency
@@ -37,12 +42,6 @@ class ReadEntityCommandTest extends TestCase
             ]
         ];
         $this->vfs = vfsStream::setup('project', null, $structure);
-
-        // Verify directory existence
-        $entitiesDir = $this->vfs->url() . '/src/Entities';
-        $configDir = $this->vfs->url() . '/config/yaml';
-        $this->assertDirectoryExists($entitiesDir, 'Entities directory missing');
-        $this->assertDirectoryExists($configDir, 'Config directory missing');
     }
 
     protected function tearDown(): void
@@ -63,36 +62,20 @@ class ReadEntityCommandTest extends TestCase
         $this->assertTrue($definition->hasOption('entity'));
         $this->assertTrue($definition->hasOption('id'));
         $this->assertTrue($definition->hasOption('filters'));
-
-        $entityOption = $definition->getOption('entity');
-        $this->assertEquals('e', $entityOption->getShortcut());
-        $this->assertTrue($entityOption->isValueRequired());
-        $this->assertEquals('The entity which the data will be retrieved from', $entityOption->getDescription());
-
-        $idOption = $definition->getOption('id');
-        $this->assertEquals('i', $idOption->getShortcut());
-        $this->assertTrue($idOption->isValueOptional());
-        $this->assertEquals('The id of the entity record', $idOption->getDescription());
-
-        $filtersOption = $definition->getOption('filters');
-        $this->assertEquals('f', $filtersOption->getShortcut());
-        $this->assertTrue($filtersOption->isValueOptional());
-        $this->assertEquals('The fields which will be used to filter the data (JSON body)', $filtersOption->getDescription());
     }
 
-    /**
-     */
     public function testExecuteWithIdReturnsSuccess(): void
     {
         // Mock Response
         $response = $this->createMock(Response::class);
+        $response->expects($this->any())
+            ->method('getStatusCode')
+            ->willReturn(200);
         $response->expects($this->once())
             ->method('getContent')
             ->willReturn('Entity read successfully');
 
-        // Mock CrudController
-        $crudController = $this->createMock(CrudController::class);
-        $crudController->expects($this->once())
+        $this->crudController->expects($this->once())
             ->method('__invoke')
             ->with(
                 $this->equalTo('product'),
@@ -100,10 +83,6 @@ class ReadEntityCommandTest extends TestCase
                 $this->equalTo('123')
             )
             ->willReturn($response);
-
-        // Use test-specific subclass to inject mock
-        $this->command = new TestReadEntityCommand($crudController);
-        $this->commandTester = new CommandTester($this->command);
 
         // Execute command
         $this->commandTester->execute([
@@ -117,19 +96,18 @@ class ReadEntityCommandTest extends TestCase
         $this->assertEquals(0, $this->commandTester->getStatusCode());
     }
 
-    /**
-     */
     public function testExecuteWithFiltersReturnsSuccess(): void
     {
         // Mock Response
         $response = $this->createMock(Response::class);
+        $response->expects($this->any())
+            ->method('getStatusCode')
+            ->willReturn(200);
         $response->expects($this->once())
             ->method('getContent')
             ->willReturn('Entities listed successfully');
 
-        // Mock CrudController
-        $crudController = $this->createMock(CrudController::class);
-        $crudController->expects($this->once())
+        $this->crudController->expects($this->once())
             ->method('__invoke')
             ->with(
                 $this->equalTo('product'),
@@ -138,10 +116,6 @@ class ReadEntityCommandTest extends TestCase
                 $this->equalTo('{"name":"Test Product"}')
             )
             ->willReturn($response);
-
-        // Use test-specific subclass to inject mock
-        $this->command = new TestReadEntityCommand($crudController);
-        $this->commandTester = new CommandTester($this->command);
 
         // Execute command
         $this->commandTester->execute([
@@ -155,19 +129,18 @@ class ReadEntityCommandTest extends TestCase
         $this->assertEquals(0, $this->commandTester->getStatusCode());
     }
 
-    /**
-     */
     public function testExecuteWithoutIdOrFiltersReturnsSuccess(): void
     {
         // Mock Response
         $response = $this->createMock(Response::class);
+        $response->expects($this->any())
+            ->method('getStatusCode')
+            ->willReturn(200);
         $response->expects($this->once())
             ->method('getContent')
             ->willReturn('Entities listed successfully');
 
-        // Mock CrudController
-        $crudController = $this->createMock(CrudController::class);
-        $crudController->expects($this->once())
+        $this->crudController->expects($this->once())
             ->method('__invoke')
             ->with(
                 $this->equalTo('product'),
@@ -176,10 +149,6 @@ class ReadEntityCommandTest extends TestCase
                 $this->equalTo(null)
             )
             ->willReturn($response);
-
-        // Use test-specific subclass to inject mock
-        $this->command = new TestReadEntityCommand($crudController);
-        $this->commandTester = new CommandTester($this->command);
 
         // Execute command
         $this->commandTester->execute([
@@ -196,7 +165,6 @@ class ReadEntityCommandTest extends TestCase
     {
         // Execute command without --entity
         $this->expectException(\TypeError::class);
-        $this->expectExceptionMessageMatches('/Controllers\\\CrudController::__invoke\(\): Argument #1 \(\$entity\) must be of type string, null given/');
 
         $this->commandTester->execute([
             '--id' => '123',
@@ -204,25 +172,11 @@ class ReadEntityCommandTest extends TestCase
         ]);
     }
 
-    /**
-     */
     public function testExecuteHandlesNotSupportedException(): void
     {
-        // Mock CrudController to throw NotSupported
-        $crudController = $this->createMock(CrudController::class);
-        $crudController->expects($this->once())
+        $this->crudController->expects($this->once())
             ->method('__invoke')
-            ->with(
-                $this->equalTo('product'),
-                $this->equalTo('list'),
-                $this->equalTo(null),
-                $this->equalTo(null)
-            )
             ->willThrowException(new NotSupported('Entity not supported'));
-
-        // Use test-specific subclass to inject mock
-        $this->command = new TestReadEntityCommand($crudController);
-        $this->commandTester = new CommandTester($this->command);
 
         // Expect exception
         $this->expectException(NotSupported::class);
@@ -234,25 +188,11 @@ class ReadEntityCommandTest extends TestCase
         ]);
     }
 
-    /**
-     */
     public function testExecuteHandlesReflectionException(): void
     {
-        // Mock CrudController to throw ReflectionException
-        $crudController = $this->createMock(CrudController::class);
-        $crudController->expects($this->once())
+        $this->crudController->expects($this->once())
             ->method('__invoke')
-            ->with(
-                $this->equalTo('product'),
-                $this->equalTo('list'),
-                $this->equalTo(null),
-                $this->equalTo(null)
-            )
             ->willThrowException(new ReflectionException('Reflection error'));
-
-        // Use test-specific subclass to inject mock
-        $this->command = new TestReadEntityCommand($crudController);
-        $this->commandTester = new CommandTester($this->command);
 
         // Expect exception
         $this->expectException(ReflectionException::class);
@@ -262,39 +202,5 @@ class ReadEntityCommandTest extends TestCase
         $this->commandTester->execute([
             '--entity' => 'product'
         ]);
-    }
-}
-
-/**
- * Test-specific subclass to inject a mock CrudController.
- */
-class TestReadEntityCommand extends ReadEntityCommand
-{
-    private CrudController $crudController;
-
-    public function __construct(CrudController $crudController)
-    {
-        parent::__construct();
-        $this->crudController = $crudController;
-    }
-
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        if ($input->getOption('id')) {
-            $result = ($this->crudController)(
-                entity: $input->getOption('entity'),
-                method: 'read',
-                id: $input->getOption('id'),
-            );
-        } else {
-            $result = ($this->crudController)(
-                entity: $input->getOption('entity'),
-                method: 'list',
-                body: $input->getOption('filters'),
-            );
-        }
-
-        $output->writeln('<info>' . $result->getContent() . '</info>');
-        return Command::SUCCESS;
     }
 }

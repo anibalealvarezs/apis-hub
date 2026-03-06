@@ -74,7 +74,7 @@ class DiscountRepositoryTest extends TestCase
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(2))
             ->method('addSelect')
-            ->with($this->callback(function ($arg) use (&$addSelectCallCount,) {
+            ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
                 $addSelectExpected = ['d', 'pr'];
                 $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg);
                 $addSelectCallCount++;
@@ -114,7 +114,7 @@ class DiscountRepositoryTest extends TestCase
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(2))
             ->method('addSelect')
-            ->with($this->callback(function ($arg) use (&$addSelectCallCount,) {
+            ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
                 $addSelectExpected = ['d', 'pr'];
                 $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg);
                 $addSelectCallCount++;

@@ -75,9 +75,9 @@ class VendorRepository extends BaseRepository
 
     private function replaceChannelName(array $entity): array
     {
-        $entity['channeledVendors'] = array_map(function($channelVendor) {
+        $entity['channeledVendors'] = array_map(function ($channelVendor) {
             $channelVendor['channel'] = Channel::from($channelVendor['channel'])->getName();
-            $channelVendor['channeledProducts'] = array_map(function($channeledProduct) {
+            $channelVendor['channeledProducts'] = array_map(function ($channeledProduct) {
                 unset($channeledProduct['channel']);
                 return $channeledProduct;
             }, $channelVendor['channeledProducts']);

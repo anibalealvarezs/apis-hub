@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . "/../vendor/autoload.php";
+
+$cliConfig = \Helpers\Helpers::getCliConfig();
+ini_set('memory_limit', $cliConfig['memory_limit'] ?? '1G');
+
 use Commands\Crud\CreateEntityCommand;
 use Commands\Crud\DeleteEntityCommand;
 use Commands\Crud\ReadEntityCommand;
@@ -32,7 +37,11 @@ $cli->addCommands([
     new ReadEntityCommand(),
     new UpdateEntityCommand(),
     new GenerateEntitiesConfigCommand(),
-    new InitializeEntitiesCommand(Helpers::getManager())
+    new InitializeEntitiesCommand(Helpers::getManager()),
+    new \Commands\Analytics\CacheEntityCommand(),
+    new \Commands\Analytics\ProcessJobsCommand(),
+    new \Commands\HealthCheckCommand(),
+    new \Commands\Crud\AggregateEntityCommand()
 ]);
 
 // Runs console application

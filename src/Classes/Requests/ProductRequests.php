@@ -75,7 +75,9 @@ class ProductRequests implements RequestInterface
         string|int|null $collectionId = null,
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true, ?int $jobId = null): Response {
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -106,7 +108,7 @@ class ProductRequests implements RequestInterface
             updatedAtMax: $filters->updatedAtMax ?? null,
             vendor: $filters->vendor ?? null,
             pageInfo: $filters->pageInfo ?? null,
-            callback: function($products) use ($jobId) {
+            callback: function ($products) use ($jobId) {
                 Helpers::checkJobStatus($jobId);
                 self::process(ShopifyConvert::products($products));
             }
@@ -124,7 +126,9 @@ class ProductRequests implements RequestInterface
     public static function getListFromKlaviyo(
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true, ?int $jobId = null): Response {
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
         $config = Helpers::getChannelsConfig()['klaviyo'];
         $klaviyoClient = new KlaviyoApi(
             apiKey: $config['klaviyo_api_key'],
@@ -247,10 +251,10 @@ class ProductRequests implements RequestInterface
         $query .= " ORDER BY Item.id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
             query: $query,
-            callback: function($products) use ($netsuiteClient, $config, $jobId) {
+            callback: function ($products) use ($netsuiteClient, $config, $jobId) {
                 Helpers::checkJobStatus($jobId);
                 $convertedProductsArray = NetSuiteConvert::products($products)->toArray();
-                $productsIds = array_map(function($product) {
+                $productsIds = array_map(function ($product) {
                     return $product->platformId;
                 }, $convertedProductsArray);
                 if (!empty($productsIds)) {
@@ -263,7 +267,7 @@ class ProductRequests implements RequestInterface
                         usleep(500000); // Delay to prevent rate limit issues between the `images` and `items` queries
                     }
                     $keyedImages = [];
-                    foreach($images['items'] as $image) {
+                    foreach ($images['items'] as $image) {
                         if (!isset($keyedImages[$image['item']])) {
                             $keyedImages[$image['item']] = [];
                         }
@@ -272,16 +276,16 @@ class ProductRequests implements RequestInterface
                             'url' => $config['netsuite_store_base_url'] . (!str_ends_with($config['netsuite_store_base_url'], '/') ? '/' : '') . 'site/images/' . $image['name'],
                         ];
                     }
-                    foreach($convertedProductsArray as &$product) {
-                        $product->data['images'] = array_map(function($image) {
+                    foreach ($convertedProductsArray as &$product) {
+                        $product->data['images'] = array_map(function ($image) {
                             return $image['url'];
                         }, $keyedImages[$product->platformId] ?? []);
-                        foreach($product->variants as &$variant) {
+                        foreach ($product->variants as &$variant) {
                             $variant->data['images'] = [];
                             if (!isset($keyedImages[$product->platformId])) {
                                 continue;
                             }
-                            foreach($keyedImages[$product->platformId] as $image) {
+                            foreach ($keyedImages[$product->platformId] as $image) {
                                 $cleanNameArray = explode('.', $image['name']);
                                 if (str_starts_with($variant->sku, $cleanNameArray[0])) {
                                     $variant->data['images'][] = $image['url'];
@@ -316,9 +320,9 @@ class ProductRequests implements RequestInterface
     {
         try {
             $manager = Helpers::getManager();
-            
+
             $result = \Classes\ProductProcessor::processProducts($channeledCollection, $manager);
-            
+
             if (!empty($result)) {
                 $cacheService = CacheService::getInstance(redisClient: Helpers::getRedisClient());
                 $entities = [
@@ -331,11 +335,11 @@ class ProductRequests implements RequestInterface
                     'ProductCategory' => $result['productCategories'],
                     // 'ChanneledProductCategory' => $categoryIds['channeledProductCategoryIds'],
                 ];
-                
-                $channelName = Channel::from(reset($result['channels']))->getName(); 
-                
+
+                $channelName = Channel::from(reset($result['channels']))->getName();
+
                 $cacheService->invalidateMultipleEntities(
-                    entities: array_filter($entities, fn($value) => !empty($value)),
+                    entities: array_filter($entities, fn ($value) => !empty($value)),
                     channel: $channelName
                 );
             }

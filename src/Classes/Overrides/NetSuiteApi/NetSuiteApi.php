@@ -17,8 +17,7 @@ class NetSuiteApi extends \Anibalealvarezs\NetSuiteApi\NetSuiteApi
         string $query,
         int $limit = 1000,
         callable $callback = null,
-    ): void
-    {
+    ): void {
         $offset = 0;
         do {
             $response = $this->getSuiteQLQuery($query, $offset, $limit);

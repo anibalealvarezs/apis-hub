@@ -1,4 +1,5 @@
 <?php
+
 // cli-config.php
 use Doctrine\ORM\Tools\Console\Helper\EntityManagerHelper;
 use Helpers\Helpers;

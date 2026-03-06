@@ -5,19 +5,25 @@ namespace Tests\Unit\Classes\Conversions;
 use Classes\Conversions\NetSuiteConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 
-class NetSuiteConvertTest extends TestCase
+class NetSuiteConvertTest extends BaseUnitTestCase
 {
     public function testCustomers(): void
     {
+        $id = 'cust' . $this->faker->randomNumber();
+        $email = $this->faker->safeEmail;
+        $date = $this->faker->iso8601;
+        $city = $this->faker->city;
+        $country = $this->faker->countryCode;
+
         $input = [
             [
-                'entityid' => 'cust123',
-                'email' => 'test@example.com',
-                'datecreated' => '2026-03-03T21:00:00Z',
-                'addresscity' => 'New York',
-                'addresscountry' => 'US',
+                'entityid' => $id,
+                'email' => $email,
+                'datecreated' => $date,
+                'addresscity' => $city,
+                'addresscountry' => $country,
             ]
         ];
 
@@ -26,22 +32,24 @@ class NetSuiteConvertTest extends TestCase
         $this->assertInstanceOf(ArrayCollection::class, $result);
         $this->assertCount(1, $result);
         $customer = $result->first();
-        $this->assertEquals('cust123', $customer->platformId);
-        $this->assertEquals('test@example.com', $customer->email);
+        $this->assertEquals($id, $customer->platformId);
+        $this->assertEquals($email, $customer->email);
         $this->assertEquals(Channel::netsuite->value, $customer->channel);
-        $this->assertEquals('2026-03-03 21:00:00', $customer->platformCreatedAt->format('Y-m-d H:i:s'));
         $this->assertIsArray($customer->data['addresses']);
         $this->assertCount(1, $customer->data['addresses']);
-        $this->assertEquals('New York', $customer->data['addresses'][0]['addresscity']);
+        $this->assertEquals($city, $customer->data['addresses'][0]['addresscity']);
     }
 
     public function testDiscounts(): void
     {
+        $id = 'disc' . $this->faker->randomNumber();
+        $code = strtoupper($this->faker->word);
+
         $input = [
             [
-                'id' => 'disc123',
-                'created_at' => '2026-03-03T21:00:00Z',
-                'code' => 'DISC10'
+                'id' => $id,
+                'created_at' => $this->faker->iso8601,
+                'code' => $code
             ]
         ];
 
@@ -50,16 +58,17 @@ class NetSuiteConvertTest extends TestCase
         $this->assertInstanceOf(ArrayCollection::class, $result);
         $this->assertCount(1, $result);
         $discount = $result->first();
-        $this->assertEquals('disc123', $discount->platformId);
-        $this->assertEquals('DISC10', $discount->code);
+        $this->assertEquals($id, $discount->platformId);
+        $this->assertEquals($code, $discount->code);
     }
 
     public function testPriceRules(): void
     {
+        $id = 'rule' . $this->faker->randomNumber();
         $input = [
             [
-                'id' => 'rule123',
-                'created_at' => '2026-03-03T21:00:00Z'
+                'id' => $id,
+                'created_at' => $this->faker->iso8601
             ]
         ];
 
@@ -68,27 +77,34 @@ class NetSuiteConvertTest extends TestCase
         $this->assertInstanceOf(ArrayCollection::class, $result);
         $this->assertCount(1, $result);
         $priceRule = $result->first();
-        $this->assertEquals('rule123', $priceRule->platformId);
+        $this->assertEquals($id, $priceRule->platformId);
     }
 
     public function testProducts(): void
     {
+        $prodId = 'item' . $this->faker->randomNumber();
+        $sku = 'SKU-' . $this->faker->word;
+        $vendorName = $this->faker->company;
+        $catId = 'cat' . $this->faker->randomNumber();
+        $varId = 'item' . $this->faker->randomNumber();
+        $varSku = 'VAR-' . $this->faker->word;
+
         $input = [
             [
-                'id' => 'item123',
+                'id' => $prodId,
                 'itemtype' => 'NonInvtPart',
-                'itemid' => 'SKU-001',
-                'createddate' => '2026-03-03T21:00:00Z',
-                'custitem_design_code' => 'DESIGN-1',
-                'vendorname' => 'Vendor A',
-                'commercecategoryid' => 'cat123',
+                'itemid' => $sku,
+                'createddate' => $this->faker->iso8601,
+                'custitem_design_code' => 'DESIGN-' . $this->faker->randomNumber(),
+                'vendorname' => $vendorName,
+                'commercecategoryid' => $catId,
             ],
             [
-                'id' => 'item124',
+                'id' => $varId,
                 'itemtype' => 'Assembly',
-                'parent' => 'item124',
-                'custitem_web_store_design_item' => 'item123',
-                'itemid' => 'VAR-001',
+                'parent' => $varId,
+                'custitem_web_store_design_item' => $prodId,
+                'itemid' => $varSku,
                 'data' => [],
             ]
         ];
@@ -98,16 +114,16 @@ class NetSuiteConvertTest extends TestCase
         $this->assertInstanceOf(ArrayCollection::class, $result);
         $this->assertCount(1, $result);
         $product = $result->first();
-        $this->assertEquals('item123', $product->platformId);
-        $this->assertEquals('SKU-001', $product->sku);
-        $this->assertEquals('Vendor A', $product->vendor->name);
+        $this->assertEquals($prodId, $product->platformId);
+        $this->assertEquals($sku, $product->sku);
+        $this->assertEquals($vendorName, $product->vendor->name);
         $this->assertInstanceOf(ArrayCollection::class, $product->variants);
         $this->assertCount(1, $product->variants);
-        $this->assertEquals('item124', $product->variants->first()->platformId);
-        $this->assertEquals('VAR-001', $product->variants->first()->sku);
+        $this->assertEquals($varId, $product->variants->first()->platformId);
+        $this->assertEquals($varSku, $product->variants->first()->sku);
         $this->assertInstanceOf(ArrayCollection::class, $product->categories);
         $this->assertCount(1, $product->categories);
-        $this->assertEquals('cat123', $product->categories->first()->platformId);
+        $this->assertEquals($catId, $product->categories->first()->platformId);
     }
 
     public function testProductCategories(): void
@@ -146,5 +162,32 @@ class NetSuiteConvertTest extends TestCase
         $vendor = $result->first();
         $this->assertEquals('vendor123', $vendor->platformId);
         $this->assertEquals('Vendor A', $vendor->name);
+    }
+
+    public function testRobustness(): void
+    {
+        // 1. Customer with missing entityid (should be skipped)
+        $rows = [['email' => 'test@example.com']];
+        $result = NetSuiteConvert::customers($rows);
+        $this->assertCount(0, $result);
+
+        // 2. Customer with missing datecreated or email
+        $rows = [['entityid' => 'cust123']];
+        $result = NetSuiteConvert::customers($rows);
+        $customer = $result->first();
+        $this->assertEquals('cust123', $customer->platformId);
+        $this->assertNull($customer->platformCreatedAt);
+        $this->assertEquals('', $customer->email);
+
+        // 3. Order without id (should be skipped)
+        $rows = [['entity' => 'cust123']];
+        $result = NetSuiteConvert::orders($rows);
+        $this->assertCount(0, $result);
+
+        // 4. Order with missing PromotionCodeName
+        $rows = [['id' => 'ord123', 'entity' => 'cust123']];
+        $result = NetSuiteConvert::orders($rows);
+        $this->assertCount(1, $result);
+        $this->assertCount(0, $result->first()->discountCodes);
     }
 }

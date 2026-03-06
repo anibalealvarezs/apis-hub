@@ -45,11 +45,11 @@ class ChanneledOrderRepository extends ChanneledBaseRepository
     {
         $entity['channel'] = Channel::from($entity['channel'])->getName();
         unset($entity['channeledCustomer']['channel']);
-        $entity['channeledProducts'] = array_map(function($channeledProduct) {
+        $entity['channeledProducts'] = array_map(function ($channeledProduct) {
             $channeledProduct['channel'] = Channel::from($channeledProduct['channel'])->getName();
             return $channeledProduct;
         }, $entity['channeledProducts']);
-        $entity['channeledDiscounts'] = array_map(function($channeledDiscount) {
+        $entity['channeledDiscounts'] = array_map(function ($channeledDiscount) {
             $channeledDiscount['channel'] = Channel::from($channeledDiscount['channel'])->getName();
             return $channeledDiscount;
         }, $entity['channeledDiscounts']);

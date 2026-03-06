@@ -13,6 +13,17 @@ return [
             );
         }
     ],
+    '/entity/{entity}/aggregate' => [
+        'httpMethod' => 'POST',
+        'callable' => function (string $entity, ?string $body = null, ?array $params = null) {
+            return (new CrudController())(
+                entity: $entity,
+                method: 'aggregate',
+                body: $body,
+                params: $params
+            );
+        }
+    ],
     '/entity/{entity}/count' => [
         'httpMethod' => 'GET',
         'callable' => function (string $entity, ?string $body = null, ?array $params = null) {

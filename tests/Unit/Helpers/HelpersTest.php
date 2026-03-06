@@ -3,25 +3,34 @@
 namespace Tests\Unit\Helpers;
 
 use DateTime;
-use Faker\Factory;
-use Faker\Generator;
 use Helpers\Helpers;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 use Predis\ClientInterface;
 use ReflectionClass;
 use ReflectionException;
 use Doctrine\ORM\EntityManager;
 use Entities\Entity;
 
-class HelpersTest extends TestCase
+class HelpersTest extends BaseUnitTestCase
 {
-    private Generator $faker;
 
     protected function setUp(): void
     {
-        $this->faker = Factory::create();
+        parent::setUp();
 
-        // Reset static properties before each test
+        $this->resetHelpers();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->resetHelpers();
+
+        parent::tearDown();
+    }
+
+    private function resetHelpers(): void
+    {
+        // Reset static properties before/after each test to prevent state leakage
         $reflection = new ReflectionClass(Helpers::class);
         foreach ($reflection->getProperties(\ReflectionProperty::IS_STATIC) as $property) {
             $property->setValue(null, null);
@@ -47,7 +56,7 @@ class HelpersTest extends TestCase
      */
     public function testListPrivateProperties(): void
     {
-        $testObject = new class {
+        $testObject = new class () {
             /** @phpstan-ignore-next-line */
             private $privateProp;
             protected $protectedProp;
@@ -86,10 +95,10 @@ class HelpersTest extends TestCase
      */
     public function testGetManager(): void
     {
-        // We avoid hardcoding credentials in the test file. 
+        // We avoid hardcoding credentials in the test file.
         // Helpers::getManager() will load the configuration from config/yaml/dbconfig.yaml
         $entityManager = Helpers::getManager();
-        
+
         $this->assertInstanceOf(EntityManager::class, $entityManager);
         $this->assertTrue($entityManager->isOpen());
     }
@@ -136,19 +145,24 @@ class HelpersTest extends TestCase
 
             public function getId(): ?int
             {
-                return $this->id; }
+                return $this->id;
+            }
             public function getName(): string
             {
-                return $this->name; }
+                return $this->name;
+            }
             public function getCreatedAt(): DateTime
             {
-                return $this->createdAt; }
+                return $this->createdAt;
+            }
             public function getUpdatedAt(): ?DateTime
             {
-                return $this->updatedAt; }
+                return $this->updatedAt;
+            }
             public function getDeletedAt(): ?DateTime
             {
-                return $this->deletedAt; }
+                return $this->deletedAt;
+            }
         };
 
         $result = Helpers::jsonSerialize($entity);

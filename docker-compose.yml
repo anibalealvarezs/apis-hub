@@ -1,55 +1,101 @@
-version: '3.8'
-
 services:
-  app:
+  gsc-jan:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
+    env_file:
+      -
+        path: ./config/channelsconfig.env
+        required: false
     environment:
       - PORT=8080
+      - API_SOURCE=gsc
+      - API_ENTITY=metric
       - DB_DRIVER=pdo_mysql
-      - DB_HOST=db
+      - DB_HOST=host.docker.internal
       - DB_PORT=3306
       - DB_USER=root
-      - DB_PASSWORD=root
-      - DB_NAME=apis-hub
+      - DB_PASSWORD=NoEntiendo2321
+      - DB_NAME=apis-hub-3
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - START_DATE=2026-01-01
+      - END_DATE=2026-01-31
+    volumes:
+      - './:/app'
+      - /app/vendor
+    depends_on:
+      - redis
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '8081:8080'
+  gsc-feb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      -
+        path: ./config/channelsconfig.env
+        required: false
+    environment:
+      - PORT=8080
+      - API_SOURCE=gsc
+      - API_ENTITY=metric
+      - DB_DRIVER=pdo_mysql
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=NoEntiendo2321
+      - DB_NAME=apis-hub-3
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - START_DATE=2026-02-01
+      - END_DATE=2026-02-28
+    volumes:
+      - './:/app'
+      - /app/vendor
+    depends_on:
+      - redis
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '8082:8080'
+  fb-ads:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      -
+        path: ./config/channelsconfig.env
+        required: false
+    environment:
+      - PORT=8080
+      - API_SOURCE=fb-ads
+      - API_ENTITY=channeled_campaign
+      - DB_DRIVER=pdo_mysql
+      - DB_HOST=host.docker.internal
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=NoEntiendo2321
+      - DB_NAME=apis-hub-3
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     volumes:
-        # Montar código local para desarrollo dinámico
-      - ./:/app
+      - './:/app'
+      - /app/vendor
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
-
-  db:
-    image: mysql:8.0
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: apis-hub
+      - redis
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     ports:
-      - "3306:3306"
-    volumes:
-      - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
+      - '8083:8080'
   redis:
-    image: redis:alpine
+    image: 'redis:alpine'
     restart: always
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
-      - redis_data:/data
-
+      - 'redis_data:/data'
 volumes:
-  db_data:
-  redis_data:
+  redis_data: ~

@@ -168,6 +168,40 @@ class BaseControllerTest extends TestCase
         $this->expectExceptionMessage("Entity configuration for '$entity' with key '$configKey' not found");
         $this->controller->getRepository($entity, $configKey);
     }
+
+    public function testPrepareCrudParamsExtractsControlParamsFromBody(): void
+    {
+        $params = ['limit' => 10];
+        $body = json_encode([
+            'filters' => ['name' => 'test'],
+            'aggregations' => ['total' => 'SUM(amount)'],
+            'groupBy' => ['category']
+        ]);
+
+        $result = $this->controller->prepareCrudParams($params, $body);
+
+        $this->assertEquals(10, $result['limit']);
+        $this->assertEquals(['total' => 'SUM(amount)'], (array) $result['aggregations']);
+        $this->assertEquals(['category'], (array) $result['groupBy']);
+        $this->assertEquals('test', $result['filters']->name);
+    }
+
+    public function testPrepareCrudParamsExtractsControlParamsFromFlatBody(): void
+    {
+        $body = json_encode([
+            'status' => 'active',
+            'aggregations' => ['total' => 'SUM(amount)'],
+            'limit' => 5
+        ]);
+
+        $result = $this->controller->prepareCrudParams([], $body);
+
+        $this->assertEquals(['total' => 'SUM(amount)'], (array) $result['aggregations']);
+        $this->assertEquals(5, $result['limit']);
+        $this->assertEquals('active', $result['filters']->status);
+        $this->assertFalse(isset($result['filters']->aggregations));
+        $this->assertFalse(isset($result['filters']->limit));
+    }
 }
 
 // Concrete class to test the abstract BaseController
@@ -225,5 +259,10 @@ class ConcreteBaseController extends BaseController
         return $this->em->getRepository(
             entityName: $config[$entityKey][$configKey]
         );
+    }
+
+    public function prepareCrudParams(?array $params, ?string $body): array
+    {
+        return parent::prepareCrudParams($params, $body);
     }
 }

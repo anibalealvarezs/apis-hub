@@ -77,7 +77,9 @@ class GenerateEntitiesConfigCommand extends Command
 
     private function findPhpFiles(string $dir): \Generator
     {
-        if (!is_dir($dir)) return;
+        if (!is_dir($dir)) {
+            return;
+        }
 
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($dir)
@@ -189,7 +191,7 @@ class GenerateEntitiesConfigCommand extends Command
 
                 $methodInfo = [
                     'parameters' => array_map(
-                        fn($param) => $param->getName(),
+                        fn ($param) => $param->getName(),
                         $method->getParameters()
                     )
                 ];
@@ -217,7 +219,7 @@ class GenerateEntitiesConfigCommand extends Command
 
         if ($type instanceof ReflectionUnionType) {
             return implode('|', array_map(
-                fn($t) => $t->getName(),
+                fn ($t) => $t->getName(),
                 $type->getTypes()
             ));
         }

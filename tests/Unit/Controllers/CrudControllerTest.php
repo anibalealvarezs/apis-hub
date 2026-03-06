@@ -6,21 +6,18 @@ use Controllers\CrudController;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\NotSupported;
 use Exception;
-use Faker\Factory;
-use Faker\Generator;
 use InvalidArgumentException;
 use JsonException;
 use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 
-class CrudControllerTest extends TestCase
+class CrudControllerTest extends BaseUnitTestCase
 {
-    private Generator $faker;
     private MockObject|EntityManager $entityManager;
     private MockObject|CacheService $cacheService;
     private MockObject|CacheKeyGenerator $cacheKeyGenerator;
@@ -28,7 +25,7 @@ class CrudControllerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->faker = Factory::create();
+        parent::setUp();
 
         // Mock dependencies
         $this->entityManager = $this->createMock(EntityManager::class);
@@ -355,10 +352,12 @@ class CrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
         };
@@ -407,6 +406,53 @@ class CrudControllerTest extends TestCase
         );
     }
 
+    public function testAggregateReturnsData(): void
+    {
+        $entity = 'customer';
+        $body = json_encode(['filters' => ['status' => 'active']]);
+        $params = [
+            'aggregations' => ['total' => 'SUM(amount)'],
+            'groupBy' => ['category']
+        ];
+        $expectedData = [['total' => 1000, 'category' => 'finance']];
+
+        // Mock custom repository
+        $repository = $this->getMockBuilder(\stdClass::class)
+            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'aggregate'])
+            ->getMock();
+        $repository->expects($this->once())
+            ->method('aggregate')
+            ->with(
+                ['total' => 'SUM(amount)'],
+                ['category'],
+                $this->callback(fn($filters) => $filters->status === 'active')
+            )
+            ->willReturn($expectedData);
+
+        $this->entityManager->expects($this->once())
+            ->method('getRepository')
+            ->with('Entities\\' . $entity)
+            ->willReturn($repository);
+
+        $this->controller->setMockCrudEntities([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
+        $this->controller->setMockEntitiesConfig([
+            strtolower($entity) => [
+                'class' => 'Entities\\' . $entity,
+                'repository_methods' => [
+                    'aggregate' => ['parameters' => ['filters', 'aggregations', 'groupBy']]
+                ]
+            ]
+        ]);
+
+        $response = $this->controller->aggregate($entity, $body, $params);
+
+        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertEquals(
+            json_encode(['data' => $expectedData, 'status' => 'success', 'error' => null]),
+            $response->getContent()
+        );
+    }
+
     /**
      * @throws NotSupported
      */
@@ -420,16 +466,20 @@ class CrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
-            public function getId() {
+            public function getId()
+            {
                 return $this->data['id'];
             }
-            public function getChannel(): string {
+            public function getChannel(): string
+            {
                 return 'shopify';
             }
         };
@@ -515,23 +565,27 @@ class CrudControllerTest extends TestCase
     public function testUpdateReturnsUpdatedEntity(): void
     {
         $entity = 'customer';
-        $id = $this->faker->randomNumber();
+        $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
         $body = json_encode(['name' => $this->faker->word]);
         $data = ['id' => $id, 'name' => $this->faker->word];
         $channel = 'shopify';
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
-            public function getId() {
+            public function getId()
+            {
                 return $this->data['id'];
             }
-            public function getChannel(): string {
+            public function getChannel(): string
+            {
                 return 'shopify';
             }
         };
@@ -599,7 +653,7 @@ class CrudControllerTest extends TestCase
     public function testDeleteReturnsSuccess(): void
     {
         $entity = 'customer';
-        $id = $this->faker->randomNumber();
+        $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
 
         // Mock custom repository
         $repository = $this->getMockBuilder(stdClass::class)
@@ -662,10 +716,12 @@ class CrudControllerTest extends TestCase
         $id = $this->faker->randomNumber();
         $result = new class ($id) {
             private int $id;
-            public function __construct(int $id) {
+            public function __construct(int $id)
+            {
                 $this->id = $id;
             }
-            public function getId(): int {
+            public function getId(): int
+            {
                 return $this->id;
             }
         };
@@ -690,10 +746,12 @@ class CrudControllerTest extends TestCase
         $channel = 'shopify';
         $result = new class ($channel) {
             private string $channel;
-            public function __construct(string $channel) {
+            public function __construct(string $channel)
+            {
                 $this->channel = $channel;
             }
-            public function getChannel(): string {
+            public function getChannel(): string
+            {
                 return $this->channel;
             }
         };
@@ -791,6 +849,11 @@ class ConcreteCrudController extends CrudController
         return $params;
     }
 
+    public function prepareCrudParams(?array $params, ?string $body): array
+    {
+        return parent::prepareCrudParams($params, $body);
+    }
+
     public function read(string $entity, ?int $id = null, array $hideFields = []): Response
     {
         try {
@@ -798,7 +861,7 @@ class ConcreteCrudController extends CrudController
             $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id);
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->read($id)
+                callback: fn () => $repository->read($id)
             );
 
             return $this->createResponse(
@@ -827,7 +890,7 @@ class ConcreteCrudController extends CrudController
                 $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
                 $count = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn() => $repository->countElements($filters)
+                    callback: fn () => $repository->countElements($filters)
                 );
             }
 
@@ -854,7 +917,7 @@ class ConcreteCrudController extends CrudController
             $cacheKey = 'list_' . $entity . '_' . md5(json_encode(['filters' => $filters, 'extra' => $extra]));
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->readMultiple($filters, $extra)->toArray()
+                callback: fn () => $repository->readMultiple($filters, $extra)->toArray()
             );
 
             return $this->createResponse(
@@ -990,6 +1053,46 @@ class ConcreteCrudController extends CrudController
 
             return $this->createResponse(
                 data: null,
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    public function aggregate(string $entity, ?string $body = null, ?array $params = null): Response
+    {
+        try {
+            $repository = $this->getRepository($entity);
+            $params = $this->prepareCrudParams($params, $body);
+
+            $aggregations = (array) ($params['aggregations'] ?? []);
+            $groupBy = (array) ($params['groupBy'] ?? []);
+
+            if (empty($aggregations)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Missing aggregations parameter',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $data = $repository->aggregate(
+                $aggregations,
+                $groupBy,
+                $params['filters'] ?? null,
+                $params['startDate'] ?? null,
+                $params['endDate'] ?? null
+            );
+
+            return $this->createResponse(
+                data: $data,
                 status: 'success'
             );
         } catch (Exception $e) {

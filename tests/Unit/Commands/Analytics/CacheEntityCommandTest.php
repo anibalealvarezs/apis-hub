@@ -23,7 +23,7 @@ class CacheEntityCommandTest extends TestCase
 
     public function testConfigureSetsCorrectAttributes(): void
     {
-        $this->assertEquals('analytics:cache', $this->command->getName());
+        $this->assertEquals('apis-hub:cache', $this->command->getName());
         $this->assertEquals('Schedule a caching job for an analytics entity.', $this->command->getDescription());
         $this->assertEquals('This command allows you to schedule a caching job for a specific entity and channel, identical to the API endpoint logic.', $this->command->getHelp());
         $this->assertEquals(['app:cache'], $this->command->getAliases());

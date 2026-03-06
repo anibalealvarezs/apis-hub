@@ -6,18 +6,22 @@ use Classes\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use Enums\Period;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 
-class KlaviyoConvertTest extends TestCase
+class KlaviyoConvertTest extends BaseUnitTestCase
 {
     public function testCustomers(): void
     {
+        $id = $this->faker->uuid;
+        $email = $this->faker->safeEmail;
+        $createdAt = $this->faker->iso8601;
+
         $input = [
             [
-                'id' => '123',
+                'id' => $id,
                 'attributes' => [
-                    'created' => '2026-03-03T21:00:00Z',
-                    'email' => 'test@example.com'
+                    'created' => $createdAt,
+                    'email' => $email
                 ]
             ]
         ];
@@ -27,28 +31,34 @@ class KlaviyoConvertTest extends TestCase
         $this->assertInstanceOf(ArrayCollection::class, $result);
         $this->assertCount(1, $result);
         $customer = $result->first();
-        $this->assertEquals('123', $customer->platformId);
-        $this->assertEquals('test@example.com', $customer->email);
+        $this->assertEquals($id, $customer->platformId);
+        $this->assertEquals($email, $customer->email);
         $this->assertEquals(Channel::klaviyo->value, $customer->channel);
-        $this->assertEquals('2026-03-03 21:00:00', $customer->platformCreatedAt->format('Y-m-d H:i:s'));
         $this->assertEquals($input[0], $customer->data);
     }
 
     public function testProducts(): void
     {
+        $prodId = 'prod_' . $this->faker->uuid;
+        $prodSku = 'SKU-' . $this->faker->bothify('??-###');
+        $prodCreated = $this->faker->iso8601;
+        $varId = 'var_' . $this->faker->uuid;
+        $varSku = 'VAR-' . $this->faker->bothify('??-###');
+        $varCreated = $this->faker->iso8601;
+
         $input = [
             [
-                'id' => 'prod_123',
-                'sku' => 'SKU-001',
+                'id' => $prodId,
+                'sku' => $prodSku,
                 'attributes' => [
-                    'created' => '2026-03-03T21:00:00Z'
+                    'created' => $prodCreated
                 ],
                 'included' => [
                     [
-                        'id' => 'var_123',
-                        'sku' => 'VAR-001',
+                        'id' => $varId,
+                        'sku' => $varSku,
                         'attributes' => [
-                            'created' => '2026-03-03T21:00:00Z'
+                            'created' => $varCreated
                         ]
                     ]
                 ]
@@ -60,25 +70,28 @@ class KlaviyoConvertTest extends TestCase
         $this->assertInstanceOf(ArrayCollection::class, $result);
         $this->assertCount(1, $result);
         $product = $result->first();
-        $this->assertEquals('prod_123', $product->platformId);
-        $this->assertEquals('SKU-001', $product->sku);
+        $this->assertEquals($prodId, $product->platformId);
+        $this->assertEquals($prodSku, $product->sku);
         $this->assertEquals(Channel::klaviyo->value, $product->channel);
-        $this->assertEquals('2026-03-03 21:00:00', $product->platformCreatedAt->format('Y-m-d H:i:s'));
         $this->assertEquals($input[0], $product->data);
         $this->assertNull($product->vendor);
         $this->assertInstanceOf(ArrayCollection::class, $product->variants);
         $this->assertCount(1, $product->variants);
-        $this->assertEquals('var_123', $product->variants->first()->platformId);
+        $this->assertEquals($varId, $product->variants->first()->platformId);
     }
 
     public function testProductVariants(): void
     {
+        $id = 'var_' . $this->faker->uuid;
+        $sku = 'VAR-' . $this->faker->bothify('??-###');
+        $createdAt = $this->faker->iso8601;
+
         $input = [
             [
-                'id' => 'var_123',
-                'sku' => 'VAR-001',
+                'id' => $id,
+                'sku' => $sku,
                 'attributes' => [
-                    'created' => '2026-03-03T21:00:00Z'
+                    'created' => $createdAt
                 ]
             ]
         ];
@@ -88,20 +101,22 @@ class KlaviyoConvertTest extends TestCase
         $this->assertInstanceOf(ArrayCollection::class, $result);
         $this->assertCount(1, $result);
         $variant = $result->first();
-        $this->assertEquals('var_123', $variant->platformId);
-        $this->assertEquals('VAR-001', $variant->sku);
+        $this->assertEquals($id, $variant->platformId);
+        $this->assertEquals($sku, $variant->sku);
         $this->assertEquals(Channel::klaviyo->value, $variant->channel);
-        $this->assertEquals('2026-03-03 21:00:00', $variant->platformCreatedAt->format('Y-m-d H:i:s'));
         $this->assertEquals($input[0], $variant->data);
     }
 
     public function testProductCategories(): void
     {
+        $id = 'cat_' . $this->faker->uuid;
+        $createdAt = $this->faker->iso8601;
+
         $input = [
             [
-                'id' => 'cat_123',
+                'id' => $id,
                 'attributes' => [
-                    'created' => '2026-03-03T21:00:00Z'
+                    'created' => $createdAt
                 ]
             ]
         ];
@@ -111,9 +126,40 @@ class KlaviyoConvertTest extends TestCase
         $this->assertInstanceOf(ArrayCollection::class, $result);
         $this->assertCount(1, $result);
         $category = $result->first();
-        $this->assertEquals('cat_123', $category->platformId);
+        $this->assertEquals($id, $category->platformId);
         $this->assertEquals(Channel::klaviyo->value, $category->channel);
-        $this->assertEquals('2026-03-03 21:00:00', $category->platformCreatedAt->format('Y-m-d H:i:s'));
         $this->assertEquals($input[0], $category->data);
+    }
+
+    public function testRobustness(): void
+    {
+        // 1. Customer without email or created date
+        $rows = [
+            [
+                'id' => 'cust_123',
+                'attributes' => [
+                    // email and created are missing
+                ]
+            ]
+        ];
+        $result = KlaviyoConvert::customers($rows);
+        $customer = $result->first();
+        $this->assertEquals('', $customer->email);
+        $this->assertInstanceOf(\DateTime::class, $customer->platformCreatedAt->toDateTime());
+
+        // 2. Product without 'included' variants or 'created' attribute
+        $rows = [
+            [
+                'id' => 'prod_456',
+                'attributes' => [
+                    // created is missing
+                ]
+                // included is missing
+            ]
+        ];
+        $result = KlaviyoConvert::products($rows);
+        $product = $result->first();
+        $this->assertCount(0, $product->variants);
+        $this->assertNull($product->platformCreatedAt);
     }
 }

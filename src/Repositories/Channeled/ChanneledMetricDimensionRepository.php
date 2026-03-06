@@ -15,7 +15,6 @@ use Exception;
 use InvalidArgumentException;
 use Repositories\BaseRepository;
 
-
 class ChanneledMetricDimensionRepository extends BaseRepository
 {
     /**

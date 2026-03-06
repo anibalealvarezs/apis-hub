@@ -5,6 +5,7 @@ namespace Controllers;
 use Doctrine\ORM\Exception\NotSupported;
 use Exception;
 use Helpers\Helpers;
+use InvalidArgumentException;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
@@ -50,8 +51,9 @@ class CrudController extends BaseController
             'list'   => $this->list(entity: $entity, body: $body, params: $params, hideFields: $hideFields),
             'create' => $this->create(entity: $entity, body: $body),
             'update' => $this->update(entity: $entity, id: $id, body: $body),
-            'delete' => $this->delete(entity: $entity, id: $id),
-            default  => $this->createResponse(
+            'delete'    => $this->delete(entity: $entity, id: $id),
+            'aggregate' => $this->aggregate(entity: $entity, body: $body, params: $params),
+            default     => $this->createResponse(
                 data: null,
                 status: 'error',
                 error: 'Method not found',
@@ -90,12 +92,30 @@ class CrudController extends BaseController
             $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id) . ($hideFields ? '_' . implode('_', $hideFields) : '');
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->read(id: $id)
+                callback: function () use ($repository, $id) {
+                    return $repository->read(id: $id);
+                }
             );
 
+            if (!$data) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: "Record with ID " . ($id ?? 'unknown') . " not found",
+                    httpStatus: Response::HTTP_NOT_FOUND
+                );
+            }
+
             return $this->createResponse(
-                data: $data ?: [],
+                data: $data,
                 status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -132,13 +152,22 @@ class CrudController extends BaseController
                 $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
                 $count = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn() => $repository->countElements(filters: $params['filters'])
+                    callback: function () use ($repository, $params) {
+                        return $repository->countElements(filters: $params['filters']);
+                    }
                 );
             }
 
             return $this->createResponse(
                 data: ['count' => $count],
                 status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -178,13 +207,15 @@ class CrudController extends BaseController
                 $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params)) . ($hideFields ? '_' . implode('_', $hideFields) : '');
                 $data = $this->cacheService->get(
                     key: $cacheKey,
-                    callback: fn() => $repository->readMultiple(...$params)->toArray()
+                    callback: function () use ($repository, $params) {
+                        return $repository->readMultiple(...$params)->toArray();
+                    }
                 );
             }
 
             $meta = array_filter(
                 $params,
-                fn($k) => !in_array($k, ['filters', 'extra']),
+                fn ($k) => !in_array($k, ['filters', 'extra']),
                 ARRAY_FILTER_USE_KEY
             );
 
@@ -192,6 +223,67 @@ class CrudController extends BaseController
                 data: $data ?: [],
                 status: 'success',
                 meta: $meta ?: null
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * @param string $entity
+     * @param string|null $body
+     * @param array|null $params
+     * @return Response
+     * @throws NotSupported
+     */
+    protected function aggregate(string $entity, ?string $body = null, ?array $params = null): Response
+    {
+        try {
+            $repository = $this->getRepository(entity: $entity);
+            $params = $this->prepareCrudParams(params: $params, body: $body);
+
+            $aggregations = (array) ($params['aggregations'] ?? []);
+            $groupBy = (array) ($params['groupBy'] ?? []);
+
+            if (empty($aggregations)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Missing aggregations parameter',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $data = $repository->aggregate(
+                aggregations: $aggregations,
+                groupBy: $groupBy,
+                filters: $params['filters'] ?? null,
+                startDate: $params['startDate'] ?? null,
+                endDate: $params['endDate'] ?? null
+            );
+
+            return $this->createResponse(
+                data: $data,
+                status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -238,6 +330,13 @@ class CrudController extends BaseController
                 data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
                 status: 'success',
                 httpStatus: Response::HTTP_CREATED
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -293,6 +392,13 @@ class CrudController extends BaseController
                 data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
                 status: 'success'
             );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
         } catch (Exception $e) {
             return $this->createResponse(
                 data: null,
@@ -341,6 +447,13 @@ class CrudController extends BaseController
             return $this->createResponse(
                 data: null,
                 status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(

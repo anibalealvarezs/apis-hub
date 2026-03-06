@@ -55,23 +55,30 @@ class FacebookGraphConvert
         $elements = [];
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
-            foreach($row['values'] as $value) {
+            $values = $row['values'] ?? [];
+            if (!is_array($values)) {
+                $logger?->warning("Row '{$row['name']}' values is not an array for metric " . ($row['name'] ?? 'unknown'));
+                continue;
+            }
+            foreach ($values as $value) {
+                $endTime = $value['end_time'] ?? null;
+                $metricDate = $endTime ? Carbon::parse($endTime)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook->value,
-                    name: $row['name'],
+                    name: $row['name'] ?? 'unknown',
                     period: $period->value,
-                    metricDate: isset($value['end_time']) ? Carbon::parse($value['end_time'])->toDateString() : Carbon::now()->toDateString(),
+                    metricDate: $metricDate,
                     page:  $pageEntity?->getUrl(),
                     post: $postEntity?->getPostId(),
                 );
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::facebook->value;
-                $channeledMetric->name = $row['name'];
-                $channeledMetric->value = $value['value'];
+                $channeledMetric->name = $row['name'] ?? 'unknown';
+                $channeledMetric->value = $value['value'] ?? 0;
                 $channeledMetric->period = $period->value;
-                $channeledMetric->metricDate = isset($value['end_time']) ? Carbon::parse($value['end_time'])->toDateString() : Carbon::now()->toDateString();
+                $channeledMetric->metricDate = $metricDate;
                 $channeledMetric->platformId = $platformId;
-                $channeledMetric->platformCreatedAt = isset($value['end_time']) ? Carbon::parse($value['end_time'])->toDateString() : Carbon::now()->toDateString();
+                $channeledMetric->platformCreatedAt = $metricDate;
                 $channeledMetric->page = $pageEntity;
                 $channeledMetric->post = $postEntity;
                 $channeledMetric->dimensions = [];
@@ -93,9 +100,9 @@ class FacebookGraphConvert
             }
         }
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -142,7 +149,7 @@ class FacebookGraphConvert
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
             $dimensions = [];
-            foreach($breakdowns as $breakdown) {
+            foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
                     $logger?->warning("Skipping breakdown $breakdown for row $index of Ad Account metrics due to missing value");
                     continue;
@@ -155,26 +162,28 @@ class FacebookGraphConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach($row as $key => $value) {
+            foreach ($row as $key => $value) {
                 if (!in_array($key, $metricsList)) {
                     continue;
                 }
+                $dateStart = $row['date_start'] ?? null;
+                $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook->value,
                     name: $key,
                     period: $period->value,
-                    metricDate: Carbon::parse($row['date_start'])->toDateString(),
+                    metricDate: $metricDate,
                     account: $accountEntity,
                     channeledAccount:  $channeledAccountPlatformId,
                 );
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::facebook->value;
                 $channeledMetric->name = $key;
-                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? $value[0]['value'] : $value;
+                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? ($value[0]['value'] ?? 0) : $value;
                 $channeledMetric->period = $period->value;
-                $channeledMetric->metricDate = Carbon::parse($row['date_start'])->toDateString();
+                $channeledMetric->metricDate = $metricDate;
                 $channeledMetric->platformId = $channeledAccountPlatformId;
-                $channeledMetric->platformCreatedAt = Carbon::parse($row['date_start'])->toDateString();
+                $channeledMetric->platformCreatedAt = $metricDate;
                 $channeledMetric->dimensions = $dimensions;
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
@@ -194,9 +203,9 @@ class FacebookGraphConvert
             }
         }
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -240,14 +249,16 @@ class FacebookGraphConvert
         $elements = [];
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
+            $dateCarbon = Carbon::parse($date);
+            $metricDateString = $dateCarbon->toDateString();
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: Channel::facebook->value,
-                name: $row['name'],
+                name: $row['name'] ?? 'unknown',
                 period: $period->value,
-                metricDate: Carbon::parse($date)->toDateString(),
+                metricDate: $metricDateString,
                 account: $accountEntity->getName(),
                 channeledAccount:  $channeledAccountEntity->getPlatformId(),
-                page:  $pageEntity->getUrl(),
+                page:  $pageEntity?->getUrl(),
             );
             if (!isset($elements[$metricConfigKey])) {
                 $elements[$metricConfigKey] = [];
@@ -257,11 +268,11 @@ class FacebookGraphConvert
             }
             $channeledMetric = new stdClass();
             $channeledMetric->channel = Channel::facebook->value;
-            $channeledMetric->name = $row['name'];
+            $channeledMetric->name = $row['name'] ?? 'unknown';
             $channeledMetric->period = $period->value;
-            $channeledMetric->metricDate = Carbon::parse($date)->toDateString();
+            $channeledMetric->metricDate = $metricDateString;
             $channeledMetric->platformId = $channeledAccountEntity->getPlatformId();
-            $channeledMetric->platformCreatedAt = Carbon::parse($date)->toDateString();
+            $channeledMetric->platformCreatedAt = $metricDateString;
             $channeledMetric->account = $accountEntity;
             $channeledMetric->channeledAccount = $channeledAccountEntity;
             $channeledMetric->page = $pageEntity;
@@ -272,10 +283,10 @@ class FacebookGraphConvert
             if (isset($row['total_value']['breakdowns'])) {
                 $breakdowns = $row['total_value']['breakdowns'][0]['dimension_keys'];
                 if (isset($row['total_value']['breakdowns'][0]['results'])) {
-                    foreach($row['total_value']['breakdowns'][0]['results'] as $vector) {
+                    foreach ($row['total_value']['breakdowns'][0]['results'] as $vector) {
                         $channeledMetric->value = $vector['value'];
                         $dimensions = [];
-                        foreach($breakdowns as $key => $breakdown) {
+                        foreach ($breakdowns as $key => $breakdown) {
                             $dimensions[] = [
                                 'dimensionKey' => $breakdown,
                                 'dimensionValue' => $vector['dimension_values'][$key],
@@ -300,7 +311,7 @@ class FacebookGraphConvert
                     $logger?->warning("Skipping row $index/$rowCount, platformId: {$channeledAccountEntity->getPlatformId()}(), no breakdowns found for metric " . $row['name']);
                 }
             } else {
-                $channeledMetric->value = $row['total_value']['value'];
+                $channeledMetric->value = $row['total_value']['value'] ?? 0;
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash([]);
 
                 $elements[$metricConfigKey][$row['name']][] = $channeledMetric;
@@ -313,9 +324,9 @@ class FacebookGraphConvert
             }
         }
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -357,11 +368,12 @@ class FacebookGraphConvert
         $elements = [];
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
+            $today = Carbon::today()->toDateString();
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: Channel::facebook->value,
-                name: $row['name'],
+                name: $row['name'] ?? 'unknown',
                 period: Period::Lifetime->value,
-                metricDate: Carbon::today()->toDateString(),
+                metricDate: $today,
                 account: $accountEntity->getName(),
                 channeledAccount:  $channeledAccountEntity->getPlatformId(),
                 page:  $pageEntity->getUrl(),
@@ -372,11 +384,11 @@ class FacebookGraphConvert
             }
             $channeledMetric = new stdClass();
             $channeledMetric->channel = Channel::facebook->value;
-            $channeledMetric->name = $row['name'];
+            $channeledMetric->name = $row['name'] ?? 'unknown';
             $channeledMetric->period = Period::Lifetime->value;
-            $channeledMetric->metricDate = Carbon::today()->toDateString();
+            $channeledMetric->metricDate = $today;
             $channeledMetric->platformId = $channeledAccountEntity->getPlatformId();
-            $channeledMetric->platformCreatedAt = Carbon::today()->toDateString();
+            $channeledMetric->platformCreatedAt = $today;
             $channeledMetric->account = $accountEntity;
             $channeledMetric->channeledAccount = $channeledAccountEntity;
             $channeledMetric->page = $pageEntity;
@@ -385,7 +397,7 @@ class FacebookGraphConvert
             $channeledMetric->metricConfigKey = $metricConfigKey;
             $channeledMetric->metadata = [];
             $channeledMetric->data = [];
-            $channeledMetric->value = $row['values'][0]['value'];
+            $channeledMetric->value = $row['values'][0]['value'] ?? 0;
             $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash([]);
 
             if (!isset($elements[$metricConfigKey][$row['name']])) {
@@ -400,9 +412,9 @@ class FacebookGraphConvert
             }
         }
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -451,7 +463,7 @@ class FacebookGraphConvert
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
             $dimensions = [];
-            foreach($breakdowns as $breakdown) {
+            foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
                     $logger?->warning("Skipping breakdown $breakdown for row $index of Campaign metrics due to missing value");
                     continue;
@@ -464,15 +476,17 @@ class FacebookGraphConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach($row as $key => $value) {
+            foreach ($row as $key => $value) {
                 if (!in_array($key, $metricsList)) {
                     continue;
                 }
+                $dateStart = $row['date_start'] ?? null;
+                $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook->value,
                     name: $key,
                     period: $period->value,
-                    metricDate: Carbon::parse($row['date_start'])->toDateString(),
+                    metricDate: $metricDate,
                     channeledAccount:  $channeledAccountEntity->getPlatformId(),
                     campaign: $campaignEntity->getCampaignId(),
                     channeledCampaign: $channeledCampaignEntity->getPlatformId(),
@@ -480,11 +494,11 @@ class FacebookGraphConvert
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::facebook->value;
                 $channeledMetric->name = $key;
-                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? $value[0]['value'] : $value;
+                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? ($value[0]['value'] ?? 0) : $value;
                 $channeledMetric->period = $period->value;
-                $channeledMetric->metricDate = Carbon::parse($row['date_start'])->toDateString();
+                $channeledMetric->metricDate = $metricDate;
                 $channeledMetric->platformId = $channeledCampaignEntity->getPlatformId();
-                $channeledMetric->platformCreatedAt = Carbon::parse($row['date_start'])->toDateString();
+                $channeledMetric->platformCreatedAt = $metricDate;
                 $channeledMetric->dimensions = $dimensions;
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
@@ -506,9 +520,9 @@ class FacebookGraphConvert
 
         // Helpers::dumpDebugJson($elements);
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -561,7 +575,7 @@ class FacebookGraphConvert
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
             $dimensions = [];
-            foreach($breakdowns as $breakdown) {
+            foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
                     $logger?->warning("Skipping breakdown $breakdown for row $index of Adset metrics due to missing value");
                     continue;
@@ -574,15 +588,17 @@ class FacebookGraphConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach($row as $key => $value) {
+            foreach ($row as $key => $value) {
                 if (!in_array($key, $metricsList)) {
                     continue;
                 }
+                $dateStart = $row['date_start'] ?? null;
+                $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook->value,
                     name: $key,
                     period: $period->value,
-                    metricDate: Carbon::parse($row['date_start'])->toDateString(),
+                    metricDate: $metricDate,
                     channeledAccount:  $channeledAccountEntity->getPlatformId(),
                     campaign: $campaignEntity->getCampaignId(),
                     channeledCampaign: $channeledCampaignEntity->getPlatformId(),
@@ -591,11 +607,11 @@ class FacebookGraphConvert
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::facebook->value;
                 $channeledMetric->name = $key;
-                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? $value[0]['value'] : $value;
+                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? ($value[0]['value'] ?? 0) : $value;
                 $channeledMetric->period = $period->value;
-                $channeledMetric->metricDate = Carbon::parse($row['date_start'])->toDateString();
+                $channeledMetric->metricDate = $metricDate;
                 $channeledMetric->platformId = $channeledCampaignEntity->getPlatformId();
-                $channeledMetric->platformCreatedAt = Carbon::parse($row['date_start'])->toDateString();
+                $channeledMetric->platformCreatedAt = $metricDate;
                 $channeledMetric->dimensions = $dimensions;
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
@@ -617,9 +633,9 @@ class FacebookGraphConvert
 
         // Helpers::dumpDebugJson($elements);
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }
@@ -674,7 +690,7 @@ class FacebookGraphConvert
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
             $dimensions = [];
-            foreach($breakdowns as $breakdown) {
+            foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
                     $logger?->warning("Skipping breakdown $breakdown for row $index of Adset metrics due to missing value");
                     continue;
@@ -687,15 +703,17 @@ class FacebookGraphConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach($row as $key => $value) {
+            foreach ($row as $key => $value) {
                 if (!in_array($key, $metricsList)) {
                     continue;
                 }
+                $dateStart = $row['date_start'] ?? null;
+                $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook->value,
                     name: $key,
                     period: $period->value,
-                    metricDate: Carbon::parse($row['date_start'])->toDateString(),
+                    metricDate: $metricDate,
                     channeledAccount:  $channeledAccountEntity->getPlatformId(),
                     campaign: $campaignEntity->getCampaignId(),
                     channeledCampaign: $channeledCampaignEntity->getPlatformId(),
@@ -705,11 +723,11 @@ class FacebookGraphConvert
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::facebook->value;
                 $channeledMetric->name = $key;
-                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? $value[0]['value'] : $value;
+                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? ($value[0]['value'] ?? 0) : $value;
                 $channeledMetric->period = $period->value;
-                $channeledMetric->metricDate = Carbon::parse($row['date_start'])->toDateString();
+                $channeledMetric->metricDate = $metricDate;
                 $channeledMetric->platformId = $channeledCampaignEntity->getPlatformId();
-                $channeledMetric->platformCreatedAt = Carbon::parse($row['date_start'])->toDateString();
+                $channeledMetric->platformCreatedAt = $metricDate;
                 $channeledMetric->dimensions = $dimensions;
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
@@ -731,9 +749,9 @@ class FacebookGraphConvert
 
         // Helpers::dumpDebugJson($elements);
 
-        foreach($elements as $element) {
-            foreach($element as $metricNameElement) {
-                foreach($metricNameElement as $metricElement) {
+        foreach ($elements as $element) {
+            foreach ($element as $metricNameElement) {
+                foreach ($metricNameElement as $metricElement) {
                     $collection->add($metricElement);
                 }
             }

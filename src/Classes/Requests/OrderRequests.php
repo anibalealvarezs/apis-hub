@@ -67,7 +67,9 @@ class OrderRequests implements RequestInterface
         ?string $processedAtMax = null,
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true, ?int $jobId = null): Response {
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -94,7 +96,7 @@ class OrderRequests implements RequestInterface
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
             pageInfo: $filters->pageInfo ?? null,
-            callback: function($orders) use ($jobId) {
+            callback: function ($orders) use ($jobId) {
                 Helpers::checkJobStatus($jobId);
                 self::process(ShopifyConvert::orders($orders));
             }
@@ -136,7 +138,9 @@ class OrderRequests implements RequestInterface
     public static function getListFromNetsuite(
         string $fromDate = '01/01/1999',
         ?object $filters = null,
-        string|bool $resume = true, ?int $jobId = null): Response {
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
             consumerId: $config['netsuite_consumer_id'],
@@ -236,7 +240,7 @@ class OrderRequests implements RequestInterface
         $query .= " ORDER BY transaction.id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
             query: $query,
-            callback: function($orders) use ($jobId) {
+            callback: function ($orders) use ($jobId) {
                 Helpers::checkJobStatus($jobId);
                 self::process(NetSuiteConvert::orders($orders));
             }
@@ -263,7 +267,7 @@ class OrderRequests implements RequestInterface
     {
         try {
             $manager = Helpers::getManager();
-            
+
             $result = \Classes\OrderProcessor::processOrders($channeledCollection, $manager);
 
             if (!empty($result)) {
@@ -276,11 +280,11 @@ class OrderRequests implements RequestInterface
                     'ChanneledProduct' => $result['channeledProducts'],
                     'ChanneledProductVariant' => $result['channeledVariants'],
                 ];
-                
-                $channelName = Channel::from(reset($result['channels']))->getName(); 
-                
+
+                $channelName = Channel::from(reset($result['channels']))->getName();
+
                 $cacheService->invalidateMultipleEntities(
-                    entities: array_filter($entities, fn($value) => !empty($value)),
+                    entities: array_filter($entities, fn ($value) => !empty($value)),
                     channel: $channelName
                 );
             }

@@ -15,7 +15,6 @@ use Entities\Entity;
 use Enums\Channel;
 use Enums\QueryBuilderType;
 
-
 class ChanneledMetricRepository extends ChanneledBaseRepository
 {
     /** Controls whether the raw JSON `data` field is included in results */
@@ -42,12 +41,13 @@ class ChanneledMetricRepository extends ChanneledBaseRepository
             QueryBuilderType::SELECT => $query->select('e'),
             QueryBuilderType::COUNT  => $query->select('count(e.id)'),
             QueryBuilderType::LAST   => $query->select('e, LENGTH(e.platformId) AS HIDDEN length'),
+            QueryBuilderType::AGGREGATE => $query,
             QueryBuilderType::CUSTOM => null,
         };
 
         $query->from($this->getEntityName(), 'e');
 
-        if ($type !== QueryBuilderType::COUNT) {
+        if ($type === QueryBuilderType::SELECT || $type === QueryBuilderType::AGGREGATE || $type === QueryBuilderType::LAST) {
             $query->addSelect('partial m.{id, value, dimensionsHash, metadata}')
                 ->addSelect('partial mc.{id, channel, name, period, metricDate}')
                 ->addSelect('partial dim.{id, dimensionKey, dimensionValue}')

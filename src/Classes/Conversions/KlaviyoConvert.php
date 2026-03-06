@@ -3,25 +3,21 @@
 namespace Classes\Conversions;
 
 use Carbon\Carbon;
-use Classes\Overrides\KlaviyoApi\KlaviyoApi;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use Enums\Period;
-use GuzzleHttp\Exception\GuzzleException;
-use Helpers\Helpers;
-use Services\CacheService;
 use stdClass;
 
 class KlaviyoConvert
 {
     public static function customers(array $customers): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($customer) {
+        return new ArrayCollection(array_map(function ($customer) {
             return (object) [
-                'platformId' => $customer['id'],
-                'platformCreatedAt' => Carbon::parse($customer['attributes']['created']),
+                'platformId' => $customer['id'] ?? null,
+                'platformCreatedAt' => isset($customer['attributes']['created']) ? Carbon::parse($customer['attributes']['created']) : Carbon::now(),
                 'channel' => Channel::klaviyo->value,
-                'email' => $customer['attributes']['email'],
+                'email' => $customer['attributes']['email'] ?? '',
                 'data' => $customer,
             ];
         }, $customers));
@@ -29,22 +25,22 @@ class KlaviyoConvert
 
     public static function products(array $products): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($product) {
+        return new ArrayCollection(array_map(function ($product) {
             return (object) [
-                'platformId' => $product['id'],
+                'platformId' => $product['id'] ?? null,
                 'sku' => $product['sku'] ?? '',
                 'platformCreatedAt' => isset($product['attributes']['created']) ? Carbon::parse($product['attributes']['created']) : null,
                 'channel' => Channel::klaviyo->value,
                 'data' => $product,
                 'vendor' => null,
-                'variants' => self::productVariants($product['included']),
+                'variants' => self::productVariants($product['included'] ?? []),
             ];
         }, $products));
     }
 
     public static function productVariants(array $productVariants): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($productVariant) {
+        return new ArrayCollection(array_map(function ($productVariant) {
             return (object) [
                 'platformId' => $productVariant['id'],
                 'sku' => $productVariant['sku'] ?? '',
@@ -57,9 +53,9 @@ class KlaviyoConvert
 
     public static function productCategories(array $productCategories): ArrayCollection
     {
-        return new ArrayCollection(array_map(function($productCategory) {
+        return new ArrayCollection(array_map(function ($productCategory) {
             return (object) [
-                'platformId' => $productCategory['id'],
+                'platformId' => $productCategory['id'] ?? null,
                 'platformCreatedAt' => isset($productCategory['attributes']['created']) ? Carbon::parse($productCategory['attributes']['created']) : null,
                 'channel' => Channel::klaviyo->value,
                 'data' => $productCategory,
@@ -72,24 +68,12 @@ class KlaviyoConvert
      *
      * @param array $aggregates
      * @param string $metricId
+     * @param array $metricNamesMap Mapping of metricId to metricName.
      * @return ArrayCollection
-     * @throws GuzzleException
      */
-    public static function metricAggregates(array $aggregates, string $metricId): ArrayCollection
+    public static function metricAggregates(array $aggregates, string $metricId, array $metricNamesMap = []): ArrayCollection
     {
-        $cacheService = CacheService::getInstance(Helpers::getRedisClient());
-        $cacheKey = 'klaviyo_metric_names_' . md5($metricId);
-        $metricName = $cacheService->get(
-            key: $cacheKey,
-            callback: function() use ($metricId) {
-                $klaviyoClient = new KlaviyoApi(
-                    apiKey: Helpers::getChannelsConfig()['klaviyo']['klaviyo_api_key']
-                );
-                $response = $klaviyoClient->getMetricData($metricId);
-                return $response['data']['attributes']['name'] ?? 'Unknown Metric';
-            },
-            ttl: Helpers::getChannelsConfig()['klaviyo']['metrics_cache_ttl'] ?? 86400
-        );
+        $metricName = $metricNamesMap[$metricId] ?? 'Unknown Metric';
 
         $collection = new ArrayCollection();
         $dates = $aggregates['dates'] ?? [];

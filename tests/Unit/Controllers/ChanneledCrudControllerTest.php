@@ -7,21 +7,18 @@ use Doctrine\ORM\EntityManager;
 use Entities\Analytics\Channeled\ChanneledDiscount;
 use Enums\Channel;
 use Exception;
-use Faker\Factory;
-use Faker\Generator;
 use Helpers\Helpers;
 use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
+use Tests\Unit\BaseUnitTestCase;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 
-class ChanneledCrudControllerTest extends TestCase
+class ChanneledCrudControllerTest extends BaseUnitTestCase
 {
-    private Generator $faker;
     private MockObject|EntityManager $entityManager;
     private MockObject|CacheService $cacheService;
     private MockObject|CacheKeyGenerator $cacheKeyGenerator;
@@ -29,7 +26,7 @@ class ChanneledCrudControllerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->faker = Factory::create();
+        parent::setUp();
 
         // Mock dependencies
         $this->entityManager = $this->createMock(EntityManager::class);
@@ -452,6 +449,57 @@ class ChanneledCrudControllerTest extends TestCase
         );
     }
 
+    public function testAggregateReturnsData(): void
+    {
+        $entity = 'product_metric';
+        $channel = Channel::shopify;
+        $body = json_encode(['filters' => ['status' => 'active']]);
+        $params = [
+            'aggregations' => ['total' => 'SUM(value)'],
+            'groupBy' => ['metricDate']
+        ];
+        $expectedData = [['total' => 500, 'metricDate' => '2024-01-01']];
+
+        // Mock repository
+        $repository = $this->getMockBuilder(\stdClass::class)
+            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'aggregate'])
+            ->getMock();
+        $repository->expects($this->once())
+            ->method('aggregate')
+            ->with(
+                ['total' => 'SUM(value)'],
+                ['metricDate'],
+                $this->callback(fn($filters) => $filters->status === 'active' && $filters->channel === $channel->value)
+            )
+            ->willReturn($expectedData);
+
+        $this->entityManager->expects($this->once())
+            ->method('getRepository')
+            ->with('Entities\\Channeled\\' . $entity)
+            ->willReturn($repository);
+
+        $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
+        $this->controller->setMockEntitiesConfig([
+            strtolower($entity) => [
+                'channeled_class' => 'Entities\\Channeled\\' . $entity,
+                'repository_methods' => [
+                    'aggregate' => ['parameters' => ['filters', 'aggregations', 'groupBy']]
+                ]
+            ]
+        ]);
+        $this->controller->setMockChannelsConfig([
+            $channel->value => ['enabled' => true]
+        ]);
+
+        $response = $this->controller->aggregate($entity, $channel, $body, $params);
+
+        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertEquals(
+            json_encode(['data' => $expectedData, 'status' => 'success', 'error' => null]),
+            $response->getContent()
+        );
+    }
+
     /**
      * @throws ReflectionException
      */
@@ -467,10 +515,12 @@ class ChanneledCrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
         };
@@ -535,13 +585,16 @@ class ChanneledCrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
-            public function getId() {
+            public function getId()
+            {
                 return $this->data['id'];
             }
         };
@@ -641,13 +694,16 @@ class ChanneledCrudControllerTest extends TestCase
 
         $result = new class ($data) {
             private array $data;
-            public function __construct(array $data) {
+            public function __construct(array $data)
+            {
                 $this->data = $data;
             }
-            public function toArray(): array {
+            public function toArray(): array
+            {
                 return $this->data;
             }
-            public function getId() {
+            public function getId()
+            {
                 return $this->data['id'];
             }
         };
@@ -722,7 +778,7 @@ class ChanneledCrudControllerTest extends TestCase
     {
         $entity = 'customer';
         $channel = Channel::shopify;
-        $id = $this->faker->randomNumber();
+        $id = $this->faker->numberBetween(1, 1000);
 
         // Mock repository
         $repository = $this->getMockBuilder(stdClass::class)
@@ -792,10 +848,12 @@ class ChanneledCrudControllerTest extends TestCase
         $id = $this->faker->randomNumber();
         $result = new class ($id) {
             private int $id;
-            public function __construct(int $id) {
+            public function __construct(int $id)
+            {
                 $this->id = $id;
             }
-            public function getId(): int {
+            public function getId(): int
+            {
                 return $this->id;
             }
         };
@@ -810,10 +868,12 @@ class ChanneledCrudControllerTest extends TestCase
         $id = $this->faker->randomNumber();
         $result = new class ($id) {
             private int $id;
-            public function __construct(int $id) {
+            public function __construct(int $id)
+            {
                 $this->id = $id;
             }
-            public function getPlatformId(): int {
+            public function getPlatformId(): int
+            {
                 return $this->id;
             }
         };
@@ -828,14 +888,17 @@ class ChanneledCrudControllerTest extends TestCase
         $code = $this->faker->word;
         $result = new class ($code) extends ChanneledDiscount {
             protected string $code;
-            public function __construct(string $code) {
+            public function __construct(string $code)
+            {
                 parent::__construct();
                 $this->code = $code;
             }
-            public function getCode(): string {
+            public function getCode(): string
+            {
                 return $this->code;
             }
-            public function getId(): ?int {
+            public function getId(): ?int
+            {
                 return null; // Override to prevent Entity::$id access
             }
         };
@@ -983,6 +1046,11 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         return empty(array_diff($params, $validParams));
     }
 
+    public function prepareCrudParams(?array $params, ?string $body): array
+    {
+        return parent::prepareCrudParams($params, $body);
+    }
+
     public function prepareChanneledReadMultipleParams(
         ?array $params,
         string $repositoryClass,
@@ -992,9 +1060,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         if (!empty($params) && !$this->validateParams(array_keys($params), $repositoryClass, 'readMultiple')) {
             throw new InvalidArgumentException('Invalid parameters');
         }
-
-        $params = $params ?? [];
-        $params['filters'] = Helpers::bodyToObject($body);
+        $params = $this->prepareCrudParams($params, $body);
         if (!isset($params['filters']->channel)) {
             $params['filters']->channel = $channel->value;
         }
@@ -1020,7 +1086,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
 
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->read($id, false, $filters)
+                callback: fn () => $repository->read($id, false, $filters)
             );
 
             return $this->createResponse(
@@ -1052,7 +1118,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
 
             $count = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->countElements($params['filters']),
+                callback: fn () => $repository->countElements($params['filters']),
                 ttl: 300
             );
 
@@ -1092,7 +1158,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
 
             $data = $this->cacheService->get(
                 key: $cacheKey,
-                callback: fn() => $repository->readMultiple($params['filters'], $params['extra'] ?? null)->toArray(),
+                callback: fn () => $repository->readMultiple($params['filters'], $params['extra'] ?? null)->toArray(),
                 ttl: 600
             );
 
@@ -1206,6 +1272,49 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
+    public function aggregate(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
+    {
+        try {
+            $repository = $this->getRepository($entity);
+            $params = $this->prepareCrudParams($params, $body);
+            if (!isset($params['filters']->channel)) {
+                $params['filters']->channel = $channel->value;
+            }
+
+            $aggregations = (array) ($params['aggregations'] ?? []);
+            $groupBy = (array) ($params['groupBy'] ?? []);
+
+            if (empty($aggregations)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Missing aggregations parameter',
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
+
+            $data = $repository->aggregate(
+                $aggregations,
+                $groupBy,
+                $params['filters'] ?? null,
+                $params['startDate'] ?? null,
+                $params['endDate'] ?? null
+            );
+
+            return $this->createResponse(
+                data: $data,
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
     public function delete(string $entity, Channel $channel, ?int $id = null): Response
     {
         try {
@@ -1274,8 +1383,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         ?string $body = null,
         ?array $params = null,
         ...$extraArgs
-    ): Response
-    {
+    ): Response {
         $channelsConfig = $this->getChannelsConfig();
         $validChannels = ['shopify', 'klaviyo', 'facebook', 'bigcommerce', 'netsuite', 'amazon'];
         $channelEnum = Channel::tryFromName($channel);
@@ -1333,7 +1441,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
                 'update' => $this->update($entity, $channelEnum, $id, $extraArgs[0] ?? null),
                 'delete' => $this->delete($entity, $channelEnum, $id),
                 'create' => $this->create($entity, $channelEnum, $extraArgs[0] ?? null),
-                'count', 'list' => $this->$method($entity, $channelEnum, ...$extraArgs),
+                'aggregate', 'count', 'list' => $this->$method($entity, $channelEnum, ...$extraArgs),
                 default => $this->createResponse(
                     data: null,
                     status: 'error',

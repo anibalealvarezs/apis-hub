@@ -210,7 +210,7 @@ class InitializeEntitiesCommand extends Command
                     }
                 }
             }
-            foreach($fbConfig['ad_accounts'] as $adAccount) {
+            foreach ($fbConfig['ad_accounts'] as $adAccount) {
                 $adAccountEntity = $channeledAccountRepository->getByPlatformId($adAccount['id'], Channel::facebook->value);
                 if (!$adAccountEntity) {
                     $channeledAccount = new ChanneledAccount();

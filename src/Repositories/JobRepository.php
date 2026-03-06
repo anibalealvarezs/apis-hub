@@ -16,6 +16,7 @@ use Faker\Factory;
 use InvalidArgumentException;
 use ReflectionEnum;
 use ReflectionException;
+
 class JobRepository extends BaseRepository
 {
     /**
@@ -57,14 +58,14 @@ class JobRepository extends BaseRepository
         if (!isset($data['entity']) || !$data['entity']) {
             throw new InvalidArgumentException('Entity is required');
         }
-        if (!(new ReflectionEnum(AnalyticsEntity::class))->getConstant($data['entity'])) {
+        if (!AnalyticsEntity::tryFrom($data['entity'])) {
             throw new InvalidArgumentException('Invalid entity');
         }
 
         if (!isset($data['channel'])) {
             throw new InvalidArgumentException('Channel is required');
         }
-        if (!(new ReflectionEnum(Channel::class))->getConstant($data['channel'])) {
+        if (!Channel::tryFromName($data['channel'])) {
             throw new InvalidArgumentException('Invalid channel');
         }
 

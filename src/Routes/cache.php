@@ -12,7 +12,7 @@ return [
             $input = (array) Helpers::bodyToObject(data: $body);
             $channel = $input['channel'] ?? $params['channel'] ?? null;
             $entity = $input['entity'] ?? $params['entity'] ?? null;
-            
+
             return (new CacheController())->interruptJobs(
                 channel: $channel,
                 entity: $entity

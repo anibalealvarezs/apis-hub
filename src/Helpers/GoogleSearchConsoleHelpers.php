@@ -48,14 +48,20 @@ class GoogleSearchConsoleHelpers
 
         $differences = self::calculateDifferences($allRows, $childrenSums);
 
-        $allocatedDifferences = self::allocatePositiveDifferences($differences,
-            self::$allDimensions);
+        $allocatedDifferences = self::allocatePositiveDifferences(
+            $differences,
+            self::$allDimensions
+        );
 
-        $allocateFinalDifference = self::addGlobalRemainderSynthetic($allocatedDifferences,
-            self::$allDimensions);
+        $allocateFinalDifference = self::addGlobalRemainderSynthetic(
+            $allocatedDifferences,
+            self::$allDimensions
+        );
 
-        $negativeDifferencesProcessed = self::flagOrScaleNegativeDifferences($allocateFinalDifference,
-            true);
+        $negativeDifferencesProcessed = self::flagOrScaleNegativeDifferences(
+            $allocateFinalDifference,
+            true
+        );
 
         $scaleAdjusted = self::adjustScaledPositions($negativeDifferencesProcessed);
 
@@ -468,7 +474,8 @@ class GoogleSearchConsoleHelpers
      * @param array $targetCountries
      * @return array
      */
-    public static function fillWithNullsAndFilter(array $rows, array $targetKeywords, array $targetCountries): array {
+    public static function fillWithNullsAndFilter(array $rows, array $targetKeywords, array $targetCountries): array
+    {
         $newRows = [];
         foreach ($rows as $row) {
             list($date, $query, $country, $page, $device) = self::getDimensionsValues($row, array_flip($row['subset']), $targetKeywords, $targetCountries);
@@ -487,7 +494,8 @@ class GoogleSearchConsoleHelpers
      * @param array $targetCountries
      * @return array
      */
-    public static function dontFillButFilter(array &$rows, array $subset, array $targetKeywords, array $targetCountries): array {
+    public static function dontFillButFilter(array &$rows, array $subset, array $targetKeywords, array $targetCountries): array
+    {
         $allRows = [];
         foreach ($rows as $row) {
             list($date, $query, $country, $page, $device) = self::getDimensionsValues($row, array_flip($subset), $targetKeywords, $targetCountries);
@@ -506,15 +514,15 @@ class GoogleSearchConsoleHelpers
      */
     public static function validateGoogleConfig(LoggerInterface $logger): array
     {
-        $config = Helpers::getChannelsConfig()['google'] ?? null;
-        if (!$config) {
-            $logger->error("Missing 'google' configuration in channels config");
-            throw new Exception("Missing 'google' configuration in channels config");
-        }
+        $config = Helpers::getChannelsConfig()['google'] ?? [];
         $scConfig = Helpers::getChannelsConfig()['google_search_console'] ?? null;
         if (!$scConfig) {
             $logger->error("Missing 'google_search_console' configuration in channels config");
             throw new Exception("Missing 'google_search_console' configuration in channels config");
+        }
+        if (!isset($scConfig['sites']) || !is_array($scConfig['sites'])) {
+            $logger->error("Missing or invalid 'sites' configuration in 'google_search_console'");
+            throw new Exception("Missing or invalid 'sites' configuration in 'google_search_console'");
         }
         $logger->info("Loaded GSC config: sites=" . count($scConfig['sites']));
         return [
@@ -617,7 +625,7 @@ class GoogleSearchConsoleHelpers
      * @param mixed $row
      * @return array
      */
-    public static function getMetricsValues(mixed $row) : array
+    public static function getMetricsValues(mixed $row): array
     {
         return [
             (int)($row['impressions'] ?? 0),

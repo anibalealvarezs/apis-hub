@@ -60,7 +60,9 @@ class ProductCategoryRequests implements RequestInterface
         ?string $publishedAtMax = null,
         ?array $fields = null,
         ?object $filters = null,
-        string|bool $resume = true, ?int $jobId = null): Response {
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -152,7 +154,7 @@ class ProductCategoryRequests implements RequestInterface
         $query = "SELECT * FROM CommerceCategory WHERE id >= " . (isset($lastChanneledProductCategory['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledProductCategory['platformId'] : 0) . " ORDER BY id ASC";
         $netsuiteClient->getSuiteQLQueryAllAndProcess(
             query: $query,
-            callback: function($productCategories) use ($jobId) {
+            callback: function ($productCategories) use ($jobId) {
                 Helpers::checkJobStatus($jobId);
                 self::process(NetSuiteConvert::productCategories($productCategories));
             }
@@ -182,7 +184,7 @@ class ProductCategoryRequests implements RequestInterface
     {
         try {
             $manager = Helpers::getManager();
-            
+
             $result = \Classes\ProductCategoryProcessor::processCategories($channeledCollection, $collects, $manager);
 
             if (!empty($result)) {
@@ -192,11 +194,11 @@ class ProductCategoryRequests implements RequestInterface
                     'ChanneledProductCategory' => $result['channeledProductCategories'],
                     'ChanneledProduct' => $result['channeledProducts'],
                 ];
-                
-                $channelName = Channel::from(reset($result['channels']))->getName(); 
-                
+
+                $channelName = Channel::from(reset($result['channels']))->getName();
+
                 $cacheService->invalidateMultipleEntities(
-                    entities: array_filter($entities, fn($value) => !empty($value)),
+                    entities: array_filter($entities, fn ($value) => !empty($value)),
                     channel: $channelName
                 );
             }

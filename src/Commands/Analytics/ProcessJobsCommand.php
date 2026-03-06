@@ -11,6 +11,7 @@ use Helpers\Helpers;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Services\DateResolver;
 use Throwable;
 
 class ProcessJobsCommand extends Command
@@ -34,7 +35,7 @@ class ProcessJobsCommand extends Command
     {
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
-        
+
         $output->writeln("Querying scheduled jobs...");
 
         // Note: findBy is provided by Doctrine EntityRepository
@@ -54,7 +55,7 @@ class ProcessJobsCommand extends Command
             try {
                 // Update to processing
                 $jobRepo->update($job->getId(), (object)['status' => JobStatus::processing->value]);
-                
+
                 $channelEnum = Channel::tryFromName($job->getChannel());
                 if (!$channelEnum) {
                     throw new \Exception("Invalid channel enum: " . $job->getChannel());
@@ -63,15 +64,19 @@ class ProcessJobsCommand extends Command
                 // Iniciar el caching de data via fetchData
                 $payload = $job->getPayload() ?? [];
                 $params = $payload['params'] ?? [];
+                
+                // Resolve relative dates (e.g. 'yesterday' -> '2024-03-05')
+                $params = DateResolver::resolveParams($params);
+                
                 $params['jobId'] = $job->getId();
                 $body = $payload['body'] ?? null;
-                
+
                 $controller->fetchData($job->getEntity(), $channelEnum, $params, $body);
 
                 // Update to completed
                 $jobRepo->update($job->getId(), (object)['status' => JobStatus::completed->value]);
                 $output->writeln("<info>Successfully completed job {$job->getUuid()}</info>");
-                
+
             } catch (Throwable $e) {
                 // Update to failed
                 $jobRepo->update($job->getId(), (object)['status' => JobStatus::failed->value]);

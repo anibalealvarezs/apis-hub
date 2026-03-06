@@ -58,7 +58,9 @@ class PriceRuleRequests implements RequestInterface
         ?string $createdAtMin = null,
         ?string $createdAtMax = null,
         ?object $filters = null,
-        string|bool $resume = true, ?int $jobId = null): Response {
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
         $config = Helpers::getChannelsConfig()['shopify'];
         $shopifyClient = new ShopifyApi(
             apiKey: $config['shopify_api_key'],
@@ -83,7 +85,7 @@ class PriceRuleRequests implements RequestInterface
             updatedAtMin: $filters->updatedAtMin ?? null,
             updatedAtMax: $filters->updatedAtMax ?? null,
             pageInfo: $filters->pageInfo ?? null,
-            callback: function($priceRules) use ($jobId) {
+            callback: function ($priceRules) use ($jobId) {
                 Helpers::checkJobStatus($jobId);
                 self::process(ShopifyConvert::priceRules($priceRules));
             }
@@ -146,13 +148,13 @@ class PriceRuleRequests implements RequestInterface
     {
         try {
             $manager = Helpers::getManager();
-            
+
             $result = \Classes\PriceRuleProcessor::processPriceRules($channeledCollection, $manager);
 
             if (!empty($result)) {
                 $cacheService = CacheService::getInstance(redisClient: Helpers::getRedisClient());
-                $channelName = Channel::from(reset($result['channels']))->getName(); 
-                
+                $channelName = Channel::from(reset($result['channels']))->getName();
+
                 $discountCodesTotal = [];
                 $channeledDiscountCodesTotal = [];
 
@@ -193,9 +195,9 @@ class PriceRuleRequests implements RequestInterface
                     'Discount' => array_unique($discountCodesTotal),
                     'ChanneledDiscount' => array_unique($channeledDiscountCodesTotal),
                 ];
-                
+
                 $cacheService->invalidateMultipleEntities(
-                    entities: array_filter($entities, fn($value) => !empty($value)),
+                    entities: array_filter($entities, fn ($value) => !empty($value)),
                     channel: $channelName
                 );
             }

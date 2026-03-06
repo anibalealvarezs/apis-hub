@@ -68,7 +68,7 @@ abstract class BaseController
      */
     protected const CRUD_TOP_LEVEL_PARAMS = [
         'limit', 'pagination', 'ids', 'filters', 'orderBy', 'orderDir',
-        'startDate', 'endDate', 'rawData', 'hideFields'
+        'startDate', 'endDate', 'rawData', 'hideFields', 'aggregations', 'groupBy', 'extra'
     ];
 
     /**
@@ -79,8 +79,14 @@ abstract class BaseController
     {
         $config = Helpers::getEntitiesConfig();
         $entityKey = strtolower($entity);
+
+        // Fallback for channeled_class if missing (useful for entities that are already channeled)
+        if ($configKey === 'channeled_class' && !isset($config[$entityKey][$configKey])) {
+            $configKey = 'class';
+        }
+
         if (!isset($config[$entityKey][$configKey])) {
-            throw new Exception("Entity configuration for '$entity' with key '$configKey' not found");
+            throw new Exception("The entity '$entity' is not correctly configured in your config/yaml/entitiesconfig.yaml. Missing '$configKey' entry.");
         }
         return $this->em->getRepository(
             entityName: $config[$entityKey][$configKey]
@@ -106,31 +112,43 @@ abstract class BaseController
         $finalParams = [];
         $queryFilters = [];
 
-        // 1. Extract Control Parameters EXCLUSIVELY from the URL (query params)
+        // 1. Extract Control Parameters from the URL (query params)
         foreach ($params as $key => $value) {
             if (in_array($key, self::CRUD_TOP_LEVEL_PARAMS)) {
                 if ($key === 'filters') {
-                    // If they send ?filters[field]=value, merge it later
                     $queryFilters = array_merge($queryFilters, (array) $value);
                 } elseif (!in_array($key, self::CONTROLLER_ONLY_PARAMS)) {
-                    // Only forward params that the repository actually accepts
                     $finalParams[$key] = $value;
                 }
             } else {
-                // Any other query parameter is treated as a high-priority filter
                 $queryFilters[$key] = $value;
             }
         }
 
-        // 2. Extract Business Filters from the Body (ignore control params here)
+        // 2. Extract Business Filters and Control Params from the Body
         $bodyFilters = (array) ($bodyData['filters'] ?? $bodyData);
-        
-        // Remove any control params that might have been sent in the body to avoid accidents
-        foreach (self::CRUD_TOP_LEVEL_PARAMS as $controlParam) {
-            unset($bodyFilters[$controlParam]);
+        $bodyHasTopLevel = isset($bodyData['filters']);
+
+        if ($bodyHasTopLevel) {
+            // If body has 'filters' key, treat other top-level keys as control params if not already set by URL
+            foreach ($bodyData as $key => $value) {
+                if ($key !== 'filters' && in_array($key, self::CRUD_TOP_LEVEL_PARAMS) && !isset($finalParams[$key])) {
+                    $finalParams[$key] = $value;
+                }
+            }
+        } else {
+            // Otherwise, check all keys in bodyData. If it's a control param, move it to finalParams.
+            foreach ($bodyFilters as $key => $value) {
+                if (in_array($key, self::CRUD_TOP_LEVEL_PARAMS)) {
+                    if (!isset($finalParams[$key])) {
+                        $finalParams[$key] = $value;
+                    }
+                    unset($bodyFilters[$key]);
+                }
+            }
         }
 
-        // 3. Merge: URL filters/parameters override Body filters
+        // 3. Merge: URL filters override Body filters
         $finalParams['filters'] = (object) array_merge($bodyFilters, $queryFilters);
 
         return $finalParams;

@@ -30,7 +30,7 @@ class Page extends Entity
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $data = [];
 
-    #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'channeledAccounts')]
+    #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'pages')]
     #[ORM\JoinColumn(onDelete: 'cascade')]
     protected Account $account;
 
@@ -218,8 +218,8 @@ class Page extends Entity
      */
     public function addPost(Post $post): self
     {
-        if (!$this->metricConfigs->contains($post)) {
-            $this->metricConfigs->add($post);
+        if (!$this->posts->contains($post)) {
+            $this->posts->add($post);
             $post->addPage($this);
         }
         return $this;
@@ -232,8 +232,8 @@ class Page extends Entity
      */
     public function removePost(Post $post): self
     {
-        if ($this->metricConfigs->contains($post)) {
-            $this->metricConfigs->removeElement($post);
+        if ($this->posts->contains($post)) {
+            $this->posts->removeElement($post);
             if ($post->getPage() === $this) {
                 $post->addPage(null);
             }

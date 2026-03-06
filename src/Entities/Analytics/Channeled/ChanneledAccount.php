@@ -242,8 +242,8 @@ class ChanneledAccount extends ChanneledEntity
      */
     public function addPost(Post $post): self
     {
-        if (!$this->metricConfigs->contains($post)) {
-            $this->metricConfigs->add($post);
+        if (!$this->posts->contains($post)) {
+            $this->posts->add($post);
             $post->addChanneledAccount($this);
         }
         return $this;
@@ -256,8 +256,8 @@ class ChanneledAccount extends ChanneledEntity
      */
     public function removePost(Post $post): self
     {
-        if ($this->metricConfigs->contains($post)) {
-            $this->metricConfigs->removeElement($post);
+        if ($this->posts->contains($post)) {
+            $this->posts->removeElement($post);
             if ($post->getChanneledAccount() === $this) {
                 $post->addChanneledAccount(null);
             }

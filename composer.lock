@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "61d7bb723c8704724caf87b7a9b7ea95",
+    "content-hash": "a69817ea7cfce5cdee9211bd181b62f9",
     "packages": [
         {
             "name": "anibalealvarezs/amazon-api",
@@ -12,13 +12,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/amazon-api.git",
-                "reference": "daf78fee29ed094deb5ef49244893aa2a0477cdd"
+                "reference": "a629b04fde738eb65d73aa43b453ca3042c68489"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/amazon-api/anibalealvarezs-amazon-api-daf78fee29ed094deb5ef49244893aa2a0477cdd-zip-78e9e3.zip",
-                "reference": "daf78fee29ed094deb5ef49244893aa2a0477cdd",
-                "shasum": "a3ce2d4d6e35b98e6ca8be537bd119916cab254d"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/amazon-api/anibalealvarezs-amazon-api-a629b04fde738eb65d73aa43b453ca3042c68489-zip-5eead0.zip",
+                "reference": "a629b04fde738eb65d73aa43b453ca3042c68489",
+                "shasum": "fc9ceaf491b478f6d6d1b0f35c098d16b83d9ca5"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -30,6 +30,7 @@
             },
             "require-dev": {
                 "fakerphp/faker": "^1.20",
+                "phpstan/phpstan": "^1.10",
                 "phpunit/phpunit": "^9"
             },
             "default-branch": true,
@@ -58,7 +59,7 @@
                 "source": "https://github.com/anibalealvarezs/amazon-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/amazon-api/issues"
             },
-            "time": "2025-02-08T03:44:30+00:00"
+            "time": "2026-03-04T23:59:16+00:00"
         },
         {
             "name": "anibalealvarezs/api-client-skeleton",
@@ -66,13 +67,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/api-client-skeleton.git",
-                "reference": "5c122ef04bff64fb764eadb33b738d13574f4394"
+                "reference": "80721a0f82c67498d7c9219ac878ff625c0e31ac"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-5c122ef04bff64fb764eadb33b738d13574f4394-zip-cc5755.zip",
-                "reference": "5c122ef04bff64fb764eadb33b738d13574f4394",
-                "shasum": "a56c1c258d2d77b641ebbd8eb403bc739052f561"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-80721a0f82c67498d7c9219ac878ff625c0e31ac-zip-ace250.zip",
+                "reference": "80721a0f82c67498d7c9219ac878ff625c0e31ac",
+                "shasum": "9efb8baf95cfa9171cf101ddcc696e48d477c35c"
             },
             "require": {
                 "anibalealvarezs/oauth-v1": "@dev",
@@ -113,7 +114,7 @@
                 "source": "https://github.com/anibalealvarezs/api-client-skeleton/tree/main",
                 "issues": "https://github.com/anibalealvarezs/api-client-skeleton/issues"
             },
-            "time": "2026-03-02T21:37:54+00:00"
+            "time": "2026-03-06T02:23:03+00:00"
         },
         {
             "name": "anibalealvarezs/facebook-graph-api",
@@ -121,13 +122,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "40fc4456f727a16bfd2f47c4d8718545b1cf889d"
+                "reference": "e1cf034ea965151c26853976d9df7035fcddad8e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-40fc4456f727a16bfd2f47c4d8718545b1cf889d-zip-e2d3a0.zip",
-                "reference": "40fc4456f727a16bfd2f47c4d8718545b1cf889d",
-                "shasum": "3fcbf46e32f0721c30bf5a69273971eee8cb39b2"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-e1cf034ea965151c26853976d9df7035fcddad8e-zip-cac147.zip",
+                "reference": "e1cf034ea965151c26853976d9df7035fcddad8e",
+                "shasum": "11652b44f3ddae198c7c59c9fb90360f1ec56fbf"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -140,6 +141,7 @@
             },
             "require-dev": {
                 "fakerphp/faker": "^1.20",
+                "phpstan/phpstan": "^1.10",
                 "phpunit/phpunit": "^9"
             },
             "default-branch": true,
@@ -168,21 +170,21 @@
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues"
             },
-            "time": "2025-11-13T13:38:55+00:00"
+            "time": "2026-03-05T20:15:43+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
-            "version": "dev-main",
+            "version": "dev-develop",
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/google-api.git",
-                "reference": "492d84303757f3ab30be8a079c1c19c832d13995"
+                "reference": "2106626ad079fe1e644af77cce688c42e020c0fd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-492d84303757f3ab30be8a079c1c19c832d13995-zip-78278e.zip",
-                "reference": "492d84303757f3ab30be8a079c1c19c832d13995",
-                "shasum": "796a1b59b74b4fc3a8cb1395df96e06474a60a09"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-2106626ad079fe1e644af77cce688c42e020c0fd-zip-2369ed.zip",
+                "reference": "2106626ad079fe1e644af77cce688c42e020c0fd",
+                "shasum": "48b0d0cc59548c4306a84d494d1c1d940b37773a"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -195,9 +197,9 @@
             },
             "require-dev": {
                 "fakerphp/faker": "^1.20",
+                "phpstan/phpstan": "^1.10",
                 "phpunit/phpunit": "^9"
             },
-            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -208,6 +210,11 @@
                 "psr-4": {
                     "Tests\\": "tests/"
                 }
+            },
+            "scripts": {
+                "phpstan": [
+                    "phpstan analyse"
+                ]
             },
             "license": [
                 "MIT"
@@ -220,10 +227,10 @@
             ],
             "description": "description",
             "support": {
-                "source": "https://github.com/anibalealvarezs/google-api/tree/main",
+                "source": "https://github.com/anibalealvarezs/google-api/tree/develop",
                 "issues": "https://github.com/anibalealvarezs/google-api/issues"
             },
-            "time": "2025-06-19T22:01:40+00:00"
+            "time": "2026-03-06T05:43:11+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -231,13 +238,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/klaviyo-api.git",
-                "reference": "c3a664d757695a563edb2602787fcfa661c580ec"
+                "reference": "1772503e5ad13eeebd3633f811417bc289f2b82e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/klaviyo-api/anibalealvarezs-klaviyo-api-c3a664d757695a563edb2602787fcfa661c580ec-zip-cdcfcb.zip",
-                "reference": "c3a664d757695a563edb2602787fcfa661c580ec",
-                "shasum": "de72c6e66911fa4456f8eceaf35f19f63e00c3dd"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/klaviyo-api/anibalealvarezs-klaviyo-api-1772503e5ad13eeebd3633f811417bc289f2b82e-zip-1f0a65.zip",
+                "reference": "1772503e5ad13eeebd3633f811417bc289f2b82e",
+                "shasum": "54b3cdcee085fb27dda2597992f843e4f4a196fa"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -277,7 +284,62 @@
                 "source": "https://github.com/anibalealvarezs/klaviyo-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/klaviyo-api/issues"
             },
-            "time": "2025-02-08T03:48:52+00:00"
+            "time": "2026-03-04T23:41:05+00:00"
+        },
+        {
+            "name": "anibalealvarezs/mailchimp-api",
+            "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/anibalealvarezs/mailchimp-api.git",
+                "reference": "3a11bae1283b9420dd1a565792318d065c790ddb"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-api/anibalealvarezs-mailchimp-api-3a11bae1283b9420dd1a565792318d065c790ddb-zip-bb8c55.zip",
+                "reference": "3a11bae1283b9420dd1a565792318d065c790ddb",
+                "shasum": "ddc8a0f606a866eca0d4fb7d4d49934cb3dd7d84"
+            },
+            "require": {
+                "anibalealvarezs/api-client-skeleton": "@dev",
+                "ext-json": "*",
+                "guzzlehttp/guzzle": "^7.0",
+                "nesbot/carbon": "^2.61",
+                "php": ">=8.1",
+                "symfony/yaml": "^5.4.10"
+            },
+            "require-dev": {
+                "fakerphp/faker": "^1.20",
+                "phpstan/phpstan": "^1.10",
+                "phpunit/phpunit": "^9"
+            },
+            "default-branch": true,
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Anibalealvarezs\\MailchimpApi\\": "src"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Aníbal Álvarez",
+                    "email": "anibalealvarezs@gmail.com"
+                }
+            ],
+            "description": "description",
+            "support": {
+                "source": "https://github.com/anibalealvarezs/mailchimp-api/tree/main",
+                "issues": "https://github.com/anibalealvarezs/mailchimp-api/issues"
+            },
+            "time": "2026-03-04T23:57:54+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
@@ -285,13 +347,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/netsuite-api.git",
-                "reference": "b1637df4264a475f885945f89b7404800d8100f2"
+                "reference": "c3abfae36e56bee95385bc3fa904055785c470b2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/netsuite-api/anibalealvarezs-netsuite-api-b1637df4264a475f885945f89b7404800d8100f2-zip-d6639d.zip",
-                "reference": "b1637df4264a475f885945f89b7404800d8100f2",
-                "shasum": "59e6c1447d0126f79f8aea8de59d13a4e61151db"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/netsuite-api/anibalealvarezs-netsuite-api-c3abfae36e56bee95385bc3fa904055785c470b2-zip-ca1749.zip",
+                "reference": "c3abfae36e56bee95385bc3fa904055785c470b2",
+                "shasum": "d2ca51dfd3f15345f41d246873a20b0492f0ea47"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -304,6 +366,7 @@
             },
             "require-dev": {
                 "fakerphp/faker": "^1.20",
+                "phpstan/phpstan": "^1.10",
                 "phpunit/phpunit": "^9"
             },
             "default-branch": true,
@@ -332,7 +395,7 @@
                 "source": "https://github.com/anibalealvarezs/netsuite-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/netsuite-api/issues"
             },
-            "time": "2025-02-08T04:00:08+00:00"
+            "time": "2026-03-05T00:21:39+00:00"
         },
         {
             "name": "anibalealvarezs/oauth-v1",
@@ -340,19 +403,20 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/oauth-v1.git",
-                "reference": "c47bb38647f4e331c33ff1fc1a0968d6aec00350"
+                "reference": "248153e7796f4171ab424429b4a951bfe5d33a9c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/oauth-v1/anibalealvarezs-oauth-v1-c47bb38647f4e331c33ff1fc1a0968d6aec00350-zip-b2a53f.zip",
-                "reference": "c47bb38647f4e331c33ff1fc1a0968d6aec00350",
-                "shasum": "e4254addab2564db4514669d3b2c7917c94e7e82"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/oauth-v1/anibalealvarezs-oauth-v1-248153e7796f4171ab424429b4a951bfe5d33a9c-zip-d5152e.zip",
+                "reference": "248153e7796f4171ab424429b4a951bfe5d33a9c",
+                "shasum": "9269990062b7ea167ce53a3fc14cd58ba6aa9629"
             },
             "require": {
                 "php": ">=8.1"
             },
             "require-dev": {
                 "fakerphp/faker": "^1.20",
+                "phpstan/phpstan": "^1.10",
                 "phpunit/phpunit": "^9"
             },
             "default-branch": true,
@@ -381,7 +445,7 @@
                 "source": "https://github.com/anibalealvarezs/oauth-v1/tree/main",
                 "issues": "https://github.com/anibalealvarezs/oauth-v1/issues"
             },
-            "time": "2025-05-02T18:49:31+00:00"
+            "time": "2026-03-04T20:37:40+00:00"
         },
         {
             "name": "anibalealvarezs/shopify-api",
@@ -389,13 +453,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/shopify-api.git",
-                "reference": "18568aad870fe39595b79dd3f7b751e6facd3f12"
+                "reference": "d3f5122ae72073deb631ebb67e060b818620014e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/shopify-api/anibalealvarezs-shopify-api-18568aad870fe39595b79dd3f7b751e6facd3f12-zip-1cf57d.zip",
-                "reference": "18568aad870fe39595b79dd3f7b751e6facd3f12",
-                "shasum": "7c332b918157ed96b3e95d0afa481affd9d65e78"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/shopify-api/anibalealvarezs-shopify-api-d3f5122ae72073deb631ebb67e060b818620014e-zip-aedd60.zip",
+                "reference": "d3f5122ae72073deb631ebb67e060b818620014e",
+                "shasum": "40c88a9d1149a498e0c2958d371b9fe2e72f8733"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -406,6 +470,7 @@
                 "symfony/yaml": "^5.4.10"
             },
             "require-dev": {
+                "phpstan/phpstan": "^1.10",
                 "phpunit/phpunit": "^9"
             },
             "default-branch": true,
@@ -434,7 +499,7 @@
                 "source": "https://github.com/anibalealvarezs/shopify-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/shopify-api/issues"
             },
-            "time": "2025-02-08T22:22:52+00:00"
+            "time": "2026-03-05T00:22:28+00:00"
         },
         {
             "name": "anibalealvarezs/triple-whale-api",
@@ -442,13 +507,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/triple-whale-api.git",
-                "reference": "3f7e096ecbe2e65438678f5bb6b9e2d552e0cc43"
+                "reference": "4c645263ddadfc00747a898e5ae641aeee1c2332"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/triple-whale-api/anibalealvarezs-triple-whale-api-3f7e096ecbe2e65438678f5bb6b9e2d552e0cc43-zip-78375a.zip",
-                "reference": "3f7e096ecbe2e65438678f5bb6b9e2d552e0cc43",
-                "shasum": "37959145c4fbe9469cd691513e6561fac05ab7df"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/triple-whale-api/anibalealvarezs-triple-whale-api-4c645263ddadfc00747a898e5ae641aeee1c2332-zip-3c8f3f.zip",
+                "reference": "4c645263ddadfc00747a898e5ae641aeee1c2332",
+                "shasum": "8b6fda87461fd455935b461b249b3f9e465c6ed6"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -461,6 +526,7 @@
             },
             "require-dev": {
                 "fakerphp/faker": "^1.20",
+                "phpstan/phpstan": "^1.10",
                 "phpunit/phpunit": "^9"
             },
             "default-branch": true,
@@ -489,7 +555,7 @@
                 "source": "https://github.com/anibalealvarezs/triple-whale-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/triple-whale-api/issues"
             },
-            "time": "2025-02-08T22:40:52+00:00"
+            "time": "2026-03-04T23:47:35+00:00"
         },
         {
             "name": "carbonphp/carbon-doctrine-types",
@@ -1586,12 +1652,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/guzzle.git",
-                "reference": "b51ac707cfa420b7bfd4e4d5e510ba8008e822b4"
+                "reference": "fb92d95f80a9da51bf8f2a5b26d8e8ea3b6d99ed"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/guzzle/zipball/b51ac707cfa420b7bfd4e4d5e510ba8008e822b4",
-                "reference": "b51ac707cfa420b7bfd4e4d5e510ba8008e822b4",
+                "url": "https://api.github.com/repos/guzzle/guzzle/zipball/fb92d95f80a9da51bf8f2a5b26d8e8ea3b6d99ed",
+                "reference": "fb92d95f80a9da51bf8f2a5b26d8e8ea3b6d99ed",
                 "shasum": ""
             },
             "require": {
@@ -1689,7 +1755,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/guzzle/issues",
-                "source": "https://github.com/guzzle/guzzle/tree/7.10.0"
+                "source": "https://github.com/guzzle/guzzle/tree/7.10"
             },
             "funding": [
                 {
@@ -1705,7 +1771,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-08-23T22:36:01+00:00"
+            "time": "2026-03-05T20:35:15+00:00"
         },
         {
             "name": "guzzlehttp/promises",
@@ -1713,12 +1779,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/promises.git",
-                "reference": "481557b130ef3790cf82b713667b43030dc9c957"
+                "reference": "74c1b7186ecda8058c8958a1b2d3e8ef4419a84e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/promises/zipball/481557b130ef3790cf82b713667b43030dc9c957",
-                "reference": "481557b130ef3790cf82b713667b43030dc9c957",
+                "url": "https://api.github.com/repos/guzzle/promises/zipball/74c1b7186ecda8058c8958a1b2d3e8ef4419a84e",
+                "reference": "74c1b7186ecda8058c8958a1b2d3e8ef4419a84e",
                 "shasum": ""
             },
             "require": {
@@ -1773,7 +1839,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/promises/issues",
-                "source": "https://github.com/guzzle/promises/tree/2.3.0"
+                "source": "https://github.com/guzzle/promises/tree/2.3"
             },
             "funding": [
                 {
@@ -1789,7 +1855,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-08-22T14:34:08+00:00"
+            "time": "2026-03-05T20:35:27+00:00"
         },
         {
             "name": "guzzlehttp/psr7",
@@ -1797,12 +1863,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/psr7.git",
-                "reference": "21dc724a0583619cd1652f673303492272778051"
+                "reference": "27b6714cf2e71cfcc49718eb81ac711103f08218"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/psr7/zipball/21dc724a0583619cd1652f673303492272778051",
-                "reference": "21dc724a0583619cd1652f673303492272778051",
+                "url": "https://api.github.com/repos/guzzle/psr7/zipball/27b6714cf2e71cfcc49718eb81ac711103f08218",
+                "reference": "27b6714cf2e71cfcc49718eb81ac711103f08218",
                 "shasum": ""
             },
             "require": {
@@ -1890,7 +1956,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/psr7/issues",
-                "source": "https://github.com/guzzle/psr7/tree/2.8.0"
+                "source": "https://github.com/guzzle/psr7/tree/2.8"
             },
             "funding": [
                 {
@@ -1906,7 +1972,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-08-23T21:21:41+00:00"
+            "time": "2026-03-05T21:03:18+00:00"
         },
         {
             "name": "monolog/monolog",
@@ -2125,12 +2191,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/predis/predis.git",
-                "reference": "274cb866bdde785da266610383b1d67dff5b5dc9"
+                "reference": "7388d911535bff78fee714138b0462d98c196c01"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/predis/predis/zipball/274cb866bdde785da266610383b1d67dff5b5dc9",
-                "reference": "274cb866bdde785da266610383b1d67dff5b5dc9",
+                "url": "https://api.github.com/repos/predis/predis/zipball/7388d911535bff78fee714138b0462d98c196c01",
+                "reference": "7388d911535bff78fee714138b0462d98c196c01",
                 "shasum": ""
             },
             "require": {
@@ -2181,7 +2247,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-02-26T19:01:54+00:00"
+            "time": "2026-03-05T15:05:02+00:00"
         },
         {
             "name": "psr/cache",
@@ -2991,12 +3057,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/console.git",
-                "reference": "7b1f1c37eff5910ddda2831345467e593a5120ad"
+                "reference": "4d5318a66a747418eb12544ac38dc1ce78f3a482"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/console/zipball/7b1f1c37eff5910ddda2831345467e593a5120ad",
-                "reference": "7b1f1c37eff5910ddda2831345467e593a5120ad",
+                "url": "https://api.github.com/repos/symfony/console/zipball/4d5318a66a747418eb12544ac38dc1ce78f3a482",
+                "reference": "4d5318a66a747418eb12544ac38dc1ce78f3a482",
                 "shasum": ""
             },
             "require": {
@@ -3081,7 +3147,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-02-23T15:42:15+00:00"
+            "time": "2026-03-05T15:03:01+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",
@@ -3560,12 +3626,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-kernel.git",
-                "reference": "2a85e5c9a9ab72fdb75c68ae38de34ad615807b0"
+                "reference": "07f732b24472da0ba685281a849b60a1012d142b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/2a85e5c9a9ab72fdb75c68ae38de34ad615807b0",
-                "reference": "2a85e5c9a9ab72fdb75c68ae38de34ad615807b0",
+                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/07f732b24472da0ba685281a849b60a1012d142b",
+                "reference": "07f732b24472da0ba685281a849b60a1012d142b",
                 "shasum": ""
             },
             "require": {
@@ -3670,7 +3736,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-02-26T08:27:46+00:00"
+            "time": "2026-03-04T15:26:40+00:00"
         },
         {
             "name": "symfony/messenger",
@@ -3678,12 +3744,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/messenger.git",
-                "reference": "465d8eae412a59084a868f467357b2bbbe4bd20c"
+                "reference": "4f377837498a37d6e6d12640fec624bbd44ebbbf"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/messenger/zipball/465d8eae412a59084a868f467357b2bbbe4bd20c",
-                "reference": "465d8eae412a59084a868f467357b2bbbe4bd20c",
+                "url": "https://api.github.com/repos/symfony/messenger/zipball/4f377837498a37d6e6d12640fec624bbd44ebbbf",
+                "reference": "4f377837498a37d6e6d12640fec624bbd44ebbbf",
                 "shasum": ""
             },
             "require": {
@@ -3761,7 +3827,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-02-24T16:00:52+00:00"
+            "time": "2026-03-04T13:20:04+00:00"
         },
         {
             "name": "symfony/polyfill-ctype",
@@ -5777,16 +5843,16 @@
         },
         {
             "name": "phpbench/phpbench",
-            "version": "1.4.3",
+            "version": "1.5.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpbench/phpbench.git",
-                "reference": "b641dde59d969ea42eed70a39f9b51950bc96878"
+                "reference": "9a28fd0833f11171b949843c6fd663eb69b6d14c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpbench/phpbench/zipball/b641dde59d969ea42eed70a39f9b51950bc96878",
-                "reference": "b641dde59d969ea42eed70a39f9b51950bc96878",
+                "url": "https://api.github.com/repos/phpbench/phpbench/zipball/9a28fd0833f11171b949843c6fd663eb69b6d14c",
+                "reference": "9a28fd0833f11171b949843c6fd663eb69b6d14c",
                 "shasum": ""
             },
             "require": {
@@ -5797,7 +5863,7 @@
                 "ext-reflection": "*",
                 "ext-spl": "*",
                 "ext-tokenizer": "*",
-                "php": "^8.1",
+                "php": "^8.2",
                 "phpbench/container": "^2.2",
                 "psr/log": "^1.1 || ^2.0 || ^3.0",
                 "seld/jsonlint": "^1.1",
@@ -5817,8 +5883,9 @@
                 "phpstan/extension-installer": "^1.1",
                 "phpstan/phpstan": "^1.0",
                 "phpstan/phpstan-phpunit": "^1.0",
-                "phpunit/phpunit": "^10.4 || ^11.0",
+                "phpunit/phpunit": "^11.5",
                 "rector/rector": "^1.2",
+                "sebastian/exporter": "^6.3.2",
                 "symfony/error-handler": "^6.1 || ^7.0 || ^8.0",
                 "symfony/var-dumper": "^6.1 || ^7.0 || ^8.0"
             },
@@ -5863,7 +5930,7 @@
             ],
             "support": {
                 "issues": "https://github.com/phpbench/phpbench/issues",
-                "source": "https://github.com/phpbench/phpbench/tree/1.4.3"
+                "source": "https://github.com/phpbench/phpbench/tree/1.5.1"
             },
             "funding": [
                 {
@@ -5871,7 +5938,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-11-06T19:07:31+00:00"
+            "time": "2026-03-05T08:18:58+00:00"
         },
         {
             "name": "phpstan/phpstan",
@@ -6263,12 +6330,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "a8ed8c5d85b7cb6768e2829b4ee507e880e9f22e"
+                "reference": "a71778ade547d17881d1039314375ec273a0b32f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/a8ed8c5d85b7cb6768e2829b4ee507e880e9f22e",
-                "reference": "a8ed8c5d85b7cb6768e2829b4ee507e880e9f22e",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/a71778ade547d17881d1039314375ec273a0b32f",
+                "reference": "a71778ade547d17881d1039314375ec273a0b32f",
                 "shasum": ""
             },
             "require": {
@@ -6346,27 +6413,11 @@
             },
             "funding": [
                 {
-                    "url": "https://phpunit.de/sponsors.html",
-                    "type": "custom"
-                },
-                {
-                    "url": "https://github.com/sebastianbergmann",
-                    "type": "github"
-                },
-                {
-                    "url": "https://liberapay.com/sebastianbergmann",
-                    "type": "liberapay"
-                },
-                {
-                    "url": "https://thanks.dev/u/gh/sebastianbergmann",
-                    "type": "thanks_dev"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/phpunit/phpunit",
-                    "type": "tidelift"
+                    "url": "https://phpunit.de/sponsoring.html",
+                    "type": "other"
                 }
             ],
-            "time": "2026-02-23T16:12:28+00:00"
+            "time": "2026-03-03T16:43:55+00:00"
         },
         {
             "name": "sebastian/cli-parser",
@@ -7757,6 +7808,7 @@
         "anibalealvarezs/facebook-graph-api": 20,
         "anibalealvarezs/google-api": 20,
         "anibalealvarezs/klaviyo-api": 20,
+        "anibalealvarezs/mailchimp-api": 20,
         "anibalealvarezs/netsuite-api": 20,
         "anibalealvarezs/shopify-api": 20,
         "anibalealvarezs/triple-whale-api": 20,

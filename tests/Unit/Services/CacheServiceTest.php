@@ -67,7 +67,7 @@ class CacheServiceTest extends TestCase
             ->with('get', [$key])
             ->willReturn($serialized);
 
-        $result = $this->cacheService->get($key, fn() => $this->faker->sentence);
+        $result = $this->cacheService->get($key, fn () => $this->faker->sentence);
         $this->assertEquals($value, $result);
     }
 

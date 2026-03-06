@@ -87,7 +87,7 @@ class CacheController extends BaseController
         // Use Reflection to only pass parameters that the method expects
         $reflection = new \ReflectionMethod($className, $methodName);
         $methodParams = $reflection->getParameters();
-        
+
         $finalParams = [];
         $extraParams = [];
 
@@ -136,7 +136,7 @@ class CacheController extends BaseController
                ->setParameter('entity', $entity)
                ->setParameter('channel', $channel->name)
                ->setParameter('statuses', [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value]);
-            
+
             $existingJobs = $qb->getQuery()->getResult();
             if (count($existingJobs) > 0) {
                 return $this->createResponse(
@@ -163,6 +163,13 @@ class CacheController extends BaseController
                 data: ['message' => 'Caching job successfully scheduled in background.'],
                 status: 'success'
             );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: "error",
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
+            );
         } catch (Exception $e) {
             return $this->createResponse(
                 data: null,
@@ -188,7 +195,7 @@ class CacheController extends BaseController
                 ->set('j.status', \Enums\JobStatus::failed->value)
                 ->where('j.status IN (:statuses)')
                 ->setParameter('statuses', [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value]);
-            
+
             if ($channel) {
                 $channelEnum = Channel::tryFromName($channel);
                 if ($channelEnum) {
@@ -200,12 +207,19 @@ class CacheController extends BaseController
             if ($entity) {
                 $qb->andWhere('j.entity = :entity')->setParameter('entity', $entity);
             }
-            
+
             $count = $qb->getQuery()->execute();
-            
+
             return $this->createResponse(
                 data: ['message' => "$count caching jobs interrupted."],
                 status: 'success'
+            );
+        } catch (InvalidArgumentException $e) {
+            return $this->createResponse(
+                data: null,
+                status: "error",
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
         } catch (Exception $e) {
             return $this->createResponse(
@@ -277,13 +291,15 @@ class CacheController extends BaseController
             } */
 
             return $requestsClassName::$methodName(...$parameters) ?: [];
-        } catch (Exception) {
+        } catch (InvalidArgumentException $e) {
             return $this->createResponse(
                 data: null,
-                status: 'error',
-                error: "Entity " . $entity . " not found in AnalyticsEntities",
-                httpStatus: Response::HTTP_NOT_FOUND
+                status: "error",
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_BAD_REQUEST
             );
+        } catch (Exception $e) {
+            throw $e;
         }
     }
 }

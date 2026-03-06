@@ -55,15 +55,15 @@ class Post extends Entity
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $data = [];
 
-    #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'post')]
+    #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'posts')]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?Account $account = null;
 
-    #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'post')]
+    #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'posts')]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?ChanneledAccount $channeledAccount = null;
 
-    #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'post')]
+    #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'posts')]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?Page $page = null;
 

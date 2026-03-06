@@ -12,7 +12,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 #[AsCommand(
-    name: 'analytics:cache',
+    name: 'apis-hub:cache',
     description: 'Schedules a caching job for an analytics entity.',
     aliases: ['app:cache'],
     hidden: false
@@ -38,7 +38,8 @@ class CacheEntityCommand extends Command
             ->addArgument('channel', InputArgument::REQUIRED, 'The channel to cache from (e.g. shopify, klaviyo)')
             ->addArgument('entity', InputArgument::REQUIRED, 'The entity to cache (e.g. products, customers)')
             ->addOption('data', 'd', InputOption::VALUE_OPTIONAL, 'The JSON body data to pass to the request')
-            ->addOption('params', 'p', InputOption::VALUE_OPTIONAL, 'The JSON or query string parameters to pass to the request');
+            ->addOption('params', 'p', InputOption::VALUE_OPTIONAL, 'The JSON or query string parameters to pass to the request')
+            ->addOption('pretty', null, InputOption::VALUE_NONE, 'Pretty print the JSON response');
     }
 
     /**
@@ -53,7 +54,8 @@ class CacheEntityCommand extends Command
         $entity = $input->getArgument('entity');
         $body = $input->getOption('data');
         $paramsString = $input->getOption('params');
-        
+        $pretty = $input->getOption('pretty');
+
         $params = [];
         if ($paramsString) {
             $paramsArray = json_decode($paramsString, true);
@@ -74,13 +76,17 @@ class CacheEntityCommand extends Command
         );
 
         $content = json_decode($response->getContent(), true) ?? $response->getContent();
-        
+        $jsonOptions = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+        if ($pretty) {
+            $jsonOptions |= JSON_PRETTY_PRINT;
+        }
+
         if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
-            $output->writeln('<info>Success (' . $response->getStatusCode() . '): ' . (is_array($content) ? json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : $content) . '</info>');
+            $output->writeln('<info>Success (' . $response->getStatusCode() . '): ' . (is_array($content) ? json_encode($content, $jsonOptions) : $content) . '</info>');
             return Command::SUCCESS;
         }
 
-        $output->writeln('<error>Error (' . $response->getStatusCode() . '): ' . (is_array($content) ? json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : $content) . '</error>');
+        $output->writeln('<error>Error (' . $response->getStatusCode() . '): ' . (is_array($content) ? json_encode($content, $jsonOptions) : $content) . '</error>');
         return Command::FAILURE;
     }
 }

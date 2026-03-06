@@ -266,7 +266,7 @@ class JobRepositoryTest extends TestCase
             ->with($this->callback(function ($key) use (&$setParameterCallCount, $ids) {
                 error_log("testBuildReadMultipleQuery: setParameter call #$setParameterCallCount with key=" . json_encode($key));
                 $expected = $setParameterCallCount === 0 ? ['ids', $ids] : (
-                $setParameterCallCount === 1 ? ['status', JobStatus::scheduled->value] : ['entity', 'order']
+                    $setParameterCallCount === 1 ? ['status', JobStatus::scheduled->value] : ['entity', 'order']
                 );
                 $this->assertEquals($expected[0], $key, "Parameter key does not match for call #$setParameterCallCount");
                 $setParameterCallCount++;

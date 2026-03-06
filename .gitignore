@@ -1,20 +1,34 @@
+# Credentials — never commit these
+/config/yaml/channelsconfig.yaml
+/config/yaml/cacheconfig.yaml
+/config/yaml/dbconfig.yaml
+/config/channelsconfig.env
+/config/google_tokens.json
+/config/yaml/entitiesconfig_old.yaml
+
+# Deployment configs
+/deploy/*.yaml
+!/deploy/*.example.yaml
+!/deploy/project.yaml.example
+
+# Development / IDE
 /vendor/
 /.idea/
-/config/yaml/cacheconfig.yaml
-/config/yaml/channelsconfig.yaml
-/config/yaml/dbconfig.yaml
-/config/yaml/entitiesconfig_old.yaml
+/.vscode/
+/phpstan.neon
+/.phpunit.result.cache
+
+# Temp / Logs / Output
 /tests/Benchmark/*
 /tests/App/*
-/src/Entities/Analytics/Lead.php
-/src/Entities/Analytics/Accounts/*
-/.phpunit.result.cache
 *entities.php*
 *stderr*
 test_output_patch.txt
 test_redis.php
 *.log
-/phpstan.neon
-/.vscode/
+
+# Scripts / Entities
+/src/Entities/Analytics/Lead.php
+/src/Entities/Analytics/Accounts/*
 fix_callbacks.php
 fix_signatures.php

@@ -8,6 +8,7 @@ use Enums\QueryBuilderType;
 use Exception;
 use RuntimeException;
 use Repositories\RepositoryInterface;
+
 class ChanneledPriceRuleRepository extends ChanneledBaseRepository
 {
     /**
@@ -40,7 +41,7 @@ class ChanneledPriceRuleRepository extends ChanneledBaseRepository
             $entity['channel'] = Channel::from($entity['channel'])->getName();
         }
         if (isset($entity['channeledDiscounts'])) {
-            $entity['channeledDiscounts'] = array_map(function($channeledDiscount) {
+            $entity['channeledDiscounts'] = array_map(function ($channeledDiscount) {
                 unset($channeledDiscount['channel']);
                 return $channeledDiscount;
             }, $entity['channeledDiscounts']);

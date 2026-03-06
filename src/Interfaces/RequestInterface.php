@@ -12,7 +12,7 @@ interface RequestInterface
      * @param ArrayCollection $channeledCollection
      * @return Response
      */
-    static function process(ArrayCollection $channeledCollection): Response;
+    public static function process(ArrayCollection $channeledCollection): Response;
 
     /**
      * @return Channel[]

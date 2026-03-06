@@ -627,7 +627,7 @@ class MetricsProcessor
         $uniqueMetrics = [];
         /** @var \stdClass&object{dimensions: array, metricConfigKey: string, value: float|int, metadata?: array} $metric */
         foreach ($metrics->toArray() as $metric) {
-            $dimensions = array_map(function($dimension){
+            $dimensions = array_map(function ($dimension) {
                 return [ 'dimensionKey' => $dimension['dimensionKey'], 'dimensionValue' => $dimension['dimensionValue'] ];
             }, $metric->dimensions);
             $dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
@@ -683,8 +683,9 @@ class MetricsProcessor
             metricConfigMap: $metricConfigMap
         );
 
-        // Get the list of metrics that need to be inserted
+        // Get the list of metrics that need to be inserted and updated
         $metricsToInsert = [];
+        $metricsToUpdate = [];
         foreach ($uniqueMetrics as $key => $metric) {
             if (!isset($metricMap[$key])) {
                 $metricsToInsert[] = [
@@ -693,6 +694,11 @@ class MetricsProcessor
                     'dimensionsHash' => $metric['dimensionsHash'],
                     'metricConfig_id' => $metric['metricConfig_id'],
                     'key' => $key,
+                ];
+            } else {
+                $metricsToUpdate[] = [
+                    'id' => $metricMap[$key],
+                    'value' => $metric['value']
                 ];
             }
         }
@@ -748,6 +754,33 @@ class MetricsProcessor
                 $metricMap[$metricKey] = (int)$metric['id'];
                 // $logger->info("Added metric to map: metricKey=$metricKey, metric_id={$metric['id']}");
             }
+        }
+
+        // Bulk Update metrics (High-Water Mark / Monotonic)
+        if (!empty($metricsToUpdate)) {
+            $updateCases = [];
+            $updateParams = [];
+            $ids = [];
+            foreach ($metricsToUpdate as $update) {
+                $id = (int)$update['id'];
+                $newValue = $update['value'];
+                $updateCases[] = "WHEN id = ? THEN GREATEST(COALESCE(value, 0), ?)";
+                $updateParams[] = $id;
+                $updateParams[] = $newValue;
+                $ids[] = $id;
+            }
+            $caseSql = implode("\n", $updateCases);
+            $idPlaceholders = implode(', ', array_fill(0, count($ids), '?'));
+            $finalParams = array_merge($updateParams, $ids);
+
+            $manager->getConnection()->executeStatement("
+                UPDATE metrics
+                SET value = CASE
+                    $caseSql
+                    ELSE value
+                END
+                WHERE id IN ($idPlaceholders)
+            ", $finalParams);
         }
 
         // Helpers::dumpDebugJson($metricMap);
@@ -1003,7 +1036,7 @@ class MetricsProcessor
     ): void {
         // $logger->info("Processing " . count($metrics->toArray()) . " metrics in processChanneledMetricDimensions");
         // Extract dimensions from metrics
-        
+
         $uniqueDimensions = [];
         /** @var \stdClass&object{dimensions: array, dimensionsHash: string, metricConfigKey: string, channel: string, platformId: string, platformCreatedAt: string|\DateTime} $metric */
         foreach ($metrics->toArray() as $metric) {
@@ -1063,10 +1096,14 @@ class MetricsProcessor
                 $selectParams[] = $channeledMetricId;
 
                 $conditions[] = $dimensionKey === null ? 'dimensionKey IS NULL' : 'dimensionKey = ?';
-                if ($dimensionKey !== null) $selectParams[] = $dimensionKey;
+                if ($dimensionKey !== null) {
+                    $selectParams[] = $dimensionKey;
+                }
 
                 $conditions[] = $dimensionValue === null ? 'dimensionValue IS NULL' : 'dimensionValue = ?';
-                if ($dimensionValue !== null) $selectParams[] = $dimensionValue;
+                if ($dimensionValue !== null) {
+                    $selectParams[] = $dimensionValue;
+                }
 
                 $nullConditions[] = '(' . implode(' AND ', $conditions) . ')';
             } else {
@@ -1128,7 +1165,8 @@ class MetricsProcessor
             $manager->getConnection()->executeStatement(
                 "INSERT INTO channeled_metric_dimensions (channeledMetric_id, dimensionKey, dimensionValue)
                     VALUES $insertPlaceholders",
-                $insertParams);
+                $insertParams
+            );
         }
     }
 }

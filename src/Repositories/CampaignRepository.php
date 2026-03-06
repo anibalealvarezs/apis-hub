@@ -9,6 +9,7 @@ use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\Channel;
 use Enums\QueryBuilderType;
+
 class CampaignRepository extends BaseRepository
 {
     /**
@@ -92,11 +93,11 @@ class CampaignRepository extends BaseRepository
      */
     protected function replaceChannelName(array $entity): array
     {
-        $entity['channeledCampaigns'] = array_map(function($channelCustomer) {
+        $entity['channeledCampaigns'] = array_map(function ($channelCustomer) {
             $channelCustomer['channel'] = Channel::from($channelCustomer['channel'])->getName();
             return $channelCustomer;
         }, $entity['channeledCampaigns']);
-        $entity['channeledAdGroups'] = array_map(function($channelCustomer) {
+        $entity['channeledAdGroups'] = array_map(function ($channelCustomer) {
             $channelCustomer['channel'] = Channel::from($channelCustomer['channel'])->getName();
             return $channelCustomer;
         }, $entity['channeledAdGroups']);

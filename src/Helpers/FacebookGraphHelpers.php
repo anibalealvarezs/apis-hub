@@ -48,14 +48,20 @@ class FacebookGraphHelpers
 
         $differences = self::calculateDifferences($allRows, $childrenSums);
 
-        $allocatedDifferences = self::allocatePositiveDifferences($differences,
-            self::$allDimensions);
+        $allocatedDifferences = self::allocatePositiveDifferences(
+            $differences,
+            self::$allDimensions
+        );
 
-        $allocateFinalDifference = self::addGlobalRemainderSynthetic($allocatedDifferences,
-            self::$allDimensions);
+        $allocateFinalDifference = self::addGlobalRemainderSynthetic(
+            $allocatedDifferences,
+            self::$allDimensions
+        );
 
-        $negativeDifferencesProcessed = self::flagOrScaleNegativeDifferences($allocateFinalDifference,
-            true);
+        $negativeDifferencesProcessed = self::flagOrScaleNegativeDifferences(
+            $allocateFinalDifference,
+            true
+        );
 
         $scaleAdjusted = self::adjustScaledPositions($negativeDifferencesProcessed);
 
@@ -468,7 +474,8 @@ class FacebookGraphHelpers
      * @param array $targetCountries
      * @return array
      */
-    public static function fillWithNullsAndFilter(array $rows, array $targetKeywords, array $targetCountries): array {
+    public static function fillWithNullsAndFilter(array $rows, array $targetKeywords, array $targetCountries): array
+    {
         $newRows = [];
         foreach ($rows as $row) {
             list($date, $query, $country, $page, $device) = self::getDimensionsValues($row, array_flip($row['subset']), $targetKeywords, $targetCountries);
@@ -487,7 +494,8 @@ class FacebookGraphHelpers
      * @param array $targetCountries
      * @return array
      */
-    public static function dontFillButFilter(array &$rows, array $subset, array $targetKeywords, array $targetCountries): array {
+    public static function dontFillButFilter(array &$rows, array $subset, array $targetKeywords, array $targetCountries): array
+    {
         $allRows = [];
         foreach ($rows as $row) {
             list($date, $query, $country, $page, $device) = self::getDimensionsValues($row, array_flip($subset), $targetKeywords, $targetCountries);
@@ -637,7 +645,7 @@ class FacebookGraphHelpers
      * @param mixed $row
      * @return array
      */
-    public static function getMetricsValues(mixed $row) : array
+    public static function getMetricsValues(mixed $row): array
     {
         return [
             $row['impressions'] ?? 0,

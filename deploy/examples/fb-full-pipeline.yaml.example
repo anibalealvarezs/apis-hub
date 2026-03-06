@@ -1,0 +1,132 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# apis-hub · Facebook Full Historical + Daily Sync Example
+# ─────────────────────────────────────────────────────────────────────────────
+# This configuration demonstrates a complete Facebook & Instagram setup:
+# 1. Backfill of historical Ads and Page Insights.
+# 2. Daily synchronization of Ads, Posts, and Metrics.
+# 3. Use of "Gold Standards" for daily attribution (-3 days).
+# ─────────────────────────────────────────────────────────────────────────────
+
+project: facebook-full-pipeline
+
+database:
+  testing:
+    driver: pdo_mysql
+    host: ${DB_HOST:-127.0.0.1}
+    port: 3306
+    user: root
+    password: YOUR_LOCAL_PASSWORD
+    name: ${DB_NAME:-apis_hub_fb_dev}
+
+  production:
+    driver: pdo_mysql
+    host: ${PROD_DB_HOST:-host.docker.internal}
+    port: 3306
+    user: root
+    password: ${PROD_DB_PASSWORD:-YOUR_PROD_PASSWORD}
+    name: ${PROD_DB_NAME:-apis_hub_fb_prod}
+
+redis:
+  host: ${REDIS_HOST:-127.0.0.1}
+  port: ${REDIS_PORT:-6379}
+
+# ── Worker instances (Scheduled Caching) ──────────────────────────────────────
+instances:
+  # ---------------------------------------------------------------------------
+  # 1. HISTORICAL BACKFILL (Ads & Insights)
+  # ---------------------------------------------------------------------------
+  # Runs once a month just to verify history. 
+  # Covers from 2 years ago to last month.
+  - name: fb-history-backfill
+    frequency: "0 2 1 * *" 
+    channel: facebook
+    entity: metric
+    start_date: "-2 years"
+    end_date: "-31 days"
+
+  # ---------------------------------------------------------------------------
+  # 2. DAILY CONTENT SYNC (Campaigns, AdSets, Ads)
+  # ---------------------------------------------------------------------------
+  # Refresh the structure of the ad accounts daily.
+  - name: fb-structure-sync
+    frequency: "0 3 * * *" 
+    channel: facebook
+    entity: channeled_campaign  # This triggers a recursive structure sync
+    start_date: "-30 days"      # Check status of recent campaigns
+
+  # ---------------------------------------------------------------------------
+  # 3. DAILY PAGE POSTS SYNC
+  # ---------------------------------------------------------------------------
+  # Fetches new posts and their engagement.
+  - name: fb-posts-daily
+    frequency: "0 4 * * *"
+    channel: facebook
+    entity: post
+    start_date: "-30 days"
+
+  # ---------------------------------------------------------------------------
+  # 4. GOLD STANDARD METRIC SYNC (Daily Insights)
+  # ---------------------------------------------------------------------------
+  # This maintains the "sliding window" of fresh data for both FB & IG.
+  # Granularity: 1 day.
+  - name: fb-metrics-daily
+    frequency: "30 4 * * *" 
+    channel: facebook
+    entity: metric
+    # GOLD STANDARD: -3 days to yesterday to handle attribution windows.
+    # Uses Monotonic High-Water Mark logic to prevent data loss.
+    start_date: "-3 days"
+    end_date: "yesterday"
+
+# ── Channel credentials & config ─────────────────────────────────────────────
+channels:
+  facebook:
+    enabled: true                          # Enable Facebook/Instagram sync
+    user_id: ${FB_USER_ID}                 # Numerical Facebook User ID
+    app_id: ${FB_APP_ID}
+    app_secret: ${FB_APP_SECRET}
+    app_redirect_uri: ${FB_REDIRECT_URI}
+    graph_user_access_token: ${FB_USER_TOKEN}
+    # Optional tokens if already available:
+    graph_long_lived_user_access_token: ${FB_LONG_LIVED_TOKEN}
+    
+    # Page & Instagram configurations
+    pages:
+      - id: "12345678"                     # Facebook Page ID
+        url: https://www.facebook.com/yourpage # Canonical URL of the Page
+        title: "My Fan Page"                # Friendly display name
+        hostname: "yourdomain.com"          # Associated domain
+        enabled: true                       # Set to false to skip this page
+        # Detailed Sync Toggles (Organic)
+        page_metrics: true                  # Fetch Page-level insights
+        posts: true                         # Sync organic post content
+        post_metrics: true                  # Fetch engagement for organic posts
+        # Instagram Integration
+        ig_account: "987654321"             # Instagram Business Account ID
+        ig_account_metrics: true            # Fetch IG account-level insights
+        ig_account_media: true              # Sync IG media items
+        ig_account_media_metrics: true      # Fetch IG media performance
+        ig_account_media_stop_id: null       # Limit for historical media sync
+
+    # Ad Account configurations (Paid Data)
+    ad_accounts:
+      - id: "act_123456789"                # Ad Account ID (including 'act_')
+        enabled: true                       # Set to false to skip this account
+        # Detailed Sync Toggles (Paid)
+        ad_account_metrics: true            # Fetch account-level spend/results
+        campaigns: true                     # Sync Campaign structures
+        campaign_metrics: true              # Fetch metrics at Campaign level
+        adsets: true                        # Sync AdSet structures
+        adset_metrics: true                 # Fetch metrics at AdSet level
+        ads: true                           # Sync Ad structures
+        ad_metrics: true                    # Fetch metrics at Ad level
+        creatives: true                     # Sync Ad creatives (images/text)
+        creative_metrics: true              # Fetch metrics per creative
+
+    # Default metrics to fetch
+    metrics:
+      - impressions
+      - clicks
+      - spend
+      - reach
+      - frequency
