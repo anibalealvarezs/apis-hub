@@ -45,12 +45,34 @@ class HealthCheckCommand extends Command
         // 3. Schema Sync
         $output->write("📐 <comment>Doctrine Schema Sync:</comment> ");
         try {
-            $tool = new \Doctrine\ORM\Tools\SchemaValidator(Helpers::getManager());
+            $em = Helpers::getManager();
+            $tool = new \Doctrine\ORM\Tools\SchemaValidator($em);
             $mappingErrors = $tool->validateMapping();
-            $schemaSynced = $tool->schemaInSyncWithMetadata();
+            
+            // Check for structural changes
+            $schemaTool = new \Doctrine\ORM\Tools\SchemaTool($em);
+            $allMetadata = $em->getMetadataFactory()->getAllMetadata();
+            $sqls = $schemaTool->getUpdateSchemaSql($allMetadata, false);
+
+            // Filter out "Phantom Diffs" (known Doctrine quirks)
+            $filteredSqls = array_filter($sqls, function($sql) {
+                // Ignore the recurring "ALTER TABLE queries ... COLLATE `utf8mb4_bin`"
+                // which stays in the diff due to provider/comparator string mismatch
+                if (stripos($sql, 'ALTER TABLE queries') !== false && stripos($sql, 'utf8mb4_bin') !== false) {
+                    return false;
+                }
+                return true;
+            });
+
+            $schemaSynced = empty($filteredSqls);
 
             if (empty($mappingErrors) && $schemaSynced) {
-                $output->writeln("<info>SYNCHRONIZED</info>");
+                $output->write("<info>SYNCHRONIZED</info>");
+                if (count($sqls) !== count($filteredSqls)) {
+                    $output->writeln(" <comment>(with documented phantom diffs ignored)</comment>");
+                } else {
+                    $output->writeln("");
+                }
             } else {
                 $output->writeln("<error>OUT OF SYNC</error>");
                 if (!empty($mappingErrors)) {
@@ -59,7 +81,10 @@ class HealthCheckCommand extends Command
                     }
                 }
                 if (!$schemaSynced) {
-                    $output->writeln("   - Database schema is not in sync with metadata.");
+                    $output->writeln("   - Database schema has pending structural changes:");
+                    foreach ($filteredSqls as $sql) {
+                        $output->writeln("     > $sql");
+                    }
                 }
                 $allPassed = false;
             }

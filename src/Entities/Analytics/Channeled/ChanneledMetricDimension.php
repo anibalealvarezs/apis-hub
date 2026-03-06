@@ -8,20 +8,10 @@ use Repositories\Channeled\ChanneledMetricDimensionRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledMetricDimensionRepository::class)]
 #[ORM\Table(name: 'channeled_metric_dimensions')]
-#[ORM\Index(
-    columns: ['channeledMetric_id', 'dimensionKey', 'dimensionValue'],
-    name: 'lookup_by_metric_key_value_idx'
-)]
 #[ORM\UniqueConstraint(name: 'channeled_metric_dimension_unique', columns: ['dimensionKey', 'dimensionValue', 'channeledMetric_id'])]
 #[ORM\Index(columns: ['channeledMetric_id'], name: 'channeledMetric_id_idx')]
 #[ORM\Index(columns: ['dimensionKey', 'dimensionValue'], name: 'dimensionKey_dimensionValue_idx')]
-#[ORM\Index(columns: ['dimensionKey', 'dimensionValue', 'channeledMetric_id'], name: 'dimensionKey_dimensionValue_channeledMetric_id_idx')]
-#[ORM\Index(
-    columns: ['dimensionKey', 'dimensionValue', 'channeledMetric_id'],
-    name: 'channeled_metric_dimension_partial',
-    options: ['where' => 'dimensionValue IS NOT NULL']
-)]
-#[ORM\HasLifecycleCallbacks]
+#[ORM\Index(columns: ['channeledMetric_id', 'dimensionKey', 'dimensionValue'], name: 'lookup_by_metric_key_value_idx')]
 class ChanneledMetricDimension extends Entity
 {
     #[ORM\ManyToOne(targetEntity: ChanneledMetric::class, inversedBy: 'dimensions')]
