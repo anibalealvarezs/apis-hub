@@ -240,7 +240,8 @@ class BaseRepository extends EntityRepository
         ?string $startDate = null,
         ?string $endDate = null
     ): ArrayCollection {
-        $query = $this->buildReadMultipleQuery(
+        // Fallback for repositories without ID fetch capability if needed, but not here
+        $idQueryBuilder = $this->buildReadMultipleQuery(
             ids: $ids,
             filters: $filters,
             orderBy: $orderBy,
@@ -251,7 +252,21 @@ class BaseRepository extends EntityRepository
             endDate: $endDate
         );
 
-        $list = $query->getQuery()->getResult(AbstractQuery::HYDRATE_ARRAY);
+        // First step: Get ONLY the IDs we need, respecting limit and pagination
+        $idResult = $idQueryBuilder->select('DISTINCT e.id AS id')->getQuery()->getScalarResult();
+        $targetIds = array_column($idResult, 'id');
+
+        if (empty($targetIds)) {
+            return new ArrayCollection([]);
+        }
+
+        // Second step: Fetch full data for only these IDs, with all joins
+        $dataQueryBuilder = $this->createBaseQueryBuilder()
+            ->where('e.id IN (:targetIds)')
+            ->setParameter('targetIds', $targetIds)
+            ->orderBy("e.$orderBy", strtoupper($orderDir));
+
+        $list = $dataQueryBuilder->getQuery()->getResult(AbstractQuery::HYDRATE_ARRAY);
 
         $processedList = array_map(
             fn ($item) => $this->processResult($item),
