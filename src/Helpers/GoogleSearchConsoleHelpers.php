@@ -514,11 +514,7 @@ class GoogleSearchConsoleHelpers
      */
     public static function validateGoogleConfig(LoggerInterface $logger): array
     {
-        $config = Helpers::getChannelsConfig()['google'] ?? null;
-        if (!$config) {
-            $logger->error("Missing 'google' configuration in channels config");
-            throw new Exception("Missing 'google' configuration in channels config");
-        }
+        $config = Helpers::getChannelsConfig()['google'] ?? [];
         $scConfig = Helpers::getChannelsConfig()['google_search_console'] ?? null;
         if (!$scConfig) {
             $logger->error("Missing 'google_search_console' configuration in channels config");

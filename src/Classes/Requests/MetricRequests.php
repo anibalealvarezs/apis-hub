@@ -785,14 +785,20 @@ class MetricRequests
         $apiRetryCount = 0;
         while ($apiRetryCount < $maxApiRetries) {
             try {
+                $scopes = $config['google_search_console']['scope'] ?? ["https://www.googleapis.com/auth/webmasters"];
+                if (is_string($scopes)) {
+                    $scopes = array_map('trim', explode(',', $scopes));
+                }
+
                 $apiInstance = new SearchConsoleApi(
-                    redirectUrl: $config['google']['redirect_uri'] ?? null,
-                    clientId: $config['google']['client_id'] ?? null,
-                    clientSecret: $config['google']['client_secret'] ?? null,
-                    refreshToken: $config['google']['refresh_token'] ?? null,
-                    userId: $config['google']['user_id'] ?? null,
-                    scopes: [$config['google_search_console']['scope'] ?? null],
-                    token: $config['google_search_console']['token'] ?? null
+                    redirectUrl: $config['google_search_console']['redirect_uri'] ?? ($config['google']['redirect_uri'] ?? null),
+                    clientId: $config['google_search_console']['client_id'] ?? ($config['google']['client_id'] ?? null),
+                    clientSecret: $config['google_search_console']['client_secret'] ?? ($config['google']['client_secret'] ?? null),
+                    refreshToken: $config['google_search_console']['refresh_token'] ?? ($config['google']['refresh_token'] ?? null),
+                    userId: $config['google_search_console']['user_id'] ?? ($config['google']['user_id'] ?? null),
+                    scopes: $scopes,
+                    token: $config['google_search_console']['token'] ?? null,
+                    tokenPath: $config['google_search_console']['token_path'] ?? ($config['google']['token_path'] ?? "")
                 );
                 $logger->info("Initialized SearchConsoleApi");
                 return $apiInstance;

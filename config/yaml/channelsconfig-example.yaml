@@ -54,11 +54,18 @@ google:
   client_secret: #client_secret
   redirect_uri: https://oauth.pstmn.io/v1/browser-callback
   refresh_token: #refresh_token
-  user_id: #anibalealvarezs@gmail.com
+  user_id: #your@email.com
+  token_path: #./config/google_tokens.json
 google_search_console:
   enabled: true
-  scope: https://www.googleapis.com/auth/webmasters
+  scope: https://www.googleapis.com/auth/webmasters # can be a comma-separated list
   token: #token
+  # The following fields are optional and override the global 'google' settings if provided
+  # client_id: #specific_client_id
+  # client_secret: #specific_client_secret
+  # refresh_token: #specific_refresh_token
+  # user_id: #specific_user_id
+  # token_path: #specific_token_path
   test_site_url: #sc-domain:anibalalvarez.com
   test_removable_site_url: #sc-domain:loquesea.com
   test_sitemap_url: #https://anibalalvarez.com/sitemap_index.xml
