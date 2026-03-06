@@ -88,7 +88,13 @@ If the header is missing or incorrect, the API will return a `401 Unauthorized` 
 
 ---
 
-### 3. Database Initialization
+## 📖 Documentation
+
+Detailed guides for setting up and maintaining the infrastructure:
+*   [External Database Preparation](docs/external-db-prep.md)
+*   [Infrastructure & Health Checks](docs/health-checks.md)
+
+## 🛠 Installation
 
 Before running queries, initialize your Cloud/Local Database schema with these idempotent commands:
 

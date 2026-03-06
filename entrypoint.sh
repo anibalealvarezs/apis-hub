@@ -1,9 +1,10 @@
 #!/bin/bash
 set -e
 
-# Update database schema
-echo "Updating database schema..."
-php bin/cli.php orm:schema-tool:update --force || echo "Schema update failed, continuing..."
+# Update database schema and seed entities
+echo "Initializing database..."
+php bin/cli.php orm:schema-tool:update --force || echo "Schema update failed"
+php bin/cli.php app:initialize-entities || echo "Entity initialization failed"
 
 # Configure Cron based on project config
 if [ -n "$PROJECT_CONFIG_FILE" ]; then

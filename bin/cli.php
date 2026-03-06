@@ -34,7 +34,8 @@ $cli->addCommands([
     new GenerateEntitiesConfigCommand(),
     new InitializeEntitiesCommand(Helpers::getManager()),
     new \Commands\Analytics\CacheEntityCommand(),
-    new \Commands\Analytics\ProcessJobsCommand()
+    new \Commands\Analytics\ProcessJobsCommand(),
+    new \Commands\HealthCheckCommand()
 ]);
 
 // Runs console application
