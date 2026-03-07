@@ -2,8 +2,6 @@
 
 namespace Repositories;
 
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
@@ -14,8 +12,6 @@ use Enums\JobStatus;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use InvalidArgumentException;
-use ReflectionEnum;
-use ReflectionException;
 
 class JobRepository extends BaseRepository
 {
@@ -42,15 +38,29 @@ class JobRepository extends BaseRepository
      * @param bool $returnEntity
      * @return array|null
      * @throws NonUniqueResultException
-     * @throws ReflectionException
+     * @throws \ReflectionException
      * @throws MappingException|OptimisticLockException
      */
     public function create(?object $data = null, bool $returnEntity = false): ?array
     {
         $data = (array) ($data ?? []);
 
-        if (isset($data['status']) && is_int($data['status']) && $job = JobStatus::tryFrom($data['status'])) {
-            $data['status'] = $job->value;
+        $status = $data['status'] ?? null;
+        if (is_numeric($status)) {
+            $statusEnum = JobStatus::tryFrom((int)$status);
+            $data['status'] = $statusEnum ? $statusEnum->value : JobStatus::scheduled->value;
+        } elseif (is_string($status)) {
+            $matched = false;
+            foreach (JobStatus::cases() as $case) {
+                if (strtolower($case->name) === strtolower($status)) {
+                    $data['status'] = $case->value;
+                    $matched = true;
+                    break;
+                }
+            }
+            if (!$matched) {
+                $data['status'] = JobStatus::scheduled->value;
+            }
         } else {
             $data['status'] = JobStatus::scheduled->value;
         }
@@ -95,9 +105,11 @@ class JobRepository extends BaseRepository
         int $limit,
         int $pagination,
         ?string $startDate = null,
-        ?string $endDate = null
+        ?string $endDate = null,
+        ?array $extra = null
     ): QueryBuilder {
         $query = $this->createBaseQueryBuilder();
+        $isGlobal = false;
 
         if ($ids) {
             $query->where('e.id IN (:ids)')
@@ -106,15 +118,64 @@ class JobRepository extends BaseRepository
 
         if ($filters) {
             foreach ($filters as $key => $value) {
-                if ($key === 'status' && !is_int($value)) {
-                    $value = (new ReflectionEnum(objectOrClass: JobStatus::class))->getConstant($value);
+                if ($key === 'global' && $value) {
+                    $isGlobal = true;
+                    continue;
+                }
+                if ($key === 'status') {
+                    if (is_numeric($value)) {
+                        $value = (int) $value;
+                    } elseif (is_string($value)) {
+                        // Try to get value from Enum name
+                        foreach (JobStatus::cases() as $case) {
+                            if (strtolower($case->name) === strtolower($value)) {
+                                $value = $case->value;
+                                break;
+                            }
+                        }
+                    }
                 }
                 $query->andWhere('e.' . $key . ' = :' . $key)
                     ->setParameter($key, $value);
             }
         }
 
-        $this->applyDateFilters($query, $startDate, $endDate);
+        // Apply Smart Context (localized filters) if not global and not explicitly overridden
+        if (!$isGlobal) {
+            $envChannel = getenv('API_SOURCE');
+            $envEntity = getenv('API_ENTITY');
+            $envStart = getenv('START_DATE');
+            $envEnd = getenv('END_DATE');
+
+            if ($envChannel && (!is_object($filters) || !isset($filters->channel))) {
+                if ($chanEnum = Channel::tryFromName($envChannel)) {
+                    $envChannel = $chanEnum->name;
+                }
+                $query->andWhere('e.channel = :ctx_channel')->setParameter('ctx_channel', $envChannel);
+            }
+            if ($envEntity && (!is_object($filters) || !isset($filters->entity))) {
+                $query->andWhere('e.entity = :ctx_entity')->setParameter('ctx_entity', $envEntity);
+            }
+
+            // Differentiate by Date Range in payload (e.g. gsc-jan vs gsc-feb)
+            // We use a loose LIKE pattern to be compatible with MySQL JSON columns without custom DQL functions.
+            if ($envStart && (!is_object($filters) || !isset($filters->startDate))) {
+                $query->andWhere('(e.payload LIKE :ctx_start_pattern1 OR e.payload LIKE :ctx_start_pattern2)')
+                    ->setParameter('ctx_start_pattern1', '%startDate%' . $envStart . '%')
+                    ->setParameter('ctx_start_pattern2', '%start_date%' . $envStart . '%');
+            }
+            if ($envEnd && (!is_object($filters) || !isset($filters->endDate))) {
+                $query->andWhere('(e.payload LIKE :ctx_end_pattern1 OR e.payload LIKE :ctx_end_pattern2)')
+                    ->setParameter('ctx_end_pattern1', '%endDate%' . $envEnd . '%')
+                    ->setParameter('ctx_end_pattern2', '%end_date%' . $envEnd . '%');
+            }
+        }
+
+        // Apply technical date filters (createdAt) ONLY if explicitly requested via params/CLI
+        // We bypass the automatic env-to-createdAt mapping because Jobs are technical records.
+        if ($startDate || $endDate) {
+            $this->applyDateFilters($query, $startDate, $endDate);
+        }
 
         $query->orderBy("e.$orderBy", strtoupper($orderDir))
             ->setMaxResults($limit)
@@ -138,13 +199,8 @@ class JobRepository extends BaseRepository
      */
     public function getJobs(): array
     {
-        $qb = $this->createQueryBuilder('j');
-        $jobs = $qb->getQuery()->getResult();
-        foreach ($jobs as $key => $job) {
-            $jobs[$key]['status'] = $this->getStatusName($job['status']);
-        }
-
-        return $jobs;
+        $list = $this->readMultiple()->toArray();
+        return $list;
     }
 
     /**
@@ -153,13 +209,8 @@ class JobRepository extends BaseRepository
      */
     public function getJobsByStatus(int $status): array
     {
-        $qb = $this->createQueryBuilder('j');
-        $qb->where('j.status = :status')
-            ->setParameter('status', $status);
-        $job = $qb->getQuery()->getResult();
-        $job['status'] = $this->getStatusName($job['status']);
-
-        return $job;
+        $list = $this->readMultiple(filters: (object)['status' => $status])->toArray();
+        return count($list) > 0 ? $list[0] : [];
     }
 
     /**
@@ -168,13 +219,8 @@ class JobRepository extends BaseRepository
      */
     public function getJobsByUuid(string $uuid): array
     {
-        $qb = $this->createQueryBuilder('j');
-        $qb->where('j.uuid = :uuid')
-            ->setParameter('uuid', $uuid);
-        $job = $qb->getQuery()->getResult();
-        $job['status'] = $this->getStatusName($job['status']);
-
-        return $job;
+        $list = $this->readMultiple(filters: (object)['uuid' => $uuid])->toArray();
+        return count($list) > 0 ? $list[0] : [];
     }
 
     /**
@@ -201,10 +247,47 @@ class JobRepository extends BaseRepository
             return parent::update($id, (object) $data);
         }
 
-        if ($job = is_int($data['status']) ? JobStatus::from($data['status']) : (new ReflectionEnum(JobStatus::class))->getConstant($data['status'])) {
-            $data['status'] = $job->value;
+        $statusValue = $data['status'];
+        $mappedStatus = null;
+
+        if (is_numeric($statusValue)) {
+            $mappedStatus = JobStatus::tryFrom((int)$statusValue);
+        } elseif (is_string($statusValue)) {
+            foreach (JobStatus::cases() as $case) {
+                if (strtolower($case->name) === strtolower($statusValue)) {
+                    $mappedStatus = $case;
+                    break;
+                }
+            }
+        }
+
+        if ($mappedStatus) {
+            $data['status'] = $mappedStatus->value;
         }
 
         return parent::update($id, (object) $data);
+    }
+
+    /**
+     * Atomically claims a job by moving it from 'scheduled' to 'processing'.
+     * Returns true if the claim was successful.
+     *
+     * @param int $id
+     * @return bool
+     */
+    public function claimJob(int $id): bool
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $updatedRows = $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':processing')
+            ->where('e.id = :id')
+            ->andWhere('e.status = :scheduled')
+            ->setParameter('processing', JobStatus::processing->value)
+            ->setParameter('id', $id)
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->getQuery()
+            ->execute();
+
+        return (int)$updatedRows > 0;
     }
 }

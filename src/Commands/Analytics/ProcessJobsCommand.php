@@ -37,9 +37,19 @@ class ProcessJobsCommand extends Command
         $jobRepo = $this->em->getRepository(Job::class);
 
         $output->writeln("Querying scheduled jobs...");
+        $filters = ['status' => JobStatus::scheduled->value];
 
-        // Note: findBy is provided by Doctrine EntityRepository
-        $jobs = $jobRepo->findBy(['status' => JobStatus::scheduled->value]);
+        if ($envChannel = getenv('API_SOURCE')) {
+            $filters['channel'] = $envChannel;
+        }
+        if ($envEntity = getenv('API_ENTITY')) {
+            $filters['entity'] = $envEntity;
+        }
+
+        $envStartDate = getenv('START_DATE');
+        $envEndDate = getenv('END_DATE');
+
+        $jobs = $jobRepo->findBy($filters);
 
         if (empty($jobs)) {
             $output->writeln("No scheduled jobs found.");
@@ -50,21 +60,38 @@ class ProcessJobsCommand extends Command
 
         /** @var Job $job */
         foreach ($jobs as $job) {
+            $payload = $job->getPayload() ?? [];
+            $params = $payload['params'] ?? [];
+
+            // If instance has specific range, filter out jobs not matching it
+            if ($envStartDate !== false && $envStartDate !== '') {
+                $jobStart = $params['startDate'] ?? $params['start_date'] ?? null;
+                if ($jobStart !== $envStartDate) {
+                    continue;
+                }
+            }
+            if ($envEndDate !== false && $envEndDate !== '') {
+                $jobEnd = $params['endDate'] ?? $params['end_date'] ?? null;
+                if ($jobEnd !== $envEndDate) {
+                    continue;
+                }
+            }
+
             $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
 
             try {
-                // Update to processing
-                $jobRepo->update($job->getId(), (object)['status' => JobStatus::processing->value]);
+                // Atomic claim by repository
+                if (!$jobRepo->claimJob($job->getId())) {
+                    $output->writeln("Job {$job->getUuid()} already claimed by another worker. Skipping.");
+                    continue;
+                }
 
                 $channelEnum = Channel::tryFromName($job->getChannel());
                 if (!$channelEnum) {
                     throw new \Exception("Invalid channel enum: " . $job->getChannel());
                 }
 
-                // Iniciar el caching de data via fetchData
-                $payload = $job->getPayload() ?? [];
-                $params = $payload['params'] ?? [];
-                
+                // Finish parameter resolution...
                 // Resolve relative dates (e.g. 'yesterday' -> '2024-03-05')
                 $params = DateResolver::resolveParams($params);
                 
