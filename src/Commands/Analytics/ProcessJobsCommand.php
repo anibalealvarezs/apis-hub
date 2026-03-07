@@ -40,6 +40,10 @@ class ProcessJobsCommand extends Command
         $filters = ['status' => JobStatus::scheduled->value];
 
         if ($envChannel = getenv('API_SOURCE')) {
+            // Normalize container alias (e.g. 'fb-ads') to channel name (e.g. 'facebook')
+            if ($chanEnum = Channel::tryFromName($envChannel)) {
+                $envChannel = $chanEnum->name;
+            }
             $filters['channel'] = $envChannel;
         }
         if ($envEntity = getenv('API_ENTITY')) {
