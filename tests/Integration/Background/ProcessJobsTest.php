@@ -36,9 +36,25 @@ class ProcessJobsTest extends BaseIntegrationTestCase
         $input = new ArrayInput([]);
         $output = new BufferedOutput();
         
+        // Capture and clear env to ensure isolation doesn't filter out the test job
+        $oldSource = getenv('API_SOURCE');
+        $oldEntity = getenv('API_ENTITY');
+        $oldStart = getenv('START_DATE');
+        $oldEnd = getenv('END_DATE');
+        putenv('API_SOURCE');
+        putenv('API_ENTITY');
+        putenv('START_DATE');
+        putenv('END_DATE');
+
         // Command runs the logic
         $exitCode = $command->run($input, $output);
         $outputContent = $output->fetch();
+
+        // Restore env
+        if ($oldSource) putenv("API_SOURCE=$oldSource");
+        if ($oldEntity) putenv("API_ENTITY=$oldEntity");
+        if ($oldStart) putenv("START_DATE=$oldStart");
+        if ($oldEnd) putenv("END_DATE=$oldEnd");
         
         // 3. Assert: The command completes and attempts to process the job
         $this->assertEquals(0, $exitCode);

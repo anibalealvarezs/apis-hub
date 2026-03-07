@@ -197,9 +197,9 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         }
 
         // Verify real filesystem is untouched
-        $realConfigPath = 'D:/laragon/www/apis-hub/config/yaml/entitiesconfig.yaml';
-        if (!file_exists($realConfigPath)) {
-            $this->fail("Real entitiesconfig.yaml was deleted at $realConfigPath. Ensure saveConfig uses provided path.\nMessages: " . implode(', ', $messages));
+        $realConfigPath = realpath(__DIR__ . '/../../../config/yaml/entitiesconfig.yaml');
+        if (!$realConfigPath || !file_exists($realConfigPath)) {
+            $this->fail("Real entitiesconfig.yaml was not found or was deleted. Expected at config/yaml/entitiesconfig.yaml. Messages: " . implode(', ', $messages));
         }
 
         // Debug config files in vfsStream
@@ -268,9 +268,9 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         $saveConfig->invoke($command, $entities, $output, $outputFile);
 
         // Verify real filesystem is untouched
-        $realConfigPath = 'D:/laragon/www/apis-hub/config/yaml/entitiesconfig.yaml';
-        if (!file_exists($realConfigPath)) {
-            $this->fail("Real entitiesconfig.yaml was deleted at $realConfigPath. Ensure saveConfig uses provided path.\nMessages: " . implode(', ', $messages));
+        $realConfigPath = realpath(__DIR__ . '/../../../config/yaml/entitiesconfig.yaml');
+        if (!$realConfigPath || !file_exists($realConfigPath)) {
+            $this->fail("Real entitiesconfig.yaml was not found or was deleted. Expected at config/yaml/entitiesconfig.yaml. Messages: " . implode(', ', $messages));
         }
 
         $this->assertFalse(file_exists($outputFile), "Unexpected test_entitiesconfig.yaml at $outputFile");
@@ -329,9 +329,9 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         $saveConfig->invoke($command, $entities, $output, $outputFile);
 
         // Verify real filesystem is untouched
-        $realConfigPath = 'D:/laragon/www/apis-hub/config/yaml/entitiesconfig.yaml';
-        if (!file_exists($realConfigPath)) {
-            $this->fail("Real entitiesconfig.yaml was deleted at $realConfigPath. Ensure saveConfig uses provided path.\nMessages: " . implode(', ', $messages));
+        $realConfigPath = realpath(__DIR__ . '/../../../config/yaml/entitiesconfig.yaml');
+        if (!$realConfigPath || !file_exists($realConfigPath)) {
+            $this->fail("Real entitiesconfig.yaml was not found or was deleted. Expected at config/yaml/entitiesconfig.yaml. Messages: " . implode(', ', $messages));
         }
 
         $this->assertFalse(file_exists($outputFile), "Unexpected test_entitiesconfig.yaml at $outputFile");
@@ -432,7 +432,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
                     'return_type' => 'int'
                 ],
                 'readMultiple' => [
-                    'parameters' => ['limit', 'pagination', 'ids', 'filters', 'orderBy', 'orderDir', 'startDate', 'endDate'],
+                    'parameters' => ['limit', 'pagination', 'ids', 'filters', 'orderBy', 'orderDir', 'startDate', 'endDate', 'extra'],
                     'return_type' => 'Doctrine\Common\Collections\ArrayCollection'
                 ],
                 'update' => [

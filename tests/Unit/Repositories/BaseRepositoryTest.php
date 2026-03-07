@@ -738,9 +738,10 @@ class ConcreteBaseRepository extends BaseRepository
         int $limit,
         int $pagination,
         ?string $startDate = null,
-        ?string $endDate = null
+        ?string $endDate = null,
+        ?array $extra = null
     ): QueryBuilder {
-        return parent::buildReadMultipleQuery($ids, $filters, $orderBy, $orderDir, $limit, $pagination, $startDate, $endDate);
+        return parent::buildReadMultipleQuery($ids, $filters, $orderBy, $orderDir, $limit, $pagination, $startDate, $endDate, $extra);
     }
 
     public function processResult(array $result): array

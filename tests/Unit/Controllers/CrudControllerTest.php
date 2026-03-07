@@ -14,6 +14,7 @@ use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
 use stdClass;
+use Doctrine\Common\Collections\ArrayCollection;
 use Symfony\Component\HttpFoundation\Response;
 
 class CrudControllerTest extends BaseUnitTestCase
@@ -77,8 +78,9 @@ class CrudControllerTest extends BaseUnitTestCase
         $cacheKey = "entity_{$entity}_{$id}";
 
         // Mock custom repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
             ->getMock();
         $repository->expects($this->once())
             ->method('read')
@@ -97,7 +99,7 @@ class CrudControllerTest extends BaseUnitTestCase
 
         $this->cacheService->expects($this->once())
             ->method('get')
-            ->with($cacheKey, $this->anything(), $this->anything())
+            ->with($cacheKey, $this->anything())
             ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
@@ -205,8 +207,9 @@ class CrudControllerTest extends BaseUnitTestCase
         $cacheKey = "entity_{$entity}_{$id}";
 
         // Mock custom repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
             ->getMock();
         $repository->expects($this->once())
             ->method('read')
@@ -225,7 +228,7 @@ class CrudControllerTest extends BaseUnitTestCase
 
         $this->cacheService->expects($this->once())
             ->method('get')
-            ->with($cacheKey, $this->anything(), $this->anything())
+            ->with($cacheKey, $this->anything())
             ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
@@ -257,8 +260,9 @@ class CrudControllerTest extends BaseUnitTestCase
         $cacheKey = "entity_{$entity}_{$id}";
 
         // Mock custom repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
             ->getMock();
         $repository->expects($this->once())
             ->method('read')
@@ -277,7 +281,7 @@ class CrudControllerTest extends BaseUnitTestCase
 
         $this->cacheService->expects($this->once())
             ->method('get')
-            ->with($cacheKey, $this->anything(), $this->anything())
+            ->with($cacheKey, $this->anything())
             ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
@@ -344,31 +348,32 @@ class CrudControllerTest extends BaseUnitTestCase
     public function testListReturnsData(): void
     {
         $entity = 'customer';
-        $body = json_encode(['key' => 'value']);
-        $params = ['extra' => 'param'];
+        $body = null;
+        $params = ['extra' => ['param']];
         $data = [['id' => 1, 'name' => $this->faker->word]];
-        $filters = (object) ['key' => 'value'];
-        $cacheKey = 'list_' . $entity . '_' . md5(json_encode(['filters' => $filters, 'extra' => 'param']));
+        $filters = new stdClass();
+        $cacheKey = 'list_' . $entity . '_' . md5(json_encode(['extra' => ['param'], 'filters' => $filters]));
 
-        $result = new class ($data) {
-            private array $data;
-            public function __construct(array $data)
-            {
-                $this->data = $data;
-            }
-            public function toArray(): array
-            {
-                return $this->data;
-            }
-        };
+        $result = new ArrayCollection($data);
 
         // Mock custom repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
             ->getMock();
         $repository->expects($this->once())
             ->method('readMultiple')
-            ->with($filters, 'param')
+            ->with(
+                $this->anything(), // limit
+                $this->anything(), // pagination
+                $this->anything(), // ids
+                $filters,          // filters
+                $this->anything(), // orderBy
+                $this->anything(), // orderDir
+                $this->anything(), // startDate
+                $this->anything(), // endDate
+                ['param']          // extra
+            )
             ->willReturn($result);
 
         $this->entityManager->expects($this->once())
@@ -378,7 +383,7 @@ class CrudControllerTest extends BaseUnitTestCase
 
         $this->cacheService->expects($this->once())
             ->method('get')
-            ->with($cacheKey, $this->anything(), $this->anything())
+            ->with($cacheKey, $this->anything())
             ->willReturnCallback(function ($key, $callback) {
                 return $callback();
             });
@@ -417,8 +422,9 @@ class CrudControllerTest extends BaseUnitTestCase
         $expectedData = [['total' => 1000, 'category' => 'finance']];
 
         // Mock custom repository
-        $repository = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'aggregate'])
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
             ->getMock();
         $repository->expects($this->once())
             ->method('aggregate')
@@ -461,32 +467,15 @@ class CrudControllerTest extends BaseUnitTestCase
         $entity = 'customer';
         $body = json_encode(['name' => $this->faker->word]);
         $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
-        $data = ['id' => $id, 'name' => $this->faker->word];
         $channel = 'shopify';
+        $data = ['id' => $id, 'name' => $this->faker->word, 'channel' => $channel];
 
-        $result = new class ($data) {
-            private array $data;
-            public function __construct(array $data)
-            {
-                $this->data = $data;
-            }
-            public function toArray(): array
-            {
-                return $this->data;
-            }
-            public function getId()
-            {
-                return $this->data['id'];
-            }
-            public function getChannel(): string
-            {
-                return 'shopify';
-            }
-        };
+        $result = $data;
 
         // Mock custom repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
             ->getMock();
         $repository->expects($this->once())
             ->method('create')
@@ -530,8 +519,9 @@ class CrudControllerTest extends BaseUnitTestCase
         $body = json_encode(['name' => $this->faker->word]);
 
         // Mock custom repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
             ->getMock();
         $repository->expects($this->once())
             ->method('create')
@@ -567,32 +557,15 @@ class CrudControllerTest extends BaseUnitTestCase
         $entity = 'customer';
         $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
         $body = json_encode(['name' => $this->faker->word]);
-        $data = ['id' => $id, 'name' => $this->faker->word];
         $channel = 'shopify';
+        $data = ['id' => $id, 'name' => $this->faker->word, 'channel' => $channel];
 
-        $result = new class ($data) {
-            private array $data;
-            public function __construct(array $data)
-            {
-                $this->data = $data;
-            }
-            public function toArray(): array
-            {
-                return $this->data;
-            }
-            public function getId()
-            {
-                return $this->data['id'];
-            }
-            public function getChannel(): string
-            {
-                return 'shopify';
-            }
-        };
+        $result = $data;
 
         // Mock custom repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
             ->getMock();
         $repository->expects($this->once())
             ->method('update')
@@ -612,6 +585,10 @@ class CrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
 
         $response = $this->controller->update($entity, $id, $body);
+
+        if ($response->getStatusCode() !== Response::HTTP_OK) {
+            error_log("testUpdateReturnsUpdatedEntity: Response content: " . $response->getContent());
+        }
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
             error_log("testUpdateReturnsUpdatedEntity: Response content: " . $response->getContent());
@@ -656,8 +633,9 @@ class CrudControllerTest extends BaseUnitTestCase
         $id = $this->faker->numberBetween(1, 1000000); // Ensure truthy ID
 
         // Mock custom repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields', 'aggregate'])
             ->getMock();
         $repository->expects($this->once())
             ->method('delete')
@@ -770,6 +748,90 @@ class CrudControllerTest extends BaseUnitTestCase
 
         $this->assertEquals($channel, $extractedChannel);
     }
+
+    /**
+     * @throws ReflectionException
+     * @throws NotSupported
+     */
+    public function testInvokeReadJobBypassesCache(): void
+    {
+        $entity = 'job';
+        $method = 'read';
+        $id = 123;
+        $data = ['id' => $id, 'status' => 'scheduled'];
+
+        $this->controller->setMockCrudEntities([$entity => ['class' => 'Entities\\' . $entity]]);
+        $this->controller->setMockEntitiesConfig([$entity => ['class' => 'Entities\\' . $entity]]);
+
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields'])
+            ->getMock();
+
+        $repository->expects($this->once())
+            ->method('read')
+            ->with($id)
+            ->willReturn($data);
+
+        $this->entityManager->expects($this->once())
+            ->method('getRepository')
+            ->willReturn($repository);
+
+        // Expect cacheService->get to NEVER be called for job
+        $this->cacheService->expects($this->never())->method('get');
+
+        $response = $this->controller->__invoke($entity, $method, $id);
+
+        if ($response->getStatusCode() !== Response::HTTP_OK) {
+            error_log("testInvokeReadJobBypassesCache: Response content: " . $response->getContent());
+        }
+
+        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+    }
+
+    /**
+     * @throws ReflectionException
+     * @throws NotSupported
+     */
+    public function testInvokeListJobBypassesCache(): void
+    {
+        $entity = 'job';
+        $method = 'list';
+        $data = [['id' => 1, 'status' => 'scheduled']];
+
+        $this->controller->setMockCrudEntities([$entity => ['class' => 'Entities\\' . $entity]]);
+        $this->controller->setMockEntitiesConfig([$entity => ['class' => 'Entities\\' . $entity]]);
+        $this->controller->setMockEntitiesConfig([
+            $entity => [
+                'class' => 'Entities\\' . $entity,
+                'repository_methods' => [
+                    'readMultiple' => ['parameters' => ['filters']]
+                ]
+            ]
+        ]);
+
+        $repository = $this->getMockBuilder(\Repositories\JobRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'setHideFields'])
+            ->getMock();
+
+        $result = new ArrayCollection($data);
+
+        $repository->expects($this->once())
+            ->method('readMultiple')
+            ->willReturn($result);
+
+        $this->entityManager->expects($this->once())
+            ->method('getRepository')
+            ->willReturn($repository);
+
+        // Expect cacheService->get to NEVER be called for job
+        $this->cacheService->expects($this->never())->method('get');
+
+        $response = $this->controller->__invoke($entity, $method);
+
+        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+    }
 }
 
 // Concrete class to test the CrudController
@@ -778,17 +840,13 @@ class ConcreteCrudController extends CrudController
     private array $mockCrudEntities = [];
     private array $mockEntitiesConfig = [];
     private ?int $mockCountData = null;
-    private EntityManager $entityManager;
-    private CacheService $cacheService;
-    private CacheKeyGenerator $cacheKeyGenerator;
-
     public function __construct(
         EntityManager $entityManager,
         CacheService $cacheService,
         CacheKeyGenerator $cacheKeyGenerator
     ) {
-        parent::__construct();
-        $this->entityManager = $entityManager;
+        // Don't call parent::__construct() because it will overwrite the mocks with real instances
+        $this->em = $entityManager;
         $this->cacheService = $cacheService;
         $this->cacheKeyGenerator = $cacheKeyGenerator;
     }
@@ -822,7 +880,7 @@ class ConcreteCrudController extends CrudController
         if (!isset($config[$entityKey][$configKey])) {
             throw new Exception("Entity configuration for '$entity' with key '$configKey' not found");
         }
-        return $this->entityManager->getRepository(
+        return $this->em->getRepository(
             entityName: $config[$entityKey][$configKey]
         );
     }
@@ -856,82 +914,23 @@ class ConcreteCrudController extends CrudController
 
     public function read(string $entity, ?int $id = null, array $hideFields = []): Response
     {
-        try {
-            $repository = $this->getRepository($entity);
-            $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id);
-            $data = $this->cacheService->get(
-                key: $cacheKey,
-                callback: fn () => $repository->read($id)
-            );
-
-            return $this->createResponse(
-                data: $data ?: [],
-                status: 'success'
-            );
-        } catch (Exception $e) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
-            );
-        }
+        return parent::read($entity, $id, $hideFields);
     }
 
     public function count(string $entity, ?string $body = null, ?array $params = null): Response
     {
-        try {
-            if ($this->mockCountData !== null) {
-                $count = $this->mockCountData;
-            } else {
-                $repository = $this->getRepository($entity);
-                $filters = $body ? json_decode($body, false, 512, JSON_THROW_ON_ERROR) : new stdClass();
-                $params = ['filters' => $filters];
-                $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
-                $count = $this->cacheService->get(
-                    key: $cacheKey,
-                    callback: fn () => $repository->countElements($filters)
-                );
-            }
-
+        if ($this->mockCountData !== null) {
             return $this->createResponse(
-                data: ['count' => $count],
+                data: ['count' => $this->mockCountData],
                 status: 'success'
             );
-        } catch (Exception $e) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
-            );
         }
+        return parent::count($entity, $body, $params);
     }
 
     public function list(string $entity, ?string $body = null, ?array $params = null, array $hideFields = []): Response
     {
-        try {
-            $repository = $this->getRepository($entity);
-            $filters = $body ? json_decode($body, false, 512, JSON_THROW_ON_ERROR) : new stdClass();
-            $extra = $params['extra'] ?? null;
-            $cacheKey = 'list_' . $entity . '_' . md5(json_encode(['filters' => $filters, 'extra' => $extra]));
-            $data = $this->cacheService->get(
-                key: $cacheKey,
-                callback: fn () => $repository->readMultiple($filters, $extra)->toArray()
-            );
-
-            return $this->createResponse(
-                data: $data ?: [],
-                status: 'success'
-            );
-        } catch (Exception $e) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
-            );
-        }
+        return parent::list($entity, $body, $params, $hideFields);
     }
 
     public function create(string $entity, ?string $body = null): Response
@@ -962,7 +961,7 @@ class ConcreteCrudController extends CrudController
             }
 
             return $this->createResponse(
-                data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
+                data: (is_object($result) && method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
                 status: 'success',
                 httpStatus: Response::HTTP_CREATED
             );
@@ -1010,7 +1009,7 @@ class ConcreteCrudController extends CrudController
             );
 
             return $this->createResponse(
-                data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
+                data: (is_object($result) && method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
                 status: 'success'
             );
         } catch (Exception $e) {
