@@ -12,6 +12,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Services\DateResolver;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 class ProcessJobsCommand extends Command
@@ -102,7 +103,14 @@ class ProcessJobsCommand extends Command
                 $params['jobId'] = $job->getId();
                 $body = $payload['body'] ?? null;
 
-                $controller->fetchData($job->getEntity(), $channelEnum, $params, $body);
+                $result = $controller->fetchData($job->getEntity(), $channelEnum, $params, $body);
+
+                // Check if fetchData returned an error Response
+                if ($result instanceof Response && $result->getStatusCode() >= 400) {
+                    $content = json_decode($result->getContent(), true);
+                    $errorMsg = $content['error'] ?? 'Unknown error from fetchData';
+                    throw new \Exception($errorMsg);
+                }
 
                 // Update to completed
                 $jobRepo->update($job->getId(), (object)['status' => JobStatus::completed->value]);
