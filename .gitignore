@@ -32,3 +32,6 @@ test_redis.php
 /src/Entities/Analytics/Accounts/*
 fix_callbacks.php
 fix_signatures.php
+
+# Development recurrences
+dev-recurrences.md
