@@ -123,7 +123,7 @@ class AggregateEntityCommand extends Command
                 }
             }
             
-            fwrite(STDOUT, $responseContent . PHP_EOL);
+            $output->writeln($responseContent);
             return Command::SUCCESS;
         }
 

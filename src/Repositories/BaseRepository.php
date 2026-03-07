@@ -415,7 +415,8 @@ class BaseRepository extends EntityRepository
         string $orderBy = 'id',
         string $orderDir = 'DESC',
         ?string $startDate = null,
-        ?string $endDate = null
+        ?string $endDate = null,
+        ?array $extra = null
     ): ArrayCollection {
         // Fallback for repositories without ID fetch capability if needed, but not here
         $idQueryBuilder = $this->buildReadMultipleQuery(
@@ -426,7 +427,8 @@ class BaseRepository extends EntityRepository
             limit: $limit,
             pagination: $pagination,
             startDate: $startDate,
-            endDate: $endDate
+            endDate: $endDate,
+            extra: $extra
         );
 
         // First step: Get ONLY the IDs we need, respecting limit and pagination
@@ -473,7 +475,8 @@ class BaseRepository extends EntityRepository
         int $limit,
         int $pagination,
         ?string $startDate = null,
-        ?string $endDate = null
+        ?string $endDate = null,
+        ?array $extra = null
     ): QueryBuilder {
         $query = $this->createBaseQueryBuilder();
 
@@ -578,8 +581,8 @@ class BaseRepository extends EntityRepository
 
         if ((array) $data) {
             foreach ((array) $data as $key => $value) {
-                if (method_exists($entity, 'add' . Helpers::toCamelcase($key))) {
-                    $entity->{'add' . Helpers::toCamelcase($key)}($value);
+                if (method_exists($entity, 'add' . Helpers::toCamelcase($key, true))) {
+                    $entity->{'add' . Helpers::toCamelcase($key, true)}($value);
                 }
             }
         }
@@ -610,8 +613,8 @@ class BaseRepository extends EntityRepository
         $props = $this->_class->fieldMappings;
 
         foreach ($props as $key => $value) {
-            if (is_a($entity->{'get' . Helpers::toCamelcase($key)}(), 'Collection')) {
-                $entity->{'remove' . Helpers::toCamelcase($key)}($entity->{'get' . Helpers::toCamelcase($key)}());
+            if (is_a($entity->{'get' . Helpers::toCamelcase($key, true)}(), 'Collection')) {
+                $entity->{'remove' . Helpers::toCamelcase($key, true)}($entity->{'get' . Helpers::toCamelcase($key, true)}());
             }
         }
 

@@ -6,10 +6,11 @@
 /config/google_tokens.json
 /config/yaml/entitiesconfig_old.yaml
 
-# Deployment configs
+# Deployment configs (auto-generated / contains credentials)
 /deploy/*.yaml
 !/deploy/*.example.yaml
 !/deploy/project.yaml.example
+docker-compose.yml
 
 # Development / IDE
 /vendor/
@@ -32,3 +33,6 @@ test_redis.php
 /src/Entities/Analytics/Accounts/*
 fix_callbacks.php
 fix_signatures.php
+
+# Development recurrences
+dev-recurrences.md

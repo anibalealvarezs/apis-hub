@@ -174,7 +174,8 @@ class MetricRepository extends BaseRepository
         int $limit,
         int $pagination,
         ?string $startDate = null,
-        ?string $endDate = null
+        ?string $endDate = null,
+        ?array $extra = null
     ): QueryBuilder {
         $query = $this->createBaseQueryBuilder();
 

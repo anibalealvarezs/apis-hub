@@ -40,6 +40,7 @@ $cli->addCommands([
     new InitializeEntitiesCommand(Helpers::getManager()),
     new \Commands\Analytics\CacheEntityCommand(),
     new \Commands\Analytics\ProcessJobsCommand(),
+    new \Commands\Analytics\ClearCacheCommand(),
     new \Commands\HealthCheckCommand(),
     new \Commands\Crud\AggregateEntityCommand()
 ]);

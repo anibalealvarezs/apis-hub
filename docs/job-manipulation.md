@@ -26,12 +26,26 @@ You can check the status of a specific job or list recent ones using the CRUD co
 php bin/cli.php app:read --entity=job --filters='{"uuid":"<UUID>"}'
 ```
 
-### List Recent Jobs
+### List Jobs (Smart Context)
+
+By default, when you list jobs inside a specific container, the output is **automatically filtered** to match that instance's configuration (Channel, Entity, and Date Range). This keeps your workspace clean and relevant.
 
 ```bash
-# Lists all jobs (use --params to limit/paginate)
+# Shows only jobs relevant to the current instance
 php bin/cli.php app:read --entity=job --params='limit=10'
 ```
+
+### Force Global View
+
+If you need to see all jobs across the entire system from any container, use the `global=1` parameter:
+
+```bash
+# Shows all jobs from all instances
+php bin/cli.php app:read --entity=job --params='global=1&limit=20'
+```
+
+> [!TIP]
+> You can also override the local context by explicitly filtering for a different channel, e.g., `--params='channel=gsc'`.
 
 ### Status Reference
 
@@ -59,9 +73,16 @@ php bin/cli.php app:update --entity=job --id=<ID> --data='{"status":4}'
 
 ---
 
-## 4. Automation & Monitoring
+## 4. Automation & Safe Processing
 
-Jobs are automatically processed in the background by the `ProcessJobsCommand`, which is usually triggered via Cron.
+Jobs are automatically processed in the background by the `ProcessJobsCommand`.
+
+### Instance-Safe Workers
+
+The workers are designed to be **localized** and **thread-safe**:
+
+- **Localization**: Each worker only picks up jobs that match its assigned `Channel`, `Entity`, and `Date Range`.
+- **Atomic Claiming**: The system uses a "Claim-first" mechanism. Multiple workers can query the same database without ever starting the same job twice.
 
 - **Worker Command**: `php bin/cli.php jobs:process`
 - **Automation Logic**: See [entrypoint.sh](../entrypoint.sh) to see how the worker is bootstrapped in a container.
