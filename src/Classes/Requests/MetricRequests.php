@@ -840,13 +840,13 @@ class MetricRequests
                     appId: (string) $config['facebook']['app_id'],
                     appSecret: $config['facebook']['app_secret'],
                     redirectUrl: $config['facebook']['app_redirect_uri'],
-                    userAccessToken: $config['facebook']['graph_user_access_token'],
-                    longLivedUserAccessToken: $config['facebook']['graph_long_lived_user_access_token'],
-                    appAccessToken: $config['facebook']['graph_app_access_token'],
-                    pageAccesstoken: $config['facebook']['graph_page_access_token'],
-                    longLivedPageAccesstoken: $config['facebook']['graph_long_lived_page_access_token'],
-                    clientAccesstoken: $config['facebook']['graph_client_access_token'],
-                    longLivedClientAccesstoken: $config['facebook']['graph_long_lived_client_access_token'],
+                    userAccessToken: $config['facebook']['graph_user_access_token'] ?? '',
+                    longLivedUserAccessToken: $config['facebook']['graph_long_lived_user_access_token'] ?? '',
+                    appAccessToken: $config['facebook']['graph_app_access_token'] ?? '',
+                    pageAccesstoken: $config['facebook']['graph_page_access_token'] ?? '',
+                    longLivedPageAccesstoken: $config['facebook']['graph_long_lived_page_access_token'] ?? '',
+                    clientAccesstoken: $config['facebook']['graph_client_access_token'] ?? '',
+                    longLivedClientAccesstoken: $config['facebook']['graph_long_lived_client_access_token'] ?? '',
                 );
                 $logger->info("Initialized FacebookGraphApi");
                 return $apiInstance;
@@ -1084,7 +1084,7 @@ class MetricRequests
 
             return;
         } catch (Exception $e) {
-            $logger->error("Error during FB page insights request for page " . $page['platformId'] . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+            $logger->error("Error during FB page insights request for page " . $page['id'] . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
             throw $e;
         }
     }
