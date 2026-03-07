@@ -213,4 +213,20 @@ vendor/bin/phpunit tests/
 
 ---
 
+## 💖 Support & Sponsorship
+
+APIs Hub is high-quality, free-to-use software maintained with ❤️. If you or your company benefit from the project, please consider supporting its ongoing development:
+
+- **[Sponsor on GitHub](https://github.com/sponsors/anibalealvarezs)**
+- **Star the repo** to help with visibility!
+- **Contribute code** by opening a Pull Request.
+
+Your support helps cover hosting costs and the time spent adding new adapters and features.
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+---
+
 *Maintained with ❤️ for elite Data Analytics pipelines.*
