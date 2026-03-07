@@ -12,13 +12,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/amazon-api.git",
-                "reference": "a629b04fde738eb65d73aa43b453ca3042c68489"
+                "reference": "a91a0e0a399c17d820a5c3607b9b26f6556dad0c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/amazon-api/anibalealvarezs-amazon-api-a629b04fde738eb65d73aa43b453ca3042c68489-zip-5eead0.zip",
-                "reference": "a629b04fde738eb65d73aa43b453ca3042c68489",
-                "shasum": "fc9ceaf491b478f6d6d1b0f35c098d16b83d9ca5"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/amazon-api/anibalealvarezs-amazon-api-a91a0e0a399c17d820a5c3607b9b26f6556dad0c-zip-d80e63.zip",
+                "reference": "a91a0e0a399c17d820a5c3607b9b26f6556dad0c",
+                "shasum": "1eed36e213fa004ebf802bc89549ec68ec543070"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -59,7 +59,7 @@
                 "source": "https://github.com/anibalealvarezs/amazon-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/amazon-api/issues"
             },
-            "time": "2026-03-04T23:59:16+00:00"
+            "time": "2026-03-07T00:03:43+00:00"
         },
         {
             "name": "anibalealvarezs/api-client-skeleton",
@@ -67,13 +67,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/api-client-skeleton.git",
-                "reference": "80721a0f82c67498d7c9219ac878ff625c0e31ac"
+                "reference": "0432f01f0616b5c1c2de423378f9948fc94caa15"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-80721a0f82c67498d7c9219ac878ff625c0e31ac-zip-ace250.zip",
-                "reference": "80721a0f82c67498d7c9219ac878ff625c0e31ac",
-                "shasum": "9efb8baf95cfa9171cf101ddcc696e48d477c35c"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-0432f01f0616b5c1c2de423378f9948fc94caa15-zip-a6bd9a.zip",
+                "reference": "0432f01f0616b5c1c2de423378f9948fc94caa15",
+                "shasum": "b647892150c52d6b4f237d658a02638c770c0c2e"
             },
             "require": {
                 "anibalealvarezs/oauth-v1": "@dev",
@@ -109,12 +109,21 @@
                     "email": "anibalealvarezs@gmail.com"
                 }
             ],
-            "description": "description",
+            "description": "Base skeleton for standardizing PHP API clients with advanced error handling and data normalization.",
+            "homepage": "https://github.com/anibalealvarezs/api-client-skeleton",
+            "keywords": [
+                "api",
+                "client",
+                "error-handling",
+                "normalization",
+                "sdk",
+                "skeleton"
+            ],
             "support": {
-                "source": "https://github.com/anibalealvarezs/api-client-skeleton/tree/main",
-                "issues": "https://github.com/anibalealvarezs/api-client-skeleton/issues"
+                "issues": "https://github.com/anibalealvarezs/api-client-skeleton/issues",
+                "source": "https://github.com/anibalealvarezs/api-client-skeleton/tree/main"
             },
-            "time": "2026-03-06T02:23:03+00:00"
+            "time": "2026-03-07T00:09:05+00:00"
         },
         {
             "name": "anibalealvarezs/facebook-graph-api",
@@ -122,13 +131,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "e1cf034ea965151c26853976d9df7035fcddad8e"
+                "reference": "c13cf243910d8197817e9de86070dd7484144ea4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-e1cf034ea965151c26853976d9df7035fcddad8e-zip-cac147.zip",
-                "reference": "e1cf034ea965151c26853976d9df7035fcddad8e",
-                "shasum": "11652b44f3ddae198c7c59c9fb90360f1ec56fbf"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-c13cf243910d8197817e9de86070dd7484144ea4-zip-2b3c27.zip",
+                "reference": "c13cf243910d8197817e9de86070dd7484144ea4",
+                "shasum": "4f6fd41a5ff39851bfb6801d5412d88daa629f7e"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -165,12 +174,21 @@
                     "email": "anibalealvarezs@gmail.com"
                 }
             ],
-            "description": "description",
+            "description": "Comprehensive Facebook Graph API client for data extraction, supporting Ads, Pages, and Instagram metrics.",
+            "homepage": "https://github.com/anibalealvarezs/facebook-graph-api",
+            "keywords": [
+                "facebook-ads",
+                "facebook-api",
+                "graph-api",
+                "instagram-api",
+                "metrics",
+                "php"
+            ],
             "support": {
-                "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main",
-                "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues"
+                "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
+                "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-05T20:15:43+00:00"
+            "time": "2026-03-07T00:03:44+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -178,13 +196,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/google-api.git",
-                "reference": "2106626ad079fe1e644af77cce688c42e020c0fd"
+                "reference": "09b928c1ffc60baf38968b1562a7291daeb74eb9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-2106626ad079fe1e644af77cce688c42e020c0fd-zip-2369ed.zip",
-                "reference": "2106626ad079fe1e644af77cce688c42e020c0fd",
-                "shasum": "48b0d0cc59548c4306a84d494d1c1d940b37773a"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-09b928c1ffc60baf38968b1562a7291daeb74eb9-zip-782c93.zip",
+                "reference": "09b928c1ffc60baf38968b1562a7291daeb74eb9",
+                "shasum": "674456afba271716cdde70719b8e5e43e38ff536"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -225,12 +243,20 @@
                     "email": "anibalealvarezs@gmail.com"
                 }
             ],
-            "description": "description",
+            "description": "Standardized Google API client for APIs Hub, supporting Search Console and Analytics data extraction.",
+            "homepage": "https://github.com/anibalealvarezs/google-api",
+            "keywords": [
+                "analytics",
+                "apis-hub",
+                "google-api",
+                "google-search-console",
+                "php"
+            ],
             "support": {
-                "source": "https://github.com/anibalealvarezs/google-api/tree/develop",
-                "issues": "https://github.com/anibalealvarezs/google-api/issues"
+                "issues": "https://github.com/anibalealvarezs/google-api/issues",
+                "source": "https://github.com/anibalealvarezs/google-api/tree/develop"
             },
-            "time": "2026-03-06T05:43:11+00:00"
+            "time": "2026-03-07T00:03:45+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -238,13 +264,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/klaviyo-api.git",
-                "reference": "1772503e5ad13eeebd3633f811417bc289f2b82e"
+                "reference": "a107160207da530c758d2c1b00fed9c3226cf461"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/klaviyo-api/anibalealvarezs-klaviyo-api-1772503e5ad13eeebd3633f811417bc289f2b82e-zip-1f0a65.zip",
-                "reference": "1772503e5ad13eeebd3633f811417bc289f2b82e",
-                "shasum": "54b3cdcee085fb27dda2597992f843e4f4a196fa"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/klaviyo-api/anibalealvarezs-klaviyo-api-a107160207da530c758d2c1b00fed9c3226cf461-zip-73b960.zip",
+                "reference": "a107160207da530c758d2c1b00fed9c3226cf461",
+                "shasum": "95879d6714c0edc07b3c3a3fc2f901e517af7897"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -284,7 +310,7 @@
                 "source": "https://github.com/anibalealvarezs/klaviyo-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/klaviyo-api/issues"
             },
-            "time": "2026-03-04T23:41:05+00:00"
+            "time": "2026-03-07T00:03:46+00:00"
         },
         {
             "name": "anibalealvarezs/mailchimp-api",
@@ -292,13 +318,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/mailchimp-api.git",
-                "reference": "3a11bae1283b9420dd1a565792318d065c790ddb"
+                "reference": "0848b7f57bef2ba051dae0860432ada813a4008a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-api/anibalealvarezs-mailchimp-api-3a11bae1283b9420dd1a565792318d065c790ddb-zip-bb8c55.zip",
-                "reference": "3a11bae1283b9420dd1a565792318d065c790ddb",
-                "shasum": "ddc8a0f606a866eca0d4fb7d4d49934cb3dd7d84"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/mailchimp-api/anibalealvarezs-mailchimp-api-0848b7f57bef2ba051dae0860432ada813a4008a-zip-914385.zip",
+                "reference": "0848b7f57bef2ba051dae0860432ada813a4008a",
+                "shasum": "a0f60424630220e67a9f4c2615829070be905426"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -339,7 +365,7 @@
                 "source": "https://github.com/anibalealvarezs/mailchimp-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/mailchimp-api/issues"
             },
-            "time": "2026-03-04T23:57:54+00:00"
+            "time": "2026-03-07T00:03:46+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
@@ -347,13 +373,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/netsuite-api.git",
-                "reference": "c3abfae36e56bee95385bc3fa904055785c470b2"
+                "reference": "07af7bf6e8bd817e817b6ce69bc96ecf9cb85829"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/netsuite-api/anibalealvarezs-netsuite-api-c3abfae36e56bee95385bc3fa904055785c470b2-zip-ca1749.zip",
-                "reference": "c3abfae36e56bee95385bc3fa904055785c470b2",
-                "shasum": "d2ca51dfd3f15345f41d246873a20b0492f0ea47"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/netsuite-api/anibalealvarezs-netsuite-api-07af7bf6e8bd817e817b6ce69bc96ecf9cb85829-zip-2b5d31.zip",
+                "reference": "07af7bf6e8bd817e817b6ce69bc96ecf9cb85829",
+                "shasum": "3a2827b89a748e3f7ed20588a625f1850ae582ab"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -395,7 +421,7 @@
                 "source": "https://github.com/anibalealvarezs/netsuite-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/netsuite-api/issues"
             },
-            "time": "2026-03-05T00:21:39+00:00"
+            "time": "2026-03-07T00:03:47+00:00"
         },
         {
             "name": "anibalealvarezs/oauth-v1",
@@ -403,13 +429,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/oauth-v1.git",
-                "reference": "248153e7796f4171ab424429b4a951bfe5d33a9c"
+                "reference": "c42fa2cd07e1bc9206f039092bdcbbd99ac2aea3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/oauth-v1/anibalealvarezs-oauth-v1-248153e7796f4171ab424429b4a951bfe5d33a9c-zip-d5152e.zip",
-                "reference": "248153e7796f4171ab424429b4a951bfe5d33a9c",
-                "shasum": "9269990062b7ea167ce53a3fc14cd58ba6aa9629"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/oauth-v1/anibalealvarezs-oauth-v1-c42fa2cd07e1bc9206f039092bdcbbd99ac2aea3-zip-13c64e.zip",
+                "reference": "c42fa2cd07e1bc9206f039092bdcbbd99ac2aea3",
+                "shasum": "da3fc10c694f7cd5e2d8ca138b3ba70713e170c4"
             },
             "require": {
                 "php": ">=8.1"
@@ -440,12 +466,21 @@
                     "email": "anibalealvarezs@gmail.com"
                 }
             ],
-            "description": "description",
+            "description": "A lightweight PHP library for handling OAuth 1.0a authentication and request signing.",
+            "homepage": "https://github.com/anibalealvarezs/OAuth-v1",
+            "keywords": [
+                "api",
+                "authentication",
+                "guzzle-middleware",
+                "oauth",
+                "oauth1",
+                "signing"
+            ],
             "support": {
-                "source": "https://github.com/anibalealvarezs/oauth-v1/tree/main",
-                "issues": "https://github.com/anibalealvarezs/oauth-v1/issues"
+                "issues": "https://github.com/anibalealvarezs/OAuth-v1/issues",
+                "source": "https://github.com/anibalealvarezs/oauth-v1/tree/main"
             },
-            "time": "2026-03-04T20:37:40+00:00"
+            "time": "2026-03-07T00:03:43+00:00"
         },
         {
             "name": "anibalealvarezs/shopify-api",
@@ -453,13 +488,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/shopify-api.git",
-                "reference": "d3f5122ae72073deb631ebb67e060b818620014e"
+                "reference": "73422133c52cfefccbae50fe672da13202b49630"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/shopify-api/anibalealvarezs-shopify-api-d3f5122ae72073deb631ebb67e060b818620014e-zip-aedd60.zip",
-                "reference": "d3f5122ae72073deb631ebb67e060b818620014e",
-                "shasum": "40c88a9d1149a498e0c2958d371b9fe2e72f8733"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/shopify-api/anibalealvarezs-shopify-api-73422133c52cfefccbae50fe672da13202b49630-zip-4ad479.zip",
+                "reference": "73422133c52cfefccbae50fe672da13202b49630",
+                "shasum": "13a104d643c49cb2fa29ee257991073f30226899"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -494,12 +529,21 @@
                     "email": "anibalealvarezs@gmail.com"
                 }
             ],
-            "description": "description",
+            "description": "Standardized Shopify Admin API client for data extraction and integration within the APIs Hub ecosystem.",
+            "homepage": "https://github.com/anibalealvarezs/shopify-api",
+            "keywords": [
+                "apis-hub",
+                "data-extraction",
+                "ecommerce",
+                "guzzle",
+                "php",
+                "shopify-api"
+            ],
             "support": {
-                "source": "https://github.com/anibalealvarezs/shopify-api/tree/main",
-                "issues": "https://github.com/anibalealvarezs/shopify-api/issues"
+                "issues": "https://github.com/anibalealvarezs/shopify-api/issues",
+                "source": "https://github.com/anibalealvarezs/shopify-api/tree/main"
             },
-            "time": "2026-03-05T00:22:28+00:00"
+            "time": "2026-03-07T00:03:48+00:00"
         },
         {
             "name": "anibalealvarezs/triple-whale-api",
@@ -507,13 +551,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/triple-whale-api.git",
-                "reference": "4c645263ddadfc00747a898e5ae641aeee1c2332"
+                "reference": "64635eac6a2ef6923525ee9ba8f6aede3ff39c85"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/triple-whale-api/anibalealvarezs-triple-whale-api-4c645263ddadfc00747a898e5ae641aeee1c2332-zip-3c8f3f.zip",
-                "reference": "4c645263ddadfc00747a898e5ae641aeee1c2332",
-                "shasum": "8b6fda87461fd455935b461b249b3f9e465c6ed6"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/triple-whale-api/anibalealvarezs-triple-whale-api-64635eac6a2ef6923525ee9ba8f6aede3ff39c85-zip-75afb8.zip",
+                "reference": "64635eac6a2ef6923525ee9ba8f6aede3ff39c85",
+                "shasum": "6490a801236620f150d7ea3af116200885267983"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -555,7 +599,7 @@
                 "source": "https://github.com/anibalealvarezs/triple-whale-api/tree/main",
                 "issues": "https://github.com/anibalealvarezs/triple-whale-api/issues"
             },
-            "time": "2026-03-04T23:47:35+00:00"
+            "time": "2026-03-07T00:03:48+00:00"
         },
         {
             "name": "carbonphp/carbon-doctrine-types",
@@ -2720,12 +2764,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/cache.git",
-                "reference": "a0a1690543329685c044362c873b78c6de9d4faa"
+                "reference": "77f5eca135d1b5471de4301b99496649e4f62878"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/cache/zipball/a0a1690543329685c044362c873b78c6de9d4faa",
-                "reference": "a0a1690543329685c044362c873b78c6de9d4faa",
+                "url": "https://api.github.com/repos/symfony/cache/zipball/77f5eca135d1b5471de4301b99496649e4f62878",
+                "reference": "77f5eca135d1b5471de4301b99496649e4f62878",
                 "shasum": ""
             },
             "require": {
@@ -2812,7 +2856,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-02-20T15:06:30+00:00"
+            "time": "2026-03-05T20:47:12+00:00"
         },
         {
             "name": "symfony/cache-contracts",
@@ -3057,12 +3101,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/console.git",
-                "reference": "4d5318a66a747418eb12544ac38dc1ce78f3a482"
+                "reference": "49257c96304c508223815ee965c251e7c79e614e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/console/zipball/4d5318a66a747418eb12544ac38dc1ce78f3a482",
-                "reference": "4d5318a66a747418eb12544ac38dc1ce78f3a482",
+                "url": "https://api.github.com/repos/symfony/console/zipball/49257c96304c508223815ee965c251e7c79e614e",
+                "reference": "49257c96304c508223815ee965c251e7c79e614e",
                 "shasum": ""
             },
             "require": {
@@ -3147,7 +3191,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-05T15:03:01+00:00"
+            "time": "2026-03-06T13:31:08+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",
@@ -3545,12 +3589,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-foundation.git",
-                "reference": "5bb346d1b4b2a616e5c3d99b3ee4d5810735c535"
+                "reference": "cffffd0a2c037117b742b4f8b379a22a2a33f6d2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-foundation/zipball/5bb346d1b4b2a616e5c3d99b3ee4d5810735c535",
-                "reference": "5bb346d1b4b2a616e5c3d99b3ee4d5810735c535",
+                "url": "https://api.github.com/repos/symfony/http-foundation/zipball/cffffd0a2c037117b742b4f8b379a22a2a33f6d2",
+                "reference": "cffffd0a2c037117b742b4f8b379a22a2a33f6d2",
                 "shasum": ""
             },
             "require": {
@@ -3618,7 +3662,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-02-21T15:48:41+00:00"
+            "time": "2026-03-06T11:15:58+00:00"
         },
         {
             "name": "symfony/http-kernel",
@@ -3626,12 +3670,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-kernel.git",
-                "reference": "07f732b24472da0ba685281a849b60a1012d142b"
+                "reference": "5ba59341639b232728a147fb165c31883866245a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/07f732b24472da0ba685281a849b60a1012d142b",
-                "reference": "07f732b24472da0ba685281a849b60a1012d142b",
+                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/5ba59341639b232728a147fb165c31883866245a",
+                "reference": "5ba59341639b232728a147fb165c31883866245a",
                 "shasum": ""
             },
             "require": {
@@ -3736,7 +3780,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-04T15:26:40+00:00"
+            "time": "2026-03-06T16:30:12+00:00"
         },
         {
             "name": "symfony/messenger",

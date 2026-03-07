@@ -847,6 +847,7 @@ class MetricRequests
                     longLivedPageAccesstoken: $config['facebook']['graph_long_lived_page_access_token'] ?? '',
                     clientAccesstoken: $config['facebook']['graph_client_access_token'] ?? '',
                     longLivedClientAccesstoken: $config['facebook']['graph_long_lived_client_access_token'] ?? '',
+                    tokenPath: $config['facebook']['graph_token_path'] ?? '',
                 );
                 $logger->info("Initialized FacebookGraphApi");
                 return $apiInstance;
