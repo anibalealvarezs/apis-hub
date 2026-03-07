@@ -13,8 +13,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CrudController extends BaseController
 {
-    private CacheService $cacheService;
-    private CacheKeyGenerator $cacheKeyGenerator;
+    protected CacheService $cacheService;
+    protected CacheKeyGenerator $cacheKeyGenerator;
 
     public function __construct()
     {
@@ -43,7 +43,7 @@ class CrudController extends BaseController
             );
         }
 
-        $hideFields = array_filter(array_map('trim', explode(',', $params['hideFields'] ?? '')));
+        $hideFields = array_filter(array_map('trim', explode(',', (is_array($params) && isset($params['hideFields'])) ? $params['hideFields'] : '')));
 
         return match ($method) {
             'read'   => $this->read(entity: $entity, id: $id, hideFields: $hideFields),
@@ -89,13 +89,17 @@ class CrudController extends BaseController
             if ($hideFields) {
                 $repository->setHideFields($hideFields);
             }
-            $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id) . ($hideFields ? '_' . implode('_', $hideFields) : '');
-            $data = $this->cacheService->get(
-                key: $cacheKey,
-                callback: function () use ($repository, $id) {
-                    return $repository->read(id: $id);
-                }
-            );
+            if ($entity === 'job') {
+                $data = $repository->read(id: $id);
+            } else {
+                $cacheKey = $this->cacheKeyGenerator->forEntity($entity, $id) . ($hideFields ? '_' . implode('_', $hideFields) : '');
+                $data = $this->cacheService->get(
+                    key: $cacheKey,
+                    callback: function () use ($repository, $id) {
+                        return $repository->read(id: $id);
+                    }
+                );
+            }
 
             if (!$data) {
                 return $this->createResponse(
@@ -146,7 +150,7 @@ class CrudController extends BaseController
 
             $hasBodyFilters = !empty($body) && trim($body) !== '{}' && trim($body) !== '[]';
 
-            if ($hasBodyFilters) {
+            if ($hasBodyFilters || $entity === 'job') {
                 $count = $repository->countElements(filters: $params['filters']);
             } else {
                 $cacheKey = 'count_' . $entity . '_' . md5(json_encode($params));
@@ -201,7 +205,7 @@ class CrudController extends BaseController
 
             $hasBodyFilters = !empty($body) && trim($body) !== '{}' && trim($body) !== '[]';
 
-            if ($hasBodyFilters) {
+            if ($hasBodyFilters || $entity === 'job') {
                 $data = $repository->readMultiple(...$params)->toArray();
             } else {
                 $cacheKey = 'list_' . $entity . '_' . md5(json_encode($params)) . ($hideFields ? '_' . implode('_', $hideFields) : '');
@@ -327,7 +331,7 @@ class CrudController extends BaseController
             }
 
             return $this->createResponse(
-                data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
+                data: (is_object($result) && method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
                 status: 'success',
                 httpStatus: Response::HTTP_CREATED
             );
@@ -389,7 +393,7 @@ class CrudController extends BaseController
             );
 
             return $this->createResponse(
-                data: (method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
+                data: (is_object($result) && method_exists($result, 'toArray') ? $result->toArray() : (array)$result),
                 status: 'success'
             );
         } catch (InvalidArgumentException $e) {
