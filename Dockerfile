@@ -2,23 +2,16 @@ FROM php:8.3-cli
 
 # Instalar dependencias del sistema operativo
 RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    libzip-dev \
-    libonig-dev \
-    libxml2-dev \
     unzip \
     git \
     cron \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar extensiones PHP nativas
-RUN docker-php-ext-install \
-    pdo_mysql \
-    pdo_pgsql \
-    zip
+# Obtener el instalador de extensiones profesional
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 
-# Instalar y habilitar extensión Redis de PECL
-RUN pecl install redis && docker-php-ext-enable redis
+# Instalar extensiones PHP (maneja automáticamente dependencias complejas como IMAP)
+RUN install-php-extensions pdo_mysql pdo_pgsql zip imap redis
 
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -35,7 +28,7 @@ RUN php -r '$j=json_decode(file_get_contents("composer.json"), true); if(isset($
     && rm -f composer.lock
 
 # Instalar dependencias PHP
-RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader --verbose --ignore-platform-req=ext-imap
+RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader --verbose
 
 # Copiar el resto de la aplicación
 COPY . /app

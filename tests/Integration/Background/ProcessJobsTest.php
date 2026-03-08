@@ -60,7 +60,7 @@ class ProcessJobsTest extends BaseIntegrationTestCase
         $this->assertEquals(0, $exitCode);
         
         // Assert STDOUT log verifies it actually caught the job off the database
-        $this->assertStringContainsString('Querying scheduled jobs', $outputContent);
+        $this->assertStringContainsString('Querying scheduled and delayed jobs', $outputContent);
         $this->assertStringContainsString('Processing job ' . $uuid, $outputContent);
         
         // Refresh job
