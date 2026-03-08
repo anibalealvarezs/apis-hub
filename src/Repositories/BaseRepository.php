@@ -23,6 +23,7 @@ class BaseRepository extends EntityRepository
      * Set via setHideFields() from the controller layer.
      */
     private array $hideFields = [];
+    protected bool $isChanneledMetric = false;
 
     /**
      * Set the list of fields to hide from the result.
@@ -100,8 +101,8 @@ class BaseRepository extends EntityRepository
         $qb->from($tableName, 'e');
 
         // Specialized logic for ChanneledMetric to support deep joins in aggregation
-        $isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
-        if ($isChanneledMetric) {
+        $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
+        if ($this->isChanneledMetric) {
             $qb->join('e', 'metrics', 'm', 'e.metric_id = m.id')
                ->join('m', 'metric_configs', 'mc', 'm.metricConfig_id = mc.id');
         }
@@ -109,6 +110,17 @@ class BaseRepository extends EntityRepository
         // Selects with aggregation functions
         foreach ($aggregations as $alias => $expr) {
             $parsedExpr = $this->mapFieldToSql($expr, true);
+            
+            // Safety check for ChanneledMetric to prevent raw 'value' aggregation
+            // We only allow m.value if it's wrapped in a CASE WHEN (our formulas)
+            if ($this->isChanneledMetric && preg_match('/\bm\.value\b/i', $parsedExpr) && !str_contains($parsedExpr, 'CASE WHEN')) {
+                throw new \InvalidArgumentException(
+                    "Direct aggregation of 'value' field is restricted for ChanneledMetrics to prevent data corruption. " .
+                    "Please use intelligent formulas (e.g., 'spend', 'clicks', 'ctr', 'cpc', 'cpm', 'frequency', 'position') " .
+                    "or filter specifically by 'name' before aggregating."
+                );
+            }
+
             $qb->addSelect("$parsedExpr AS $alias");
         }
 
@@ -126,14 +138,14 @@ class BaseRepository extends EntityRepository
 
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
-            if ($isChanneledMetric && str_starts_with($field, 'dimensions.')) {
+            if ($this->isChanneledMetric && str_starts_with($field, 'dimensions.')) {
                 $dimKey = substr($field, 11);
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                 $qb->leftJoin('e', 'channeled_metric_dimensions', $dimAlias, "e.id = $dimAlias.channeledMetric_id AND $dimAlias.dimensionKey = :key_$dimAlias")
                    ->setParameter("key_$dimAlias", $dimKey)
                    ->addSelect("$dimAlias.dimensionValue AS " . ($field === 'dimensions.page' ? 'page' : $dimAlias))
                    ->addGroupBy("$dimAlias.dimensionValue");
-            } elseif ($isChanneledMetric && isset($relationMap[$field])) {
+            } elseif ($this->isChanneledMetric && isset($relationMap[$field])) {
                 $map = $relationMap[$field];
                 if (!isset($activeJoins[$field])) {
                     $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
@@ -150,14 +162,14 @@ class BaseRepository extends EntityRepository
         // Apply filters
         if ($filters) {
             foreach ($filters as $key => $value) {
-                if ($isChanneledMetric && str_starts_with($key, 'dimensions.')) {
+                if ($this->isChanneledMetric && str_starts_with($key, 'dimensions.')) {
                     $dimKey = substr($key, 11);
                     $dimAlias = "f_dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                     $qb->join('e', 'channeled_metric_dimensions', $dimAlias, "e.id = $dimAlias.channeledMetric_id AND $dimAlias.dimensionKey = :key_$dimAlias")
                        ->setParameter("key_$dimAlias", $dimKey)
                        ->andWhere("$dimAlias.dimensionValue = :val_$dimAlias")
                        ->setParameter("val_$dimAlias", $value);
-                } elseif ($isChanneledMetric && isset($relationMap[$key])) {
+                } elseif ($this->isChanneledMetric && isset($relationMap[$key])) {
                     $map = $relationMap[$key];
                     if (!isset($activeJoins[$key])) {
                         $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
@@ -326,8 +338,8 @@ class BaseRepository extends EntityRepository
         $lowerField = strtolower($field);
 
         // Specialized metric formulas for ChanneledMetric to handle cross-row aggregation
-        $isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
-        if ($isChanneledMetric && $isAggregate) {
+        $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
+        if ($this->isChanneledMetric && $isAggregate) {
             $formulas = [
                 'spend'       => 'SUM(CASE WHEN mc.name = "spend" THEN m.value ELSE 0 END)',
                 'clicks'      => 'SUM(CASE WHEN mc.name = "clicks" THEN m.value ELSE 0 END)',
@@ -353,6 +365,15 @@ class BaseRepository extends EntityRepository
 
             if (isset($formulas[$lowerField])) {
                 return $formulas[$lowerField];
+            }
+
+            // Prevent direct 'value' aggregation for ChanneledMetric to avoid data corruption (summing different units)
+            if (str_ends_with($this->getEntityName(), 'ChanneledMetric') && ($lowerField === 'value' || str_contains($lowerField, 'm.value'))) {
+                throw new \InvalidArgumentException(
+                    "Direct aggregation of 'value' field is restricted for ChanneledMetrics to prevent data corruption. " .
+                    "Please use intelligent formulas (e.g., 'spend', 'clicks', 'ctr', 'cpc', 'cpm', 'frequency', 'position') " .
+                    "or filter specifically by 'name' before aggregating."
+                );
             }
         }
 
@@ -420,7 +441,7 @@ class BaseRepository extends EntityRepository
         }
 
         if ($field === 'value') {
-            return "m.value";
+            return str_ends_with($this->getEntityName(), 'Metric') ? (str_ends_with($this->getEntityName(), 'ChanneledMetric') ? 'm.value' : 'e.value') : "e.$field";
         }
 
         return "e.$field";
