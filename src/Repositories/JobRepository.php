@@ -281,10 +281,10 @@ class JobRepository extends BaseRepository
         $updatedRows = $qb->update($this->getEntityName(), 'e')
             ->set('e.status', ':processing')
             ->where('e.id = :id')
-            ->andWhere('e.status = :scheduled')
+            ->andWhere($qb->expr()->in('e.status', ':claimable'))
             ->setParameter('processing', JobStatus::processing->value)
             ->setParameter('id', $id)
-            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('claimable', [JobStatus::scheduled->value, JobStatus::delayed->value])
             ->getQuery()
             ->execute();
 

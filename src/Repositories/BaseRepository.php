@@ -23,6 +23,7 @@ class BaseRepository extends EntityRepository
      * Set via setHideFields() from the controller layer.
      */
     private array $hideFields = [];
+    protected bool $isChanneledMetric = false;
 
     /**
      * Set the list of fields to hide from the result.
@@ -100,8 +101,8 @@ class BaseRepository extends EntityRepository
         $qb->from($tableName, 'e');
 
         // Specialized logic for ChanneledMetric to support deep joins in aggregation
-        $isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
-        if ($isChanneledMetric) {
+        $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
+        if ($this->isChanneledMetric) {
             $qb->join('e', 'metrics', 'm', 'e.metric_id = m.id')
                ->join('m', 'metric_configs', 'mc', 'm.metricConfig_id = mc.id');
         }
@@ -109,18 +110,49 @@ class BaseRepository extends EntityRepository
         // Selects with aggregation functions
         foreach ($aggregations as $alias => $expr) {
             $parsedExpr = $this->mapFieldToSql($expr, true);
+            
+            // Safety check for ChanneledMetric to prevent raw 'value' aggregation
+            // We only allow m.value if it's wrapped in a CASE WHEN (our formulas)
+            if ($this->isChanneledMetric && preg_match('/\bm\.value\b/i', $parsedExpr) && !str_contains($parsedExpr, 'CASE WHEN')) {
+                throw new \InvalidArgumentException(
+                    "Direct aggregation of 'value' field is restricted for ChanneledMetrics to prevent data corruption. " .
+                    "Please use intelligent formulas (e.g., 'spend', 'clicks', 'ctr', 'cpc', 'cpm', 'frequency', 'position') " .
+                    "or filter specifically by 'name' before aggregating."
+                );
+            }
+
             $qb->addSelect("$parsedExpr AS $alias");
         }
 
+        $relationMap = [
+            'query'    => ['table' => 'queries', 'fk' => 'query_id', 'field' => 'query', 'alias' => 'rq'],
+            'page'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rp'],
+            'account'  => ['table' => 'accounts', 'fk' => 'account_id', 'field' => 'name', 'alias' => 'ra'],
+            'campaign' => ['table' => 'campaigns', 'fk' => 'campaign_id', 'field' => 'name', 'alias' => 'rc'],
+            'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeledAdGroup_id', 'field' => 'name', 'alias' => 'rag'],
+            'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeledAd_id', 'field' => 'name', 'alias' => 'rad'],
+            'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
+            'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'name', 'alias' => 'rd'],
+        ];
+        $activeJoins = [];
+
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
-            if ($isChanneledMetric && str_starts_with($field, 'dimensions.')) {
+            if ($this->isChanneledMetric && str_starts_with($field, 'dimensions.')) {
                 $dimKey = substr($field, 11);
-                $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/', '_', $dimKey);
+                $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                 $qb->leftJoin('e', 'channeled_metric_dimensions', $dimAlias, "e.id = $dimAlias.channeledMetric_id AND $dimAlias.dimensionKey = :key_$dimAlias")
                    ->setParameter("key_$dimAlias", $dimKey)
                    ->addSelect("$dimAlias.dimensionValue AS " . ($field === 'dimensions.page' ? 'page' : $dimAlias))
                    ->addGroupBy("$dimAlias.dimensionValue");
+            } elseif ($this->isChanneledMetric && isset($relationMap[$field])) {
+                $map = $relationMap[$field];
+                if (!isset($activeJoins[$field])) {
+                    $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
+                    $activeJoins[$field] = true;
+                }
+                $qb->addSelect("{$map['alias']}.{$map['field']} AS $field")
+                   ->addGroupBy("{$map['alias']}.{$map['field']}");
             } else {
                 $sqlField = $this->mapFieldToSql($field);
                 $qb->addSelect("$sqlField AS $field")->addGroupBy($sqlField);
@@ -130,10 +162,27 @@ class BaseRepository extends EntityRepository
         // Apply filters
         if ($filters) {
             foreach ($filters as $key => $value) {
-                $sqlKey = $this->mapFieldToSql($key);
-                $paramName = 'f_' . preg_replace('/[^a-z0-9]/', '_', $key);
-                $qb->andWhere("$sqlKey = :$paramName")
-                   ->setParameter($paramName, $value);
+                if ($this->isChanneledMetric && str_starts_with($key, 'dimensions.')) {
+                    $dimKey = substr($key, 11);
+                    $dimAlias = "f_dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
+                    $qb->join('e', 'channeled_metric_dimensions', $dimAlias, "e.id = $dimAlias.channeledMetric_id AND $dimAlias.dimensionKey = :key_$dimAlias")
+                       ->setParameter("key_$dimAlias", $dimKey)
+                       ->andWhere("$dimAlias.dimensionValue = :val_$dimAlias")
+                       ->setParameter("val_$dimAlias", $value);
+                } elseif ($this->isChanneledMetric && isset($relationMap[$key])) {
+                    $map = $relationMap[$key];
+                    if (!isset($activeJoins[$key])) {
+                        $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
+                        $activeJoins[$key] = true;
+                    }
+                    $qb->andWhere("{$map['alias']}.{$map['field']} = :f_$key")
+                       ->setParameter("f_$key", $value);
+                } else {
+                    $sqlKey = $this->mapFieldToSql($key);
+                    $paramName = 'f_' . preg_replace('/[^a-z0-9]/i', '_', $key);
+                    $qb->andWhere("$sqlKey = :$paramName")
+                       ->setParameter($paramName, $value);
+                }
             }
         }
 
@@ -155,7 +204,129 @@ class BaseRepository extends EntityRepository
             }
         }
 
-        return $qb->executeQuery()->fetchAllAssociative();
+        $results = $qb->executeQuery()->fetchAllAssociative();
+
+        // 4. Smoothing: Fill temporal gaps for time-series data
+        if ($startDate && $endDate) {
+            $temporalField = null;
+            $temporalType = null;
+            foreach ($groupBy as $field) {
+                if (in_array(strtolower($field), ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'])) {
+                    $temporalField = $field;
+                    $temporalType = strtolower($field);
+                    break;
+                }
+            }
+
+            if ($temporalField) {
+                $results = $this->fillTemporalGaps($results, $temporalField, $temporalType, $startDate, $endDate, $aggregations, $groupBy);
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Fills gaps in a time series result set with zeroed-out records.
+     */
+    protected function fillTemporalGaps(
+        array $results,
+        string $temporalField,
+        string $type,
+        string $startDate,
+        string $endDate,
+        array $aggregations,
+        array $groupBy
+    ): array {
+        $start = new \DateTime($startDate);
+        $end = new \DateTime($endDate);
+        $periods = [];
+        
+        // Generate all expected periods
+        $current = clone $start;
+        while ($current <= $end) {
+            $periodKey = match($type) {
+                'daily'     => $current->format('Y-m-d'),
+                'weekly'    => $current->format('Y-\W') . str_pad($current->format('W'), 2, '0', STR_PAD_LEFT),
+                'monthly'   => $current->format('Y-m'),
+                'quarterly' => $current->format('Y-\Q') . ceil($current->format('n') / 3),
+                'yearly'    => $current->format('Y'),
+            };
+            $periods[$periodKey] = true;
+            
+            $interval = match($type) {
+                'daily'     => 'P1D',
+                'weekly'    => 'P1W',
+                'monthly'   => 'P1M',
+                'quarterly' => 'P3M',
+                'yearly'    => 'P1Y',
+            };
+            $current->add(new \DateInterval($interval));
+        }
+
+        // Identify non-temporal grouping fields
+        $otherGroups = array_filter($groupBy, fn($f) => $f !== $temporalField);
+        
+        // If we have other groups (e.g. gender), we need to fill gaps for each combination
+        if (!empty($otherGroups)) {
+            $uniqueCombos = [];
+            foreach ($results as $row) {
+                $combo = [];
+                foreach ($otherGroups as $field) {
+                    $combo[$field] = $row[$field] ?? null;
+                }
+                $comboKey = serialize($combo);
+                $uniqueCombos[$comboKey] = $combo;
+            }
+
+            $indexedResults = [];
+            foreach ($results as $row) {
+                $combo = [];
+                foreach ($otherGroups as $field) {
+                    $combo[$field] = $row[$field] ?? null;
+                }
+                $key = $row[$temporalField] . '|' . serialize($combo);
+                $indexedResults[$key] = $row;
+            }
+
+            $finalResults = [];
+            foreach ($uniqueCombos as $combo) {
+                foreach (array_keys($periods) as $pKey) {
+                    $lookupKey = $pKey . '|' . serialize($combo);
+                    if (isset($indexedResults[$lookupKey])) {
+                        $finalResults[] = $indexedResults[$lookupKey];
+                    } else {
+                        $newRow = array_merge($combo, [$temporalField => $pKey]);
+                        foreach (array_keys($aggregations) as $alias) {
+                            $newRow[$alias] = 0;
+                        }
+                        $finalResults[] = $newRow;
+                    }
+                }
+            }
+            return $finalResults;
+        }
+
+        // Simple case: only temporal grouping
+        $indexedResults = [];
+        foreach ($results as $row) {
+            $indexedResults[$row[$temporalField]] = $row;
+        }
+
+        $finalResults = [];
+        foreach (array_keys($periods) as $pKey) {
+            if (isset($indexedResults[$pKey])) {
+                $finalResults[] = $indexedResults[$pKey];
+            } else {
+                $newRow = [$temporalField => $pKey];
+                foreach (array_keys($aggregations) as $alias) {
+                    $newRow[$alias] = 0;
+                }
+                $finalResults[] = $newRow;
+            }
+        }
+
+        return $finalResults;
     }
 
     /**
@@ -163,7 +334,48 @@ class BaseRepository extends EntityRepository
      */
     protected function mapFieldToSql(string $expr, bool $isAggregate = false): string
     {
-        $field = trim($expr);
+        $field = trim($expr);            
+        $lowerField = strtolower($field);
+
+        // Specialized metric formulas for ChanneledMetric to handle cross-row aggregation
+        $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
+        if ($this->isChanneledMetric && $isAggregate) {
+            $formulas = [
+                'spend'       => 'SUM(CASE WHEN mc.name = "spend" THEN m.value ELSE 0 END)',
+                'clicks'      => 'SUM(CASE WHEN mc.name = "clicks" THEN m.value ELSE 0 END)',
+                'impressions' => 'SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END)',
+                'reach'       => 'SUM(CASE WHEN mc.name = "reach" THEN m.value ELSE 0 END)',
+                'frequency'   => 'SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "reach" THEN m.value ELSE 0 END), 0)',
+                'ctr'         => 'SUM(CASE WHEN mc.name = "clicks" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0)',
+                'cpc'         => 'SUM(CASE WHEN mc.name = "spend" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "clicks" THEN m.value ELSE 0 END), 0)',
+                'cpm'         => 'SUM(CASE WHEN mc.name = "spend" THEN m.value ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0) / 1000)',
+                'position'    => 'SUM(CASE WHEN mc.name = "position" THEN m.value ELSE 0 END * (
+                    SELECT m2.value 
+                    FROM metrics m2 
+                    JOIN metric_configs mc2 ON m2.metricConfig_id = mc2.id 
+                    WHERE mc2.name = "impressions" 
+                    AND mc2.metricDate = mc.metricDate 
+                    AND mc2.channel = mc.channel
+                    AND (mc2.query_id = mc.query_id OR (mc2.query_id IS NULL AND mc.query_id IS NULL))
+                    AND (mc2.page_id = mc.page_id OR (mc2.page_id IS NULL AND mc.page_id IS NULL))
+                    LIMIT 1
+                )) / NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0)',
+                'unique_clicks' => 'SUM(CASE WHEN mc.name = "unique_clicks" THEN m.value ELSE 0 END)',
+            ];
+
+            if (isset($formulas[$lowerField])) {
+                return $formulas[$lowerField];
+            }
+
+            // Prevent direct 'value' aggregation for ChanneledMetric to avoid data corruption (summing different units)
+            if (str_ends_with($this->getEntityName(), 'ChanneledMetric') && ($lowerField === 'value' || str_contains($lowerField, 'm.value'))) {
+                throw new \InvalidArgumentException(
+                    "Direct aggregation of 'value' field is restricted for ChanneledMetrics to prevent data corruption. " .
+                    "Please use intelligent formulas (e.g., 'spend', 'clicks', 'ctr', 'cpc', 'cpm', 'frequency', 'position') " .
+                    "or filter specifically by 'name' before aggregating."
+                );
+            }
+        }
 
         // If it's an aggregate expression, it might contain functions, arithmetic and multiple fields.
         if ($isAggregate) {
@@ -173,7 +385,7 @@ class BaseRepository extends EntityRepository
                 '/data\.[a-zA-Z0-9_]+/',
                 '/metric\.[a-zA-Z0-9_]+/',
                 '/metricConfig\.[a-zA-Z0-9_]+/',
-                '/\b(name|period|metricDate|value|platformCreatedAt|createdAt|date)\b/'
+                '/\b(id|name|period|metricDate|value|platformCreatedAt|createdAt|date)\b/'
             ];
 
             return preg_replace_callback($patterns, function ($matches) {
@@ -205,8 +417,31 @@ class BaseRepository extends EntityRepository
         if ($field === 'metricDate' || $field === 'name' || $field === 'period') {
             return "mc.$field";
         }
+        
+        // Temporal virtual fields
+        $baseDate = str_ends_with($this->getEntityName(), 'ChanneledMetric') ? 'mc.metricDate' : 'e.platformCreatedAt';
+        $dateParts = [
+            'year'      => "YEAR($baseDate)",
+            'month'     => "MONTH($baseDate)",
+            'day'       => "DAY($baseDate)",
+            'week'      => "WEEK($baseDate)",
+            'quarter'   => "QUARTER($baseDate)",
+            'dayofweek' => "DAYOFWEEK($baseDate)",
+            'dayname'   => "DAYNAME($baseDate)",
+            'monthname' => "MONTHNAME($baseDate)",
+            // Friendly grouping keys
+            'daily'     => "DATE($baseDate)",
+            'weekly'    => "CONCAT(YEAR($baseDate), '-W', LPAD(WEEK($baseDate), 2, '0'))",
+            'monthly'   => "CONCAT(YEAR($baseDate), '-', LPAD(MONTH($baseDate), 2, '0'))",
+            'quarterly' => "CONCAT(YEAR($baseDate), '-Q', QUARTER($baseDate))",
+            'yearly'    => "YEAR($baseDate)",
+        ];
+        if (isset($dateParts[$lowerField])) {
+            return $dateParts[$lowerField];
+        }
+
         if ($field === 'value') {
-            return "m.value";
+            return str_ends_with($this->getEntityName(), 'Metric') ? (str_ends_with($this->getEntityName(), 'ChanneledMetric') ? 'm.value' : 'e.value') : "e.$field";
         }
 
         return "e.$field";

@@ -43,11 +43,15 @@ foreach (['database', 'instances', 'channels'] as $required) {
     }
 }
 
-$db      = $config['database'];
+$env      = getenv('APP_ENV') ?: 'testing';
+$dbConfig = $config['database'];
+$db       = $dbConfig[$env] ?? array_shift($dbConfig); // Default to specified env or first block
+
 $redis   = $config['redis'] ?? ['host' => 'redis', 'port' => 6379];
 $instances = $config['instances'];
 $channels  = $config['channels'];
 $projectLabel = $config['project'] ?? $projectName;
+echo "⚒  Building deployment for environment: " . strtoupper($env) . "\n";
 
 // ─── Build docker-compose.yml ─────────────────────────────────────────────────
 $services = [];

@@ -12,6 +12,8 @@ enum JobStatus: int
 
     case failed = 4;
 
+    case delayed = 5;
+
     public function getName(): string
     {
         return $this->name;

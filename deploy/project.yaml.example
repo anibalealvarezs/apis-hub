@@ -124,6 +124,8 @@ channels:
     graph_page_access_token: ${FB_PAGE_TOKEN} # Page-specific access token
     graph_long_lived_user_access_token: ${FB_LONG_LIVED_USER_TOKEN} # Highly recommended for background workers
     graph_long_lived_page_access_token: ${FB_LONG_LIVED_PAGE_TOKEN} # Highly recommended for background workers
+    # Path to store/read tokens persistently (ensures long-lived tokens survive restarts)
+    graph_token_path: ./config/facebook_tokens.json
     
     # Facebook Pages to track (includes Instagram settings)
     pages:
