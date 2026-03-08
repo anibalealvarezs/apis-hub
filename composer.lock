@@ -131,16 +131,16 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "c13cf243910d8197817e9de86070dd7484144ea4"
+                "reference": "ecd3f4a848c630bcdd31c4c4179b9ba4bbbbb1d0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-c13cf243910d8197817e9de86070dd7484144ea4-zip-2b3c27.zip",
-                "reference": "c13cf243910d8197817e9de86070dd7484144ea4",
-                "shasum": "4f6fd41a5ff39851bfb6801d5412d88daa629f7e"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-ecd3f4a848c630bcdd31c4c4179b9ba4bbbbb1d0-zip-7968e0.zip",
+                "reference": "ecd3f4a848c630bcdd31c4c4179b9ba4bbbbb1d0",
+                "shasum": "a73d1b069a79d349d533aac532317ea616d1bff7"
             },
             "require": {
-                "anibalealvarezs/api-client-skeleton": "@dev",
+                "anibalealvarezs/api-client-skeleton": "dev-main",
                 "ext-json": "*",
                 "guzzlehttp/guzzle": "^7.0",
                 "monolog/monolog": "3.x-dev",
@@ -188,7 +188,7 @@
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-07T00:03:44+00:00"
+            "time": "2026-03-07T23:42:32+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",

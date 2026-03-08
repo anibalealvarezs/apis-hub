@@ -66,4 +66,12 @@ enum Channel: int
             default => null,
         };
     }
+
+    public function getCooldown(): int
+    {
+        return match($this) {
+            self::facebook, self::instagram => 3600, // 1 hour
+            default => 600, // 10 minutes
+        };
+    }
 }

@@ -13,6 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Services\DateResolver;
 use Symfony\Component\HttpFoundation\Response;
+use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
 use Throwable;
 
 class ProcessJobsCommand extends Command
@@ -37,27 +38,15 @@ class ProcessJobsCommand extends Command
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
 
-        $output->writeln("Querying scheduled jobs...");
-        $filters = ['status' => JobStatus::scheduled->value];
-
-        if ($envChannel = getenv('API_SOURCE')) {
-            // Normalize container alias (e.g. 'fb-ads') to channel name (e.g. 'facebook')
-            if ($chanEnum = Channel::tryFromName($envChannel)) {
-                $envChannel = $chanEnum->name;
-            }
-            $filters['channel'] = $envChannel;
-        }
-        if ($envEntity = getenv('API_ENTITY')) {
-            $filters['entity'] = $envEntity;
-        }
+        $output->writeln("Querying scheduled and delayed jobs...");
 
         $envStartDate = getenv('START_DATE');
         $envEndDate = getenv('END_DATE');
 
-        $jobs = $jobRepo->findBy($filters);
+        $jobs = $jobRepo->findBy(['status' => [JobStatus::scheduled->value, JobStatus::delayed->value]]);
 
         if (empty($jobs)) {
-            $output->writeln("No scheduled jobs found.");
+            $output->writeln("No jobs found.");
             return Command::SUCCESS;
         }
 
@@ -79,6 +68,41 @@ class ProcessJobsCommand extends Command
                 $jobEnd = $params['endDate'] ?? $params['end_date'] ?? null;
                 if ($jobEnd !== $envEndDate) {
                     continue;
+                }
+            }
+
+            if ($job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
+                continue;
+            }
+
+            // Global filters from env
+            if ($envChannel = getenv('API_SOURCE')) {
+                if ($chanEnum = Channel::tryFromName($envChannel)) {
+                    $envChannel = $chanEnum->name;
+                }
+                if ($job->getChannel() !== $envChannel) {
+                    continue;
+                }
+            }
+            if ($envEntity = getenv('API_ENTITY')) {
+                if ($job->getEntity() !== $envEntity) {
+                    continue;
+                }
+            }
+
+            // Cooldown check for delayed jobs
+            if ($job->getStatus() === JobStatus::delayed->value) {
+                $channelEnum = Channel::tryFromName($job->getChannel());
+                $cooldown = $channelEnum ? $channelEnum->getCooldown() : 600;
+                $updatedAt = $job->getUpdatedAt();
+                if ($updatedAt) {
+                    $elapsed = time() - $updatedAt->getTimestamp();
+                    if ($elapsed < $cooldown) {
+                        $remaining = $cooldown - $elapsed;
+                        $minutes = ceil($remaining / 60);
+                        $output->writeln("<comment>Job {$job->getUuid()} is in cooldown. Skipping (available in {$minutes} mins).</comment>");
+                        continue;
+                    }
                 }
             }
 
@@ -116,6 +140,10 @@ class ProcessJobsCommand extends Command
                 $jobRepo->update($job->getId(), (object)['status' => JobStatus::completed->value]);
                 $output->writeln("<info>Successfully completed job {$job->getUuid()}</info>");
 
+            } catch (FacebookRateLimitException $e) {
+                // Update to delayed
+                $jobRepo->update($job->getId(), (object)['status' => JobStatus::delayed->value]);
+                $output->writeln("<comment>Rate limit reached for job {$job->getUuid()}. Job delayed for cooldown.</comment>");
             } catch (Throwable $e) {
                 // Update to failed
                 $jobRepo->update($job->getId(), (object)['status' => JobStatus::failed->value]);
