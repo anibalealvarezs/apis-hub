@@ -39,17 +39,12 @@ class RoutingCore implements HttpKernelInterface
         $context = new RequestContext();
         $context->fromRequest($request);
 
-        // Security Check: API Key validation
-        $expectedKeysRaw = \Helpers\Helpers::getAppApiKey();
-        if ($expectedKeysRaw !== null) {
-            $expectedKeys = array_map('trim', explode(',', $expectedKeysRaw));
-            $providedKey = $request->headers->get('X-API-Key');
-            if ($providedKey === null || !in_array($providedKey, $expectedKeys, true)) {
-                return new Response(json_encode([
-                    'status' => 'error',
-                    'error' => 'Unauthorized: Invalid or missing API Key'
-                ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
-            }
+        // Security Check
+        if (!$this->isAuthorized($request)) {
+            return new Response(json_encode([
+                'status' => 'error',
+                'error' => 'Unauthorized: Access denied'
+            ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
         }
 
         $matcher = new UrlMatcher($this->routes, $context);
@@ -79,6 +74,43 @@ class RoutingCore implements HttpKernelInterface
         }
 
         return $response;
+    }
+
+    /**
+     * @param Request $request
+     * @return bool
+     */
+    private function isAuthorized(Request $request): bool
+    {
+        // 1. IP Whitelisting Check (First layer)
+        $authorizedIps = \Helpers\Helpers::getAuthorizedIps();
+        if (!empty($authorizedIps)) {
+            $clientIp = $request->getClientIp();
+            if (!\Symfony\Component\HttpFoundation\IpUtils::checkIp($clientIp, $authorizedIps)) {
+                return false;
+            }
+        }
+
+        // 2. Token Check (Second layer)
+        $expectedKeysRaw = \Helpers\Helpers::getAppApiKey();
+        if ($expectedKeysRaw === null) {
+            return true; // If no keys are defined, API is public (within whitelisted IPs)
+        }
+
+        $expectedKeys = array_map('trim', explode(',', $expectedKeysRaw));
+        
+        // Try X-API-Key
+        $providedKey = $request->headers->get('X-API-Key');
+        
+        // Try Authorization: Bearer <token>
+        if ($providedKey === null) {
+            $authHeader = $request->headers->get('Authorization');
+            if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
+                $providedKey = substr($authHeader, 7);
+            }
+        }
+
+        return in_array($providedKey, $expectedKeys, true);
     }
 
     // Associates a URL with a callback function

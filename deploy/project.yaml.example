@@ -177,6 +177,18 @@ channels:
     shopify_shop_name: your-shop-prefix    # The 'my-shop' part of my-shop.myshopify.com
     # API Version (e.g. "2024-04")
     shopify_last_stable_revision: "2024-04" # Recommended Shopify API version
+# ── Security ──────────────────────────────────────────────────────────────────
+# API Access Protection
+security:
+  # List of authorized API keys.
+  # Validated via 'X-API-Key' header OR 'Authorization: Bearer <key>' header.
+  api_keys:
+    - ${APP_API_KEY:-YOUR_SECRET_API_KEY_HERE}
+
+  # IP Whitelisting: List of authorized IP addresses or CIDR blocks.
+  # e.g., "127.0.0.1", "192.168.1.0/24". Leave empty to disable.
+  authorized_ips: []
+
 # ── CLI Settings ──────────────────────────────────────────────────────────────
 # Global settings for CLI commands (bin/cli.php).
 cli:
