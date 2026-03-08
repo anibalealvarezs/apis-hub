@@ -104,20 +104,84 @@ curl -X POST https://api.yourdomain.com/shopify/channeled_order/aggregate \
 
 ## 🧠 Advanced Concepts
 
-### Channeled Metrics Logic
+### 1. Intelligent Metric Formulas
 
-When aggregating `channeled_metric` entities, the hub automatically performs joins with the `metrics` and `metric_configs` tables. This allows you to use specific aliases in your aggregation expressions:
+For `channeled_metric` entities, you no longer need to write raw SQL for common metrics. The system provides **pre-calculated formulas** that ensure mathematical correctness (e.g., using weighted averages for rates).
 
-- `e.`: The main `channeled_metrics` table.
-- `m.`: The `metrics` table (contains `value`).
-- `mc.`: The `metric_configs` table (contains metadata and settings).
+| Formula | Description | Calculation Logic |
+| :--- | :--- | :--- |
+| `spend` | Total Spend | `SUM(value)` where name is "spend" |
+| `clicks` | Total Clicks | `SUM(value)` where name is "clicks" |
+| `impressions` | Total Impressions | `SUM(value)` where name is "impressions" |
+| `reach` | Total Reach | `SUM(value)` where name is "reach" |
+| `frequency` | Ad Frequency | `SUM(impressions) / SUM(reach)` |
+| `ctr` | Click-Through Rate | `SUM(clicks) / SUM(impressions)` |
+| `cpc` | Cost Per Click | `SUM(spend) / SUM(clicks)` |
+| `cpm` | Cost Per Mille | `SUM(spend) / (SUM(impressions) / 1000)` |
+| `position` | Weighted Position | `SUM(position * impressions) / SUM(impressions)` |
 
-### Dimensional Grouping
+**Example:**
 
-If your entity uses `channeled_metric_dimensions`, you can group by dimensions using the `dimensions.NAME` syntax in the CLI or API:
+```bash
+php bin/cli.php app:aggregate -e channeled_metric -c facebook \
+  -a '{"cost":"spend", "CTR":"ctr"}' --pretty
+```
 
-```json
-"groupBy": ["dimensions.page", "dimensions.country"]
+### 2. Multi-Level Filtering & Grouping
+
+The engine intelligently traverses the 4-level architecture (`MetricConfig` -> `Metric` -> `ChanneledMetric` -> `Dimension`) automatically.
+
+#### Level 1: Configuration Fields
+
+You can group or filter directly by entity relationships defined in `MetricConfig`:
+
+- `account`, `campaign`, `adGroup`, `ad`, `query`, `page`, `country`, `device`.
+
+#### Level 4: Dynamic Dimensions
+
+Filter or group by granular platform dimensions using the `dimensions.` prefix:
+
+- `dimensions.gender`, `dimensions.age`, `dimensions.searchAppearance`, etc.
+
+**Example (Segmented Analysis):**
+
+```bash
+php bin/cli.php app:aggregate -e channeled_metric -c facebook \
+  -a '{"gasto":"spend"}' \
+  -g 'account,dimensions.gender' \
+  -f '{"dimensions.age":"45-54"}' --pretty
+```
+
+---
+
+## 📅 Time Series & Smoothing
+
+### Temporal Aggregation
+
+The engine supports built-in temporal aliases to easily format and group data by time periods.
+
+| Alias | Description | Output Format |
+| :--- | :--- | :--- |
+| `daily` | Full date | `YYYY-MM-DD` |
+| `weekly` | ISO Week | `YYYY-Www` |
+| `monthly` | Year and Month | `YYYY-MM` |
+| `quarterly` | Year and Quarter | `YYYY-QX` |
+| `yearly` | Full Year | `YYYY` |
+
+### Gap Filling (Smoothing)
+
+When aggregating by a temporal alias (e.g., `daily`), the engine automatically performs **Gap Filling**. If a specific day or month has no data, the system will inject a "zeroed" record to ensure a continuous series.
+
+> [!IMPORTANT]
+> Smoothing is automatically triggered when using a temporal alias in `groupBy` and providing both `--start-date` and `--end-date`.
+
+**Example (Continuous Daily Chart Data):**
+
+```bash
+php bin/cli.php app:aggregate -e channeled_metric -c google_search_console \
+  -a '{"clicks":"clicks"}' \
+  -g 'daily' \
+  -s '2026-03-01' -d '2026-03-31' --pretty
 ```
 
 ---
@@ -127,3 +191,4 @@ If your entity uses `channeled_metric_dimensions`, you can group by dimensions u
 - **Missing Aggregations:** Returns `400 Bad Request`.
 - **Invalid SQL Expression:** Returns `500 Internal Server Error` with Doctrine's message.
 - **Invalid Entity/Channel:** Returns `404 Not Found`.
+- **Dimension Mismatch:** If a dimension filter is applied to an entity that doesn't support it, the filter is ignored or returns empty results depending on the join type.
