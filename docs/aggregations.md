@@ -6,7 +6,7 @@
 
 ## 🚀 CLI Usage
 
-The `app:aggregate` command allows you to calculate metrics directly from the terminal.
+The `app:aggregate` command is the main entry point to calculate metrics directly from the terminal.
 
 ### Basic Syntax
 
@@ -22,22 +22,29 @@ php bin/cli.php app:aggregate --entity=<entity_name> --aggregations='{"alias": "
 php bin/cli.php app:aggregate \
   --entity=channeled_order \
   --channel=shopify \
-  --aggregations='{"total_revenue": "SUM(e.total_price)"}' \
+  --aggregations='{"total_revenue": "SUM(total_price)"}' \
   --pretty
 ```
 
-#### 2. Advanced Metrics with Grouping (Google Search Console)
+#### 2. Advanced Multi-Channel Metrics with Grouping
 
-You can group data by dimensions and apply multiple aggregations at once. Use `e.` prefix for standard fields and `m.` or `mc.` for metric/config fields in channeled metrics.
+The engine is platform-agnostic. You can group data by dimensions and apply multiple aggregations for any provider (Facebook, Google Search Console, etc.).
 
 ```bash
+# Example for Facebook Ads
+php bin/cli.php app:aggregate \
+  --entity=channeled_metric \
+  --channel=facebook \
+  --aggregations='{"spend": "spend", "ctr": "ctr"}' \
+  --group-by='monthly' \
+  --pretty
+
+# Example for Google Search Console
 php bin/cli.php app:aggregate \
   --entity=channeled_metric \
   --channel=google_search_console \
-  --aggregations='{"total_clicks": "SUM(m.value)", "avg_ctr": "AVG(mc.ctr)"}' \
-  --group-by='metricDate' \
-  --start-date='2024-03-01' \
-  --end-date='2024-03-31' \
+  --aggregations='{"clicks": "clicks", "avg_position": "position"}' \
+  --group-by='query' \
   --pretty
 ```
 
@@ -46,7 +53,7 @@ php bin/cli.php app:aggregate \
 | Option | Shortcut | Description |
 | :--- | :--- | :--- |
 | `--entity` | `-e` | **Required.** The entity to aggregate. |
-| `--aggregations` | `-a` | **Required.** JSON map of aggregations. e.g. `{"clicks": "SUM(m.value)"}` |
+| `--aggregations` | `-a` | **Required.** JSON map of aggregations. e.g. `{"clicks": "clicks"}` |
 | `--channel` | `-c` | Optional. The channel for the entity (for channeled entities). |
 | `--group-by` | `-g` | Optional. Comma separated list of fields to group by. |
 | `--start-date` | `-s` | Optional. Filter by date (if the entity supports it). |
@@ -63,7 +70,7 @@ Aggregations are exposed via `POST` endpoints to allow complex payloads.
 ### Endpoints
 
 - **Standard Entities:** `POST /entity/{entity}/aggregate`
-- **Channeled Entities:** `POST /{channel}/{entity}/aggregate`
+- **Managed Metrics:** `POST /{channel}/{entity}/aggregate`
 
 ### Request Payload
 
@@ -72,12 +79,12 @@ The API accepts a JSON body with the following structure:
 ```json
 {
   "aggregations": {
-    "total_amount": "SUM(e.amount)",
-    "average_price": "AVG(e.price)"
+    "total_spend": "spend",
+    "avg_ctr": "ctr"
   },
-  "groupBy": ["category", "brand"],
+  "groupBy": ["monthly", "account"],
   "filters": {
-    "status": "published"
+    "dimensions.gender": "female"
   },
   "startDate": "2024-01-01",
   "endDate": "2024-01-31"
@@ -87,59 +94,39 @@ The API accepts a JSON body with the following structure:
 > [!TIP]
 > You can also pass control parameters (like `aggregations` or `groupBy`) via query string if your body only contains `filters`.
 
-### Example Request (cURL)
-
-```bash
-curl -X POST https://api.yourdomain.com/shopify/channeled_order/aggregate \
-     -H "Content-Type: application/json" \
-     -H "X-API-Key: your_key" \
-     -d '{
-       "aggregations": {"gross_sales": "SUM(e.total_price)"},
-       "groupBy": ["platformCreatedAt"],
-       "startDate": "2024-02-01"
-     }'
-```
-
 ---
 
 ## 🧠 Advanced Concepts
 
-### 1. Intelligent Metric Formulas
+### 1. Unified Metric Formulas
 
-For `channeled_metric` entities, you no longer need to write raw SQL for common metrics. The system provides **pre-calculated formulas** that ensure mathematical correctness (e.g., using weighted averages for rates).
+For metrics aggregation, the system provides **Intelligent Formulas** that ensure mathematical correctness (e.g., using weighted averages for rates instead of simple sums). These are universal across all supported platforms.
 
-| Formula | Description | Calculation Logic |
+| Formula | Description | Platform Support |
 | :--- | :--- | :--- |
-| `spend` | Total Spend | `SUM(value)` where name is "spend" |
-| `clicks` | Total Clicks | `SUM(value)` where name is "clicks" |
-| `impressions` | Total Impressions | `SUM(value)` where name is "impressions" |
-| `reach` | Total Reach | `SUM(value)` where name is "reach" |
-| `frequency` | Ad Frequency | `SUM(impressions) / SUM(reach)` |
-| `ctr` | Click-Through Rate | `SUM(clicks) / SUM(impressions)` |
-| `cpc` | Cost Per Click | `SUM(spend) / SUM(clicks)` |
-| `cpm` | Cost Per Mille | `SUM(spend) / (SUM(impressions) / 1000)` |
-| `position` | Weighted Position | `SUM(position * impressions) / SUM(impressions)` |
+| `spend` | Total Spend | Facebook, etc. |
+| `clicks` | Total Clicks | Facebook, Google, etc. |
+| `impressions` | Total Impressions | Facebook, Google, etc. |
+| `reach` | Unique Reach | Facebook, etc. |
+| `frequency` | Ad Frequency (Weighted) | Facebook, etc. |
+| `ctr` | Click-Through Rate (Weighted) | Facebook, Google, etc. |
+| `cpc` | Cost Per Click (Weighted) | Facebook, etc. |
+| `cpm` | Cost Per Mille (Weighted) | Facebook, etc. |
+| `position` | Mean Position (Weighted) | Google, etc. |
 
-**Example:**
+### 2. Intelligent Filtering & Grouping
 
-```bash
-php bin/cli.php app:aggregate -e channeled_metric -c facebook \
-  -a '{"cost":"spend", "CTR":"ctr"}' --pretty
-```
+The engine automatically bridges different levels of the data architecture to allow filtering and grouping by both high-level configurations and low-level granular dimensions.
 
-### 2. Multi-Level Filtering & Grouping
+#### Global Entities
 
-The engine intelligently traverses the 4-level architecture (`MetricConfig` -> `Metric` -> `ChanneledMetric` -> `Dimension`) automatically.
-
-#### Level 1: Configuration Fields
-
-You can group or filter directly by entity relationships defined in `MetricConfig`:
+You can group or filter directly by these common high-level attributes:
 
 - `account`, `campaign`, `adGroup`, `ad`, `query`, `page`, `country`, `device`.
 
-#### Level 4: Dynamic Dimensions
+#### Granular Platform Dimensions
 
-Filter or group by granular platform dimensions using the `dimensions.` prefix:
+Filter or group by platform-specific granular breakdowns using the `dimensions.` prefix:
 
 - `dimensions.gender`, `dimensions.age`, `dimensions.searchAppearance`, etc.
 
@@ -147,7 +134,7 @@ Filter or group by granular platform dimensions using the `dimensions.` prefix:
 
 ```bash
 php bin/cli.php app:aggregate -e channeled_metric -c facebook \
-  -a '{"gasto":"spend"}' \
+  -a '{"cost":"spend"}' \
   -g 'account,dimensions.gender' \
   -f '{"dimensions.age":"45-54"}' --pretty
 ```
@@ -170,25 +157,16 @@ The engine supports built-in temporal aliases to easily format and group data by
 
 ### Gap Filling (Smoothing)
 
-When aggregating by a temporal alias (e.g., `daily`), the engine automatically performs **Gap Filling**. If a specific day or month has no data, the system will inject a "zeroed" record to ensure a continuous series.
+When aggregating by a temporal alias (e.g., `daily`), the engine automatically performs **Gap Filling**. If a specific day or month has no data, the system will inject a "zeroed" record to ensure a continuous series, essential for charting.
 
 > [!IMPORTANT]
 > Smoothing is automatically triggered when using a temporal alias in `groupBy` and providing both `--start-date` and `--end-date`.
-
-**Example (Continuous Daily Chart Data):**
-
-```bash
-php bin/cli.php app:aggregate -e channeled_metric -c google_search_console \
-  -a '{"clicks":"clicks"}' \
-  -g 'daily' \
-  -s '2026-03-01' -d '2026-03-31' --pretty
-```
 
 ---
 
 ## 🧪 Error Handling
 
 - **Missing Aggregations:** Returns `400 Bad Request`.
-- **Invalid SQL Expression:** Returns `500 Internal Server Error` with Doctrine's message.
 - **Invalid Entity/Channel:** Returns `404 Not Found`.
+- **Security Restriction:** Direct access to raw data fields like `value` in metrics is restricted to prevent data corruption. Users must use named formulas.
 - **Dimension Mismatch:** If a dimension filter is applied to an entity that doesn't support it, the filter is ignored or returns empty results depending on the join type.
