@@ -1372,7 +1372,9 @@
                     case 'run-tests': cmd = `docker compose exec ${main} vendor/bin/phpunit tests && \\\n` +
                                            `docker compose exec ${main} vendor/bin/phpstan analyze src`; break;
                     case 'job-lifecycle':
-                        cmd = `docker compose exec ${main} php bin/cli.php apis-hub:cache ${channel} ${entity} && \\\n` +
+                        const params = `startDate=${state.startDate || '-3 days'}&endDate=${state.endDate || 'yesterday'}`;
+                        const normalizedEntity = entity.replace('channeled_', '');
+                        cmd = `docker compose exec ${main} php bin/cli.php apis-hub:cache ${channel} ${normalizedEntity} --params="${params}" && \\\n` +
                               `docker compose exec ${main} php bin/cli.php app:read --entity=job --filters='{"status":"scheduled"}' --pretty && \\\n` +
                               `docker compose exec ${main} php bin/cli.php jobs:process`;
                         break;
