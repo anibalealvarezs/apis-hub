@@ -1018,9 +1018,17 @@
         // Functions
         function renderAggregations() {
             aggListEl.innerHTML = '';
+            
+            const formulas = ['spend', 'clicks', 'impressions', 'reach', 'frequency', 'ctr', 'cpc', 'cpm', 'position', 'unique_clicks'];
+            const isChanneled = state.entity.startsWith('channeled_');
+
             state.aggregations.forEach((agg, index) => {
                 const div = document.createElement('div');
                 div.className = 'agg-item';
+                
+                // Smart lock: Disable operation if it's a channeled formula (backend handles it)
+                const isFormula = formulas.includes(agg.formula.toLowerCase());
+                const shouldDisableOp = isChanneled && isFormula;
                 
                 const metricOptions = DICTIONARY.metrics.map(m => `<option value="${m.id}" ${agg.formula === m.id ? 'selected' : ''}>${m.name}</option>`).join('');
                 const opOptions = ['(Default)', ...DICTIONARY.operations].map(op => `<option value="${op === '(Default)' ? '' : op}" ${agg.operation === (op === '(Default)' ? '' : op) ? 'selected' : ''}>${op}</option>`).join('');
@@ -1036,14 +1044,16 @@
                             <select onchange="updateAgg(${index}, 'formula', this.value)">
                                 ${metricOptions}
                                 <optgroup label="Custom">
-                                    <option value="CUSTOM" ${!DICTIONARY.metrics.find(m => m.id === agg.formula) ? 'selected' : ''}>[Custom SQL]</option>
+                                    <option value="CUSTOM" ${!DICTIONARY.metrics.find(m => m.id === agg.formula) ? 'selected' : ''}>[Custom SQL / Metadata]</option>
                                 </optgroup>
                             </select>
                         </div>
                         <div>
-                            <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Operation</label>
-                            <select onchange="updateAgg(${index}, 'operation', this.value)">
-                                ${opOptions}
+                            <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Operation ${shouldDisableOp ? '<i data-lucide="lock" size="10" style="vertical-align:middle; margin-left:4px; opacity:0.6"></i>' : ''}</label>
+                            <select onchange="updateAgg(${index}, 'operation', this.value)" 
+                                    ${shouldDisableOp ? 'disabled' : ''} 
+                                    style="${shouldDisableOp ? 'opacity:0.5; cursor:not-allowed;' : ''}">
+                                ${shouldDisableOp ? '<option value="">(Default)</option>' : opOptions}
                             </select>
                         </div>
                     </div>
@@ -1309,7 +1319,11 @@
 
         // Event Listeners
         commandTypeEl.addEventListener('change', (e) => { state.command = e.target.value; updatePreview(); });
-        entitySelectEl.addEventListener('change', (e) => { state.entity = e.target.value; updatePreview(); });
+        entitySelectEl.addEventListener('change', (e) => { 
+            state.entity = e.target.value; 
+            renderAggregations(); // Refresh op lock status
+            updatePreview(); 
+        });
         channelSelectEl.addEventListener('change', (e) => { state.channel = e.target.value; updatePreview(); });
         startDateEl.addEventListener('input', (e) => { state.startDate = e.target.value; updatePreview(); });
         endDateEl.addEventListener('input', (e) => { state.endDate = e.target.value; updatePreview(); });
