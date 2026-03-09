@@ -674,6 +674,7 @@
                     <button class="add-btn" onclick="setDockerOp('composer')" style="width:100%"><i data-lucide="package"></i> Composer Update</button>
                     <button class="add-btn" onclick="setDockerOp('logs')" style="width:100%"><i data-lucide="list"></i> Tail Logs (-f)</button>
                     <button class="add-btn" onclick="setDockerOp('health')" style="width:100%"><i data-lucide="heart"></i> Health Check</button>
+                    <button class="add-btn" onclick="setDockerOp('time')" style="width:100%"><i data-lucide="clock"></i> Check Time</button>
                     <button class="add-btn" onclick="setDockerOp('bash')" style="width:100%"><i data-lucide="terminal"></i> Interactive Shell</button>
                 </div>
             </div>
@@ -1318,6 +1319,7 @@
                     case 'composer': cmd = `docker compose exec ${first} composer update`; break;
                     case 'logs': cmd = `docker compose logs -f ${targets}`; break;
                     case 'health': cmd = `docker compose exec ${first} php bin/cli.php app:health-check`; break;
+                    case 'time': cmd = `docker compose exec ${first} date`; break;
                     case 'bash': cmd = `docker compose exec ${first} bash`; break;
                     case 'review-jobs': cmd = `docker compose exec ${first} php bin/cli.php app:read --entity=job --filters='{"status":"${state.jobStatus}"}' --pretty`; break;
                     case 'global-up': cmd = `docker compose up -d --build`; break;
