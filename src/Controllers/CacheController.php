@@ -130,19 +130,39 @@ class CacheController extends BaseController
             /** @var \Repositories\JobRepository $jobRepo */
             $jobRepo = $this->em->getRepository(\Entities\Job::class);
             $qb = $jobRepo->createQueryBuilder('j');
-            $qb->where('j.entity = :entity')
+            
+            $equivalents = [$entity];
+            if (str_contains($entity, 'channeled_')) {
+                $equivalents[] = str_replace('channeled_', '', $entity);
+            } else {
+                $equivalents[] = 'channeled_' . $entity;
+            }
+
+            $qb->where('j.entity IN (:entities)')
                ->andWhere('j.channel = :channel')
                ->andWhere('j.status IN (:statuses)')
-               ->setParameter('entity', $entity)
+               ->setParameter('entities', array_unique($equivalents))
                ->setParameter('channel', $channel->name)
                ->setParameter('statuses', [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value]);
+
+            // Be timeframe-specific to allow parallel jobs for different periods (e.g. gsc-jan vs gsc-feb)
+            if ($params && isset($params['startDate'])) {
+                $qb->andWhere('(j.payload LIKE :start_pattern1 OR j.payload LIKE :start_pattern2)')
+                    ->setParameter('start_pattern1', '%startDate%' . $params['startDate'] . '%')
+                    ->setParameter('start_pattern2', '%start_date%' . $params['startDate'] . '%');
+            }
+            if ($params && isset($params['endDate'])) {
+                $qb->andWhere('(j.payload LIKE :end_pattern1 OR j.payload LIKE :end_pattern2)')
+                    ->setParameter('end_pattern1', '%endDate%' . $params['endDate'] . '%')
+                    ->setParameter('end_pattern2', '%end_date%' . $params['endDate'] . '%');
+            }
 
             $existingJobs = $qb->getQuery()->getResult();
             if (count($existingJobs) > 0) {
                 return $this->createResponse(
                     data: null,
                     status: 'error',
-                    error: 'There is already an active caching process for this endpoint.',
+                    error: 'There is already an active caching process for this endpoint and timeframe.',
                     httpStatus: Response::HTTP_CONFLICT
                 );
             }
