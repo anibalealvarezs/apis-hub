@@ -709,6 +709,15 @@
         <!-- Semantic Ops Panel -->
         <div id="card-semantic" class="card animate-fade">
             <h2 class="section-title"><i data-lucide="play-circle"></i> Semantic Workflows</h2>
+            
+            <div class="form-group" style="margin-bottom: 25px;">
+                <label>Target Container</label>
+                <div id="semantic-container-selector" class="badge-group">
+                    <!-- Dynamic Containers -->
+                </div>
+                <div class="hint">The selected container will be used for all command chains below.</div>
+            </div>
+
             <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 20px;">Common command chains based on local development recurrences.</p>
             
             <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -872,6 +881,7 @@
             selectedContainers: ['gsc-jan'],
             dockerOp: 'restart',
             jobStatus: 'scheduled',
+            semanticContainer: 'gsc-jan',
             semanticOp: '',
             // History
             history: JSON.parse(localStorage.getItem('commandHistory') || '[]')
@@ -931,8 +941,24 @@
                     <i data-lucide="${state.selectedContainers.includes(c) ? 'check-circle-2' : 'circle'}"></i> ${c}
                 </div>
             `).join('');
+
+            const semanticSelector = document.getElementById('semantic-container-selector');
+            if (semanticSelector) {
+                semanticSelector.innerHTML = DICTIONARY.containers.map(c => `
+                    <div class="badge ${state.semanticContainer === c ? 'active' : ''}" onclick="setSemanticContainer('${c}')">
+                        <i data-lucide="${state.semanticContainer === c ? 'check-circle-2' : 'circle'}"></i> ${c}
+                    </div>
+                `).join('');
+            }
+
             lucide.createIcons();
         }
+
+        window.setSemanticContainer = (container) => {
+            state.semanticContainer = container;
+            renderContainers();
+            updatePreview();
+        };
 
         // History Functions
         window.saveToHistory = () => {
@@ -1327,7 +1353,10 @@
                     case 'build-deployment': cmd = `php bin/build-deployment.php project`; break;
                 }
             } else if (state.activeTab === 'semantic') {
-                const main = 'gsc-jan';
+                const main = state.semanticContainer || 'gsc-jan';
+                const channel = state.channel || '<channel>';
+                const entity = state.entity || '<entity>';
+
                 switch(state.semanticOp) {
                     case 'refresh-code': cmd = `docker compose restart && docker compose exec ${main} composer install`; break;
                     case 'breaking-rebuild': 
@@ -1343,7 +1372,7 @@
                     case 'run-tests': cmd = `docker compose exec ${main} vendor/bin/phpunit tests && \\\n` +
                                            `docker compose exec ${main} vendor/bin/phpstan analyze src`; break;
                     case 'job-lifecycle':
-                        cmd = `docker compose exec ${main} php bin/cli.php apis-hub:cache <channel> <entity> && \\\n` +
+                        cmd = `docker compose exec ${main} php bin/cli.php apis-hub:cache ${channel} ${entity} && \\\n` +
                               `docker compose exec ${main} php bin/cli.php app:read --entity=job --filters='{"status":"scheduled"}' --pretty && \\\n` +
                               `docker compose exec ${main} php bin/cli.php jobs:process`;
                         break;
