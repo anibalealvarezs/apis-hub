@@ -104,6 +104,10 @@ abstract class BaseController
      */
     protected const CONTROLLER_ONLY_PARAMS = ['rawData', 'hideFields'];
 
+    protected const DEFAULT_LIMIT = 100;
+    protected const HARD_MAX_LIMIT = 50000;
+    protected const DOCS_FORCED_LIMIT = 10;
+
     protected function prepareCrudParams(?array $params, ?string $body): array
     {
         $params = $params ?? [];
@@ -148,7 +152,33 @@ abstract class BaseController
             }
         }
 
-        // 3. Merge: URL filters override Body filters
+        // 3. Defaults & Safety Enforcement
+        $isDocsRequest = isset($_SERVER['HTTP_REFERER']) && str_contains($_SERVER['HTTP_REFERER'], '/docs');
+        
+        // Initial limit setup if not provided
+        if (!isset($finalParams['limit'])) {
+            $finalParams['limit'] = $isDocsRequest ? self::DOCS_FORCED_LIMIT : self::DEFAULT_LIMIT;
+        }
+
+        if (!isset($finalParams['pagination'])) {
+            $finalParams['pagination'] = 0;
+        }
+
+        $limit = (int) $finalParams['limit'];
+        
+        if ($isDocsRequest) {
+            $limit = self::DOCS_FORCED_LIMIT; // Fixed limit for documentation
+        } else {
+            if ($limit <= 0) {
+                $limit = self::DEFAULT_LIMIT;
+            }
+            if ($limit > self::HARD_MAX_LIMIT) {
+                $limit = self::HARD_MAX_LIMIT;
+            }
+        }
+        $finalParams['limit'] = $limit;
+
+        // 4. Merge: URL filters override Body filters
         $finalParams['filters'] = (object) array_merge($bodyFilters, $queryFilters);
 
         return $finalParams;

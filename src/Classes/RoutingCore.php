@@ -40,21 +40,20 @@ class RoutingCore implements HttpKernelInterface
         $context->fromRequest($request);
 
         $matcher = new UrlMatcher($this->routes, $context);
-        $attributes = $matcher->match($request->getPathInfo());
-        $isPublic = $attributes['public'] ?? false;
-
-        // Security Check
-        if (!$isPublic && !$this->isAuthorized($request)) {
-            return new Response(json_encode([
-                'status' => 'error',
-                'error' => 'Unauthorized: Access denied'
-            ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
-        }
 
         try {
             $attributes = $matcher->match($request->getPathInfo());
+            $isPublic = $attributes['public'] ?? false;
             $controller = $attributes['controller'];
             $isHtml = $attributes['html'] ?? false; // Detect if HTML
+
+            // Security Check
+            if (!$isPublic && !$this->isAuthorized($request)) {
+                return new Response(json_encode([
+                    'status' => 'error',
+                    'error' => 'Unauthorized: Access denied'
+                ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
+            }
 
             unset($attributes['controller'], $attributes['_route'], $attributes['html'], $attributes['public']);
             $attributes['body'] = $request->getContent() ?: null;

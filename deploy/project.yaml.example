@@ -21,11 +21,11 @@ database:
   # Configuration for local development and test execution
   testing:
     driver: pdo_mysql
-    host: ${DB_HOST:-host.docker.internal}
+    host: ${DB_HOST:-127.0.0.1}
     port: 3306
     user: root
-    password: YOUR_LOCAL_PASSWORD
-    name: ${DB_NAME:-apis-hub-testing}
+    password: ${DB_PASSWORD:-NoEntiendo2321}
+    name: ${DB_NAME:-apis-hub-3}
 
   # Configuration for production (e.g. Docker container networking)
   production:

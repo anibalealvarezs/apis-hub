@@ -1,0 +1,383 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "APIs Hub API",
+    "description": "A headless data extraction and caching engine tailored for Analytics and E-commerce integrations.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Aníbal Álvarez",
+      "email": "anibalealvarezs@gmail.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Local server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "FilterObject": {
+        "type": "object",
+        "description": "A set of key-value pairs where keys are entity fields and values are the filter criteria.",
+        "example": {
+          "status": "active",
+          "category": "electronics"
+        }
+      },
+      "AggregationRequest": {
+        "type": "object",
+        "required": ["aggregations"],
+        "properties": {
+          "aggregations": {
+            "type": "object",
+            "description": "Mapping of resulting aliases to DQL aggregate functions (SUM, AVG, COUNT, MIN, MAX).",
+            "example": {
+              "total_sales": "SUM(e.price)",
+              "avg_rating": "AVG(e.rating)"
+            }
+          },
+          "groupBy": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Fields to group the aggregation results by.",
+            "example": ["brand", "model"]
+          },
+          "filters": {
+            "$ref": "#/components/schemas/FilterObject"
+          }
+        }
+      },
+      "CacheRequest": {
+        "type": "object",
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/FilterObject"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Start date for data extraction (YYYY-MM-DD).",
+            "example": "2024-01-01"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "End date for data extraction (YYYY-MM-DD).",
+            "example": "2024-12-31"
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    },
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/cache/{channel}/{entity}": {
+      "post": {
+        "summary": "Schedule async extraction jobs",
+        "description": "Triggers a background job to pull data from a third-party API.",
+        "tags": ["Cache"],
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Integration channel (e.g., shopify, facebook)"
+          },
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Data entity (e.g., products, metric)"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CacheRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      }
+    },
+    "/cache/interrupt": {
+      "post": {
+        "summary": "Interrupt running jobs",
+        "tags": ["Cache"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel": { "type": "string" },
+                  "entity": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      }
+    },
+    "/entity/{entity}": {
+      "get": {
+        "summary": "List entities",
+        "description": "Retrieve a list of records. Supports filtering via Query Parameters or JSON Body.",
+        "tags": ["CRUD"],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { 
+              "type": "integer",
+              "default": 10,
+              "enum": [10]
+            },
+            "description": "Number of records to return. Fixed to 10 in the documentation UI for stability. In production, this can be increased up to 50,000."
+          },
+          {
+            "name": "pagination",
+            "in": "query",
+            "schema": { 
+              "type": "integer",
+              "default": 0
+            },
+            "description": "Page offset (0-indexed). Use this to browse the dataset while the limit is fixed."
+          }
+        ],
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      }
+    },
+    "/entity/{entity}/{id}": {
+      "get": {
+        "summary": "Read entity by ID",
+        "tags": ["CRUD"],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      }
+    },
+    "/entity/{entity}/count": {
+      "get": {
+        "summary": "Count entities",
+        "tags": ["CRUD"],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      }
+    },
+    "/entity/{entity}/aggregate": {
+      "post": {
+        "summary": "Aggregate entity data",
+        "description": "Performs aggregations (SUM, AVG, etc.) on the dataset.",
+        "tags": ["CRUD"],
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AggregationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      }
+    },
+    "/{channel}/{entity}/count": {
+      "get": {
+        "summary": "Count channeled entities",
+        "tags": ["Channeled CRUD"],
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      }
+    },
+    "/{channel}/{entity}/aggregate": {
+      "post": {
+        "summary": "Aggregate channeled entity data",
+        "tags": ["Channeled CRUD"],
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AggregationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      }
+    },
+    "/{channel}/{entity}/{id}": {
+      "get": {
+        "summary": "Read channeled entity by ID",
+        "tags": ["Channeled CRUD"],
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      }
+    },
+    "/{channel}/{entity}": {
+      "get": {
+        "summary": "List channeled entities",
+        "tags": ["Channeled CRUD"],
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { 
+              "type": "integer",
+              "default": 10,
+              "enum": [10]
+            },
+            "description": "Number of records to return. Fixed to 10 in the documentation UI for stability. In production, this can be increased up to 50,000."
+          },
+          {
+            "name": "pagination",
+            "in": "query",
+            "schema": { 
+              "type": "integer",
+              "default": 0
+            },
+            "description": "Page offset (0-indexed). Use this to browse the dataset while the limit is fixed."
+          }
+        ],
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      }
+    }
+  }
+}

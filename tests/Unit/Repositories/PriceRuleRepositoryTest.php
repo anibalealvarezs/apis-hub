@@ -73,7 +73,6 @@ class PriceRuleRepositoryTest extends TestCase
             ->method('addSelect')
             ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
                 $addSelectExpected = ['p', 'd'];
-                error_log("testCreateBaseQueryBuilderSelect: addSelect call #$addSelectCallCount with arg=" . json_encode($arg));
                 $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg, "addSelect does not match for call #$addSelectCallCount");
                 $addSelectCallCount++;
                 return true;
@@ -86,7 +85,6 @@ class PriceRuleRepositoryTest extends TestCase
         $this->queryBuilder->expects($this->exactly(2))
             ->method('leftJoin')
             ->willReturnCallback(function (...$args) use (&$leftJoinCallCount) {
-                error_log("testCreateBaseQueryBuilderSelect: leftJoin call #$leftJoinCallCount with args=" . json_encode($args));
                 $leftJoinCallCount++;
                 return $this->queryBuilder;
             });
@@ -115,7 +113,6 @@ class PriceRuleRepositoryTest extends TestCase
             ->method('addSelect')
             ->with($this->callback(function ($arg) use (&$addSelectCallCount) {
                 $addSelectExpected = ['p', 'd'];
-                error_log("testCreateBaseQueryBuilderCount: addSelect call #$addSelectCallCount with arg=" . json_encode($arg));
                 $this->assertEquals($addSelectExpected[$addSelectCallCount], $arg, "addSelect does not match for call #$addSelectCallCount");
                 $addSelectCallCount++;
                 return true;
@@ -128,7 +125,6 @@ class PriceRuleRepositoryTest extends TestCase
         $this->queryBuilder->expects($this->exactly(2))
             ->method('leftJoin')
             ->willReturnCallback(function (...$args) use (&$leftJoinCallCount) {
-                error_log("testCreateBaseQueryBuilderCount: leftJoin call #$leftJoinCallCount with args=" . json_encode($args));
                 $leftJoinCallCount++;
                 return $this->queryBuilder;
             });
