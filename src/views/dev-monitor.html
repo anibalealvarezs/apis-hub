@@ -1033,6 +1033,11 @@
                 const isPredefined = availableMetrics.some(m => m.id === agg.formula);
                 const shouldDisableOp = isMetricEntity && isPredefined;
                 
+                // Reset to default operation if disabled to prevent leftover values
+                if (shouldDisableOp && agg.operation !== '') {
+                    agg.operation = '';
+                }
+                
                 const metricOptions = availableMetrics.map(m => `<option value="${m.id}" ${agg.formula === m.id ? 'selected' : ''}>${m.name}</option>`).join('');
                 const opOptions = ['(Default)', ...DICTIONARY.operations].map(op => `<option value="${op === '(Default)' ? '' : op}" ${agg.operation === (op === '(Default)' ? '' : op) ? 'selected' : ''}>${op}</option>`).join('');
 
