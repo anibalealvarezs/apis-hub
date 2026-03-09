@@ -154,7 +154,13 @@ class JobRepository extends BaseRepository
                 $query->andWhere('e.channel = :ctx_channel')->setParameter('ctx_channel', $envChannel);
             }
             if ($envEntity && (!is_object($filters) || !isset($filters->entity))) {
-                $query->andWhere('e.entity = :ctx_entity')->setParameter('ctx_entity', $envEntity);
+                $equivalents = [$envEntity];
+                if (strpos($envEntity, 'channeled_') === 0) {
+                    $equivalents[] = str_replace('channeled_', '', $envEntity);
+                } else {
+                    $equivalents[] = 'channeled_' . $envEntity;
+                }
+                $query->andWhere('e.entity IN (:ctx_entities)')->setParameter('ctx_entities', array_unique($equivalents));
             }
 
             // Differentiate by Date Range in payload (e.g. gsc-jan vs gsc-feb)
