@@ -1016,19 +1016,24 @@
         // Functions
         function renderAggregations() {
             aggListEl.innerHTML = '';
-            
             const isMetricEntity = state.entity === 'channeled_metric';
+            const availableMetrics = isMetricEntity ? DICTIONARY.metrics : [];
 
             state.aggregations.forEach((agg, index) => {
                 const div = document.createElement('div');
                 div.className = 'agg-item';
                 
+                // If switching entities makes the current formula invalid, switch to CUSTOM
+                if (agg.formula !== 'CUSTOM' && !availableMetrics.some(m => m.id === agg.formula)) {
+                    agg.formula = 'CUSTOM';
+                    agg.operation = 'SUM'; // Default to SUM for non-predefined
+                }
+
                 // Op logic: Disable if it's a Metric Entity using a predefined formula.
-                // Enable if it's a different entity (Order, Ad) or a Custom field.
-                const isPredefined = DICTIONARY.metrics.some(m => m.id === agg.formula);
+                const isPredefined = availableMetrics.some(m => m.id === agg.formula);
                 const shouldDisableOp = isMetricEntity && isPredefined;
                 
-                const metricOptions = DICTIONARY.metrics.map(m => `<option value="${m.id}" ${agg.formula === m.id ? 'selected' : ''}>${m.name}</option>`).join('');
+                const metricOptions = availableMetrics.map(m => `<option value="${m.id}" ${agg.formula === m.id ? 'selected' : ''}>${m.name}</option>`).join('');
                 const opOptions = ['(Default)', ...DICTIONARY.operations].map(op => `<option value="${op === '(Default)' ? '' : op}" ${agg.operation === (op === '(Default)' ? '' : op) ? 'selected' : ''}>${op}</option>`).join('');
 
                 div.innerHTML = `
