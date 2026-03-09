@@ -138,12 +138,13 @@ class BaseRepository extends EntityRepository
 
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
+            $quotedField = "`$field`";
             if ($this->isChanneledMetric && str_starts_with($field, 'dimensions.')) {
                 $dimKey = substr($field, 11);
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                 $qb->leftJoin('e', 'channeled_metric_dimensions', $dimAlias, "e.id = $dimAlias.channeledMetric_id AND $dimAlias.dimensionKey = :key_$dimAlias")
                    ->setParameter("key_$dimAlias", $dimKey)
-                   ->addSelect("$dimAlias.dimensionValue AS " . ($field === 'dimensions.page' ? 'page' : $dimAlias))
+                   ->addSelect("$dimAlias.dimensionValue AS $quotedField")
                    ->addGroupBy("$dimAlias.dimensionValue");
             } elseif ($this->isChanneledMetric && isset($relationMap[$field])) {
                 $map = $relationMap[$field];
@@ -151,11 +152,11 @@ class BaseRepository extends EntityRepository
                     $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
                     $activeJoins[$field] = true;
                 }
-                $qb->addSelect("{$map['alias']}.{$map['field']} AS $field")
+                $qb->addSelect("{$map['alias']}.{$map['field']} AS $quotedField")
                    ->addGroupBy("{$map['alias']}.{$map['field']}");
             } else {
                 $sqlField = $this->mapFieldToSql($field);
-                $qb->addSelect("$sqlField AS $field")->addGroupBy($sqlField);
+                $qb->addSelect("$sqlField AS $quotedField")->addGroupBy($sqlField);
             }
         }
 

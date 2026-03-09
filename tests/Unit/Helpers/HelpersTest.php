@@ -266,4 +266,47 @@ class HelpersTest extends BaseUnitTestCase
         $property = $reflection->getProperty($property);
         $property->setValue(null, $value);
     }
+
+    public function testGetAppApiKey(): void
+    {
+        // 1. Test from environment variable
+        $secret = 'env-secret';
+        putenv("APP_API_KEY=$secret");
+        $this->assertEquals($secret, Helpers::getAppApiKey());
+        putenv('APP_API_KEY'); // Clear env
+
+        // 2. Test from project config (single string)
+        $this->resetHelpers();
+        $this->setPrivateStaticProperty('projectConfig', ['security' => ['api_keys' => 'config-secret']]);
+        $this->assertEquals('config-secret', Helpers::getAppApiKey());
+
+        // 3. Test from project config (array)
+        $this->resetHelpers();
+        $this->setPrivateStaticProperty('projectConfig', ['security' => ['api_keys' => ['secret1', 'secret2']]]);
+        $this->assertEquals('secret1,secret2', Helpers::getAppApiKey());
+
+        // 4. Test missing
+        $this->resetHelpers();
+        $this->setPrivateStaticProperty('projectConfig', []);
+        $this->assertNull(Helpers::getAppApiKey());
+    }
+
+    public function testGetAuthorizedIps(): void
+    {
+        // 1. Test from project config (array)
+        $this->resetHelpers();
+        $ips = ['127.0.0.1', '192.168.1.1'];
+        $this->setPrivateStaticProperty('projectConfig', ['security' => ['authorized_ips' => $ips]]);
+        $this->assertEquals($ips, Helpers::getAuthorizedIps());
+
+        // 2. Test from project config (single string)
+        $this->resetHelpers();
+        $this->setPrivateStaticProperty('projectConfig', ['security' => ['authorized_ips' => '10.0.0.1']]);
+        $this->assertEquals(['10.0.0.1'], Helpers::getAuthorizedIps());
+
+        // 3. Test missing
+        $this->resetHelpers();
+        $this->setPrivateStaticProperty('projectConfig', []);
+        $this->assertEquals([], Helpers::getAuthorizedIps());
+    }
 }

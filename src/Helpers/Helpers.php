@@ -262,7 +262,30 @@ class Helpers
      */
     public static function getAppApiKey(): ?string
     {
-        return getenv('APP_API_KEY') ?: null;
+        $envKey = getenv('APP_API_KEY') ?: null;
+        if ($envKey) {
+            return $envKey;
+        }
+
+        $projectConfig = self::getProjectConfig();
+        $configKeys = $projectConfig['security']['api_keys'] ?? null;
+        
+        if (is_array($configKeys)) {
+            return implode(',', $configKeys);
+        }
+
+        return is_string($configKeys) ? $configKeys : null;
+    }
+
+    /**
+     * @return array
+     */
+    public static function getAuthorizedIps(): array
+    {
+        $projectConfig = self::getProjectConfig();
+        $ips = $projectConfig['security']['authorized_ips'] ?? [];
+        
+        return is_array($ips) ? $ips : [$ips];
     }
 
     /**

@@ -77,14 +77,40 @@ All values in the YAML can be dynamic. For example, `host: ${DB_HOST:-127.0.0.1}
 
 ## 🔐 Security & Access
 
-To protect your public endpoints on Google Cloud, the application requires an **API Key** if the environment variable `APP_API_KEY` is set.
+To protect your endpoints, the application supports three layers of validation:
 
-All requests must include the following header:
+### 1. IP Whitelisting
 
-- **Header Name:** `X-API-Key`
-- **Header Value:** The value you defined in `APP_API_KEY`.
+Restricts access to specific IP addresses or CIDR blocks. Configure it in `project.yaml`:
 
-If the header is missing or incorrect, the API will return a `401 Unauthorized` response.
+```yaml
+security:
+  authorized_ips:
+    - "127.0.0.1"
+    - "192.168.1.0/24"
+```
+
+### 2. Token-Based Authentication
+
+Supports both standard and industry-standard headers. Define keys in `project.yaml` or via the `APP_API_KEY` environment variable:
+
+```yaml
+security:
+  api_keys:
+    - "your-secret-key-1"
+```
+
+The API accepts two types of headers for these keys:
+
+- **X-API-Key:** `X-API-Key: your-secret-key-1`
+- **Bearer Token:** `Authorization: Bearer your-secret-key-1`
+
+### 🛡️ Validation Logic
+
+- **IP Check:** If `authorized_ips` is not empty, the client IP must match at least one entry.
+- **Token Check:** If `api_keys` (or `APP_API_KEY`) is defined, the request must include a valid key in either header.
+- **Combined:** If both are configured, the request must pass both layers.
+- **Public:** If no security is configured, the API is public (use with caution).
 
 ---
 

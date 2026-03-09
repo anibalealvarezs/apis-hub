@@ -21,7 +21,7 @@ database:
   # Configuration for local development and test execution
   testing:
     driver: pdo_mysql
-    host: ${DB_HOST:-127.0.0.1}
+    host: ${DB_HOST:-host.docker.internal}
     port: 3306
     user: root
     password: YOUR_LOCAL_PASSWORD
@@ -120,8 +120,12 @@ channels:
     user_id: ${FB_USER_ID:-YOUR_USER_ID}   # Numerical Facebook User ID
     accounts_group_name: "Project/Client Name" # Label for grouping accounts in database
     # Tokens (Graph API)
-    graph_user_access_token: ${FB_USER_TOKEN} # Standard user access token
+    # Temporary user access token from Graph API Explorer (usually 1 hour).
+    # IMPORTANT: If using this, run the app immediately so it can be exchanged for a long-lived token.
+    graph_user_access_token: ${FB_USER_TOKEN}
     graph_page_access_token: ${FB_PAGE_TOKEN} # Page-specific access token
+    # Optional: If you already have a 60-day token, paste it here.
+    # This will override the short-lived user token and be stored in the JSON cache.
     graph_long_lived_user_access_token: ${FB_LONG_LIVED_USER_TOKEN} # Highly recommended for background workers
     graph_long_lived_page_access_token: ${FB_LONG_LIVED_PAGE_TOKEN} # Highly recommended for background workers
     # Path to store/read tokens persistently (ensures long-lived tokens survive restarts)
@@ -177,6 +181,18 @@ channels:
     shopify_shop_name: your-shop-prefix    # The 'my-shop' part of my-shop.myshopify.com
     # API Version (e.g. "2024-04")
     shopify_last_stable_revision: "2024-04" # Recommended Shopify API version
+# ── Security ──────────────────────────────────────────────────────────────────
+# API Access Protection
+security:
+  # List of authorized API keys.
+  # Validated via 'X-API-Key' header OR 'Authorization: Bearer <key>' header.
+  api_keys:
+    - ${APP_API_KEY:-YOUR_SECRET_API_KEY_HERE}
+
+  # IP Whitelisting: List of authorized IP addresses or CIDR blocks.
+  # e.g., "127.0.0.1", "192.168.1.0/24". Leave empty to disable.
+  authorized_ips: []
+
 # ── CLI Settings ──────────────────────────────────────────────────────────────
 # Global settings for CLI commands (bin/cli.php).
 cli:

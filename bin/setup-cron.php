@@ -28,7 +28,23 @@ if (!file_exists($projectFile)) {
 $config = Yaml::parseFile($projectFile);
 $instances = $config['instances'] ?? [];
 
+// Capture relevant environment variables to pass to Cron
+$envVars = [
+    'PATH' => '/usr/local/bin:/usr/bin:/bin',
+    'SHELL' => '/bin/bash'
+];
+
+$keep = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'DB_DRIVER', 'PROJECT_CONFIG_FILE', 'APP_ENV', 'REDIS_HOST', 'REDIS_PORT', 'API_SOURCE', 'API_ENTITY', 'START_DATE', 'END_DATE'];
+foreach ($keep as $key) {
+    if ($val = getenv($key)) {
+        $envVars[$key] = $val;
+    }
+}
+
 $cronLines = [];
+foreach ($envVars as $k => $v) {
+    $cronLines[] = "{$k}=\"{$v}\"";
+}
 
 foreach ($instances as $instance) {
     $channel = $instance['channel'] ?? null;
@@ -47,11 +63,11 @@ foreach ($instances as $instance) {
     }
 
     // Command to schedule the job in the database
-    $cronLines[] = "{$frequency} root cd /app && php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} >> /var/log/cron.log 2>&1";
+    $cronLines[] = "{$frequency} root cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} >> /var/log/cron.log 2>&1";
 }
 
 // Also add the job processor cron (runs every minute)
-$cronLines[] = "* * * * * root cd /app && php bin/cli.php jobs:process >> /var/log/jobs.log 2>&1";
+$cronLines[] = "* * * * * root cd /app && /usr/local/bin/php bin/cli.php jobs:process >> /var/log/jobs.log 2>&1";
 
 $cronFile = '/etc/cron.d/apis-hub-cron';
 file_put_contents($cronFile, implode("\n", $cronLines) . "\n");
