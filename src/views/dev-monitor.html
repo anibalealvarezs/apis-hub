@@ -679,6 +679,23 @@
             </div>
 
             <div class="form-group" style="margin-top: 30px;">
+                <label>Job Review & Monitoring</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <select id="job-status-select" style="flex: 1;" onchange="state.jobStatus = this.value; updatePreview();">
+                        <option value="scheduled">Scheduled</option>
+                        <option value="processing">Processing</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                        <option value="delayed">Delayed</option>
+                    </select>
+                    <button class="add-btn" onclick="setDockerOp('review-jobs')" style="margin-top:0; white-space:nowrap">
+                        <i data-lucide="eye"></i> Review Jobs
+                    </button>
+                </div>
+                <div class="hint">Inspect technical Job entities inside the container filtering by status.</div>
+            </div>
+
+            <div class="form-group" style="margin-top: 30px;">
                 <label>Global Operations</label>
                 <div class="badge-group">
                     <div class="badge" onclick="setDockerOp('global-up')"><i data-lucide="cloud-lightning"></i> Full Rebuild & Up</div>
@@ -712,6 +729,11 @@
                 <div class="agg-item" onclick="setSemanticOp('run-tests')" style="cursor:pointer; display:block">
                     <div style="font-weight:600; color:#22c55e; margin-bottom:5px">🧪 Quality Check (Tests + PHPStan)</div>
                     <div style="font-size:0.75rem; color:var(--text-dim)">Runs PHPUnit and PHPStan analysis in the primary container.</div>
+                </div>
+                
+                <div class="agg-item" onclick="setSemanticOp('job-lifecycle')" style="cursor:pointer; display:block">
+                    <div style="font-weight:600; color:#fb923c; margin-bottom:5px">⚡ Job Lifecycle Chain</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim)">Sequence: Reset Schedule -> Listen -> Process. Ideal for debugging data ingestion.</div>
                 </div>
                 
                 <div class="agg-item" onclick="setSemanticOp('schema-update')" style="cursor:pointer; display:block">
@@ -827,7 +849,8 @@
                 'account', 'campaign', 'adGroup', 'ad', 'query', 'page', 'country', 'device',
                 'dimensions.gender', 'dimensions.age', 'dimensions.searchAppearance', 'dimensions.platform'
             ],
-            containers: ['gsc-jan', 'gsc-feb', 'fb-ads', 'gsc-recent', 'fb-recent', 'redis']
+            containers: ['gsc-jan', 'gsc-feb', 'fb-ads', 'gsc-recent', 'fb-recent', 'redis'],
+            jobStatuses: ['scheduled', 'processing', 'completed', 'failed', 'delayed']
         };
 
         // State Management
@@ -847,6 +870,7 @@
             // Docker State
             selectedContainers: ['gsc-jan'],
             dockerOp: 'restart',
+            jobStatus: 'scheduled',
             semanticOp: '',
             // History
             history: JSON.parse(localStorage.getItem('commandHistory') || '[]')
@@ -1295,6 +1319,7 @@
                     case 'logs': cmd = `docker compose logs -f ${targets}`; break;
                     case 'health': cmd = `docker compose exec ${first} php bin/cli.php app:health-check`; break;
                     case 'bash': cmd = `docker compose exec ${first} bash`; break;
+                    case 'review-jobs': cmd = `docker compose exec ${first} php bin/cli.php app:read --entity=job --filters='{"status":"${state.jobStatus}"}' --pretty`; break;
                     case 'global-up': cmd = `docker compose up -d --build`; break;
                     case 'global-down': cmd = `docker compose down`; break;
                     case 'build-deployment': cmd = `php bin/build-deployment.php project`; break;
@@ -1315,6 +1340,11 @@
                     case 'clear-cache': cmd = `docker compose exec ${main} php bin/cli.php cache:clear --all`; break;
                     case 'run-tests': cmd = `docker compose exec ${main} vendor/bin/phpunit tests && \\\n` +
                                            `docker compose exec ${main} vendor/bin/phpstan analyze src`; break;
+                    case 'job-lifecycle':
+                        cmd = `docker compose exec ${main} php bin/cli.php apis-hub:cache <channel> <entity> && \\\n` +
+                              `docker compose exec ${main} php bin/cli.php app:read --entity=job --filters='{"status":"scheduled"}' --pretty && \\\n` +
+                              `docker compose exec ${main} php bin/cli.php jobs:process`;
+                        break;
                     case 'schema-update': cmd = `docker compose exec ${main} php bin/cli.php orm:schema-tool:update --dump-sql && \\\n` +
                                                `docker compose exec ${main} php bin/cli.php orm:schema-tool:update --force`; break;
                     default: cmd = '# Select a workflow below to generate the chain';
