@@ -39,22 +39,24 @@ class RoutingCore implements HttpKernelInterface
         $context = new RequestContext();
         $context->fromRequest($request);
 
+        $matcher = new UrlMatcher($this->routes, $context);
+        $attributes = $matcher->match($request->getPathInfo());
+        $isPublic = $attributes['public'] ?? false;
+
         // Security Check
-        if (!$this->isAuthorized($request)) {
+        if (!$isPublic && !$this->isAuthorized($request)) {
             return new Response(json_encode([
                 'status' => 'error',
                 'error' => 'Unauthorized: Access denied'
             ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
         }
 
-        $matcher = new UrlMatcher($this->routes, $context);
-
         try {
             $attributes = $matcher->match($request->getPathInfo());
             $controller = $attributes['controller'];
             $isHtml = $attributes['html'] ?? false; // Detect if HTML
 
-            unset($attributes['controller'], $attributes['_route'], $attributes['html']);
+            unset($attributes['controller'], $attributes['_route'], $attributes['html'], $attributes['public']);
             $attributes['body'] = $request->getContent() ?: null;
             $attributes['params'] = $request->query->all() ?: null;
 
@@ -119,13 +121,15 @@ class RoutingCore implements HttpKernelInterface
      * @param string $path
      * @param string $httpMethod
      * @param callable $controller
+     * @param bool $public
+     * @param bool $html
      */
-    public function map(string $path, string $httpMethod, callable $controller): void
+    public function map(string $path, string $httpMethod, callable $controller, bool $public = false, bool $html = false): void
     {
         $routes = new RouteCollection();
         $routes->add($path, new Route(
             $path,
-            array('controller' => $controller)
+            array('controller' => $controller, 'public' => $public, 'html' => $html)
         ));
         $routes->setMethods($httpMethod);
         $this->routes->addCollection($routes);
@@ -137,7 +141,13 @@ class RoutingCore implements HttpKernelInterface
     public function multiMap(array $routes): void
     {
         foreach ($routes as $path => $data) {
-            $this->map($path, $data['httpMethod'], $data['callable']);
+            $this->map(
+                $path, 
+                $data['httpMethod'], 
+                $data['callable'], 
+                $data['public'] ?? false, 
+                $data['html'] ?? false
+            );
         }
     }
 }

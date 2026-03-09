@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APIs Hub | Dev Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0c10;
+            --bg-card: rgba(22, 27, 34, 0.7);
+            --bg-accent: #21262d;
+            --primary: #58a6ff;
+            --primary-glow: rgba(88, 166, 255, 0.3);
+            --secondary: #238636;
+            --text-main: #c9d1d9;
+            --text-dim: #8b949e;
+            --border: rgba(48, 54, 61, 0.8);
+            --header-h: 70px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(88, 166, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(35, 134, 54, 0.05) 0%, transparent 40%);
+            min-height: 100vh;
+        }
+
+        header {
+            height: var(--header-h);
+            background: rgba(13, 17, 23, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .logo i {
+            color: var(--primary);
+        }
+
+        .logo span {
+            color: var(--text-dim);
+            font-weight: 400;
+            margin-left: 5px;
+            font-size: 0.9rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .nav-link {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        .nav-link:hover {
+            color: var(--primary);
+        }
+
+        main {
+            padding: 20px 40px 40px 40px;
+            max-width: 1750px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 680px 1fr 340px;
+            gap: 30px;
+            align-items: start;
+        }
+
+        @media (max-width: 1400px) {
+            main {
+                grid-template-columns: 1fr 1fr;
+            }
+            .preview-pane { grid-column: 1 / span 2; }
+            .history-pane { grid-column: 1 / span 2; }
+        }
+
+        @media (max-width: 900px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+            .history-pane { grid-column: auto; }
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            height: fit-content;
+        }
+
+        #card-agg, #card-docker, #card-semantic {
+            display: none;
+        }
+
+        #card-agg.active, #card-docker.active, #card-semantic.active {
+            display: block;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            background: rgba(13, 17, 23, 0.4);
+            padding: 5px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            width: fit-content;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-dim);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+        }
+
+        .tab.active {
+            background: var(--bg-accent);
+            color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        select, input, textarea {
+            width: 100%;
+            background: var(--bg-accent);
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        select:focus, input:focus, textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px var(--primary-glow);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .badge-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .badge {
+            background: var(--bg-accent);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .badge:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .badge.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .preview-pane {
+            position: sticky;
+            top: 110px;
+        }
+
+        .terminal {
+            background: #0d1117;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .terminal-header {
+            background: #161b22;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .terminal-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        .terminal-body {
+            padding: 24px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.95rem;
+            color: #d1d5db;
+            min-height: 200px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            position: relative;
+        }
+
+        .curl-pane {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .curl-pane.active {
+            display: block;
+        }
+
+        .terminal-prompt {
+            color: var(--primary);
+            margin-right: 10px;
+        }
+
+        .command-arg { color: #f97316; }
+        .command-val { color: #22c55e; }
+        .command-flag { color: #a855f7; }
+
+        .copy-btn {
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        #command-name-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 12px;
+            color: #fff;
+            font-size: 0.8rem;
+            width: 180px;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        #command-name-input:focus {
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .copy-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+
+        .input-pill-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 8px;
+            background: var(--bg-accent);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            min-height: 48px;
+        }
+
+        .input-pill {
+            background: rgba(88, 166, 255, 0.1);
+            color: var(--primary);
+            border: 1px solid rgba(88, 166, 255, 0.2);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .input-pill span {
+            cursor: pointer;
+            opacity: 0.6;
+        }
+
+        .input-pill span:hover {
+            opacity: 1;
+        }
+
+        .pill-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #fff;
+            min-width: 100px;
+            padding: 4px;
+        }
+
+        .pill-input:focus {
+            box-shadow: none;
+            border: none;
+        }
+
+        .hint {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 6px;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        .dynamic-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+        }
+
+        .dynamic-list.open {
+            max-height: 1000px;
+        }
+
+        .agg-item {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 10px;
+            margin-bottom: 10px;
+            background: rgba(255,255,255,0.03);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .remove-btn {
+            background: rgba(255, 95, 86, 0.1);
+            color: #ff5f56;
+            border: 1px solid rgba(255, 95, 86, 0.2);
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .add-btn {
+            background: rgba(35, 134, 54, 0.1);
+            color: #238636;
+            border: 1px solid rgba(35, 134, 54, 0.2);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-top: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .history-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        .history-header {
+            padding: 12px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .history-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .history-content {
+            padding: 15px;
+            background: #0d1117;
+            border-top: 1px solid var(--border);
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            display: none;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .history-item.active .history-content {
+            display: block;
+        }
+
+        .history-item.active .history-header i[data-lucide="chevron-down"] {
+            transform: rotate(180deg);
+        }
+
+        .history-header i {
+            transition: transform 0.3s ease;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .history-action-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: var(--transition);
+        }
+
+        .history-action-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .history-action-btn.delete:hover {
+            color: #ff5f56;
+            background: rgba(255, 95, 86, 0.1);
+        }
+
+        .history-tag {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--bg-accent);
+            color: var(--primary);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="/" class="logo">
+            <i data-lucide="terminal"></i>
+            APIs Hub <span>Dev Monitor</span>
+        </a>
+        <nav class="nav-links">
+            <a href="/" class="nav-link">Home API</a>
+        </nav>
+    </header>
+
+    <div class="shell" style="max-width: 1750px; margin: 0 auto; padding: calc(var(--header-h) + 30px) 40px 0 40px;">
+        <div class="tabs">
+            <div class="tab active" data-tab="agg" onclick="switchTab('agg')"><i data-lucide="calculator"></i> Aggregations</div>
+            <div class="tab" data-tab="docker" onclick="switchTab('docker')"><i data-lucide="box"></i> Docker Admin</div>
+            <div class="tab" data-tab="semantic" onclick="switchTab('semantic')"><i data-lucide="play-circle"></i> Semantic Ops</div>
+        </div>
+    </div>
+
+    <main>
+        <!-- Aggregation Panel -->
+        <div id="card-agg" class="card active animate-fade">
+            <h2 class="section-title"><i data-lucide="settings-2"></i> Command Configurator</h2>
+            
+            <div class="form-group">
+                <label>Command Type</label>
+                <select id="command-type">
+                    <option value="app:aggregate">Aggregation (app:aggregate)</option>
+                    <option value="app:read">Read Entity (app:read)</option>
+                    <option value="analytics:cache">Cache Extraction (analytics:cache)</option>
+                    <option value="app:health-check">Health Check (app:health-check)</option>
+                </select>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Entity</label>
+                    <select id="entity-select">
+                        <option value="channeled_metric">Channeled Metric</option>
+                        <option value="channeled_order">Channeled Order</option>
+                        <option value="channeled_ad">Channeled Ad</option>
+                        <option value="channeled_ad_group">Channeled Ad Group</option>
+                        <option value="channeled_campaign">Channeled Campaign</option>
+                        <option value="metric">Global Metric</option>
+                        <option value="order">Global Order</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Channel</label>
+                    <select id="channel-select">
+                        <option value="facebook">Facebook</option>
+                        <option value="google_search_console">Google Search Console</option>
+                        <option value="shopify">Shopify</option>
+                        <option value="">(None)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="aggregation-config">
+                <label>Aggregations</label>
+                <div id="agg-list">
+                    <!-- Dynamic Aggregation Items -->
+                </div>
+                <button class="add-btn" id="add-agg"><i data-lucide="plus"></i> Add Metric</button>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <label>Group By</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <select id="group-by-select" onchange="if(this.value) { addGroup(this.value); this.value=''; }" style="flex: 1;">
+                        <option value="">Add grouping dimension...</option>
+                        <!-- Options filled by DICTIONARY -->
+                    </select>
+                </div>
+                <div class="input-pill-container" id="group-by-container">
+                    <input type="text" class="pill-input" placeholder="Or type custom..." id="group-by-input">
+                </div>
+                <div class="hint">Suggested: monthly, daily, account</div>
+            </div>
+
+            <div id="filter-config" style="margin-top: 20px;">
+                <label>Filters</label>
+                <div id="filter-list">
+                    <!-- Dynamic Filter Items -->
+                </div>
+                <button class="add-btn" id="add-filter" style="border-color: rgba(249, 115, 22, 0.2); color: #f97316; background: rgba(249, 115, 22, 0.1);"><i data-lucide="filter"></i> Add Filter</button>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" id="start-date">
+                    <div class="hint">Leave empty for all time</div>
+                </div>
+                <div class="form-group">
+                    <label>End Date</label>
+                    <input type="date" id="end-date">
+                    <div class="hint">Default: today</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Options</label>
+                <div class="badge-group">
+                    <div class="badge active" data-flag="--pretty" onclick="toggleFlag(this)">
+                        <i data-lucide="check-circle-2"></i> Pretty Print
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Docker Admin Panel -->
+        <div id="card-docker" class="card animate-fade">
+            <h2 class="section-title"><i data-lucide="box"></i> Docker Administration</h2>
+            
+            <div class="form-group">
+                <label>Target Container(s)</label>
+                <div id="container-selector" class="badge-group">
+                    <!-- Dynamic Containers -->
+                </div>
+                <div class="hint">Click to select targets. Multi-select enabled for these operations.</div>
+            </div>
+
+            <div class="form-group" style="margin-top: 30px;">
+                <label>Quick Actions</label>
+                <div class="grid-2">
+                    <button class="add-btn" onclick="setDockerOp('restart')" style="width:100%"><i data-lucide="refresh-cw"></i> Restart</button>
+                    <button class="add-btn" onclick="setDockerOp('redeploy')" style="width:100%"><i data-lucide="server"></i> Re-deploy (up -d)</button>
+                    <button class="add-btn" onclick="setDockerOp('composer')" style="width:100%"><i data-lucide="package"></i> Composer Update</button>
+                    <button class="add-btn" onclick="setDockerOp('logs')" style="width:100%"><i data-lucide="list"></i> Tail Logs (-f)</button>
+                    <button class="add-btn" onclick="setDockerOp('health')" style="width:100%"><i data-lucide="heart"></i> Health Check</button>
+                    <button class="add-btn" onclick="setDockerOp('bash')" style="width:100%"><i data-lucide="terminal"></i> Interactive Shell</button>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 30px;">
+                <label>Global Operations</label>
+                <div class="badge-group">
+                    <div class="badge" onclick="setDockerOp('global-up')"><i data-lucide="cloud-lightning"></i> Full Rebuild & Up</div>
+                    <div class="badge" onclick="setDockerOp('global-down')"><i data-lucide="cloud-off"></i> Total Shutdown (down)</div>
+                    <div class="badge" onclick="setDockerOp('build-deployment')"><i data-lucide="wrench"></i> Rebuild docker-compose.yml</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Semantic Ops Panel -->
+        <div id="card-semantic" class="card animate-fade">
+            <h2 class="section-title"><i data-lucide="play-circle"></i> Semantic Workflows</h2>
+            <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 20px;">Common command chains based on local development recurrences.</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="agg-item" onclick="setSemanticOp('refresh-code')" style="cursor:pointer; display:block">
+                    <div style="font-weight:600; color:var(--primary); margin-bottom:5px">🔄 Refresh Code Base</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim)">Restarts services and ensures dependencies are synced after commits.</div>
+                </div>
+
+                <div class="agg-item" onclick="setSemanticOp('breaking-rebuild')" style="cursor:pointer; display:block">
+                    <div style="font-weight:600; color:#ef4444; margin-bottom:5px">⚡ Full Rebuild & Sync</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim)">Complete cycle: build -> down -> up -> composer -> schema -> seed -> health.</div>
+                </div>
+
+                <div class="agg-item" onclick="setSemanticOp('clear-cache')" style="cursor:pointer; display:block">
+                    <div style="font-weight:600; color:#eab308; margin-bottom:5px">🧹 Clear Redis Cache</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim)">Invalidates all data in Redis across instances.</div>
+                </div>
+
+                <div class="agg-item" onclick="setSemanticOp('run-tests')" style="cursor:pointer; display:block">
+                    <div style="font-weight:600; color:#22c55e; margin-bottom:5px">🧪 Quality Check (Tests + PHPStan)</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim)">Runs PHPUnit and PHPStan analysis in the primary container.</div>
+                </div>
+                
+                <div class="agg-item" onclick="setSemanticOp('schema-update')" style="cursor:pointer; display:block">
+                    <div style="font-weight:600; color:var(--primary); margin-bottom:5px">🗄️ Database Schema Sync</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim)">Checks and applies Doctrine schema updates (--force).</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="preview-pane animate-fade" style="animation-delay: 0.1s;">
+            <h2 class="section-title"><i data-lucide="code"></i> Live Command Preview</h2>
+            <div class="terminal">
+                <div class="terminal-header">
+                    <div class="terminal-dots">
+                        <div class="dot dot-red"></div>
+                        <div class="dot dot-yellow"></div>
+                        <div class="dot dot-green"></div>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" id="command-name-input" placeholder="Name this command...">
+                        <button class="copy-btn" id="save-btn" style="background: var(--secondary);">
+                            <i data-lucide="save" size="16"></i> Save
+                        </button>
+                        <button class="copy-btn" id="copy-btn">
+                            <i data-lucide="copy" size="16"></i> Copy
+                        </button>
+                    </div>
+                </div>
+                <div class="terminal-body" id="command-preview">
+                    <!-- Live preview goes here -->
+                </div>
+            </div>
+
+            <div id="curl-preview-pane" class="curl-pane animate-fade">
+                <h4 style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="globe" size="14"></i> cURL Equivalent (API v1)
+                </h4>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <span id="curl-method" style="font-size: 0.7rem; color: var(--text-dim);">METHOD: GET</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="copy-btn" id="copy-url-btn" style="padding: 4px 10px; font-size: 0.75rem; background: var(--bg-accent);">
+                                <i data-lucide="link" size="12"></i> Copy URL
+                            </button>
+                            <button class="copy-btn" id="copy-body-btn" style="padding: 4px 10px; font-size: 0.75rem; background: var(--bg-accent); display: none;">
+                                <i data-lucide="file-json" size="12"></i> Copy Body
+                            </button>
+                            <button class="copy-btn" id="copy-curl-btn" style="padding: 4px 10px; font-size: 0.75rem;">
+                                <i data-lucide="copy" size="12"></i> Copy cURL
+                            </button>
+                        </div>
+                    </div>
+                    <div class="terminal-body" id="curl-preview" style="min-height: 60px; font-size: 0.8rem; color: #a5d6ff;">
+                        <!-- cURL goes here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card" style="margin-top: 30px; padding: 20px;">
+                <h4 style="font-size: 0.9rem; margin-bottom: 15px; color: var(--text-dim); display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="info" size="16"></i> Quick Tips
+                </h4>
+                <ul style="font-size: 0.85rem; color: var(--text-dim); padding-left: 20px;">
+                    <li style="margin-bottom: 8px;">Use <code style="color: var(--primary)">dimensions.FIELD</code> for granular platform attributes.</li>
+                    <li style="margin-bottom: 8px;">Temporal grouping (daily, weekly) automatically fills gaps for charts.</li>
+                    <li>Weighted formulas like <code style="color: var(--primary)">ctr</code> or <code style="color: var(--primary)">cpc</code> are handled intelligently.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- History Pane -->
+        <div class="history-pane animate-fade" style="animation-delay: 0.2s;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+                <h2 class="section-title" style="margin-bottom: 0;"><i data-lucide="history"></i> History</h2>
+                <button class="history-action-btn delete" id="clear-history-btn" title="Clear All History">
+                    <i data-lucide="trash-2" size="20"></i>
+                </button>
+            </div>
+            
+            <div id="history-list">
+                <!-- Saved commands go here -->
+            </div>
+            
+            <div id="empty-history" style="text-align: center; padding: 40px 20px; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 12px; display: none;">
+                <i data-lucide="ghost" size="48" style="opacity: 0.2; margin-bottom: 15px;"></i>
+                <p style="font-size: 0.9rem;">No saved commands yet.</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Init Lucide Icons
+        lucide.createIcons();
+
+        // Metadata Dictionary for APIs Hub
+        const DICTIONARY = {
+            metrics: [
+                { id: 'spend', name: 'Total Spend', type: 'currency' },
+                { id: 'clicks', name: 'Total Clicks', type: 'numeric' },
+                { id: 'impressions', name: 'Total Impressions', type: 'numeric' },
+                { id: 'reach', name: 'Unique Reach', type: 'numeric' },
+                { id: 'ctr', name: 'Click-Through Rate', type: 'percentage' },
+                { id: 'cpc', name: 'Cost Per Click', type: 'currency' },
+                { id: 'cpm', name: 'Cost Per Mille', type: 'currency' },
+                { id: 'position', name: 'Mean Position', type: 'numeric' },
+                { id: 'frequency', name: 'Frequency', type: 'numeric' }
+            ],
+            operations: ['SUM', 'AVG', 'COUNT', 'MIN', 'MAX'],
+            dimensions: [
+                'monthly', 'weekly', 'daily', 'yearly', 'quarterly',
+                'account', 'campaign', 'adGroup', 'ad', 'query', 'page', 'country', 'device',
+                'dimensions.gender', 'dimensions.age', 'dimensions.searchAppearance', 'dimensions.platform'
+            ],
+            containers: ['gsc-jan', 'gsc-feb', 'fb-ads', 'gsc-recent', 'fb-recent', 'redis']
+        };
+
+        // State Management
+        const state = {
+            activeTab: 'agg',
+            command: 'app:aggregate',
+            entity: 'channeled_metric',
+            channel: 'facebook',
+            aggregations: [
+                { alias: 'spend', formula: 'spend', operation: '', type: 'formula' }
+            ],
+            groupBy: [],
+            filters: [],
+            startDate: '',
+            endDate: new Date().toISOString().split('T')[0],
+            flags: ['--pretty'],
+            // Docker State
+            selectedContainers: ['gsc-jan'],
+            dockerOp: 'restart',
+            semanticOp: '',
+            // History
+            history: JSON.parse(localStorage.getItem('commandHistory') || '[]')
+        };
+
+        // DOM Elements
+        const commandTypeEl = document.getElementById('command-type');
+        const entitySelectEl = document.getElementById('entity-select');
+        const channelSelectEl = document.getElementById('channel-select');
+        const aggListEl = document.getElementById('agg-list');
+        const addAggBtn = document.getElementById('add-agg');
+        const filterListEl = document.getElementById('filter-list');
+        const addFilterBtn = document.getElementById('add-filter');
+        const groupByInput = document.getElementById('group-by-input');
+        const groupByContainer = document.getElementById('group-by-container');
+        const startDateEl = document.getElementById('start-date');
+        const endDateEl = document.getElementById('end-date');
+        const previewEl = document.getElementById('command-preview');
+        const copyBtn = document.getElementById('copy-btn');
+        const containerSelectorEl = document.getElementById('container-selector');
+
+        // Functions
+        window.switchTab = (tabId) => {
+            state.activeTab = tabId;
+            document.querySelectorAll('.tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tabId);
+            });
+            document.querySelectorAll('.card').forEach(c => {
+                c.classList.toggle('active', c.id === `card-${tabId}`);
+            });
+            updatePreview();
+        };
+
+        window.setDockerOp = (op) => {
+            state.dockerOp = op;
+            updatePreview();
+        };
+
+        window.setSemanticOp = (op) => {
+            state.semanticOp = op;
+            updatePreview();
+        };
+
+        window.toggleContainer = (container) => {
+            if (state.selectedContainers.includes(container)) {
+                state.selectedContainers = state.selectedContainers.filter(c => c !== container);
+            } else {
+                state.selectedContainers.push(container);
+            }
+            renderContainers();
+            updatePreview();
+        };
+
+        function renderContainers() {
+            containerSelectorEl.innerHTML = DICTIONARY.containers.map(c => `
+                <div class="badge ${state.selectedContainers.includes(c) ? 'active' : ''}" onclick="toggleContainer('${c}')">
+                    <i data-lucide="${state.selectedContainers.includes(c) ? 'check-circle-2' : 'circle'}"></i> ${c}
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        // History Functions
+        window.saveToHistory = () => {
+            const nameInput = document.getElementById('command-name-input');
+            const name = nameInput.value.trim() || `${state.activeTab.toUpperCase()} Command`;
+            
+            const entry = {
+                id: Date.now(),
+                name: name,
+                tab: state.activeTab,
+                command: previewEl.innerText,
+                curl: document.getElementById('curl-preview-pane').classList.contains('active') ? document.getElementById('curl-preview').innerText : null,
+                apiUrl: state.lastApiUrl,
+                apiBody: state.lastApiBody,
+                timestamp: new Date().toLocaleTimeString()
+            };
+            
+            state.history.unshift(entry);
+            localStorage.setItem('commandHistory', JSON.stringify(state.history));
+            nameInput.value = '';
+            renderHistory();
+        };
+
+        window.removeFromHistory = (id) => {
+            state.history = state.history.filter(h => h.id !== id);
+            localStorage.setItem('commandHistory', JSON.stringify(state.history));
+            renderHistory();
+        };
+
+        window.clearHistory = () => {
+            if (confirm('Are you sure you want to clear all history?')) {
+                state.history = [];
+                localStorage.setItem('commandHistory', '[]');
+                renderHistory();
+            }
+        };
+
+        window.updateHistoryTitle = (id, newTitle) => {
+            const index = state.history.findIndex(h => h.id === id);
+            if (index !== -1) {
+                state.history[index].name = newTitle.trim() || 'Unnamed Command';
+                localStorage.setItem('commandHistory', JSON.stringify(state.history));
+            }
+        };
+
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            const empty = document.getElementById('empty-history');
+            
+            if (state.history.length === 0) {
+                list.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+            list.innerHTML = '';
+            
+            state.history.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <div class="history-header">
+                        <div style="flex:1; cursor:pointer;" onclick="this.closest('.history-item').classList.toggle('active')">
+                            <div style="display:flex; align-items:center; gap:8px">
+                                <span class="history-title" 
+                                      contenteditable="true" 
+                                      onclick="event.stopPropagation()"
+                                      onblur="updateHistoryTitle(${item.id}, this.innerText)"
+                                      onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}"
+                                      style="font-weight:600; font-size:0.85rem; border-bottom: 1px dashed transparent;"
+                                      onmouseover="this.style.borderBottomColor='var(--primary)'"
+                                      onmouseout="this.style.borderBottomColor='transparent'">
+                                    ${item.name}
+                                </span>
+                                <span class="history-tag" style="font-size: 0.6rem;">${item.tab}</span>
+                            </div>
+                            <div style="font-size:0.7rem; color:var(--text-dim)">${item.timestamp}</div>
+                        </div>
+                        <div class="history-actions">
+                            <i data-lucide="chevron-down" size="14" style="cursor:pointer; color:var(--text-dim)" onclick="this.closest('.history-item').classList.toggle('active')"></i>
+                        </div>
+                    </div>
+                    <div class="history-content">
+                        <div style="margin-bottom:10px">
+                            <div style="font-size:0.65rem; color:var(--primary); text-transform:uppercase; margin-bottom:4px">CLI Command</div>
+                            <pre style="font-size:0.75rem; white-space:pre-wrap; background:rgba(0,0,0,0.2); padding:8px; border-radius:4px">${item.command}</pre>
+                        </div>
+                        ${item.curl ? `
+                        <div>
+                            <div style="font-size:0.65rem; color:var(--primary); text-transform:uppercase; margin-bottom:4px">cURL / API</div>
+                            <pre style="font-size:0.75rem; white-space:pre-wrap; background:rgba(0,0,0,0.2); padding:8px; border-radius:4px">${item.curl}</pre>
+                        </div>` : ''}
+                        <div style="display:flex; gap:8px; margin-top:10px">
+                            <button class="copy-btn" style="padding:4px 8px; font-size:0.7rem" onclick="event.stopPropagation(); copyToClipboard(\`${item.command.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`, this)">Copy CLI</button>
+                            ${item.curl ? `<button class="copy-btn" style="padding:4px 8px; font-size:0.7rem" onclick="event.stopPropagation(); copyToClipboard(\`${item.curl.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`, this)">Copy cURL</button>` : ''}
+                            <button class="remove-btn" style="padding:4px 8px; font-size:0.7rem; margin-left:auto" onclick="event.stopPropagation(); removeFromHistory(${item.id})">Delete</button>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+
+        // Functions
+        function renderAggregations() {
+            aggListEl.innerHTML = '';
+            state.aggregations.forEach((agg, index) => {
+                const div = document.createElement('div');
+                div.className = 'agg-item';
+                
+                const metricOptions = DICTIONARY.metrics.map(m => `<option value="${m.id}" ${agg.formula === m.id ? 'selected' : ''}>${m.name}</option>`).join('');
+                const opOptions = ['(Default)', ...DICTIONARY.operations].map(op => `<option value="${op === '(Default)' ? '' : op}" ${agg.operation === (op === '(Default)' ? '' : op) ? 'selected' : ''}>${op}</option>`).join('');
+
+                div.innerHTML = `
+                    <div style="display:flex; flex-direction:column; gap:5px">
+                        <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Alias</label>
+                        <input type="text" placeholder="Alias" value="${agg.alias}" onchange="updateAgg(${index}, 'alias', this.value)">
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
+                        <div>
+                            <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Metric/Formula</label>
+                            <select onchange="updateAgg(${index}, 'formula', this.value)">
+                                ${metricOptions}
+                                <optgroup label="Custom">
+                                    <option value="CUSTOM" ${!DICTIONARY.metrics.find(m => m.id === agg.formula) ? 'selected' : ''}>[Custom SQL]</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Operation</label>
+                            <select onchange="updateAgg(${index}, 'operation', this.value)">
+                                ${opOptions}
+                            </select>
+                        </div>
+                    </div>
+                    <button class="remove-btn" onclick="removeAgg(${index})" style="align-self: flex-end; margin-bottom: 2px;"><i data-lucide="trash-2"></i></button>
+                `;
+
+                if (agg.formula === 'CUSTOM' || (!DICTIONARY.metrics.find(m => m.id === agg.formula) && agg.formula)) {
+                    const customInput = document.createElement('input');
+                    customInput.type = 'text';
+                    customInput.value = agg.formula === 'CUSTOM' ? '' : agg.formula;
+                    customInput.placeholder = 'Enter field or SQL expression...';
+                    customInput.style.marginTop = '10px';
+                    customInput.style.gridColumn = '1 / span 3';
+                    customInput.onchange = (e) => updateAgg(index, 'formula', e.target.value);
+                    div.appendChild(customInput);
+                }
+
+                aggListEl.appendChild(div);
+            });
+            lucide.createIcons();
+            updatePreview();
+        }
+
+        function renderFilters() {
+            filterListEl.innerHTML = '';
+            state.filters.forEach((filter, index) => {
+                const div = document.createElement('div');
+                div.className = 'agg-item';
+                div.style.background = 'rgba(249, 115, 22, 0.05)';
+                
+                const dimOptions = DICTIONARY.dimensions.map(d => `<option value="${d}" ${filter.key === d ? 'selected' : ''}>${d}</option>`).join('');
+
+                div.innerHTML = `
+                    <div style="display:flex; flex-direction:column; gap:5px">
+                        <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Field/Dimension</label>
+                        <select onchange="updateFilter(${index}, 'key', this.value)">
+                            ${dimOptions}
+                            <optgroup label="Custom">
+                                <option value="CUSTOM" ${!DICTIONARY.dimensions.includes(filter.key) ? 'selected' : ''}>[Custom]</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:5px">
+                        <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Value</label>
+                        <input type="text" placeholder="e.g. female, campaign_123..." value="${filter.value}" onchange="updateFilter(${index}, 'value', this.value)">
+                    </div>
+                    <button class="remove-btn" onclick="removeFilter(${index})" style="align-self: flex-end; margin-bottom: 2px;"><i data-lucide="trash-2"></i></button>
+                `;
+
+                if (filter.key === 'CUSTOM' || (!DICTIONARY.dimensions.includes(filter.key) && filter.key)) {
+                    const customInput = document.createElement('input');
+                    customInput.type = 'text';
+                    customInput.value = filter.key === 'CUSTOM' ? '' : filter.key;
+                    customInput.placeholder = 'Enter field name...';
+                    customInput.style.marginTop = '10px';
+                    customInput.style.gridColumn = '1 / span 3';
+                    customInput.onchange = (e) => updateFilter(index, 'key', e.target.value);
+                    div.appendChild(customInput);
+                }
+
+                filterListEl.appendChild(div);
+            });
+            lucide.createIcons();
+            updatePreview();
+        }
+
+        window.updateFilter = (index, key, val) => {
+            state.filters[index][key] = val;
+            renderFilters();
+        };
+
+        window.removeFilter = (index) => {
+            state.filters.splice(index, 1);
+            renderFilters();
+        };
+
+        window.updateAgg = (index, key, val) => {
+            if (key === 'alias') val = val.replace(/\s+/g, '_');
+            state.aggregations[index][key] = val;
+            if (key === 'formula' && DICTIONARY.metrics.find(m => m.id === val)) {
+                if (!state.aggregations[index].alias) state.aggregations[index].alias = val.replace(/\s+/g, '_');
+            }
+            renderAggregations();
+        };
+
+        window.removeAgg = (index) => {
+            state.aggregations.splice(index, 1);
+            renderAggregations();
+        };
+
+        window.toggleFlag = (el) => {
+            const flag = el.dataset.flag;
+            if (state.flags.includes(flag)) {
+                state.flags = state.flags.filter(f => f !== flag);
+                el.classList.remove('active');
+                el.querySelector('i').setAttribute('data-lucide', 'circle');
+            } else {
+                state.flags.push(flag);
+                el.classList.add('active');
+                el.querySelector('i').setAttribute('data-lucide', 'check-circle-2');
+            }
+            lucide.createIcons();
+            updatePreview();
+        };
+
+        window.addGroup = (val) => {
+            if (val && !state.groupBy.includes(val)) {
+                state.groupBy.push(val);
+                renderGroupBy();
+            }
+        };
+
+        function renderGroupBy() {
+            const pills = groupByContainer.querySelectorAll('.input-pill');
+            pills.forEach(p => p.remove());
+
+            state.groupBy.forEach((g, index) => {
+                const pill = document.createElement('div');
+                pill.className = 'input-pill';
+                pill.innerHTML = `${g} <span onclick="removeGroup(${index})">×</span>`;
+                groupByContainer.insertBefore(pill, groupByInput);
+            });
+
+            const suggestionsEl = document.querySelector('.hint');
+            const available = DICTIONARY.dimensions.filter(d => !state.groupBy.includes(d));
+            const selectEl = document.getElementById('group-by-select');
+            if (selectEl) {
+                selectEl.innerHTML = '<option value="">Add grouping dimension...</option>' + 
+                    available.map(d => `<option value="${d}">${d}</option>`).join('');
+            }
+            suggestionsEl.innerHTML = `Suggested: ` + available.slice(0, 5).map(d => `<span style="text-decoration: underline; cursor:pointer" onclick="addGroup('${d}')">${d}</span>`).join(', ');
+            updatePreview();
+        }
+
+        window.removeGroup = (index) => {
+            state.groupBy.splice(index, 1);
+            renderGroupBy();
+        };
+
+        function updatePreview() {
+            let cmd = '';
+            let curl = '';
+            let hasApi = false;
+
+            if (state.activeTab === 'agg') {
+                hasApi = true;
+                cmd = `<span class="command-prompt">php bin/cli.php</span> <span class="command-arg">${state.command}</span>`;
+                cmd += ` <span class="command-flag">--entity=</span><span class="command-val">${state.entity}</span>`;
+                if (state.channel) cmd += ` <span class="command-flag">--channel=</span><span class="command-val">${state.channel}</span>`;
+
+                const curlParams = new URLSearchParams();
+                const curlBody = {};
+
+                if (state.command === 'app:aggregate') {
+                    const aggObj = {};
+                    state.aggregations.forEach(a => {
+                        if (a.alias && a.formula) {
+                            let value = a.formula;
+                            if (a.operation) value = `${a.operation}(${a.formula})`;
+                            aggObj[a.alias] = value;
+                        }
+                    });
+                    
+                    if (Object.keys(aggObj).length > 0) {
+                        cmd += ` <span class="command-flag">--aggregations=</span><span class="command-val">'${JSON.stringify(aggObj)}'</span>`;
+                        curlBody.aggregations = aggObj;
+                    }
+                    if (state.groupBy.length > 0) {
+                        cmd += ` <span class="command-flag">--group-by=</span><span class="command-val">"${state.groupBy.join(',')}"</span>`;
+                        curlBody.groupBy = state.groupBy.join(','); 
+                    }
+                    if (state.filters.length > 0) {
+                        const filterObj = {};
+                        state.filters.forEach(f => { if (f.key && f.value) filterObj[f.key] = f.value; });
+                        if (Object.keys(filterObj).length > 0) {
+                            cmd += ` <span class="command-flag">--filters=</span><span class="command-val">'${JSON.stringify(filterObj)}'</span>`;
+                            curlBody.filters = filterObj;
+                        }
+                    }
+                } else if (['app:read', 'analytics:cache'].includes(state.command)) {
+                    if (state.groupBy.length > 0) {
+                        cmd += ` <span class="command-flag">--group-by=</span><span class="command-val">"${state.groupBy.join(',')}"</span>`;
+                        curlParams.set('groupBy', state.groupBy.join(','));
+                    }
+                }
+
+                if (state.startDate) {
+                    cmd += ` <span class="command-flag">--start-date=</span><span class="command-val">"${state.startDate}"</span>`;
+                    if (state.command === 'app:aggregate') curlBody.startDate = state.startDate;
+                    else curlParams.set('startDate', state.startDate);
+                }
+                if (state.endDate) {
+                    cmd += ` <span class="command-flag">--end-date=</span><span class="command-val">"${state.endDate}"</span>`;
+                    if (state.command === 'app:aggregate') curlBody.endDate = state.endDate;
+                    else curlParams.set('endDate', state.endDate);
+                }
+                
+                state.flags.forEach(f => { cmd += ` <span class="command-flag">${f}</span>`; });
+
+                const isAgg = state.command === 'app:aggregate';
+                const endpoint = isAgg ? '/aggregate' : '';
+                const channelPart = state.channel ? `/${state.channel}` : '';
+                const baseUrl = window.location.origin + `${channelPart}/${state.entity}${endpoint}`;
+                
+                const method = isAgg ? 'POST' : 'GET';
+                const queryString = curlParams.toString();
+                const finalUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+                
+                curl = `curl -X ${method} "${finalUrl}" \\\n` +
+                       `  -H "Content-Type: application/json" \\\n` +
+                       `  -H "Accept: application/json" \\\n` +
+                       `  -H "X-API-Key: YOUR_API_KEY"`;
+                
+                if (isAgg && Object.keys(curlBody).length > 0) {
+                    curl += ` \\\n  --data-raw '${JSON.stringify(curlBody, null, 2)}'`;
+                }
+                
+                state.lastApiUrl = finalUrl;
+                state.lastApiBody = isAgg && Object.keys(curlBody).length > 0 ? JSON.stringify(curlBody, null, 2) : null;
+                
+                document.getElementById('curl-method').innerText = `METHOD: ${method}`;
+                document.getElementById('copy-body-btn').style.display = state.lastApiBody ? 'flex' : 'none';
+
+            } else if (state.activeTab === 'docker') {
+                const targets = state.selectedContainers.join(' ');
+                const first = state.selectedContainers[0] || 'gsc-jan';
+                switch(state.dockerOp) {
+                    case 'restart': cmd = `docker compose restart ${targets}`; break;
+                    case 'redeploy': cmd = `docker compose up -d --no-deps --build ${targets}`; break;
+                    case 'composer': cmd = `docker compose exec ${first} composer update`; break;
+                    case 'logs': cmd = `docker compose logs -f ${targets}`; break;
+                    case 'health': cmd = `docker compose exec ${first} php bin/cli.php app:health-check`; break;
+                    case 'bash': cmd = `docker compose exec ${first} bash`; break;
+                    case 'global-up': cmd = `docker compose up -d --build`; break;
+                    case 'global-down': cmd = `docker compose down`; break;
+                    case 'build-deployment': cmd = `php bin/build-deployment.php project`; break;
+                }
+            } else if (state.activeTab === 'semantic') {
+                const main = 'gsc-jan';
+                switch(state.semanticOp) {
+                    case 'refresh-code': cmd = `docker compose restart && docker compose exec ${main} composer install`; break;
+                    case 'breaking-rebuild': 
+                        cmd = `php bin/build-deployment.php project && \\\n` +
+                              `docker compose down && \\\n` +
+                              `docker compose up -d --build && \\\n` +
+                              `docker compose exec ${main} composer install && \\\n` +
+                              `docker compose exec ${main} php bin/cli.php orm:schema-tool:update --force && \\\n` +
+                              `docker compose exec ${main} php bin/cli.php app:initialize-entities && \\\n` +
+                              `docker compose exec ${main} php bin/cli.php app:health-check`;
+                        break;
+                    case 'clear-cache': cmd = `docker compose exec ${main} php bin/cli.php cache:clear --all`; break;
+                    case 'run-tests': cmd = `docker compose exec ${main} vendor/bin/phpunit tests && \\\n` +
+                                           `docker compose exec ${main} vendor/bin/phpstan analyze src`; break;
+                    case 'schema-update': cmd = `docker compose exec ${main} php bin/cli.php orm:schema-tool:update --dump-sql && \\\n` +
+                                               `docker compose exec ${main} php bin/cli.php orm:schema-tool:update --force`; break;
+                    default: cmd = '# Select a workflow below to generate the chain';
+                }
+            }
+            previewEl.innerHTML = cmd;
+            document.getElementById('curl-preview').innerText = curl;
+            document.getElementById('curl-preview-pane').classList.toggle('active', hasApi);
+        }
+
+        // Event Listeners
+        commandTypeEl.addEventListener('change', (e) => { state.command = e.target.value; updatePreview(); });
+        entitySelectEl.addEventListener('change', (e) => { state.entity = e.target.value; updatePreview(); });
+        channelSelectEl.addEventListener('change', (e) => { state.channel = e.target.value; updatePreview(); });
+        startDateEl.addEventListener('input', (e) => { state.startDate = e.target.value; updatePreview(); });
+        endDateEl.addEventListener('input', (e) => { state.endDate = e.target.value; updatePreview(); });
+        addAggBtn.addEventListener('click', () => { state.aggregations.push({ alias: '', formula: 'spend', operation: '', type: 'formula' }); renderAggregations(); });
+        addFilterBtn.addEventListener('click', () => { state.filters.push({ key: 'dimensions.gender', value: '' }); renderFilters(); });
+        
+        groupByInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const val = groupByInput.value.trim();
+                if (val) addGroup(val);
+                groupByInput.value = '';
+            } else if (e.key === 'Backspace' && !groupByInput.value && state.groupBy.length > 0) {
+                state.groupBy.pop();
+                renderGroupBy();
+            }
+        });
+
+        window.copyToClipboard = function(text, btn, successMessage = 'Copied!') {
+            const originalHTML = btn.innerHTML;
+            const showSuccess = () => {
+                btn.innerHTML = `<i data-lucide="check" size="${btn.id === 'copy-btn' ? 16 : 12}"></i> ${successMessage}`;
+                lucide.createIcons();
+                setTimeout(() => { btn.innerHTML = originalHTML; lucide.createIcons(); }, 2000);
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(showSuccess).catch(() => fallbackCopy(text, showSuccess));
+            } else {
+                fallbackCopy(text, showSuccess);
+            }
+        }
+
+        function fallbackCopy(text, callback) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed"; textArea.style.left = "-9999px"; textArea.style.top = "0";
+            document.body.appendChild(textArea);
+            textArea.focus(); textArea.select();
+            try { document.execCommand('copy'); callback(); } catch (err) { alert('Copy failed. Please copy manually.'); }
+            document.body.removeChild(textArea);
+        }
+
+        copyBtn?.addEventListener('click', () => copyToClipboard(previewEl.innerText, copyBtn));
+        document.getElementById('copy-url-btn')?.addEventListener('click', () => state.lastApiUrl && copyToClipboard(state.lastApiUrl, document.getElementById('copy-url-btn'), 'Copied URL!'));
+        document.getElementById('copy-body-btn')?.addEventListener('click', () => state.lastApiBody && copyToClipboard(state.lastApiBody, document.getElementById('copy-body-btn'), 'Copied Body!'));
+        document.getElementById('copy-curl-btn')?.addEventListener('click', () => copyToClipboard(document.getElementById('curl-preview').innerText, document.getElementById('copy-curl-btn')));
+        document.getElementById('save-btn').addEventListener('click', saveToHistory);
+        document.getElementById('clear-history-btn').addEventListener('click', clearHistory);
+
+        // Initial Render
+        endDateEl.value = state.endDate;
+        renderAggregations();
+        renderFilters();
+        renderGroupBy();
+        renderContainers();
+        renderHistory();
+    </script>
+</body>
+</html>

@@ -11,4 +11,10 @@ class PageController
         $html = file_get_contents(__DIR__ . '/../views/home.html');
         return new Response($html, 200, ['Content-Type' => 'text/html']);
     }
+
+    public function devMonitor(): Response
+    {
+        $html = file_get_contents(__DIR__ . '/../views/dev-monitor.html');
+        return new Response($html, 200, ['Content-Type' => 'text/html']);
+    }
 }
