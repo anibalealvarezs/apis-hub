@@ -811,7 +811,6 @@
         // Metadata Dictionary for APIs Hub
         const DICTIONARY = {
             metrics: [
-                { id: 'value', name: 'Entity Value (Generic)', type: 'numeric' },
                 { id: 'spend', name: 'Total Spend', type: 'currency' },
                 { id: 'clicks', name: 'Total Clicks', type: 'numeric' },
                 { id: 'impressions', name: 'Total Impressions', type: 'numeric' },
@@ -1018,16 +1017,16 @@
         function renderAggregations() {
             aggListEl.innerHTML = '';
             
-            const formulas = ['spend', 'clicks', 'impressions', 'reach', 'frequency', 'ctr', 'cpc', 'cpm', 'position', 'unique_clicks'];
-            const isChanneled = state.entity.startsWith('channeled_');
+            const isMetricEntity = state.entity === 'channeled_metric';
 
             state.aggregations.forEach((agg, index) => {
                 const div = document.createElement('div');
                 div.className = 'agg-item';
                 
-                // Smart lock: Disable operation if it's a channeled formula (backend handles it)
-                const isFormula = formulas.includes(agg.formula.toLowerCase());
-                const shouldDisableOp = isChanneled && isFormula;
+                // Op logic: Disable if it's a Metric Entity using a predefined formula.
+                // Enable if it's a different entity (Order, Ad) or a Custom field.
+                const isPredefined = DICTIONARY.metrics.some(m => m.id === agg.formula);
+                const shouldDisableOp = isMetricEntity && isPredefined;
                 
                 const metricOptions = DICTIONARY.metrics.map(m => `<option value="${m.id}" ${agg.formula === m.id ? 'selected' : ''}>${m.name}</option>`).join('');
                 const opOptions = ['(Default)', ...DICTIONARY.operations].map(op => `<option value="${op === '(Default)' ? '' : op}" ${agg.operation === (op === '(Default)' ? '' : op) ? 'selected' : ''}>${op}</option>`).join('');
