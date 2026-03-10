@@ -23,6 +23,27 @@
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        footer {
+            padding: 40px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            margin-top: 40px;
+        }
+
+        .subtle-link {
+            color: inherit;
+            text-decoration: none;
+            transition: color 0.3s;
+            opacity: 0.5;
+        }
+
+        .subtle-link:hover {
+            opacity: 1;
+            color: var(--primary);
+        }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -553,8 +574,8 @@
         </a>
         <nav class="nav-links">
             <a href="/monitoring" class="nav-link"><i data-lucide="activity"></i> Monitoring</a>
-            <a href="/docs" class="nav-link"><i data-lucide="book"></i> Docs</a>
-            <a href="/" class="nav-link">Home API</a>
+            <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
+            <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
         </nav>
     </header>
 
@@ -836,6 +857,10 @@
                 <p style="font-size: 0.9rem;">No saved commands yet.</p>
             </div>
         </div>
+        
+        <footer>
+            <p>&copy; 2026 APIs Hub Central. Developed by <a href="https://anibalalvarez.com" target="_blank" class="subtle-link">Aníbal Álvarez</a>.</p>
+        </footer>
     </main>
 
     <script>
