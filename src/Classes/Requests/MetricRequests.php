@@ -402,22 +402,17 @@ class MetricRequests
                     $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
                     if ($adAccount['campaign_metrics']) {
                         $hasResults = true;
-                        foreach ($channeledCampaignMap['mapReverse'] as $channeledCampaign) {
-                            Helpers::checkJobStatus($jobId);
-                            if (!$hasResults) {
-                                break;
-                            }
-                            $hasResults = self::processCampaign(
-                                api: $api,
-                                manager: $manager,
-                                campaignEntity: $campaignRepository->findOneBy(['id' => $campaignMap['map'][$channeledCampaign]]),
-                                channeledCampaignEntity: $channeledCampaignRepository->findOneBy(['platformId' => $channeledCampaign]),
-                                channeledAccountEntity: $channeledAccountEntity,
-                                logger: $logger,
-                                campaignMap: $campaignMap,
-                                channeledCampaignMap: $channeledCampaignMap,
-                            );
-                        }
+                        self::processCampaignsBulk(
+                            api: $api,
+                            manager: $manager,
+                            channeledAccountEntity: $channeledAccountEntity,
+                            logger: $logger,
+                            startDate: $startDate,
+                            endDate: $endDate,
+                            channeledCampaignMap: $channeledCampaignMap,
+                            campaignMap: $campaignMap,
+                            jobId: $jobId,
+                        );
                     } else {
                         $logger->info("Skipping Campaign metrics for ad account: " . $adAccount['id']);
                     }
@@ -433,24 +428,18 @@ class MetricRequests
 
                         if ($adAccount['adset_metrics']) {
                             $hasResults = true;
-                            foreach ($channeledAdGroupMap['mapCampaign'] as $key => $campaignId) {
-                                Helpers::checkJobStatus($jobId);
-                                if (!$hasResults) {
-                                    break;
-                                }
-                                $hasResults = self::processAdset(
-                                    api: $api,
-                                    manager: $manager,
-                                    campaignEntity: $campaignRepository->findOneBy(['campaignId' => $campaignId]),
-                                    channeledCampaignEntity: $channeledCampaignRepository->findOneBy(['platformId' => $campaignId]),
-                                    channeledAccountEntity: $channeledAccountEntity,
-                                    channeledAdGroupEntity: $channeledAdGroupRepository->findOneBy(['platformId' => $key]),
-                                    logger: $logger,
-                                    campaignMap: $campaignMap,
-                                    channeledCampaignMap: $channeledCampaignMap,
-                                    channeledAdGroupMap: $channeledAdGroupMap,
-                                );
-                            }
+                            self::processAdsetsBulk(
+                                api: $api,
+                                manager: $manager,
+                                channeledAccountEntity: $channeledAccountEntity,
+                                logger: $logger,
+                                startDate: $startDate,
+                                endDate: $endDate,
+                                campaignMap: $campaignMap,
+                                channeledCampaignMap: $channeledCampaignMap,
+                                channeledAdGroupMap: $channeledAdGroupMap,
+                                jobId: $jobId,
+                            );
                         } else {
                             $logger->info("Skipping Adset metrics for ad account: " . $adAccount['id']);
                         }
@@ -469,26 +458,19 @@ class MetricRequests
 
                             if ($adAccount['ad_metrics']) {
                                 $hasResults = true;
-                                foreach ($channeledAdMap['mapAdGroup'] as $key => $adGroupId) {
-                                    Helpers::checkJobStatus($jobId);
-                                    if (!$hasResults) {
-                                        break;
-                                    }
-                                    $hasResults = self::processAd(
-                                        api: $api,
-                                        manager: $manager,
-                                        campaignEntity: $campaignRepository->findOneBy(['campaignId' => $channeledAdMap['mapCampaign'][$key]]),
-                                        channeledCampaignEntity: $channeledCampaignRepository->findOneBy(['platformId' => $channeledAdMap['mapCampaign'][$key]]),
-                                        channeledAccountEntity: $channeledAccountEntity,
-                                        channeledAdGroupEntity: $channeledAdGroupRepository->findOneBy(['platformId' => $adGroupId]),
-                                        channeledAdEntity: $channeledAdRepository->findOneBy(['platformId' => $key]),
-                                        logger: $logger,
-                                        campaignMap: $campaignMap,
-                                        channeledCampaignMap: $channeledCampaignMap,
-                                        channeledAdGroupMap: $channeledAdGroupMap,
-                                        channeledAdMap: $channeledAdMap,
-                                    );
-                                }
+                                self::processAdsBulk(
+                                    api: $api,
+                                    manager: $manager,
+                                    channeledAccountEntity: $channeledAccountEntity,
+                                    logger: $logger,
+                                    startDate: $startDate,
+                                    endDate: $endDate,
+                                    campaignMap: $campaignMap,
+                                    channeledCampaignMap: $channeledCampaignMap,
+                                    channeledAdGroupMap: $channeledAdGroupMap,
+                                    channeledAdMap: $channeledAdMap,
+                                    jobId: $jobId,
+                                );
                             } else {
                                 $logger->info("Skipping Ad metrics for ad account: " . $adAccount['id']);
                             }
@@ -4168,5 +4150,366 @@ class MetricRequests
             ];
         }
         return $dimensionFilterGroups;
+    }
+
+    private static function processCampaignsBulk(
+        FacebookGraphApi $api,
+        EntityManager $manager,
+        ChanneledAccount $channeledAccountEntity,
+        LoggerInterface $logger,
+        ?string $startDate,
+        ?string $endDate,
+        array $channeledCampaignMap,
+        array $campaignMap,
+        ?int $jobId = null
+    ): bool {
+        $campaignPlatformIds = array_keys($channeledCampaignMap['mapReverse']);
+        if (empty($campaignPlatformIds)) {
+            return true;
+        }
+
+        $additionalParams = [];
+        if ($startDate && $endDate) {
+            $additionalParams['time_range'] = ['since' => $startDate, 'until' => $endDate];
+        }
+
+        try {
+            $rows = $api->getCampaignInsightsFromAdAccount(
+                adAccountId: $channeledAccountEntity->getPlatformId(),
+                campaignIds: $campaignPlatformIds,
+                limit: 100,
+                metricBreakdown: [],
+                additionalParams: $additionalParams
+            );
+
+            if (count($rows['data']) === 0) {
+                $logger->info("No bulk rows found for campaigns in Ad Account " . $channeledAccountEntity->getPlatformId());
+                return false;
+            }
+
+            $groupedRows = [];
+            foreach ($rows['data'] as $row) {
+                $groupedRows[$row['campaign_id']][] = $row;
+            }
+
+            $campaignRepository = $manager->getRepository(Campaign::class);
+            $channeledCampaignRepository = $manager->getRepository(ChanneledCampaign::class);
+            $globalAllMetrics = new ArrayCollection();
+
+            foreach ($groupedRows as $campaignPlatformId => $campaignRows) {
+                Helpers::checkJobStatus($jobId);
+                $campaignEntity = $campaignRepository->findOneBy(['campaignId' => $campaignPlatformId]);
+                $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignPlatformId]);
+
+                if (!$campaignEntity || !$channeledCampaignEntity) {
+                    continue;
+                }
+
+                $metrics = FacebookGraphConvert::campaignMetrics(
+                    rows: $campaignRows,
+                    logger: $logger,
+                    channeledAccountEntity: $channeledAccountEntity,
+                    campaignEntity: $campaignEntity,
+                    channeledCampaignEntity: $channeledCampaignEntity,
+                );
+
+                foreach ($metrics as $metric) {
+                    $metric->channeledAccount = $channeledAccountEntity;
+                    $metric->campaign = $campaignEntity;
+                    $metric->channeledCampaign = $channeledCampaignEntity;
+                    $globalAllMetrics->add($metric);
+                }
+            }
+
+            if (count($globalAllMetrics) > 0) {
+                try {
+                    $manager->getConnection()->beginTransaction();
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
+                        campaignMap: $campaignMap,
+                        channeledCampaignMap: $channeledCampaignMap,
+                    );
+                    $metricMap = MetricsProcessor::processMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricConfigMap: $metricConfigMap,
+                    );
+                    $channeledMetricMap = MetricsProcessor::processChanneledMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        logger: $logger,
+                    );
+                    MetricsProcessor::processChanneledMetricDimensions(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        channeledMetricMap: $channeledMetricMap,
+                        logger: $logger,
+                    );
+                    $manager->getConnection()->commit();
+                } catch (Exception $e) {
+                    if ($manager->getConnection()->isTransactionActive()) {
+                        $manager->getConnection()->rollback();
+                    }
+                    throw $e;
+                }
+            }
+            $logger->info("Completed bulk Meta ad account's campaign insights request");
+            return true;
+        } catch (Exception $e) {
+            $logger->error("Error during bulk Meta account's campaign insights request: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    private static function processAdsetsBulk(
+        FacebookGraphApi $api,
+        EntityManager $manager,
+        ChanneledAccount $channeledAccountEntity,
+        LoggerInterface $logger,
+        ?string $startDate,
+        ?string $endDate,
+        array $campaignMap,
+        array $channeledCampaignMap,
+        array $channeledAdGroupMap,
+        ?int $jobId = null
+    ): bool {
+        $adsetPlatformIds = array_keys($channeledAdGroupMap['mapCampaign']);
+        if (empty($adsetPlatformIds)) {
+            return true;
+        }
+
+        $additionalParams = [];
+        if ($startDate && $endDate) {
+            $additionalParams['time_range'] = ['since' => $startDate, 'until' => $endDate];
+        }
+
+        try {
+            $rows = $api->getAdsetInsightsFromAdAccount(
+                adAccountId: $channeledAccountEntity->getPlatformId(),
+                adsetIds: $adsetPlatformIds,
+                limit: 100,
+                metricBreakdown: [],
+                additionalParams: $additionalParams
+            );
+
+            if (count($rows['data']) === 0) {
+                $logger->info("No bulk rows found for adsets in Ad Account " . $channeledAccountEntity->getPlatformId());
+                return false;
+            }
+
+            $groupedRows = [];
+            foreach ($rows['data'] as $row) {
+                $groupedRows[$row['adset_id']][] = $row;
+            }
+
+            $campaignRepository = $manager->getRepository(Campaign::class);
+            $channeledCampaignRepository = $manager->getRepository(ChanneledCampaign::class);
+            $channeledAdGroupRepository = $manager->getRepository(ChanneledAdGroup::class);
+            $globalAllMetrics = new ArrayCollection();
+
+            foreach ($groupedRows as $adsetPlatformId => $adsetRows) {
+                Helpers::checkJobStatus($jobId);
+                $campaignId = $channeledAdGroupMap['mapCampaign'][$adsetPlatformId];
+                $campaignEntity = $campaignRepository->findOneBy(['campaignId' => $campaignId]);
+                $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignId]);
+                $channeledAdGroupEntity = $channeledAdGroupRepository->findOneBy(['platformId' => $adsetPlatformId]);
+
+                if (!$campaignEntity || !$channeledCampaignEntity || !$channeledAdGroupEntity) {
+                    continue;
+                }
+
+                $metrics = FacebookGraphConvert::adsetMetrics(
+                    rows: $adsetRows,
+                    logger: $logger,
+                    channeledAccountEntity: $channeledAccountEntity,
+                    campaignEntity: $campaignEntity,
+                    channeledCampaignEntity: $channeledCampaignEntity,
+                    channeledAdGroupEntity: $channeledAdGroupEntity,
+                );
+
+                foreach ($metrics as $metric) {
+                    $metric->channeledAccount = $channeledAccountEntity;
+                    $metric->campaign = $campaignEntity;
+                    $metric->channeledCampaign = $channeledCampaignEntity;
+                    $metric->channeledAdGroup = $channeledAdGroupEntity;
+                    $globalAllMetrics->add($metric);
+                }
+            }
+
+            if (count($globalAllMetrics) > 0) {
+                try {
+                    $manager->getConnection()->beginTransaction();
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
+                        campaignMap: $campaignMap,
+                        channeledCampaignMap: $channeledCampaignMap,
+                        channeledAdGroupMap: $channeledAdGroupMap,
+                    );
+                    $metricMap = MetricsProcessor::processMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricConfigMap: $metricConfigMap,
+                    );
+                    $channeledMetricMap = MetricsProcessor::processChanneledMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        logger: $logger,
+                    );
+                    MetricsProcessor::processChanneledMetricDimensions(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        channeledMetricMap: $channeledMetricMap,
+                        logger: $logger,
+                    );
+                    $manager->getConnection()->commit();
+                } catch (Exception $e) {
+                    if ($manager->getConnection()->isTransactionActive()) {
+                        $manager->getConnection()->rollback();
+                    }
+                    throw $e;
+                }
+            }
+            $logger->info("Completed bulk Meta ad account's adset insights request");
+            return true;
+        } catch (Exception $e) {
+            $logger->error("Error during bulk Meta account's adset insights request: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    private static function processAdsBulk(
+        FacebookGraphApi $api,
+        EntityManager $manager,
+        ChanneledAccount $channeledAccountEntity,
+        LoggerInterface $logger,
+        ?string $startDate,
+        ?string $endDate,
+        array $campaignMap,
+        array $channeledCampaignMap,
+        array $channeledAdGroupMap,
+        array $channeledAdMap,
+        ?int $jobId = null
+    ): bool {
+        $adPlatformIds = array_keys($channeledAdMap['mapAdGroup']);
+        if (empty($adPlatformIds)) {
+            return true;
+        }
+
+        $additionalParams = [];
+        if ($startDate && $endDate) {
+            $additionalParams['time_range'] = ['since' => $startDate, 'until' => $endDate];
+        }
+
+        try {
+            $rows = $api->getAdInsightsFromAdAccount(
+                adAccountId: $channeledAccountEntity->getPlatformId(),
+                adIds: $adPlatformIds,
+                limit: 100,
+                metricBreakdown: [],
+                additionalParams: $additionalParams
+            );
+
+            if (count($rows['data']) === 0) {
+                $logger->info("No bulk rows found for ads in Ad Account " . $channeledAccountEntity->getPlatformId());
+                return false;
+            }
+
+            $groupedRows = [];
+            foreach ($rows['data'] as $row) {
+                $groupedRows[$row['ad_id']][] = $row;
+            }
+
+            $campaignRepository = $manager->getRepository(Campaign::class);
+            $channeledCampaignRepository = $manager->getRepository(ChanneledCampaign::class);
+            $channeledAdGroupRepository = $manager->getRepository(ChanneledAdGroup::class);
+            $channeledAdRepository = $manager->getRepository(ChanneledAd::class);
+            $globalAllMetrics = new ArrayCollection();
+
+            foreach ($groupedRows as $adPlatformId => $adRows) {
+                Helpers::checkJobStatus($jobId);
+                $campaignId = $channeledAdMap['mapCampaign'][$adPlatformId];
+                $adGroupId = $channeledAdMap['mapAdGroup'][$adPlatformId];
+                
+                $campaignEntity = $campaignRepository->findOneBy(['campaignId' => $campaignId]);
+                $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignId]);
+                $channeledAdGroupEntity = $channeledAdGroupRepository->findOneBy(['platformId' => $adGroupId]);
+                $channeledAdEntity = $channeledAdRepository->findOneBy(['platformId' => $adPlatformId]);
+
+                if (!$campaignEntity || !$channeledCampaignEntity || !$channeledAdGroupEntity || !$channeledAdEntity) {
+                    continue;
+                }
+
+                $metrics = FacebookGraphConvert::adMetrics(
+                    rows: $adRows,
+                    logger: $logger,
+                    channeledAccountEntity: $channeledAccountEntity,
+                    campaignEntity: $campaignEntity,
+                    channeledCampaignEntity: $channeledCampaignEntity,
+                    channeledAdGroupEntity: $channeledAdGroupEntity,
+                    channeledAdEntity: $channeledAdEntity,
+                );
+
+                foreach ($metrics as $metric) {
+                    $metric->channeledAccount = $channeledAccountEntity;
+                    $metric->campaign = $campaignEntity;
+                    $metric->channeledCampaign = $channeledCampaignEntity;
+                    $metric->channeledAdGroup = $channeledAdGroupEntity;
+                    $metric->channeledAd = $channeledAdEntity;
+                    $globalAllMetrics->add($metric);
+                }
+            }
+
+            if (count($globalAllMetrics) > 0) {
+                try {
+                    $manager->getConnection()->beginTransaction();
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
+                        campaignMap: $campaignMap,
+                        channeledCampaignMap: $channeledCampaignMap,
+                        channeledAdGroupMap: $channeledAdGroupMap,
+                        channeledAdMap: $channeledAdMap,
+                    );
+                    $metricMap = MetricsProcessor::processMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricConfigMap: $metricConfigMap,
+                    );
+                    $channeledMetricMap = MetricsProcessor::processChanneledMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        logger: $logger,
+                    );
+                    MetricsProcessor::processChanneledMetricDimensions(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        channeledMetricMap: $channeledMetricMap,
+                        logger: $logger,
+                    );
+                    $manager->getConnection()->commit();
+                } catch (Exception $e) {
+                    if ($manager->getConnection()->isTransactionActive()) {
+                        $manager->getConnection()->rollback();
+                    }
+                    throw $e;
+                }
+            }
+            $logger->info("Completed bulk Meta ad account's ad insights request");
+            return true;
+        } catch (Exception $e) {
+            $logger->error("Error during bulk Meta account's ad insights request: " . $e->getMessage());
+            throw $e;
+        }
     }
 }

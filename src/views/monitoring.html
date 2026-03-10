@@ -466,11 +466,11 @@
             border-top: 1px solid var(--border);
         }
 
-        .accordion-item.active .accordion-content {
+        .accordion-item.active > .accordion-content {
             display: block;
         }
 
-        .accordion-item.active .chevron {
+        .accordion-item.active > .accordion-header .chevron {
             transform: rotate(90deg);
         }
 
@@ -670,8 +670,8 @@
                         <div class="status-badge status-online">Active</div>
                     </div>
                     <div class="container-meta">
-                        <div class="meta-item"><i data-lucide="hash"></i>Port: ${c.port}</div>
-                        <div class="meta-item"><i data-lucide="tag"></i>Src: ${c.source}</div>
+                        <div class="meta-item"><i data-lucide="hash" style="width: 1em; height: 1em;"></i>Port: ${c.port}</div>
+                        <div class="meta-item"><i data-lucide="tag" style="width: 1em; height: 1em;"></i>Src: ${c.source}</div>
                     </div>
                     <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
                         <span class="spec-label" style="font-size: 0.65rem;">Instance Job Stats</span>
@@ -744,6 +744,18 @@
                     break;
             }
 
+            let execTime = 'N/A';
+            if (j.created_at && j.created_at !== 'N/A' && j.updated_at && j.updated_at !== 'N/A') {
+                const start = new Date(j.created_at.replace(' ', 'T'));
+                const end = new Date(j.updated_at.replace(' ', 'T'));
+                const diffSec = Math.floor((end - start) / 1000);
+                if (diffSec >= 0) {
+                    if (diffSec < 60) execTime = `${diffSec}s`;
+                    else if (diffSec < 3600) execTime = `${Math.floor(diffSec / 60)}m ${diffSec % 60}s`;
+                    else execTime = `${Math.floor(diffSec / 3600)}h ${Math.floor((diffSec % 3600) / 60)}m`;
+                }
+            }
+
             return `
                 <div class="job-card" style="${!isLatest ? 'opacity: 0.6; transform: scale(0.98); border-style: dashed;' : ''}">
                     <div class="job-card-header">
@@ -762,8 +774,16 @@
                             <span class="spec-value" style="color: var(--primary);">${j.frequency}</span>
                         </div>
                         <div class="spec-item">
-                            <span class="spec-label">Scheduled Date</span>
+                            <span class="spec-label">Created At</span>
                             <span class="spec-value">${j.created_at}</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">Execution Time</span>
+                            <span class="spec-value">${execTime}</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">Updated At</span>
+                            <span class="spec-value">${j.updated_at}</span>
                         </div>
                     </div>
                     <div style="margin-top: 15px;">
@@ -774,7 +794,7 @@
                         ${actionButtons}
                     </div>` : `
                     <div style="font-size: 0.75rem; color: var(--text-dim); display: flex; justify-content: space-between; align-items: center;">
-                        <span>Ran on: ${j.created_at}</span>
+                        <span>Created: ${j.created_at} | Updated: ${j.updated_at} | Exec: ${execTime}</span>
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <span style="font-family: 'Fira Code'">${statusLabel || 'ARCHIVED'}</span>
                             <div class="job-actions" style="margin-top: 0; border: none; padding: 0;">
@@ -830,7 +850,18 @@
                     </div>
                     <div class="accordion-content">
                         ${createJobCardHtml(latest, true)}
-                        ${history.map(hj => createJobCardHtml(hj, false)).join('')}
+                        ${history.length > 0 ? `
+                        <div class="accordion-item" style="border: 1px dashed var(--border); border-radius: 8px; margin-top: 10px;">
+                            <div class="accordion-header" onclick="this.parentElement.classList.toggle('active')" style="padding: 8px 15px; min-height: unset; background: transparent;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i data-lucide="chevron-right" class="chevron" style="width:14px; height:14px"></i>
+                                    <span style="font-size: 0.75rem; color: var(--text-dim);">Historical Executions (${history.length})</span>
+                                </div>
+                            </div>
+                            <div class="accordion-content" style="padding: 10px 15px; border-top: 1px dashed var(--border);">
+                                ${history.map(hj => createJobCardHtml(hj, false)).join('')}
+                            </div>
+                        </div>` : ''}
                     </div>
                 `;
                 list.appendChild(accordionItem);

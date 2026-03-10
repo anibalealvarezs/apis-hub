@@ -91,7 +91,7 @@ class MonitoringController extends BaseController
             if (!$targetId) continue;
 
             if (!isset($groupedJobs[$targetId])) $groupedJobs[$targetId] = [];
-            if (count($groupedJobs[$targetId]) >= 3) continue;
+            if (count($groupedJobs[$targetId]) >= 6) continue;
 
             $payload = $job->getPayload() ?? [];
             $params = $payload['params'] ?? [];
@@ -111,7 +111,8 @@ class MonitoringController extends BaseController
                 'status' => $job->getStatus(),
                 'params' => $params,
                 'frequency' => $frequency,
-                'created_at' => $job->getCreatedAt() ? $job->getCreatedAt()->format('Y-m-d H:i:s') : 'N/A'
+                'created_at' => $job->getCreatedAt() ? $job->getCreatedAt()->format('Y-m-d H:i:s') : 'N/A',
+                'updated_at' => $job->getUpdatedAt() ? $job->getUpdatedAt()->format('Y-m-d H:i:s') : 'N/A'
             ];
         }
 
@@ -160,6 +161,9 @@ class MonitoringController extends BaseController
         try {
             switch ($action) {
                 case 'retry':
+                    if ($job->getStatus() === JobStatus::processing->value) {
+                        return new JsonResponse(['error' => 'Cannot re-schedule a job that is already processing to avoid overlap.'], 400);
+                    }
                     $newJobData = [
                         'channel' => $job->getChannel(),
                         'entity' => $job->getEntity(),

@@ -49,9 +49,9 @@ foreach ($envVars as $k => $v) {
 foreach ($instances as $instance) {
     $channel = $instance['channel'] ?? null;
     $entity = $instance['entity'] ?? null;
-    $frequency = $instance['frequency'] ?? '0 * * * *'; // Default to hourly
+    $frequency = $instance['frequency'] ?? null;
     
-    if (!$channel || !$entity) continue;
+    if (!$channel || !$entity || !$frequency) continue;
 
     $params = [];
     if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];
