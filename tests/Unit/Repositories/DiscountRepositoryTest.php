@@ -88,7 +88,6 @@ class DiscountRepositoryTest extends TestCase
         $this->queryBuilder->expects($this->exactly(2))
             ->method('leftJoin')
             ->willReturnCallback(function (...$args) use (&$leftJoinCallCount) {
-                error_log("testCreateBaseQueryBuilderSelect: leftJoin call #$leftJoinCallCount with args=" . json_encode($args));
                 $leftJoinCallCount++;
                 return $this->queryBuilder;
             });
@@ -128,7 +127,6 @@ class DiscountRepositoryTest extends TestCase
         $this->queryBuilder->expects($this->exactly(2))
             ->method('leftJoin')
             ->willReturnCallback(function (...$args) use (&$leftJoinCallCount) {
-                error_log("testCreateBaseQueryBuilderCount: leftJoin call #$leftJoinCallCount with args=" . json_encode($args));
                 $leftJoinCallCount++;
                 return $this->queryBuilder;
             });

@@ -57,7 +57,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->__invoke($entity, $channel, $method);
 
         if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-            error_log("testInvokeReturnsErrorForInvalidEntity: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
@@ -83,7 +82,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->__invoke($entity, $channel, $method);
 
         if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-            error_log("testInvokeReturnsErrorForInvalidChannel: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
@@ -115,7 +113,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->__invoke($entity, $channel, $method);
 
         if ($response->getStatusCode() !== Response::HTTP_FORBIDDEN) {
-            error_log("testInvokeReturnsErrorForDisabledChannel: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_FORBIDDEN, $response->getStatusCode());
@@ -180,7 +177,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->__invoke($entity, $channel, $method, $id);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testInvokeRoutesToReadMethod: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -213,7 +209,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->__invoke($entity, $channel, $method);
 
         if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-            error_log("testInvokeReturnsErrorForInvalidMethod: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
@@ -232,7 +227,9 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $filters = (object) ['key' => 'value', 'channel' => $channel->value];
         $expected = [
             'extra' => 'param',
-            'filters' => $filters
+            'filters' => $filters,
+            'limit' => 100,
+            'pagination' => 0
         ];
 
         $this->controller->setMockEntitiesConfig([
@@ -319,7 +316,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->read($entity, $channel, $id);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testReadReturnsCachedData: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -378,7 +374,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->read($entity, $channel, $id);
 
         if ($response->getStatusCode() !== Response::HTTP_INTERNAL_SERVER_ERROR) {
-            error_log("testReadHandlesException: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
@@ -439,7 +434,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->count($entity, $channel, $body, $params);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testCountReturnsCount: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -562,7 +556,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->list($entity, $channel, $body, $params);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testListReturnsData: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -626,11 +619,9 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->create($entity, $channel, $body);
 
         if ($response->getStatusCode() !== Response::HTTP_CREATED) {
-            error_log("testCreateReturnsCreatedEntity: Response content: " . $response->getContent());
         }
 
         if ($response->getStatusCode() !== Response::HTTP_CREATED) {
-            error_log("testCreateReturnsCreatedEntity: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_CREATED, $response->getStatusCode());
@@ -671,7 +662,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->create($entity, $channel, $body);
 
         if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-            error_log("testCreateReturnsErrorForInvalidData: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
@@ -735,7 +725,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->update($entity, $channel, $id, $body);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testUpdateReturnsUpdatedEntity: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -762,7 +751,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->update($entity, $channel, null, $body);
 
         if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-            error_log("testUpdateReturnsErrorForMissingId: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
@@ -807,7 +795,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->delete($entity, $channel, $id);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testDeleteReturnsSuccess: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -833,7 +820,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->delete($entity, $channel);
 
         if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-            error_log("testDeleteReturnsErrorForMissingId: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
@@ -932,7 +918,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->__invoke($entity, $channel, $method, $id);
 
         if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-            error_log("testReadReturnsErrorForNullId: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());

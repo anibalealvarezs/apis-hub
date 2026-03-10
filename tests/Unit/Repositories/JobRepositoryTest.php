@@ -45,12 +45,10 @@ class JobRepositoryTest extends TestCase
 
         $entityManager->method('createQueryBuilder')
             ->willReturnCallback(function () {
-                error_log("Mocked EntityManager::createQueryBuilder");
                 return $this->queryBuilder;
             });
 
         $this->queryBuilder->method('select')->willReturnCallback(function ($alias) {
-            error_log("Mocked QueryBuilder::select with alias=$alias");
             return $this->queryBuilder;
         });
         $this->queryBuilder->method('from')->willReturnSelf();
@@ -79,13 +77,11 @@ class JobRepositoryTest extends TestCase
 
         $this->repository->method('getStatusName')
             ->willReturnCallback(function (int $status) {
-                error_log("Mocked getStatusName with status=$status");
                 return JobStatus::from($status)->getName();
             });
         $this->repository->method('create')
             ->willReturnCallback(function (?stdClass $data = null, bool $returnEntity = false) {
                 /** @var stdClass $data */
-                error_log("Mocked create with data=" . json_encode($data));
                 if (!isset($data->entity) || !$data->entity) {
                     throw new InvalidArgumentException('Entity is required');
                 }
@@ -103,7 +99,6 @@ class JobRepositoryTest extends TestCase
         $this->repository->method('update')
             ->willReturnCallback(function ($id, ?stdClass $data = null) {
                 /** @var stdClass $data */
-                error_log("Mocked update with id=$id, data=" . json_encode($data));
                 if (!isset($data->status) || !$data->status) {
                     return ['id' => $id];
                 }
@@ -281,7 +276,6 @@ class JobRepositoryTest extends TestCase
         $this->queryBuilder->expects($this->exactly(3))
             ->method('setParameter')
             ->with($this->callback(function ($key) use (&$setParameterCallCount, $ids) {
-                error_log("testBuildReadMultipleQuery: setParameter call #$setParameterCallCount with key=" . json_encode($key));
                 $expected = $setParameterCallCount === 0 ? ['ids', $ids] : (
                     $setParameterCallCount === 1 ? ['status', JobStatus::scheduled->value] : ['entity', 'order']
                 );
@@ -343,7 +337,7 @@ class JobRepositoryTest extends TestCase
             ->with($this->callback(function ($condition) {
                 return in_array($condition, [
                     'e.channel = :ctx_channel',
-                    'e.entity = :ctx_entity',
+                    'e.entity IN (:ctx_entities)',
                     '(e.payload LIKE :ctx_start_pattern1 OR e.payload LIKE :ctx_start_pattern2)',
                     '(e.payload LIKE :ctx_end_pattern1 OR e.payload LIKE :ctx_end_pattern2)'
                 ]);

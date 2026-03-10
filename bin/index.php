@@ -20,13 +20,13 @@ $app->multiMap($cacheRoutes);
 $crudRoutes = require_once __DIR__ . "/../src/Routes/crud.php";
 $app->multiMap($crudRoutes);
 
-// Channeled CRUD routes next
-$cacheRoutes = require_once __DIR__ . "/../src/Routes/channeledcrud.php";
-$app->multiMap($cacheRoutes);
-
 // Page routes next
 $pageRoutes = require_once __DIR__ . "/../src/Routes/page.php";
 $app->multiMap($pageRoutes);
+
+// Channeled CRUD routes next
+$channeledRoutes = require_once __DIR__ . "/../src/Routes/channeledcrud.php";
+$app->multiMap($channeledRoutes);
 
 try {
     $response = $app->handle($request);

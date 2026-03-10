@@ -373,10 +373,6 @@ class MetricRepository extends BaseRepository
 
             $query = $qb->setMaxResults(1)->getQuery();
 
-            $dql = $query->getDQL();
-            error_log("findByChannelAndDimensions DQL: $dql");
-            error_log("findByChannelAndDimensions Parameters: " . json_encode($query->getParameters()->toArray()));
-
             $result = $query->getOneOrNullResult();
 
             if ($result && $result->getPage() && !$result->getPage()->getId()) {
@@ -384,7 +380,7 @@ class MetricRepository extends BaseRepository
                 return null; // Invalidate result
             }
 
-            error_log("findByChannelAndDimensions: name=$name, channel=$channel, query_id=" . ($queryEntity ? $queryEntity->getId() : 'null') . ", page_id=" . ($page ? $page->getId() : 'null') . ", country_id=" . ($country ? $country->getId() : 'null') . ", device_id=" . ($device ? $device->getId() : 'null') . ", dimensions=" . json_encode($dimensions) . ", result=" . ($result ? 'found' : 'null'));
+
 
             return $result;
         } catch (Exception $e) {

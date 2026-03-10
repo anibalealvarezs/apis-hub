@@ -56,6 +56,16 @@ class Helpers
         }
         return self::$projectConfig;
     }
+
+    /**
+     * @return void
+     */
+    public static function applyTimezone(): void
+    {
+        $config = self::getProjectConfig();
+        $timezone = $config['timezone'] ?? 'UTC';
+        date_default_timezone_set($timezone);
+    }
     /**
      * @return array
      */
@@ -404,7 +414,7 @@ class Helpers
      * @return array
      * @throws ReflectionException
      */
-    public static function jsonSerialize(Entity $entity, array $fields = null): array
+    public static function jsonSerialize(Entity $entity, ?array $fields = null): array
     {
         $reflect = new ReflectionClass($entity);
         $props = $reflect->getProperties(ReflectionProperty::IS_STATIC | ReflectionProperty::IS_PUBLIC | ReflectionProperty::IS_PROTECTED | ReflectionProperty::IS_PRIVATE);
@@ -441,7 +451,7 @@ class Helpers
      * @param string|null $data
      * @return object
      */
-    public static function dataToObject(string $data = null): object
+    public static function dataToObject(?string $data = null): object
     {
         if ($data) {
             return json_decode(base64_decode($data));
@@ -453,7 +463,7 @@ class Helpers
      * @param string|null $data
      * @return object
      */
-    public static function bodyToObject(string $data = null): object
+    public static function bodyToObject(?string $data = null): object
     {
         if ($data) {
             return json_decode($data);
@@ -550,8 +560,8 @@ class Helpers
             ->getQuery()
             ->getSingleScalarResult();
 
-        if ($status == \Enums\JobStatus::failed->value) {
-            throw new \Exceptions\JobCancelledException("El Job #{$jobId} fue interrumpido manualmente.");
+        if ($status == \Enums\JobStatus::failed->value || $status == \Enums\JobStatus::cancelled->value) {
+            throw new \Exceptions\JobCancelledException("El Job #{$jobId} fue interrumpido o cancelado manualmente.");
         }
     }
 }

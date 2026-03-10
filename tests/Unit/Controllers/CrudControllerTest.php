@@ -54,7 +54,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->__invoke($entity, $method);
 
         if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-            error_log("testInvokeReturnsErrorForInvalidEntity: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
@@ -110,7 +109,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->__invoke($entity, $method, $id);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testInvokeRoutesToReadMethod: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -134,7 +132,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->__invoke($entity, $method);
 
         if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-            error_log("testInvokeReturnsErrorForInvalidMethod: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
@@ -239,7 +236,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->read($entity, $id);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testReadReturnsCachedData: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -292,7 +288,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->read($entity, $id);
 
         if ($response->getStatusCode() !== Response::HTTP_INTERNAL_SERVER_ERROR) {
-            error_log("testReadHandlesException: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
@@ -331,7 +326,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->count($entity, $body, $params);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testCountReturnsCount: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -401,7 +395,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->list($entity, $body, $params);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testListReturnsData: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -500,7 +493,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->create($entity, $body);
 
         if ($response->getStatusCode() !== Response::HTTP_CREATED) {
-            error_log("testCreateReturnsCreatedEntity: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_CREATED, $response->getStatusCode());
@@ -539,7 +531,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->create($entity, $body);
 
         if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-            error_log("testCreateReturnsErrorForInvalidData: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
@@ -587,11 +578,9 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->update($entity, $id, $body);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testUpdateReturnsUpdatedEntity: Response content: " . $response->getContent());
         }
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testUpdateReturnsUpdatedEntity: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -614,7 +603,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->update($entity, null, $body);
 
         if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-            error_log("testUpdateReturnsErrorForMissingId: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
@@ -657,7 +645,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->delete($entity, $id);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testDeleteReturnsSuccess: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
@@ -679,7 +666,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->delete($entity);
 
         if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-            error_log("testDeleteReturnsErrorForMissingId: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
@@ -783,7 +769,6 @@ class CrudControllerTest extends BaseUnitTestCase
         $response = $this->controller->__invoke($entity, $method, $id);
 
         if ($response->getStatusCode() !== Response::HTTP_OK) {
-            error_log("testInvokeReadJobBypassesCache: Response content: " . $response->getContent());
         }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());

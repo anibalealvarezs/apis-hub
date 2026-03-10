@@ -14,6 +14,10 @@
 # used as Docker image/container prefix (e.g. alimentos-bahia)
 project: my-project
 
+# Global timezone for workers and database logs
+# Supports environment variable: APP_TIMEZONE
+timezone: ${APP_TIMEZONE:-UTC}
+
 # ── Database ─────────────────────────────────────────────────────────────────
 # The application uses APP_ENV to switch between 'testing' and 'production'.
 # Defaults to 'testing' if APP_ENV is not set.
@@ -21,11 +25,11 @@ database:
   # Configuration for local development and test execution
   testing:
     driver: pdo_mysql
-    host: ${DB_HOST:-host.docker.internal}
+    host: ${DB_HOST:-127.0.0.1}
     port: 3306
     user: root
-    password: YOUR_LOCAL_PASSWORD
-    name: ${DB_NAME:-apis-hub-testing}
+    password: ${DB_PASSWORD:-NoEntiendo2321}
+    name: ${DB_NAME:-apis-hub-3}
 
   # Configuration for production (e.g. Docker container networking)
   production:

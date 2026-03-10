@@ -131,13 +131,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "80e2fadafff7bcd7b105556dcdddb4dd172c6021"
+                "reference": "dc155a9eb20b6296b639ff4f32cc24d652fec806"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-80e2fadafff7bcd7b105556dcdddb4dd172c6021-zip-5b1320.zip",
-                "reference": "80e2fadafff7bcd7b105556dcdddb4dd172c6021",
-                "shasum": "550fc0400ea59a2ef367cf5392f173ef72b8e7ce"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-dc155a9eb20b6296b639ff4f32cc24d652fec806-zip-190139.zip",
+                "reference": "dc155a9eb20b6296b639ff4f32cc24d652fec806",
+                "shasum": "d1df96e8c830aca260f6ada4684bf4b12561eb51"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -188,7 +188,7 @@
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-08T02:10:23+00:00"
+            "time": "2026-03-09T13:57:20+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -7684,12 +7684,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/process.git",
-                "reference": "608476f4604102976d687c483ac63a79ba18cc97"
+                "reference": "95b070ee7180a0d49d48786fccf3b935c01d6f3b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/process/zipball/608476f4604102976d687c483ac63a79ba18cc97",
-                "reference": "608476f4604102976d687c483ac63a79ba18cc97",
+                "url": "https://api.github.com/repos/symfony/process/zipball/95b070ee7180a0d49d48786fccf3b935c01d6f3b",
+                "reference": "95b070ee7180a0d49d48786fccf3b935c01d6f3b",
                 "shasum": ""
             },
             "require": {
@@ -7741,7 +7741,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-01-26T15:07:59+00:00"
+            "time": "2026-03-08T22:25:36+00:00"
         },
         {
             "name": "theseer/tokenizer",
@@ -7847,8 +7847,8 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
-        "anibalealvarezs/api-client-skeleton": 20,
         "anibalealvarezs/amazon-api": 20,
+        "anibalealvarezs/api-client-skeleton": 20,
         "anibalealvarezs/facebook-graph-api": 20,
         "anibalealvarezs/google-api": 20,
         "anibalealvarezs/klaviyo-api": 20,
@@ -7856,10 +7856,10 @@
         "anibalealvarezs/netsuite-api": 20,
         "anibalealvarezs/shopify-api": 20,
         "anibalealvarezs/triple-whale-api": 20,
-        "symfony/redis-messenger": 20,
-        "symfony/cache-contracts": 20,
+        "mikey179/vfsstream": 20,
         "predis/predis": 20,
-        "mikey179/vfsstream": 20
+        "symfony/cache-contracts": 20,
+        "symfony/redis-messenger": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
@@ -7867,6 +7867,6 @@
         "php": ">=8.1",
         "ext-json": "*"
     },
-    "platform-dev": [],
-    "plugin-api-version": "2.3.0"
+    "platform-dev": {},
+    "plugin-api-version": "2.9.0"
 }
