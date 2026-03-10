@@ -834,13 +834,25 @@
                 const history = jobsArr.slice(1);
                 totalSampling += jobsArr.length;
 
+                let sColor = 'var(--warning)'; 
+                let sIcon = 'clock';
+                switch(parseInt(latest.status)) {
+                    case 1: sColor = 'var(--warning)'; sIcon = 'clock'; break;
+                    case 2: sColor = 'var(--primary)'; sIcon = 'play-circle'; break;
+                    case 3: sColor = 'var(--secondary)'; sIcon = 'check-circle'; break;
+                    case 4: sColor = 'var(--danger)'; sIcon = 'alert-circle'; break;
+                    case 5: sColor = '#6e7681'; sIcon = 'history'; break;
+                    case 6: sColor = '#babbbd'; sIcon = 'circle-slash'; break;
+                }
+
                 const accordionItem = document.createElement('div');
-                accordionItem.className = 'accordion-item active'; // Default open
+                accordionItem.className = 'accordion-item'; // Default collapsed
                 
                 accordionItem.innerHTML = `
                     <div class="accordion-header" onclick="this.parentElement.classList.toggle('active')">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <i data-lucide="chevron-right" class="chevron"></i>
+                            <i data-lucide="${sIcon}" style="color: ${sColor}; width: 18px; height: 18px;" title="Latest Status"></i>
                             <span style="font-weight: 600; font-size: 0.9rem;">${targetId.toUpperCase()}</span>
                             <span class="job-id-pill" style="font-size: 0.6rem">#${latest.id}</span>
                         </div>
