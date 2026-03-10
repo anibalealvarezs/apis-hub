@@ -24,6 +24,11 @@
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        .nav-link.active {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
         html {
             box-sizing: border-box;
             overflow: -moz-scrollbars-vertical;
@@ -187,9 +192,10 @@
             APIs Hub <span>Documentation</span>
         </a>
         <nav class="nav-links">
+            <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
             <a href="/monitoring" class="nav-link"><i data-lucide="activity"></i> Monitoring</a>
             <a href="/command-builder" class="nav-link"><i data-lucide="terminal"></i> Builder</a>
-            <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
+            <a href="/docs" class="nav-link active"><i data-lucide="book"></i> API Docs</a>
         </nav>
     </header>
 

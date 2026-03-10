@@ -91,6 +91,7 @@ Navigate to `/monitoring` in your browser. You will see a list of all active con
 ### Data Integrity (History)
 
 The dashboard follows a **Forensic Preservation** policy:
+
 - Manual actions like "Retry" or "Re-schedule" do **not** overwrite the original job record. Instead, they create a brand new entry, preserving the status and logs of the previous attempt for auditing.
 - No jobs are physically deleted from the database via the dashboard; they are only deactivated and moved to a terminal state.
 

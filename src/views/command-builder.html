@@ -23,6 +23,11 @@
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        .nav-link.active {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
         footer {
             padding: 40px;
             border-top: 1px solid var(--border);
@@ -573,9 +578,10 @@
             APIs Hub <span>Command Builder</span>
         </a>
         <nav class="nav-links">
-            <a href="/monitoring" class="nav-link"><i data-lucide="activity"></i> Monitoring</a>
-            <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
             <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
+            <a href="/monitoring" class="nav-link"><i data-lucide="activity"></i> Monitoring</a>
+            <a href="/command-builder" class="nav-link active"><i data-lucide="terminal"></i> Builder</a>
+            <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
         </nav>
     </header>
 

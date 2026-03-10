@@ -95,6 +95,11 @@
             gap: 8px;
         }
 
+        .nav-link.active {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
         .nav-link:hover {
             color: var(--primary);
         }
@@ -547,9 +552,10 @@
             Last updated: <span id="last-updated">...</span>
         </div>
         <nav class="nav-links">
+            <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
+            <a href="/monitoring" class="nav-link active"><i data-lucide="activity"></i> Monitoring</a>
             <a href="/command-builder" class="nav-link"><i data-lucide="terminal"></i> Builder</a>
             <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
-            <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
         </nav>
     </header>
 
@@ -886,6 +892,14 @@
 
         fetchData();
         setInterval(fetchData, 30000);
+    </script>
+
+    <footer>
+        <p>&copy; 2026 APIs Hub Central. Developed by <a href="https://anibalalvarez.com" target="_blank" class="subtle-link">Aníbal Álvarez</a>.</p>
+    </footer>
+
+    <script>
+        lucide.createIcons();
     </script>
 </body>
 </html>
