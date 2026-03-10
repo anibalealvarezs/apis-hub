@@ -5,6 +5,9 @@ use Doctrine\ORM\Exception\ORMException;
 
 require_once __DIR__ . "/../vendor/autoload.php";
 
+// Set timezone from config
+Helpers::applyTimezone();
+
 // Return the entity manager
 // return Helpers::getSingletonManager();
 try {

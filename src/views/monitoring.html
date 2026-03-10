@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APIs Hub | Monitoring Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0c10;
+            --bg-card: rgba(22, 27, 34, 0.7);
+            --bg-accent: #21262d;
+            --primary: #58a6ff;
+            --primary-glow: rgba(88, 166, 255, 0.3);
+            --secondary: #238636;
+            --danger: #f85149;
+            --warning: #d29922;
+            --info: #3fb950;
+            --text-main: #c9d1d9;
+            --text-dim: #8b949e;
+            --border: rgba(48, 54, 61, 0.8);
+            --header-h: 70px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(88, 166, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(35, 134, 54, 0.05) 0%, transparent 40%);
+            min-height: 100vh;
+        }
+
+        header {
+            height: var(--header-h);
+            background: rgba(13, 17, 23, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .logo i {
+            color: var(--primary);
+        }
+
+        .logo span {
+            color: var(--text-dim);
+            font-weight: 400;
+            margin-left: 5px;
+            font-size: 0.9rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .nav-link {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link:hover {
+            color: var(--primary);
+        }
+
+        main {
+            padding: calc(var(--header-h) + 40px) 40px 40px 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1.8fr 1.2fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 1100px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            margin-bottom: 30px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #f0f6fc;
+        }
+
+        .card-title div {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Container Grid */
+        .container-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .container-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .container-item:hover {
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .container-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .container-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .container-id {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+        }
+
+        .status-online {
+            background: rgba(35, 134, 54, 0.15);
+            color: var(--secondary);
+            border: 1px solid rgba(35, 134, 54, 0.3);
+        }
+
+        .status-offline {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+        }
+
+        .container-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .meta-item i {
+            font-size: 0.9rem;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        /* Stats List */
+        .stats-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .stat-value {
+            font-family: 'Fira Code', monospace;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        /* Jobs List Refined */
+        .job-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: var(--transition);
+        }
+
+        .job-card:hover {
+            border-color: var(--warning);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .job-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+        }
+
+        .job-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--warning);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .job-id-pill {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.7rem;
+            background: var(--bg-accent);
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: var(--text-dim);
+        }
+
+        .job-specs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+        }
+
+        .spec-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .spec-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-dim);
+        }
+
+        .spec-value {
+            font-size: 0.85rem;
+            font-family: 'Fira Code', monospace;
+            color: var(--text-main);
+        }
+
+        .job-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            border-top: 1px solid var(--border);
+            padding-top: 15px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: var(--transition);
+            border: 1px solid transparent;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-retry {
+            background: rgba(35, 134, 54, 0.15);
+            color: var(--secondary);
+            border-color: rgba(35, 134, 54, 0.3);
+        }
+
+        .btn-retry:hover {
+            background: var(--secondary);
+            color: #fff;
+        }
+
+        .btn-cancel {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--danger);
+            border-color: rgba(248, 81, 73, 0.3);
+        }
+
+        .btn-cancel:hover {
+            background: var(--danger);
+            color: #fff;
+        }
+
+        .btn-delete {
+            background: var(--bg-accent);
+            color: var(--text-dim);
+            border-color: var(--border);
+        }
+
+        .btn-delete:hover {
+            background: #484f58;
+            color: #fff;
+        }
+
+        .payload-container {
+            margin-top: 10px;
+            background: #0d1117;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 0.75rem;
+            color: var(--info);
+            font-family: 'Fira Code', monospace;
+            border: 1px solid rgba(63, 185, 80, 0.2);
+            overflow-x: auto;
+        }
+
+        /* Loading Animation */
+        .loader {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .refresh-indicator {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Accordion Styles */
+        .accordion-item {
+            margin-bottom: 20px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .accordion-header {
+            padding: 15px 20px;
+            background: var(--bg-accent);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: var(--transition);
+        }
+
+        .accordion-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .accordion-content {
+            display: none;
+            padding: 15px;
+            border-top: 1px solid var(--border);
+        }
+
+        .accordion-item.active .accordion-content {
+            display: block;
+        }
+
+        .accordion-item.active .chevron {
+            transform: rotate(90deg);
+        }
+
+        .chevron {
+            transition: transform 0.3s ease;
+            width: 16px;
+            height: 16px;
+        }
+
+        .btn-process {
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--primary);
+            border-color: rgba(88, 166, 255, 0.3);
+        }
+
+        .btn-process:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--secondary);
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 0 0 rgba(35, 134, 54, 0.7);
+            animation: pulse 2s infinite;
+        }
+
+        .job-mini-stats {
+            display: flex;
+            gap: 12px;
+            margin-top: 5px;
+            flex-wrap: wrap;
+        }
+
+        .mini-badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.75rem;
+            font-family: 'Fira Code', monospace;
+            font-weight: 600;
+        }
+
+        .mini-badge i {
+            width: 12px;
+            height: 12px;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(35, 134, 54, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(35, 134, 54, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(35, 134, 54, 0); }
+        }
+
+        .empty-state {
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="/" class="logo">
+            <i data-lucide="activity"></i>
+            APIs Hub <span>Monitoring</span>
+        </a>
+        <div class="refresh-indicator">
+            <span class="pulse"></span>
+            Last updated: <span id="last-updated">...</span>
+        </div>
+        <nav class="nav-links">
+            <a href="/command-builder" class="nav-link"><i data-lucide="terminal"></i> Builder</a>
+            <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
+            <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
+        </nav>
+    </header>
+
+    <main>
+        <div class="dashboard-grid">
+            <!-- Left Column: Infrastructure & Jobs -->
+            <div class="col">
+                <div class="card">
+                    <h2 class="card-title">
+                        <div><i data-lucide="box"></i> Infrastructure</div>
+                    </h2>
+                    <div class="container-grid" id="container-grid">
+                        <!-- Containers will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 class="card-title">
+                        <div><i data-lucide="database"></i> Records Distribution</div>
+                    </h2>
+                    <div class="container-grid" id="db-totals-grid">
+                        <!-- DB Totals will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Detailed Jobs & System Info -->
+            <div class="col">
+                <div class="card">
+                    <h2 class="card-title">
+                        <div><i data-lucide="clock"></i> Scheduled Job Specifications</div>
+                        <span id="job-count-badge" class="job-id-pill">0 Pending</span>
+                    </h2>
+                    <div id="jobs-detailed-list" style="overflow-y: auto; max-height: 800px; padding-right: 5px;">
+                        <!-- Detailed jobs will be loaded here -->
+                        <div class="empty-state">
+                            <i data-lucide="loader" class="loader"></i>
+                            Fetching latest job specifications...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 0;">
+                    <h2 class="card-title"><div><i data-lucide="info"></i> System Stack</div></h2>
+                    <div class="stats-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="stat-item">
+                            <div class="stat-label">Env</div>
+                            <div class="stat-value">Docker</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Base</div>
+                            <div class="stat-value">PHP 8.3</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Init Lucide
+        lucide.createIcons();
+
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/monitoring/data');
+                const data = await response.json();
+                
+                updateContainers(data.containers);
+                updatePendingJobsDetailed(data.groupedJobs); // Now using groupedJobs
+                updateDbTotals(data.dbTotals);
+                
+                document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Error fetching monitoring data:', error);
+            }
+        }
+
+        function updateContainers(containers) {
+            const grid = document.getElementById('container-grid');
+            grid.innerHTML = '';
+            containers.forEach(c => {
+                const stats = c.stats || {total: 0};
+                const item = document.createElement('div');
+                item.className = 'container-item';
+                
+                let statsHtml = '';
+                if (stats.total > 0) {
+                    statsHtml = `
+                        <div class="job-mini-stats">
+                            ${stats.scheduled ? `<span class="mini-badge" title="Scheduled" style="color: var(--warning)"><i data-lucide="clock"></i> ${stats.scheduled}</span>` : ''}
+                            ${stats.processing ? `<span class="mini-badge" title="Processing" style="color: var(--primary)"><i data-lucide="play"></i> ${stats.processing}</span>` : ''}
+                            ${stats.completed ? `<span class="mini-badge" title="Completed" style="color: var(--secondary)"><i data-lucide="check"></i> ${stats.completed}</span>` : ''}
+                            ${stats.failed ? `<span class="mini-badge" title="Failed" style="color: var(--danger)"><i data-lucide="x-circle"></i> ${stats.failed}</span>` : ''}
+                            ${stats.delayed ? `<span class="mini-badge" title="Delayed" style="color: #6e7681"><i data-lucide="history"></i> ${stats.delayed}</span>` : ''}
+                        </div>
+                    `;
+                } else {
+                    statsHtml = '<div class="job-mini-stats"><span style="color: var(--text-dim); font-size: 0.7rem;">No jobs registered</span></div>';
+                }
+
+                item.innerHTML = `
+                    <div class="container-header">
+                        <div>
+                            <div class="container-name">${c.name}</div>
+                            <div class="container-id">${c.id}</div>
+                        </div>
+                        <div class="status-badge status-online">Active</div>
+                    </div>
+                    <div class="container-meta">
+                        <div class="meta-item"><i data-lucide="hash"></i>Port: ${c.port}</div>
+                        <div class="meta-item"><i data-lucide="tag"></i>Src: ${c.source}</div>
+                    </div>
+                    <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
+                        <span class="spec-label" style="font-size: 0.65rem;">Instance Job Stats</span>
+                        ${statsHtml}
+                    </div>
+                `;
+                grid.appendChild(item);
+            });
+            lucide.createIcons();
+        }
+
+        function createJobCardHtml(j, isLatest) {
+            const paramsStr = JSON.stringify(j.params, null, 2);
+            let actionButtons = '';
+            
+            if (isLatest) {
+                // Force Process (only for scheduled)
+                if (j.status == 1) {
+                    actionButtons += `<button class="btn btn-process" onclick="handleJobAction(${j.id}, 'process', this)" style="background: rgba(88, 166, 255, 0.25); border-color: var(--primary); padding: 8px 16px; font-weight: 700; color: #fff;"><i data-lucide="zap" size="14"></i> Run Process Now</button>`;
+                }
+                
+                // Allow "Discard/Disable" for any non-terminal jobs (Scheduled/Delayed/Processing)
+                if (j.status != 3 && j.status != 4 && j.status != 6) {
+                    actionButtons += `<button class="btn btn-cancel" onclick="handleJobAction(${j.id}, 'cancel', this)" style="margin-left: auto;"><i data-lucide="slash" size="14"></i> Discard Job</button>`;
+                }
+            }
+
+            // Universal "Re-schedule" allowed for all (Latest AND History) EXCEPT if already processing
+            // This creates a NEW job with same params
+            if (j.status != 2) {
+                actionButtons += `<button class="btn btn-retry" onclick="handleJobAction(${j.id}, 'retry', this)" title="Clone and re-schedule this configuration"><i data-lucide="calendar-plus" size="14"></i> ${isLatest ? 'Re-schedule (New Job)' : 'Recycle Config'}</button>`;
+            } else {
+                actionButtons += `<span style="font-size: 0.65rem; color: var(--text-dim); border: 1px dashed var(--border); padding: 5px 10px; border-radius: 6px; display: flex; align-items: center; gap: 5px;"><i data-lucide="lock" size="12"></i> Rescheduling Locked (Running)</span>`;
+            }
+
+            // Status Styles Configuration
+            let statusColor = 'var(--warning)'; 
+            let statusIcon = 'calendar-clock';
+            let statusLabel = '';
+
+            switch(parseInt(j.status)) {
+                case 1: // Scheduled
+                    statusColor = 'var(--warning)';
+                    statusIcon = 'clock';
+                    break;
+                case 2: // Processing
+                    statusColor = 'var(--primary)';
+                    statusIcon = 'play-circle';
+                    statusLabel = 'PROCESSING';
+                    break;
+                case 3: // Completed
+                    statusColor = 'var(--secondary)';
+                    statusIcon = 'check-circle';
+                    statusLabel = 'COMPLETED';
+                    break;
+                case 4: // Failed
+                    statusColor = 'var(--danger)';
+                    statusIcon = 'alert-circle';
+                    statusLabel = 'FAILED';
+                    break;
+                case 5: // Delayed
+                    statusColor = '#6e7681';
+                    statusIcon = 'history';
+                    statusLabel = 'DELAYED';
+                    break;
+                case 6: // Cancelled
+                    statusColor = '#babbbd';
+                    statusIcon = 'circle-slash';
+                    statusLabel = 'CANCELLED';
+                    break;
+            }
+
+            return `
+                <div class="job-card" style="${!isLatest ? 'opacity: 0.6; transform: scale(0.98); border-style: dashed;' : ''}">
+                    <div class="job-card-header">
+                        <div class="job-title" style="color: ${statusColor}">
+                            <i data-lucide="${statusIcon}"></i> 
+                            ${j.channel} &raquo; ${j.entity}
+                            ${statusLabel ? `<span style="font-size: 0.6rem; background: ${statusColor}; color: white; padding: 1px 5px; border-radius: 4px; margin-left: 5px;">${statusLabel}</span>` : ''}
+                            ${!isLatest ? '<span style="font-size: 0.55rem; color: var(--text-dim); margin-left: 5px;">[HISTORY]</span>' : ''}
+                        </div>
+                        <div class="job-id-pill">#${j.id}</div>
+                    </div>
+                    ${isLatest ? `
+                    <div class="job-specs">
+                        <div class="spec-item">
+                            <span class="spec-label">Frequency (Cron)</span>
+                            <span class="spec-value" style="color: var(--primary);">${j.frequency}</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">Scheduled Date</span>
+                            <span class="spec-value">${j.created_at}</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <span class="spec-label">Configuration Payload</span>
+                        <div class="payload-container" style="max-height: 100px;">${paramsStr}</div>
+                    </div>
+                    <div class="job-actions">
+                        ${actionButtons}
+                    </div>` : `
+                    <div style="font-size: 0.75rem; color: var(--text-dim); display: flex; justify-content: space-between; align-items: center;">
+                        <span>Ran on: ${j.created_at}</span>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <span style="font-family: 'Fira Code'">${statusLabel || 'ARCHIVED'}</span>
+                            <div class="job-actions" style="margin-top: 0; border: none; padding: 0;">
+                                ${actionButtons}
+                            </div>
+                        </div>
+                    </div>
+                    `}
+                </div>
+            `;
+        }
+
+        function updatePendingJobsDetailed(groupedJobs) {
+            const list = document.getElementById('jobs-detailed-list');
+            const badge = document.getElementById('job-count-badge');
+            list.innerHTML = '';
+            
+            let totalSampling = 0;
+            const containersKeys = Object.keys(groupedJobs);
+
+            if (containersKeys.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <i data-lucide="check-circle" style="color: var(--secondary); width: 48px; height: 48px;"></i>
+                        <p>No jobs found in recent history.</p>
+                    </div>`;
+                badge.textContent = '0 Sampling';
+                lucide.createIcons();
+                return;
+            }
+
+            containersKeys.forEach(targetId => {
+                const jobsArr = groupedJobs[targetId];
+                if (!jobsArr || jobsArr.length === 0) return;
+
+                const latest = jobsArr[0];
+                const history = jobsArr.slice(1);
+                totalSampling += jobsArr.length;
+
+                const accordionItem = document.createElement('div');
+                accordionItem.className = 'accordion-item active'; // Default open
+                
+                accordionItem.innerHTML = `
+                    <div class="accordion-header" onclick="this.parentElement.classList.toggle('active')">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i data-lucide="chevron-right" class="chevron"></i>
+                            <span style="font-weight: 600; font-size: 0.9rem;">${targetId.toUpperCase()}</span>
+                            <span class="job-id-pill" style="font-size: 0.6rem">#${latest.id}</span>
+                        </div>
+                        <div style="font-size: 0.7rem; color: var(--text-dim);">
+                            Latest Activity: ${latest.created_at}
+                        </div>
+                    </div>
+                    <div class="accordion-content">
+                        ${createJobCardHtml(latest, true)}
+                        ${history.map(hj => createJobCardHtml(hj, false)).join('')}
+                    </div>
+                `;
+                list.appendChild(accordionItem);
+            });
+
+            badge.textContent = `${totalSampling} sampled`;
+            lucide.createIcons();
+        }
+
+        function updateDbTotals(totals) {
+            const grid = document.getElementById('db-totals-grid');
+            grid.innerHTML = '';
+            totals.forEach(t => {
+                const item = document.createElement('div');
+                item.className = 'container-item';
+                item.style.padding = '15px';
+                item.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-weight: 500; font-size: 0.9rem;">${t.entity}</div>
+                        <div class="stat-value" style="font-size: 1.1rem; color: #fff;">${t.count.toLocaleString()}</div>
+                    </div>
+                `;
+                grid.appendChild(item);
+            });
+        }
+
+        async function handleJobAction(id, action, btnElement) {
+            if (action === 'cancel' && !confirm('Are you sure you want to discard/deactivate this job? It will be marked as failed for history.')) return;
+            if (action === 'process' && !confirm('Warning: This will execute the caching logic NOW. The page might freeze for a few seconds if the dataset is large. Continue?')) return;
+
+            // Simple visual feedback
+            if (btnElement) {
+                btnElement.disabled = true;
+                const originalText = btnElement.innerHTML;
+                btnElement.innerHTML = '<i data-lucide="loader" class="loader" style="width:12px; height:12px;"></i> Process...';
+                lucide.createIcons();
+            }
+            
+            try {
+                const response = await fetch('/api/monitoring/jobs/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `id=${id}&action=${action}`
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    fetchData(); // Refresh dashboard
+                } else {
+                    alert('Error: ' + result.error);
+                    if (btnElement) btnElement.disabled = false;
+                }
+            } catch (error) {
+                console.error('Job action failed:', error);
+                alert('Connection error while executing action.');
+                if (btnElement) btnElement.disabled = false;
+            }
+        }
+
+        fetchData();
+        setInterval(fetchData, 30000);
+    </script>
+</body>
+</html>
