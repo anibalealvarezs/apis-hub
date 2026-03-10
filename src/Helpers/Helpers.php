@@ -199,6 +199,25 @@ class Helpers
                     }
                 }
 
+                // Normalize relative paths to project root to avoid CWD issues
+                $rootPath = dirname(__DIR__, 2);
+                $resolvePath = function($path) use ($rootPath) {
+                    if (is_string($path) && str_starts_with($path, './')) {
+                        return $rootPath . substr($path, 1);
+                    }
+                    return $path;
+                };
+
+                if (isset($config['google']['token_path'])) {
+                    $config['google']['token_path'] = $resolvePath($config['google']['token_path']);
+                }
+                if (isset($config['google_search_console']['token_path'])) {
+                    $config['google_search_console']['token_path'] = $resolvePath($config['google_search_console']['token_path']);
+                }
+                if (isset($config['facebook']['graph_token_path'])) {
+                    $config['facebook']['graph_token_path'] = $resolvePath($config['facebook']['graph_token_path']);
+                }
+
                 self::$channelsConfig = $config;
             } catch (Exception $e) {
                 throw new RuntimeException("Failed to load channels configuration: " . $e->getMessage());
