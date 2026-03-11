@@ -905,11 +905,27 @@
                 const item = document.createElement('div');
                 item.className = 'container-item';
                 item.style.padding = '15px';
+
+                let channelsHtml = '';
+                if (t.channels && t.channels.length > 0) {
+                    channelsHtml = '<div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);">';
+                    t.channels.forEach(ch => {
+                        channelsHtml += `
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 2px;">
+                                <span>${ch.name}</span>
+                                <span style="font-family: 'Fira Code'">${ch.count.toLocaleString()}</span>
+                            </div>
+                        `;
+                    });
+                    channelsHtml += '</div>';
+                }
+
                 item.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div style="font-weight: 500; font-size: 0.9rem;">${t.entity}</div>
                         <div class="stat-value" style="font-size: 1.1rem; color: #fff;">${t.count.toLocaleString()}</div>
                     </div>
+                    ${channelsHtml}
                 `;
                 grid.appendChild(item);
             });

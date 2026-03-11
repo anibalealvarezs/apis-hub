@@ -139,21 +139,69 @@ class MonitoringController extends BaseController
             ];
         }
 
-        $entitiesToMonitor = [
-            'Metrics' => 'Analytics\Metric', 'Orders' => 'Analytics\Order',
-            'Customers' => 'Analytics\Customer', 'Campaigns' => 'Analytics\Campaign',
-            'Ads' => 'Analytics\Ad', 'Jobs (Total)' => 'Job'
+        $statsConfig = [
+            'Accounts' => ['class' => 'Analytics\Account', 'channeled' => 'Analytics\Channeled\ChanneledAccount'],
+            'Metrics' => ['class' => 'Analytics\Metric', 'channeled' => 'Analytics\Channeled\ChanneledMetric'],
+            'Campaigns' => ['class' => 'Analytics\Campaign', 'channeled' => 'Analytics\Channeled\ChanneledCampaign'],
+            'Ad Groups' => ['class' => null, 'channeled' => 'Analytics\Channeled\ChanneledAdGroup'],
+            'Ads' => ['class' => null, 'channeled' => 'Analytics\Channeled\ChanneledAd'],
+            'Creatives' => ['class' => 'Analytics\Creative', 'channeled' => null],
+            'Orders' => ['class' => 'Analytics\Order', 'channeled' => 'Analytics\Channeled\ChanneledOrder'],
+            'Customers' => ['class' => 'Analytics\Customer', 'channeled' => 'Analytics\Channeled\ChanneledCustomer'],
+            'Products' => ['class' => 'Analytics\Product', 'channeled' => 'Analytics\Channeled\ChanneledProduct'],
+            'Variants' => ['class' => 'Analytics\ProductVariant', 'channeled' => 'Analytics\Channeled\ChanneledProductVariant'],
+            'Categories' => ['class' => 'Analytics\ProductCategory', 'channeled' => 'Analytics\Channeled\ChanneledProductCategory'],
+            'Discounts' => ['class' => 'Analytics\Discount', 'channeled' => 'Analytics\Channeled\ChanneledDiscount'],
+            'Price Rules' => ['class' => 'Analytics\PriceRule', 'channeled' => 'Analytics\Channeled\ChanneledPriceRule'],
+            'Vendors' => ['class' => 'Analytics\Vendor', 'channeled' => 'Analytics\Channeled\ChanneledVendor'],
+            'Pages' => ['class' => 'Analytics\Page', 'channeled' => null],
+            'Posts' => ['class' => 'Analytics\Post', 'channeled' => null],
+            'Queries' => ['class' => 'Analytics\Query', 'channeled' => null],
+            'Countries' => ['class' => 'Analytics\Country', 'channeled' => null],
+            'Devices' => ['class' => 'Analytics\Device', 'channeled' => null],
+            'Jobs' => ['class' => 'Job', 'channeled' => null]
         ];
 
         $dbTotals = [];
-        foreach ($entitiesToMonitor as $label => $className) {
-            try {
-                $fullClass = "\\Entities\\" . $className;
-                $count = $this->em->createQueryBuilder()->select('count(e.id)')->from($fullClass, 'e')->getQuery()->getSingleScalarResult();
-                $dbTotals[] = ['entity' => $label, 'count' => (int)$count];
-            } catch (\Exception $e) {
-                $dbTotals[] = ['entity' => $label, 'count' => 0];
+        foreach ($statsConfig as $label => $config) {
+            $entry = ['entity' => $label, 'count' => 0, 'channels' => []];
+            
+            // 1. Base Class Count
+            if ($config['class']) {
+                try {
+                    $fullClass = "\\Entities\\" . $config['class'];
+                    $count = $this->em->createQueryBuilder()->select('count(e.id)')->from($fullClass, 'e')->getQuery()->getSingleScalarResult();
+                    $entry['count'] = (int)$count;
+                } catch (\Exception $e) {}
             }
+
+            // 2. Channeled Breakdown
+            if ($config['channeled']) {
+                try {
+                    $fullChanneled = "\\Entities\\" . $config['channeled'];
+                    $results = $this->em->createQueryBuilder()
+                        ->select('e.channel, count(e.id) as count')
+                        ->from($fullChanneled, 'e')
+                        ->groupBy('e.channel')
+                        ->getQuery()
+                        ->getArrayResult();
+                    
+                    $channeledTotal = 0;
+                    foreach ($results as $res) {
+                        $channelId = (int)$res['channel'];
+                        $channelCount = (int)$res['count'];
+                        $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? "Ch $channelId";
+                        $entry['channels'][] = ['name' => $channelName, 'count' => $channelCount];
+                        $channeledTotal += $channelCount;
+                    }
+                    
+                    // If no base class, use sum of channels as total
+                    if (!$config['class']) {
+                        $entry['count'] = $channeledTotal;
+                    }
+                } catch (\Exception $e) {}
+            }
+            $dbTotals[] = $entry;
         }
 
         return new JsonResponse([
