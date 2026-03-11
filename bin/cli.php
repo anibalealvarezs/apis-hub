@@ -38,6 +38,7 @@ $cli->addCommands([
     new UpdateEntityCommand(),
     new GenerateEntitiesConfigCommand(),
     new InitializeEntitiesCommand(Helpers::getManager()),
+    new \Commands\Analytics\ScheduleInitialJobsCommand($entityManager),
     new \Commands\Analytics\CacheEntityCommand(),
     new \Commands\Analytics\ProcessJobsCommand(),
     new \Commands\Analytics\ClearCacheCommand(),

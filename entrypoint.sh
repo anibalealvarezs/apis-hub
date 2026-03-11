@@ -5,6 +5,7 @@ set -e
 echo "Initializing database..."
 php bin/cli.php orm:schema-tool:update --force || echo "Schema update failed"
 php bin/cli.php app:initialize-entities || echo "Entity initialization failed"
+php bin/cli.php app:schedule-initial-jobs || echo "Initial scheduling failed"
 
 # Configure Cron based on project config
 if [ -n "$PROJECT_CONFIG_FILE" ]; then
