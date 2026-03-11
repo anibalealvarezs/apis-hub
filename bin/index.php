@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+// Permitir que el servidor integrado de PHP devuelva archivos estáticos directamente (CSS, ASSETS, etc.)
+if (php_sapi_name() === 'cli-server') {
+    $path = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+    if (is_file(__DIR__ . '/..' . $path)) {
+        return false; // Retornar falso le dice al cli-server que sirva el archivo estático
+    }
+}
+
 use Symfony\Component\HttpFoundation\Request;
 use Classes\RoutingCore;
 use Symfony\Component\HttpFoundation\Response;

@@ -24,4 +24,4 @@ service cron start
 
 # Run the web server
 echo "Starting PHP server on port $PORT..."
-exec php -S 0.0.0.0:${PORT} -t bin/
+exec php -S 0.0.0.0:${PORT} -t . bin/index.php
