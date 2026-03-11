@@ -68,7 +68,7 @@ foreach ($instances as $instance) {
         "API_SOURCE={$channel}",
         "API_ENTITY={$entity}",
         "DB_DRIVER=" . ($db['driver'] ?? 'pdo_mysql'),
-        "DB_HOST=" . ($db['host'] ?? 'host.docker.internal'),
+        "DB_HOST=" . str_replace(['127.0.0.1', 'localhost'], 'host.docker.internal', $db['host'] ?? 'host.docker.internal'),
         "DB_PORT=" . ($db['port'] ?? 3306),
         "DB_USER=" . ($db['user'] ?? 'root'),
         "DB_PASSWORD=" . ($db['password'] ?? ''),
