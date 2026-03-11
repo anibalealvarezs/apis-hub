@@ -63,16 +63,20 @@ foreach ($instances as $instance) {
     $startDate = $instance['start_date'] ?? null;
     $endDate   = $instance['end_date']   ?? null;
 
+    $extractEnvVar = function($str) {
+        return preg_replace('/^\$\{.*:-(.*)\}$/', '$1', (string) $str);
+    };
+
     $envBlock = [
         "PORT=8080",
         "API_SOURCE={$channel}",
         "API_ENTITY={$entity}",
-        "DB_DRIVER=" . ($db['driver'] ?? 'pdo_mysql'),
-        "DB_HOST=" . str_replace(['127.0.0.1', 'localhost'], 'host.docker.internal', $db['host'] ?? 'host.docker.internal'),
-        "DB_PORT=" . ($db['port'] ?? 3306),
-        "DB_USER=" . ($db['user'] ?? 'root'),
-        "DB_PASSWORD=" . ($db['password'] ?? ''),
-        "DB_NAME=" . ($db['name'] ?? ''),
+        "DB_DRIVER=" . $extractEnvVar($db['driver'] ?? 'pdo_mysql'),
+        "DB_HOST=" . str_replace(['127.0.0.1', 'localhost'], 'host.docker.internal', $extractEnvVar($db['host'] ?? 'host.docker.internal')),
+        "DB_PORT=" . $extractEnvVar($db['port'] ?? 3306),
+        "DB_USER=" . $extractEnvVar($db['user'] ?? 'root'),
+        "DB_PASSWORD=" . $extractEnvVar($db['password'] ?? ''),
+        "DB_NAME=" . $extractEnvVar($db['name'] ?? ''),
         "REDIS_HOST=" . $redis['host'],
         "REDIS_PORT=" . $redis['port'],
         "PROJECT_CONFIG_FILE=/app/deploy/{$projectName}.yaml",
