@@ -819,11 +819,10 @@ class MetricsProcessor
             );
 
             if (!isset($metricMap['map'][$metricKey])) {
-                Helpers::dumpDebugJson([
-                    'metric' => $metric,
-                    'metricMap' => $metricMap,
+                $logger->error("Metric mapping not found for key: $metricKey", [
+                    'metric' => (array) $metric,
+                    'metricMap_keys' => array_keys($metricMap['map'] ?? []),
                 ]);
-                $logger->warning("Skipping channeled metric due to missing metricKey: metricKey=$metricKey");
                 continue;
             }
             if (empty($metric->platformId)) {
@@ -844,7 +843,7 @@ class MetricsProcessor
                 'platformId' => $metric->platformId,
                 'metric_id' => $metricMap['map'][$metricKey],
                 'platformCreatedAt' => Carbon::parse($metric->platformCreatedAt)->format('Y-m-d'),
-                'data' => $metric->data ?? ['impressions' => 0, 'clicks' => 0, 'position_weighted' => 0, 'ctr' => 0],
+                'data' => $metric->data ?? [],
                 'metricKey' => $metricKey,
             ];
             // $logger->info("Prepared channeled metric: channeledMetricKey=$channeledMetricKey, metricKey=$metricKey, metric_id={$metricMap['map'][$metricKey]}, platformId=$metric->platformId");
@@ -898,10 +897,11 @@ class MetricsProcessor
                 $data = json_decode($channeledMetricsToInsert[$key]['data'], true);
                 $newData = $channeledMetric['data'];
 
-                $data['impressions'] = max($data['impressions'] ?? 0, $newData['impressions'] ?? 0);
-                $data['clicks'] = max($data['clicks'] ?? 0, $newData['clicks'] ?? 0);
-                $data['position_weighted'] = max($data['position_weighted'] ?? 0, $newData['position_weighted'] ?? 0);
-                $data['ctr'] = max($data['ctr'] ?? 0, $newData['ctr'] ?? 0);
+                $data = array_merge($data, $newData);
+                if (isset($newData['impressions'])) $data['impressions'] = max($data['impressions'] ?? 0, $newData['impressions']);
+                if (isset($newData['clicks'])) $data['clicks'] = max($data['clicks'] ?? 0, $newData['clicks']);
+                if (isset($newData['position_weighted'])) $data['position_weighted'] = max($data['position_weighted'] ?? 0, $newData['position_weighted']);
+                if (isset($newData['ctr'])) $data['ctr'] = max($data['ctr'] ?? 0, $newData['ctr']);
 
                 $channeledMetricsToInsert[$key]['data'] = json_encode($data);
                 // $logger->info("Updated queued channeled metric: channeledMetricKey=$key, metric_id={$channeledMetric['metric_id']}");
@@ -910,10 +910,11 @@ class MetricsProcessor
                 $data = json_decode($channeledMetricMap[$key]['data'], true);
                 $newData = $channeledMetric['data'];
 
-                $data['impressions'] = max($data['impressions'] ?? 0, $newData['impressions'] ?? 0);
-                $data['clicks'] = max($data['clicks'] ?? 0, $newData['clicks'] ?? 0);
-                $data['position_weighted'] = max($data['position_weighted'] ?? 0, $newData['position_weighted'] ?? 0);
-                $data['ctr'] = max($data['ctr'] ?? 0, $newData['ctr'] ?? 0);
+                $data = array_merge($data, $newData);
+                if (isset($newData['impressions'])) $data['impressions'] = max($data['impressions'] ?? 0, $newData['impressions']);
+                if (isset($newData['clicks'])) $data['clicks'] = max($data['clicks'] ?? 0, $newData['clicks']);
+                if (isset($newData['position_weighted'])) $data['position_weighted'] = max($data['position_weighted'] ?? 0, $newData['position_weighted']);
+                if (isset($newData['ctr'])) $data['ctr'] = max($data['ctr'] ?? 0, $newData['ctr']);
 
                 $channeledMetricsToUpdate[$key] = [
                     'id' => $channeledMetricMap[$key]['id'],

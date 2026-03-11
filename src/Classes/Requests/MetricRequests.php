@@ -6,6 +6,7 @@ namespace Classes\Requests;
 
 use Anibalealvarezs\FacebookGraphApi\Enums\MediaType;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricBreakdown;
+use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Dimension;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\GroupType;
@@ -224,9 +225,18 @@ class MetricRequests
             $logger->pushHandler(new StreamHandler('logs/gsc.log', Level::Info));
         }
 
+        // Apply default dates if missing for "recent" safety
+        if (empty($startDate)) {
+            $startDate = Carbon::today()->subDays(3)->format('Y-m-d');
+            $logger->info("No startDate provided, defaulting to $startDate");
+        }
+        if (empty($endDate)) {
+            $endDate = Carbon::today()->format('Y-m-d');
+            $logger->info("No endDate provided, defaulting to $endDate");
+        }
+
         $logger->info("Starting getListFromFacebook: startDate=$startDate, endDate=$endDate, resume=$resume");
         $manager = Helpers::getManager();
-        $manager->getConnection()->beginTransaction();
         try {
             // Validate configuration
             $config = self::validateFacebookConfig($logger);
@@ -273,16 +283,23 @@ class MetricRequests
                 }
                 $pageEntity = $pageRepository->findOneBy(['platformId' => $page['id']]);
                 if ($page['page_metrics']) {
-                    self::processFacebookPage(
-                        page: $page,
-                        startDate: $startDate,
-                        endDate: $endDate,
-                        api: $api,
-                        manager: $manager,
-                        pageRepository: $pageRepository,
-                        logger: $logger,
-                        pageMap: $pageMap,
-                    );
+                    $manager->getConnection()->beginTransaction();
+                    try {
+                        self::processFacebookPage(
+                            page: $page,
+                            startDate: $startDate,
+                            endDate: $endDate,
+                            api: $api,
+                            manager: $manager,
+                            pageRepository: $pageRepository,
+                            logger: $logger,
+                            pageMap: $pageMap,
+                        );
+                        $manager->getConnection()->commit();
+                    } catch (Exception $e) {
+                        $manager->getConnection()->rollBack();
+                        $logger->error("Error processing page " . $page['id'] . ": " . $e->getMessage());
+                    }
                 } else {
                     $logger->info("Skipping page metrics for page: " . $page['id']);
                 }
@@ -375,111 +392,116 @@ class MetricRequests
                     'platformId' => $adAccount['id'],
                     'account' => $accountEntity,
                 ]);
-                if (!$adAccount['enabled']) {
-                    $logger->info("Skipping disabled ad account: " . $adAccount['id']);
-                    continue;
-                }
-                if ($adAccount['ad_account_metrics']) {
-                    self::processAdAccount(
-                        adAccount: $adAccount,
-                        api: $api,
-                        manager: $manager,
-                        accountEntity: $accountEntity,
-                        channeledAccountEntity: $channeledAccountEntity,
-                        logger: $logger,
-                    );
-                } else {
-                    $logger->info("Skipping ad account metrics for ad account: " . $adAccount['id']);
-                }
-                if ($adAccount['campaigns']) {
-                    $campaignsMultiMap = self::fetchAdAccountCampaigns(
-                        api: $api,
-                        manager: $manager,
-                        logger: $logger,
-                        channeledAccountEntity: $channeledAccountEntity,
-                    );
-                    $campaignMap = $campaignsMultiMap['campaignMap'];
-                    $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
-                    if ($adAccount['campaign_metrics']) {
-                        $hasResults = true;
-                        self::processCampaignsBulk(
-                            api: $api,
-                            manager: $manager,
-                            channeledAccountEntity: $channeledAccountEntity,
-                            logger: $logger,
-                            startDate: $startDate,
-                            endDate: $endDate,
-                            channeledCampaignMap: $channeledCampaignMap,
-                            campaignMap: $campaignMap,
-                            jobId: $jobId,
-                        );
-                    } else {
-                        $logger->info("Skipping Campaign metrics for ad account: " . $adAccount['id']);
-                    }
-                    if ($adAccount['adsets']) {
-                        $channeledAdGroupMap = self::fetchAdAccountAdsets(
-                            api: $api,
-                            manager: $manager,
-                            logger: $logger,
-                            channeledAccountEntity: $channeledAccountEntity,
-                            campaignMap: $campaignMap,
-                            channeledCampaignMap: $channeledCampaignMap,
-                        );
-
-                        if ($adAccount['adset_metrics']) {
-                            $hasResults = true;
-                            self::processAdsetsBulk(
+                if ($adAccount['enabled']) {
+                    $manager->getConnection()->beginTransaction();
+                    try {
+                        if ($adAccount['ad_account_metrics']) {
+                            self::processAdAccount(
+                                adAccount: $adAccount,
                                 api: $api,
                                 manager: $manager,
+                                accountEntity: $accountEntity,
                                 channeledAccountEntity: $channeledAccountEntity,
                                 logger: $logger,
                                 startDate: $startDate,
                                 endDate: $endDate,
-                                campaignMap: $campaignMap,
-                                channeledCampaignMap: $channeledCampaignMap,
-                                channeledAdGroupMap: $channeledAdGroupMap,
-                                jobId: $jobId,
                             );
                         } else {
-                            $logger->info("Skipping Adset metrics for ad account: " . $adAccount['id']);
+                            $logger->info("Skipping ad account metrics for ad account: " . $adAccount['id']);
                         }
 
-                        if ($adAccount['ads']) {
-                            $channeledAdMap = self::fetchAdAccountAds(
+                        if ($adAccount['campaigns']) {
+                            $campaignsMultiMap = self::fetchAdAccountCampaigns(
                                 api: $api,
                                 manager: $manager,
                                 logger: $logger,
                                 channeledAccountEntity: $channeledAccountEntity,
-                                channeledCampaignMap: $channeledCampaignMap,
-                                channeledAdGroupMap: $channeledAdGroupMap,
                             );
+                            $campaignMap = $campaignsMultiMap['campaignMap'];
+                            $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
 
-                            // Helpers::dumpDebugJson($campaignMap['map']);
-
-                            if ($adAccount['ad_metrics']) {
-                                $hasResults = true;
-                                self::processAdsBulk(
+                            if ($adAccount['campaign_metrics']) {
+                                self::processCampaignsBulk(
                                     api: $api,
                                     manager: $manager,
                                     channeledAccountEntity: $channeledAccountEntity,
                                     logger: $logger,
                                     startDate: $startDate,
                                     endDate: $endDate,
-                                    campaignMap: $campaignMap,
                                     channeledCampaignMap: $channeledCampaignMap,
-                                    channeledAdGroupMap: $channeledAdGroupMap,
-                                    channeledAdMap: $channeledAdMap,
+                                    campaignMap: $campaignMap,
                                     jobId: $jobId,
                                 );
                             } else {
-                                $logger->info("Skipping Ad metrics for ad account: " . $adAccount['id']);
+                                $logger->info("Skipping Campaign metrics for ad account: " . $adAccount['id']);
+                            }
+
+                            if ($adAccount['adsets']) {
+                                $channeledAdGroupMap = self::fetchAdAccountAdsets(
+                                    api: $api,
+                                    manager: $manager,
+                                    logger: $logger,
+                                    channeledAccountEntity: $channeledAccountEntity,
+                                    campaignMap: $campaignMap,
+                                    channeledCampaignMap: $channeledCampaignMap,
+                                );
+
+                                if ($adAccount['adset_metrics']) {
+                                    self::processAdsetsBulk(
+                                        api: $api,
+                                        manager: $manager,
+                                        channeledAccountEntity: $channeledAccountEntity,
+                                        logger: $logger,
+                                        startDate: $startDate,
+                                        endDate: $endDate,
+                                        campaignMap: $campaignMap,
+                                        channeledCampaignMap: $channeledCampaignMap,
+                                        channeledAdGroupMap: $channeledAdGroupMap,
+                                        jobId: $jobId,
+                                    );
+                                } else {
+                                    $logger->info("Skipping Adset metrics for ad account: " . $adAccount['id']);
+                                }
+
+                                if ($adAccount['ads']) {
+                                    $channeledAdMap = self::fetchAdAccountAds(
+                                        api: $api,
+                                        manager: $manager,
+                                        logger: $logger,
+                                        channeledAccountEntity: $channeledAccountEntity,
+                                        channeledCampaignMap: $channeledCampaignMap,
+                                        channeledAdGroupMap: $channeledAdGroupMap,
+                                    );
+
+                                    if ($adAccount['ad_metrics']) {
+                                        self::processAdsBulk(
+                                            api: $api,
+                                            manager: $manager,
+                                            channeledAccountEntity: $channeledAccountEntity,
+                                            logger: $logger,
+                                            startDate: $startDate,
+                                            endDate: $endDate,
+                                            campaignMap: $campaignMap,
+                                            channeledCampaignMap: $channeledCampaignMap,
+                                            channeledAdGroupMap: $channeledAdGroupMap,
+                                            channeledAdMap: $channeledAdMap,
+                                            jobId: $jobId,
+                                        );
+                                    } else {
+                                        $logger->info("Skipping Ad metrics for ad account: " . $adAccount['id']);
+                                    }
+                                }
                             }
                         }
+                        $manager->getConnection()->commit();
+                    } catch (Exception $e) {
+                        if ($manager->getConnection()->isTransactionActive()) {
+                            $manager->getConnection()->rollBack();
+                        }
+                        $logger->error("Error processing ad account " . $adAccount['id'] . ": " . $e->getMessage() . " " . $e->getTraceAsString());
                     }
                 }
             }
-
-            $manager->getConnection()->commit();
 
             // Finalize transaction and cache
             return self::finalizeTransaction(
@@ -1092,6 +1114,8 @@ class MetricRequests
         Account $accountEntity,
         ChanneledAccount $channeledAccountEntity,
         LoggerInterface $logger,
+        ?string $startDate,
+        ?string $endDate,
     ): void {
 
         $allMetrics = new ArrayCollection();
@@ -1113,9 +1137,16 @@ class MetricRequests
         ];
 
         try {
+            $additionalParams = [];
+            if ($startDate && $endDate) {
+                $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
+            }
+
             $rows = $api->getAdAccountInsights(
                 adAccountId: (string) $adAccount['id'],
-                metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER]
+                metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
+                additionalParams: $additionalParams,
+                metricSet: MetricSet::KEY,
             );
 
             if (count($rows['data']) === 0) {
@@ -1128,6 +1159,7 @@ class MetricRequests
                 logger: $logger,
                 accountEntity: $accountEntity,
                 channeledAccountPlatformId: $channeledAccountEntity->getPlatformId(),
+                metricSet: MetricSet::KEY,
             );
 
             foreach ($metrics as $metric) {
@@ -1545,6 +1577,7 @@ class MetricRequests
                 channeledAccountEntity: $channeledAccountEntity,
                 campaignEntity: $campaignEntity,
                 channeledCampaignEntity: $channeledCampaignEntity,
+                metricSet: MetricSet::KEY,
             );
 
             foreach ($metrics as $metric) {
@@ -1671,6 +1704,7 @@ class MetricRequests
                 campaignEntity: $campaignEntity,
                 channeledCampaignEntity: $channeledCampaignEntity,
                 channeledAdGroupEntity: $channeledAdGroupEntity,
+                metricSet: MetricSet::KEY,
             );
 
             foreach ($metrics as $metric) {
@@ -1804,6 +1838,7 @@ class MetricRequests
                 channeledCampaignEntity: $channeledCampaignEntity,
                 channeledAdGroupEntity: $channeledAdGroupEntity,
                 channeledAdEntity: $channeledAdEntity,
+                metricSet: MetricSet::KEY,
             );
 
             foreach ($metrics as $metric) {
@@ -2537,13 +2572,7 @@ class MetricRequests
             $subConditions = [];
             foreach ($adFields as $field) {
                 if (!isset($channeledAdGroupMap['map'][$ad['adset_id']])) {
-                    Helpers::dumpDebugJson(
-                        [
-                            'ad' => $ad,
-                            'channeledAdGroupMap' => $channeledAdGroupMap,
-                            'channeledCampaignMap' => $channeledCampaignMap,
-                        ]
-                    );
+                    throw new Exception("Ad Set ID {$ad['adset_id']} not found in local mapping during Ad sync for account {$channeledAccountEntity->getPlatformId()}. Ad: {$ad['id']}");
                 }
                 $subConditions[] = "$field = ?";
                 $adParams[] = match($field) {
@@ -4163,32 +4192,47 @@ class MetricRequests
         array $campaignMap,
         ?int $jobId = null
     ): bool {
-        $campaignPlatformIds = array_keys($channeledCampaignMap['mapReverse']);
+        $campaignPlatformIds = array_values($channeledCampaignMap['mapReverse']);
         if (empty($campaignPlatformIds)) {
             return true;
         }
 
         $additionalParams = [];
         if ($startDate && $endDate) {
-            $additionalParams['time_range'] = ['since' => $startDate, 'until' => $endDate];
+            $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
         }
 
         try {
-            $rows = $api->getCampaignInsightsFromAdAccount(
-                adAccountId: $channeledAccountEntity->getPlatformId(),
-                campaignIds: $campaignPlatformIds,
-                limit: 100,
-                metricBreakdown: [],
-                additionalParams: $additionalParams
-            );
+            $campaignPlatformIdChunks = array_chunk($campaignPlatformIds, 50);
+            $allRows = [];
 
-            if (count($rows['data']) === 0) {
+            foreach ($campaignPlatformIdChunks as $chunk) {
+                try {
+                    $rows = $api->getCampaignInsightsFromAdAccount(
+                        adAccountId: $channeledAccountEntity->getPlatformId(),
+                        campaignIds: $chunk,
+                        limit: 100,
+                        metricBreakdown: null,
+                        additionalParams: $additionalParams,
+                        metricSet: MetricSet::KEY,
+                    );
+                    if (isset($rows['data']) && is_array($rows['data'])) {
+                        $allRows = array_merge($allRows, $rows['data']);
+                    }
+                } catch (Exception $e) {
+                    $logger->error("Error fetching campaign insights chunk: " . $e->getMessage());
+                }
+            }
+
+            $logger->info("Fetched " . count($allRows) . " bulk rows for campaigns in Ad Account " . $channeledAccountEntity->getPlatformId());
+
+            if (count($allRows) === 0) {
                 $logger->info("No bulk rows found for campaigns in Ad Account " . $channeledAccountEntity->getPlatformId());
                 return false;
             }
 
             $groupedRows = [];
-            foreach ($rows['data'] as $row) {
+            foreach ($allRows as $row) {
                 $groupedRows[$row['campaign_id']][] = $row;
             }
 
@@ -4211,6 +4255,7 @@ class MetricRequests
                     channeledAccountEntity: $channeledAccountEntity,
                     campaignEntity: $campaignEntity,
                     channeledCampaignEntity: $channeledCampaignEntity,
+                    metricSet: MetricSet::KEY,
                 );
 
                 foreach ($metrics as $metric) {
@@ -4284,25 +4329,40 @@ class MetricRequests
 
         $additionalParams = [];
         if ($startDate && $endDate) {
-            $additionalParams['time_range'] = ['since' => $startDate, 'until' => $endDate];
+            $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
         }
 
         try {
-            $rows = $api->getAdsetInsightsFromAdAccount(
-                adAccountId: $channeledAccountEntity->getPlatformId(),
-                adsetIds: $adsetPlatformIds,
-                limit: 100,
-                metricBreakdown: [],
-                additionalParams: $additionalParams
-            );
+            $adsetPlatformIdChunks = array_chunk($adsetPlatformIds, 50);
+            $allRows = [];
 
-            if (count($rows['data']) === 0) {
+            foreach ($adsetPlatformIdChunks as $chunk) {
+                try {
+                    $rows = $api->getAdsetInsightsFromAdAccount(
+                        adAccountId: $channeledAccountEntity->getPlatformId(),
+                        adsetIds: $chunk,
+                        limit: 100,
+                        metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
+                        additionalParams: $additionalParams,
+                        metricSet: MetricSet::KEY,
+                    );
+                    if (isset($rows['data']) && is_array($rows['data'])) {
+                        $allRows = array_merge($allRows, $rows['data']);
+                    }
+                } catch (Exception $e) {
+                    $logger->error("Error fetching adset insights chunk: " . $e->getMessage());
+                }
+            }
+
+            $logger->info("Fetched " . count($allRows) . " bulk rows for adsets in Ad Account " . $channeledAccountEntity->getPlatformId());
+
+            if (count($allRows) === 0) {
                 $logger->info("No bulk rows found for adsets in Ad Account " . $channeledAccountEntity->getPlatformId());
                 return false;
             }
 
             $groupedRows = [];
-            foreach ($rows['data'] as $row) {
+            foreach ($allRows as $row) {
                 $groupedRows[$row['adset_id']][] = $row;
             }
 
@@ -4329,6 +4389,7 @@ class MetricRequests
                     campaignEntity: $campaignEntity,
                     channeledCampaignEntity: $channeledCampaignEntity,
                     channeledAdGroupEntity: $channeledAdGroupEntity,
+                    metricSet: MetricSet::KEY,
                 );
 
                 foreach ($metrics as $metric) {
@@ -4405,28 +4466,43 @@ class MetricRequests
 
         $additionalParams = [];
         if ($startDate && $endDate) {
-            $additionalParams['time_range'] = ['since' => $startDate, 'until' => $endDate];
+            $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
+        }
+
+        $adPlatformIdChunks = array_chunk($adPlatformIds, 50);
+        $allRows = [];
+
+        foreach ($adPlatformIdChunks as $chunk) {
+            try {
+                $rows = $api->getAdInsightsFromAdAccount(
+                    adAccountId: $channeledAccountEntity->getPlatformId(),
+                    adIds: $chunk,
+                    limit: 100,
+                    metricBreakdown: [],
+                    additionalParams: $additionalParams,
+                    metricSet: MetricSet::KEY,
+                );
+                if (isset($rows['data']) && is_array($rows['data'])) {
+                    $allRows = array_merge($allRows, $rows['data']);
+                }
+            } catch (Exception $e) {
+                $logger->error("Error fetching ad insights chunk: " . $e->getMessage());
+            }
+        }
+
+        $logger->info("Fetched " . count($allRows) . " bulk rows for ads in Ad Account " . $channeledAccountEntity->getPlatformId());
+
+        if (count($allRows) === 0) {
+            $logger->info("No bulk rows found for ads in Ad Account " . $channeledAccountEntity->getPlatformId());
+            return false;
+        }
+
+        $groupedRows = [];
+        foreach ($allRows as $row) {
+            $groupedRows[$row['ad_id']][] = $row;
         }
 
         try {
-            $rows = $api->getAdInsightsFromAdAccount(
-                adAccountId: $channeledAccountEntity->getPlatformId(),
-                adIds: $adPlatformIds,
-                limit: 100,
-                metricBreakdown: [],
-                additionalParams: $additionalParams
-            );
-
-            if (count($rows['data']) === 0) {
-                $logger->info("No bulk rows found for ads in Ad Account " . $channeledAccountEntity->getPlatformId());
-                return false;
-            }
-
-            $groupedRows = [];
-            foreach ($rows['data'] as $row) {
-                $groupedRows[$row['ad_id']][] = $row;
-            }
-
             $campaignRepository = $manager->getRepository(Campaign::class);
             $channeledCampaignRepository = $manager->getRepository(ChanneledCampaign::class);
             $channeledAdGroupRepository = $manager->getRepository(ChanneledAdGroup::class);
@@ -4435,12 +4511,12 @@ class MetricRequests
 
             foreach ($groupedRows as $adPlatformId => $adRows) {
                 Helpers::checkJobStatus($jobId);
-                $campaignId = $channeledAdMap['mapCampaign'][$adPlatformId];
-                $adGroupId = $channeledAdMap['mapAdGroup'][$adPlatformId];
-                
+                $adgroupId = $channeledAdMap['mapAdGroup'][$adPlatformId];
+                $campaignId = $channeledAdGroupMap['mapCampaign'][$adgroupId];
+
                 $campaignEntity = $campaignRepository->findOneBy(['campaignId' => $campaignId]);
                 $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignId]);
-                $channeledAdGroupEntity = $channeledAdGroupRepository->findOneBy(['platformId' => $adGroupId]);
+                $channeledAdGroupEntity = $channeledAdGroupRepository->findOneBy(['platformId' => $adgroupId]);
                 $channeledAdEntity = $channeledAdRepository->findOneBy(['platformId' => $adPlatformId]);
 
                 if (!$campaignEntity || !$channeledCampaignEntity || !$channeledAdGroupEntity || !$channeledAdEntity) {
@@ -4455,6 +4531,7 @@ class MetricRequests
                     channeledCampaignEntity: $channeledCampaignEntity,
                     channeledAdGroupEntity: $channeledAdGroupEntity,
                     channeledAdEntity: $channeledAdEntity,
+                    metricSet: MetricSet::KEY,
                 );
 
                 foreach ($metrics as $metric) {

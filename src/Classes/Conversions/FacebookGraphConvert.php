@@ -17,6 +17,11 @@ use Enums\Channel;
 use Enums\Period;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
+use Anibalealvarezs\FacebookGraphApi\Enums\AdAccountPermission;
+use Anibalealvarezs\FacebookGraphApi\Enums\AdPermission;
+use Anibalealvarezs\FacebookGraphApi\Enums\AdsetPermission;
+use Anibalealvarezs\FacebookGraphApi\Enums\CampaignPermission;
+use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
 use stdClass;
 
 class FacebookGraphConvert
@@ -37,7 +42,7 @@ class FacebookGraphConvert
         array $rows,
         string $pagePlatformId = '',
         string $postPlatformId = '',
-        LoggerInterface $logger = null,
+        ?LoggerInterface $logger = null,
         ?Page $pageEntity = null,
         ?Post $postEntity = null,
         Period $period = Period::Daily,
@@ -85,7 +90,7 @@ class FacebookGraphConvert
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash([]);
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
                 $channeledMetric->metadata = $row;
-                $channeledMetric->data = [];
+                $channeledMetric->data = $row;
 
                 if (!isset($elements[$metricConfigsGroupKey][$row['name']])) {
                     $elements[$metricConfigsGroupKey][$row['name']] = [];
@@ -127,17 +132,18 @@ class FacebookGraphConvert
      */
     public static function adAccountMetrics(
         array $rows,
-        LoggerInterface $logger = null,
-        Account $accountEntity = null,
-        string $channeledAccountPlatformId = null,
+        ?LoggerInterface $logger = null,
+        ?Account $accountEntity = null,
+        ?string $channeledAccountPlatformId = null,
         Period $period = Period::Daily,
+        MetricSet $metricSet = MetricSet::KEY,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = ['impressions', 'clicks', 'cpc', 'ctr', 'cpm', 'spend', 'reach', 'frequency', 'unique_clicks', 'unique_ctr', 'cost_per_unique_click', 'cost_per_inline_link_click', 'cost_per_unique_outbound_click'];
+        $metricsList = explode(',', AdAccountPermission::DEFAULT->insightsFields($metricSet));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -179,7 +185,11 @@ class FacebookGraphConvert
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::facebook->value;
                 $channeledMetric->name = $key;
-                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? ($value[0]['value'] ?? 0) : $value;
+                $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
+                if (!is_numeric($val)) {
+                    continue;
+                }
+                $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
                 $channeledMetric->platformId = $channeledAccountPlatformId;
@@ -188,7 +198,7 @@ class FacebookGraphConvert
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
                 $channeledMetric->metadata = $metadata;
-                $channeledMetric->data = [];
+                $channeledMetric->data = $row;
 
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
@@ -236,7 +246,7 @@ class FacebookGraphConvert
         ?Page $pageEntity,
         ?Account $accountEntity,
         ?ChanneledAccount $channeledAccountEntity,
-        LoggerInterface $logger = null,
+        ?LoggerInterface $logger = null,
         Period $period = Period::Daily,
     ): ArrayCollection {
         $startTime = microtime(true);
@@ -279,12 +289,12 @@ class FacebookGraphConvert
             $channeledMetric->dimensions = [];
             $channeledMetric->metricConfigKey = $metricConfigKey;
             $channeledMetric->metadata = [];
-            $channeledMetric->data = [];
+            $channeledMetric->data = $row;
             if (isset($row['total_value']['breakdowns'])) {
                 $breakdowns = $row['total_value']['breakdowns'][0]['dimension_keys'];
                 if (isset($row['total_value']['breakdowns'][0]['results'])) {
                     foreach ($row['total_value']['breakdowns'][0]['results'] as $vector) {
-                        $channeledMetric->value = $vector['value'];
+                        $channeledMetric->value = is_array($vector['value']) ? ($vector['value'][0]['value'] ?? ($vector['value'][0]['amount'] ?? 0)) : $vector['value'];
                         $dimensions = [];
                         foreach ($breakdowns as $key => $breakdown) {
                             $dimensions[] = [
@@ -356,7 +366,7 @@ class FacebookGraphConvert
         ?Post $postEntity,
         ?Account $accountEntity,
         ?ChanneledAccount $channeledAccountEntity,
-        LoggerInterface $logger = null,
+        ?LoggerInterface $logger = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
@@ -387,7 +397,7 @@ class FacebookGraphConvert
             $channeledMetric->name = $row['name'] ?? 'unknown';
             $channeledMetric->period = Period::Lifetime->value;
             $channeledMetric->metricDate = $today;
-            $channeledMetric->platformId = $channeledAccountEntity->getPlatformId();
+            $channeledMetric->platformId = $postEntity->getPostId();
             $channeledMetric->platformCreatedAt = $today;
             $channeledMetric->account = $accountEntity;
             $channeledMetric->channeledAccount = $channeledAccountEntity;
@@ -396,7 +406,7 @@ class FacebookGraphConvert
             $channeledMetric->dimensions = [];
             $channeledMetric->metricConfigKey = $metricConfigKey;
             $channeledMetric->metadata = [];
-            $channeledMetric->data = [];
+            $channeledMetric->data = $row;
             $channeledMetric->value = $row['values'][0]['value'] ?? 0;
             $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash([]);
 
@@ -440,18 +450,19 @@ class FacebookGraphConvert
      */
     public static function campaignMetrics(
         array $rows,
-        LoggerInterface $logger = null,
-        ChanneledAccount $channeledAccountEntity = null,
-        Campaign $campaignEntity = null,
-        ChanneledCampaign $channeledCampaignEntity = null,
+        ?LoggerInterface $logger = null,
+        ?ChanneledAccount $channeledAccountEntity = null,
+        ?Campaign $campaignEntity = null,
+        ?ChanneledCampaign $channeledCampaignEntity = null,
         Period $period = Period::Daily,
+        MetricSet $metricSet = MetricSet::KEY,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = ['impressions', 'clicks', 'cpc', 'ctr', 'cpm', 'spend', 'reach', 'frequency'];
+        $metricsList = explode(',', CampaignPermission::DEFAULT->insightsFields($metricSet));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -494,7 +505,11 @@ class FacebookGraphConvert
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::facebook->value;
                 $channeledMetric->name = $key;
-                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? ($value[0]['value'] ?? 0) : $value;
+                $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
+                if (!is_numeric($val)) {
+                    continue;
+                }
+                $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
                 $channeledMetric->platformId = $channeledCampaignEntity->getPlatformId();
@@ -503,7 +518,7 @@ class FacebookGraphConvert
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
                 $channeledMetric->metadata = $metadata;
-                $channeledMetric->data = [];
+                $channeledMetric->data = $row;
 
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
@@ -551,19 +566,20 @@ class FacebookGraphConvert
      */
     public static function adsetMetrics(
         array $rows,
-        LoggerInterface $logger = null,
-        ChanneledAccount $channeledAccountEntity = null,
-        Campaign $campaignEntity = null,
-        ChanneledCampaign $channeledCampaignEntity = null,
-        ChanneledAdGroup $channeledAdGroupEntity = null,
+        ?LoggerInterface $logger = null,
+        ?ChanneledAccount $channeledAccountEntity = null,
+        ?Campaign $campaignEntity = null,
+        ?ChanneledCampaign $channeledCampaignEntity = null,
+        ?ChanneledAdGroup $channeledAdGroupEntity = null,
         Period $period = Period::Daily,
+        MetricSet $metricSet = MetricSet::KEY,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = ['impressions', 'clicks', 'cpc', 'ctr', 'cpm', 'spend', 'reach', 'frequency'];
+        $metricsList = explode(',', AdsetPermission::DEFAULT->insightsFields($metricSet));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -607,16 +623,20 @@ class FacebookGraphConvert
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::facebook->value;
                 $channeledMetric->name = $key;
-                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? ($value[0]['value'] ?? 0) : $value;
+                $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
+                if (!is_numeric($val)) {
+                    continue;
+                }
+                $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
-                $channeledMetric->platformId = $channeledCampaignEntity->getPlatformId();
+                $channeledMetric->platformId = $channeledAdGroupEntity->getPlatformId();
                 $channeledMetric->platformCreatedAt = $metricDate;
                 $channeledMetric->dimensions = $dimensions;
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
                 $channeledMetric->metadata = $metadata;
-                $channeledMetric->data = [];
+                $channeledMetric->data = $row;
 
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
@@ -665,20 +685,21 @@ class FacebookGraphConvert
      */
     public static function adMetrics(
         array $rows,
-        LoggerInterface $logger = null,
-        ChanneledAccount $channeledAccountEntity = null,
-        Campaign $campaignEntity = null,
-        ChanneledCampaign $channeledCampaignEntity = null,
-        ChanneledAdGroup $channeledAdGroupEntity = null,
-        ChanneledAd $channeledAdEntity = null,
+        ?LoggerInterface $logger = null,
+        ?ChanneledAccount $channeledAccountEntity = null,
+        ?Campaign $campaignEntity = null,
+        ?ChanneledCampaign $channeledCampaignEntity = null,
+        ?ChanneledAdGroup $channeledAdGroupEntity = null,
+        ?ChanneledAd $channeledAdEntity = null,
         Period $period = Period::Daily,
+        MetricSet $metricSet = MetricSet::KEY,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = ['impressions', 'clicks', 'cpc', 'ctr', 'cpm', 'spend', 'reach', 'frequency'];
+        $metricsList = explode(',', AdPermission::DEFAULT->insightsFields($metricSet));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -723,16 +744,20 @@ class FacebookGraphConvert
                 $channeledMetric = new stdClass();
                 $channeledMetric->channel = Channel::facebook->value;
                 $channeledMetric->name = $key;
-                $channeledMetric->value = ($key == 'cost_per_unique_outbound_click') && is_array($value) ? ($value[0]['value'] ?? 0) : $value;
+                $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
+                if (!is_numeric($val)) {
+                    continue;
+                }
+                $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
-                $channeledMetric->platformId = $channeledCampaignEntity->getPlatformId();
+                $channeledMetric->platformId = $channeledAdEntity->getPlatformId();
                 $channeledMetric->platformCreatedAt = $metricDate;
                 $channeledMetric->dimensions = $dimensions;
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
                 $channeledMetric->metadata = $metadata;
-                $channeledMetric->data = [];
+                $channeledMetric->data = $row;
 
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
