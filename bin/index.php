@@ -17,6 +17,8 @@ if (php_sapi_name() === 'cli-server') {
     }
 }
 
+require_once __DIR__ . "/../vendor/autoload.php";
+
 use Symfony\Component\HttpFoundation\Request;
 use Classes\RoutingCore;
 use Symfony\Component\HttpFoundation\Response;
