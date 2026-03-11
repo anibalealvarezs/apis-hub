@@ -11,6 +11,7 @@ use Entities\Analytics\Channeled\ChanneledCampaign;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
 use Enums\Period;
+use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
 use Tests\Integration\BaseIntegrationTestCase;
 
 class FacebookGraphConvertTest extends BaseIntegrationTestCase
@@ -58,16 +59,17 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
             logger: null,
             accountEntity: $accountEntity,
             channeledAccountPlatformId: $channeledAccountPlatformId,
-            period: Period::Daily
+            period: Period::Daily,
+            metricSet: MetricSet::FULL,
         );
 
         // 3. Assert
         $this->assertInstanceOf(ArrayCollection::class, $collection);
         
-        // Row 1 has 3 metrics matching the filter (impressions, clicks, spend).
+        // Row 1 has 4 metrics matching the filter (impressions, clicks, spend, actions).
         // Row 2 has 4 metrics matching the filter (impressions, clicks, spend, cost_per_unique_outbound_click).
-        // Total metrics should be 7
-        $this->assertCount(7, $collection);
+        // Total metrics should be 8
+        $this->assertCount(8, $collection);
 
         $metricsMap = [];
         foreach ($collection as $item) {
@@ -227,7 +229,7 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
             period: Period::Daily
         );
 
-        $this->assertCount(2, $collection); // Impressions and clicks
+        $this->assertCount(2, $collection); // Impressions and clicks (actions missing from row)
     }
 
     public function testRobustness(): void
@@ -239,13 +241,13 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
         $this->entityManager->flush();
 
         $rows = [['date_start' => $this->faker->date(), 'impressions' => '100', 'actions' => []]];
-        $collection = FacebookGraphConvert::adAccountMetrics($rows, null, $accountEntity);
-        $this->assertCount(1, $collection);
+        $collection = FacebookGraphConvert::adAccountMetrics($rows, null, $accountEntity, metricSet: MetricSet::BASIC);
+        $this->assertCount(2, $collection); // Impressions and actions
         $this->assertEquals('100', $collection->first()->value);
 
         // 2. AdAccount with missing spend (should be skipped by metrics filter typically, but let's check)
         $rows = [['date_start' => $this->faker->date(), 'impressions' => '100']];
-        $collection = FacebookGraphConvert::adAccountMetrics($rows, null, $accountEntity);
+        $collection = FacebookGraphConvert::adAccountMetrics($rows, null, $accountEntity, metricSet: MetricSet::BASIC);
         $this->assertCount(1, $collection);
     }
 }

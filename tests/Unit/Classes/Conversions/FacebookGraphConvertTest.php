@@ -120,8 +120,7 @@ class FacebookGraphConvertTest extends BaseUnitTestCase
             Period::Daily
         );
 
-        $this->assertInstanceOf(ArrayCollection::class, $result);
-        $this->assertCount(2, $result);
+        $this->assertCount(3, $result);
         $metric = $result->first();
         $this->assertContains($metric->name, ['impressions', 'clicks']);
         $this->assertEquals($platformId, $metric->platformId);
@@ -188,7 +187,7 @@ class FacebookGraphConvertTest extends BaseUnitTestCase
         $metric = $result->first();
         $this->assertEquals('likes', $metric->name);
         $this->assertEquals($likes, $metric->value);
-        $this->assertEquals($this->channeledAccount->getPlatformId(), $metric->platformId);
+        $this->assertEquals($this->post->getPostId(), $metric->platformId);
         $this->assertEquals(Period::Lifetime->value, $metric->period);
     }
 
@@ -219,7 +218,7 @@ class FacebookGraphConvertTest extends BaseUnitTestCase
         );
 
         $this->assertInstanceOf(ArrayCollection::class, $result);
-        $this->assertCount(2, $result);
+        $this->assertCount(3, $result);
     }
 
     public function testAdsetMetrics(): void
@@ -250,7 +249,7 @@ class FacebookGraphConvertTest extends BaseUnitTestCase
         );
 
         $this->assertInstanceOf(ArrayCollection::class, $result);
-        $this->assertCount(2, $result);
+        $this->assertCount(3, $result);
     }
 
     public function testAdMetrics(): void
@@ -282,7 +281,7 @@ class FacebookGraphConvertTest extends BaseUnitTestCase
         );
 
         $this->assertInstanceOf(ArrayCollection::class, $result);
-        $this->assertCount(2, $result);
+        $this->assertCount(3, $result);
     }
 
     public function testRobustness(): void
