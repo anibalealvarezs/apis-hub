@@ -65,7 +65,15 @@ class ProcessJobsCommand extends Command
             $payload = $job->getPayload() ?? [];
             $params = $payload['params'] ?? [];
 
-            // If instance has specific range, filter out jobs not matching it
+            // 1. Instance Name Match (Primary Filter)
+            $envInstance = getenv('INSTANCE_NAME');
+            $jobInstance = $payload['instance_name'] ?? null;
+            if ($envInstance && $jobInstance && $envInstance !== $jobInstance) {
+                $stats['skipped']++;
+                continue;
+            }
+
+            // 2. Date Range Filters (Fallback/Secondary)
             if ($envStartDate !== false && $envStartDate !== '') {
                 $jobStart = $params['startDate'] ?? $params['start_date'] ?? null;
                 if ($jobStart !== $envStartDate) {
@@ -88,10 +96,13 @@ class ProcessJobsCommand extends Command
 
             // Global filters from env
             if ($envChannel = getenv('API_SOURCE')) {
-                if ($chanEnum = Channel::tryFromName($envChannel)) {
-                    $envChannel = $chanEnum->name;
-                }
-                if ($job->getChannel() !== $envChannel) {
+                $envChannelEnum = Channel::tryFromName($envChannel);
+                $jobChannelEnum = Channel::tryFromName($job->getChannel());
+                
+                $envMatch = $envChannelEnum ? $envChannelEnum->name : $envChannel;
+                $jobMatch = $jobChannelEnum ? $jobChannelEnum->name : $job->getChannel();
+
+                if ($jobMatch !== $envMatch) {
                     $stats['skipped']++;
                     continue;
                 }
