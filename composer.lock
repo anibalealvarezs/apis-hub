@@ -131,13 +131,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "812666b767d7a6674e1cad07fc30d2308d80bdab"
+                "reference": "bc14fe030c2ddc1f9522ba07a81c99f755560b79"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-812666b767d7a6674e1cad07fc30d2308d80bdab-zip-60a02d.zip",
-                "reference": "812666b767d7a6674e1cad07fc30d2308d80bdab",
-                "shasum": "b5fc502963b93a0833b2a07f415d0ee2cff5c58b"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-bc14fe030c2ddc1f9522ba07a81c99f755560b79-zip-a8cf84.zip",
+                "reference": "bc14fe030c2ddc1f9522ba07a81c99f755560b79",
+                "shasum": "f03b0cec172a753d3c622f1e893ffd457e04c9ad"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -188,7 +188,7 @@
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-10T16:15:06+00:00"
+            "time": "2026-03-11T22:32:05+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -1907,12 +1907,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/psr7.git",
-                "reference": "a496afd2526facc946694dde8d83bc03d160d72c"
+                "reference": "7d0ed42f28e42d61352a7a79de682e5e67fec884"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/psr7/zipball/a496afd2526facc946694dde8d83bc03d160d72c",
-                "reference": "a496afd2526facc946694dde8d83bc03d160d72c",
+                "url": "https://api.github.com/repos/guzzle/psr7/zipball/7d0ed42f28e42d61352a7a79de682e5e67fec884",
+                "reference": "7d0ed42f28e42d61352a7a79de682e5e67fec884",
                 "shasum": ""
             },
             "require": {
@@ -2017,7 +2017,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-10T15:20:00+00:00"
+            "time": "2026-03-10T16:41:02+00:00"
         },
         {
             "name": "monolog/monolog",
