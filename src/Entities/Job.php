@@ -90,6 +90,9 @@ class Job extends Entity
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $payload = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    protected ?string $message = null;
+
     /**
      * @return array|null
      */
@@ -104,5 +107,21 @@ class Job extends Entity
     public function addPayload(?array $payload): void
     {
         $this->payload = $payload;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getMessage(): ?string
+    {
+        return $this->message;
+    }
+
+    /**
+     * @param string|null $message
+     */
+    public function addMessage(?string $message): void
+    {
+        $this->message = $message;
     }
 }

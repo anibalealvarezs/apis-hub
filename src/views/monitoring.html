@@ -404,7 +404,7 @@
             color: #fff;
         }
 
-        .payload-container {
+        .payload-container, .message-container {
             margin-top: 10px;
             background: #0d1117;
             border-radius: 6px;
@@ -414,6 +414,12 @@
             font-family: 'Fira Code', monospace;
             border: 1px solid rgba(63, 185, 80, 0.2);
             overflow-x: auto;
+        }
+
+        .message-container {
+            color: var(--text);
+            border: 1px solid var(--border);
+            white-space: pre-wrap;
         }
 
         /* Loading Animation */
@@ -787,6 +793,11 @@
                             <span class="spec-value">${j.updated_at}</span>
                         </div>
                     </div>
+                    ${j.message ? `
+                    <div style="margin-top: 15px;">
+                        <span class="spec-label">Status Message</span>
+                        <div class="message-container">${j.message}</div>
+                    </div>` : ''}
                     <div style="margin-top: 15px;">
                         <span class="spec-label">Configuration Payload</span>
                         <div class="payload-container" style="max-height: 100px;">${paramsStr}</div>
@@ -794,14 +805,17 @@
                     <div class="job-actions">
                         ${actionButtons}
                     </div>` : `
-                    <div style="font-size: 0.75rem; color: var(--text-dim); display: flex; justify-content: space-between; align-items: center;">
-                        <span>Created: ${j.created_at} | Updated: ${j.updated_at} | Exec: ${execTime}</span>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <span style="font-family: 'Fira Code'">${statusLabel || 'ARCHIVED'}</span>
-                            <div class="job-actions" style="margin-top: 0; border: none; padding: 0;">
-                                ${actionButtons}
+                    <div style="font-size: 0.75rem; color: var(--text-dim);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Created: ${j.created_at} | Updated: ${j.updated_at} | Exec: ${execTime}</span>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <span style="font-family: 'Fira Code'">${statusLabel || 'ARCHIVED'}</span>
+                                <div class="job-actions" style="margin-top: 0; border: none; padding: 0;">
+                                    ${actionButtons}
+                                </div>
                             </div>
                         </div>
+                        ${j.message ? `<div class="message-container" style="margin-top: 5px; opacity: 0.8;">${j.message}</div>` : ''}
                     </div>
                     `}
                 </div>

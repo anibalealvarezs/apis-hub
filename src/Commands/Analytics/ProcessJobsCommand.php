@@ -154,18 +154,31 @@ class ProcessJobsCommand extends Command
                 }
 
                 // Update to completed
-                $jobRepo->update($job->getId(), (object)['status' => JobStatus::completed->value]);
+                $jobRepo->update($job->getId(), (object)[
+                    'status' => JobStatus::completed->value,
+                    'message' => 'Success'
+                ]);
                 $output->writeln("<info>Successfully completed job {$job->getUuid()}</info>");
                 $stats['completed']++;
 
             } catch (FacebookRateLimitException $e) {
                 // Update to delayed
-                $jobRepo->update($job->getId(), (object)['status' => JobStatus::delayed->value]);
+                $currentMessage = $job->getMessage();
+                $newMessage = $e->getMessage();
+                $updatedMessage = $currentMessage ? $currentMessage . PHP_EOL . $newMessage : $newMessage;
+                
+                $jobRepo->update($job->getId(), (object)[
+                    'status' => JobStatus::delayed->value,
+                    'message' => $updatedMessage
+                ]);
                 $output->writeln("<comment>Rate limit reached for job {$job->getUuid()}. Job delayed for cooldown.</comment>");
                 $stats['delayed']++;
             } catch (Throwable $e) {
                 // Update to failed
-                $jobRepo->update($job->getId(), (object)['status' => JobStatus::failed->value]);
+                $jobRepo->update($job->getId(), (object)[
+                    'status' => JobStatus::failed->value,
+                    'message' => $e->getMessage()
+                ]);
                 $output->writeln("<error>Failed job {$job->getUuid()}: {$e->getMessage()}</error>");
                 $stats['failed']++;
             }

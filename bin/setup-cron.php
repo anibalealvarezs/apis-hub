@@ -46,12 +46,20 @@ foreach ($envVars as $k => $v) {
     $cronLines[] = "{$k}=\"{$v}\"";
 }
 
+$instanceFilter = getenv('INSTANCE_NAME');
+
 foreach ($instances as $instance) {
+    $instanceName = $instance['name'] ?? null;
     $channel = $instance['channel'] ?? null;
     $entity = $instance['entity'] ?? null;
     $frequency = $instance['frequency'] ?? null;
     
     if (!$channel || !$entity || !$frequency) continue;
+
+    // Only schedule if it matches current container instance name
+    if (!$instanceFilter || $instanceName !== $instanceFilter) {
+        continue;
+    }
 
     $params = [];
     if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];

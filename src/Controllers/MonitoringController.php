@@ -17,46 +17,71 @@ class MonitoringController extends BaseController
         return new Response($html, 200, ['Content-Type' => 'text/html']);
     }
 
-    private function getTargetContainerId($job): ?string
+    private function getTargetContainerId($job, array $instances): ?string
     {
-        $chan = strtolower($job instanceof Job ? $job->getChannel() : $job['channel']);
+        $chanRaw = $job instanceof Job ? $job->getChannel() : $job['channel'];
+        $chan = \Enums\Channel::tryFromName($chanRaw)?->name ?? strtolower($chanRaw);
         $ent = strtolower($job instanceof Job ? $job->getEntity() : $job['entity']);
         
         $payload = $job instanceof Job ? $job->getPayload() : json_decode($job['payload'], true);
         $params = $payload['params'] ?? [];
-        $startDate = $params['startDate'] ?? $params['start_date'] ?? '';
+        $jobStartDate = $params['startDate'] ?? $params['start_date'] ?? null;
+        $jobEndDate = $params['endDate'] ?? $params['end_date'] ?? null;
 
-        // GSC Logic
-        if ($chan === 'gsc' || $chan === 'google_search_console' || $chan === '8') {
-            if ($ent === 'metric') {
-                if (str_starts_with($startDate, '2026-01')) return 'gsc-jan';
-                if (str_starts_with($startDate, '2026-02')) return 'gsc-feb';
-                return 'gsc-recent';
-            }
-        } 
-        // Facebook Logic
-        elseif ($chan === 'facebook' || $chan === 'fb-ads' || $chan === '3') {
-            if ($ent === 'metric') {
-                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $startDate) && !str_contains($startDate, 'days') && !str_contains($startDate, 'yesterday')) {
-                    return 'fb-ads';
+        if ($jobStartDate) $jobStartDate = str_replace('+', ' ', $jobStartDate); // Decode "+ " back to space if any
+        if ($jobEndDate) $jobEndDate = str_replace('+', ' ', $jobEndDate);
+
+        // Try to find exact match including dates
+        foreach ($instances as $instance) {
+            $instChanRaw = $instance['channel'] ?? '';
+            $instChan = \Enums\Channel::tryFromName($instChanRaw)?->name ?? strtolower($instChanRaw);
+            $instEnt = strtolower($instance['entity'] ?? '');
+            $instStart = $instance['start_date'] ?? null;
+            $instEnd = $instance['end_date'] ?? null;
+
+            if ($chan === $instChan && $ent === $instEnt) {
+                if ($instStart === $jobStartDate && $instEnd === $jobEndDate) {
+                    return $instance['name'];
                 }
-                return 'fb-recent';
             }
         }
+        
+        // Fallback: match without dates
+        foreach ($instances as $instance) {
+            $instChanRaw = $instance['channel'] ?? '';
+            $instChan = \Enums\Channel::tryFromName($instChanRaw)?->name ?? strtolower($instChanRaw);
+            $instEnt = strtolower($instance['entity'] ?? '');
+            
+            if ($chan === $instChan && $ent === $instEnt) {
+                return $instance['name'];
+            }
+        }
+
         return null;
     }
 
     public function data(): JsonResponse
     {
-        // 1. Containers
-        $containersData = [
-            ['id' => 'gsc-jan', 'name' => 'GSC January', 'source' => 'gsc', 'entity' => 'metric', 'period' => '2026-01', 'port' => 8081],
-            ['id' => 'gsc-feb', 'name' => 'GSC February', 'source' => 'gsc', 'entity' => 'metric', 'period' => '2026-02', 'port' => 8082],
-            ['id' => 'fb-ads', 'name' => 'FB Ads Historics', 'source' => 'facebook', 'entity' => 'metric', 'period' => 'Full', 'port' => 8083],
-            ['id' => 'gsc-recent', 'name' => 'GSC Recent', 'source' => 'gsc', 'entity' => 'metric', 'period' => 'Rolling', 'port' => 8084],
-            ['id' => 'fb-recent', 'name' => 'FB Recent', 'source' => 'facebook', 'entity' => 'metric', 'period' => 'Rolling', 'port' => 8085],
-            ['id' => 'redis', 'name' => 'Redis Cache', 'source' => 'global', 'entity' => 'cache', 'period' => 'N/A', 'port' => 6379],
-        ];
+        $config = Helpers::getProjectConfig();
+        $instances = $config['instances'] ?? [];
+        
+        $containersData = [];
+        foreach ($instances as $instance) {
+            $period = 'Full';
+            if (!empty($instance['start_date'])) {
+                $period = $instance['start_date'] === '-3 days' ? 'Rolling' : $instance['start_date'];
+            }
+            $containersData[] = [
+                'id' => $instance['name'],
+                'name' => ucwords(str_replace('-', ' ', $instance['name'])),
+                'source' => $instance['channel'],
+                'entity' => $instance['entity'],
+                'period' => $period,
+                'port' => $instance['port'] ?? 8080
+            ];
+        }
+
+        $containersData[] = ['id' => 'redis', 'name' => 'Redis Cache', 'source' => 'global', 'entity' => 'cache', 'period' => 'N/A', 'port' => 6379];
 
         $conn = $this->em->getConnection();
         $allJobsSql = "SELECT channel, entity, status, payload FROM jobs";
@@ -64,7 +89,7 @@ class MonitoringController extends BaseController
         
         $containerStats = [];
         foreach ($results as $row) {
-            $targetId = $this->getTargetContainerId($row);
+            $targetId = $this->getTargetContainerId($row, $instances);
             if ($targetId) {
                 $statusName = JobStatus::tryFrom((int)$row['status'])?->name ?? 'unknown';
                 if (!isset($containerStats[$targetId])) $containerStats[$targetId] = ['total' => 0];
@@ -82,12 +107,9 @@ class MonitoringController extends BaseController
         $jobRepo = $this->em->getRepository(Job::class);
         $allRecentJobs = $jobRepo->findBy([], ['id' => 'DESC'], 200);
 
-        $config = Helpers::getProjectConfig();
-        $instances = $config['instances'] ?? [];
-        
         $groupedJobs = [];
         foreach ($allRecentJobs as $job) {
-            $targetId = $this->getTargetContainerId($job);
+            $targetId = $this->getTargetContainerId($job, $instances);
             if (!$targetId) continue;
 
             if (!isset($groupedJobs[$targetId])) $groupedJobs[$targetId] = [];
@@ -97,7 +119,7 @@ class MonitoringController extends BaseController
             $params = $payload['params'] ?? [];
             $frequency = 'N/A';
             foreach ($instances as $instance) {
-                if (($instance['channel'] ?? '') === $job->getChannel() && ($instance['entity'] ?? '') === $job->getEntity()) {
+                if ($instance['name'] === $targetId) {
                     $frequency = $instance['frequency'] ?? $frequency;
                     break;
                 }
@@ -112,7 +134,8 @@ class MonitoringController extends BaseController
                 'params' => $params,
                 'frequency' => $frequency,
                 'created_at' => $job->getCreatedAt() ? $job->getCreatedAt()->format('Y-m-d H:i:s') : 'N/A',
-                'updated_at' => $job->getUpdatedAt() ? $job->getUpdatedAt()->format('Y-m-d H:i:s') : 'N/A'
+                'updated_at' => $job->getUpdatedAt() ? $job->getUpdatedAt()->format('Y-m-d H:i:s') : 'N/A',
+                'message' => $job->getMessage()
             ];
         }
 

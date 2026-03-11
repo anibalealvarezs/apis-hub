@@ -80,6 +80,7 @@ foreach ($instances as $instance) {
         "REDIS_HOST=" . $redis['host'],
         "REDIS_PORT=" . $redis['port'],
         "PROJECT_CONFIG_FILE=/app/deploy/{$projectName}.yaml",
+        "INSTANCE_NAME={$name}",
     ];
 
     if ($startDate) {
