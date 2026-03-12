@@ -6,6 +6,7 @@ use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
+use Entities\Job;
 use Enums\AnalyticsEntity;
 use Enums\Channel;
 use Enums\JobStatus;
@@ -205,18 +206,37 @@ class JobRepository extends BaseRepository
      */
     public function getJobs(): array
     {
-        $list = $this->readMultiple()->toArray();
-        return $list;
+        return $this->readMultiple()->toArray();
     }
 
     /**
      * @param int $status
-     * @return array
+     * @param string|null $channel
+     * @param string|null $instanceName
+     * @return Job[]
      */
-    public function getJobsByStatus(int $status): array
+    public function getJobsByStatus(int $status, ?string $channel = null, ?string $instanceName = null): array
     {
-        $list = $this->readMultiple(filters: (object)['status' => $status])->toArray();
-        return count($list) > 0 ? $list[0] : [];
+        $filters = ['status' => $status];
+        if ($channel) {
+            $filters['channel'] = $channel;
+        }
+
+        $qb = $this->buildReadMultipleQuery(
+            ids: null,
+            filters: (object)$filters,
+            orderBy: 'id',
+            orderDir: 'ASC',
+            limit: 100,
+            pagination: 0
+        );
+
+        if ($instanceName) {
+            $qb->andWhere('e.payload LIKE :instance_name_pattern')
+               ->setParameter('instance_name_pattern', '%"instance_name": "' . $instanceName . '"%');
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     /**

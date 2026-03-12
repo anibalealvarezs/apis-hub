@@ -55,7 +55,7 @@ Once the containers are up, each one executes `entrypoint.sh` which performs the
    This performs **3 steps automatically**:
 
    | Step | Action |
-   |---|---|
+   | --- | --- |
    | **1** | Installs Composer dependencies via `composer:latest` Docker image (skipped if `vendor/` already exists) |
    | **2** | Generates `docker-compose.yml` from `deploy/project.yaml` via `php:8.3-cli` Docker image |
    | **3** | Builds images and starts all containers (`docker compose up -d --build`) |
