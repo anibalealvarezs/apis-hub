@@ -51,5 +51,14 @@ return [
         },
         'public' => true,
         'html' => false
+    ],
+    '/api/monitoring/logs' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
+            return (new \Controllers\MonitoringController())->logs($request);
+        },
+        'public' => true,
+        'html' => false
     ]
 ];

@@ -71,11 +71,11 @@ foreach ($instances as $instance) {
     }
 
     // Command to schedule the job in the database
-    $cronLines[] = "{$frequency} root cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} >> /var/log/cron.log 2>&1";
+    $cronLines[] = "{$frequency} root cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} >> /app/logs/cron.log 2>&1";
 }
 
 // Also add the job processor cron (runs every minute)
-$cronLines[] = "* * * * * root cd /app && /usr/local/bin/php bin/cli.php jobs:process >> /var/log/jobs.log 2>&1";
+$cronLines[] = "* * * * * root cd /app && /usr/local/bin/php bin/cli.php jobs:process >> /app/logs/jobs.log 2>&1";
 
 $cronFile = '/etc/cron.d/apis-hub-cron';
 file_put_contents($cronFile, implode("\n", $cronLines) . "\n");

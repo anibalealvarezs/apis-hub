@@ -11,6 +11,8 @@ use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Dimension;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\GroupType;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Operator;
+use Anibalealvarezs\GoogleApi\Google\Exceptions\GoogleQuotaExceededException;
+use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
 use Anibalealvarezs\KlaviyoApi\Enums\AggregatedMeasurement;
 use Carbon\Carbon;
 use Classes\Conversions\FacebookGraphConvert;
@@ -222,7 +224,7 @@ class MetricRequests
     ): Response {
         if (!$logger) {
             $logger = new Logger('gsc');
-            $logger->pushHandler(new StreamHandler('logs/gsc.log', Level::Info));
+            $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/gsc.log', Level::Error));
         }
 
         // Apply default dates if missing for "recent" safety
@@ -313,20 +315,23 @@ class MetricRequests
                         accountEntity: $accountEntity,
                     );
                     if ($page['post_metrics']) {
-                        $hasResults = true;
                         foreach ($postMap['map'] as $post) {
-                            if (!$hasResults) {
-                                break;
+                            $manager->getConnection()->beginTransaction();
+                            try {
+                                self::processFacebookPagePost(
+                                    postEntity: $postRepository->findOneBy(['id' => $post]),
+                                    pageEntity: $pageEntity,
+                                    api: $api,
+                                    manager: $manager,
+                                    logger: $logger,
+                                    postMap: $postMap,
+                                    pageMap: $pageMap,
+                                );
+                                $manager->getConnection()->commit();
+                            } catch (Exception $e) {
+                                $manager->getConnection()->rollBack();
+                                $logger->error("Error processing Facebook post " . $post . ": " . $e->getMessage());
                             }
-                            $hasResults = self::processFacebookPagePost(
-                                postEntity: $postRepository->findOneBy(['id' => $post]),
-                                pageEntity: $pageEntity,
-                                api: $api,
-                                manager: $manager,
-                                logger: $logger,
-                                postMap: $postMap,
-                                pageMap: $pageMap,
-                            );
                         }
                     } else {
                         $logger->info("Skipping post metrics for page: " . $page['id']);
@@ -335,17 +340,24 @@ class MetricRequests
                     $logger->info("Skipping posts for page: " . $page['id']);
                 }
                 if ($page['ig_account'] && $page['ig_account_metrics']) {
-                    self::processInstagramAccount(
-                        page: $page,
-                        api: $api,
-                        manager: $manager,
-                        accountEntity: $accountEntity,
-                        pageEntity: $pageEntity,
-                        logger: $logger,
-                        pageMap: $pageMap,
-                        startDate: $startDate,
-                        endDate: $endDate,
-                    );
+                    $manager->getConnection()->beginTransaction();
+                    try {
+                        self::processInstagramAccount(
+                            page: $page,
+                            api: $api,
+                            manager: $manager,
+                            accountEntity: $accountEntity,
+                            pageEntity: $pageEntity,
+                            logger: $logger,
+                            pageMap: $pageMap,
+                            startDate: $startDate,
+                            endDate: $endDate,
+                        );
+                        $manager->getConnection()->commit();
+                    } catch (Exception $e) {
+                        $manager->getConnection()->rollBack();
+                        $logger->error("Error processing Instagram account " . $page['ig_account'] . ": " . $e->getMessage());
+                    }
                 }
                 $channeledAccountEntity = $channeledAccountRepository->findOneBy([
                     'platformId' => $page['ig_account'],
@@ -362,22 +374,28 @@ class MetricRequests
                         channeledAccountEntity: $channeledAccountEntity,
                     );
                     if ($page['ig_account_media_metrics']) {
-                        $hasResults = true;
                         foreach ($mediaMap['map'] as $media) {
-                            if (($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$media] == $page['ig_account_media_stop_id'])) || !$hasResults) {
+                            if ($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$media] == $page['ig_account_media_stop_id'])) {
                                 break;
                             }
-                            $hasResults = self::processInstagramMedia(
-                                pageEntity: $pageEntity,
-                                postEntity: $postRepository->findOneBy(['id' => $media]),
-                                accountEntity: $accountEntity,
-                                channeledAccountEntity: $channeledAccountEntity,
-                                api: $api,
-                                manager: $manager,
-                                logger: $logger,
-                                mediaMap: $mediaMap,
-                                pageMap: $pageMap,
-                            );
+                            $manager->getConnection()->beginTransaction();
+                            try {
+                                self::processInstagramMedia(
+                                    pageEntity: $pageEntity,
+                                    postEntity: $postRepository->findOneBy(['id' => $media]),
+                                    accountEntity: $accountEntity,
+                                    channeledAccountEntity: $channeledAccountEntity,
+                                    api: $api,
+                                    manager: $manager,
+                                    logger: $logger,
+                                    mediaMap: $mediaMap,
+                                    pageMap: $pageMap,
+                                );
+                                $manager->getConnection()->commit();
+                            } catch (Exception $e) {
+                                $manager->getConnection()->rollBack();
+                                $logger->error("Error processing Instagram media " . $media . ": " . $e->getMessage());
+                            }
                         }
                     } else {
                         $logger->info("Skipping Instagram media metrics for page: " . $page['id']);
@@ -512,6 +530,16 @@ class MetricRequests
                 $startDate,
                 $endDate
             );
+        } catch (FacebookRateLimitException $e) {
+            $logger->error("Facebook API Rate Limit Reach: " . $e->getMessage());
+            try {
+                if ($manager->getConnection()->isTransactionActive()) {
+                    $manager->getConnection()->rollback();
+                }
+            } catch (Exception $rollbackException) {
+                $logger->error("Error during transaction rollback: " . $rollbackException->getMessage());
+            }
+            return new Response(json_encode(['error' => 'Rate limit reached: ' . $e->getMessage()]), 429);
         } catch (Exception $e) {
             try {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -601,7 +629,7 @@ class MetricRequests
     ): Response {
         if (!$logger) {
             $logger = new Logger('gsc');
-            $logger->pushHandler(new StreamHandler('logs/gsc.log', Level::Info));
+            $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/gsc.log', Level::Error));
         }
 
         $logger->info("Starting getListFromGoogleSearchConsole: startDate=$startDate, endDate=$endDate, resume=$resume");
@@ -704,6 +732,16 @@ class MetricRequests
                 $startDate,
                 $endDate
             );
+        } catch (GoogleQuotaExceededException $e) {
+            $logger->error("Google API Quota Exceeded: " . $e->getMessage());
+            try {
+                if ($manager->getConnection()->isTransactionActive()) {
+                    $manager->getConnection()->rollback();
+                }
+            } catch (Exception $rollbackException) {
+                $logger->error("Error during transaction rollback: " . $rollbackException->getMessage());
+            }
+            return new Response(json_encode(['error' => 'Quota exceeded: ' . $e->getMessage()]), 429);
         } catch (Exception $e) {
             try {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -1945,7 +1983,7 @@ class MetricRequests
             $subConditions = [];
             foreach ($fields as $field) {
                 $subConditions[] = "$field = ?";
-                $params[] = match($field) {
+                $params[] = match($field) { default => null, 
                     'postId' => $platformId,
                     'page_id' => $pageEntity->getId(),
                     'account_id' => $accountEntity->getId(),
@@ -2006,7 +2044,7 @@ class MetricRequests
                 $subConditions = [];
                 foreach ($fields as $field) {
                     $subConditions[] = "$field = ?";
-                    $reFetchParams[] = match($field) {
+                    $reFetchParams[] = match($field) { default => null, 
                         'postId' => $platformId,
                         'page_id' => $pageEntity->getId(),
                         'account_id' => $accountEntity->getId(),
@@ -2071,7 +2109,7 @@ class MetricRequests
             $subConditions = [];
             foreach ($fields as $field) {
                 $subConditions[] = "$field = ?";
-                $params[] = match($field) {
+                $params[] = match($field) { default => null, 
                     'postId' => $platformId,
                     'page_id' => $pageEntity->getId(),
                     'account_id' => $accountEntity->getId(),
@@ -2134,7 +2172,7 @@ class MetricRequests
                 $subConditions = [];
                 foreach ($fields as $field) {
                     $subConditions[] = "$field = ?";
-                    $reFetchParams[] = match($field) {
+                    $reFetchParams[] = match($field) { default => null, 
                         'postId' => $platformId,
                         'page_id' => $pageEntity->getId(),
                         'account_id' => $accountEntity->getId(),
@@ -2195,7 +2233,7 @@ class MetricRequests
             $subConditions = [];
             foreach ($campaignFields as $field) {
                 $subConditions[] = "$field = ?";
-                $campaignParams[] = match($field) {
+                $campaignParams[] = match($field) { default => null, 
                     'campaignId' => $campaign['id'],
                     'name' => $campaign['name'],
                 };
@@ -2258,7 +2296,7 @@ class MetricRequests
                 $subConditions = [];
                 foreach ($campaignFields as $field) {
                     $subConditions[] = "$field = ?";
-                    $reFetchCampaignParams[] = match($field) {
+                    $reFetchCampaignParams[] = match($field) { default => null, 
                         'campaignId' => $campaign['id'],
                         'name' => $campaign['name'],
                     };
@@ -2292,7 +2330,7 @@ class MetricRequests
             $subConditions = [];
             foreach ($channeledCampaignFields as $field) {
                 $subConditions[] = "$field = ?";
-                $channeledCampaignParams[] = match($field) {
+                $channeledCampaignParams[] = match($field) { default => null, 
                     'campaign_id' => $campaignMap['map'][$campaign['id']],
                     'platformId' => $campaign['id'],
                     'channeledAccount_id' => $channeledAccountEntity->getId(),
@@ -2343,7 +2381,7 @@ class MetricRequests
                 $subConditions = [];
                 foreach ($channeledCampaignFields as $field) {
                     $subConditions[] = "$field = ?";
-                    $fetchChanneledCampaignParams[] = match($field) {
+                    $fetchChanneledCampaignParams[] = match($field) { default => null, 
                         'campaign_id' => $campaignMap['map'][$campaign['id']],
                         'platformId' => $campaign['id'],
                         'channeledAccount_id' => $channeledAccountEntity->getId(),
@@ -2410,7 +2448,7 @@ class MetricRequests
             $subConditions = [];
             foreach ($adsetFields as $field) {
                 $subConditions[] = "$field = ?";
-                $adsetParams[] = match($field) {
+                $adsetParams[] = match($field) { default => null, 
                     'channeledAccount_id' => $channeledAccountEntity->getId(),
                     'campaign_id' => $campaignMap['map'][$adset['campaign_id']],
                     'platformId' => $adset['id'],
@@ -2504,7 +2542,7 @@ class MetricRequests
                 $subConditions = [];
                 foreach ($adsetFields as $field) {
                     $subConditions[] = "$field = ?";
-                    $reFetchAdsetParams[] = match($field) {
+                    $reFetchAdsetParams[] = match($field) { default => null, 
                         'channeledAccount_id' => $channeledAccountEntity->getId(),
                         'campaign_id' => $campaignMap['map'][$adset['campaign_id']],
                         'platformId' => $adset['id'],
@@ -2575,7 +2613,7 @@ class MetricRequests
                     throw new Exception("Ad Set ID {$ad['adset_id']} not found in local mapping during Ad sync for account {$channeledAccountEntity->getPlatformId()}. Ad: {$ad['id']}");
                 }
                 $subConditions[] = "$field = ?";
-                $adParams[] = match($field) {
+                $adParams[] = match($field) { default => null, 
                     'platformId' => $ad['id'],
                     'channeledCampaign_id' => $channeledCampaignMap['map'][$ad['campaign_id']],
                     'channeledAdGroup_id' => $channeledAdGroupMap['map'][$ad['adset_id']],
@@ -2642,7 +2680,7 @@ class MetricRequests
                 $subConditions = [];
                 foreach ($adFields as $field) {
                     $subConditions[] = "$field = ?";
-                    $reFetchAdParams[] = match($field) {
+                    $reFetchAdParams[] = match($field) { default => null, 
                         'platformId' => $ad['id'],
                         'channeledCampaign_id' => $channeledCampaignMap['map'][$ad['campaign_id']],
                         'channeledAdGroup_id' => $channeledAdGroupMap['map'][$ad['adset_id']],
@@ -3393,7 +3431,7 @@ class MetricRequests
 
         if (!$logger) {
             $logger = new Logger('gsc');
-            $logger->pushHandler(new StreamHandler('logs/gsc.log', Level::Info));
+            $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/gsc.log', Level::Error));
         }
         $logger->info("Starting process with " . $channeledCollection->count() . " metrics");
 

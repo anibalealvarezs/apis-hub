@@ -38,15 +38,12 @@ class ProcessJobsCommand extends Command
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
 
-        $output->writeln("Querying scheduled and delayed jobs...");
+        $jobs = $jobRepo->findBy(['status' => [JobStatus::scheduled->value, JobStatus::delayed->value]]);
 
         $envStartDate = getenv('START_DATE');
         $envEndDate = getenv('END_DATE');
 
-        $jobs = $jobRepo->findBy(['status' => [JobStatus::scheduled->value, JobStatus::delayed->value]]);
-
         if (empty($jobs)) {
-            $output->writeln("No jobs found.");
             return Command::SUCCESS;
         }
 
@@ -191,6 +188,7 @@ class ProcessJobsCommand extends Command
                     'message' => $e->getMessage()
                 ]);
                 $output->writeln("<error>Failed job {$job->getUuid()}: {$e->getMessage()}</error>");
+                $output->writeln($e->getTraceAsString());
                 $stats['failed']++;
             }
         }

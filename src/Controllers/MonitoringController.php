@@ -268,4 +268,58 @@ class MonitoringController extends BaseController
             return new JsonResponse(['error' => $e->getMessage()], 500);
         }
     }
+
+    public function logs(Request $request): JsonResponse
+    {
+        $logFile = $request->query->get('file', 'jobs');
+        $lines = (int)$request->query->get('lines', 500);
+        
+        $filePath = '';
+        switch ($logFile) {
+            case 'jobs': $filePath = '/app/logs/jobs.log'; break;
+            case 'cron': $filePath = '/app/logs/cron.log'; break;
+            case 'gsc':  $filePath = '/app/logs/gsc.log';  break;
+            default: return new JsonResponse(['error' => 'Invalid log file'], 400);
+        }
+
+        if (!file_exists($filePath)) {
+            return new JsonResponse(['content' => "Log file not found: $filePath"]);
+        }
+
+        $content = $this->readLastLines($filePath, $lines);
+        return new JsonResponse(['content' => $content, 'file' => $logFile]);
+    }
+
+    private function readLastLines(string $filename, int $lines): string
+    {
+        if (!file_exists($filename) || !is_readable($filename)) {
+            return "File not found or not readable.";
+        }
+
+        $file = fopen($filename, "rb");
+        if (!$file) return "Could not open file.";
+
+        $lineCount = 0;
+        $pos = -2; // Start from end of file
+        $t = " ";
+        $data = "";
+
+        fseek($file, $pos, SEEK_END);
+
+        while ($lineCount < $lines) {
+            try {
+                if (fseek($file, $pos, SEEK_END) == -1) break;
+                $t = fgetc($file);
+                if ($t == "\n") $lineCount++;
+                $pos--;
+            } catch (\Exception $e) {
+                break;
+            }
+        }
+
+        $data = fread($file, abs($pos));
+        fclose($file);
+
+        return $data ?: "Empty log file.";
+    }
 }

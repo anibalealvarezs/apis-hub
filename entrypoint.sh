@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Ensure persistent log directory exists (mapped to host via volume)
+mkdir -p /app/logs
+
 # Update database schema and seed entities
 echo "Initializing database..."
 php bin/cli.php orm:schema-tool:update --force || echo "Schema update failed"
@@ -13,9 +16,22 @@ if [ -n "$PROJECT_CONFIG_FILE" ]; then
     PROJECT_NAME=$(basename "$PROJECT_CONFIG_FILE" .yaml)
     echo "Configuring dynamic cron for project: $PROJECT_NAME..."
     php bin/setup-cron.php "$PROJECT_NAME" || echo "Cron setup failed, continuing..."
-    
-    # Ensure cron service is ready
-    touch /var/log/cron.log /var/log/jobs.log
+
+    # Ensure log files exist
+    touch /app/logs/cron.log /app/logs/jobs.log /app/logs/gsc.log
+
+    # Configure logrotate to cap logs at 2MB
+    cat > /etc/logrotate.d/apis-hub << 'EOF'
+/app/logs/*.log {
+    size 2M
+    rotate 2
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+EOF
+
     crontab /etc/cron.d/apis-hub-cron || echo "Crontab load failed"
 fi
 
