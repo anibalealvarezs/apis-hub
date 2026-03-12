@@ -15,7 +15,8 @@ use Anibalealvarezs\GoogleApi\Google\Exceptions\GoogleQuotaExceededException;
 use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
 use Anibalealvarezs\KlaviyoApi\Enums\AggregatedMeasurement;
 use Carbon\Carbon;
-use Classes\Conversions\FacebookGraphConvert;
+use Classes\Conversions\FacebookMarketingMetricConvert;
+use Classes\Conversions\FacebookOrganicMetricConvert;
 use Classes\Conversions\GoogleSearchConsoleConvert;
 use Classes\Conversions\KlaviyoConvert;
 use Classes\MapGenerator;
@@ -1069,7 +1070,7 @@ class MetricRequests
                 return;
             }
 
-            $metrics = FacebookGraphConvert::pageMetrics(
+            $metrics = FacebookOrganicMetricConvert::pageMetrics(
                 rows: $rows['data'],
                 pagePlatformId: (string) $page['id'],
                 logger: $logger,
@@ -1197,7 +1198,7 @@ class MetricRequests
                 return;
             }
 
-            $metrics = FacebookGraphConvert::adAccountMetrics(
+            $metrics = FacebookMarketingMetricConvert::adAccountMetrics(
                 rows: $rows['data'],
                 logger: $logger,
                 accountEntity: $accountEntity,
@@ -1363,7 +1364,7 @@ class MetricRequests
                     }
                     $option++;
                 }
-                $metrics = FacebookGraphConvert::igAccountMetrics(
+                $metrics = FacebookOrganicMetricConvert::igAccountMetrics(
                     rows: $rows['data'],
                     date: $startDate->format('Y-m-d'),
                     pageEntity: $pageEntity,
@@ -1496,7 +1497,7 @@ class MetricRequests
                 return false;
             }
 
-            $metrics = FacebookGraphConvert::igMediaMetrics(
+            $metrics = FacebookOrganicMetricConvert::igMediaMetrics(
                 rows: $insights['data'],
                 pageEntity: $pageEntity,
                 postEntity: $postEntity,
@@ -1614,7 +1615,7 @@ class MetricRequests
                 return false;
             }
 
-            $metrics = FacebookGraphConvert::campaignMetrics(
+            $metrics = FacebookMarketingMetricConvert::campaignMetrics(
                 rows: $rows['data'],
                 logger: $logger,
                 channeledAccountEntity: $channeledAccountEntity,
@@ -1740,7 +1741,7 @@ class MetricRequests
                 return false;
             }
 
-            $metrics = FacebookGraphConvert::adsetMetrics(
+            $metrics = FacebookMarketingMetricConvert::adsetMetrics(
                 rows: $rows['data'],
                 logger: $logger,
                 channeledAccountEntity: $channeledAccountEntity,
@@ -1873,7 +1874,7 @@ class MetricRequests
                 return false;
             }
 
-            $metrics = FacebookGraphConvert::adMetrics(
+            $metrics = FacebookMarketingMetricConvert::adMetrics(
                 rows: $rows['data'],
                 logger: $logger,
                 channeledAccountEntity: $channeledAccountEntity,
@@ -2114,7 +2115,7 @@ class MetricRequests
                 return false;
             }
 
-            $metrics = FacebookGraphConvert::pageMetrics(
+            $metrics = FacebookOrganicMetricConvert::pageMetrics(
                 rows: $rows['data'],
                 postPlatformId: $postEntity->getPostId(),
                 logger: $logger,
@@ -3660,7 +3661,7 @@ class MetricRequests
                     continue;
                 }
 
-                $metrics = FacebookGraphConvert::campaignMetrics(
+                $metrics = FacebookMarketingMetricConvert::campaignMetrics(
                     rows: $campaignRows,
                     logger: $logger,
                     channeledAccountEntity: $channeledAccountEntity,
@@ -3796,7 +3797,7 @@ class MetricRequests
                     continue;
                 }
 
-                $metrics = FacebookGraphConvert::adsetMetrics(
+                $metrics = FacebookMarketingMetricConvert::adsetMetrics(
                     rows: $adsetRows,
                     logger: $logger,
                     channeledAccountEntity: $channeledAccountEntity,
@@ -3940,7 +3941,7 @@ class MetricRequests
                     continue;
                 }
 
-                $metrics = FacebookGraphConvert::adMetrics(
+                $metrics = FacebookMarketingMetricConvert::adMetrics(
                     rows: $adRows,
                     logger: $logger,
                     channeledAccountEntity: $channeledAccountEntity,

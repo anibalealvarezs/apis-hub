@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
-use Classes\Conversions\FacebookConvert;
+use Classes\Conversions\FacebookOrganicConvert;
 use Classes\SocialProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
@@ -71,7 +71,7 @@ class PageRequests implements RequestInterface
                 // In this case, 'pages' in config are already "entities" we want to ensure exist in DB
                 // But we might want to fetch more info from API if needed
                 // For now, let's just use the config data to sync
-                $channeledCollection->add(FacebookConvert::pages([$pageCfg], $account->getId())->first());
+                $channeledCollection->add(FacebookOrganicConvert::pages([$pageCfg], $account->getId())->first());
             }
 
             if (!$channeledCollection->isEmpty()) {

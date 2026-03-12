@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
-use Classes\Conversions\FacebookConvert;
+use Classes\Conversions\FacebookOrganicConvert;
 use Classes\SocialProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
@@ -85,7 +85,7 @@ class PostRequests implements RequestInterface
                     additionalParams: $additionalParams
                 );
                 if (!empty($fbPosts['data'])) {
-                    $converted = FacebookConvert::posts(
+                    $converted = FacebookOrganicConvert::posts(
                         posts: $fbPosts['data'],
                         pageId: $pageEntity->getId(),
                         accountId: $accountEntity->getId()
@@ -109,7 +109,7 @@ class PostRequests implements RequestInterface
                         additionalParams: $additionalParams
                     );
                     if (!empty($igMedia['data'])) {
-                        $converted = FacebookConvert::posts(
+                        $converted = FacebookOrganicConvert::posts(
                             posts: $igMedia['data'],
                             pageId: $pageEntity->getId(),
                             accountId: $accountEntity->getId(),

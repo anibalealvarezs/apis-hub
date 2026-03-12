@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
-use Classes\Conversions\FacebookConvert;
+use Classes\Conversions\FacebookMarketingConvert;
 use Classes\MarketingProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
@@ -81,7 +81,7 @@ class AdGroupRequests implements RequestInterface
                 $logger->info("Fetched " . count($adsets['data']) . " adsets for ad account $adAccountId");
 
                 if (!empty($adsets['data'])) {
-                    self::process(FacebookConvert::adsets($adsets['data'], $channeledAccount->getId()));
+                    self::process(FacebookMarketingConvert::adsets($adsets['data'], $channeledAccount->getId()));
                 }
             }
 

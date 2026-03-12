@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
-use Classes\Conversions\FacebookConvert;
+use Classes\Conversions\FacebookMarketingConvert;
 use Classes\MarketingProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
@@ -86,7 +86,7 @@ class CampaignRequests implements RequestInterface
                 $logger->info("Fetched " . count($campaigns['data']) . " campaigns for ad account $adAccountId");
 
                 if (!empty($campaigns['data'])) {
-                    self::process(FacebookConvert::campaigns($campaigns['data'], $channeledAccount->getId()));
+                    self::process(FacebookMarketingConvert::campaigns($campaigns['data'], $channeledAccount->getId()));
                 }
             }
 
