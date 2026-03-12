@@ -116,6 +116,7 @@ $services['redis'] = [
 ];
 
 $compose = [
+    'name'     => 'apis-hub',
     'services' => $services,
     'volumes'  => ['redis_data' => null],
 ];
