@@ -37,13 +37,33 @@ Once the containers are up, each one executes `entrypoint.sh` which performs the
 | **Idempotency** | The scheduling command checks for existing `scheduled` or `processing` jobs for the same range. | Safe to run in parallel across multiple containers. |
 | **Combined Entrypoint** | Merges infrastructure setup (Cron) with application setup (DB/Jobs). | Guaranteed consistency; the container is not "Ready" until its local configuration is applied. |
 
-## 📝 Usage Example
+## 📝 Usage
 
-1. Edit `deploy/project.yaml` with your credentials and instances.
-2. Run:
+### Prerequisites
+
+- **Docker** and **Docker Compose** — that's it. No host-side PHP, Laragon, or any other runtime required.
+
+### Steps
+
+1. Edit `deploy/project.yaml` with your credentials, DB settings, and instance definitions.
+2. Run from the project root:
 
    ```bash
    ./bin/full-deploy.sh project
    ```
 
-3. Check the progress at: `http://<your-server-ip>:<port>/monitoring` (or whatever port your first instance uses).
+   This performs **3 steps automatically**:
+
+   | Step | Action |
+   |---|---|
+   | **1** | Installs Composer dependencies via `composer:latest` Docker image (skipped if `vendor/` already exists) |
+   | **2** | Generates `docker-compose.yml` from `deploy/project.yaml` via `php:8.3-cli` Docker image |
+   | **3** | Builds images and starts all containers (`docker compose up -d --build`) |
+
+3. Once containers are running, each one self-initializes:
+   - Migrates the DB schema
+   - Seeds entities and catalogs
+   - Schedules initial jobs (historical + recent ranges)
+   - Sets up its local cron worker
+
+4. Monitor progress at: `http://<host>:<port>/monitoring`
