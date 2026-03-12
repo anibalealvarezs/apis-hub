@@ -27,12 +27,16 @@ class PostRequests implements RequestInterface
     }
 
     /**
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @param LoggerInterface|null $logger
      * @param int|null $jobId
      * @param array|null $pageIds
      * @return Response
      */
     public static function getListFromFacebook(
+        ?string $startDate = null,
+        ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?array $pageIds = null
@@ -56,6 +60,11 @@ class PostRequests implements RequestInterface
             foreach ($pagesToProcess as $pageCfg) {
                 Helpers::checkJobStatus($jobId);
 
+                if (empty($pageCfg['enabled']) || empty($pageCfg['posts'])) {
+                    $logger->info("Skipping posts sync for page: " . ($pageCfg['name'] ?? $pageCfg['id']) . " (disabled in config)");
+                    continue;
+                }
+
                 $pageEntity = $pageRepo->findOneBy(['platformId' => $pageCfg['id']]);
                 if (!$pageEntity) {
                     $logger->warning("Page entity not found for platformId: " . $pageCfg['id']);
@@ -65,8 +74,16 @@ class PostRequests implements RequestInterface
                 $accountEntity = $pageEntity->getAccount();
 
                 // 1. Fetch Facebook Page Posts
-                $logger->info("Fetching Facebook posts for page: " . $pageCfg['name']);
-                $fbPosts = $api->getFacebookPosts(pageId: (string) $pageCfg['id']);
+                $logger->info("Fetching Facebook posts for page: " . $pageCfg['name'] . ($startDate ? " since $startDate" : "") . ($endDate ? " until $endDate" : ""));
+                
+                $additionalParams = [];
+                if ($startDate) $additionalParams['since'] = $startDate;
+                if ($endDate) $additionalParams['until'] = $endDate;
+
+                $fbPosts = $api->getFacebookPosts(
+                    pageId: (string) $pageCfg['id'],
+                    additionalParams: $additionalParams
+                );
                 if (!empty($fbPosts['data'])) {
                     $converted = FacebookConvert::posts(
                         posts: $fbPosts['data'],
@@ -77,7 +94,7 @@ class PostRequests implements RequestInterface
                 }
 
                 // 2. Fetch Instagram Media if applicable
-                if (!empty($pageCfg['ig_account'])) {
+                if (!empty($pageCfg['ig_account']) && !empty($pageCfg['ig_account_media'])) {
                     $logger->info("Fetching Instagram media for page: " . $pageCfg['name']);
                     
                     // We need a channeled account for IG media as per existing logic
@@ -87,7 +104,10 @@ class PostRequests implements RequestInterface
                         // This logic might need refinement based on how IG accounts are linked to Ad Accounts
                     ]);
 
-                    $igMedia = $api->getInstagramMedia(igUserId: (string) $pageCfg['ig_account']);
+                    $igMedia = $api->getInstagramMedia(
+                        igUserId: (string) $pageCfg['ig_account'],
+                        additionalParams: $additionalParams
+                    );
                     if (!empty($igMedia['data'])) {
                         $converted = FacebookConvert::posts(
                             posts: $igMedia['data'],

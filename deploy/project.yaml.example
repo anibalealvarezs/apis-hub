@@ -65,14 +65,20 @@ instances:
     end_date: "yesterday"
     # Granularity: 1 day (standard for aggregated metrics)
 
-  - name: fb-ads-daily
+  - name: fb-entities-sync
     frequency: "0 5 * * *" # Runs daily at 05:00 AM
+    channel: facebook      # Optimized bridge channel
+    entity: facebook_entities # Integrated sync for Pages, Campaigns, AdGroups, etc.
+
+  - name: fb-ads-daily
+    frequency: "30 5 * * *" # Runs after entities sync
     channel: facebook
     entity: metric
+    # Dependency: ensure entities are cached before fetching metrics
+    requires: "fb-entities-sync"
     # GOLD STANDARD: -3 days to yesterday for reliable attribution
     start_date: "-3 days"
     end_date: "yesterday"
-    # Granularity: 1 day (standard for aggregated metrics)
 
 # ── Channel credentials & config ─────────────────────────────────────────────
 # Credentials and specific settings for each integration channel.

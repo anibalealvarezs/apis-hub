@@ -144,6 +144,21 @@ class ProcessJobsCommand extends Command
                 }
             }
 
+            // Dependency check
+            $requires = $params['requires'] ?? null;
+            if ($requires) {
+                $requiredInstances = array_map('trim', explode(',', $requires));
+                foreach ($requiredInstances as $requiredInstance) {
+                    if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
+                        if (Helpers::isDebug()) {
+                            $output->writeln("<comment>Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.</comment>");
+                        }
+                        $stats['skipped']++;
+                        continue 2; // Skip to next job
+                    }
+                }
+            }
+
             if (Helpers::isDebug()) {
                 $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
             }

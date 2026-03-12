@@ -316,4 +316,29 @@ class JobRepository extends BaseRepository
 
         return (int)$updatedRows > 0;
     }
+
+    /**
+     * @param string $instanceName
+     * @param int $withinHours
+     * @return bool
+     */
+    public function hasSuccessfulRecentJob(string $instanceName, int $withinHours = 24): bool
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $since = new \DateTime();
+        $since->modify("-$withinHours hours");
+
+        $count = $qb->select('count(e.id)')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.payload LIKE :instance_name_pattern')
+            ->andWhere('e.status = :completed')
+            ->andWhere('e.updatedAt >= :since')
+            ->setParameter('instance_name_pattern', '%"instance_name": "' . $instanceName . '"%')
+            ->setParameter('completed', JobStatus::completed->value)
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int)$count > 0;
+    }
 }

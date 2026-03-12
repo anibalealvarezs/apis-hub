@@ -27,11 +27,15 @@ class PageRequests implements RequestInterface
     }
 
     /**
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @param LoggerInterface|null $logger
      * @param int|null $jobId
      * @return Response
      */
     public static function getListFromFacebook(
+        ?string $startDate = null,
+        ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null
     ): Response {
@@ -52,6 +56,11 @@ class PageRequests implements RequestInterface
 
             foreach ($pagesToProcess as $pageCfg) {
                 Helpers::checkJobStatus($jobId);
+
+                if (empty($pageCfg['enabled'])) {
+                    $logger->info("Skipping page sync for page: " . ($pageCfg['name'] ?? $pageCfg['id']) . " (disabled in config)");
+                    continue;
+                }
 
                 $account = $accountRepo->findOneBy(['name' => $pageCfg['account']]);
                 if (!$account) {

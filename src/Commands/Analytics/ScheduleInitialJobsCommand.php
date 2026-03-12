@@ -54,6 +54,7 @@ class ScheduleInitialJobsCommand extends Command
             $params = [];
             if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];
             if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
+            if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
 
             // Check if a similar job is already scheduled or processing
             $existingJob = $jobRepository->findOneBy([

@@ -28,12 +28,16 @@ class CampaignRequests implements RequestInterface
     }
 
     /**
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @param LoggerInterface|null $logger
      * @param int|null $jobId
      * @param array|null $adAccountIds
      * @return Response
      */
     public static function getListFromFacebook(
+        ?string $startDate = null,
+        ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?array $adAccountIds = null
@@ -47,10 +51,20 @@ class CampaignRequests implements RequestInterface
             $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
             $manager = Helpers::getManager();
 
-            $accountsToProcess = $adAccountIds ?? array_column($config['facebook']['ad_accounts'], 'id');
+            $adAccounts = $config['facebook']['ad_accounts'] ?? [];
+            if ($adAccountIds) {
+                $adAccounts = array_filter($adAccounts, fn($acc) => in_array($acc['id'], $adAccountIds));
+            }
 
-            foreach ($accountsToProcess as $adAccountId) {
+            foreach ($adAccounts as $adAccount) {
                 Helpers::checkJobStatus($jobId);
+
+                if (empty($adAccount['enabled']) || empty($adAccount['campaigns'])) {
+                    $logger->info("Skipping campaigns sync for ad account: " . $adAccount['id'] . " (disabled in config)");
+                    continue;
+                }
+
+                $adAccountId = (string) $adAccount['id'];
 
                 $channeledAccount = $manager->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class)->findOneBy([
                     'platformId' => $adAccountId,
@@ -61,7 +75,14 @@ class CampaignRequests implements RequestInterface
                     continue;
                 }
 
-                $campaigns = $api->getCampaigns(adAccountId: $adAccountId);
+                $additionalParams = [];
+                if ($startDate) $additionalParams['since'] = $startDate;
+                if ($endDate) $additionalParams['until'] = $endDate;
+
+                $campaigns = $api->getCampaigns(
+                    adAccountId: $adAccountId,
+                    additionalParams: $additionalParams
+                );
                 $logger->info("Fetched " . count($campaigns['data']) . " campaigns for ad account $adAccountId");
 
                 if (!empty($campaigns['data'])) {
@@ -83,7 +104,7 @@ class CampaignRequests implements RequestInterface
     public static function process(ArrayCollection $channeledCollection): Response
     {
         $manager = Helpers::getManager();
-        \Classes\MarketingProcessor::processCampaigns($channeledCollection, $manager);
+        MarketingProcessor::processCampaigns($channeledCollection, $manager);
         return new Response(json_encode(['Campaigns processed']));
     }
 }

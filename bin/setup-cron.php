@@ -62,9 +62,12 @@ foreach ($instances as $instance) {
         continue;
     }
 
-    $params = [];
+    $params = [
+        'instance_name' => $instanceName
+    ];
     if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];
     if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
+    if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
     
     $paramString = "";
     if (!empty($params)) {

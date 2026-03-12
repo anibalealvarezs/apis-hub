@@ -23,11 +23,15 @@ class FacebookEntityRequests implements RequestInterface
     }
 
     /**
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @param LoggerInterface|null $logger
      * @param int|null $jobId
      * @return Response
      */
     public static function getListFromFacebook(
+        ?string $startDate = null,
+        ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null
     ): Response {
@@ -39,19 +43,19 @@ class FacebookEntityRequests implements RequestInterface
             $logger->info("Starting full Facebook entities sync via FacebookEntityRequests");
 
             // 1. Sync Pages
-            PageRequests::getListFromFacebook($logger, $jobId);
+            PageRequests::getListFromFacebook($startDate, $endDate, $logger, $jobId);
 
             // 2. Sync Campaigns
-            CampaignRequests::getListFromFacebook($logger, $jobId);
+            CampaignRequests::getListFromFacebook($startDate, $endDate, $logger, $jobId);
 
             // 3. Sync AdGroups
-            AdGroupRequests::getListFromFacebook($logger, $jobId);
+            AdGroupRequests::getListFromFacebook($startDate, $endDate, $logger, $jobId);
 
             // 4. Sync Ads
-            AdRequests::getListFromFacebook($logger, $jobId);
+            AdRequests::getListFromFacebook($startDate, $endDate, $logger, $jobId);
 
             // 5. Sync Posts
-            PostRequests::getListFromFacebook($logger, $jobId);
+            PostRequests::getListFromFacebook($startDate, $endDate, $logger, $jobId);
 
             $logger->info("Full Facebook entities sync completed");
 

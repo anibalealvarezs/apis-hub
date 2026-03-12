@@ -27,12 +27,16 @@ class AdRequests implements RequestInterface
     }
 
     /**
+     * @param string|null $startDate
+     * @param string|null $endDate
      * @param LoggerInterface|null $logger
      * @param int|null $jobId
      * @param array|null $adAccountIds
      * @return Response
      */
     public static function getListFromFacebook(
+        ?string $startDate = null,
+        ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?array $adAccountIds = null
@@ -46,10 +50,20 @@ class AdRequests implements RequestInterface
             $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
             $manager = Helpers::getManager();
 
-            $accountsToProcess = $adAccountIds ?? array_column($config['facebook']['ad_accounts'], 'id');
+            $adAccounts = $config['facebook']['ad_accounts'] ?? [];
+            if ($adAccountIds) {
+                $adAccounts = array_filter($adAccounts, fn($acc) => in_array($acc['id'], $adAccountIds));
+            }
 
-            foreach ($accountsToProcess as $adAccountId) {
+            foreach ($adAccounts as $adAccount) {
                 Helpers::checkJobStatus($jobId);
+
+                if (empty($adAccount['enabled']) || empty($adAccount['ads'])) {
+                    $logger->info("Skipping ads sync for ad account: " . $adAccount['id'] . " (disabled in config)");
+                    continue;
+                }
+
+                $adAccountId = (string) $adAccount['id'];
 
                 $channeledAccount = $manager->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class)->findOneBy([
                     'platformId' => $adAccountId,
@@ -59,7 +73,14 @@ class AdRequests implements RequestInterface
                     continue;
                 }
 
-                $ads = $api->getAds(adAccountId: $adAccountId);
+                $additionalParams = [];
+                if ($startDate) $additionalParams['since'] = $startDate;
+                if ($endDate) $additionalParams['until'] = $endDate;
+
+                $ads = $api->getAds(
+                    adAccountId: $adAccountId,
+                    additionalParams: $additionalParams
+                );
                 $logger->info("Fetched " . count($ads['data']) . " ads for ad account $adAccountId");
 
                 if (!empty($ads['data'])) {
