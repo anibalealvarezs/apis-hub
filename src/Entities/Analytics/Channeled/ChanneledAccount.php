@@ -52,12 +52,16 @@ class ChanneledAccount extends ChanneledEntity
     #[ORM\OneToMany(mappedBy: 'channeledAccount', targetEntity: Post::class, orphanRemoval: true)]
     protected Collection $posts;
 
+    #[ORM\OneToMany(mappedBy: 'channeledAccount', targetEntity: ChanneledAd::class, orphanRemoval: true)]
+    protected Collection $channeledAds;
+
     public function __construct()
     {
         $this->channeledCampaigns = new ArrayCollection();
         $this->channeledAdGroups = new ArrayCollection();
         $this->metricConfigs = new ArrayCollection();
         $this->posts = new ArrayCollection();
+        $this->channeledAds = new ArrayCollection();
     }
 
     /**
@@ -260,6 +264,45 @@ class ChanneledAccount extends ChanneledEntity
             $this->posts->removeElement($post);
             if ($post->getChanneledAccount() === $this) {
                 $post->addChanneledAccount(null);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Gets the collection of channeled ads.
+     * @return Collection
+     */
+    public function getChanneledAds(): Collection
+    {
+        return $this->channeledAds;
+    }
+
+    /**
+     * Adds a channeled ad.
+     * @param ChanneledAd $channeledAd
+     * @return self
+     */
+    public function addChanneledAd(ChanneledAd $channeledAd): self
+    {
+        if (!$this->channeledAds->contains($channeledAd)) {
+            $this->channeledAds->add($channeledAd);
+            $channeledAd->addChanneledAccount($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Removes a channeled ad.
+     * @param ChanneledAd $channeledAd
+     * @return self
+     */
+    public function removeChanneledAd(ChanneledAd $channeledAd): self
+    {
+        if ($this->channeledAds->contains($channeledAd)) {
+            $this->channeledAds->removeElement($channeledAd);
+            if ($channeledAd->getChanneledAccount() === $this) {
+                $channeledAd->addChanneledAccount(null);
             }
         }
         return $this;
