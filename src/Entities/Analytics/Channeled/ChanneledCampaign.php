@@ -20,6 +20,7 @@ use Repositories\Channeled\ChanneledCampaignRepository;
 #[ORM\Index(columns: ['channeledAccount_id'], name: 'channeledAccount_id_idx')]
 #[ORM\Index(columns: ['campaign_id'], name: 'campaign_id_idx')]
 #[ORM\Index(columns: ['channeledAccount_id', 'campaign_id'], name: 'channeledAccount_id_campaign_id_idx')]
+#[ORM\UniqueConstraint(name: 'platformId_channeledAccount_id_uidx', columns: ['platformId', 'channeledAccount_id'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledCampaign extends ChanneledEntity
 {

@@ -24,6 +24,7 @@ use Repositories\Channeled\ChanneledAdGroupRepository;
 #[ORM\Index(columns: ['channeledAccount_id', 'campaign_id'], name: 'channeledAccount_id_campaign_id_idx')]
 #[ORM\Index(columns: ['channeledAccount_id', 'channeledCampaign_id'], name: 'channeledAccount_id_channeledCampaign_id_idx')]
 #[ORM\Index(columns: ['platformId', 'channel', 'channeledAccount_id', 'channeledCampaign_id'], name: 'platformId_channel_channeledAccount_id_channeledCampaign_id_idx')]
+#[ORM\UniqueConstraint(name: 'platformId_channeledAccount_id_adgroup_uidx', columns: ['platformId', 'channeledAccount_id'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledAdGroup extends ChanneledEntity
 {
