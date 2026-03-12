@@ -37,6 +37,10 @@ class ChanneledAd extends ChanneledEntity
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?ChanneledCampaign $channeledCampaign = null;
 
+    #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'channeledAds')]
+    #[ORM\JoinColumn(onDelete: 'CASCADE')]
+    protected ChanneledAccount $channeledAccount;
+
     #[ORM\ManyToOne(targetEntity: Creative::class, inversedBy: 'channeledAds')]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?Creative $creative = null;
@@ -127,6 +131,24 @@ class ChanneledAd extends ChanneledEntity
     {
         $this->channeledCampaign = $channeledCampaign;
         return $this;
+    }
+
+    /**
+     * @param ChanneledAccount|null $channeledAccount
+     * @return self
+     */
+    public function addChanneledAccount(?ChanneledAccount $channeledAccount): self
+    {
+        $this->channeledAccount = $channeledAccount;
+        return $this;
+    }
+
+    /**
+     * @return ChanneledAccount
+     */
+    public function getChanneledAccount(): ChanneledAccount
+    {
+        return $this->channeledAccount;
     }
 
     /**

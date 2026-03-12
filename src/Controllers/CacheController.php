@@ -266,7 +266,11 @@ class CacheController extends BaseController
     protected function isValidEntity(string $entity): bool
     {
         $crudEntities = Helpers::getEntitiesConfig();
-        return in_array(needle: $entity, haystack: array_keys(array: $crudEntities));
+        if (in_array(needle: $entity, haystack: array_keys(array: $crudEntities))) {
+            return true;
+        }
+
+        return AnalyticsEntity::tryFrom($entity) !== null;
     }
 
     /**

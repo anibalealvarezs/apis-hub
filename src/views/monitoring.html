@@ -680,7 +680,7 @@
                 const data = await response.json();
                 
                 updateContainers(data.containers);
-                updatePendingJobsDetailed(data.groupedJobs); // Now using groupedJobs
+                updatePendingJobsDetailed(data.groupedJobs, data.containers); // Passing containers for order
                 updateDbTotals(data.dbTotals);
                 
                 document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
@@ -692,11 +692,22 @@
         function updateContainers(containers) {
             const grid = document.getElementById('container-grid');
             grid.innerHTML = '';
+
+            let currentChannel = null;
+
             containers.forEach(c => {
-                const stats = c.stats || {total: 0};
+                // Add channel header if it changes
+                if (c.group !== currentChannel) {
+                    const header = document.createElement('div');
+                    header.style = 'grid-column: 1 / -1; margin-top: 20px; margin-bottom: 10px; font-weight: 700; font-size: 0.85rem; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 10px;';
+                    header.innerHTML = `<i data-lucide="layers" style="width:16px; height:16px"></i> <span>${c.group}</span><div style="flex-grow: 1; height: 1px; background: var(--border);"></div>`;
+                    grid.appendChild(header);
+                    currentChannel = c.group;
+                }
                 const item = document.createElement('div');
                 item.className = 'container-item';
                 
+                const stats = c.stats || {total: 0};
                 let statsHtml = '';
                 if (stats.total > 0) {
                     statsHtml = `
@@ -866,15 +877,15 @@
             `;
         }
 
-        function updatePendingJobsDetailed(groupedJobs) {
+        function updatePendingJobsDetailed(groupedJobs, containersOrder) {
             const list = document.getElementById('jobs-detailed-list');
             const badge = document.getElementById('job-count-badge');
             list.innerHTML = '';
             
             let totalSampling = 0;
-            const containersKeys = Object.keys(groupedJobs);
+            let currentChannel = null;
 
-            if (containersKeys.length === 0) {
+            if (!containersOrder || containersOrder.length === 0) {
                 list.innerHTML = `
                     <div class="empty-state">
                         <i data-lucide="check-circle" style="color: var(--secondary); width: 48px; height: 48px;"></i>
@@ -885,7 +896,17 @@
                 return;
             }
 
-            containersKeys.forEach(targetId => {
+            containersOrder.forEach(container => {
+                const targetId = container.id;
+                
+                // Add channel header in the jobs list too
+                if (container.group !== currentChannel) {
+                    const header = document.createElement('div');
+                    header.style = 'margin-top: 35px; margin-bottom: 20px; font-weight: 700; font-size: 0.9rem; color: var(--warning); text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 10px;';
+                    header.innerHTML = `<i data-lucide="network" style="width:18px; height:18px"></i> <span>${container.group} Workflow</span><div style="flex-grow: 1; height: 1px; background: var(--border);"></div>`;
+                    list.appendChild(header);
+                    currentChannel = container.group;
+                }
                 const jobsArr = groupedJobs[targetId];
                 if (!jobsArr || jobsArr.length === 0) return;
 
@@ -977,7 +998,7 @@
 
         async function handleJobAction(id, action, btnElement) {
             if (action === 'cancel' && !confirm('Are you sure you want to discard/deactivate this job? It will be marked as failed for history.')) return;
-            if (action === 'process' && !confirm('Warning: This will execute the caching logic NOW. The page might freeze for a few seconds if the dataset is large. Continue?')) return;
+            if (action === 'process' && !confirm('Confirm: Trigger workflow execution in background? You will see logs in the console below.')) return;
 
             // Simple visual feedback
             if (btnElement) {
@@ -1032,7 +1053,7 @@
 
         fetchData();
         fetchLogs();
-        setInterval(fetchData, 30000);
+        setInterval(fetchData, 15000);
         setInterval(fetchLogs, 10000);
     </script>
 

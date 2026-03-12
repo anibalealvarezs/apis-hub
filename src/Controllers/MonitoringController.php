@@ -19,19 +19,25 @@ class MonitoringController extends BaseController
 
     private function getTargetContainerId($job, array $instances): ?string
     {
+        $payload = $job instanceof Job ? $job->getPayload() : json_decode($job['payload'], true);
+        
+        // 1. Direct match by instance_name (the most reliable)
+        if (isset($payload['instance_name'])) {
+            return $payload['instance_name'];
+        }
+
         $chanRaw = $job instanceof Job ? $job->getChannel() : $job['channel'];
         $chan = \Enums\Channel::tryFromName($chanRaw)?->name ?? strtolower($chanRaw);
         $ent = strtolower($job instanceof Job ? $job->getEntity() : $job['entity']);
         
-        $payload = $job instanceof Job ? $job->getPayload() : json_decode($job['payload'], true);
         $params = $payload['params'] ?? [];
         $jobStartDate = $params['startDate'] ?? $params['start_date'] ?? null;
         $jobEndDate = $params['endDate'] ?? $params['end_date'] ?? null;
 
-        if ($jobStartDate) $jobStartDate = str_replace('+', ' ', $jobStartDate); // Decode "+ " back to space if any
+        if ($jobStartDate) $jobStartDate = str_replace('+', ' ', $jobStartDate);
         if ($jobEndDate) $jobEndDate = str_replace('+', ' ', $jobEndDate);
 
-        // Try to find exact match including dates
+        // 2. Fallback to channel/entity/date match
         foreach ($instances as $instance) {
             $instChanRaw = $instance['channel'] ?? '';
             $instChan = \Enums\Channel::tryFromName($instChanRaw)?->name ?? strtolower($instChanRaw);
@@ -46,17 +52,6 @@ class MonitoringController extends BaseController
             }
         }
         
-        // Fallback: match without dates
-        foreach ($instances as $instance) {
-            $instChanRaw = $instance['channel'] ?? '';
-            $instChan = \Enums\Channel::tryFromName($instChanRaw)?->name ?? strtolower($instChanRaw);
-            $instEnt = strtolower($instance['entity'] ?? '');
-            
-            if ($chan === $instChan && $ent === $instEnt) {
-                return $instance['name'];
-            }
-        }
-
         return null;
     }
 
@@ -65,6 +60,9 @@ class MonitoringController extends BaseController
         $config = Helpers::getProjectConfig();
         $instances = $config['instances'] ?? [];
         
+        // 1. Sort instances by dependency
+        $instances = $this->sortInstancesByDependency($instances);
+
         $containersData = [];
         foreach ($instances as $instance) {
             $period = 'Full';
@@ -75,9 +73,11 @@ class MonitoringController extends BaseController
                 'id' => $instance['name'],
                 'name' => ucwords(str_replace('-', ' ', $instance['name'])),
                 'source' => $instance['channel'],
+                'group' => $instance['group_label'] ?? ucwords($instance['channel']),
                 'entity' => $instance['entity'],
                 'period' => $period,
-                'port' => $instance['port'] ?? 8080
+                'port' => $instance['port'] ?? 8080,
+                'requires' => $instance['requires'] ?? null
             ];
         }
 
@@ -113,7 +113,7 @@ class MonitoringController extends BaseController
             if (!$targetId) continue;
 
             if (!isset($groupedJobs[$targetId])) $groupedJobs[$targetId] = [];
-            if (count($groupedJobs[$targetId]) >= 6) continue;
+            if (count($groupedJobs[$targetId]) >= 10) continue; // Show more in detail
 
             $payload = $job->getPayload() ?? [];
             $params = $payload['params'] ?? [];
@@ -159,45 +159,45 @@ class MonitoringController extends BaseController
             'Queries' => ['class' => 'Analytics\Query', 'channeled' => null],
             'Countries' => ['class' => 'Analytics\Country', 'channeled' => null],
             'Devices' => ['class' => 'Analytics\Device', 'channeled' => null],
-            'Jobs' => ['class' => 'Job', 'channeled' => null]
+            'Jobs' => ['class' => 'Job', 'channeled' => 'Job']
         ];
 
         $dbTotals = [];
+        $conn = $this->em->getConnection();
+        
         foreach ($statsConfig as $label => $config) {
             $entry = ['entity' => $label, 'count' => 0, 'channels' => []];
             
-            // 1. Base Class Count
+            // 1. Base Class Count (Raw SQL for speed)
             if ($config['class']) {
                 try {
-                    $fullClass = "\\Entities\\" . $config['class'];
-                    $count = $this->em->createQueryBuilder()->select('count(e.id)')->from($fullClass, 'e')->getQuery()->getSingleScalarResult();
-                    $entry['count'] = (int)$count;
+                    $tableName = self::getTableNameForEntity($config['class']);
+                    if ($tableName) {
+                        $count = $conn->fetchOne("SELECT COUNT(*) FROM $tableName");
+                        $entry['count'] = (int)$count;
+                    }
                 } catch (\Exception $e) {}
             }
 
-            // 2. Channeled Breakdown
+            // 2. Channeled Breakdown (Raw SQL for speed)
             if ($config['channeled']) {
                 try {
-                    $fullChanneled = "\\Entities\\" . $config['channeled'];
-                    $results = $this->em->createQueryBuilder()
-                        ->select('e.channel, count(e.id) as count')
-                        ->from($fullChanneled, 'e')
-                        ->groupBy('e.channel')
-                        ->getQuery()
-                        ->getArrayResult();
-                    
-                    $channeledTotal = 0;
-                    foreach ($results as $res) {
-                        $channelId = (int)$res['channel'];
-                        $channelCount = (int)$res['count'];
-                        $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? "Ch $channelId";
-                        $entry['channels'][] = ['name' => $channelName, 'count' => $channelCount];
-                        $channeledTotal += $channelCount;
-                    }
-                    
-                    // If no base class, use sum of channels as total
-                    if (!$config['class']) {
-                        $entry['count'] = $channeledTotal;
+                    $tableName = self::getTableNameForEntity($config['channeled']);
+                    if ($tableName) {
+                        $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
+                        
+                        $channeledTotal = 0;
+                        foreach ($results as $res) {
+                            $channelId = (int)$res['channel'];
+                            $channelCount = (int)$res['count'];
+                            $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? \Enums\Channel::tryFromName($res['channel'])?->getCommonName() ?? "Ch $channelId";
+                            $entry['channels'][] = ['name' => $channelName, 'count' => $channelCount];
+                            $channeledTotal += $channelCount;
+                        }
+                        
+                        if (!$config['class']) {
+                            $entry['count'] = $channeledTotal;
+                        }
                     }
                 } catch (\Exception $e) {}
             }
@@ -246,17 +246,19 @@ class MonitoringController extends BaseController
                 
                 case 'process':
                     if ($job->getStatus() !== JobStatus::scheduled->value) {
-                        return new JsonResponse(['error' => 'Only scheduled jobs can be processed manually'], 400);
+                         return new JsonResponse(['error' => 'Only scheduled jobs can be processed manually'], 400);
                     }
                     if (!$jobRepo->claimJob($id)) return new JsonResponse(['error' => 'Job already processing'], 409);
                     
                     $channel = \Enums\Channel::tryFromName($job->getChannel());
                     $payload = $job->getPayload() ?? [];
-                    $cacheCtrl = new \Controllers\CacheController();
-                    $cacheCtrl->fetchData($job->getEntity(), $channel, $payload['params'] ?? null, isset($payload['body']) ? json_encode($payload['body']) : null);
                     
-                    $jobRepo->update($id, (object)['status' => JobStatus::completed->value]);
-                    return new JsonResponse(['success' => true, 'message' => "Job #$id processed successfully"]);
+                    // Execute in background to avoid blocking the single-threaded web server
+                    $params = json_encode($payload['params'] ?? []);
+                    $cmd = "php bin/cli.php apis-hub:cache \"{$channel->name}\" \"{$job->getEntity()}\" --params='{$params}' > /dev/null 2>&1 &";
+                    exec($cmd);
+
+                    return new JsonResponse(['success' => true, 'message' => "Job #$id triggered in background. Refresh in a few moments."]);
 
                 case 'cancel':
                     $jobRepo->update($id, (object)['status' => JobStatus::cancelled->value]);
@@ -321,5 +323,97 @@ class MonitoringController extends BaseController
         fclose($file);
 
         return $data ?: "Empty log file.";
+    }
+
+    private function sortInstancesByDependency(array $instances): array
+    {
+        // 1. Define channel mapping for grouping
+        $channelMap = [
+            'gsc' => 'Google Search Console',
+            'fb-ads' => 'Facebook',
+            'facebook' => 'Facebook',
+        ];
+
+        // 2. Group instances by mapped channel
+        $grouped = [];
+        foreach ($instances as $instance) {
+            $rawChan = $instance['channel'] ?? 'Other';
+            $groupKey = $channelMap[$rawChan] ?? ucwords($rawChan);
+            $grouped[$groupKey][] = $instance;
+        }
+
+        $allSorted = [];
+        foreach ($grouped as $groupName => $chanInstances) {
+            $temp = $chanInstances;
+            $sorted = [];
+            
+            while (count($temp) > 0) {
+                $addedThisRound = false;
+                foreach ($temp as $key => $instance) {
+                    $requires = $instance['requires'] ?? null;
+                    
+                    // Check if the requirement is still in the unsorted list of THIS group
+                    // or in ANY OTHER group that hasn't been processed? 
+                    // Actually, cross-channel dependencies are rare, but we should check all unsorted.
+                    $allUnsortedNames = array_map(fn($i) => $i['name'], $temp);
+                    
+                    if (!$requires || !in_array($requires, $allUnsortedNames)) {
+                        $instance['group_label'] = $groupName; // Cache the group label
+                        $sorted[] = $instance;
+                        unset($temp[$key]);
+                        $addedThisRound = true;
+                    }
+                }
+                
+                if (!$addedThisRound) {
+                    foreach ($temp as $instance) {
+                        $instance['group_label'] = $groupName;
+                        $sorted[] = $instance;
+                    }
+                    break;
+                }
+            }
+            $allSorted = array_merge($allSorted, $sorted);
+        }
+        
+        return $allSorted;
+    }
+
+    private static function getTableNameForEntity(string $entityPath): ?string
+    {
+        $map = [
+            'Analytics\Account' => 'accounts',
+            'Analytics\Metric' => 'metrics',
+            'Analytics\Campaign' => 'campaigns',
+            'Analytics\Creative' => 'creatives',
+            'Analytics\Order' => 'orders',
+            'Analytics\Customer' => 'customers',
+            'Analytics\Product' => 'products',
+            'Analytics\ProductVariant' => 'product_variants',
+            'Analytics\ProductCategory' => 'product_categories',
+            'Analytics\Discount' => 'discounts',
+            'Analytics\PriceRule' => 'price_rules',
+            'Analytics\Vendor' => 'vendors',
+            'Analytics\Page' => 'pages',
+            'Analytics\Post' => 'posts',
+            'Analytics\Query' => 'queries',
+            'Analytics\Country' => 'countries',
+            'Analytics\Device' => 'devices',
+            'Job' => 'jobs',
+            'Analytics\Channeled\ChanneledAccount' => 'channeled_accounts',
+            'Analytics\Channeled\ChanneledMetric' => 'channeled_metrics',
+            'Analytics\Channeled\ChanneledCampaign' => 'channeled_campaigns',
+            'Analytics\Channeled\ChanneledAdGroup' => 'channeled_ad_groups',
+            'Analytics\Channeled\ChanneledAd' => 'channeled_ads',
+            'Analytics\Channeled\ChanneledOrder' => 'channeled_orders',
+            'Analytics\Channeled\ChanneledCustomer' => 'channeled_customers',
+            'Analytics\Channeled\ChanneledProduct' => 'channeled_products',
+            'Analytics\Channeled\ChanneledProductVariant' => 'channeled_product_variants',
+            'Analytics\Channeled\ChanneledProductCategory' => 'channeled_product_categories',
+            'Analytics\Channeled\ChanneledDiscount' => 'channeled_discounts',
+            'Analytics\Channeled\ChanneledPriceRule' => 'channeled_price_rules',
+            'Analytics\Channeled\ChanneledVendor' => 'channeled_vendors',
+        ];
+        return $map[$entityPath] ?? null;
     }
 }
