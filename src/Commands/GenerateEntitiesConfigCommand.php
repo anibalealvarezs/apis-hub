@@ -12,6 +12,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Yaml\Yaml;
+use Helpers\Helpers;
 use ReflectionUnionType;
 use ReflectionNamedType;
 
@@ -99,13 +100,17 @@ class GenerateEntitiesConfigCommand extends Command
     ): ?array {
         $content = file_get_contents($file);
         if (!$content) {
-            $output->writeln("<comment>Empty file: $file</comment>", OutputInterface::VERBOSITY_VERBOSE);
+            if (Helpers::isDebug()) {
+                $output->writeln("<comment>Empty file: $file</comment>", OutputInterface::VERBOSITY_VERBOSE);
+            }
             return null;
         }
 
         $classInfo = $this->extractClassInfo($content);
         if (!$classInfo) {
-            $output->writeln("<comment>Invalid entity in: $file</comment>", OutputInterface::VERBOSITY_VERBOSE);
+            if (Helpers::isDebug()) {
+                $output->writeln("<comment>Invalid entity in: $file</comment>", OutputInterface::VERBOSITY_VERBOSE);
+            }
             return null;
         }
 
@@ -122,7 +127,9 @@ class GenerateEntitiesConfigCommand extends Command
 
         $methods = $this->analyzeRepositoryMethods($repositoryClass, $output);
         if (empty($methods)) {
-            $output->writeln("<warning>No methods found in repository: $repositoryClass</warning>", OutputInterface::VERBOSITY_VERBOSE);
+            if (Helpers::isDebug()) {
+                $output->writeln("<warning>No methods found in repository: $repositoryClass</warning>", OutputInterface::VERBOSITY_VERBOSE);
+            }
             return null;
         }
 
@@ -245,7 +252,9 @@ class GenerateEntitiesConfigCommand extends Command
     {
         $path = $path ?? __DIR__.'/../../config/yaml/entitiesconfig.yaml';
         if (empty($entities)) {
-            $output->writeln("<info>Successfully generated config for 0 entities</info>");
+            if (Helpers::isDebug()) {
+                $output->writeln("<info>Successfully generated config for 0 entities</info>");
+            }
             return;
         }
         $yaml = Yaml::dump($entities, 6, 2, Yaml::DUMP_OBJECT_AS_MAP);
@@ -253,7 +262,9 @@ class GenerateEntitiesConfigCommand extends Command
             $output->writeln("<error>Failed to write config to $path</error>");
             throw new RuntimeException("Failed to write config to $path");
         }
-        $output->writeln("<info>Successfully generated config for ".count($entities)." entities</info>");
+        if (Helpers::isDebug()) {
+            $output->writeln("<info>Successfully generated config for ".count($entities)." entities</info>");
+        }
     }
 
     private function extractRepositoryClass(string $content): ?string
