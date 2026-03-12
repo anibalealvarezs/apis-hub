@@ -14,6 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Services\DateResolver;
 use Symfony\Component\HttpFoundation\Response;
 use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
+use Doctrine\DBAL\Exception\LockWaitTimeoutException;
 use Throwable;
 
 class ProcessJobsCommand extends Command
@@ -152,6 +153,10 @@ class ProcessJobsCommand extends Command
                 $params['jobId'] = $job->getId();
                 $body = $payload['body'] ?? null;
 
+                // Increase lock wait timeout for this connection to reduce contention
+                // when multiple containers write to shared tables simultaneously
+                $this->em->getConnection()->executeStatement('SET SESSION innodb_lock_wait_timeout = 120');
+
                 $result = $controller->fetchData($job->getEntity(), $channelEnum, $params, $body);
 
                 // Check if fetchData returned an error Response
@@ -183,6 +188,15 @@ class ProcessJobsCommand extends Command
                     'message' => $updatedMessage
                 ]);
                 $output->writeln("<comment>Rate limit reached for job {$job->getUuid()}. Job delayed for cooldown.</comment>");
+                $stats['delayed']++;
+            } catch (LockWaitTimeoutException $e) {
+                // Transient DB lock contention — reset to scheduled so it retries on next cron tick
+                // This happens when multiple containers write to the same tables simultaneously
+                $jobRepo->update($job->getId(), (object)[
+                    'status'  => JobStatus::scheduled->value,
+                    'message' => 'Lock wait timeout — will retry: ' . $e->getMessage(),
+                ]);
+                $output->writeln("<comment>Lock timeout for job {$job->getUuid()}. Reset to scheduled for retry.</comment>");
                 $stats['delayed']++;
             } catch (Throwable $e) {
                 // Update to failed
