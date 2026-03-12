@@ -4,11 +4,20 @@ set -e
 # Ensure persistent log directory exists (mapped to host via volume)
 mkdir -p /app/logs
 
-# Update database schema and seed entities
-echo "Initializing database..."
-php bin/cli.php orm:schema-tool:update --force || echo "Schema update failed"
-php bin/cli.php app:initialize-entities || echo "Entity initialization failed"
-php bin/cli.php app:schedule-initial-jobs || echo "Initial scheduling failed"
+# Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
+if [ "$INSTANCE_NAME" = "fb-entities-sync" ]; then
+    echo "Master Instance ($INSTANCE_NAME): Initializing database and entities..."
+    php bin/cli.php orm:schema-tool:update --force || echo "Schema update failed"
+    php bin/cli.php app:initialize-entities || echo "Entity initialization failed"
+else
+    echo "Worker Instance ($INSTANCE_NAME): Waiting for master initialization..."
+    # Small sleep to allow master to finish schema updates
+    sleep 5
+fi
+
+# Each instance only schedules its OWN initial job to prevent massive duplication
+echo "Scheduling initial job for $INSTANCE_NAME..."
+php bin/cli.php app:schedule-initial-jobs --instance="$INSTANCE_NAME" || echo "Initial scheduling failed"
 
 # Configure Cron based on project config
 if [ -n "$PROJECT_CONFIG_FILE" ]; then

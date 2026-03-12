@@ -25,10 +25,16 @@ class ScheduleInitialJobsCommand extends Command
         parent::__construct();
     }
 
+    protected function configure(): void
+    {
+        $this->addOption('instance', null, \Symfony\Component\Console\Input\InputOption::VALUE_OPTIONAL, 'Schedule only for this instance name');
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $config = Helpers::getProjectConfig();
         $instances = $config['instances'] ?? [];
+        $targetInstance = $input->getOption('instance');
 
         if (empty($instances)) {
             if (Helpers::isDebug()) {
@@ -42,9 +48,15 @@ class ScheduleInitialJobsCommand extends Command
         $skippedCount = 0;
 
         foreach ($instances as $instance) {
+            $name = $instance['name'] ?? 'unknown';
+
+            // Filter by instance if provided
+            if ($targetInstance && $targetInstance !== $name) {
+                continue;
+            }
+
             $channel = $instance['channel'] ?? null;
             $entity = $instance['entity'] ?? null;
-            $name = $instance['name'] ?? 'unknown';
 
             if (!$channel || !$entity) {
                 $output->writeln("<error>Instance $name is missing channel or entity. Skipping.</error>");
@@ -56,20 +68,41 @@ class ScheduleInitialJobsCommand extends Command
             if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
             if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
 
-            // Check if a similar job is already scheduled or processing
+            $shouldSchedule = true;
+            // 1. Try to find by instance_name in payload first (most accurate)
             $existingJob = $jobRepository->findOneBy([
                 'channel' => $channel,
                 'entity' => $entity,
                 'status' => [JobStatus::scheduled->value, JobStatus::processing->value]
             ]);
 
-            // We also need to check the payload to be sure it's the SAME range
-            $shouldSchedule = true;
+            // If we found one, we must verify it really belongs to THIS instance
+            // because findOneBy above is too generic
             if ($existingJob) {
                 $payload = $existingJob->getPayload();
-                $existingParams = $payload['params'] ?? [];
-                if ($existingParams == $params) {
+                $jobInstance = $payload['instance_name'] ?? null;
+                $jobParams = $payload['params'] ?? [];
+                
+                // Match either by explicit instance name OR by exact params/dates
+                if ($jobInstance === $name || ($jobParams == $params)) {
                     $shouldSchedule = false;
+                } else {
+                    // It was a job for a DIFFERENT instance, so we need to look specifically for ours
+                    $specificJob = $jobRepository->getJobsByStatus(
+                        status: JobStatus::scheduled->value,
+                        channel: $channel,
+                        instanceName: $name
+                    );
+                    if (empty($specificJob)) {
+                        $specificJob = $jobRepository->getJobsByStatus(
+                            status: JobStatus::processing->value,
+                            channel: $channel,
+                            instanceName: $name
+                        );
+                    }
+                    if (!empty($specificJob)) {
+                        $shouldSchedule = false;
+                    }
                 }
             }
 
