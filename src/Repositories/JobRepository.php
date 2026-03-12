@@ -306,11 +306,64 @@ class JobRepository extends BaseRepository
         $qb = $this->_em->createQueryBuilder();
         $updatedRows = $qb->update($this->getEntityName(), 'e')
             ->set('e.status', ':processing')
+            ->set('e.updatedAt', ':now')
             ->where('e.id = :id')
             ->andWhere($qb->expr()->in('e.status', ':claimable'))
             ->setParameter('processing', JobStatus::processing->value)
+            ->setParameter('now', new \DateTime())
             ->setParameter('id', $id)
             ->setParameter('claimable', [JobStatus::scheduled->value, JobStatus::delayed->value])
+            ->getQuery()
+            ->execute();
+
+        return (int)$updatedRows > 0;
+    }
+
+    /**
+     * Resets a job to scheduled status.
+     *
+     * @param int $id
+     * @return bool
+     */
+    public function resetJob(int $id): bool
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $updatedRows = $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':scheduled')
+            ->set('e.updatedAt', ':now')
+            ->where('e.id = :id')
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('now', new \DateTime())
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->execute();
+
+        return (int)$updatedRows > 0;
+    }
+
+    /**
+     * Marks a job as delayed (e.g. for rate limiting).
+     *
+     * @param int $id
+     * @param string|null $message
+     * @return bool
+     */
+    public function markAsDelayed(int $id, ?string $message = null): bool
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':delayed')
+            ->set('e.updatedAt', ':now');
+        
+        if ($message) {
+            $qb->set('e.message', ':message')
+               ->setParameter('message', $message);
+        }
+
+        $updatedRows = $qb->where('e.id = :id')
+            ->setParameter('delayed', JobStatus::delayed->value)
+            ->setParameter('now', new \DateTime())
+            ->setParameter('id', $id)
             ->getQuery()
             ->execute();
 

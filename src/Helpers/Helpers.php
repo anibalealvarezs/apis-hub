@@ -616,4 +616,18 @@ class Helpers
         $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/' . $filename, $requestedLevel));
         return $logger;
     }
+
+    /**
+     * @param EntityManager $em
+     * @return void
+     */
+    public static function reconnectIfNeeded(EntityManager $em): void
+    {
+        try {
+            $em->getConnection()->executeQuery('SELECT 1');
+        } catch (Exception $e) {
+            $em->getConnection()->close();
+            $em->getConnection()->connect();
+        }
+    }
 }

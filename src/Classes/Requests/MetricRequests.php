@@ -275,6 +275,7 @@ class MetricRequests
             $totalDuplicates = 0;
 
             // Process everything
+            Helpers::reconnectIfNeeded($manager);
             foreach ($config['facebook']['pages'] as $page) {
                 Helpers::checkJobStatus($jobId);
 
@@ -381,6 +382,7 @@ class MetricRequests
                 }
             }
 
+            Helpers::reconnectIfNeeded($manager);
             foreach ($config['facebook']['ad_accounts'] as $adAccount) {
                 Helpers::checkJobStatus($jobId);
 
@@ -1992,15 +1994,21 @@ class MetricRequests
         EntityManager $manager,
         ChanneledAccount $channeledAccountEntity,
     ): array {
-        $sql = "SELECT id, platformId FROM channeled_ad_groups WHERE channeledAccount_id = ?";
+        $sql = "SELECT cag.id, cag.platformId, cc.platformId as campaignPlatformId 
+                FROM channeled_ad_groups cag
+                LEFT JOIN channeled_campaigns cc ON cag.channeledCampaign_id = cc.id
+                WHERE cag.channeledAccount_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
+        $mapCampaign = [];
         foreach ($fetched as $row) {
             $map[$row['platformId']] = (int)$row['id'];
+            $mapCampaign[$row['platformId']] = $row['campaignPlatformId'];
         }
         return [
             'map' => $map,
             'mapReverse' => array_flip($map),
+            'mapCampaign' => $mapCampaign,
         ];
     }
 
@@ -2008,15 +2016,21 @@ class MetricRequests
         EntityManager $manager,
         ChanneledAccount $channeledAccountEntity,
     ): array {
-        $sql = "SELECT id, platformId FROM channeled_ads WHERE channeledAccount_id = ?";
+        $sql = "SELECT ca.id, ca.platformId, cag.platformId as adGroupPlatformId 
+                FROM channeled_ads ca
+                LEFT JOIN channeled_ad_groups cag ON ca.channeledAdGroup_id = cag.id
+                WHERE ca.channeledAccount_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
+        $mapAdGroup = [];
         foreach ($fetched as $row) {
             $map[$row['platformId']] = (int)$row['id'];
+            $mapAdGroup[$row['platformId']] = $row['adGroupPlatformId'];
         }
         return [
             'map' => $map,
             'mapReverse' => array_flip($map),
+            'mapAdGroup' => $mapAdGroup,
         ];
     }
 
@@ -3571,6 +3585,9 @@ class MetricRequests
                     }
                 } catch (Exception $e) {
                     $logger->error("Error fetching campaign insights chunk: " . $e->getMessage());
+                    if (str_contains($e->getMessage(), 'request limit reached')) {
+                        throw new FacebookRateLimitException($e->getMessage());
+                    }
                 }
             }
 
@@ -3701,6 +3718,9 @@ class MetricRequests
                     }
                 } catch (Exception $e) {
                     $logger->error("Error fetching adset insights chunk: " . $e->getMessage());
+                    if (str_contains($e->getMessage(), 'request limit reached')) {
+                        throw new FacebookRateLimitException($e->getMessage());
+                    }
                 }
             }
 
@@ -3835,9 +3855,12 @@ class MetricRequests
                 if (isset($rows['data']) && is_array($rows['data'])) {
                     $allRows = array_merge($allRows, $rows['data']);
                 }
-            } catch (Exception $e) {
-                $logger->error("Error fetching ad insights chunk: " . $e->getMessage());
-            }
+                } catch (Exception $e) {
+                    $logger->error("Error fetching ad insights chunk: " . $e->getMessage());
+                    if (str_contains($e->getMessage(), 'request limit reached')) {
+                        throw new FacebookRateLimitException($e->getMessage());
+                    }
+                }
         }
 
         $logger->info("Fetched " . count($allRows) . " bulk rows for ads in Ad Account " . $channeledAccountEntity->getPlatformId());

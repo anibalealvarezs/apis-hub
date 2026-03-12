@@ -165,6 +165,7 @@ class ProcessJobsCommand extends Command
                 $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
             }
             $stats['total']++;
+            \Helpers\Helpers::reconnectIfNeeded($this->em);
 
             try {
                 // Atomic claim by repository
