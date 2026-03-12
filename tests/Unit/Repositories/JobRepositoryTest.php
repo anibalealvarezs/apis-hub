@@ -412,7 +412,7 @@ class JobRepositoryTest extends TestCase
 
         $result = $this->repository->getJobsByStatus($status);
 
-        $this->assertEquals($expected, $result);
+        $this->assertEquals([$job], $result);
     }
 
     public function testGetJobsByUuid(): void
@@ -496,6 +496,45 @@ class JobRepositoryTest extends TestCase
             ->willReturn(1);
 
         $result = $this->repository->claimJob($id);
+        
+        $this->assertTrue($result);
+    }
+
+    public function testHasSuccessfulRecentJob(): void
+    {
+        $instanceName = 'test-instance';
+        
+        $this->queryBuilder->expects($this->once())
+            ->method('select')
+            ->with('count(e.id)')
+            ->willReturnSelf();
+            
+        $this->queryBuilder->expects($this->once())
+            ->method('from')
+            ->with($this->entityName, 'e')
+            ->willReturnSelf();
+
+        $this->queryBuilder->expects($this->once())
+            ->method('where')
+            ->with('e.payload LIKE :instance_name_pattern')
+            ->willReturnSelf();
+
+        $this->queryBuilder->expects($this->exactly(2))
+            ->method('andWhere')
+            ->with($this->callback(function ($condition) {
+                return in_array($condition, ['e.status = :completed', 'e.updatedAt >= :since']);
+            }))
+            ->willReturnSelf();
+
+        $this->queryBuilder->expects($this->exactly(3))
+            ->method('setParameter')
+            ->willReturnSelf();
+
+        $this->query->expects($this->once())
+            ->method('getSingleScalarResult')
+            ->willReturn(1);
+
+        $result = $this->repository->hasSuccessfulRecentJob($instanceName);
         
         $this->assertTrue($result);
     }

@@ -131,13 +131,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "bc14fe030c2ddc1f9522ba07a81c99f755560b79"
+                "reference": "1d1915c7989c910e7a8a07334c656fbe58708084"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-bc14fe030c2ddc1f9522ba07a81c99f755560b79-zip-a8cf84.zip",
-                "reference": "bc14fe030c2ddc1f9522ba07a81c99f755560b79",
-                "shasum": "f03b0cec172a753d3c622f1e893ffd457e04c9ad"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-1d1915c7989c910e7a8a07334c656fbe58708084-zip-c934a2.zip",
+                "reference": "1d1915c7989c910e7a8a07334c656fbe58708084",
+                "shasum": "a43b5ec4b6b4b570023fee1c15cd5c3611e13413"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -188,7 +188,7 @@
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-11T22:32:05+00:00"
+            "time": "2026-03-12T14:48:59+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -196,13 +196,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/google-api.git",
-                "reference": "09b928c1ffc60baf38968b1562a7291daeb74eb9"
+                "reference": "1c7b6839cf13df4170c6b256df3e8b55e99f2026"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-09b928c1ffc60baf38968b1562a7291daeb74eb9-zip-782c93.zip",
-                "reference": "09b928c1ffc60baf38968b1562a7291daeb74eb9",
-                "shasum": "674456afba271716cdde70719b8e5e43e38ff536"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-1c7b6839cf13df4170c6b256df3e8b55e99f2026-zip-a08b05.zip",
+                "reference": "1c7b6839cf13df4170c6b256df3e8b55e99f2026",
+                "shasum": "3f03196e7fccafbe78a4d09c4731bbbf1b50bcc0"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -256,7 +256,7 @@
                 "issues": "https://github.com/anibalealvarezs/google-api/issues",
                 "source": "https://github.com/anibalealvarezs/google-api/tree/develop"
             },
-            "time": "2026-03-07T00:03:45+00:00"
+            "time": "2026-03-11T23:59:57+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -7848,8 +7848,8 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
-        "anibalealvarezs/amazon-api": 20,
         "anibalealvarezs/api-client-skeleton": 20,
+        "anibalealvarezs/amazon-api": 20,
         "anibalealvarezs/facebook-graph-api": 20,
         "anibalealvarezs/google-api": 20,
         "anibalealvarezs/klaviyo-api": 20,
@@ -7857,10 +7857,10 @@
         "anibalealvarezs/netsuite-api": 20,
         "anibalealvarezs/shopify-api": 20,
         "anibalealvarezs/triple-whale-api": 20,
-        "mikey179/vfsstream": 20,
-        "predis/predis": 20,
+        "symfony/redis-messenger": 20,
         "symfony/cache-contracts": 20,
-        "symfony/redis-messenger": 20
+        "predis/predis": 20,
+        "mikey179/vfsstream": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
@@ -7868,6 +7868,6 @@
         "php": ">=8.1",
         "ext-json": "*"
     },
-    "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "platform-dev": [],
+    "plugin-api-version": "2.3.0"
 }

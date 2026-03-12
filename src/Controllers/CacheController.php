@@ -167,15 +167,23 @@ class CacheController extends BaseController
                 );
             }
 
+            $payload = [
+                'body' => $body,
+                'params' => $params
+            ];
+            
+            if (isset($params['instance_name'])) {
+                $payload['instance_name'] = $params['instance_name'];
+                unset($params['instance_name']);
+                $payload['params'] = $params;
+            }
+
             // Create job
             $jobData = (object) [
                 'entity' => $entity,
                 'channel' => $channel->name,
                 'status' => \Enums\JobStatus::scheduled->value,
-                'payload' => [
-                    'body' => $body,
-                    'params' => $params
-                ]
+                'payload' => $payload
             ];
             $jobRepo->create($jobData);
 

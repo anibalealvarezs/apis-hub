@@ -42,6 +42,8 @@ class ProcessJobsCommand extends Command
         $envChannel = getenv('API_SOURCE');
         $envInstance = getenv('INSTANCE_NAME');
         
+        $output->writeln("Querying scheduled and delayed jobs...");
+
         $jobs = $jobRepo->getJobsByStatus(
             status: JobStatus::scheduled->value,
             channel: $envChannel,

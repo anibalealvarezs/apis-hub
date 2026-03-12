@@ -62,8 +62,10 @@ class MonitoringControllerTest extends TestCase
         $this->entityManager->method('createQueryBuilder')->willReturn($queryBuilder);
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
+        $queryBuilder->method('groupBy')->willReturnSelf();
         $queryBuilder->method('getQuery')->willReturn($query);
         $query->method('getSingleScalarResult')->willReturn(0);
+        $query->method('getArrayResult')->willReturn([]);
 
         $response = $this->controller->data();
         $this->assertInstanceOf(Response::class, $response);
