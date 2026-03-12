@@ -158,6 +158,9 @@ class ProcessJobsCommand extends Command
                 if ($result instanceof Response && $result->getStatusCode() >= 400) {
                     $content = json_decode($result->getContent(), true);
                     $errorMsg = $content['error'] ?? 'Unknown error from fetchData';
+                    if ($result->getStatusCode() === 429) {
+                        throw new FacebookRateLimitException($errorMsg);
+                    }
                     throw new \Exception($errorMsg);
                 }
 

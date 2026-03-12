@@ -512,6 +512,13 @@ class MetricRequests
                             }
                         }
                         $manager->getConnection()->commit();
+                    } catch (FacebookRateLimitException $e) {
+                        // Re-throw rate limit exceptions so they propagate to the outer handler
+                        // which marks the job as failed with a 429 status
+                        if ($manager->getConnection()->isTransactionActive()) {
+                            $manager->getConnection()->rollBack();
+                        }
+                        throw $e;
                     } catch (Exception $e) {
                         if ($manager->getConnection()->isTransactionActive()) {
                             $manager->getConnection()->rollBack();
