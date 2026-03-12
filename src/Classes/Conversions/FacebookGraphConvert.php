@@ -69,7 +69,7 @@ class FacebookGraphConvert
                 $endTime = $value['end_time'] ?? null;
                 $metricDate = $endTime ? Carbon::parse($endTime)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
-                    channel: Channel::facebook->value,
+                    channel: Channel::facebook_organic->value,
                     name: $row['name'] ?? 'unknown',
                     period: $period->value,
                     metricDate: $metricDate,
@@ -77,7 +77,7 @@ class FacebookGraphConvert
                     post: $postEntity?->getPostId(),
                 );
                 $channeledMetric = new stdClass();
-                $channeledMetric->channel = Channel::facebook->value;
+                $channeledMetric->channel = Channel::facebook_organic->value;
                 $channeledMetric->name = $row['name'] ?? 'unknown';
                 $channeledMetric->value = $value['value'] ?? 0;
                 $channeledMetric->period = $period->value;
@@ -175,7 +175,7 @@ class FacebookGraphConvert
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
-                    channel: Channel::facebook->value,
+                    channel: Channel::facebook_marketing->value,
                     name: $key,
                     period: $period->value,
                     metricDate: $metricDate,
@@ -183,7 +183,7 @@ class FacebookGraphConvert
                     channeledAccount:  $channeledAccountPlatformId,
                 );
                 $channeledMetric = new stdClass();
-                $channeledMetric->channel = Channel::facebook->value;
+                $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
                 if (!is_numeric($val)) {
@@ -262,7 +262,7 @@ class FacebookGraphConvert
             $dateCarbon = Carbon::parse($date);
             $metricDateString = $dateCarbon->toDateString();
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
-                channel: Channel::facebook->value,
+                channel: Channel::facebook_organic->value,
                 name: $row['name'] ?? 'unknown',
                 period: $period->value,
                 metricDate: $metricDateString,
@@ -277,7 +277,7 @@ class FacebookGraphConvert
                 $elements[$metricConfigKey][$row['name']] = [];
             }
             $channeledMetric = new stdClass();
-            $channeledMetric->channel = Channel::facebook->value;
+            $channeledMetric->channel = Channel::facebook_organic->value;
             $channeledMetric->name = $row['name'] ?? 'unknown';
             $channeledMetric->period = $period->value;
             $channeledMetric->metricDate = $metricDateString;
@@ -380,7 +380,7 @@ class FacebookGraphConvert
             $rowStart = microtime(true);
             $today = Carbon::today()->toDateString();
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
-                channel: Channel::facebook->value,
+                channel: Channel::facebook_organic->value,
                 name: $row['name'] ?? 'unknown',
                 period: Period::Lifetime->value,
                 metricDate: $today,
@@ -393,7 +393,7 @@ class FacebookGraphConvert
                 $elements[$metricConfigKey] = [];
             }
             $channeledMetric = new stdClass();
-            $channeledMetric->channel = Channel::facebook->value;
+            $channeledMetric->channel = Channel::facebook_organic->value;
             $channeledMetric->name = $row['name'] ?? 'unknown';
             $channeledMetric->period = Period::Lifetime->value;
             $channeledMetric->metricDate = $today;
@@ -494,7 +494,7 @@ class FacebookGraphConvert
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
-                    channel: Channel::facebook->value,
+                    channel: Channel::facebook_marketing->value,
                     name: $key,
                     period: $period->value,
                     metricDate: $metricDate,
@@ -503,7 +503,7 @@ class FacebookGraphConvert
                     channeledCampaign: $channeledCampaignEntity->getPlatformId(),
                 );
                 $channeledMetric = new stdClass();
-                $channeledMetric->channel = Channel::facebook->value;
+                $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
                 if (!is_numeric($val)) {
@@ -611,7 +611,7 @@ class FacebookGraphConvert
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
-                    channel: Channel::facebook->value,
+                    channel: Channel::facebook_marketing->value,
                     name: $key,
                     period: $period->value,
                     metricDate: $metricDate,
@@ -621,7 +621,7 @@ class FacebookGraphConvert
                     channeledAdGroup: $channeledAdGroupEntity->getPlatformId(),
                 );
                 $channeledMetric = new stdClass();
-                $channeledMetric->channel = Channel::facebook->value;
+                $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
                 if (!is_numeric($val)) {
@@ -731,7 +731,7 @@ class FacebookGraphConvert
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
-                    channel: Channel::facebook->value,
+                    channel: Channel::facebook_marketing->value,
                     name: $key,
                     period: $period->value,
                     metricDate: $metricDate,
@@ -742,7 +742,7 @@ class FacebookGraphConvert
                     channeledAd: $channeledAdEntity->getPlatformId(),
                 );
                 $channeledMetric = new stdClass();
-                $channeledMetric->channel = Channel::facebook->value;
+                $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
                 if (!is_numeric($val)) {

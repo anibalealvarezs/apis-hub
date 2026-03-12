@@ -91,7 +91,7 @@ class FacebookGraphConvertTest extends BaseUnitTestCase
         $this->assertEquals('page_impressions', $metric->name);
         $this->assertEquals($value, $metric->value);
         $this->assertEquals($platformId, $metric->platformId);
-        $this->assertEquals(Channel::facebook->value, $metric->channel);
+        $this->assertEquals(Channel::facebook_organic->value, $metric->channel);
     }
 
     public function testAdAccountMetrics(): void

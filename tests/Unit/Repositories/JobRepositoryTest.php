@@ -487,7 +487,7 @@ class JobRepositoryTest extends TestCase
             
         $this->queryBuilder->method('set')->willReturnSelf();
 
-        $this->queryBuilder->expects($this->exactly(3))
+        $this->queryBuilder->expects($this->exactly(4))
             ->method('setParameter')
             ->willReturnSelf();
 

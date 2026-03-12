@@ -15,12 +15,12 @@ class CampaignRequestsTest extends BaseUnitTestCase
     {
         $channels = CampaignRequests::supportedChannels();
         $this->assertIsArray($channels);
-        $this->assertContains(Channel::facebook, $channels);
+        $this->assertContains(Channel::facebook_marketing, $channels);
     }
 
-    public function testGetListFromFacebookExists(): void
+    public function testGetListFromFacebookMarketingExists(): void
     {
-        $this->assertTrue(method_exists(CampaignRequests::class, 'getListFromFacebook'));
+        $this->assertTrue(method_exists(CampaignRequests::class, 'getListFromFacebookMarketing'));
     }
 
     public function testProcess(): void

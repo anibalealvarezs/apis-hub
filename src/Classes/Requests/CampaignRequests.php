@@ -23,7 +23,7 @@ class CampaignRequests implements RequestInterface
     public static function supportedChannels(): array
     {
         return [
-            Channel::facebook,
+            Channel::facebook_marketing,
         ];
     }
 
@@ -35,7 +35,7 @@ class CampaignRequests implements RequestInterface
      * @param array|null $adAccountIds
      * @return Response
      */
-    public static function getListFromFacebook(
+    public static function getListFromFacebookMarketing(
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
@@ -92,7 +92,7 @@ class CampaignRequests implements RequestInterface
 
             return new Response(json_encode(['Campaigns synchronized']));
         } catch (\Exception $e) {
-            $logger->error("Error in CampaignRequests::getListFromFacebook: " . $e->getMessage());
+            $logger->error("Error in CampaignRequests::getListFromFacebookMarketing: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);
         }
     }

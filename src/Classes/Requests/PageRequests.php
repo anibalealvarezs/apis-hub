@@ -22,7 +22,7 @@ class PageRequests implements RequestInterface
     public static function supportedChannels(): array
     {
         return [
-            Channel::facebook,
+            Channel::facebook_organic,
         ];
     }
 
@@ -33,7 +33,7 @@ class PageRequests implements RequestInterface
      * @param int|null $jobId
      * @return Response
      */
-    public static function getListFromFacebook(
+    public static function getListFromFacebookOrganic(
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
@@ -80,7 +80,7 @@ class PageRequests implements RequestInterface
 
             return new Response(json_encode(['Pages synchronized']));
         } catch (\Exception $e) {
-            $logger->error("Error in PageRequests::getListFromFacebook: " . $e->getMessage());
+            $logger->error("Error in PageRequests::getListFromFacebookOrganic: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);
         }
     }

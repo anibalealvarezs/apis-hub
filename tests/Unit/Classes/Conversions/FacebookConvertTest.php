@@ -42,7 +42,7 @@ class FacebookConvertTest extends BaseUnitTestCase
         $this->assertEquals($name, $campaign->name);
         $this->assertEquals($status, $campaign->status);
         $this->assertEquals($channeledAccountId, $campaign->channeledAccountId);
-        $this->assertEquals(Channel::facebook->value, $campaign->channel);
+        $this->assertEquals(Channel::facebook_marketing->value, $campaign->channel);
     }
 
     public function testAdsets(): void

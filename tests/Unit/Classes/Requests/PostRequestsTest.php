@@ -14,11 +14,11 @@ class PostRequestsTest extends BaseUnitTestCase
     {
         $channels = PostRequests::supportedChannels();
         $this->assertIsArray($channels);
-        $this->assertContains(Channel::facebook, $channels);
+        $this->assertContains(Channel::facebook_organic, $channels);
     }
 
-    public function testGetListFromFacebookExists(): void
+    public function testGetListFromFacebookOrganicExists(): void
     {
-        $this->assertTrue(method_exists(PostRequests::class, 'getListFromFacebook'));
+        $this->assertTrue(method_exists(PostRequests::class, 'getListFromFacebookOrganic'));
     }
 }

@@ -82,7 +82,8 @@ class MetricRequests
         return [
             Channel::shopify,
             Channel::klaviyo,
-            Channel::facebook,
+            Channel::facebook_marketing,
+            Channel::facebook_organic,
             Channel::bigcommerce,
             Channel::netsuite,
             Channel::amazon,
@@ -215,7 +216,7 @@ class MetricRequests
      * @throws \Doctrine\DBAL\Exception
      * @throws Exception
      */
-    public static function getListFromFacebook(
+    public static function getListFromFacebookOrganic(
         ?string $startDate = null,
         ?string $endDate = null,
         string|bool $resume = true,
@@ -223,7 +224,7 @@ class MetricRequests
         ?int $jobId = null
     ): Response {
         if (!$logger) {
-            $logger = Helpers::setLogger('facebook.log');
+            $logger = Helpers::setLogger('facebook-organic.log');
         }
 
         // Apply default dates if missing for "recent" safety
@@ -236,7 +237,7 @@ class MetricRequests
             $logger->info("No endDate provided, defaulting to $endDate");
         }
 
-        $logger->info("Starting getListFromFacebook: startDate=$startDate, endDate=$endDate, resume=$resume");
+        $logger->info("Starting getListFromFacebookOrganic: startDate=$startDate, endDate=$endDate, resume=$resume");
         $manager = Helpers::getManager();
         try {
             // Validate configuration
@@ -245,18 +246,19 @@ class MetricRequests
             // Initialize API client
             $api = self::initializeFacebookGraphApi($config, $logger);
 
-            // Initialize repositories and settings
+            // Initialize repositories
             $pageRepository = $manager->getRepository(Page::class);
             $postRepository = $manager->getRepository(Post::class);
             $accountRepository = $manager->getRepository(Account::class);
             $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
-            $campaignRepository = $manager->getRepository(Campaign::class);
-            $channeledCampaignRepository = $manager->getRepository(ChanneledCampaign::class);
-            $channeledAdGroupRepository = $manager->getRepository(ChanneledAdGroup::class);
-            $channeledAdRepository = $manager->getRepository(ChanneledAd::class);
 
             // Load global entities
-            $accountEntity = $accountRepository->findOneBy(['name' => $config['facebook']['accounts_group_name']]);
+            $accountEntityName = $config['facebook']['accounts_group_name'] ?? null;
+            $accountEntity = $accountEntityName ? $accountRepository->findOneBy(['name' => $accountEntityName]) : null;
+
+            if (!$accountEntity) {
+                $logger->warning("Account group '{$accountEntityName}' not found. Instagram accounts might not be processed correctly.");
+            }
 
             // Load pages and create a map
             /** @var Page[] $pages */
@@ -265,16 +267,16 @@ class MetricRequests
                 'map' => [],
                 'mapReverse' => [],
             ];
-            foreach ($pages as $page) {
-                $pageMap['map'][$page->getUrl()] = $page->getId();
-                $pageMap['mapReverse'][$page->getId()] = $page->getUrl();
+            foreach ($pages as $p) { // Use simpler variable name
+                $pageMap['map'][$p->getUrl()] = $p->getId();
+                $pageMap['mapReverse'][$p->getId()] = $p->getUrl();
             }
 
             $totalMetrics = 0;
             $totalRows = 0;
             $totalDuplicates = 0;
 
-            // Process everything
+            // Process Pages & Instagram
             Helpers::reconnectIfNeeded($manager);
             foreach ($config['facebook']['pages'] as $page) {
                 Helpers::checkJobStatus($jobId);
@@ -283,9 +285,14 @@ class MetricRequests
                     $logger->info("Skipping disabled page: " . $page['id']);
                     continue;
                 }
+
                 $pageEntity = $pageRepository->findOneBy(['platformId' => $page['id']]);
+                if (!$pageEntity) {
+                    $logger->error("Page entity not found for platformId=" . $page['id'] . ". Skipping.");
+                    continue;
+                }
+
                 if ($page['page_metrics']) {
-                    $manager->getConnection()->beginTransaction();
                     try {
                         self::processFacebookPage(
                             page: $page,
@@ -297,91 +304,160 @@ class MetricRequests
                             logger: $logger,
                             pageMap: $pageMap,
                         );
-                        $manager->getConnection()->commit();
                     } catch (Exception $e) {
-                        $manager->getConnection()->rollBack();
                         $logger->error("Error processing page " . $page['id'] . ": " . $e->getMessage());
                     }
-                } else {
-                    $logger->info("Skipping page metrics for page: " . $page['id']);
                 }
+
                 if ($page['posts']) {
                     $postMap = self::getPostMap($manager, $pageEntity);
                     if ($page['post_metrics']) {
-                        foreach ($postMap['map'] as $post) {
-                            $manager->getConnection()->beginTransaction();
+                        foreach ($postMap['map'] as $postIdInDb) {
                             try {
-                                self::processFacebookPagePost(
-                                    postEntity: $postRepository->findOneBy(['id' => $post]),
-                                    pageEntity: $pageEntity,
-                                    api: $api,
-                                    manager: $manager,
-                                    logger: $logger,
-                                    postMap: $postMap,
-                                    pageMap: $pageMap,
-                                );
-                                $manager->getConnection()->commit();
+                                $postEntity = $postRepository->find($postIdInDb);
+                                if ($postEntity) {
+                                    self::processFacebookPagePost(
+                                        postEntity: $postEntity,
+                                        pageEntity: $pageEntity,
+                                        api: $api,
+                                        manager: $manager,
+                                        logger: $logger,
+                                        postMap: $postMap,
+                                        pageMap: $pageMap,
+                                    );
+                                }
                             } catch (Exception $e) {
-                                $manager->getConnection()->rollBack();
-                                $logger->error("Error processing Facebook post " . $post . ": " . $e->getMessage());
+                                $logger->error("Error processing Facebook post " . $postIdInDb . ": " . $e->getMessage());
                             }
                         }
                     }
                 }
+
                 if ($page['ig_account'] && $page['ig_account_metrics']) {
-                    $manager->getConnection()->beginTransaction();
-                    try {
-                        self::processInstagramAccount(
-                            page: $page,
-                            api: $api,
-                            manager: $manager,
-                            accountEntity: $accountEntity,
-                            pageEntity: $pageEntity,
-                            logger: $logger,
-                            pageMap: $pageMap,
-                            startDate: $startDate,
-                            endDate: $endDate,
-                        );
-                        $manager->getConnection()->commit();
-                    } catch (Exception $e) {
-                        $manager->getConnection()->rollBack();
-                        $logger->error("Error processing Instagram account " . $page['ig_account'] . ": " . $e->getMessage());
+                    if ($accountEntity) {
+                        try {
+                            self::processInstagramAccount(
+                                page: $page,
+                                api: $api,
+                                manager: $manager,
+                                accountEntity: $accountEntity,
+                                pageEntity: $pageEntity,
+                                logger: $logger,
+                                pageMap: $pageMap,
+                                startDate: $startDate,
+                                endDate: $endDate,
+                            );
+                        } catch (Exception $e) {
+                            $logger->error("Error processing Instagram account " . $page['ig_account'] . ": " . $e->getMessage());
+                        }
+                    } else {
+                        $logger->error("Cannot process Instagram account " . $page['ig_account'] . " because accountEntity is null.");
                     }
                 }
-                $channeledAccountEntity = $channeledAccountRepository->findOneBy([
-                    'platformId' => $page['ig_account'],
-                    'account' => $accountEntity,
-                ]);
+
                 if ($page['ig_account_media']) {
-                    $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
-                    if ($page['ig_account_media_metrics']) {
-                        foreach ($mediaMap['map'] as $media) {
-                            if ($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$media] == $page['ig_account_media_stop_id'])) {
-                                break;
-                            }
-                            $manager->getConnection()->beginTransaction();
-                            try {
-                                self::processInstagramMedia(
-                                    pageEntity: $pageEntity,
-                                    postEntity: $postRepository->findOneBy(['id' => $media]),
-                                    accountEntity: $accountEntity,
-                                    channeledAccountEntity: $channeledAccountEntity,
-                                    api: $api,
-                                    manager: $manager,
-                                    logger: $logger,
-                                    mediaMap: $mediaMap,
-                                    pageMap: $pageMap,
-                                );
-                                $manager->getConnection()->commit();
-                            } catch (Exception $e) {
-                                $manager->getConnection()->rollBack();
-                                $logger->error("Error processing Instagram media " . $media . ": " . $e->getMessage());
+                    $channeledAccountEntity = $channeledAccountRepository->findOneBy([
+                        'platformId' => $page['ig_account'],
+                        'account' => $accountEntity,
+                    ]);
+
+                    if ($channeledAccountEntity) {
+                        $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
+                        if ($page['ig_account_media_metrics']) {
+                            foreach ($mediaMap['map'] as $mediaIdInDb) {
+                                if ($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$mediaIdInDb] == $page['ig_account_media_stop_id'])) {
+                                    break;
+                                }
+                                try {
+                                    $mediaEntity = $postRepository->find($mediaIdInDb);
+                                    if ($mediaEntity) {
+                                        self::processInstagramMedia(
+                                            pageEntity: $pageEntity,
+                                            postEntity: $mediaEntity,
+                                            accountEntity: $accountEntity,
+                                            channeledAccountEntity: $channeledAccountEntity,
+                                            api: $api,
+                                            manager: $manager,
+                                            logger: $logger,
+                                            mediaMap: $mediaMap,
+                                            pageMap: $pageMap,
+                                        );
+                                    }
+                                } catch (Exception $e) {
+                                    $logger->error("Error processing Instagram media " . $mediaIdInDb . ": " . $e->getMessage());
+                                }
                             }
                         }
                     }
                 }
             }
 
+            return self::finalizeTransaction($totalMetrics, $totalRows, $totalDuplicates, $logger, $startDate, $endDate);
+        } catch (Exception $e) {
+            $logger->error("Unexpected error in getListFromFacebookOrganic: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param string|bool $resume
+     * @param LoggerInterface|null $logger
+     * @return Response
+     * @throws NotSupported
+     * @throws ORMException
+     * @throws \Doctrine\DBAL\Exception
+     * @throws Exception
+     */
+    public static function getListFromFacebookMarketing(
+        ?string $startDate = null,
+        ?string $endDate = null,
+        string|bool $resume = true,
+        ?LoggerInterface $logger = null,
+        ?int $jobId = null
+    ): Response {
+        if (!$logger) {
+            $logger = Helpers::setLogger('facebook-marketing.log');
+        }
+
+        // Apply default dates if missing for "recent" safety
+        if (empty($startDate)) {
+            $startDate = Carbon::today()->subDays(3)->format('Y-m-d');
+            $logger->info("No startDate provided, defaulting to $startDate");
+        }
+        if (empty($endDate)) {
+            $endDate = Carbon::today()->format('Y-m-d');
+            $logger->info("No endDate provided, defaulting to $endDate");
+        }
+
+        $logger->info("Starting getListFromFacebookMarketing: startDate=$startDate, endDate=$endDate, resume=$resume");
+        $manager = Helpers::getManager();
+        try {
+            // Validate configuration
+            $config = self::validateFacebookConfig($logger);
+
+            // Initialize API client
+            $api = self::initializeFacebookGraphApi($config, $logger);
+
+            // Initialize repositories
+            $accountRepository = $manager->getRepository(Account::class);
+            $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
+
+            // Load global entities
+            $accountEntityName = $config['facebook']['accounts_group_name'] ?? null;
+            $accountEntity = $accountEntityName ? $accountRepository->findOneBy(['name' => $accountEntityName]) : null;
+
+            if (!$accountEntity) {
+                $logger->error("Account group '{$accountEntityName}' not found. Facebook Marketing cannot be processed.");
+                throw new Exception("Account group '{$accountEntityName}' not found.");
+            }
+
+            $totalMetrics = 0;
+            $totalRows = 0;
+            $totalDuplicates = 0;
+
+            // Process Ad Accounts
             Helpers::reconnectIfNeeded($manager);
             foreach ($config['facebook']['ad_accounts'] as $adAccount) {
                 Helpers::checkJobStatus($jobId);
@@ -390,8 +466,13 @@ class MetricRequests
                     'platformId' => $adAccount['id'],
                     'account' => $accountEntity,
                 ]);
+
+                if (!$channeledAccountEntity) {
+                    $logger->error("ChanneledAccount entity not found for adAccount=" . $adAccount['id'] . ". Skipping.");
+                    continue;
+                }
+
                 if ($adAccount['enabled']) {
-                    $manager->getConnection()->beginTransaction();
                     try {
                         if ($adAccount['ad_account_metrics']) {
                             self::processAdAccount(
@@ -404,8 +485,6 @@ class MetricRequests
                                 startDate: $startDate,
                                 endDate: $endDate,
                             );
-                        } else {
-                            $logger->info("Skipping ad account metrics for ad account: " . $adAccount['id']);
                         }
 
                         if ($adAccount['campaigns']) {
@@ -466,56 +545,21 @@ class MetricRequests
                                 }
                             }
                         }
-                        $manager->getConnection()->commit();
                     } catch (FacebookRateLimitException $e) {
-                        // Re-throw rate limit exceptions so they propagate to the outer handler
-                        // which marks the job as failed with a 429 status
-                        if ($manager->getConnection()->isTransactionActive()) {
-                            $manager->getConnection()->rollBack();
-                        }
                         throw $e;
                     } catch (Exception $e) {
-                        if ($manager->getConnection()->isTransactionActive()) {
-                            $manager->getConnection()->rollBack();
-                        }
-                        $logger->error("Error processing ad account " . $adAccount['id'] . ": " . $e->getMessage() . " " . $e->getTraceAsString());
+                        $logger->error("Error processing ad account " . $adAccount['id'] . ": " . $e->getMessage());
                     }
                 }
             }
 
-            // Finalize transaction and cache
-            return self::finalizeTransaction(
-                $totalMetrics,
-                $totalRows,
-                $totalDuplicates,
-                $logger,
-                $startDate,
-                $endDate
-            );
+            return self::finalizeTransaction($totalMetrics, $totalRows, $totalDuplicates, $logger, $startDate, $endDate);
         } catch (FacebookRateLimitException $e) {
             $logger->error("Facebook API Rate Limit Reach: " . $e->getMessage());
-            try {
-                if ($manager->getConnection()->isTransactionActive()) {
-                    $manager->getConnection()->rollback();
-                }
-            } catch (Exception $rollbackException) {
-                $logger->error("Error during transaction rollback: " . $rollbackException->getMessage());
-            }
             return new Response(json_encode(['error' => 'Rate limit reached: ' . $e->getMessage()]), 429);
         } catch (Exception $e) {
-            try {
-                if ($manager->getConnection()->isTransactionActive()) {
-                    $manager->getConnection()->rollback();
-                    $logger->info("Rolled back transaction");
-                }
-            } catch (Exception $rollbackException) {
-                $logger->error("Error during transaction rollback: " . $rollbackException->getMessage());
-            }
-            $logger->error("Unexpected error in getListFromFacebook: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+            $logger->error("Unexpected error in getListFromFacebookMarketing: " . $e->getMessage());
             throw $e;
-        } catch (GuzzleException $e) {
-            $logger->error("GuzzleException in getListFromFacebook: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
-            throw new Exception("GuzzleException in getListFromFacebook: " . $e->getMessage());
         }
     }
 
@@ -1286,7 +1330,7 @@ class MetricRequests
         $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
         $channeledAccountEntity = $channeledAccountRepository->findOneBy([
             'platformId' => (string) $page['ig_account'],
-            'channel' => Channel::facebook->value,
+            'channel' => Channel::facebook_organic->value,
             'type' => AccountEnum::INSTAGRAM->value,
         ]);
         $channeledAccountMap['map'][(string) $page['ig_account']] = $channeledAccountEntity->getId();

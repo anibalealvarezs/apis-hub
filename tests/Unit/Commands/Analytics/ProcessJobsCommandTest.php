@@ -38,6 +38,9 @@ class ProcessJobsCommandTest extends TestCase
         $emProperty = $reflection->getProperty('em');
         $emProperty->setAccessible(true);
         $emProperty->setValue($this->command, $this->entityManager);
+
+        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $this->entityManager->method('getConnection')->willReturn($connection);
     }
 
     public function testExecuteSkipsJobWhenDependencyNotMet(): void

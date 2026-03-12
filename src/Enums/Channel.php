@@ -8,7 +8,8 @@ enum Channel: int
 {
     case shopify = 1;
     case klaviyo = 2;
-    case facebook = 3;
+    case facebook_marketing = 3;
+    case facebook_organic = 15;
     case bigcommerce = 4;
     case netsuite = 5;
     case amazon = 6;
@@ -31,7 +32,8 @@ enum Channel: int
         return match($this) {
             self::shopify => 'Shopify',
             self::klaviyo => 'Klaviyo',
-            self::facebook => 'Facebook',
+            self::facebook_marketing => 'FacebookMarketing',
+            self::facebook_organic => 'FacebookOrganic',
             self::bigcommerce => 'BigCommerce',
             self::netsuite => 'Netsuite',
             self::amazon => 'Amazon',
@@ -51,7 +53,8 @@ enum Channel: int
         return match (strtolower($name)) {
             'shopify' => self::shopify,
             'klaviyo' => self::klaviyo,
-            'facebook', 'facebook-ads', 'fb-ads' => self::facebook,
+            'facebook_marketing', 'facebook-ads', 'fb-ads' => self::facebook_marketing,
+            'facebook_organic', 'facebook' => self::facebook_organic,
             'bigcommerce' => self::bigcommerce,
             'netsuite' => self::netsuite,
             'amazon' => self::amazon,
@@ -70,7 +73,7 @@ enum Channel: int
     public function getCooldown(): int
     {
         return match($this) {
-            self::facebook, self::instagram => 3600, // 1 hour
+            self::facebook_marketing, self::facebook_organic, self::instagram => 3600, // 1 hour
             default => 600, // 10 minutes
         };
     }

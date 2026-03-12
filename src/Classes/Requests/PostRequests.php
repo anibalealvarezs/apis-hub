@@ -22,7 +22,7 @@ class PostRequests implements RequestInterface
     public static function supportedChannels(): array
     {
         return [
-            Channel::facebook,
+            Channel::facebook_organic,
         ];
     }
 
@@ -34,7 +34,7 @@ class PostRequests implements RequestInterface
      * @param array|null $pageIds
      * @return Response
      */
-    public static function getListFromFacebook(
+    public static function getListFromFacebookOrganic(
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
@@ -100,7 +100,7 @@ class PostRequests implements RequestInterface
                     // We need a channeled account for IG media as per existing logic
                     // The config might specify which an account to use, or we try to find one linked to the same account
                     $channeledAccount = $channeledAccountRepo->findOneBy([
-                        'channel' => Channel::facebook->value,
+                        'channel' => Channel::facebook_organic->value,
                         // This logic might need refinement based on how IG accounts are linked to Ad Accounts
                     ]);
 
@@ -122,7 +122,7 @@ class PostRequests implements RequestInterface
 
             return new Response(json_encode(['Posts synchronized']));
         } catch (\Exception $e) {
-            $logger->error("Error in PostRequests::getListFromFacebook: " . $e->getMessage());
+            $logger->error("Error in PostRequests::getListFromFacebookOrganic: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);
         }
     }

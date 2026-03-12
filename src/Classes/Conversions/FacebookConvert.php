@@ -27,7 +27,7 @@ class FacebookConvert
                 'buyingType' => $campaign['buying_type'] ?? null,
                 'status' => $campaign['status'] ?? null,
                 'budget' => $campaign['daily_budget'] ?? $campaign['lifetime_budget'] ?? 0,
-                'channel' => Channel::facebook->value,
+                'channel' => Channel::facebook_marketing->value,
                 'channeledAccountId' => $channeledAccountId,
                 'data' => $campaign,
             ];
@@ -51,7 +51,7 @@ class FacebookConvert
                 'optimizationGoal' => $adset['optimization_goal'] ?? null,
                 'billingEvent' => $adset['billing_event'] ?? null,
                 'targeting' => $adset['targeting'] ?? null,
-                'channel' => Channel::facebook->value,
+                'channel' => Channel::facebook_marketing->value,
                 'channeledAccountId' => $channeledAccountId,
                 'channeledCampaignId' => $adset['campaign_id'] ?? null, // platformId of campaign
                 'data' => $adset,
@@ -71,7 +71,7 @@ class FacebookConvert
                 'platformId' => $ad['id'] ?? null,
                 'name' => $ad['name'] ?? '',
                 'status' => $ad['status'] ?? null,
-                'channel' => Channel::facebook->value,
+                'channel' => Channel::facebook_marketing->value,
                 'channeledAccountId' => $channeledAccountId,
                 'channeledCampaignId' => $ad['campaign_id'] ?? null, // platformId of campaign
                 'channeledAdGroupId' => $ad['adset_id'] ?? null, // platformId of adset

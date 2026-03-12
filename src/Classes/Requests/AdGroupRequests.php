@@ -16,13 +16,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AdGroupRequests implements RequestInterface
 {
-    /**
-     * @return Channel[]
-     */
     public static function supportedChannels(): array
     {
         return [
-            Channel::facebook,
+            Channel::facebook_marketing,
         ];
     }
 
@@ -34,7 +31,7 @@ class AdGroupRequests implements RequestInterface
      * @param array|null $adAccountIds
      * @return Response
      */
-    public static function getListFromFacebook(
+    public static function getListFromFacebookMarketing(
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
@@ -90,7 +87,7 @@ class AdGroupRequests implements RequestInterface
 
             return new Response(json_encode(['AdGroups synchronized']));
         } catch (\Exception $e) {
-            $logger->error("Error in AdGroupRequests::getListFromFacebook: " . $e->getMessage());
+            $logger->error("Error in AdGroupRequests::getListFromFacebookMarketing: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);
         }
     }

@@ -14,11 +14,11 @@ class AdRequestsTest extends BaseUnitTestCase
     {
         $channels = AdRequests::supportedChannels();
         $this->assertIsArray($channels);
-        $this->assertContains(Channel::facebook, $channels);
+        $this->assertContains(Channel::facebook_marketing, $channels);
     }
 
-    public function testGetListFromFacebookExists(): void
+    public function testGetListFromFacebookMarketingExists(): void
     {
-        $this->assertTrue(method_exists(AdRequests::class, 'getListFromFacebook'));
+        $this->assertTrue(method_exists(AdRequests::class, 'getListFromFacebookMarketing'));
     }
 }

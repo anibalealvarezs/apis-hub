@@ -40,7 +40,7 @@ class CustomerRequests implements RequestInterface
         return [
             Channel::shopify,
             Channel::klaviyo,
-            Channel::facebook,
+            Channel::facebook_marketing,
             Channel::bigcommerce,
             Channel::netsuite,
             Channel::amazon,
@@ -171,7 +171,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromFacebook(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromFacebookMarketing(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }

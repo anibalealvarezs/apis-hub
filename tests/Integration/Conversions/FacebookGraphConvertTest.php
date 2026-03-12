@@ -89,7 +89,7 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
 
         $this->assertEquals($rows[0]['impressions'], $metricsMap['18-24_male_impressions']->value);
         $this->assertEquals($channeledAccountPlatformId, $metricsMap['18-24_male_impressions']->platformId);
-        $this->assertEquals(\Enums\Channel::facebook->value, $metricsMap['18-24_male_impressions']->channel);
+        $this->assertEquals(\Enums\Channel::facebook_marketing->value, $metricsMap['18-24_male_impressions']->channel);
         $this->assertEquals($dateStart, $metricsMap['18-24_male_impressions']->metricDate);
 
         // Ensure metadata extraction captures complex fields like actions natively
@@ -146,7 +146,7 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
         $channeledAccount->addPlatformId($igPlatformId);
         $channeledAccount->addName($this->faker->userName);
         $channeledAccount->addType(\Enums\Account::INSTAGRAM);
-        $channeledAccount->addChannel(\Enums\Channel::facebook->value);
+        $channeledAccount->addChannel(\Enums\Channel::facebook_organic->value);
         $channeledAccount->addAccount($accountEntity);
         $this->entityManager->persist($channeledAccount);
         $this->entityManager->flush();
@@ -196,14 +196,14 @@ class FacebookGraphConvertTest extends BaseIntegrationTestCase
         $channeledCampaign = new ChanneledCampaign();
         $channeledCampaign->addPlatformId($this->faker->uuid);
         $channeledCampaign->addBudget((float) $this->faker->numberBetween(50, 5000));
-        $channeledCampaign->addChannel(\Enums\Channel::facebook->value);
+        $channeledCampaign->addChannel(\Enums\Channel::facebook_marketing->value);
         $channeledCampaign->addCampaign($campaignEntity);
         
         $channeledAccount = new ChanneledAccount();
         $channeledAccount->addPlatformId('act_' . $this->faker->numerify('#########'));
         $channeledAccount->addName($this->faker->company);
         $channeledAccount->addType(\Enums\Account::META_AD_ACCOUNT);
-        $channeledAccount->addChannel(\Enums\Channel::facebook->value);
+        $channeledAccount->addChannel(\Enums\Channel::facebook_marketing->value);
         // Campaign requires account technically in DB relations typically, but we only supply it direct for metric config signature
         
         $this->entityManager->persist($channeledAccount);

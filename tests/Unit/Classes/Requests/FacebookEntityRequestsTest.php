@@ -14,11 +14,17 @@ class FacebookEntityRequestsTest extends BaseUnitTestCase
     {
         $channels = FacebookEntityRequests::supportedChannels();
         $this->assertIsArray($channels);
-        $this->assertContains(Channel::facebook, $channels);
+        $this->assertContains(Channel::facebook_marketing, $channels);
+        $this->assertContains(Channel::facebook_organic, $channels);
     }
 
-    public function testGetListFromFacebookExists(): void
+    public function testGetListFromFacebookMarketingExists(): void
     {
-        $this->assertTrue(method_exists(FacebookEntityRequests::class, 'getListFromFacebook'));
+        $this->assertTrue(method_exists(FacebookEntityRequests::class, 'getListFromFacebookMarketing'));
+    }
+
+    public function testGetListFromFacebookOrganicExists(): void
+    {
+        $this->assertTrue(method_exists(FacebookEntityRequests::class, 'getListFromFacebookOrganic'));
     }
 }

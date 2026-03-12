@@ -42,7 +42,7 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         $channeledAccount = new ChanneledAccount();
         $channeledAccount->addPlatformId($adAccountId);
         $channeledAccount->addName('Test Account');
-        $channeledAccount->addChannel(Channel::facebook->value);
+        $channeledAccount->addChannel(Channel::facebook_marketing->value);
         $channeledAccount->addType(AccountEnum::META_AD_ACCOUNT);
         $channeledAccount->addAccount($account);
         $channeledAccount->addPlatformCreatedAt(new \DateTime());
@@ -55,7 +55,7 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
 
         $channeledCampaign = new ChanneledCampaign();
         $channeledCampaign->addPlatformId($campaignPlatformId);
-        $channeledCampaign->addChannel(Channel::facebook->value);
+        $channeledCampaign->addChannel(Channel::facebook_marketing->value);
         $channeledCampaign->addChanneledAccount($channeledAccount);
         $channeledCampaign->addCampaign($campaign);
         $channeledCampaign->addBudget(100.0);
@@ -138,7 +138,7 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         $channeledAccount = new ChanneledAccount();
         $channeledAccount->addPlatformId($adAccountId);
         $channeledAccount->addName('Test Account');
-        $channeledAccount->addChannel(Channel::facebook->value);
+        $channeledAccount->addChannel(Channel::facebook_marketing->value);
         $channeledAccount->addType(AccountEnum::META_AD_ACCOUNT);
         $channeledAccount->addAccount($account);
         $channeledAccount->addPlatformCreatedAt(new \DateTime());
@@ -151,7 +151,7 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
 
         $channeledCampaign = new ChanneledCampaign();
         $channeledCampaign->addPlatformId($campaignPlatformId);
-        $channeledCampaign->addChannel(Channel::facebook->value);
+        $channeledCampaign->addChannel(Channel::facebook_marketing->value);
         $channeledCampaign->addChanneledAccount($channeledAccount);
         $channeledCampaign->addCampaign($campaign);
         $channeledCampaign->addBudget(100.0); // Added required budget
@@ -160,7 +160,7 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         $channeledAdGroup = new ChanneledAdGroup();
         $channeledAdGroup->addPlatformId($adsetPlatformId);
         $channeledAdGroup->addName('Test Adset'); // Added required name
-        $channeledAdGroup->addChannel(Channel::facebook->value);
+        $channeledAdGroup->addChannel(Channel::facebook_marketing->value);
         $channeledAdGroup->addChanneledAccount($channeledAccount);
         $channeledAdGroup->addChanneledCampaign($channeledCampaign);
         $channeledAdGroup->addCampaign($campaign);
@@ -250,7 +250,7 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         $channeledAccount = new ChanneledAccount();
         $channeledAccount->addPlatformId($adAccountId);
         $channeledAccount->addName('Test Account');
-        $channeledAccount->addChannel(Channel::facebook->value);
+        $channeledAccount->addChannel(Channel::facebook_marketing->value);
         $channeledAccount->addType(AccountEnum::META_AD_ACCOUNT);
         $channeledAccount->addAccount($account);
         $channeledAccount->addPlatformCreatedAt(new \DateTime());
@@ -263,7 +263,7 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
 
         $channeledCampaign = new ChanneledCampaign();
         $channeledCampaign->addPlatformId($campaignPlatformId);
-        $channeledCampaign->addChannel(Channel::facebook->value);
+        $channeledCampaign->addChannel(Channel::facebook_marketing->value);
         $channeledCampaign->addChanneledAccount($channeledAccount);
         $channeledCampaign->addCampaign($campaign);
         $channeledCampaign->addBudget(100.0);
@@ -272,7 +272,7 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         $channeledAdGroup = new ChanneledAdGroup();
         $channeledAdGroup->addPlatformId($adsetPlatformId);
         $channeledAdGroup->addName('Test Adset');
-        $channeledAdGroup->addChannel(Channel::facebook->value);
+        $channeledAdGroup->addChannel(Channel::facebook_marketing->value);
         $channeledAdGroup->addChanneledAccount($channeledAccount);
         $channeledAdGroup->addChanneledCampaign($channeledCampaign);
         $channeledAdGroup->addCampaign($campaign);
@@ -281,7 +281,7 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         $channeledAd = new ChanneledAd();
         $channeledAd->addPlatformId($adPlatformId);
         $channeledAd->addName('Test Ad');
-        $channeledAd->addChannel(Channel::facebook->value);
+        $channeledAd->addChannel(Channel::facebook_marketing->value);
         $channeledAd->addChanneledCampaign($channeledCampaign);
         $channeledAd->addChanneledAdGroup($channeledAdGroup);
         $this->entityManager->persist($channeledAd);

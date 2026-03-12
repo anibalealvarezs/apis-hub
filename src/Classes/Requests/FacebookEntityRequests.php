@@ -12,13 +12,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class FacebookEntityRequests implements RequestInterface
 {
-    /**
-     * @return Channel[]
-     */
     public static function supportedChannels(): array
     {
         return [
-            Channel::facebook,
+            Channel::facebook_marketing,
+            Channel::facebook_organic,
         ];
     }
 
@@ -29,39 +27,68 @@ class FacebookEntityRequests implements RequestInterface
      * @param int|null $jobId
      * @return Response
      */
-    public static function getListFromFacebook(
+    public static function getListFromFacebookMarketing(
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null
     ): Response {
         if (!$logger) {
-            $logger = Helpers::setLogger('facebook-entities.log');
+            $logger = Helpers::setLogger('facebook-marketing.log');
         }
 
         try {
-            $logger->info("Starting full Facebook entities sync via FacebookEntityRequests");
+            $logger->info("Starting Facebook Marketing entities sync via FacebookEntityRequests");
+
+            // 1. Sync Campaigns
+            CampaignRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+
+            // 2. Sync AdGroups
+            AdGroupRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+
+            // 3. Sync Ads
+            AdRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+
+            $logger->info("Facebook Marketing entities sync completed");
+
+            return new Response(json_encode(['Facebook Marketing entities synchronized']));
+        } catch (\Exception $e) {
+            $logger->error("Error in FacebookEntityRequests::getListFromFacebookMarketing: " . $e->getMessage());
+            return new Response(json_encode(['error' => $e->getMessage()]), 500);
+        }
+    }
+
+    /**
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param LoggerInterface|null $logger
+     * @param int|null $jobId
+     * @return Response
+     */
+    public static function getListFromFacebookOrganic(
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?LoggerInterface $logger = null,
+        ?int $jobId = null
+    ): Response {
+        if (!$logger) {
+            $logger = Helpers::setLogger('facebook-organic.log');
+        }
+
+        try {
+            $logger->info("Starting Facebook Organic entities sync via FacebookEntityRequests");
 
             // 1. Sync Pages
-            PageRequests::getListFromFacebook($startDate, $endDate, $logger, $jobId);
+            PageRequests::getListFromFacebookOrganic($startDate, $endDate, $logger, $jobId);
 
-            // 2. Sync Campaigns
-            CampaignRequests::getListFromFacebook($startDate, $endDate, $logger, $jobId);
+            // 2. Sync Posts
+            PostRequests::getListFromFacebookOrganic($startDate, $endDate, $logger, $jobId);
 
-            // 3. Sync AdGroups
-            AdGroupRequests::getListFromFacebook($startDate, $endDate, $logger, $jobId);
+            $logger->info("Facebook Organic entities sync completed");
 
-            // 4. Sync Ads
-            AdRequests::getListFromFacebook($startDate, $endDate, $logger, $jobId);
-
-            // 5. Sync Posts
-            PostRequests::getListFromFacebook($startDate, $endDate, $logger, $jobId);
-
-            $logger->info("Full Facebook entities sync completed");
-
-            return new Response(json_encode(['All Facebook entities synchronized']));
+            return new Response(json_encode(['Facebook Organic entities synchronized']));
         } catch (\Exception $e) {
-            $logger->error("Error in FacebookEntityRequests::getListFromFacebook: " . $e->getMessage());
+            $logger->error("Error in FacebookEntityRequests::getListFromFacebookOrganic: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);
         }
     }
