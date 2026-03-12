@@ -34,6 +34,7 @@ enum AnalyticsEntity: string
     case channeled_campaigns = 'channeled_campaign';
     case channeled_ad_groups = 'channeled_ad_group';
     case channeled_ads = 'channeled_ad';
+    case facebook_entities = 'facebook_entities';
 
     public function getRequestsClassName(): string
     {
@@ -51,8 +52,9 @@ enum AnalyticsEntity: string
             self::queries, self::channeled_queries => '\Classes\Requests\QueryRequests',
             self::pages, self::channeled_pages => '\Classes\Requests\PageRequests',
             self::campaigns, self::channeled_campaigns => '\Classes\Requests\CampaignRequests',
-            self::channeled_ad_groups => '\Classes\Requests\ChanneledAdGroupRequests',
-            self::channeled_ads => '\Classes\Requests\ChanneledAdRequests',
+            self::channeled_ad_groups => '\Classes\Requests\AdGroupRequests',
+            self::channeled_ads => '\Classes\Requests\AdRequests',
+            self::facebook_entities => '\Classes\Requests\FacebookEntityRequests',
         };
     }
 }

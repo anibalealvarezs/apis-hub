@@ -305,7 +305,6 @@ class MetricRequests
                     $logger->info("Skipping page metrics for page: " . $page['id']);
                 }
                 if ($page['posts']) {
-                    PostRequests::getListFromFacebook($logger, $jobId, [$page['id']]);
                     $postMap = self::getPostMap($manager, $pageEntity);
                     if ($page['post_metrics']) {
                         foreach ($postMap['map'] as $post) {
@@ -353,7 +352,6 @@ class MetricRequests
                     'account' => $accountEntity,
                 ]);
                 if ($page['ig_account_media']) {
-                    PostRequests::getListFromFacebook($logger, $jobId, [$page['id']]);
                     $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
                     if ($page['ig_account_media_metrics']) {
                         foreach ($mediaMap['map'] as $media) {
@@ -409,7 +407,6 @@ class MetricRequests
                         }
 
                         if ($adAccount['campaigns']) {
-                            CampaignRequests::getListFromFacebook($logger, $jobId, [$adAccount['id']]);
                             $campaignsMultiMap = self::getCampaignMaps($manager, $channeledAccountEntity);
                             $campaignMap = $campaignsMultiMap['campaignMap'];
                             $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
@@ -429,7 +426,6 @@ class MetricRequests
                             }
 
                             if ($adAccount['adsets']) {
-                                AdGroupRequests::getListFromFacebook($logger, $jobId, [$adAccount['id']]);
                                 $channeledAdGroupMap = self::getAdGroupMap($manager, $channeledAccountEntity);
 
                                 if ($adAccount['adset_metrics']) {
@@ -448,7 +444,6 @@ class MetricRequests
                                 }
 
                                 if ($adAccount['ads']) {
-                                    AdRequests::getListFromFacebook($logger, $jobId, [$adAccount['id']]);
                                     $channeledAdMap = self::getAdMap($manager, $channeledAccountEntity);
 
                                     if ($adAccount['ad_metrics']) {

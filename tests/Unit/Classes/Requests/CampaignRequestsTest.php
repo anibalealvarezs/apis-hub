@@ -18,6 +18,11 @@ class CampaignRequestsTest extends BaseUnitTestCase
         $this->assertContains(Channel::facebook, $channels);
     }
 
+    public function testGetListFromFacebookExists(): void
+    {
+        $this->assertTrue(method_exists(CampaignRequests::class, 'getListFromFacebook'));
+    }
+
     public function testProcess(): void
     {
         // Mock the processor behavior implicitly by not crashing
