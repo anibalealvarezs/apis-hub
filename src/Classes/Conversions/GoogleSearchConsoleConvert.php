@@ -38,7 +38,7 @@ class GoogleSearchConsoleConvert
         array $rows,
         string $siteUrl,
         string $siteKey,
-        LoggerInterface $logger = null,
+        ?LoggerInterface $logger = null,
         ?Page $pageEntity = null,
         ?EntityManager $em = null,
     ): ArrayCollection {
