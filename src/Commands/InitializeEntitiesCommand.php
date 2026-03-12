@@ -36,9 +36,7 @@ class InitializeEntitiesCommand extends Command
     public function __construct(EntityManagerInterface $entityManager)
     {
         $this->entityManager = $entityManager;
-        $logger = new Logger('initialize-entities');
-        $logger->pushHandler(new StreamHandler('logs/initialize-entities.log', Level::Info));
-        $this->logger = $logger;
+        $this->logger = Helpers::setLogger('initialize-entities.log');
         parent::__construct();
     }
 
@@ -231,10 +229,12 @@ class InitializeEntitiesCommand extends Command
             $this->logger->info("Flushed changes to database");
 
             // Output results
-            $output->writeln("<info>Initialized $countriesInitialized countries, skipped $countriesSkipped</info>");
-            $output->writeln("<info>Initialized $devicesInitialized devices, skipped $devicesSkipped</info>");
-            $output->writeln("<info>Initialized $pagesInitialized pages, skipped $pagesSkipped</info>");
-            $output->writeln("<info>Initialization completed successfully</info>");
+            if (Helpers::isDebug()) {
+                $output->writeln("<info>Initialized $countriesInitialized countries, skipped $countriesSkipped</info>");
+                $output->writeln("<info>Initialized $devicesInitialized devices, skipped $devicesSkipped</info>");
+                $output->writeln("<info>Initialized $pagesInitialized pages, skipped $pagesSkipped</info>");
+                $output->writeln("<info>Initialization completed successfully</info>");
+            }
             $this->logger->info("Completed app:initialize-entities command");
 
             return Command::SUCCESS;

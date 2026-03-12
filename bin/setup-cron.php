@@ -12,6 +12,7 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Symfony\Component\Yaml\Yaml;
+use Helpers\Helpers;
 
 $projectName = $argv[1] ?? null;
 if (!$projectName) {
@@ -81,7 +82,9 @@ $cronFile = '/etc/cron.d/apis-hub-cron';
 file_put_contents($cronFile, implode("\n", $cronLines) . "\n");
 chmod($cronFile, 0644);
 
-echo "✔ Cron configuration generated from {$projectName}.yaml\n";
-foreach ($cronLines as $line) {
-    echo "  Applied: {$line}\n";
+if (Helpers::isDebug()) {
+    echo "✔ Cron configuration generated from {$projectName}.yaml\n";
+    foreach ($cronLines as $line) {
+        echo "  Applied: {$line}\n";
+    }
 }

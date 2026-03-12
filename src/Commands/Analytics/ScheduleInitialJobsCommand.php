@@ -31,7 +31,9 @@ class ScheduleInitialJobsCommand extends Command
         $instances = $config['instances'] ?? [];
 
         if (empty($instances)) {
-            $output->writeln('<comment>No instances found in project configuration.</comment>');
+            if (Helpers::isDebug()) {
+                $output->writeln('<comment>No instances found in project configuration.</comment>');
+            }
             return Command::SUCCESS;
         }
 
@@ -86,16 +88,22 @@ class ScheduleInitialJobsCommand extends Command
 
                 $this->entityManager->persist($job);
                 $scheduledCount++;
-                $output->writeln("<info>Scheduled job for $name ($channel -> $entity)</info>");
+                if (Helpers::isDebug()) {
+                    $output->writeln("<info>Scheduled job for $name ($channel -> $entity)</info>");
+                }
             } else {
                 $skippedCount++;
-                $output->writeln("<comment>Job for $name already exists in queue. Skipping.</comment>");
+                if (Helpers::isDebug()) {
+                    $output->writeln("<comment>Job for $name already exists in queue. Skipping.</comment>");
+                }
             }
         }
 
         $this->entityManager->flush();
 
-        $output->writeln("<info>Successfully scheduled $scheduledCount new jobs ($skippedCount skipped).</info>");
+        if (Helpers::isDebug()) {
+            $output->writeln("<info>Successfully scheduled $scheduledCount new jobs ($skippedCount skipped).</info>");
+        }
 
         return Command::SUCCESS;
     }

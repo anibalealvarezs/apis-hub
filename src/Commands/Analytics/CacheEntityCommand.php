@@ -82,7 +82,9 @@ class CacheEntityCommand extends Command
         }
 
         if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
-            $output->writeln('<info>Success (' . $response->getStatusCode() . '): ' . (is_array($content) ? json_encode($content, $jsonOptions) : $content) . '</info>');
+            if (\Helpers\Helpers::isDebug()) {
+                $output->writeln('<info>Success (' . $response->getStatusCode() . '): ' . (is_array($content) ? json_encode($content, $jsonOptions) : $content) . '</info>');
+            }
             return Command::SUCCESS;
         }
 

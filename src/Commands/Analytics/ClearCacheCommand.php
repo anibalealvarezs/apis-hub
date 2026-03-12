@@ -40,37 +40,53 @@ class ClearCacheCommand extends \Symfony\Component\Console\Command\Command
         $cache = $this->cacheService ?? CacheService::getInstance(Helpers::getRedisClient());
 
         if ($all) {
-            $output->writeln('<comment>Clearing all cache...</comment>');
+            if (Helpers::isDebug()) {
+                $output->writeln('<comment>Clearing all cache...</comment>');
+            }
             $cache->deletePattern('*');
-            $output->writeln('<info>All cache cleared.</info>');
+            if (Helpers::isDebug()) {
+                $output->writeln('<info>All cache cleared.</info>');
+            }
             return self::SUCCESS;
         }
 
         if ($channel && $entity) {
-            $output->writeln("<comment>Clearing cache for channel '$channel' and entity '$entity'...</comment>");
+            if (Helpers::isDebug()) {
+                $output->writeln("<comment>Clearing cache for channel '$channel' and entity '$entity'...</comment>");
+            }
             // List and Count patterns for channeled entities
             $cache->deletePattern("channeled_list_{$entity}_{$channel}_*");
             $cache->deletePattern("channeled_count_{$entity}_{$channel}_*");
             // Standard ones just in case
             $cache->deletePattern("list_{$entity}_*");
             $cache->deletePattern("count_{$entity}_*");
-            $output->writeln('<info>Filtered cache cleared.</info>');
+            if (Helpers::isDebug()) {
+                $output->writeln('<info>Filtered cache cleared.</info>');
+            }
             return self::SUCCESS;
         }
 
         if ($channel) {
-            $output->writeln("<comment>Clearing cache for channel '$channel'...</comment>");
+            if (Helpers::isDebug()) {
+                $output->writeln("<comment>Clearing cache for channel '$channel'...</comment>");
+            }
             $cache->deletePattern("*_{$channel}_*");
-            $output->writeln('<info>Channel cache cleared.</info>');
+            if (Helpers::isDebug()) {
+                $output->writeln('<info>Channel cache cleared.</info>');
+            }
             return self::SUCCESS;
         }
 
         if ($entity) {
-            $output->writeln("<comment>Clearing cache for entity '$entity'...</comment>");
+            if (Helpers::isDebug()) {
+                $output->writeln("<comment>Clearing cache for entity '$entity'...</comment>");
+            }
             $cache->deletePattern("*_{$entity}_*");
             $cache->deletePattern("list_{$entity}_*");
             $cache->deletePattern("count_{$entity}_*");
-            $output->writeln('<info>Entity cache cleared.</info>');
+            if (Helpers::isDebug()) {
+                $output->writeln('<info>Entity cache cleared.</info>');
+            }
             return self::SUCCESS;
         }
 

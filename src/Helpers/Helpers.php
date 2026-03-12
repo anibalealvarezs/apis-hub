@@ -18,6 +18,10 @@ use ReflectionObject;
 use ReflectionProperty;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
+use Monolog\Handler\StreamHandler;
+use Monolog\Level;
+use Monolog\Logger;
+use Psr\Log\LoggerInterface;
 
 class Helpers
 {
@@ -65,6 +69,15 @@ class Helpers
         $config = self::getProjectConfig();
         $timezone = $config['timezone'] ?? 'UTC';
         date_default_timezone_set($timezone);
+    }
+
+    /**
+     * @return bool
+     */
+    public static function isDebug(): bool
+    {
+        $config = self::getProjectConfig();
+        return (bool) ($config['debug'] ?? false);
     }
     /**
      * @return array
@@ -583,5 +596,24 @@ class Helpers
         if ($status == \Enums\JobStatus::failed->value || $status == \Enums\JobStatus::cancelled->value) {
             throw new \Exceptions\JobCancelledException("El Job #{$jobId} fue interrumpido o cancelado manualmente.");
         }
+    }
+
+    /**
+     * @param string $filename
+     * @param Level $level
+     * @return LoggerInterface
+     */
+    public static function setLogger(string $filename, Level|int $level = Level::Info): LoggerInterface
+    {
+        $requestedLevel = ($level instanceof Level) ? $level : Level::from($level);
+
+        if (!self::isDebug() && $requestedLevel->value < Level::Error->value) {
+            $requestedLevel = Level::Error;
+        }
+
+        $name = str_replace('.log', '', $filename);
+        $logger = new Logger($name);
+        $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/' . $filename, $requestedLevel));
+        return $logger;
     }
 }

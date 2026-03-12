@@ -223,8 +223,7 @@ class MetricRequests
         ?int $jobId = null
     ): Response {
         if (!$logger) {
-            $logger = new Logger('gsc');
-            $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/gsc.log', Level::Error));
+            $logger = Helpers::setLogger('facebook.log');
         }
 
         // Apply default dates if missing for "recent" safety
@@ -635,8 +634,7 @@ class MetricRequests
         ?int $jobId = null
     ): Response {
         if (!$logger) {
-            $logger = new Logger('gsc');
-            $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/gsc.log', Level::Error));
+            $logger = Helpers::setLogger('gsc.log');
         }
 
         $logger->info("Starting getListFromGoogleSearchConsole: startDate=$startDate, endDate=$endDate, resume=$resume");
@@ -1195,7 +1193,7 @@ class MetricRequests
             );
 
             if (count($rows['data']) === 0) {
-                $logger->info("No rows found for page " . $adAccount['id']);
+                $logger->info("No rows found for ad account " . $adAccount['id']);
                 return;
             }
 
@@ -2010,65 +2008,36 @@ class MetricRequests
         );
         $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
 
-        // Get the list of metrics that need to be inserted
-        $postsToInsert = [];
+        // INSERT IGNORE: handle race conditions
+        $insertParams = [];
         foreach ($posts['data'] as $post) {
-            $platformId = $post['id'];
-            if (!isset($postMap[$platformId])) {
-                $postsToInsert[] = [
-                    'postId' => $platformId,
-                    'page_id' => $pageEntity->getId(),
-                    'account_id' => $accountEntity->getId(),
-                    'data' => $post,
-                    'key' => $platformId,
-                ];
-            }
+            $insertParams[] = $post['id'];
+            $insertParams[] = $pageEntity->getId();
+            $insertParams[] = $accountEntity->getId();
+            $insertParams[] = json_encode($post);
         }
-
-        if (!empty($postsToInsert)) {
-            $insertParams = [];
-            foreach ($postsToInsert as $row) {
-                $insertParams[] = $row['postId'];
-                $insertParams[] = $row['page_id'];
-                $insertParams[] = $row['account_id'];
-                $insertParams[] = json_encode($row['data']);
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
+        if (!empty($insertParams)) {
             $manager->getConnection()->executeStatement(
-                'INSERT INTO posts (postId, page_id, account_id, data)
-                     VALUES ' . implode(', ', array_fill(0, count($postsToInsert), '(?, ?, ?, ?)')),
+                'INSERT IGNORE INTO posts (postId, page_id, account_id, data)
+                     VALUES ' . implode(', ', array_fill(0, count($posts['data']), '(?, ?, ?, ?)')),
                 $insertParams
             );
+        }
 
-            // Re-fetch inserted metrics to get correct IDs
-            $reFetchParams = [];
-            $conditions = [];
-
-            $fields = ['postId', 'page_id', 'account_id'];
-
-            foreach ($posts['data'] as $post) {
-                $platformId = $post['id'];
-                $subConditions = [];
-                foreach ($fields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $reFetchParams[] = match($field) { default => null, 
-                        'postId' => $platformId,
-                        'page_id' => $pageEntity->getId(),
-                        'account_id' => $accountEntity->getId(),
-                    };
-                }
-                $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $reFetchSql = "SELECT id, " . implode(', ', $fields) . "
-                            FROM posts
-                            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
-
-            $newPosts = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
-
-            foreach ($newPosts as $newPost) {
-                $postMap[$newPost['postId']] = $newPost['id'];
-            }
+        // Always re-fetch ALL posts to build the map
+        $reFetchParams = [];
+        $conditions = [];
+        $fields = ['postId', 'page_id', 'account_id'];
+        foreach ($posts['data'] as $post) {
+            $conditions[] = '(postId = ? AND page_id = ? AND account_id = ?)';
+            $reFetchParams[] = $post['id'];
+            $reFetchParams[] = $pageEntity->getId();
+            $reFetchParams[] = $accountEntity->getId();
+        }
+        $reFetchSql = "SELECT id, postId FROM posts WHERE " . implode(' OR ', $conditions);
+        $fetchedPosts = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
+        foreach ($fetchedPosts as $newPost) {
+            $postMap[$newPost['postId']] = $newPost['id'];
         }
 
         return [
@@ -2136,68 +2105,38 @@ class MetricRequests
             params: $params,
         );
 
-        // Get the list of metrics that need to be inserted
-        $postsToInsert = [];
+        // INSERT IGNORE: handle race conditions
+        $insertParams = [];
         foreach ($posts['data'] as $post) {
-            $platformId = $post['id'];
-            if (!isset($postMap[$platformId])) {
-                $postsToInsert[] = [
-                    'postId' => $platformId,
-                    'page_id' => $pageEntity->getId(),
-                    'account_id' => $accountEntity->getId(),
-                    'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    'data' => $post,
-                    'key' => $platformId,
-                ];
-            }
+            $insertParams[] = $post['id'];
+            $insertParams[] = $pageEntity->getId();
+            $insertParams[] = $accountEntity->getId();
+            $insertParams[] = $channeledAccountEntity->getId();
+            $insertParams[] = json_encode($post);
         }
-
-        if (!empty($postsToInsert)) {
-            $insertParams = [];
-            foreach ($postsToInsert as $row) {
-                $insertParams[] = $row['postId'];
-                $insertParams[] = $row['page_id'];
-                $insertParams[] = $row['account_id'];
-                $insertParams[] = $row['channeledAccount_id'];
-                $insertParams[] = json_encode($row['data']);
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
+        if (!empty($insertParams)) {
             $manager->getConnection()->executeStatement(
-                'INSERT INTO posts (postId, page_id, account_id, channeledAccount_id, data)
-                     VALUES ' . implode(', ', array_fill(0, count($postsToInsert), '(?, ?, ?, ?, ?)')),
+                'INSERT IGNORE INTO posts (postId, page_id, account_id, channeledAccount_id, data)
+                     VALUES ' . implode(', ', array_fill(0, count($posts['data']), '(?, ?, ?, ?, ?)')),
                 $insertParams
             );
+        }
 
-            // Re-fetch inserted metrics to get correct IDs
-            $reFetchParams = [];
-            $conditions = [];
-
-            $fields = ['postId', 'page_id', 'account_id', 'channeledAccount_id'];
-
-            foreach ($posts['data'] as $post) {
-                $platformId = $post['id'];
-                $subConditions = [];
-                foreach ($fields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $reFetchParams[] = match($field) { default => null, 
-                        'postId' => $platformId,
-                        'page_id' => $pageEntity->getId(),
-                        'account_id' => $accountEntity->getId(),
-                        'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    };
-                }
-                $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $reFetchSql = "SELECT id, " . implode(', ', $fields) . "
-                            FROM posts
-                            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
-
-            $newPosts = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
-
-            foreach ($newPosts as $newPost) {
-                $postMap[$newPost['postId']] = $newPost['id'];
-            }
+        // Always re-fetch ALL posts to build the map
+        $reFetchParams = [];
+        $conditions = [];
+        $fields = ['postId', 'page_id', 'account_id', 'channeledAccount_id'];
+        foreach ($posts['data'] as $post) {
+            $conditions[] = '(postId = ? AND page_id = ? AND account_id = ? AND channeledAccount_id = ?)';
+            $reFetchParams[] = $post['id'];
+            $reFetchParams[] = $pageEntity->getId();
+            $reFetchParams[] = $accountEntity->getId();
+            $reFetchParams[] = $channeledAccountEntity->getId();
+        }
+        $reFetchSql = "SELECT id, postId FROM posts WHERE " . implode(' OR ', $conditions);
+        $fetchedPosts = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
+        foreach ($fetchedPosts as $newPost) {
+            $postMap[$newPost['postId']] = $newPost['id'];
         }
 
         return [
@@ -2230,6 +2169,8 @@ class MetricRequests
             adAccountId: $channeledAccountEntity->getPlatformId(),
         );
 
+        $logger->info("Fetched " . count($campaigns['data']) . " campaigns for ad account " . $channeledAccountEntity->getPlatformId());
+
         // Re-fetch inserted metrics to get correct IDs
         $campaignParams = [];
         $campaignConditions = [];
@@ -2258,69 +2199,33 @@ class MetricRequests
             params: $campaignParams,
         );
 
-        // Get the list of campaigns that need to be inserted
-        $campaignsToInsert = [];
+        // INSERT IGNORE: atomic upsert — if another container already inserted this campaign,
+        // the UNIQUE(campaignId) constraint prevents a duplicate; no error is thrown.
+        // We always re-fetch below, so the map is always populated correctly.
+        $insertParams = [];
         foreach ($campaigns['data'] as $campaign) {
-            $platformId = $campaign['id'];
-            if (!isset($campaignMap[$platformId])) {
-                $campaignsToInsert[] = [
-                    'campaignId' => $campaign['id'],
-                    'name' => $campaign['name'],
-                    'startDate' => Carbon::parse($campaign['start_time'])->toDateTimeString(),
-                    'endDate' => Carbon::parse($campaign['stop_time'])->toDateTimeString(),
-                    'objective' => CampaignObjective::from($campaign['objective'])->value,
-                    'budget' => (float) ($campaign['lifetime_budget'] ?? 0),
-                    'status' => CampaignStatus::from($campaign['status'])->value,
-                    'buyingType' => CampaignBuyingType::from($campaign['buying_type'])->value,
-                    'data' => json_encode($campaign),
-                    'key' => $platformId,
-                ];
-            }
+            $insertParams[] = $campaign['id'];
+            $insertParams[] = $campaign['name'];
+            $insertParams[] = Carbon::parse($campaign['start_time'])->toDateTimeString();
+            $insertParams[] = Carbon::parse($campaign['stop_time'])->toDateTimeString();
         }
-
-        if (!empty($campaignsToInsert)) {
-            $insertParams = [];
-            foreach ($campaignsToInsert as $row) {
-                $insertParams[] = $row['campaignId'];
-                $insertParams[] = $row['name'];
-                $insertParams[] = $row['startDate'];
-                $insertParams[] = $row['endDate'];
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
+        if (!empty($insertParams)) {
             $manager->getConnection()->executeStatement(
-                'INSERT INTO campaigns (campaignId, name, startDate, endDate)
-                     VALUES ' . implode(', ', array_fill(0, count($campaignsToInsert), '(?, ?, ?, ?)')),
+                'INSERT IGNORE INTO campaigns (campaignId, name, startDate, endDate)
+                     VALUES ' . implode(', ', array_fill(0, count($campaigns['data']), '(?, ?, ?, ?)')),
                 $insertParams
             );
-
-            // Re-fetch inserted metrics to get correct IDs
-            $reFetchCampaignParams = [];
-            $campaignConditions = [];
-
-            $campaignFields = ['campaignId', 'name'];
-
-            foreach ($campaigns['data'] as $campaign) {
-                $subConditions = [];
-                foreach ($campaignFields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $reFetchCampaignParams[] = match($field) { default => null, 
-                        'campaignId' => $campaign['id'],
-                        'name' => $campaign['name'],
-                    };
-                }
-                $campaignConditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $reFetchCampaignSql = "SELECT id, " . implode(', ', $campaignFields) . "
-                            FROM campaigns
-                            WHERE " . (empty($campaignConditions) ? '1=0' : implode(' OR ', $campaignConditions));
-
-            $channeledCampaigns = $manager->getConnection()->executeQuery($reFetchCampaignSql, $reFetchCampaignParams)->fetchAllAssociative();
-
-            foreach ($channeledCampaigns as $newCampaign) {
-                $campaignMap[$newCampaign['campaignId']] = $newCampaign['id'];
-            }
         }
+
+        // Always re-fetch to build the complete campaign ID map
+        $reFetchCampaignParams = array_column($campaigns['data'], 'id');
+        $reFetchCampaignSql = 'SELECT id, campaignId FROM campaigns WHERE campaignId IN ('
+            . implode(', ', array_fill(0, count($reFetchCampaignParams), '?')) . ')';
+        $fetchedCampaigns = $manager->getConnection()->executeQuery($reFetchCampaignSql, $reFetchCampaignParams)->fetchAllAssociative();
+        foreach ($fetchedCampaigns as $row) {
+            $campaignMap[$row['campaignId']] = $row['id'];
+        }
+
 
         $campaignMap = [
             'map' => $campaignMap,
@@ -2356,57 +2261,44 @@ class MetricRequests
             params: $channeledCampaignParams,
         );
 
-        // Use the same list of campaigns to insert, since campaigns and channeled_campaigns go 1 - 1 for Meta
-        if (!empty($campaignsToInsert)) {
-            $insertParams = [];
-            foreach ($campaignsToInsert as $row) {
-                $insertParams[] = $campaignMap['map'][$row['campaignId']];
-                $insertParams[] = $row['campaignId'];
-                $insertParams[] = Channel::facebook->value;
-                $insertParams[] = $row['startDate'];
-                $insertParams[] = $row['objective'];
-                $insertParams[] = $row['budget'];
-                $insertParams[] = $row['status'];
-                $insertParams[] = $row['buyingType'];
-                $insertParams[] = $row['data'];
-                $insertParams[] = $channeledAccountEntity->getId();
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
-            $manager->getConnection()->executeStatement(
-                'INSERT INTO channeled_campaigns (campaign_id, platformId, channel, platformCreatedAt, objective, budget, status, buyingType, data, channeledAccount_id)
-                     VALUES ' . implode(', ', array_fill(0, count($campaignsToInsert), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
-                $insertParams
-            );
-
-            // Re-fetch inserted metrics to get correct IDs
-            $fetchChanneledCampaignParams = [];
-            $channeledCampaignConditions = [];
-
-            $channeledCampaignFields = ['campaign_id', 'platformId', 'channeledAccount_id'];
-
-            foreach ($campaigns['data'] as $campaign) {
-                $subConditions = [];
-                foreach ($channeledCampaignFields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $fetchChanneledCampaignParams[] = match($field) { default => null, 
-                        'campaign_id' => $campaignMap['map'][$campaign['id']],
-                        'platformId' => $campaign['id'],
-                        'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    };
-                }
-                $channeledCampaignConditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $channeledCampaignSql = "SELECT id, " . implode(', ', $channeledCampaignFields) . "
-                            FROM channeled_campaigns
-                            WHERE " . (empty($channeledCampaignConditions) ? '1=0' : implode(' OR ', $channeledCampaignConditions));
-
-            $channeledCampaigns = $manager->getConnection()->executeQuery($channeledCampaignSql, $fetchChanneledCampaignParams)->fetchAllAssociative();
-
-            foreach ($channeledCampaigns as $channeledCampaign) {
-                $channeledCampaignMap[$channeledCampaign['platformId']] = $channeledCampaign['id'];
-            }
+        // INSERT IGNORE: atomic upsert — UNIQUE(platformId, channeledAccount_id) prevents duplicates.
+        // Inserts all campaigns for this account; skips silently if already present.
+        $ccInsertParams = [];
+        foreach ($campaigns['data'] as $campaign) {
+            $ccInsertParams[] = $campaignMap['map'][$campaign['id']];
+            $ccInsertParams[] = $campaign['id'];
+            $ccInsertParams[] = Channel::facebook->value;
+            $ccInsertParams[] = Carbon::parse($campaign['start_time'])->toDateTimeString();
+            $ccInsertParams[] = CampaignObjective::from($campaign['objective'])->value;
+            $ccInsertParams[] = (float) ($campaign['lifetime_budget'] ?? 0);
+            $ccInsertParams[] = CampaignStatus::from($campaign['status'])->value;
+            $ccInsertParams[] = CampaignBuyingType::from($campaign['buying_type'])->value;
+            $ccInsertParams[] = json_encode($campaign);
+            $ccInsertParams[] = $channeledAccountEntity->getId();
         }
+        if (!empty($ccInsertParams)) {
+            $manager->getConnection()->executeStatement(
+                'INSERT IGNORE INTO channeled_campaigns (campaign_id, platformId, channel, platformCreatedAt, objective, budget, status, buyingType, data, channeledAccount_id)
+                     VALUES ' . implode(', ', array_fill(0, count($campaigns['data']), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
+                $ccInsertParams
+            );
+        }
+
+        // Always re-fetch channeled_campaigns to build the complete map
+        $fetchCCParams = [];
+        $fetchCCConditions = [];
+        foreach ($campaigns['data'] as $campaign) {
+            $fetchCCConditions[] = '(platformId = ? AND channeledAccount_id = ?)';
+            $fetchCCParams[] = $campaign['id'];
+            $fetchCCParams[] = $channeledAccountEntity->getId();
+        }
+        $channeledCampaignSql = 'SELECT id, platformId, campaign_id, channeledAccount_id FROM channeled_campaigns WHERE '
+            . implode(' OR ', $fetchCCConditions);
+        $fetchedCC = $manager->getConnection()->executeQuery($channeledCampaignSql, $fetchCCParams)->fetchAllAssociative();
+        foreach ($fetchedCC as $row) {
+            $channeledCampaignMap[$row['platformId']] = $row['id'];
+        }
+
 
         $channeledCampaignMap = [
             'map' => $channeledCampaignMap,
@@ -2486,93 +2378,48 @@ class MetricRequests
         // Helpers::dumpDebugJson($adsetMap);
 
         // Get the list of adsets that need to be inserted
-        $adsetsToInsert = [];
+        // INSERT IGNORE: atomic upsert — UNIQUE(platformId, channeledAccount_id) prevents duplicates
+        // across concurrent containers. All adsets are always attempted; existing ones are silently skipped.
+        $insertParams = [];
         foreach ($adsets['data'] as $adset) {
-            $platformId = $adset['id'];
-            if (!isset($adsetMap[$platformId])) {
-                $adsetsToInsert[] = [
-                    'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    'campaign_id' => $campaignMap['map'][$adset['campaign_id']],
-                    'name' => $adset['name'],
-                    'platformId' => $platformId,
-                    'channel' => Channel::facebook->value,
-                    'startDate' => Carbon::parse($adset['start_time'])->toDateTimeString(),
-                    'endDate' => Carbon::parse($adset['end_time'])->toDateTimeString(),
-                    'platformCreatedAt' => Carbon::parse($adset['created_time'])->toDateTimeString(),
-                    'optimizationGoal' => OptimizationGoal::from($adset['optimization_goal'])->value,
-                    'status' => CampaignStatus::from($adset['status'])->value,
-                    'billingEvent' => BillingEvent::from($adset['billing_event'])->value,
-                    'targeting' => json_encode($adset['targeting']),
-                    'channeledCampaign_id' => $channeledCampaignMap['map'][$adset['campaign_id']],
-                    'data' => json_encode($adset),
-                    'key' => $platformId,
-                ];
-            }
+            $insertParams[] = $channeledAccountEntity->getId();
+            $insertParams[] = $campaignMap['map'][$adset['campaign_id']];
+            $insertParams[] = $adset['name'];
+            $insertParams[] = $adset['id'];
+            $insertParams[] = Channel::facebook->value;
+            $insertParams[] = Carbon::parse($adset['start_time'])->toDateTimeString();
+            $insertParams[] = Carbon::parse($adset['end_time'])->toDateTimeString();
+            $insertParams[] = Carbon::parse($adset['created_time'])->toDateTimeString();
+            $insertParams[] = OptimizationGoal::from($adset['optimization_goal'])->value;
+            $insertParams[] = CampaignStatus::from($adset['status'])->value;
+            $insertParams[] = BillingEvent::from($adset['billing_event'])->value;
+            $insertParams[] = json_encode($adset['targeting']);
+            $insertParams[] = $channeledCampaignMap['map'][$adset['campaign_id']];
+            $insertParams[] = json_encode($adset);
         }
-
-        /* Helpers::dumpDebugJson([
-            'adsetsToInsert' => $adsetsToInsert,
-        ]); */
-
-        if (!empty($adsetsToInsert)) {
-            $insertParams = [];
-            foreach ($adsetsToInsert as $row) {
-                $insertParams[] = $row['channeledAccount_id'];
-                $insertParams[] = $row['campaign_id'];
-                $insertParams[] = $row['name'];
-                $insertParams[] = $row['platformId'];
-                $insertParams[] = $row['channel'];
-                $insertParams[] = $row['startDate'];
-                $insertParams[] = $row['endDate'];
-                $insertParams[] = $row['platformCreatedAt'];
-                $insertParams[] = $row['optimizationGoal'];
-                $insertParams[] = $row['status'];
-                $insertParams[] = $row['billingEvent'];
-                $insertParams[] = $row['targeting'];
-                $insertParams[] = $row['channeledCampaign_id'];
-                $insertParams[] = $row['data'];
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
+        if (!empty($insertParams)) {
             $manager->getConnection()->executeStatement(
-                'INSERT INTO channeled_ad_groups (channeledAccount_id, campaign_id, name, platformId, channel, startDate, endDate, platformCreatedAt, optimizationGoal, status, billingEvent, targeting, channeledCampaign_id, data)
-                     VALUES ' . implode(', ', array_fill(0, count($adsetsToInsert), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
+                'INSERT IGNORE INTO channeled_ad_groups (channeledAccount_id, campaign_id, name, platformId, channel, startDate, endDate, platformCreatedAt, optimizationGoal, status, billingEvent, targeting, channeledCampaign_id, data)
+                     VALUES ' . implode(', ', array_fill(0, count($adsets['data']), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
                 $insertParams
             );
-
-            // Re-fetch inserted metrics to get correct IDs
-            $reFetchAdsetParams = [];
-            $adsetConditions = [];
-
-            $adsetFields = ['channeledAccount_id', 'campaign_id', 'platformId', 'channeledCampaign_id'];
-
-            foreach ($adsets['data'] as $adset) {
-                $subConditions = [];
-                foreach ($adsetFields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $reFetchAdsetParams[] = match($field) { default => null, 
-                        'channeledAccount_id' => $channeledAccountEntity->getId(),
-                        'campaign_id' => $campaignMap['map'][$adset['campaign_id']],
-                        'platformId' => $adset['id'],
-                        'channeledCampaign_id' => $channeledCampaignMap['map'][$adset['campaign_id']],
-                    };
-                }
-                $adsetConditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $reFetchAdsetSql = "SELECT id, " . implode(', ', $adsetFields) . "
-                            FROM channeled_ad_groups
-                            WHERE " . (empty($adsetConditions) ? '1=0' : implode(' OR ', $adsetConditions));
-
-            $channeledAdGroups = $manager->getConnection()->executeQuery($reFetchAdsetSql, $reFetchAdsetParams)->fetchAllAssociative();
-
-            /* Helpers::dumpDebugJson([
-                'channeledAdGroups' => $channeledAdGroups,
-            ]); */
-
-            foreach ($channeledAdGroups as $newAdGroup) {
-                $adsetMap[$newAdGroup['platformId']] = $newAdGroup['id'];
-            }
         }
+
+        // Always re-fetch to build the complete adset ID map
+        $reFetchAdsetParams = [];
+        $reFetchAdsetConditions = [];
+        foreach ($adsets['data'] as $adset) {
+            $reFetchAdsetConditions[] = '(platformId = ? AND channeledAccount_id = ?)';
+            $reFetchAdsetParams[] = $adset['id'];
+            $reFetchAdsetParams[] = $channeledAccountEntity->getId();
+        }
+        $reFetchAdsetSql = 'SELECT id, platformId, channeledAccount_id FROM channeled_ad_groups WHERE '
+            . implode(' OR ', $reFetchAdsetConditions);
+        $channeledAdGroups = $manager->getConnection()->executeQuery($reFetchAdsetSql, $reFetchAdsetParams)->fetchAllAssociative();
+        foreach ($channeledAdGroups as $newAdGroup) {
+            $adsetMap[$newAdGroup['platformId']] = $newAdGroup['id'];
+        }
+
 
         return [
             'map' => $adsetMap,
@@ -2639,73 +2486,45 @@ class MetricRequests
             params: $adParams,
         );
 
-        // Get the list of adsets that need to be inserted
-        $adsToInsert = [];
+        // INSERT IGNORE: atomic upsert — UNIQUE(platformId, channeledAccount_id) prevents duplicates.
+        $adInsertParams = [];
         foreach ($ads['data'] as $ad) {
-            $platformId = $ad['id'];
-            if (!isset($adMap[$platformId])) {
-                $adsToInsert[] = [
-                    'name' => $ad['name'],
-                    'platformId' => $platformId,
-                    'channel' => Channel::facebook->value,
-                    'platformCreatedAt' => Carbon::parse($ad['created_time'])->toDateTimeString(),
-                    'status' => CampaignStatus::from($ad['status'])->value,
-                    'channeledCampaign_id' => $channeledCampaignMap['map'][$ad['campaign_id']],
-                    'channeledAdGroup_id' => $channeledAdGroupMap['map'][$ad['adset_id']],
-                    'data' => json_encode($ad),
-                    'key' => $platformId,
-                ];
+            if (!isset($channeledAdGroupMap['map'][$ad['adset_id']])) {
+                throw new Exception("Ad Set ID {$ad['adset_id']} not found in local mapping during Ad sync for account {$channeledAccountEntity->getPlatformId()}. Ad: {$ad['id']}");
             }
+            $adInsertParams[] = $ad['name'];
+            $adInsertParams[] = $ad['id'];
+            $adInsertParams[] = Channel::facebook->value;
+            $adInsertParams[] = Carbon::parse($ad['created_time'])->toDateTimeString();
+            $adInsertParams[] = CampaignStatus::from($ad['status'])->value;
+            $adInsertParams[] = $channeledCampaignMap['map'][$ad['campaign_id']];
+            $adInsertParams[] = $channeledAdGroupMap['map'][$ad['adset_id']];
+            $adInsertParams[] = json_encode($ad);
         }
-
-        if (!empty($adsToInsert)) {
-            $insertParams = [];
-            foreach ($adsToInsert as $row) {
-                $insertParams[] = $row['name'];
-                $insertParams[] = $row['platformId'];
-                $insertParams[] = $row['channel'];
-                $insertParams[] = $row['platformCreatedAt'];
-                $insertParams[] = $row['status'];
-                $insertParams[] = $row['channeledCampaign_id'];
-                $insertParams[] = $row['channeledAdGroup_id'];
-                $insertParams[] = $row['data'];
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
+        if (!empty($adInsertParams)) {
             $manager->getConnection()->executeStatement(
-                'INSERT INTO channeled_ads (name, platformId, channel, platformCreatedAt, status, channeledCampaign_id, channeledAdGroup_id, data)
-                     VALUES ' . implode(', ', array_fill(0, count($adsToInsert), '(?, ?, ?, ?, ?, ?, ?, ?)')),
-                $insertParams
+                'INSERT IGNORE INTO channeled_ads (name, platformId, channel, platformCreatedAt, status, channeledCampaign_id, channeledAdGroup_id, data)
+                     VALUES ' . implode(', ', array_fill(0, count($ads['data']), '(?, ?, ?, ?, ?, ?, ?, ?)')),
+                $adInsertParams
             );
-
-            // Re-fetch inserted metrics to get correct IDs
-            $reFetchAdParams = [];
-            $adConditions = [];
-
-            $adFields = ['platformId', 'channeledCampaign_id', 'channeledAdGroup_id'];
-
-            foreach ($ads['data'] as $ad) {
-                $subConditions = [];
-                foreach ($adFields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $reFetchAdParams[] = match($field) { default => null, 
-                        'platformId' => $ad['id'],
-                        'channeledCampaign_id' => $channeledCampaignMap['map'][$ad['campaign_id']],
-                        'channeledAdGroup_id' => $channeledAdGroupMap['map'][$ad['adset_id']],
-                    };
-                }
-                $adConditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $reFetchAdSql = "SELECT id, " . implode(', ', $adFields) . "
-                            FROM channeled_ads
-                            WHERE " . (empty($adConditions) ? '1=0' : implode(' OR ', $adConditions));
-
-            $channeledAds = $manager->getConnection()->executeQuery($reFetchAdSql, $reFetchAdParams)->fetchAllAssociative();
-
-            foreach ($channeledAds as $newAd) {
-                $adMap[$newAd['platformId']] = $newAd['id'];
-            }
         }
+
+        // Always re-fetch to build the complete ad ID map
+        $reFetchAdParams = [];
+        $reFetchAdConditions = [];
+        foreach ($ads['data'] as $ad) {
+            $reFetchAdConditions[] = '(platformId = ? AND channeledCampaign_id = ? AND channeledAdGroup_id = ?)';
+            $reFetchAdParams[] = $ad['id'];
+            $reFetchAdParams[] = $channeledCampaignMap['map'][$ad['campaign_id']];
+            $reFetchAdParams[] = $channeledAdGroupMap['map'][$ad['adset_id']];
+        }
+        $reFetchAdSql = 'SELECT id, platformId, channeledCampaign_id, channeledAdGroup_id FROM channeled_ads WHERE '
+            . implode(' OR ', $reFetchAdConditions);
+        $channeledAds = $manager->getConnection()->executeQuery($reFetchAdSql, $reFetchAdParams)->fetchAllAssociative();
+        foreach ($channeledAds as $newAd) {
+            $adMap[$newAd['platformId']] = $newAd['id'];
+        }
+
 
         return [
             'map' => $adMap,
@@ -3437,8 +3256,7 @@ class MetricRequests
         $dimensionCache = [];
 
         if (!$logger) {
-            $logger = new Logger('gsc');
-            $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/gsc.log', Level::Error));
+            $logger = Helpers::setLogger('gsc.log');
         }
         $logger->info("Starting process with " . $channeledCollection->count() . " metrics");
 
@@ -4257,7 +4075,7 @@ class MetricRequests
                         adAccountId: $channeledAccountEntity->getPlatformId(),
                         campaignIds: $chunk,
                         limit: 100,
-                        metricBreakdown: null,
+                        metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
                         additionalParams: $additionalParams,
                         metricSet: MetricSet::KEY,
                     );
