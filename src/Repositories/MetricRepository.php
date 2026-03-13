@@ -313,6 +313,18 @@ class MetricRepository extends BaseRepository
         ?Device $device = null
     ): ?Metric {
         try {
+            $configSignature = \Classes\KeyGenerator::generateMetricConfigKey(
+                channel: $channel,
+                name: $name,
+                period: $period,
+                metricDate: $metricDate,
+                query: $queryEntity,
+                page: $page,
+                country: $country,
+                device: $device,
+                creative: $dimensions['creative'] ?? null,
+            );
+
             $qb = $this->createQueryBuilder('m')
                 ->join('m.metricConfig', 'mc')
                 ->where('mc.channel = :channel')

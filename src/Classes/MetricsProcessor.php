@@ -173,6 +173,19 @@ class MetricsProcessor
      * @param EntityManager $manager
      * @return array
      */
+    public static function processCreatives(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
+        ];
+    }
+
+    /**
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
+     * @return array
+     */
     public static function processPosts(ArrayCollection $metrics, EntityManager $manager): array
     {
         return [
@@ -272,6 +285,7 @@ class MetricsProcessor
         ?array $channeledCampaignMap = null,
         ?array $channeledAdGroupMap = null,
         ?array $channeledAdMap = null,
+        ?array $creativeMap = null,
     ): array {
 
         // Initialize null maps
@@ -390,31 +404,8 @@ class MetricsProcessor
                 order: isset($metric->order) ? $metric->order->getOrderId() : null,
                 country: $metric->countryCode ?? null,
                 device: $metric->deviceType ?? null,
+                creative: isset($metric->creative) ? $metric->creative->getCreativeId() : null,
             );
-            /* Helpers::dumpDebugJson([
-                'metric' => $metric,
-                'metricConfigKey' => [
-                    'channel' => $metric->channel,
-                    'name' => $metric->name,
-                    'period' => $metric->period,
-                    'metricDate' => $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
-                    'account' => isset($metric->account) ? $metric->account->getName() : null,
-                    'channeledAccount' => isset($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : null,
-                    'campaign' => isset($metric->campaign) ? $metric->campaign->getCampaignId() : null,
-                    'channeledCampaign' => isset($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : null,
-                    'channeledAdGroup' => isset($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : null,
-                    'channeledAd' => isset($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : null,
-                    'page' => isset($metric->page) ? $metric->page->getUrl() : null,
-                    'query' => $metric->query ?? null,
-                    'post' => isset($metric->post) ? $metric->post->getPostId() : null,
-                    'product' => isset($metric->product) ? $metric->product->getProductId() : null,
-                    'customer' => isset($metric->customer) ? $metric->customer->getEmail() : null,
-                    'order' => isset($metric->order) ? $metric->order->getOrderId() : null,
-                    'country' => $metric->countryCode ?? null,
-                    'device' => $metric->deviceType ?? null,
-                    'value' => $metricConfigKey,
-                ],
-            ]); */
 
             $uniqueMetricConfigs[$metricConfigKey] = [
                 'channel' => $metric->channel,
@@ -435,35 +426,23 @@ class MetricsProcessor
                 'order_id' => isset($metric->order) ? $orderMap['map'][$metric->order->getOrderId()] ?? null : null,
                 'country_id' => isset($metric->countryCode) ? $countryMap['map'][$metric->countryCode]->getId() : null,
                 'device_id' => isset($metric->deviceType) ? $deviceMap['map'][$metric->deviceType]->getId() : null,
+                'creative_id' => isset($metric->creative) ? $creativeMap['map'][$metric->creative->getCreativeId()] ?? null : null,
                 'value' => $metric->value,
                 'metadata' => $metric->metadata,
                 'key' => $metricConfigKey,
             ];
         }
 
-        // Batch select metrics from list
+        // Batch select metrics from list by signature
         $conditions = [];
         $selectParams = [];
 
-        $fields = [
-            'channel', 'name', 'period', 'metricDate', 'account_id', 'channeledAccount_id', 'campaign_id', 'channeledCampaign_id', 'channeledAdGroup_id',
-            'channeledAd_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id'
-        ];
-
         foreach ($uniqueMetricConfigs as $mc) {
-            $subConditions = [];
-            foreach ($fields as $field) {
-                if (array_key_exists($field, $mc) && $mc[$field] === null) {
-                    $subConditions[] = "$field IS NULL";
-                } else {
-                    $subConditions[] = "$field = ?";
-                    $selectParams[] = $mc[$field];
-                }
-            }
-            $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
+            $conditions[] = 'configSignature = ?';
+            $selectParams[] = $mc['key'];
         }
 
-        $sql = "SELECT id, " . implode(', ', $fields) . "
+        $sql = "SELECT id, configSignature
                 FROM metric_configs
                 WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
 
@@ -472,20 +451,6 @@ class MetricsProcessor
             manager: $manager,
             sql: $sql,
             params: $selectParams,
-            accountMap: $accountMap['mapReverse'] ?? [],
-            channeledAccountMap: $channeledAccountMap['mapReverse'] ?? [],
-            campaignMap: $campaignMap['mapReverse'] ?? [],
-            channeledCampaignMap: $channeledCampaignMap['mapReverse'] ?? [],
-            channeledAdGroupMap: $channeledAdGroupMap['mapReverse'] ?? [],
-            channeledAdMap: $channeledAdMap['mapReverse'] ?? [],
-            pageMap: $pageMap['mapReverse'] ?? [],
-            queryMap: $queryMap['mapReverse'] ?? [],
-            postMap: $postMap['mapReverse'] ?? [],
-            productMap: $productMap['mapReverse'] ?? [],
-            customerMap: $customerMap['mapReverse'] ?? [],
-            orderMap: $orderMap['mapReverse'] ?? [],
-            countryMap: $countryMap['mapReverse'] ?? [],
-            deviceMap: $deviceMap['mapReverse'] ?? [],
         );
 
         // Get the list of metrics that need to be inserted
@@ -518,6 +483,7 @@ class MetricsProcessor
 
         // INSERT IGNORE: atomic upsert — UNIQUE composite constraint prevents duplicates across concurrent containers.
         // If another container already inserted the same metric_config, the insert is silently skipped.
+        // INSERT IGNORE: atomic upsert — configSignature prevents duplicates.
         if (!empty($uniqueMetricConfigs)) {
             $insertParams = [];
             foreach ($uniqueMetricConfigs as $metricConfig) {
@@ -531,6 +497,7 @@ class MetricsProcessor
                 $insertParams[] = $metricConfig['channeledCampaign_id'] ?? null;
                 $insertParams[] = $metricConfig['channeledAdGroup_id'] ?? null;
                 $insertParams[] = $metricConfig['channeledAd_id'] ?? null;
+                $insertParams[] = $metricConfig['creative_id'] ?? null;
                 $insertParams[] = $metricConfig['query_id'] ?? null;
                 $insertParams[] = $metricConfig['page_id'] ?? null;
                 $insertParams[] = $metricConfig['post_id'] ?? null;
@@ -539,11 +506,12 @@ class MetricsProcessor
                 $insertParams[] = $metricConfig['order_id'] ?? null;
                 $insertParams[] = $metricConfig['country_id'] ?? null;
                 $insertParams[] = $metricConfig['device_id'] ?? null;
+                $insertParams[] = $metricConfig['key']; // configSignature
             }
             $manager->getConnection()->executeStatement(
                 'INSERT IGNORE INTO metric_configs (channel, name, period, metricDate, account_id, channeledAccount_id, campaign_id, channeledCampaign_id, channeledAdGroup_id,
-                            channeledAd_id, query_id, page_id, post_id, product_id, customer_id, order_id, country_id, device_id)
-                     VALUES ' . implode(', ', array_fill(0, count($uniqueMetricConfigs), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
+                            channeledAd_id, creative_id, query_id, page_id, post_id, product_id, customer_id, order_id, country_id, device_id, configSignature)
+                     VALUES ' . implode(', ', array_fill(0, count($uniqueMetricConfigs), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
                 $insertParams
             );
         }
@@ -551,48 +519,15 @@ class MetricsProcessor
         // Always re-fetch ALL metric_configs for these keys — covers both newly inserted and already-existing rows.
         $reFetchParams = [];
         $conditions = [];
-        $fields = [
-            'channel', 'name', 'period', 'metricDate', 'account_id', 'channeledAccount_id',
-            'campaign_id', 'channeledCampaign_id', 'channeledAdGroup_id', 'channeledAd_id',
-            'query_id', 'page_id', 'post_id', 'product_id',
-            'customer_id', 'order_id', 'country_id', 'device_id'
-        ];
         foreach ($uniqueMetricConfigs as $row) {
-            $subConditions = [];
-            foreach ($fields as $field) {
-                if (!array_key_exists($field, $row) || $row[$field] === null) {
-                    $subConditions[] = "$field IS NULL";
-                } else {
-                    $subConditions[] = "$field = ?";
-                    $reFetchParams[] = $row[$field];
-                }
-            }
-            $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
+            $conditions[] = 'configSignature = ?';
+            $reFetchParams[] = $row['key'];
         }
-        $reFetchSql = "SELECT id, " . implode(', ', $fields) . " FROM metric_configs WHERE " . implode(' OR ', $conditions);
+
+        $reFetchSql = "SELECT id, configSignature FROM metric_configs WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
         $allMetricConfigs = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
         foreach ($allMetricConfigs as $metricConfig) {
-            $metricConfigKey = KeyGenerator::generateMetricConfigKey(
-                channel: $metricConfig['channel'],
-                name: $metricConfig['name'],
-                period: $metricConfig['period'],
-                metricDate: $metricConfig['metricDate'],
-                account: isset($metricConfig['account_id']) ? $accountMap['mapReverse'][$metricConfig['account_id']] : null,
-                channeledAccount: isset($metricConfig['channeledAccount_id']) ? $channeledAccountMap['mapReverse'][$metricConfig['channeledAccount_id']] : null,
-                campaign: isset($metricConfig['campaign_id']) ? $campaignMap['mapReverse'][$metricConfig['campaign_id']] : null,
-                channeledCampaign: isset($metricConfig['channeledCampaign_id']) ? $channeledCampaignMap['mapReverse'][$metricConfig['channeledCampaign_id']] : null,
-                channeledAdGroup: isset($metricConfig['channeledAdGroup_id']) ? $channeledAdGroupMap['mapReverse'][$metricConfig['channeledAdGroup_id']] : null,
-                channeledAd: isset($metricConfig['channeledAd_id']) ? $channeledAdMap['mapReverse'][$metricConfig['channeledAd_id']] : null,
-                page: isset($metricConfig['page_id']) ? $pageMap['mapReverse'][$metricConfig['page_id']] : null,
-                query: isset($metricConfig['query_id']) ? $queryMap['mapReverse'][$metricConfig['query_id']] : null,
-                post: isset($metricConfig['post_id']) ? $postMap['mapReverse'][$metricConfig['post_id']] : null,
-                product: isset($metricConfig['product_id']) ? $productMap['mapReverse'][$metricConfig['product_id']] : null,
-                customer: isset($metricConfig['customer_id']) ? $customerMap['mapReverse'][$metricConfig['customer_id']] : null,
-                order: isset($metricConfig['order_id']) ? $orderMap['mapReverse'][$metricConfig['order_id']] : null,
-                country: isset($metricConfig['country_id']) ? $countryMap['mapReverse'][$metricConfig['country_id']]->getCode() : null,
-                device: isset($metricConfig['device_id']) ? $deviceMap['mapReverse'][$metricConfig['device_id']]->getType() : null,
-            );
-            $metricConfigMap[$metricConfigKey] = (int)$metricConfig['id'];
+            $metricConfigMap[$metricConfig['configSignature']] = (int)$metricConfig['id'];
         }
 
 
@@ -615,8 +550,6 @@ class MetricsProcessor
         EntityManager $manager,
         array $metricConfigMap,
     ): array {
-        // Helpers::dumpDebugJson($metricConfigMap);
-
         // Extract metrics from $metrics
         $uniqueMetrics = [];
         /** @var \stdClass&object{dimensions: array, metricConfigKey: string, value: float|int, metadata?: array} $metric */
@@ -629,12 +562,6 @@ class MetricsProcessor
                 dimensionsHash: $dimensionsHash,
                 metricConfigKey: $metric->metricConfigKey,
             );
-            /* Helpers::dumpDebugJson([
-                'dimensionsHash' => $dimensionsHash,
-                'metricKey' => $metricKey,
-                'metricConfigKey' => $metric->metricConfigKey,
-                'metricConfigMap' => $metricConfigMap,
-            ]); */
 
             KeyGenerator::sortDimensions($dimensions);
             $uniqueMetrics[$metricKey] = [
@@ -644,7 +571,6 @@ class MetricsProcessor
                 'metricConfig_id' => $metricConfigMap['map'][$metric->metricConfigKey],
             ];
         }
-        // Helpers::dumpDebugJson($metricConfigMap);
 
         // Batch select metrics from list
         $conditions = [];
@@ -760,8 +686,6 @@ class MetricsProcessor
             ", $finalParams);
         }
 
-        // Helpers::dumpDebugJson($metricMap);
-
         return [
             'map' => $metricMap,
             'mapReverse' => array_flip($metricMap),
@@ -782,11 +706,7 @@ class MetricsProcessor
         array $metricMap,
         LoggerInterface $logger,
     ): array {
-        // $logger->info("Processing " . count($metrics->toArray()) . " metrics in processChanneledMetrics");
         // Extract channeled metrics from metrics
-
-        // Helpers::dumpDebugJson($metrics->toArray());
-
         $uniqueChanneledMetrics = [];
         /** @var \stdClass&object{dimensionsHash: string, metricConfigKey: string, channel: string, platformId: string, platformCreatedAt: string|\DateTime, data?: array} $metric */
         foreach ($metrics->toArray() as $metric) {
@@ -807,7 +727,6 @@ class MetricsProcessor
                 continue;
             }
 
-            // $logger->info("ChanneledMetrics Inputs: metricKey=$metricKey, channel={$metric->channel}, platformId=" . ($metric->platformId ?? 'null') . ", metric_id={$metricMap['map'][$metricKey]}, platformCreatedAt=" . ($metric->platformCreatedAt->format('Y-m-d H:i:s')));
             $channeledMetricKey = KeyGenerator::generateChanneledMetricKey(
                 channel: $metric->channel,
                 platformId: $metric->platformId,
@@ -823,10 +742,7 @@ class MetricsProcessor
                 'data' => $metric->data ?? [],
                 'metricKey' => $metricKey,
             ];
-            // $logger->info("Prepared channeled metric: channeledMetricKey=$channeledMetricKey, metricKey=$metricKey, metric_id={$metricMap['map'][$metricKey]}, platformId=$metric->platformId");
         }
-
-        // Helpers::dumpDebugJson($uniqueChanneledMetrics);
 
         // Batch select channeled metrics from list
         $conditions = [];
@@ -844,7 +760,6 @@ class MetricsProcessor
             FROM channeled_metrics
             WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
 
-        // $logger->info("uniqueChanneledMetrics count: " . count($uniqueChanneledMetrics));
         // Map metrics to their IDs
         $channeledMetricMap = MapGenerator::getChanneledMetricMap(
             $manager,
@@ -852,9 +767,6 @@ class MetricsProcessor
             $selectParams,
             $metricMap,
         );
-        // $logger->info("channeledMetricMap count after re-fetch: " . count($channeledMetricMap));
-
-        // Helpers::dumpDebugJson($channeledMetricMap);
 
         // Get list of channeled metrics that need to be inserted and updated
         $channeledMetricsToInsert = [];
@@ -901,8 +813,6 @@ class MetricsProcessor
             }
         }
 
-        // Helpers::dumpDebugJson($channeledMetricsToInsert);
-
         // INSERT IGNORE: atomic upsert — UNIQUE(platformId, channel, metric_id, platformCreatedAt) prevents duplicates.
         if (!empty($channeledMetricsToInsert)) {
             $insertPlaceholders = implode(', ', array_fill(0, count($channeledMetricsToInsert), '(?, ?, ?, ?, ?)'));
@@ -933,9 +843,6 @@ class MetricsProcessor
                     FROM channeled_metrics
                     WHERE (channel, platformId, metric_id, platformCreatedAt) IN (" . implode(', ', $selectPlaceholders) . ")";
         }
-
-
-        // Helpers::dumpDebugJson($channeledMetricsToUpdate);
 
         // Bulk Update channeled metrics
         if (!empty($channeledMetricsToUpdate)) {
@@ -971,10 +878,6 @@ class MetricsProcessor
             $selectParams,
             $metricMap,
         );
-        // $logger->info("uniqueChanneledMetrics count: " . count($uniqueChanneledMetrics));
-        // $logger->info("channeledMetricMap count after re-fetch: " . count($channeledMetricMap));
-
-        // Helpers::dumpDebugJson($channeledMetricMap);
 
         $channeledMetricMapFlipped = [];
         foreach ($channeledMetricMap as $originalKey => $value) {
@@ -986,8 +889,6 @@ class MetricsProcessor
                 ];
             }
         }
-
-        // Helpers::dumpDebugJson($channeledMetricMapFlipped);
 
         return [
             'map' => $channeledMetricMap,

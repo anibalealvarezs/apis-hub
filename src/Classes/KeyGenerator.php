@@ -44,6 +44,7 @@ class KeyGenerator
      * @param ChanneledCampaign|string|null $channeledCampaign
      * @param ChanneledAdGroup|string|null $channeledAdGroup
      * @param ChanneledAd|string|null $channeledAd
+     * @param string|null $creative
      * @param Page|string|null $page
      * @param Query|string|null $query
      * @param Post|string|null $post
@@ -65,6 +66,7 @@ class KeyGenerator
         ChanneledCampaign|string|null $channeledCampaign = null,
         ChanneledAdGroup|string|null $channeledAdGroup = null,
         ChanneledAd|string|null $channeledAd = null,
+        ?string $creative = null,
         Page|string|null $page = null,
         Query|string|null $query = null,
         Post|string|null $post = null,
@@ -74,46 +76,6 @@ class KeyGenerator
         Country|CountryEnum|string|null $country = null,
         Device|DeviceEnum|string|null $device = null
     ): string {
-        /* Helpers::dumpDebugJson([
-            'channel' => $channel instanceof Channel ? $channel->getName() : $channel,
-            'name' => $name,
-            'period' => $period instanceof Period ? $period->value : $period,
-            'metricDate' => $metricDate instanceof DateTime ? $metricDate->format('Y-m-d') : $metricDate,
-            'account' => $account instanceof Account ? $account->getName() : $account,
-            'channeledAccount' => $channeledAccount instanceof ChanneledAccount ? $channeledAccount->getPlatformId() : $channeledAccount,
-            'campaign' => $campaign instanceof Campaign ? $campaign->getCampaignId() : $campaign,
-            'channeledCampaign' => $channeledCampaign instanceof ChanneledCampaign ? $channeledCampaign->getPlatformId() : $channeledCampaign,
-            'channeledAdGroup' => $channeledAdGroup instanceof ChanneledAdGroup ? $channeledAdGroup->getId() : $channeledAdGroup,
-            'channeledAd' => $channeledAd instanceof ChanneledAd ? $channeledAd->getId() : $channeledAd,
-            'page' => $page instanceof Page ? $page->getUrl() : $page,
-            'query' => $query instanceof Query ? $query->getQuery() : $query,
-            'post' => $post instanceof Post ? $post->getId() : $post,
-            'product' => $product instanceof Product ? $product->getId() : $product,
-            'customer' => $customer instanceof Customer ? $customer->getEmail() : $customer,
-            'order' => $order instanceof Order ? $order->getId() : $order,
-            'country' => $country instanceof Country ? $country->getCode() : ($country instanceof CountryEnum ? $country->value : $country),
-            'device' => $device instanceof Device ? $device->getType() : ($device instanceof DeviceEnum ? $device->value : $device),
-            'value' => md5(string: json_encode([
-                'channel' => $channel instanceof Channel ? $channel->getName() : $channel,
-                'name' => $name,
-                'period' => $period instanceof Period ? $period->value : $period,
-                'metricDate' => $metricDate instanceof DateTime ? $metricDate->format('Y-m-d') : $metricDate,
-                'account' => $account instanceof Account ? $account->getName() : $account,
-                'channeledAccount' => $channeledAccount instanceof ChanneledAccount ? $channeledAccount->getPlatformId() : $channeledAccount,
-                'campaign' => $campaign instanceof Campaign ? $campaign->getCampaignId() : $campaign,
-                'channeledCampaign' => $channeledCampaign instanceof ChanneledCampaign ? $channeledCampaign->getPlatformId() : $channeledCampaign,
-                'channeledAdGroup' => $channeledAdGroup instanceof ChanneledAdGroup ? $channeledAdGroup->getId() : $channeledAdGroup,
-                'channeledAd' => $channeledAd instanceof ChanneledAd ? $channeledAd->getId() : $channeledAd,
-                'page' => $page instanceof Page ? $page->getUrl() : $page,
-                'query' => $query instanceof Query ? $query->getQuery() : $query,
-                'post' => $post instanceof Post ? $post->getId() : $post,
-                'product' => $product instanceof Product ? $product->getId() : $product,
-                'customer' => $customer instanceof Customer ? $customer->getEmail() : $customer,
-                'order' => $order instanceof Order ? $order->getId() : $order,
-                'country' => $country instanceof Country ? $country->getCode() : ($country instanceof CountryEnum ? $country->value : $country),
-                'device' => $device instanceof Device ? $device->getType() : ($device instanceof DeviceEnum ? $device->value : $device),
-            ], JSON_UNESCAPED_UNICODE)),
-        ]); */
 
         return match($channel) {
             Channel::google_search_console => md5(string: json_encode([
@@ -125,27 +87,19 @@ class KeyGenerator
                 'channeledAccount' => (string) ($channeledAccount instanceof ChanneledAccount ? $channeledAccount->getPlatformId() : $channeledAccount),
                 'campaign' => (string) ($campaign instanceof Campaign ? $campaign->getCampaignId() : $campaign),
                 'channeledCampaign' => (string) ($channeledCampaign instanceof ChanneledCampaign ? $channeledCampaign->getPlatformId() : $channeledCampaign),
-                'channeledAdGroup' => (string) $channeledAdGroup instanceof ChanneledAdGroup ? $channeledAdGroup->getPlatformId() : $channeledAdGroup,
-                'channeledAd' => (string) $channeledAd instanceof ChanneledAd ? $channeledAd->getPlatformId() : $channeledAd,
+                'channeledAdGroup' => (string) ($channeledAdGroup instanceof ChanneledAdGroup ? $channeledAdGroup->getPlatformId() : $channeledAdGroup),
+                'channeledAd' => (string) ($channeledAd instanceof ChanneledAd ? $channeledAd->getPlatformId() : $channeledAd),
+                'creative' => $creative,
                 'page' => $page instanceof Page ? $page->getUrl() : $page,
                 'query' => $query instanceof Query ? $query->getQuery() : $query,
-                'post' => (string) $post instanceof Post ? $post->getPostId() : $post,
-                'product' => (string) $product instanceof Product ? $product->getProductId() : $product,
+                'post' => (string) ($post instanceof Post ? $post->getPostId() : $post),
+                'product' => (string) ($product instanceof Product ? $product->getProductId() : $product),
                 'customer' => $customer instanceof Customer ? $customer->getEmail() : $customer,
-                'order' => (string) $order instanceof Order ? $order->getOrderId() : $order,
-                'country' => $country instanceof Country ? $country->getCode() : $country,
-                'device' => $device instanceof Device ? $device->getType() : $device,
+                'order' => (string) ($order instanceof Order ? $order->getOrderId() : $order),
+                'country' => $country instanceof Country ? $country->getCode() : ($country instanceof CountryEnum ? $country->value : $country),
+                'device' => $device instanceof Device ? $device->getType() : ($device instanceof DeviceEnum ? $device->value : $device),
             ], JSON_UNESCAPED_UNICODE)),
-            /* Channel::google_analytics => md5(string: json_encode([
-                'channel' => $channel instanceof Channel ? $channel->value : $channel,
-                'name' => $name,
-                'period' => $period instanceof Period ? $period->value : $period,
-                'metricDate' => $metricDate instanceof DateTime ? $metricDate->format('Y-m-d') : $metricDate,
-                'page' => $page instanceof Page ? $page->getId() : $page,
-                'query' => $query instanceof Query ? $query->getId() : $query,
-                'country' => $country instanceof Country ? $country->getId() : $country,
-                'device' => $device instanceof Device ? $device->getId() : $device
-            ], JSON_UNESCAPED_UNICODE)), */
+
             default => md5(string: json_encode([
                 'channel' => $channel instanceof Channel ? $channel->getName() : $channel,
                 'name' => $name,
@@ -155,14 +109,15 @@ class KeyGenerator
                 'channeledAccount' => (string) ($channeledAccount instanceof ChanneledAccount ? $channeledAccount->getPlatformId() : $channeledAccount),
                 'campaign' => (string) ($campaign instanceof Campaign ? $campaign->getCampaignId() : $campaign),
                 'channeledCampaign' => (string) ($channeledCampaign instanceof ChanneledCampaign ? $channeledCampaign->getPlatformId() : $channeledCampaign),
-                'channeledAdGroup' => (string) $channeledAdGroup instanceof ChanneledAdGroup ? $channeledAdGroup->getPlatformId() : $channeledAdGroup,
-                'channeledAd' => (string) $channeledAd instanceof ChanneledAd ? $channeledAd->getPlatformId() : $channeledAd,
+                'channeledAdGroup' => (string) ($channeledAdGroup instanceof ChanneledAdGroup ? $channeledAdGroup->getPlatformId() : $channeledAdGroup),
+                'channeledAd' => (string) ($channeledAd instanceof ChanneledAd ? $channeledAd->getPlatformId() : $channeledAd),
+                'creative' => $creative,
                 'page' => $page instanceof Page ? $page->getUrl() : $page,
                 'query' => $query instanceof Query ? $query->getQuery() : $query,
-                'post' => (string) $post instanceof Post ? $post->getPostId() : $post,
-                'product' => (string) $product instanceof Product ? $product->getProductId() : $product,
+                'post' => (string) ($post instanceof Post ? $post->getPostId() : $post),
+                'product' => (string) ($product instanceof Product ? $product->getProductId() : $product),
                 'customer' => $customer instanceof Customer ? $customer->getEmail() : $customer,
-                'order' => (string) $order instanceof Order ? $order->getOrderId() : $order,
+                'order' => (string) ($order instanceof Order ? $order->getOrderId() : $order),
                 'country' => $country instanceof Country ? $country->getCode() : ($country instanceof CountryEnum ? $country->value : $country),
                 'device' => $device instanceof Device ? $device->getType() : ($device instanceof DeviceEnum ? $device->value : $device)
             ], JSON_UNESCAPED_UNICODE))
@@ -204,6 +159,7 @@ class KeyGenerator
         ChanneledCampaign|int|null $channeledCampaign = null,
         ChanneledAdGroup|int|null $channeledAdGroup = null,
         ChanneledAd|int|null $channeledAd = null,
+        ?string $creative = null,
         Page|string|null $page = null,
         Query|string|null $query = null,
         Post|string|null $post = null,
@@ -231,6 +187,7 @@ class KeyGenerator
                 channeledCampaign: $channeledCampaign,
                 channeledAdGroup: $channeledAdGroup,
                 channeledAd: $channeledAd,
+                creative: $creative,
                 page: $page,
                 query: $query,
                 post: $post,

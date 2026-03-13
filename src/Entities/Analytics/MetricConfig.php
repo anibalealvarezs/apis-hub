@@ -29,24 +29,7 @@ use Repositories\MetricConfigRepository;
     columns: ['channel', 'name', 'period', 'metricDate', 'account_id'],
     name: 'account_metricConfig_lookup_idx'
 )]
-#[ORM\UniqueConstraint(name: 'metric_config_unique', columns: [
-    'channel',
-    'name',
-    'period',
-    'metricDate',
-    'channeledAccount_id',
-    'channeledCampaign_id',
-    'channeledAdGroup_id',
-    'channeledAd_id',
-    'page_id',
-    'query_id',
-    'post_id',
-    'product_id',
-    'customer_id',
-    'order_id',
-    'country_id',
-    'device_id',
-])]
+#[ORM\UniqueConstraint(name: 'metric_config_signature_unique', columns: ['configSignature'])]
 #[ORM\HasLifecycleCallbacks]
 class MetricConfig extends Entity
 {
@@ -89,6 +72,10 @@ class MetricConfig extends Entity
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?ChanneledAd $channeledAd = null;
 
+    #[ORM\ManyToOne(targetEntity: Creative::class, inversedBy: 'metricConfigs')]
+    #[ORM\JoinColumn(name: 'creative_id', onDelete: 'SET NULL')]
+    protected ?Creative $creative = null;
+
     #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'metricConfigs')]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?Page $page = null;
@@ -120,6 +107,9 @@ class MetricConfig extends Entity
     #[ORM\ManyToOne(targetEntity: Device::class)]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?Device $device = null;
+
+    #[ORM\Column(type: 'string', length: 32, unique: true)]
+    protected string $configSignature;
 
     /* #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $dimensions = []; */
@@ -455,6 +445,24 @@ class MetricConfig extends Entity
     }
 
     /**
+     * @return Creative|null
+     */
+    public function getCreative(): ?Creative
+    {
+        return $this->creative;
+    }
+
+    /**
+     * @param Creative|null $creative
+     * @return self
+     */
+    public function addCreative(?Creative $creative): self
+    {
+        $this->creative = $creative;
+        return $this;
+    }
+
+    /**
      * Gets the collection of metrics.
      * @return Collection
      */
@@ -477,20 +485,48 @@ class MetricConfig extends Entity
         return $this;
     }
 
-    // METRIC SHOULDN'T BE REMOVABLE FROM METRIC CONFIG
     /**
-     * Removes a metric config.
-     * @param Metric $metric
+     * @return string
+     */
+    public function getConfigSignature(): string
+    {
+        return $this->configSignature;
+    }
+
+    /**
+     * @param string $configSignature
      * @return self
      */
-    /* public function removeMetric(Metric $metric): self
+    public function addConfigSignature(string $configSignature): self
     {
-        if ($this->metrics->contains($metric)) {
-            $this->metrics->removeElement($metric);
-            if ($metric->getMetricConfig() === $this) {
-                $metric->addMetricConfig(null);
-            }
-        }
+        $this->configSignature = $configSignature;
         return $this;
-    } */
+    }
+
+    #[ORM\PrePersist]
+    #[ORM\PreUpdate]
+    public function updateSignature(): void
+    {
+        $this->configSignature = \Classes\KeyGenerator::generateMetricConfigKey(
+            channel: $this->channel,
+            name: $this->name,
+            period: $this->period,
+            metricDate: $this->metricDate,
+            account: $this->account,
+            channeledAccount: $this->channeledAccount,
+            campaign: $this->campaign,
+            channeledCampaign: $this->channeledCampaign,
+            channeledAdGroup: $this->channeledAdGroup,
+            channeledAd: $this->channeledAd,
+            creative: $this->creative?->getCreativeId(),
+            page: $this->page,
+            query: $this->query,
+            post: $this->post,
+            product: $this->product,
+            customer: $this->customer,
+            order: $this->order,
+            country: $this->country,
+            device: $this->device
+        );
+    }
 }
