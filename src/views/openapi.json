@@ -378,6 +378,59 @@
           "200": { "description": "Success" }
         }
       }
+    },
+    "/api/monitoring/data": {
+      "get": {
+        "summary": "Get infrastructure monitoring data",
+        "description": "Returns a list of containers (instances) with their configuration and recent job history.",
+        "tags": ["Monitoring"],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "instances": {
+                      "type": "array",
+                      "items": { "type": "object" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/monitoring/jobs/action": {
+      "post": {
+        "summary": "Execute job administrative actions",
+        "description": "Supports actions like 'process' (run now), 'retry' (re-schedule), and 'cancel' (discard).",
+        "tags": ["Monitoring"],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["id", "action"],
+                "properties": {
+                  "id": { "type": "integer", "description": "numerical Job ID" },
+                  "action": { 
+                    "type": "string", 
+                    "enum": ["process", "retry", "cancel"] 
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Success" },
+          "400": { "description": "Invalid parameters" }
+        }
+      }
     }
   }
 }

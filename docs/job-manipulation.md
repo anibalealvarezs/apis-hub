@@ -55,25 +55,49 @@ The `status` field in the database follows these integer values:
 - `2`: **Processing** (Currently fetching data)
 - `3`: **Completed** (Finished successfully)
 - `4`: **Failed** (Error occurred during execution)
+- `6`: **Cancelled** (Manually discarded by an administrator)
 
 ---
 
 ## 3. Manually Suspending/Cancelling a Job
 
-If a job is **Scheduled** but not yet running, or if it's currently **Processing** and you want to stop it, you can change its status to **Failed (4)**.
+If a job is **Scheduled** but not yet running, or if it's currently **Processing** and you want to stop it, you can change its status to **Cancelled (6)**.
 
-The `ProcessJobsCommand` checks the status of the job at key intervals. If it sees the status has changed to `failed` (4), it will throw a `JobCancelledException` and stop the sync.
+The `ProcessJobsCommand` and the `CacheController` check the status of the job at key intervals. If they see the status has changed to `cancelled` (6), they will throw a `JobCancelledException` and stop the sync.
 
 ### Cancel a Job
 
 ```bash
 # Replace <ID> with the internal numerical ID of the job
-php bin/cli.php app:update --entity=job --id=<ID> --data='{"status":4}'
+php bin/cli.php app:update --entity=job --id=<ID> --data='{"status":6}'
 ```
 
 ---
 
-## 4. Automation & Safe Processing
+## 4. Monitoring Dashboard
+
+While CLI commands are powerful for automation, the **Monitoring Dashboard** provides a real-time visual interface to manage your infrastructure.
+
+### Accessing the Dashboard
+
+Navigate to `/monitoring` in your browser. You will see a list of all active containers (instances) defined in your `config/instances.yaml`.
+
+### Advanced Actions
+
+- **Run Process Now**: Triggers an immediate execution of a **Scheduled** job without waiting for its next cron cycle.
+- **Discard Job**: Stops a running process (moving it to **Cancelled**) or removes a scheduled one from the immediate queue.
+- **Re-schedule / Recycle**: Allows you to clone the configuration of *any* historical job (completed, failed, or cancelled) to create a new execution in the future.
+
+### Data Integrity (History)
+
+The dashboard follows a **Forensic Preservation** policy:
+
+- Manual actions like "Retry" or "Re-schedule" do **not** overwrite the original job record. Instead, they create a brand new entry, preserving the status and logs of the previous attempt for auditing.
+- No jobs are physically deleted from the database via the dashboard; they are only deactivated and moved to a terminal state.
+
+---
+
+## 5. Automation & Safe Processing
 
 Jobs are automatically processed in the background by the `ProcessJobsCommand`.
 

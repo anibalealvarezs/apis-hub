@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>APIs Hub | Command Builder</title>
+    <link rel="icon" type="image/png" href="/assets/images/apishub-favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
@@ -21,6 +22,32 @@
             --border: rgba(48, 54, 61, 0.8);
             --header-h: 70px;
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-link.active {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        footer {
+            padding: 40px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            margin-top: 40px;
+        }
+
+        .subtle-link {
+            color: inherit;
+            text-decoration: none;
+            transition: color 0.3s;
+            opacity: 0.5;
+        }
+
+        .subtle-link:hover {
+            opacity: 1;
+            color: var(--primary);
         }
 
         * {
@@ -548,13 +575,15 @@
 
     <header>
         <a href="/" class="logo">
-            <i data-lucide="terminal"></i>
-            APIs Hub <span>Command Builder</span>
+            <img src="/assets/images/apishub-trans-light-600.png" alt="APIs Hub Logo" style="height: 28px; width: auto;">
+            <span>Command Builder</span>
         </a>
         <nav class="nav-links">
+            <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
             <a href="/monitoring" class="nav-link"><i data-lucide="activity"></i> Monitoring</a>
-            <a href="/docs" class="nav-link"><i data-lucide="book"></i> Docs</a>
-            <a href="/" class="nav-link">Home API</a>
+            <a href="/logs" class="nav-link"><i data-lucide="scroll"></i> Logs</a>
+            <a href="/command-builder" class="nav-link active"><i data-lucide="terminal"></i> Builder</a>
+            <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
         </nav>
     </header>
 
@@ -837,6 +866,10 @@
             </div>
         </div>
     </main>
+
+    <footer>
+        <p>&copy; 2026 APIs Hub Central. Developed by <a href="https://anibalalvarez.com" target="_blank" class="subtle-link">Aníbal Álvarez</a>.</p>
+    </footer>
 
     <script>
         // Init Lucide Icons

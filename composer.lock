@@ -131,13 +131,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "dc155a9eb20b6296b639ff4f32cc24d652fec806"
+                "reference": "1d1915c7989c910e7a8a07334c656fbe58708084"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-dc155a9eb20b6296b639ff4f32cc24d652fec806-zip-190139.zip",
-                "reference": "dc155a9eb20b6296b639ff4f32cc24d652fec806",
-                "shasum": "d1df96e8c830aca260f6ada4684bf4b12561eb51"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-1d1915c7989c910e7a8a07334c656fbe58708084-zip-c934a2.zip",
+                "reference": "1d1915c7989c910e7a8a07334c656fbe58708084",
+                "shasum": "a43b5ec4b6b4b570023fee1c15cd5c3611e13413"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -188,7 +188,7 @@
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-09T13:57:20+00:00"
+            "time": "2026-03-12T14:48:59+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -196,13 +196,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/google-api.git",
-                "reference": "09b928c1ffc60baf38968b1562a7291daeb74eb9"
+                "reference": "1c7b6839cf13df4170c6b256df3e8b55e99f2026"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-09b928c1ffc60baf38968b1562a7291daeb74eb9-zip-782c93.zip",
-                "reference": "09b928c1ffc60baf38968b1562a7291daeb74eb9",
-                "shasum": "674456afba271716cdde70719b8e5e43e38ff536"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-api/anibalealvarezs-google-api-1c7b6839cf13df4170c6b256df3e8b55e99f2026-zip-a08b05.zip",
+                "reference": "1c7b6839cf13df4170c6b256df3e8b55e99f2026",
+                "shasum": "3f03196e7fccafbe78a4d09c4731bbbf1b50bcc0"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -256,7 +256,7 @@
                 "issues": "https://github.com/anibalealvarezs/google-api/issues",
                 "source": "https://github.com/anibalealvarezs/google-api/tree/develop"
             },
-            "time": "2026-03-07T00:03:45+00:00"
+            "time": "2026-03-11T23:59:57+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -1903,16 +1903,16 @@
         },
         {
             "name": "guzzlehttp/psr7",
-            "version": "2.8.x-dev",
+            "version": "2.9.x-dev",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/psr7.git",
-                "reference": "27b6714cf2e71cfcc49718eb81ac711103f08218"
+                "reference": "7d0ed42f28e42d61352a7a79de682e5e67fec884"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/psr7/zipball/27b6714cf2e71cfcc49718eb81ac711103f08218",
-                "reference": "27b6714cf2e71cfcc49718eb81ac711103f08218",
+                "url": "https://api.github.com/repos/guzzle/psr7/zipball/7d0ed42f28e42d61352a7a79de682e5e67fec884",
+                "reference": "7d0ed42f28e42d61352a7a79de682e5e67fec884",
                 "shasum": ""
             },
             "require": {
@@ -1928,6 +1928,7 @@
             "require-dev": {
                 "bamarni/composer-bin-plugin": "^1.8.2",
                 "http-interop/http-factory-tests": "0.9.0",
+                "jshttp/mime-db": "1.54.0.1",
                 "phpunit/phpunit": "^8.5.44 || ^9.6.25"
             },
             "suggest": {
@@ -2000,7 +2001,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/psr7/issues",
-                "source": "https://github.com/guzzle/psr7/tree/2.8"
+                "source": "https://github.com/guzzle/psr7/tree/2.9"
             },
             "funding": [
                 {
@@ -2016,7 +2017,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-05T21:03:18+00:00"
+            "time": "2026-03-10T16:41:02+00:00"
         },
         {
             "name": "monolog/monolog",
@@ -2235,12 +2236,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/predis/predis.git",
-                "reference": "7388d911535bff78fee714138b0462d98c196c01"
+                "reference": "383623eb05cf36e63f75f995a65cfd67827c6124"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/predis/predis/zipball/7388d911535bff78fee714138b0462d98c196c01",
-                "reference": "7388d911535bff78fee714138b0462d98c196c01",
+                "url": "https://api.github.com/repos/predis/predis/zipball/383623eb05cf36e63f75f995a65cfd67827c6124",
+                "reference": "383623eb05cf36e63f75f995a65cfd67827c6124",
                 "shasum": ""
             },
             "require": {
@@ -2291,7 +2292,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-03-05T15:05:02+00:00"
+            "time": "2026-03-09T20:34:39+00:00"
         },
         {
             "name": "psr/cache",
@@ -3271,12 +3272,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/error-handler.git",
-                "reference": "8da531f364ddfee53e36092a7eebbbd0b775f6b8"
+                "reference": "32b4dbc1e484ff80cd88312c1fab4577fd7eff5e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/error-handler/zipball/8da531f364ddfee53e36092a7eebbbd0b775f6b8",
-                "reference": "8da531f364ddfee53e36092a7eebbbd0b775f6b8",
+                "url": "https://api.github.com/repos/symfony/error-handler/zipball/32b4dbc1e484ff80cd88312c1fab4577fd7eff5e",
+                "reference": "32b4dbc1e484ff80cd88312c1fab4577fd7eff5e",
                 "shasum": ""
             },
             "require": {
@@ -3345,7 +3346,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-01-20T16:42:42+00:00"
+            "time": "2026-03-10T15:16:03+00:00"
         },
         {
             "name": "symfony/event-dispatcher",
@@ -5218,12 +5219,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/var-exporter.git",
-                "reference": "03a60f169c79a28513a78c967316fbc8bf17816f"
+                "reference": "ba6906696838e50c6dcdb5424ba43f06caeb7745"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/var-exporter/zipball/03a60f169c79a28513a78c967316fbc8bf17816f",
-                "reference": "03a60f169c79a28513a78c967316fbc8bf17816f",
+                "url": "https://api.github.com/repos/symfony/var-exporter/zipball/ba6906696838e50c6dcdb5424ba43f06caeb7745",
+                "reference": "ba6906696838e50c6dcdb5424ba43f06caeb7745",
                 "shasum": ""
             },
             "require": {
@@ -5291,7 +5292,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-09-11T10:15:23+00:00"
+            "time": "2026-03-10T15:16:03+00:00"
         },
         {
             "name": "symfony/yaml",
@@ -7847,8 +7848,8 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
-        "anibalealvarezs/amazon-api": 20,
         "anibalealvarezs/api-client-skeleton": 20,
+        "anibalealvarezs/amazon-api": 20,
         "anibalealvarezs/facebook-graph-api": 20,
         "anibalealvarezs/google-api": 20,
         "anibalealvarezs/klaviyo-api": 20,
@@ -7856,10 +7857,10 @@
         "anibalealvarezs/netsuite-api": 20,
         "anibalealvarezs/shopify-api": 20,
         "anibalealvarezs/triple-whale-api": 20,
-        "mikey179/vfsstream": 20,
-        "predis/predis": 20,
+        "symfony/redis-messenger": 20,
         "symfony/cache-contracts": 20,
-        "symfony/redis-messenger": 20
+        "predis/predis": 20,
+        "mikey179/vfsstream": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
@@ -7867,6 +7868,6 @@
         "php": ">=8.1",
         "ext-json": "*"
     },
-    "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "platform-dev": [],
+    "plugin-api-version": "2.3.0"
 }

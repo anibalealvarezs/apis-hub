@@ -4,50 +4,63 @@ declare(strict_types=1);
 
 require_once __DIR__ . "/../vendor/autoload.php";
 
-$cliConfig = \Helpers\Helpers::getCliConfig();
-ini_set('memory_limit', $cliConfig['memory_limit'] ?? '1G');
-
+use Commands\Analytics\ScheduleInitialJobsCommand;
+use Commands\Analytics\CacheEntityCommand;
+use Commands\Analytics\ProcessJobsCommand;
+use Commands\Analytics\ClearCacheCommand;
+use Commands\HealthCheckCommand;
+use Commands\Crud\AggregateEntityCommand;
 use Commands\Crud\CreateEntityCommand;
 use Commands\Crud\DeleteEntityCommand;
 use Commands\Crud\ReadEntityCommand;
 use Commands\Crud\UpdateEntityCommand;
 use Commands\GenerateEntitiesConfigCommand;
 use Commands\InitializeEntitiesCommand;
+use Commands\RefreshInstancesCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use Helpers\Helpers;
 use Symfony\Component\Console\Application;
 
-$entityManager = require_once __DIR__ . "/../app/bootstrap.php";
-$helperSet = require_once __DIR__ . "/../config/cli-config.php";
-
-$cli = new Application(
-    name: 'Doctrine Command Line Interface',
-    version: '1.0.0'
-);
-$cli->setCatchExceptions(true);
-$cli->setHelperSet($helperSet);
-
-// Register All Doctrine Commands
-ConsoleRunner::addCommands($cli);
-
-// Register your own command
-$cli->addCommands([
-    new CreateEntityCommand(),
-    new DeleteEntityCommand(),
-    new ReadEntityCommand(),
-    new UpdateEntityCommand(),
-    new GenerateEntitiesConfigCommand(),
-    new InitializeEntitiesCommand(Helpers::getManager()),
-    new \Commands\Analytics\CacheEntityCommand(),
-    new \Commands\Analytics\ProcessJobsCommand(),
-    new \Commands\Analytics\ClearCacheCommand(),
-    new \Commands\HealthCheckCommand(),
-    new \Commands\Crud\AggregateEntityCommand()
-]);
-
-// Runs console application
 try {
-    $cli->run();
-} catch (Exception $e) {
+    $cliConfig = Helpers::getCliConfig();
+    ini_set('memory_limit', $cliConfig['memory_limit'] ?? '1G');
 
+    $entityManager = require_once __DIR__ . "/../app/bootstrap.php";
+    $helperSet = require_once __DIR__ . "/../config/cli-config.php";
+
+    $cli = new Application(
+        name: 'Doctrine Command Line Interface',
+        version: '1.0.0'
+    );
+    $cli->setCatchExceptions(true);
+    $cli->setHelperSet($helperSet);
+
+    // Register All Doctrine Commands
+    ConsoleRunner::addCommands($cli);
+
+    // Register your own command
+    $cli->addCommands([
+        new CreateEntityCommand(),
+        new DeleteEntityCommand(),
+        new ReadEntityCommand(),
+        new UpdateEntityCommand(),
+        new GenerateEntitiesConfigCommand(),
+        new InitializeEntitiesCommand(Helpers::getManager()),
+        new ScheduleInitialJobsCommand($entityManager),
+        new CacheEntityCommand(),
+        new ProcessJobsCommand(),
+        new ClearCacheCommand(),
+        new HealthCheckCommand(),
+        new AggregateEntityCommand(),
+        new RefreshInstancesCommand()
+    ]);
+
+    // Runs console application
+    $cli->run();
+} catch (\Exceptions\ConfigurationException $e) {
+    fwrite(STDERR, "\n[Configuration Error]\n" . $e->getMessage() . "\n\n");
+    exit(1);
+} catch (Exception $e) {
+    fwrite(STDERR, "\n[Internal Error]\n" . $e->getMessage() . "\n\n");
+    exit(1);
 }

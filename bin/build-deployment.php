@@ -18,27 +18,15 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 use Symfony\Component\Yaml\Yaml;
 
-// ─── CLI arg ──────────────────────────────────────────────────────────────────
-$projectName = $argv[1] ?? null;
-if (!$projectName) {
-    fwrite(STDERR, "Usage: php bin/build-deployment.php <project-name>\n");
-    fwrite(STDERR, "  Reads deploy/<project-name>.yaml\n");
-    exit(1);
-}
-
-$projectFile = __DIR__ . "/../deploy/{$projectName}.yaml";
-if (!file_exists($projectFile)) {
-    fwrite(STDERR, "Project file not found: {$projectFile}\n");
-    fwrite(STDERR, "Copy deploy/project.yaml.example to deploy/{$projectName}.yaml and fill it in.\n");
-    exit(1);
-}
-
-$config = Yaml::parseFile($projectFile);
+// ─── Load Configuration ───────────────────────────────────────────────────────
+use Helpers\Helpers;
+$config = Helpers::getProjectConfig();
 
 // ─── Validate required sections ───────────────────────────────────────────────
 foreach (['database', 'instances', 'channels'] as $required) {
     if (empty($config[$required])) {
-        fwrite(STDERR, "Missing required section '{$required}' in {$projectFile}\n");
+        fwrite(STDERR, "Missing required section '{$required}' in your config/ directory.\n");
+        fwrite(STDERR, "Please ensure your YAML files are correctly populated.\n");
         exit(1);
     }
 }
@@ -50,7 +38,7 @@ $db       = $dbConfig[$env] ?? array_shift($dbConfig); // Default to specified e
 $redis   = $config['redis'] ?? ['host' => 'redis', 'port' => 6379];
 $instances = $config['instances'];
 $channels  = $config['channels'];
-$projectLabel = $config['project'] ?? $projectName;
+$projectLabel = $config['project'] ?? 'apis-hub';
 echo "⚒  Building deployment for environment: " . strtoupper($env) . "\n";
 
 // ─── Build docker-compose.yml ─────────────────────────────────────────────────
@@ -63,19 +51,24 @@ foreach ($instances as $instance) {
     $startDate = $instance['start_date'] ?? null;
     $endDate   = $instance['end_date']   ?? null;
 
+    $extractEnvVar = function($str) {
+        return preg_replace('/^\$\{.*:-(.*)\}$/', '$1', (string) $str);
+    };
+
     $envBlock = [
         "PORT=8080",
         "API_SOURCE={$channel}",
         "API_ENTITY={$entity}",
-        "DB_DRIVER=" . ($db['driver'] ?? 'pdo_mysql'),
-        "DB_HOST=" . ($db['host'] ?? 'host.docker.internal'),
-        "DB_PORT=" . ($db['port'] ?? 3306),
-        "DB_USER=" . ($db['user'] ?? 'root'),
-        "DB_PASSWORD=" . ($db['password'] ?? ''),
-        "DB_NAME=" . ($db['name'] ?? ''),
+        "DB_DRIVER=" . $extractEnvVar($db['driver'] ?? 'pdo_mysql'),
+        "DB_HOST=" . str_replace(['127.0.0.1', 'localhost'], 'host.docker.internal', $extractEnvVar($db['host'] ?? 'host.docker.internal')),
+        "DB_PORT=" . $extractEnvVar($db['port'] ?? 3306),
+        "DB_USER=" . $extractEnvVar($db['user'] ?? 'root'),
+        "DB_PASSWORD=" . $extractEnvVar($db['password'] ?? ''),
+        "DB_NAME=" . $extractEnvVar($db['name'] ?? ''),
         "REDIS_HOST=" . $redis['host'],
         "REDIS_PORT=" . $redis['port'],
-        "PROJECT_CONFIG_FILE=/app/deploy/{$projectName}.yaml",
+        "PROJECT_CONFIG_FILE=/app/config",
+        "INSTANCE_NAME={$name}",
     ];
 
     if ($startDate) {
@@ -111,6 +104,7 @@ $services['redis'] = [
 ];
 
 $compose = [
+    'name'     => 'apis-hub',
     'services' => $services,
     'volumes'  => ['redis_data' => null],
 ];

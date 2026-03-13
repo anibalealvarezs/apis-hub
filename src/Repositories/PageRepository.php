@@ -9,6 +9,7 @@ use Entities\Analytics\Campaign;
 use Entities\Analytics\Channeled\ChanneledCampaign;
 use Entities\Analytics\Metric;
 use Entities\Analytics\Page;
+use Helpers\Helpers;
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
@@ -21,8 +22,7 @@ class PageRepository extends BaseRepository
     public function getByUrl(string $url): ?Page
     {
         $normalizedUrl = rtrim($url, '/');
-        $logger = new Logger('gsc');
-        $logger->pushHandler(new StreamHandler('logs/gsc.log', Level::Info));
+        $logger = Helpers::setLogger('gsc.log');
         $logger->info("getByUrl: url=$url, normalized=$normalizedUrl");
 
         $qb = $this->createQueryBuilder('p')

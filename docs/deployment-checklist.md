@@ -34,7 +34,8 @@ Before deploying the service, ensure the following are available:
 
 - **Cloud SQL**: A MySQL instance (recommended: 8.0, Shared CPU for dev/test).
 - **VPC Connection**: If using Cloud SQL Private IP, ensure Serverless VPC Access is configured.
-- **Secrets**: Use [Secret Manager](https://cloud.google.com/secret-manager) for sensitive tokens (DB_PASSWORD, FACEBOOK_TOKEN, etc.).
+- **Secrets & Config**: Use [Secret Manager](https://cloud.google.com/secret-manager) for sensitive tokens or ensure `config/*.yaml` are properly mounted/interpolated.
+- **Mandatory Files**: Ensure `database.yaml`, `security.yaml`, and `app.yaml` are present in `config/`.
 
 ---
 
@@ -49,7 +50,7 @@ gcloud run deploy apis-hub \
     --platform managed \
     --allow-unauthenticated \
     --set-env-vars "APP_ENV=production" \
-    --set-env-vars "PROJECT_CONFIG_FILE=deploy/project.yaml"
+    --set-env-vars "PROJECT_CONFIG_FILE=/app/config"
 ```
 
 ---
@@ -59,7 +60,11 @@ gcloud run deploy apis-hub \
 Verify the system health using the built-in diagnostic tools.
 
 ```bash
-# Execute the health check on the live instance
+# 1. Regenerate instances (if rules changed)
+# Since workers are automated, ensure your instances matches your rules
+php bin/cli.php app:refresh-instances
+
+# 2. Execute the health check on the live instance
 php bin/cli.php app:health-check
 ```
 

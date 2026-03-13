@@ -56,7 +56,7 @@ class CacheControllerTest extends BaseIntegrationTestCase
 
         // 1. Act: Provide a valid channel and entity
         $response = ($this->controller)(
-            channel: 'facebook',
+            channel: 'facebook_marketing',
             entity: 'customer',
             body: $body,
             params: $params
@@ -74,7 +74,7 @@ class CacheControllerTest extends BaseIntegrationTestCase
         /** @var \Entities\Job $job */
         $job = $jobs[0];
         
-        $this->assertEquals('facebook', $job->getChannel());
+        $this->assertEquals('facebook_marketing', $job->getChannel());
         $this->assertEquals('customer', $job->getEntity());
         $this->assertEquals(JobStatus::scheduled->value, $job->getStatus());
         
@@ -84,7 +84,7 @@ class CacheControllerTest extends BaseIntegrationTestCase
 
         // 4. Act: Submitting another request while one is active should throw conflict
         $responseConflict = ($this->controller)(
-            channel: 'facebook',
+            channel: 'facebook_marketing',
             entity: 'customer'
         );
 

@@ -61,9 +61,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
                 ],
                 'EmptyEntities' => []
             ],
-            'config' => [
-                'yaml' => []
-            ]
+            'config' => []
         ];
         $this->vfs = vfsStream::setup('project', null, $structure);
 
@@ -71,11 +69,11 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         $entitiesDir = $this->vfs->url() . '/src/Entities';
         $channeledDir = $this->vfs->url() . '/src/Analytics/Channeled';
         $emptyDir = $this->vfs->url() . '/src/EmptyEntities';
-        $configDir = $this->vfs->url() . '/config/yaml';
+        $configDir = $this->vfs->url() . '/config';
         $this->assertDirectoryExists($entitiesDir, 'Entities directory missing');
         $this->assertDirectoryExists($channeledDir, 'Analytics/Channeled directory missing');
         $this->assertDirectoryExists($emptyDir, 'EmptyEntities directory missing');
-        $this->assertDirectoryExists($configDir, 'Config/yaml directory missing');
+        $this->assertDirectoryExists($configDir, 'Config directory missing');
         $expectedEntities = [
             '.', '..', 'Campaign.php', 'Customer.php', 'Discount.php', 'Invalid.php',
             'Metric.php', 'Order.php', 'PriceRule.php', 'Product.php',
@@ -90,10 +88,10 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         ];
         $this->assertEquals($expectedChanneled, scandir($channeledDir), 'Unexpected Analytics/Channeled directory contents');
         $this->assertEquals(['.', '..'], scandir($emptyDir), 'Unexpected EmptyEntities directory contents');
-        $this->assertEquals(['.', '..'], scandir($configDir), 'Unexpected Config/yaml directory contents');
+        $this->assertEquals(['.', '..'], scandir($configDir), 'Unexpected Config directory contents');
 
         // Verify vfsStream writability
-        $testFile = $this->vfs->url() . '/config/yaml/test_writability.yaml';
+        $testFile = $this->vfs->url() . '/config/test_writability.yaml';
         $this->assertTrue(file_put_contents($testFile, 'test') !== false, 'vfsStream is not writable');
         $this->assertTrue(file_exists($testFile), 'Failed to write test file to vfsStream');
         unlink($testFile);
@@ -187,7 +185,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         }
 
         // Call saveConfig with virtual path
-        $outputFile = $this->vfs->url() . '/config/yaml/test_entitiesconfig.yaml';
+        $outputFile = $this->vfs->url() . '/config/test_entitiesconfig.yaml';
         try {
             $saveConfig = new ReflectionMethod($command, 'saveConfig');
             $saveConfig->setAccessible(true);
@@ -197,20 +195,20 @@ class GenerateEntitiesConfigCommandTest extends TestCase
         }
 
         // Verify real filesystem is untouched
-        $realConfigPath = realpath(__DIR__ . '/../../../config/yaml/entitiesconfig.yaml');
+        $realConfigPath = realpath(__DIR__ . '/../../../config/entitiesconfig.yaml');
         if (!$realConfigPath || !file_exists($realConfigPath)) {
-            $this->fail("Real entitiesconfig.yaml was not found or was deleted. Expected at config/yaml/entitiesconfig.yaml. Messages: " . implode(', ', $messages));
+            $this->fail("Real entitiesconfig.yaml was not found or was deleted. Expected at config/entitiesconfig.yaml. Messages: " . implode(', ', $messages));
         }
 
         // Debug config files in vfsStream
-        $configDir = $this->vfs->url() . '/config/yaml';
+        $configDir = $this->vfs->url() . '/config';
         $filesInDir = array_diff(scandir($configDir), ['.', '..']);
         if (!empty($filesInDir) && !in_array('test_entitiesconfig.yaml', $filesInDir)) {
-            $this->fail("Unexpected files in config/yaml/: " . implode(', ', $filesInDir) . "\nMessages: " . implode(', ', $messages));
+            $this->fail("Unexpected files in config/: " . implode(', ', $filesInDir) . "\nMessages: " . implode(', ', $messages));
         }
 
         // Verify output file is in virtual filesystem
-        $this->assertTrue(file_exists($outputFile), "Expected test_entitiesconfig.yaml at $outputFile. Check if saveConfig writes to correct path. Found files in config/yaml/: " . implode(', ', $filesInDir) . "\nMessages: " . implode(', ', $messages));
+        $this->assertTrue(file_exists($outputFile), "Expected test_entitiesconfig.yaml at $outputFile. Check if saveConfig writes to correct path. Found files in config/: " . implode(', ', $filesInDir) . "\nMessages: " . implode(', ', $messages));
         $yamlContent = file_get_contents($outputFile);
         $this->assertStringContainsString('product:', $yamlContent, 'Expected product entity in YAML');
         $this->assertStringContainsString('customer:', $yamlContent, 'Expected customer entity in YAML');
@@ -262,15 +260,15 @@ class GenerateEntitiesConfigCommandTest extends TestCase
             $this->assertDirectoryExists($dir, "Directory $dir does not exist");
         }
 
-        $outputFile = $this->vfs->url() . '/config/yaml/test_entitiesconfig.yaml';
+        $outputFile = $this->vfs->url() . '/config/test_entitiesconfig.yaml';
         $saveConfig = new ReflectionMethod($command, 'saveConfig');
         $saveConfig->setAccessible(true);
         $saveConfig->invoke($command, $entities, $output, $outputFile);
 
         // Verify real filesystem is untouched
-        $realConfigPath = realpath(__DIR__ . '/../../../config/yaml/entitiesconfig.yaml');
+        $realConfigPath = realpath(__DIR__ . '/../../../config/entitiesconfig.yaml');
         if (!$realConfigPath || !file_exists($realConfigPath)) {
-            $this->fail("Real entitiesconfig.yaml was not found or was deleted. Expected at config/yaml/entitiesconfig.yaml. Messages: " . implode(', ', $messages));
+            $this->fail("Real entitiesconfig.yaml was not found or was deleted. Expected at config/entitiesconfig.yaml. Messages: " . implode(', ', $messages));
         }
 
         $this->assertFalse(file_exists($outputFile), "Unexpected test_entitiesconfig.yaml at $outputFile");
@@ -324,14 +322,14 @@ class GenerateEntitiesConfigCommandTest extends TestCase
             $this->assertCount($type === 'general' ? 1 : 0, $filteredFiles, "Expected " . ($type === 'general' ? 1 : 0) . " files for $type");
         }
 
-        $outputFile = $this->vfs->url() . '/config/yaml/test_entitiesconfig.yaml';
+        $outputFile = $this->vfs->url() . '/config/test_entitiesconfig.yaml';
         $saveConfig->setAccessible(true);
         $saveConfig->invoke($command, $entities, $output, $outputFile);
 
         // Verify real filesystem is untouched
-        $realConfigPath = realpath(__DIR__ . '/../../../config/yaml/entitiesconfig.yaml');
+        $realConfigPath = realpath(__DIR__ . '/../../../config/entitiesconfig.yaml');
         if (!$realConfigPath || !file_exists($realConfigPath)) {
-            $this->fail("Real entitiesconfig.yaml was not found or was deleted. Expected at config/yaml/entitiesconfig.yaml. Messages: " . implode(', ', $messages));
+            $this->fail("Real entitiesconfig.yaml was not found or was deleted. Expected at config/entitiesconfig.yaml. Messages: " . implode(', ', $messages));
         }
 
         $this->assertFalse(file_exists($outputFile), "Unexpected test_entitiesconfig.yaml at $outputFile");

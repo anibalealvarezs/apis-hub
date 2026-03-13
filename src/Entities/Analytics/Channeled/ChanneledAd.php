@@ -19,6 +19,7 @@ use Repositories\Channeled\ChanneledAdRepository;
 #[ORM\Index(columns: ['channeledCampaign_id'], name: 'channeledCampaign_id_idx')]
 #[ORM\Index(columns: ['channeledCampaign_id', 'channeledAdGroup_id'], name: 'channeledCampaign_id_channeledAdGroup_id_idx')]
 #[ORM\Index(columns: ['platformId', 'channel', 'channeledCampaign_id', 'channeledAdGroup_id'], name: 'platformId_channel_channeledCampaign_id_channeledAdGroup_id_idx')]
+#[ORM\UniqueConstraint(name: 'platformId_channeledCampaign_id_ad_uidx', columns: ['platformId', 'channeledCampaign_id'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledAd extends ChanneledEntity
 {
@@ -35,6 +36,10 @@ class ChanneledAd extends ChanneledEntity
     #[ORM\ManyToOne(targetEntity: ChanneledCampaign::class, inversedBy: 'channeledAds')]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?ChanneledCampaign $channeledCampaign = null;
+
+    #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'channeledAds')]
+    #[ORM\JoinColumn(onDelete: 'CASCADE')]
+    protected ChanneledAccount $channeledAccount;
 
     #[ORM\ManyToOne(targetEntity: Creative::class, inversedBy: 'channeledAds')]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
@@ -126,6 +131,24 @@ class ChanneledAd extends ChanneledEntity
     {
         $this->channeledCampaign = $channeledCampaign;
         return $this;
+    }
+
+    /**
+     * @param ChanneledAccount|null $channeledAccount
+     * @return self
+     */
+    public function addChanneledAccount(?ChanneledAccount $channeledAccount): self
+    {
+        $this->channeledAccount = $channeledAccount;
+        return $this;
+    }
+
+    /**
+     * @return ChanneledAccount
+     */
+    public function getChanneledAccount(): ChanneledAccount
+    {
+        return $this->channeledAccount;
     }
 
     /**

@@ -1,114 +1,289 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Nothing to See Here</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APIs Hub | Intelligent Infrastructure</title>
+    <link rel="icon" type="image/png" href="/assets/images/apishub-favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body {
+        :root {
+            --bg-dark: #0a0c10;
+            --bg-card: rgba(22, 27, 34, 0.7);
+            --bg-accent: #21262d;
+            --primary: #58a6ff;
+            --primary-glow: rgba(88, 166, 255, 0.3);
+            --secondary: #238636;
+            --text-main: #c9d1d9;
+            --text-dim: #8b949e;
+            --border: rgba(48, 54, 61, 0.8);
+            --header-h: 70px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nav-link.active {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #17212a;
-            color: #ffffff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(88, 166, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(35, 134, 54, 0.05) 0%, transparent 40%);
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
+        }
+
+        header {
+            height: var(--header-h);
+            background: rgba(13, 17, 23, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .logo i {
+            color: var(--primary);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .nav-link {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link:hover {
+            color: var(--primary);
+        }
+
+        main {
+            padding: calc(var(--header-h) + 60px) 40px 40px 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            flex: 1;
+            width: 100%;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 80px;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 20px;
+            letter-spacing: -0.02em;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, var(--primary) 0%, #a371f7 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-dim);
+            max-width: 700px;
+            margin: 0 auto 40px auto;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            transition: var(--transition);
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-5px);
+            background: rgba(22, 27, 34, 0.9);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 0 0 20px var(--primary-glow);
+        }
+
+        .feature-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--bg-accent);
+            border-radius: 12px;
+            display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
-            text-align: center;
+            color: var(--primary);
         }
 
-        h1 {
-            font-size: 3em;
-            margin-bottom: 0.3em;
-            color: #e7980b;
+        .feature-card h3 {
+            font-size: 1.5rem;
+            color: #fff;
         }
 
-        p {
-            font-size: 1.2em;
-            max-width: 600px;
+        .feature-card p {
+            color: var(--text-dim);
+            font-size: 1rem;
             line-height: 1.6;
         }
 
-        a {
-            margin-top: 1.5em;
-            display: inline-block;
-            padding: 0.8em 1.5em;
-            background-color: #2089ab;
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 8px;
-            transition: background-color 0.3s ease;
-        }
-
-        a:hover {
-            background-color: #176c89;
-        }
-
-        .ghost {
-            position: relative;
-            width: 120px;
-            height: 140px;
-            background: #ffffff;
-            border-radius: 60% 60% 20% 20%;
-            margin-bottom: 20px;
-            animation: float 3s ease-in-out infinite;
-        }
-
-        .ghost::before,
-        .ghost::after {
-            content: '';
+        .feature-card .arrow {
             position: absolute;
-            bottom: 0;
-            width: 24px;
-            height: 24px;
-            background: #ffffff;
-            border-radius: 50%;
+            bottom: 40px;
+            right: 40px;
+            opacity: 0;
+            transition: var(--transition);
+            color: var(--primary);
         }
 
-        .ghost::before {
-            left: 0;
+        .feature-card:hover .arrow {
+            opacity: 1;
+            transform: translateX(5px);
         }
 
-        .ghost::after {
-            right: 0;
+        footer {
+            padding: 40px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.85rem;
         }
 
-        .ghost .eyes {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 40px;
+        .subtle-link {
+            color: inherit;
+            text-decoration: none;
+            transition: color 0.3s;
+            opacity: 0.5;
         }
 
-        .ghost .eyes div {
-            width: 15px;
-            height: 15px;
-            background: #17212a;
-            border-radius: 50%;
+        .subtle-link:hover {
+            opacity: 1;
+            color: var(--primary);
         }
 
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.5rem; }
+            .nav-links { display: none; }
         }
     </style>
 </head>
 <body>
-<div class="ghost">
-    <div class="eyes">
-        <div></div>
-        <div></div>
-    </div>
-</div>
-<h1>Hello, curious traveler!</h1>
-<p>There’s nothing to see here… or is there?</p>
-<p>Since you're here, let me say hi — I'm <strong>Aníbal Álvarez</strong>, a software developer.</p>
-<div style="display: flex; gap: 15px; margin-top: 20px; flex-wrap: wrap; justify-content: center;">
-    <a href="/monitoring" style="background-color: #2089ab;">📊 Monitoring Dashboard</a>
-    <a href="/command-builder" style="background-color: #238636;">🛠️ Command Builder</a>
-    <a href="/docs" style="background-color: #e7980b;">📖 API Documentation</a>
-    <a href="https://anibalalvarez.com" target="_blank">Visit my website</a>
-</div>
+    <header>
+        <a href="/" class="logo">
+            <img src="/assets/images/apishub-trans-light-600.png" alt="APIs Hub Logo" style="height: 28px; width: auto;">
+        </a>
+        <nav class="nav-links">
+            <a href="/" class="nav-link active"><i data-lucide="home"></i> Home</a>
+            <a href="/monitoring" class="nav-link"><i data-lucide="activity"></i> Monitoring</a>
+            <a href="/logs" class="nav-link"><i data-lucide="scroll"></i> Logs</a>
+            <a href="/command-builder" class="nav-link"><i data-lucide="terminal"></i> Builder</a>
+            <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <h1>Advanced <span>API Orchestration</span></h1>
+            <p>A high-performance infrastructure for data synchronization, automated job processing, and intelligent analytics extraction.</p>
+        </section>
+
+        <div class="feature-grid">
+            <a href="/monitoring" class="feature-card">
+                <div class="feature-icon"><i data-lucide="layout-dashboard"></i></div>
+                <h3>Monitoring Dashboard</h3>
+                <p>Real-time visibility into your container infrastructure. Track job statuses, historical claims, and infrastructure health with forensic preservation.</p>
+                <div class="arrow"><i data-lucide="arrow-right"></i></div>
+            </a>
+
+            <a href="/command-builder" class="feature-card">
+                <div class="feature-icon"><i data-lucide="cpu"></i></div>
+                <h3>Command Builder</h3>
+                <p>Generate precise CLI commands and Docker configurations for Google Search Console, Facebook Graph API, and advanced aggregations.</p>
+                <div class="arrow"><i data-lucide="arrow-right"></i></div>
+            </a>
+
+            <a href="/docs" class="nav-link feature-card">
+                <div class="feature-icon"><i data-lucide="code-2"></i></div>
+                <h3>Developer API</h3>
+                <p>Comprehensive OpenAPI documentation for programmatic access to channeled metrics, orders, and automated cloud synchronization.</p>
+                <div class="arrow"><i data-lucide="arrow-right"></i></div>
+            </a>
+
+            <a href="/logs" class="nav-link feature-card">
+                <div class="feature-icon"><i data-lucide="scroll"></i></div>
+                <h3>Log Explorer</h3>
+                <p>Deep dive into real-time server activity. Filter and monitor execution traces for Facebook, GSC, and background workers with auto-refresh.</p>
+                <div class="arrow"><i data-lucide="arrow-right"></i></div>
+            </a>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 APIs Hub Central. Developed by <a href="https://anibalalvarez.com" target="_blank" class="subtle-link">Aníbal Álvarez</a>.</p>
+    </footer>
+
+    <script>lucide.createIcons();</script>
 </body>
 </html>

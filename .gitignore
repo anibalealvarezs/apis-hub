@@ -1,7 +1,7 @@
-# Deployment configs (auto-generated / contains credentials)
-/deploy/*.yaml
-!/deploy/*.example.yaml
-!/deploy/project.yaml.example
+# Configuration & Deployment
+/config/**/*.yaml
+!/config/**/*.yaml.example
+!/config/entitiesconfig.yaml
 docker-compose.yml
 
 # Development / IDE
@@ -14,6 +14,7 @@ docker-compose.yml
 # Temp / Logs / Output
 /tests/Benchmark/*
 /tests/App/*
+/tmp/*
 *entities.php*
 *stderr*
 *.log
@@ -22,6 +23,5 @@ docker-compose.yml
 dev-recurrences.md
 
 
-# Tokens
-/config/google_tokens.json
-/config/facebook_tokens.json
+# Storage (Generated tokens, logs, etc.)
+/storage/

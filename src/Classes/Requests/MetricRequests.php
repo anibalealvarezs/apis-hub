@@ -6,13 +6,17 @@ namespace Classes\Requests;
 
 use Anibalealvarezs\FacebookGraphApi\Enums\MediaType;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricBreakdown;
+use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Dimension;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\GroupType;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Operator;
+use Anibalealvarezs\GoogleApi\Google\Exceptions\GoogleQuotaExceededException;
+use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
 use Anibalealvarezs\KlaviyoApi\Enums\AggregatedMeasurement;
 use Carbon\Carbon;
-use Classes\Conversions\FacebookGraphConvert;
+use Classes\Conversions\FacebookMarketingMetricConvert;
+use Classes\Conversions\FacebookOrganicMetricConvert;
 use Classes\Conversions\GoogleSearchConsoleConvert;
 use Classes\Conversions\KlaviyoConvert;
 use Classes\MapGenerator;
@@ -34,6 +38,7 @@ use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledAd;
 use Entities\Analytics\Channeled\ChanneledAdGroup;
 use Entities\Analytics\Channeled\ChanneledCampaign;
+use Entities\Analytics\Creative;
 use Entities\Analytics\Channeled\ChanneledMetric;
 use Entities\Analytics\Channeled\ChanneledMetricDimension;
 use Entities\Analytics\Country;
@@ -54,6 +59,7 @@ use Enums\Period;
 use Enums\Account as AccountEnum;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\FacebookGraphHelpers;
+use Repositories\CreativeRepository;
 use Helpers\GoogleSearchConsoleHelpers;
 use Helpers\Helpers;
 use Repositories\Channeled\ChanneledMetricRepository;
@@ -79,7 +85,8 @@ class MetricRequests
         return [
             Channel::shopify,
             Channel::klaviyo,
-            Channel::facebook,
+            Channel::facebook_marketing,
+            Channel::facebook_organic,
             Channel::bigcommerce,
             Channel::netsuite,
             Channel::amazon,
@@ -212,7 +219,7 @@ class MetricRequests
      * @throws \Doctrine\DBAL\Exception
      * @throws Exception
      */
-    public static function getListFromFacebook(
+    public static function getListFromFacebookOrganic(
         ?string $startDate = null,
         ?string $endDate = null,
         string|bool $resume = true,
@@ -220,13 +227,21 @@ class MetricRequests
         ?int $jobId = null
     ): Response {
         if (!$logger) {
-            $logger = new Logger('gsc');
-            $logger->pushHandler(new StreamHandler('logs/gsc.log', Level::Info));
+            $logger = Helpers::setLogger('facebook-organic.log');
         }
 
-        $logger->info("Starting getListFromFacebook: startDate=$startDate, endDate=$endDate, resume=$resume");
+        // Apply default dates if missing for "recent" safety
+        if (empty($startDate)) {
+            $startDate = Carbon::today()->subDays(3)->format('Y-m-d');
+            $logger->info("No startDate provided, defaulting to $startDate");
+        }
+        if (empty($endDate)) {
+            $endDate = Carbon::today()->format('Y-m-d');
+            $logger->info("No endDate provided, defaulting to $endDate");
+        }
+
+        $logger->info("Starting getListFromFacebookOrganic: startDate=$startDate, endDate=$endDate, resume=$resume");
         $manager = Helpers::getManager();
-        $manager->getConnection()->beginTransaction();
         try {
             // Validate configuration
             $config = self::validateFacebookConfig($logger);
@@ -234,294 +249,395 @@ class MetricRequests
             // Initialize API client
             $api = self::initializeFacebookGraphApi($config, $logger);
 
-            // Initialize repositories and settings
+            // Initialize repositories
             $pageRepository = $manager->getRepository(Page::class);
             $postRepository = $manager->getRepository(Post::class);
             $accountRepository = $manager->getRepository(Account::class);
             $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
-            $campaignRepository = $manager->getRepository(Campaign::class);
-            $channeledCampaignRepository = $manager->getRepository(ChanneledCampaign::class);
-            $channeledAdGroupRepository = $manager->getRepository(ChanneledAdGroup::class);
-            $channeledAdRepository = $manager->getRepository(ChanneledAd::class);
 
             // Load global entities
-            $accountEntity = $accountRepository->findOneBy(['name' => $config['facebook']['accounts_group_name']]);
+            $accountEntityName = $config['facebook']['accounts_group_name'] ?? null;
+            $accountEntity = $accountEntityName ? $accountRepository->findOneBy(['name' => $accountEntityName]) : null;
 
-            // Load pages and create a map
-            /** @var Page[] $pages */
-            $pages = $pageRepository->findAll();
+            if (!$accountEntity) {
+                $logger->warning("Account group '{$accountEntityName}' not found. Instagram accounts might not be processed correctly.");
+            }
+
+            // Load pages
+            $pagesToProcess = $config['facebook']['pages'] ?? [];
+            $globalExcludeIds = array_map('strval', $config['facebook']['exclude_from_caching'] ?? []);
+
+            if (empty($pagesToProcess)) {
+                $logger->info("No specific pages listed in config. Fetching all available pages from database.");
+                $allPages = $pageRepository->findAll();
+                $globalPageConfig = $config['facebook']['PAGE'] ?? [
+                    'page_metrics' => false,
+                    'posts' => true,
+                    'post_metrics' => false,
+                    'ig_account_metrics' => false,
+                    'ig_account_media' => true,
+                    'ig_account_media_metrics' => false,
+                ];
+                foreach ($allPages as $p) {
+                    $pageId = (string) $p->getPlatformId();
+                    if (in_array($pageId, $globalExcludeIds)) {
+                        continue;
+                    }
+                    $pagesToProcess[] = array_merge($globalPageConfig, [
+                        'id' => $pageId,
+                        'url' => $p->getUrl(),
+                        'title' => $p->getTitle(),
+                        'enabled' => true,
+                        // If IG user ID is stored in data, we can try to extract it
+                        'ig_account' => $p->getData()['instagram_business_account']['id'] ?? null
+                    ]);
+                }
+            }
+
+            $logger->info("Processing " . count($pagesToProcess) . " Facebook pages");
+
+            // Create a map for active pages
             $pageMap = [
                 'map' => [],
                 'mapReverse' => [],
             ];
-            foreach ($pages as $page) {
-                $pageMap['map'][$page->getUrl()] = $page->getId();
-                $pageMap['mapReverse'][$page->getId()] = $page->getUrl();
+            foreach ($pageRepository->findAll() as $p) {
+                $pageMap['map'][$p->getUrl()] = $p->getId();
+                $pageMap['mapReverse'][$p->getId()] = $p->getUrl();
             }
 
             $totalMetrics = 0;
             $totalRows = 0;
             $totalDuplicates = 0;
 
-            // Process everything
-            foreach ($config['facebook']['pages'] as $page) {
+            // Process Pages & Instagram
+            Helpers::reconnectIfNeeded($manager);
+            foreach ($pagesToProcess as $page) {
                 Helpers::checkJobStatus($jobId);
 
-                if (!$page['enabled']) {
-                    $logger->info("Skipping disabled page: " . $page['id']);
+                if (!$page['enabled'] || (!empty($page['exclude_from_caching']) && $page['exclude_from_caching'])) {
+                    $logger->info("Skipping page: " . $page['id'] . ($page['enabled'] ? " (excluded from caching)" : " (disabled)"));
                     continue;
                 }
+
                 $pageEntity = $pageRepository->findOneBy(['platformId' => $page['id']]);
-                if ($page['page_metrics']) {
-                    self::processFacebookPage(
-                        page: $page,
-                        startDate: $startDate,
-                        endDate: $endDate,
-                        api: $api,
-                        manager: $manager,
-                        pageRepository: $pageRepository,
-                        logger: $logger,
-                        pageMap: $pageMap,
-                    );
-                } else {
-                    $logger->info("Skipping page metrics for page: " . $page['id']);
+                if (!$pageEntity) {
+                    $logger->error("Page entity not found for platformId=" . $page['id'] . ". Skipping.");
+                    continue;
                 }
-                if ($page['posts']) {
-                    $postMap = self::fetchFacebookPagePosts(
-                        page: $page,
-                        api: $api,
-                        manager: $manager,
-                        logger: $logger,
-                        pageEntity: $pageEntity,
-                        accountEntity: $accountEntity,
-                    );
-                    if ($page['post_metrics']) {
-                        $hasResults = true;
-                        foreach ($postMap['map'] as $post) {
-                            if (!$hasResults) {
-                                break;
+
+                try {
+                    if ($page['page_metrics']) {
+                        self::processFacebookPage(
+                            page: $page,
+                            startDate: $startDate,
+                            endDate: $endDate,
+                            api: $api,
+                            manager: $manager,
+                            pageRepository: $pageRepository,
+                            logger: $logger,
+                            pageMap: $pageMap,
+                        );
+                    }
+
+                    if ($page['posts']) {
+                        $postMap = self::getPostMap($manager, $pageEntity);
+                        if ($page['post_metrics']) {
+                            foreach ($postMap['map'] as $postIdInDb) {
+                                try {
+                                    $postEntity = $postRepository->find($postIdInDb);
+                                    if ($postEntity) {
+                                        self::processFacebookPagePost(
+                                            postEntity: $postEntity,
+                                            pageEntity: $pageEntity,
+                                            api: $api,
+                                            manager: $manager,
+                                            logger: $logger,
+                                            postMap: $postMap,
+                                            pageMap: $pageMap,
+                                        );
+                                    }
+                                } catch (Exception $e) {
+                                    $logger->error("Error processing Facebook post " . $postIdInDb . ": " . $e->getMessage());
+                                }
                             }
-                            $hasResults = self::processFacebookPagePost(
-                                postEntity: $postRepository->findOneBy(['id' => $post]),
-                                pageEntity: $pageEntity,
+                        }
+                    }
+
+                    if ($page['ig_account'] && $page['ig_account_metrics']) {
+                        if ($accountEntity) {
+                            self::processInstagramAccount(
+                                page: $page,
                                 api: $api,
                                 manager: $manager,
-                                logger: $logger,
-                                postMap: $postMap,
-                                pageMap: $pageMap,
-                            );
-                        }
-                    } else {
-                        $logger->info("Skipping post metrics for page: " . $page['id']);
-                    }
-                } else {
-                    $logger->info("Skipping posts for page: " . $page['id']);
-                }
-                if ($page['ig_account'] && $page['ig_account_metrics']) {
-                    self::processInstagramAccount(
-                        page: $page,
-                        api: $api,
-                        manager: $manager,
-                        accountEntity: $accountEntity,
-                        pageEntity: $pageEntity,
-                        logger: $logger,
-                        pageMap: $pageMap,
-                        startDate: $startDate,
-                        endDate: $endDate,
-                    );
-                }
-                $channeledAccountEntity = $channeledAccountRepository->findOneBy([
-                    'platformId' => $page['ig_account'],
-                    'account' => $accountEntity,
-                ]);
-                if ($page['ig_account_media']) {
-                    $mediaMap = self::fetchInstagramAccountMedia(
-                        page: $page,
-                        api: $api,
-                        manager: $manager,
-                        logger: $logger,
-                        pageEntity: $pageEntity,
-                        accountEntity: $accountEntity,
-                        channeledAccountEntity: $channeledAccountEntity,
-                    );
-                    if ($page['ig_account_media_metrics']) {
-                        $hasResults = true;
-                        foreach ($mediaMap['map'] as $media) {
-                            if (($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$media] == $page['ig_account_media_stop_id'])) || !$hasResults) {
-                                break;
-                            }
-                            $hasResults = self::processInstagramMedia(
-                                pageEntity: $pageEntity,
-                                postEntity: $postRepository->findOneBy(['id' => $media]),
                                 accountEntity: $accountEntity,
-                                channeledAccountEntity: $channeledAccountEntity,
-                                api: $api,
-                                manager: $manager,
+                                pageEntity: $pageEntity,
                                 logger: $logger,
-                                mediaMap: $mediaMap,
                                 pageMap: $pageMap,
+                                startDate: $startDate,
+                                endDate: $endDate,
                             );
+                        } else {
+                            $logger->error("Cannot process Instagram account " . $page['ig_account'] . " because accountEntity is null.");
                         }
-                    } else {
-                        $logger->info("Skipping Instagram media metrics for page: " . $page['id']);
                     }
+
+                    if ($page['ig_account_media']) {
+                        $channeledAccountEntity = $channeledAccountRepository->findOneBy([
+                            'platformId' => $page['ig_account'],
+                            'account' => $accountEntity,
+                        ]);
+
+                        if ($channeledAccountEntity) {
+                            $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
+                            if ($page['ig_account_media_metrics']) {
+                                foreach ($mediaMap['map'] as $mediaIdInDb) {
+                                    if ($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$mediaIdInDb] == $page['ig_account_media_stop_id'])) {
+                                        break;
+                                    }
+                                    try {
+                                        $mediaEntity = $postRepository->find($mediaIdInDb);
+                                        if ($mediaEntity) {
+                                            self::processInstagramMedia(
+                                                pageEntity: $pageEntity,
+                                                postEntity: $mediaEntity,
+                                                accountEntity: $accountEntity,
+                                                channeledAccountEntity: $channeledAccountEntity,
+                                                api: $api,
+                                                manager: $manager,
+                                                logger: $logger,
+                                                mediaMap: $mediaMap,
+                                                pageMap: $pageMap,
+                                            );
+                                        }
+                                    } catch (Exception $e) {
+                                        $logger->error("Error processing Instagram media " . $mediaIdInDb . ": " . $e->getMessage());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    $logger->error("Error processing page " . $page['id'] . ": " . $e->getMessage());
                 }
             }
 
-            foreach ($config['facebook']['ad_accounts'] as $adAccount) {
+            return self::finalizeTransaction($totalMetrics, $totalRows, $totalDuplicates, $logger, $startDate, $endDate);
+        } catch (Exception $e) {
+            $logger->error("Unexpected error in getListFromFacebookOrganic: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param string|bool $resume
+     * @param LoggerInterface|null $logger
+     * @return Response
+     * @throws NotSupported
+     * @throws ORMException
+     * @throws \Doctrine\DBAL\Exception
+     * @throws Exception
+     */
+    public static function getListFromFacebookMarketing(
+        ?string $startDate = null,
+        ?string $endDate = null,
+        string|bool $resume = true,
+        ?LoggerInterface $logger = null,
+        ?int $jobId = null
+    ): Response {
+        if (!$logger) {
+            $logger = Helpers::setLogger('facebook-marketing.log');
+        }
+
+        // Apply default dates if missing for "recent" safety
+        if (empty($startDate)) {
+            $startDate = Carbon::today()->subDays(3)->format('Y-m-d');
+            $logger->info("No startDate provided, defaulting to $startDate");
+        }
+        if (empty($endDate)) {
+            $endDate = Carbon::today()->format('Y-m-d');
+            $logger->info("No endDate provided, defaulting to $endDate");
+        }
+
+        $logger->info("Starting getListFromFacebookMarketing: startDate=$startDate, endDate=$endDate, resume=$resume");
+        $manager = Helpers::getManager();
+        try {
+            // Validate configuration
+            $config = self::validateFacebookConfig($logger);
+
+            // Initialize API client
+            $api = self::initializeFacebookGraphApi($config, $logger);
+
+            // Initialize repositories
+            $accountRepository = $manager->getRepository(Account::class);
+            $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
+
+            // Load global entities
+            $accountEntityName = $config['facebook']['accounts_group_name'] ?? null;
+            $accountEntity = $accountEntityName ? $accountRepository->findOneBy(['name' => $accountEntityName]) : null;
+
+            if (!$accountEntity) {
+                $logger->error("Account group '{$accountEntityName}' not found. Facebook Marketing cannot be processed.");
+                throw new Exception("Account group '{$accountEntityName}' not found.");
+            }
+
+            $totalMetrics = 0;
+            $totalRows = 0;
+            $totalDuplicates = 0;
+
+            // Process Ad Accounts
+            Helpers::reconnectIfNeeded($manager);
+            $adAccountsToProcess = $config['facebook']['ad_accounts'] ?? [];
+            $globalExcludeIds = array_map('strval', $config['facebook']['exclude_from_caching'] ?? []);
+
+            if (empty($adAccountsToProcess)) {
+                $logger->info("No specific ad accounts listed in config. Fetching all available ad accounts for channel from database.");
+                $allChanneledAccounts = $channeledAccountRepository->findBy([
+                    'channel' => Channel::facebook_marketing->value,
+                    'type' => AccountEnum::META_AD_ACCOUNT->value
+                ]);
+                $globalAdAccountConfig = $config['facebook']['AD_ACCOUNT'] ?? [
+                    'ad_account_metrics' => true,
+                    'campaigns' => true,
+                    'campaign_metrics' => true,
+                    'adsets' => false,
+                    'adset_metrics' => false,
+                    'ads' => false,
+                    'ad_metrics' => false,
+                    'creatives' => false,
+                    'creative_metrics' => false,
+                ];
+                foreach ($allChanneledAccounts as $ca) {
+                    $accId = (string) $ca->getPlatformId();
+                    if (in_array($accId, $globalExcludeIds)) {
+                        continue;
+                    }
+                    $adAccountsToProcess[] = array_merge($globalAdAccountConfig, [
+                        'id' => $accId,
+                        'name' => $ca->getName(),
+                        'enabled' => true
+                    ]);
+                }
+            }
+
+            foreach ($adAccountsToProcess as $adAccount) {
                 Helpers::checkJobStatus($jobId);
 
                 $channeledAccountEntity = $channeledAccountRepository->findOneBy([
                     'platformId' => $adAccount['id'],
                     'account' => $accountEntity,
                 ]);
-                if (!$adAccount['enabled']) {
-                    $logger->info("Skipping disabled ad account: " . $adAccount['id']);
+
+                if (!$channeledAccountEntity) {
+                    $logger->error("ChanneledAccount entity not found for adAccount=" . $adAccount['id'] . ". Skipping.");
                     continue;
                 }
-                if ($adAccount['ad_account_metrics']) {
-                    self::processAdAccount(
-                        adAccount: $adAccount,
-                        api: $api,
-                        manager: $manager,
-                        accountEntity: $accountEntity,
-                        channeledAccountEntity: $channeledAccountEntity,
-                        logger: $logger,
-                    );
-                } else {
-                    $logger->info("Skipping ad account metrics for ad account: " . $adAccount['id']);
+
+                if (!$adAccount['enabled'] || (!empty($adAccount['exclude_from_caching']) && $adAccount['exclude_from_caching'])) {
+                    $logger->info("Skipping ad account: " . $adAccount['id'] . ($adAccount['enabled'] ? " (excluded from caching)" : " (disabled)"));
+                    continue;
                 }
-                if ($adAccount['campaigns']) {
-                    $campaignsMultiMap = self::fetchAdAccountCampaigns(
-                        api: $api,
-                        manager: $manager,
-                        logger: $logger,
-                        channeledAccountEntity: $channeledAccountEntity,
-                    );
-                    $campaignMap = $campaignsMultiMap['campaignMap'];
-                    $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
-                    if ($adAccount['campaign_metrics']) {
-                        $hasResults = true;
-                        foreach ($channeledCampaignMap['mapReverse'] as $channeledCampaign) {
-                            Helpers::checkJobStatus($jobId);
-                            if (!$hasResults) {
-                                break;
-                            }
-                            $hasResults = self::processCampaign(
-                                api: $api,
-                                manager: $manager,
-                                campaignEntity: $campaignRepository->findOneBy(['id' => $campaignMap['map'][$channeledCampaign]]),
-                                channeledCampaignEntity: $channeledCampaignRepository->findOneBy(['platformId' => $channeledCampaign]),
-                                channeledAccountEntity: $channeledAccountEntity,
-                                logger: $logger,
-                                campaignMap: $campaignMap,
-                                channeledCampaignMap: $channeledCampaignMap,
-                            );
-                        }
-                    } else {
-                        $logger->info("Skipping Campaign metrics for ad account: " . $adAccount['id']);
-                    }
-                    if ($adAccount['adsets']) {
-                        $channeledAdGroupMap = self::fetchAdAccountAdsets(
+
+                try {
+                    if ($adAccount['ad_account_metrics']) {
+                        self::processAdAccount(
+                            adAccount: $adAccount,
                             api: $api,
                             manager: $manager,
-                            logger: $logger,
+                            accountEntity: $accountEntity,
                             channeledAccountEntity: $channeledAccountEntity,
-                            campaignMap: $campaignMap,
-                            channeledCampaignMap: $channeledCampaignMap,
+                            logger: $logger,
+                            startDate: $startDate,
+                            endDate: $endDate,
                         );
+                    }
 
-                        if ($adAccount['adset_metrics']) {
-                            $hasResults = true;
-                            foreach ($channeledAdGroupMap['mapCampaign'] as $key => $campaignId) {
-                                Helpers::checkJobStatus($jobId);
-                                if (!$hasResults) {
-                                    break;
-                                }
-                                $hasResults = self::processAdset(
+                    if ($adAccount['campaigns']) {
+                        $campaignsMultiMap = self::getCampaignMaps($manager, $channeledAccountEntity);
+                        $campaignMap = $campaignsMultiMap['campaignMap'];
+                        $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
+
+                        if ($adAccount['campaign_metrics']) {
+                            self::processCampaignsBulk(
+                                api: $api,
+                                manager: $manager,
+                                channeledAccountEntity: $channeledAccountEntity,
+                                logger: $logger,
+                                startDate: $startDate,
+                                endDate: $endDate,
+                                channeledCampaignMap: $channeledCampaignMap,
+                                campaignMap: $campaignMap,
+                                jobId: $jobId,
+                            );
+                        }
+
+                        if ($adAccount['adsets']) {
+                            $channeledAdGroupMap = self::getAdGroupMap($manager, $channeledAccountEntity);
+
+                            if ($adAccount['adset_metrics']) {
+                                self::processAdsetsBulk(
                                     api: $api,
                                     manager: $manager,
-                                    campaignEntity: $campaignRepository->findOneBy(['campaignId' => $campaignId]),
-                                    channeledCampaignEntity: $channeledCampaignRepository->findOneBy(['platformId' => $campaignId]),
                                     channeledAccountEntity: $channeledAccountEntity,
-                                    channeledAdGroupEntity: $channeledAdGroupRepository->findOneBy(['platformId' => $key]),
                                     logger: $logger,
+                                    startDate: $startDate,
+                                    endDate: $endDate,
                                     campaignMap: $campaignMap,
                                     channeledCampaignMap: $channeledCampaignMap,
                                     channeledAdGroupMap: $channeledAdGroupMap,
+                                    jobId: $jobId,
                                 );
                             }
-                        } else {
-                            $logger->info("Skipping Adset metrics for ad account: " . $adAccount['id']);
-                        }
 
-                        if ($adAccount['ads']) {
-                            $channeledAdMap = self::fetchAdAccountAds(
-                                api: $api,
-                                manager: $manager,
-                                logger: $logger,
-                                channeledAccountEntity: $channeledAccountEntity,
-                                channeledCampaignMap: $channeledCampaignMap,
-                                channeledAdGroupMap: $channeledAdGroupMap,
-                            );
+                            if ($adAccount['ads']) {
+                                $channeledAdMap = self::getAdMap($manager, $channeledAccountEntity);
 
-                            // Helpers::dumpDebugJson($campaignMap['map']);
-
-                            if ($adAccount['ad_metrics']) {
-                                $hasResults = true;
-                                foreach ($channeledAdMap['mapAdGroup'] as $key => $adGroupId) {
-                                    Helpers::checkJobStatus($jobId);
-                                    if (!$hasResults) {
-                                        break;
-                                    }
-                                    $hasResults = self::processAd(
+                                if ($adAccount['ad_metrics']) {
+                                    self::processAdsBulk(
                                         api: $api,
                                         manager: $manager,
-                                        campaignEntity: $campaignRepository->findOneBy(['campaignId' => $channeledAdMap['mapCampaign'][$key]]),
-                                        channeledCampaignEntity: $channeledCampaignRepository->findOneBy(['platformId' => $channeledAdMap['mapCampaign'][$key]]),
                                         channeledAccountEntity: $channeledAccountEntity,
-                                        channeledAdGroupEntity: $channeledAdGroupRepository->findOneBy(['platformId' => $adGroupId]),
-                                        channeledAdEntity: $channeledAdRepository->findOneBy(['platformId' => $key]),
                                         logger: $logger,
+                                        startDate: $startDate,
+                                        endDate: $endDate,
                                         campaignMap: $campaignMap,
                                         channeledCampaignMap: $channeledCampaignMap,
                                         channeledAdGroupMap: $channeledAdGroupMap,
                                         channeledAdMap: $channeledAdMap,
+                                        jobId: $jobId,
                                     );
                                 }
-                            } else {
-                                $logger->info("Skipping Ad metrics for ad account: " . $adAccount['id']);
                             }
                         }
+
+                        if (!empty($adAccount['creatives']) && !empty($adAccount['creative_metrics'])) {
+                            self::processCreativesBulk(
+                                api: $api,
+                                manager: $manager,
+                                channeledAccountEntity: $channeledAccountEntity,
+                                logger: $logger,
+                                startDate: $startDate,
+                                endDate: $endDate,
+                                jobId: $jobId,
+                            );
+                        }
                     }
+                } catch (FacebookRateLimitException $e) {
+                    throw $e;
+                } catch (Exception $e) {
+                    $logger->error("Error processing ad account " . $adAccount['id'] . ": " . $e->getMessage());
                 }
             }
 
-            $manager->getConnection()->commit();
-
-            // Finalize transaction and cache
-            return self::finalizeTransaction(
-                $totalMetrics,
-                $totalRows,
-                $totalDuplicates,
-                $logger,
-                $startDate,
-                $endDate
-            );
+            return self::finalizeTransaction($totalMetrics, $totalRows, $totalDuplicates, $logger, $startDate, $endDate);
+        } catch (FacebookRateLimitException $e) {
+            $logger->error("Facebook API Rate Limit Reach: " . $e->getMessage());
+            return new Response(json_encode(['error' => 'Rate limit reached: ' . $e->getMessage()]), 429);
         } catch (Exception $e) {
-            try {
-                if ($manager->getConnection()->isTransactionActive()) {
-                    $manager->getConnection()->rollback();
-                    $logger->info("Rolled back transaction");
-                }
-            } catch (Exception $rollbackException) {
-                $logger->error("Error during transaction rollback: " . $rollbackException->getMessage());
-            }
-            $logger->error("Unexpected error in getListFromFacebook: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+            $logger->error("Unexpected error in getListFromFacebookMarketing: " . $e->getMessage());
             throw $e;
-        } catch (GuzzleException $e) {
-            $logger->error("GuzzleException in getListFromFacebook: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
-            throw new Exception("GuzzleException in getListFromFacebook: " . $e->getMessage());
         }
     }
 
@@ -596,8 +712,7 @@ class MetricRequests
         ?int $jobId = null
     ): Response {
         if (!$logger) {
-            $logger = new Logger('gsc');
-            $logger->pushHandler(new StreamHandler('logs/gsc.log', Level::Info));
+            $logger = Helpers::setLogger('gsc.log');
         }
 
         $logger->info("Starting getListFromGoogleSearchConsole: startDate=$startDate, endDate=$endDate, resume=$resume");
@@ -700,6 +815,16 @@ class MetricRequests
                 $startDate,
                 $endDate
             );
+        } catch (GoogleQuotaExceededException $e) {
+            $logger->error("Google API Quota Exceeded: " . $e->getMessage());
+            try {
+                if ($manager->getConnection()->isTransactionActive()) {
+                    $manager->getConnection()->rollback();
+                }
+            } catch (Exception $rollbackException) {
+                $logger->error("Error during transaction rollback: " . $rollbackException->getMessage());
+            }
+            return new Response(json_encode(['error' => 'Quota exceeded: ' . $e->getMessage()]), 429);
         } catch (Exception $e) {
             try {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -760,15 +885,62 @@ class MetricRequests
     }
 
     /**
-     * Validates Google and GSC configurations.
+     * Validates and returns the Facebook configuration with global defaults.
      *
-     * @param LoggerInterface $logger
+     * @param LoggerInterface|null $logger
      * @return array
-     * @throws Exception
      */
-    private static function validateFacebookConfig(LoggerInterface $logger): array
+    public static function validateFacebookConfig(?LoggerInterface $logger = null): array
     {
-        return FacebookGraphHelpers::validateFacebookConfig($logger);
+        $channels = Helpers::getChannelsConfig();
+        if (!isset($channels['facebook'])) {
+            $logger?->error("Facebook configuration not found in channels config.");
+            throw new RuntimeException("Facebook configuration not found in channels config.");
+        }
+
+        $config = $channels['facebook'];
+
+        // Global exclusion list
+        $globalExclude = $config['exclude_from_caching'] ?? [];
+        if (!is_array($globalExclude)) {
+            $globalExclude = [$globalExclude];
+        }
+
+        // Apply global defaults for PAGES if they exist
+        if (isset($config['PAGE'])) {
+            $globalPageDefaults = $config['PAGE'];
+            $config['pages'] = array_map(function ($page) use ($globalPageDefaults, $globalExclude) {
+                $merged = array_merge($globalPageDefaults, $page);
+                if (in_array((string) $merged['id'], array_map('strval', $globalExclude))) {
+                    $merged['exclude_from_caching'] = true;
+                }
+                return $merged;
+            }, $config['pages'] ?? []);
+        }
+
+        // Apply global defaults for AD_ACCOUNTS if they exist
+        if (isset($config['AD_ACCOUNT'])) {
+            $globalAdAccountDefaults = $config['AD_ACCOUNT'];
+            $config['ad_accounts'] = array_map(function ($adAccount) use ($globalAdAccountDefaults, $globalExclude) {
+                $merged = array_merge($globalAdAccountDefaults, $adAccount);
+                if (in_array((string) $merged['id'], array_map('strval', $globalExclude))) {
+                    $merged['exclude_from_caching'] = true;
+                }
+                return $merged;
+            }, $config['ad_accounts'] ?? []);
+        }
+
+        // If 'pages' list is NOT provided or empty, we mark it as such so it's handled during request
+        if (!isset($config['pages']) || !is_array($config['pages'])) {
+             $config['pages'] = []; 
+        }
+
+        // If 'ad_accounts' list is NOT provided or empty
+        if (!isset($config['ad_accounts']) || !is_array($config['ad_accounts'])) {
+             $config['ad_accounts'] = [];
+        }
+
+        return ['facebook' => $config];
     }
 
     /**
@@ -829,7 +1001,7 @@ class MetricRequests
      * @return FacebookGraphApi
      * @throws Exception
      */
-    private static function initializeFacebookGraphApi(array $config, LoggerInterface $logger): FacebookGraphApi
+    public static function initializeFacebookGraphApi(array $config, LoggerInterface $logger): FacebookGraphApi
     {
         $maxApiRetries = 3;
         $apiRetryCount = 0;
@@ -1022,7 +1194,7 @@ class MetricRequests
                 return;
             }
 
-            $metrics = FacebookGraphConvert::pageMetrics(
+            $metrics = FacebookOrganicMetricConvert::pageMetrics(
                 rows: $rows['data'],
                 pagePlatformId: (string) $page['id'],
                 logger: $logger,
@@ -1110,6 +1282,8 @@ class MetricRequests
         Account $accountEntity,
         ChanneledAccount $channeledAccountEntity,
         LoggerInterface $logger,
+        ?string $startDate,
+        ?string $endDate,
     ): void {
 
         $allMetrics = new ArrayCollection();
@@ -1131,21 +1305,29 @@ class MetricRequests
         ];
 
         try {
+            $additionalParams = [];
+            if ($startDate && $endDate) {
+                $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
+            }
+
             $rows = $api->getAdAccountInsights(
                 adAccountId: (string) $adAccount['id'],
-                metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER]
+                metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
+                additionalParams: $additionalParams,
+                metricSet: MetricSet::KEY,
             );
 
             if (count($rows['data']) === 0) {
-                $logger->info("No rows found for page " . $adAccount['id']);
+                $logger->info("No rows found for ad account " . $adAccount['id']);
                 return;
             }
 
-            $metrics = FacebookGraphConvert::adAccountMetrics(
+            $metrics = FacebookMarketingMetricConvert::adAccountMetrics(
                 rows: $rows['data'],
                 logger: $logger,
                 accountEntity: $accountEntity,
                 channeledAccountPlatformId: $channeledAccountEntity->getPlatformId(),
+                metricSet: MetricSet::KEY,
             );
 
             foreach ($metrics as $metric) {
@@ -1273,7 +1455,7 @@ class MetricRequests
         $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
         $channeledAccountEntity = $channeledAccountRepository->findOneBy([
             'platformId' => (string) $page['ig_account'],
-            'channel' => Channel::facebook->value,
+            'channel' => Channel::facebook_organic->value,
             'type' => AccountEnum::INSTAGRAM->value,
         ]);
         $channeledAccountMap['map'][(string) $page['ig_account']] = $channeledAccountEntity->getId();
@@ -1306,7 +1488,7 @@ class MetricRequests
                     }
                     $option++;
                 }
-                $metrics = FacebookGraphConvert::igAccountMetrics(
+                $metrics = FacebookOrganicMetricConvert::igAccountMetrics(
                     rows: $rows['data'],
                     date: $startDate->format('Y-m-d'),
                     pageEntity: $pageEntity,
@@ -1439,7 +1621,7 @@ class MetricRequests
                 return false;
             }
 
-            $metrics = FacebookGraphConvert::igMediaMetrics(
+            $metrics = FacebookOrganicMetricConvert::igMediaMetrics(
                 rows: $insights['data'],
                 pageEntity: $pageEntity,
                 postEntity: $postEntity,
@@ -1557,12 +1739,13 @@ class MetricRequests
                 return false;
             }
 
-            $metrics = FacebookGraphConvert::campaignMetrics(
+            $metrics = FacebookMarketingMetricConvert::campaignMetrics(
                 rows: $rows['data'],
                 logger: $logger,
                 channeledAccountEntity: $channeledAccountEntity,
                 campaignEntity: $campaignEntity,
                 channeledCampaignEntity: $channeledCampaignEntity,
+                metricSet: MetricSet::KEY,
             );
 
             foreach ($metrics as $metric) {
@@ -1682,13 +1865,14 @@ class MetricRequests
                 return false;
             }
 
-            $metrics = FacebookGraphConvert::adsetMetrics(
+            $metrics = FacebookMarketingMetricConvert::adsetMetrics(
                 rows: $rows['data'],
                 logger: $logger,
                 channeledAccountEntity: $channeledAccountEntity,
                 campaignEntity: $campaignEntity,
                 channeledCampaignEntity: $channeledCampaignEntity,
                 channeledAdGroupEntity: $channeledAdGroupEntity,
+                metricSet: MetricSet::KEY,
             );
 
             foreach ($metrics as $metric) {
@@ -1814,7 +1998,7 @@ class MetricRequests
                 return false;
             }
 
-            $metrics = FacebookGraphConvert::adMetrics(
+            $metrics = FacebookMarketingMetricConvert::adMetrics(
                 rows: $rows['data'],
                 logger: $logger,
                 channeledAccountEntity: $channeledAccountEntity,
@@ -1822,6 +2006,7 @@ class MetricRequests
                 channeledCampaignEntity: $channeledCampaignEntity,
                 channeledAdGroupEntity: $channeledAdGroupEntity,
                 channeledAdEntity: $channeledAdEntity,
+                metricSet: MetricSet::KEY,
             );
 
             foreach ($metrics as $metric) {
@@ -1905,759 +2090,119 @@ class MetricRequests
      * @throws \Doctrine\DBAL\Exception
      * @throws Exception
      */
-    private static function fetchFacebookPagePosts(
-        array $page,
-        FacebookGraphApi $api,
+    private static function getPostMap(
         EntityManager $manager,
-        LoggerInterface $logger,
         Page $pageEntity,
-        Account $accountEntity,
     ): array {
-        $posts = $api->getFacebookPosts(
-            pageId: (string) $page['id'],
-        );
-
-        // Re-fetch inserted metrics to get correct IDs
-        $params = [];
-        $conditions = [];
-
-        $fields = ['postId', 'page_id', 'account_id'];
-
-        foreach ($posts['data'] as $post) {
-            $platformId = $post['id'];
-            $subConditions = [];
-            foreach ($fields as $field) {
-                $subConditions[] = "$field = ?";
-                $params[] = match($field) {
-                    'postId' => $platformId,
-                    'page_id' => $pageEntity->getId(),
-                    'account_id' => $accountEntity->getId(),
-                };
-            }
-            $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
+        $sql = "SELECT id, postId FROM posts WHERE page_id = ? AND channeledAccount_id IS NULL";
+        $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId()])->fetchAllAssociative();
+        $map = [];
+        foreach ($fetched as $row) {
+            $map[$row['postId']] = (int)$row['id'];
         }
-
-        $sql = "SELECT id, " . implode(', ', $fields) . "
-                            FROM posts
-                            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
-
-        $postMap = MapGenerator::getPostMap(
-            manager: $manager,
-            sql: $sql,
-            params: $params,
-        );
-        $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
-
-        // Get the list of metrics that need to be inserted
-        $postsToInsert = [];
-        foreach ($posts['data'] as $post) {
-            $platformId = $post['id'];
-            if (!isset($postMap[$platformId])) {
-                $postsToInsert[] = [
-                    'postId' => $platformId,
-                    'page_id' => $pageEntity->getId(),
-                    'account_id' => $accountEntity->getId(),
-                    'data' => $post,
-                    'key' => $platformId,
-                ];
-            }
-        }
-
-        if (!empty($postsToInsert)) {
-            $insertParams = [];
-            foreach ($postsToInsert as $row) {
-                $insertParams[] = $row['postId'];
-                $insertParams[] = $row['page_id'];
-                $insertParams[] = $row['account_id'];
-                $insertParams[] = json_encode($row['data']);
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
-            $manager->getConnection()->executeStatement(
-                'INSERT INTO posts (postId, page_id, account_id, data)
-                     VALUES ' . implode(', ', array_fill(0, count($postsToInsert), '(?, ?, ?, ?)')),
-                $insertParams
-            );
-
-            // Re-fetch inserted metrics to get correct IDs
-            $reFetchParams = [];
-            $conditions = [];
-
-            $fields = ['postId', 'page_id', 'account_id'];
-
-            foreach ($posts['data'] as $post) {
-                $platformId = $post['id'];
-                $subConditions = [];
-                foreach ($fields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $reFetchParams[] = match($field) {
-                        'postId' => $platformId,
-                        'page_id' => $pageEntity->getId(),
-                        'account_id' => $accountEntity->getId(),
-                    };
-                }
-                $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $reFetchSql = "SELECT id, " . implode(', ', $fields) . "
-                            FROM posts
-                            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
-
-            $newPosts = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
-
-            foreach ($newPosts as $newPost) {
-                $postMap[$newPost['postId']] = $newPost['id'];
-            }
-        }
-
         return [
-            'map' => $postMap,
-            'mapReverse' => array_flip($postMap),
+            'map' => $map,
+            'mapReverse' => array_flip($map),
         ];
     }
 
-    /**
-     * Processes a single site, including page lookup and data fetching.
-     *
-     * @param array $page
-     * @param FacebookGraphApi $api
-     * @param EntityManager $manager
-     * @param LoggerInterface $logger
-     * @param Page $pageEntity
-     * @param Account $accountEntity
-     * @param ChanneledAccount $channeledAccountEntity
-     * @return array
-     * @throws GuzzleException
-     * @throws \Doctrine\DBAL\Exception
-     * @throws Exception
-     */
-    private static function fetchInstagramAccountMedia(
-        array $page,
-        FacebookGraphApi $api,
+    private static function getInstagramMediaMap(
         EntityManager $manager,
-        LoggerInterface $logger,
         Page $pageEntity,
-        Account $accountEntity,
-        ChanneledAccount $channeledAccountEntity,
+        ?ChanneledAccount $channeledAccountEntity = null,
     ): array {
-        $posts = $api->getInstagramMedia(
-            igUserId: (string) $page['ig_account'],
-        );
-
-        // Re-fetch inserted metrics to get correct IDs
-        $params = [];
-        $conditions = [];
-
-        $fields = ['postId', 'page_id', 'account_id', 'channeledAccount_id'];
-
-        foreach ($posts['data'] as $post) {
-            $platformId = $post['id'];
-            $subConditions = [];
-            foreach ($fields as $field) {
-                $subConditions[] = "$field = ?";
-                $params[] = match($field) {
-                    'postId' => $platformId,
-                    'page_id' => $pageEntity->getId(),
-                    'account_id' => $accountEntity->getId(),
-                    'channeledAccount_id' => $channeledAccountEntity->getId(),
-                };
-            }
-            $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
+        if (!$channeledAccountEntity) {
+             return ['map' => [], 'mapReverse' => []];
         }
-
-        $sql = "SELECT id, " . implode(', ', $fields) . "
-                            FROM posts
-                            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
-
-        $postMap = MapGenerator::getPostMap(
-            manager: $manager,
-            sql: $sql,
-            params: $params,
-        );
-
-        // Get the list of metrics that need to be inserted
-        $postsToInsert = [];
-        foreach ($posts['data'] as $post) {
-            $platformId = $post['id'];
-            if (!isset($postMap[$platformId])) {
-                $postsToInsert[] = [
-                    'postId' => $platformId,
-                    'page_id' => $pageEntity->getId(),
-                    'account_id' => $accountEntity->getId(),
-                    'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    'data' => $post,
-                    'key' => $platformId,
-                ];
-            }
+        $sql = "SELECT id, postId FROM posts WHERE page_id = ? AND channeledAccount_id = ?";
+        $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId(), $channeledAccountEntity->getId()])->fetchAllAssociative();
+        $map = [];
+        foreach ($fetched as $row) {
+            $map[$row['postId']] = (int)$row['id'];
         }
-
-        if (!empty($postsToInsert)) {
-            $insertParams = [];
-            foreach ($postsToInsert as $row) {
-                $insertParams[] = $row['postId'];
-                $insertParams[] = $row['page_id'];
-                $insertParams[] = $row['account_id'];
-                $insertParams[] = $row['channeledAccount_id'];
-                $insertParams[] = json_encode($row['data']);
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
-            $manager->getConnection()->executeStatement(
-                'INSERT INTO posts (postId, page_id, account_id, channeledAccount_id, data)
-                     VALUES ' . implode(', ', array_fill(0, count($postsToInsert), '(?, ?, ?, ?, ?)')),
-                $insertParams
-            );
-
-            // Re-fetch inserted metrics to get correct IDs
-            $reFetchParams = [];
-            $conditions = [];
-
-            $fields = ['postId', 'page_id', 'account_id', 'channeledAccount_id'];
-
-            foreach ($posts['data'] as $post) {
-                $platformId = $post['id'];
-                $subConditions = [];
-                foreach ($fields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $reFetchParams[] = match($field) {
-                        'postId' => $platformId,
-                        'page_id' => $pageEntity->getId(),
-                        'account_id' => $accountEntity->getId(),
-                        'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    };
-                }
-                $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $reFetchSql = "SELECT id, " . implode(', ', $fields) . "
-                            FROM posts
-                            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
-
-            $newPosts = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
-
-            foreach ($newPosts as $newPost) {
-                $postMap[$newPost['postId']] = $newPost['id'];
-            }
-        }
-
         return [
-            'map' => $postMap,
-            'mapData' => array_column($posts['data'], 'media_type', 'id'),
-            'mapReverse' => array_flip($postMap),
+            'map' => $map,
+            'mapReverse' => array_flip($map),
         ];
     }
-
-    /**
-     * Processes a single site, including page lookup and data fetching.
-     *
-     * @param FacebookGraphApi $api
-     * @param EntityManager $manager
-     * @param LoggerInterface $logger
-     * @param ChanneledAccount $channeledAccountEntity
-     * @return array
-     * @throws GuzzleException
-     * @throws \Doctrine\DBAL\Exception
-     * @throws Exception
-     */
-    private static function fetchAdAccountCampaigns(
-        FacebookGraphApi $api,
+    private static function getCampaignMaps(
         EntityManager $manager,
-        LoggerInterface $logger,
         ChanneledAccount $channeledAccountEntity,
     ): array {
+        $conn = $manager->getConnection();
 
-        $campaigns = $api->getCampaigns(
-            adAccountId: $channeledAccountEntity->getPlatformId(),
-        );
-
-        // Re-fetch inserted metrics to get correct IDs
-        $campaignParams = [];
-        $campaignConditions = [];
-
-        $campaignFields = ['campaignId', 'name'];
-
-        foreach ($campaigns['data'] as $campaign) {
-            $subConditions = [];
-            foreach ($campaignFields as $field) {
-                $subConditions[] = "$field = ?";
-                $campaignParams[] = match($field) {
-                    'campaignId' => $campaign['id'],
-                    'name' => $campaign['name'],
-                };
-            }
-            $campaignConditions[] = '(' . implode(' AND ', $subConditions) . ')';
+        // 1. Campaign Map
+        $sqlCampaign = "SELECT id, campaignId FROM campaigns";
+        $fetchedCampaigns = $conn->executeQuery($sqlCampaign)->fetchAllAssociative();
+        $campaignMap = [];
+        foreach ($fetchedCampaigns as $row) {
+            $campaignMap[$row['campaignId']] = (int)$row['id'];
         }
 
-        $sqlCampaign = "SELECT id, " . implode(', ', $campaignFields) . "
-                            FROM campaigns
-                            WHERE " . (empty($campaignConditions) ? '1=0' : implode(' OR ', $campaignConditions));
-
-        $campaignMap = MapGenerator::getCampaignMap(
-            manager: $manager,
-            sql: $sqlCampaign,
-            params: $campaignParams,
-        );
-
-        // Get the list of campaigns that need to be inserted
-        $campaignsToInsert = [];
-        foreach ($campaigns['data'] as $campaign) {
-            $platformId = $campaign['id'];
-            if (!isset($campaignMap[$platformId])) {
-                $campaignsToInsert[] = [
-                    'campaignId' => $campaign['id'],
-                    'name' => $campaign['name'],
-                    'startDate' => Carbon::parse($campaign['start_time'])->toDateTimeString(),
-                    'endDate' => Carbon::parse($campaign['stop_time'])->toDateTimeString(),
-                    'objective' => CampaignObjective::from($campaign['objective'])->value,
-                    'budget' => (float) ($campaign['lifetime_budget'] ?? 0),
-                    'status' => CampaignStatus::from($campaign['status'])->value,
-                    'buyingType' => CampaignBuyingType::from($campaign['buying_type'])->value,
-                    'data' => json_encode($campaign),
-                    'key' => $platformId,
-                ];
-            }
+        // 2. Channeled Campaign Map
+        $sqlCC = "SELECT id, platformId FROM channeled_campaigns WHERE channeledAccount_id = ?";
+        $fetchedCC = $conn->executeQuery($sqlCC, [$channeledAccountEntity->getId()])->fetchAllAssociative();
+        $channeledCampaignMap = [];
+        foreach ($fetchedCC as $row) {
+            $channeledCampaignMap[$row['platformId']] = (int)$row['id'];
         }
-
-        if (!empty($campaignsToInsert)) {
-            $insertParams = [];
-            foreach ($campaignsToInsert as $row) {
-                $insertParams[] = $row['campaignId'];
-                $insertParams[] = $row['name'];
-                $insertParams[] = $row['startDate'];
-                $insertParams[] = $row['endDate'];
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
-            $manager->getConnection()->executeStatement(
-                'INSERT INTO campaigns (campaignId, name, startDate, endDate)
-                     VALUES ' . implode(', ', array_fill(0, count($campaignsToInsert), '(?, ?, ?, ?)')),
-                $insertParams
-            );
-
-            // Re-fetch inserted metrics to get correct IDs
-            $reFetchCampaignParams = [];
-            $campaignConditions = [];
-
-            $campaignFields = ['campaignId', 'name'];
-
-            foreach ($campaigns['data'] as $campaign) {
-                $subConditions = [];
-                foreach ($campaignFields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $reFetchCampaignParams[] = match($field) {
-                        'campaignId' => $campaign['id'],
-                        'name' => $campaign['name'],
-                    };
-                }
-                $campaignConditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $reFetchCampaignSql = "SELECT id, " . implode(', ', $campaignFields) . "
-                            FROM campaigns
-                            WHERE " . (empty($campaignConditions) ? '1=0' : implode(' OR ', $campaignConditions));
-
-            $channeledCampaigns = $manager->getConnection()->executeQuery($reFetchCampaignSql, $reFetchCampaignParams)->fetchAllAssociative();
-
-            foreach ($channeledCampaigns as $newCampaign) {
-                $campaignMap[$newCampaign['campaignId']] = $newCampaign['id'];
-            }
-        }
-
-        $campaignMap = [
-            'map' => $campaignMap,
-            'mapReverse' => array_flip($campaignMap),
-        ];
-
-        // Re-fetch inserted metrics to get correct IDs
-        $channeledCampaignParams = [];
-        $channeledCampaignConditions = [];
-
-        $channeledCampaignFields = ['campaign_id', 'platformId', 'channeledAccount_id'];
-
-        foreach ($campaigns['data'] as $campaign) {
-            $subConditions = [];
-            foreach ($channeledCampaignFields as $field) {
-                $subConditions[] = "$field = ?";
-                $channeledCampaignParams[] = match($field) {
-                    'campaign_id' => $campaignMap['map'][$campaign['id']],
-                    'platformId' => $campaign['id'],
-                    'channeledAccount_id' => $channeledAccountEntity->getId(),
-                };
-            }
-            $channeledCampaignConditions[] = '(' . implode(' AND ', $subConditions) . ')';
-        }
-
-        $sqlChanneledCampaign = "SELECT id, " . implode(', ', $channeledCampaignFields) . "
-                            FROM channeled_campaigns
-                            WHERE " . (empty($channeledCampaignConditions) ? '1=0' : implode(' OR ', $channeledCampaignConditions));
-
-        $channeledCampaignMap = MapGenerator::getChanneledCampaignMap(
-            manager: $manager,
-            sql: $sqlChanneledCampaign,
-            params: $channeledCampaignParams,
-        );
-
-        // Use the same list of campaigns to insert, since campaigns and channeled_campaigns go 1 - 1 for Meta
-        if (!empty($campaignsToInsert)) {
-            $insertParams = [];
-            foreach ($campaignsToInsert as $row) {
-                $insertParams[] = $campaignMap['map'][$row['campaignId']];
-                $insertParams[] = $row['campaignId'];
-                $insertParams[] = Channel::facebook->value;
-                $insertParams[] = $row['startDate'];
-                $insertParams[] = $row['objective'];
-                $insertParams[] = $row['budget'];
-                $insertParams[] = $row['status'];
-                $insertParams[] = $row['buyingType'];
-                $insertParams[] = $row['data'];
-                $insertParams[] = $channeledAccountEntity->getId();
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
-            $manager->getConnection()->executeStatement(
-                'INSERT INTO channeled_campaigns (campaign_id, platformId, channel, platformCreatedAt, objective, budget, status, buyingType, data, channeledAccount_id)
-                     VALUES ' . implode(', ', array_fill(0, count($campaignsToInsert), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
-                $insertParams
-            );
-
-            // Re-fetch inserted metrics to get correct IDs
-            $fetchChanneledCampaignParams = [];
-            $channeledCampaignConditions = [];
-
-            $channeledCampaignFields = ['campaign_id', 'platformId', 'channeledAccount_id'];
-
-            foreach ($campaigns['data'] as $campaign) {
-                $subConditions = [];
-                foreach ($channeledCampaignFields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $fetchChanneledCampaignParams[] = match($field) {
-                        'campaign_id' => $campaignMap['map'][$campaign['id']],
-                        'platformId' => $campaign['id'],
-                        'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    };
-                }
-                $channeledCampaignConditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $channeledCampaignSql = "SELECT id, " . implode(', ', $channeledCampaignFields) . "
-                            FROM channeled_campaigns
-                            WHERE " . (empty($channeledCampaignConditions) ? '1=0' : implode(' OR ', $channeledCampaignConditions));
-
-            $channeledCampaigns = $manager->getConnection()->executeQuery($channeledCampaignSql, $fetchChanneledCampaignParams)->fetchAllAssociative();
-
-            foreach ($channeledCampaigns as $channeledCampaign) {
-                $channeledCampaignMap[$channeledCampaign['platformId']] = $channeledCampaign['id'];
-            }
-        }
-
-        $channeledCampaignMap = [
-            'map' => $channeledCampaignMap,
-            'mapReverse' => array_flip($channeledCampaignMap),
-        ];
 
         return [
-            'campaignMap' => $campaignMap,
-            'channeledCampaignMap' => $channeledCampaignMap,
+            'campaignMap' => [
+                'map' => $campaignMap,
+                'mapReverse' => array_flip($campaignMap),
+            ],
+            'channeledCampaignMap' => [
+                'map' => $channeledCampaignMap,
+                'mapReverse' => array_flip($channeledCampaignMap),
+            ],
         ];
     }
 
-    /**
-     * Processes a single site, including page lookup and data fetching.
-     *
-     * @param FacebookGraphApi $api
-     * @param EntityManager $manager
-     * @param LoggerInterface $logger
-     * @param ChanneledAccount $channeledAccountEntity
-     * @param array $campaignMap
-     * @param array $channeledCampaignMap
-     * @return array
-     * @throws GuzzleException
-     * @throws \Doctrine\DBAL\Exception
-     * @throws Exception
-     */
-    private static function fetchAdAccountAdsets(
-        FacebookGraphApi $api,
+    private static function getAdGroupMap(
         EntityManager $manager,
-        LoggerInterface $logger,
         ChanneledAccount $channeledAccountEntity,
-        array $campaignMap,
-        array $channeledCampaignMap,
     ): array {
-        $adsets = $api->getAdsets(
-            adAccountId: $channeledAccountEntity->getPlatformId(),
-        );
-
-        // Re-fetch inserted metrics to get correct IDs
-        $adsetParams = [];
-        $adsetConditions = [];
-
-        $adsetFields = ['channeledAccount_id', 'campaign_id', 'platformId', 'channeledCampaign_id'];
-
-        foreach ($adsets['data'] as $adset) {
-            $subConditions = [];
-            foreach ($adsetFields as $field) {
-                $subConditions[] = "$field = ?";
-                $adsetParams[] = match($field) {
-                    'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    'campaign_id' => $campaignMap['map'][$adset['campaign_id']],
-                    'platformId' => $adset['id'],
-                    'channeledCampaign_id' => $channeledCampaignMap['map'][$adset['campaign_id']],
-                };
-            }
-            $adsetConditions[] = '(' . implode(' AND ', $subConditions) . ')';
+        $sql = "SELECT cag.id, cag.platformId, cc.platformId as campaignPlatformId 
+                FROM channeled_ad_groups cag
+                LEFT JOIN channeled_campaigns cc ON cag.channeledCampaign_id = cc.id
+                WHERE cag.channeledAccount_id = ?";
+        $fetched = $manager->getConnection()->executeQuery($sql, [$channeledAccountEntity->getId()])->fetchAllAssociative();
+        $map = [];
+        $mapCampaign = [];
+        foreach ($fetched as $row) {
+            $map[$row['platformId']] = (int)$row['id'];
+            $mapCampaign[$row['platformId']] = $row['campaignPlatformId'];
         }
-
-        $sqlAdset = "SELECT id, " . implode(', ', $adsetFields) . "
-                            FROM channeled_ad_groups
-                            WHERE " . (empty($adsetConditions) ? '1=0' : implode(' OR ', $adsetConditions));
-
-        /* Helpers::dumpDebugJson([
-            'sql' => $sqlAdset,
-            'params' => $adsetParams,
-            'conditions' => $adsetConditions,
-        ]); */
-
-        // CHECK EMPTINESS
-
-        $adsetMap = MapGenerator::getChanneledAdGroupMap(
-            manager: $manager,
-            sql: $sqlAdset,
-            params: $adsetParams,
-        );
-
-        // Helpers::dumpDebugJson($adsetMap);
-
-        // Get the list of adsets that need to be inserted
-        $adsetsToInsert = [];
-        foreach ($adsets['data'] as $adset) {
-            $platformId = $adset['id'];
-            if (!isset($adsetMap[$platformId])) {
-                $adsetsToInsert[] = [
-                    'channeledAccount_id' => $channeledAccountEntity->getId(),
-                    'campaign_id' => $campaignMap['map'][$adset['campaign_id']],
-                    'name' => $adset['name'],
-                    'platformId' => $platformId,
-                    'channel' => Channel::facebook->value,
-                    'startDate' => Carbon::parse($adset['start_time'])->toDateTimeString(),
-                    'endDate' => Carbon::parse($adset['end_time'])->toDateTimeString(),
-                    'platformCreatedAt' => Carbon::parse($adset['created_time'])->toDateTimeString(),
-                    'optimizationGoal' => OptimizationGoal::from($adset['optimization_goal'])->value,
-                    'status' => CampaignStatus::from($adset['status'])->value,
-                    'billingEvent' => BillingEvent::from($adset['billing_event'])->value,
-                    'targeting' => json_encode($adset['targeting']),
-                    'channeledCampaign_id' => $channeledCampaignMap['map'][$adset['campaign_id']],
-                    'data' => json_encode($adset),
-                    'key' => $platformId,
-                ];
-            }
-        }
-
-        /* Helpers::dumpDebugJson([
-            'adsetsToInsert' => $adsetsToInsert,
-        ]); */
-
-        if (!empty($adsetsToInsert)) {
-            $insertParams = [];
-            foreach ($adsetsToInsert as $row) {
-                $insertParams[] = $row['channeledAccount_id'];
-                $insertParams[] = $row['campaign_id'];
-                $insertParams[] = $row['name'];
-                $insertParams[] = $row['platformId'];
-                $insertParams[] = $row['channel'];
-                $insertParams[] = $row['startDate'];
-                $insertParams[] = $row['endDate'];
-                $insertParams[] = $row['platformCreatedAt'];
-                $insertParams[] = $row['optimizationGoal'];
-                $insertParams[] = $row['status'];
-                $insertParams[] = $row['billingEvent'];
-                $insertParams[] = $row['targeting'];
-                $insertParams[] = $row['channeledCampaign_id'];
-                $insertParams[] = $row['data'];
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
-            $manager->getConnection()->executeStatement(
-                'INSERT INTO channeled_ad_groups (channeledAccount_id, campaign_id, name, platformId, channel, startDate, endDate, platformCreatedAt, optimizationGoal, status, billingEvent, targeting, channeledCampaign_id, data)
-                     VALUES ' . implode(', ', array_fill(0, count($adsetsToInsert), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
-                $insertParams
-            );
-
-            // Re-fetch inserted metrics to get correct IDs
-            $reFetchAdsetParams = [];
-            $adsetConditions = [];
-
-            $adsetFields = ['channeledAccount_id', 'campaign_id', 'platformId', 'channeledCampaign_id'];
-
-            foreach ($adsets['data'] as $adset) {
-                $subConditions = [];
-                foreach ($adsetFields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $reFetchAdsetParams[] = match($field) {
-                        'channeledAccount_id' => $channeledAccountEntity->getId(),
-                        'campaign_id' => $campaignMap['map'][$adset['campaign_id']],
-                        'platformId' => $adset['id'],
-                        'channeledCampaign_id' => $channeledCampaignMap['map'][$adset['campaign_id']],
-                    };
-                }
-                $adsetConditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $reFetchAdsetSql = "SELECT id, " . implode(', ', $adsetFields) . "
-                            FROM channeled_ad_groups
-                            WHERE " . (empty($adsetConditions) ? '1=0' : implode(' OR ', $adsetConditions));
-
-            $channeledAdGroups = $manager->getConnection()->executeQuery($reFetchAdsetSql, $reFetchAdsetParams)->fetchAllAssociative();
-
-            /* Helpers::dumpDebugJson([
-                'channeledAdGroups' => $channeledAdGroups,
-            ]); */
-
-            foreach ($channeledAdGroups as $newAdGroup) {
-                $adsetMap[$newAdGroup['platformId']] = $newAdGroup['id'];
-            }
-        }
-
         return [
-            'map' => $adsetMap,
-            'mapCampaign' => array_column($adsets['data'], 'campaign_id', 'id'),
-            'mapReverse' => array_flip($adsetMap),
+            'map' => $map,
+            'mapReverse' => array_flip($map),
+            'mapCampaign' => $mapCampaign,
         ];
     }
 
-    /**
-     * Processes a single site, including page lookup and data fetching.
-     *
-     * @param FacebookGraphApi $api
-     * @param EntityManager $manager
-     * @param LoggerInterface $logger
-     * @param ChanneledAccount $channeledAccountEntity
-     * @param array $channeledCampaignMap
-     * @param array $channeledAdGroupMap
-     * @return array
-     * @throws GuzzleException
-     * @throws \Doctrine\DBAL\Exception
-     * @throws Exception
-     */
-    private static function fetchAdAccountAds(
-        FacebookGraphApi $api,
+    private static function getAdMap(
         EntityManager $manager,
-        LoggerInterface $logger,
         ChanneledAccount $channeledAccountEntity,
-        array $channeledCampaignMap,
-        array $channeledAdGroupMap,
     ): array {
-        $ads = $api->getAds(
-            adAccountId: $channeledAccountEntity->getPlatformId(),
-        );
-
-        // Re-fetch inserted metrics to get correct IDs
-        $adParams = [];
-        $adConditions = [];
-
-        $adFields = ['platformId', 'channeledCampaign_id', 'channeledAdGroup_id'];
-
-        foreach ($ads['data'] as $ad) {
-            $subConditions = [];
-            foreach ($adFields as $field) {
-                if (!isset($channeledAdGroupMap['map'][$ad['adset_id']])) {
-                    Helpers::dumpDebugJson(
-                        [
-                            'ad' => $ad,
-                            'channeledAdGroupMap' => $channeledAdGroupMap,
-                            'channeledCampaignMap' => $channeledCampaignMap,
-                        ]
-                    );
-                }
-                $subConditions[] = "$field = ?";
-                $adParams[] = match($field) {
-                    'platformId' => $ad['id'],
-                    'channeledCampaign_id' => $channeledCampaignMap['map'][$ad['campaign_id']],
-                    'channeledAdGroup_id' => $channeledAdGroupMap['map'][$ad['adset_id']],
-                };
-            }
-            $adConditions[] = '(' . implode(' AND ', $subConditions) . ')';
+        $sql = "SELECT ca.id, ca.platformId, cag.platformId as adGroupPlatformId 
+                FROM channeled_ads ca
+                LEFT JOIN channeled_ad_groups cag ON ca.channeledAdGroup_id = cag.id
+                WHERE ca.channeledAccount_id = ?";
+        $fetched = $manager->getConnection()->executeQuery($sql, [$channeledAccountEntity->getId()])->fetchAllAssociative();
+        $map = [];
+        $mapAdGroup = [];
+        foreach ($fetched as $row) {
+            $map[$row['platformId']] = (int)$row['id'];
+            $mapAdGroup[$row['platformId']] = $row['adGroupPlatformId'];
         }
-
-        $sqlAd = "SELECT id, " . implode(', ', $adFields) . "
-                            FROM channeled_ads
-                            WHERE " . (empty($adConditions) ? '1=0' : implode(' OR ', $adConditions));
-
-        $adMap = MapGenerator::getChanneledAdMap(
-            manager: $manager,
-            sql: $sqlAd,
-            params: $adParams,
-        );
-
-        // Get the list of adsets that need to be inserted
-        $adsToInsert = [];
-        foreach ($ads['data'] as $ad) {
-            $platformId = $ad['id'];
-            if (!isset($adMap[$platformId])) {
-                $adsToInsert[] = [
-                    'name' => $ad['name'],
-                    'platformId' => $platformId,
-                    'channel' => Channel::facebook->value,
-                    'platformCreatedAt' => Carbon::parse($ad['created_time'])->toDateTimeString(),
-                    'status' => CampaignStatus::from($ad['status'])->value,
-                    'channeledCampaign_id' => $channeledCampaignMap['map'][$ad['campaign_id']],
-                    'channeledAdGroup_id' => $channeledAdGroupMap['map'][$ad['adset_id']],
-                    'data' => json_encode($ad),
-                    'key' => $platformId,
-                ];
-            }
-        }
-
-        if (!empty($adsToInsert)) {
-            $insertParams = [];
-            foreach ($adsToInsert as $row) {
-                $insertParams[] = $row['name'];
-                $insertParams[] = $row['platformId'];
-                $insertParams[] = $row['channel'];
-                $insertParams[] = $row['platformCreatedAt'];
-                $insertParams[] = $row['status'];
-                $insertParams[] = $row['channeledCampaign_id'];
-                $insertParams[] = $row['channeledAdGroup_id'];
-                $insertParams[] = $row['data'];
-            }
-            // $logger->info("Inserting " . count($metricsToInsert) . " new metrics");
-            $manager->getConnection()->executeStatement(
-                'INSERT INTO channeled_ads (name, platformId, channel, platformCreatedAt, status, channeledCampaign_id, channeledAdGroup_id, data)
-                     VALUES ' . implode(', ', array_fill(0, count($adsToInsert), '(?, ?, ?, ?, ?, ?, ?, ?)')),
-                $insertParams
-            );
-
-            // Re-fetch inserted metrics to get correct IDs
-            $reFetchAdParams = [];
-            $adConditions = [];
-
-            $adFields = ['platformId', 'channeledCampaign_id', 'channeledAdGroup_id'];
-
-            foreach ($ads['data'] as $ad) {
-                $subConditions = [];
-                foreach ($adFields as $field) {
-                    $subConditions[] = "$field = ?";
-                    $reFetchAdParams[] = match($field) {
-                        'platformId' => $ad['id'],
-                        'channeledCampaign_id' => $channeledCampaignMap['map'][$ad['campaign_id']],
-                        'channeledAdGroup_id' => $channeledAdGroupMap['map'][$ad['adset_id']],
-                    };
-                }
-                $adConditions[] = '(' . implode(' AND ', $subConditions) . ')';
-            }
-
-            $reFetchAdSql = "SELECT id, " . implode(', ', $adFields) . "
-                            FROM channeled_ads
-                            WHERE " . (empty($adConditions) ? '1=0' : implode(' OR ', $adConditions));
-
-            $channeledAds = $manager->getConnection()->executeQuery($reFetchAdSql, $reFetchAdParams)->fetchAllAssociative();
-
-            foreach ($channeledAds as $newAd) {
-                $adMap[$newAd['platformId']] = $newAd['id'];
-            }
-        }
-
         return [
-            'map' => $adMap,
-            'mapCampaign' => array_column($ads['data'], 'campaign_id', 'id'),
-            'mapAdGroup' => array_column($ads['data'], 'adset_id', 'id'),
-            'mapReverse' => array_flip($adMap),
+            'map' => $map,
+            'mapReverse' => array_flip($map),
+            'mapAdGroup' => $mapAdGroup,
         ];
     }
+
 
     /**
      * Processes a single site, including page lookup and data fetching.
@@ -2694,7 +2239,7 @@ class MetricRequests
                 return false;
             }
 
-            $metrics = FacebookGraphConvert::pageMetrics(
+            $metrics = FacebookOrganicMetricConvert::pageMetrics(
                 rows: $rows['data'],
                 postPlatformId: $postEntity->getPostId(),
                 logger: $logger,
@@ -3367,7 +2912,7 @@ class MetricRequests
      * @throws OptimisticLockException
      * @throws \Doctrine\DBAL\Exception
      */
-    public static function process(ArrayCollection $channeledCollection, LoggerInterface $logger = null): Response
+    public static function process(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response
     {
         $manager = Helpers::getManager();
         $repos = self::initializeRepositories($manager);
@@ -3381,8 +2926,7 @@ class MetricRequests
         $dimensionCache = [];
 
         if (!$logger) {
-            $logger = new Logger('gsc');
-            $logger->pushHandler(new StreamHandler('logs/gsc.log', Level::Info));
+            $logger = Helpers::setLogger('gsc.log');
         }
         $logger->info("Starting process with " . $channeledCollection->count() . " metrics");
 
@@ -4168,5 +3712,547 @@ class MetricRequests
             ];
         }
         return $dimensionFilterGroups;
+    }
+
+    private static function processCampaignsBulk(
+        FacebookGraphApi $api,
+        EntityManager $manager,
+        ChanneledAccount $channeledAccountEntity,
+        LoggerInterface $logger,
+        ?string $startDate,
+        ?string $endDate,
+        array $channeledCampaignMap,
+        array $campaignMap,
+        ?int $jobId = null
+    ): bool {
+        $campaignPlatformIds = array_values($channeledCampaignMap['mapReverse']);
+        if (empty($campaignPlatformIds)) {
+            return true;
+        }
+
+        $additionalParams = [];
+        if ($startDate && $endDate) {
+            $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
+        }
+
+        try {
+            $campaignPlatformIdChunks = array_chunk($campaignPlatformIds, 50);
+            $allRows = [];
+
+            foreach ($campaignPlatformIdChunks as $chunk) {
+                try {
+                    $rows = $api->getCampaignInsightsFromAdAccount(
+                        adAccountId: $channeledAccountEntity->getPlatformId(),
+                        campaignIds: $chunk,
+                        limit: 100,
+                        metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
+                        additionalParams: $additionalParams,
+                        metricSet: MetricSet::KEY,
+                    );
+                    if (isset($rows['data']) && is_array($rows['data'])) {
+                        $allRows = array_merge($allRows, $rows['data']);
+                    }
+                } catch (Exception $e) {
+                    $logger->error("Error fetching campaign insights chunk: " . $e->getMessage());
+                    if (str_contains($e->getMessage(), 'request limit reached')) {
+                        throw new FacebookRateLimitException($e->getMessage());
+                    }
+                }
+            }
+
+            $logger->info("Fetched " . count($allRows) . " bulk rows for campaigns in Ad Account " . $channeledAccountEntity->getPlatformId());
+
+            if (count($allRows) === 0) {
+                $logger->info("No bulk rows found for campaigns in Ad Account " . $channeledAccountEntity->getPlatformId());
+                return false;
+            }
+
+            $groupedRows = [];
+            foreach ($allRows as $row) {
+                $groupedRows[$row['campaign_id']][] = $row;
+            }
+
+            $campaignRepository = $manager->getRepository(Campaign::class);
+            $channeledCampaignRepository = $manager->getRepository(ChanneledCampaign::class);
+            $globalAllMetrics = new ArrayCollection();
+
+            foreach ($groupedRows as $campaignPlatformId => $campaignRows) {
+                Helpers::checkJobStatus($jobId);
+                $campaignEntity = $campaignRepository->findOneBy(['campaignId' => $campaignPlatformId]);
+                $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignPlatformId]);
+
+                if (!$campaignEntity || !$channeledCampaignEntity) {
+                    continue;
+                }
+
+                $metrics = FacebookMarketingMetricConvert::campaignMetrics(
+                    rows: $campaignRows,
+                    logger: $logger,
+                    channeledAccountEntity: $channeledAccountEntity,
+                    campaignEntity: $campaignEntity,
+                    channeledCampaignEntity: $channeledCampaignEntity,
+                    metricSet: MetricSet::KEY,
+                );
+
+                foreach ($metrics as $metric) {
+                    $metric->channeledAccount = $channeledAccountEntity;
+                    $metric->campaign = $campaignEntity;
+                    $metric->channeledCampaign = $channeledCampaignEntity;
+                    $globalAllMetrics->add($metric);
+                }
+            }
+
+            if (count($globalAllMetrics) > 0) {
+                try {
+                    $manager->getConnection()->beginTransaction();
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
+                        campaignMap: $campaignMap,
+                        channeledCampaignMap: $channeledCampaignMap,
+                    );
+                    $metricMap = MetricsProcessor::processMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricConfigMap: $metricConfigMap,
+                    );
+                    $channeledMetricMap = MetricsProcessor::processChanneledMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        logger: $logger,
+                    );
+                    MetricsProcessor::processChanneledMetricDimensions(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        channeledMetricMap: $channeledMetricMap,
+                        logger: $logger,
+                    );
+                    $manager->getConnection()->commit();
+                } catch (Exception $e) {
+                    if ($manager->getConnection()->isTransactionActive()) {
+                        $manager->getConnection()->rollback();
+                    }
+                    throw $e;
+                }
+            }
+            $logger->info("Completed bulk Meta ad account's campaign insights request");
+            return true;
+        } catch (Exception $e) {
+            $logger->error("Error during bulk Meta account's campaign insights request: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    private static function processAdsetsBulk(
+        FacebookGraphApi $api,
+        EntityManager $manager,
+        ChanneledAccount $channeledAccountEntity,
+        LoggerInterface $logger,
+        ?string $startDate,
+        ?string $endDate,
+        array $campaignMap,
+        array $channeledCampaignMap,
+        array $channeledAdGroupMap,
+        ?int $jobId = null
+    ): bool {
+        $adsetPlatformIds = array_keys($channeledAdGroupMap['mapCampaign']);
+        if (empty($adsetPlatformIds)) {
+            return true;
+        }
+
+        $additionalParams = [];
+        if ($startDate && $endDate) {
+            $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
+        }
+
+        try {
+            $adsetPlatformIdChunks = array_chunk($adsetPlatformIds, 50);
+            $allRows = [];
+
+            foreach ($adsetPlatformIdChunks as $chunk) {
+                try {
+                    $rows = $api->getAdsetInsightsFromAdAccount(
+                        adAccountId: $channeledAccountEntity->getPlatformId(),
+                        adsetIds: $chunk,
+                        limit: 100,
+                        metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
+                        additionalParams: $additionalParams,
+                        metricSet: MetricSet::KEY,
+                    );
+                    if (isset($rows['data']) && is_array($rows['data'])) {
+                        $allRows = array_merge($allRows, $rows['data']);
+                    }
+                } catch (Exception $e) {
+                    $logger->error("Error fetching adset insights chunk: " . $e->getMessage());
+                    if (str_contains($e->getMessage(), 'request limit reached')) {
+                        throw new FacebookRateLimitException($e->getMessage());
+                    }
+                }
+            }
+
+            $logger->info("Fetched " . count($allRows) . " bulk rows for adsets in Ad Account " . $channeledAccountEntity->getPlatformId());
+
+            if (count($allRows) === 0) {
+                $logger->info("No bulk rows found for adsets in Ad Account " . $channeledAccountEntity->getPlatformId());
+                return false;
+            }
+
+            $groupedRows = [];
+            foreach ($allRows as $row) {
+                $groupedRows[$row['adset_id']][] = $row;
+            }
+
+            $campaignRepository = $manager->getRepository(Campaign::class);
+            $channeledCampaignRepository = $manager->getRepository(ChanneledCampaign::class);
+            $channeledAdGroupRepository = $manager->getRepository(ChanneledAdGroup::class);
+            $globalAllMetrics = new ArrayCollection();
+
+            foreach ($groupedRows as $adsetPlatformId => $adsetRows) {
+                Helpers::checkJobStatus($jobId);
+                $campaignId = $channeledAdGroupMap['mapCampaign'][$adsetPlatformId];
+                $campaignEntity = $campaignRepository->findOneBy(['campaignId' => $campaignId]);
+                $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignId]);
+                $channeledAdGroupEntity = $channeledAdGroupRepository->findOneBy(['platformId' => $adsetPlatformId]);
+
+                if (!$campaignEntity || !$channeledCampaignEntity || !$channeledAdGroupEntity) {
+                    continue;
+                }
+
+                $metrics = FacebookMarketingMetricConvert::adsetMetrics(
+                    rows: $adsetRows,
+                    logger: $logger,
+                    channeledAccountEntity: $channeledAccountEntity,
+                    campaignEntity: $campaignEntity,
+                    channeledCampaignEntity: $channeledCampaignEntity,
+                    channeledAdGroupEntity: $channeledAdGroupEntity,
+                    metricSet: MetricSet::KEY,
+                );
+
+                foreach ($metrics as $metric) {
+                    $metric->channeledAccount = $channeledAccountEntity;
+                    $metric->campaign = $campaignEntity;
+                    $metric->channeledCampaign = $channeledCampaignEntity;
+                    $metric->channeledAdGroup = $channeledAdGroupEntity;
+                    $globalAllMetrics->add($metric);
+                }
+            }
+
+            if (count($globalAllMetrics) > 0) {
+                try {
+                    $manager->getConnection()->beginTransaction();
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
+                        campaignMap: $campaignMap,
+                        channeledCampaignMap: $channeledCampaignMap,
+                        channeledAdGroupMap: $channeledAdGroupMap,
+                    );
+                    $metricMap = MetricsProcessor::processMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricConfigMap: $metricConfigMap,
+                    );
+                    $channeledMetricMap = MetricsProcessor::processChanneledMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        logger: $logger,
+                    );
+                    MetricsProcessor::processChanneledMetricDimensions(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        channeledMetricMap: $channeledMetricMap,
+                        logger: $logger,
+                    );
+                    $manager->getConnection()->commit();
+                } catch (Exception $e) {
+                    if ($manager->getConnection()->isTransactionActive()) {
+                        $manager->getConnection()->rollback();
+                    }
+                    throw $e;
+                }
+            }
+            $logger->info("Completed bulk Meta ad account's adset insights request");
+            return true;
+        } catch (Exception $e) {
+            $logger->error("Error during bulk Meta account's adset insights request: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    private static function processAdsBulk(
+        FacebookGraphApi $api,
+        EntityManager $manager,
+        ChanneledAccount $channeledAccountEntity,
+        LoggerInterface $logger,
+        ?string $startDate,
+        ?string $endDate,
+        array $campaignMap,
+        array $channeledCampaignMap,
+        array $channeledAdGroupMap,
+        array $channeledAdMap,
+        ?int $jobId = null
+    ): bool {
+        $adPlatformIds = array_keys($channeledAdMap['mapAdGroup']);
+        if (empty($adPlatformIds)) {
+            return true;
+        }
+
+        $additionalParams = [];
+        if ($startDate && $endDate) {
+            $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
+        }
+
+        $adPlatformIdChunks = array_chunk($adPlatformIds, 50);
+        $allRows = [];
+
+        foreach ($adPlatformIdChunks as $chunk) {
+            try {
+                $rows = $api->getAdInsightsFromAdAccount(
+                    adAccountId: $channeledAccountEntity->getPlatformId(),
+                    adIds: $chunk,
+                    limit: 100,
+                    metricBreakdown: [],
+                    additionalParams: $additionalParams,
+                    metricSet: MetricSet::KEY,
+                );
+                if (isset($rows['data']) && is_array($rows['data'])) {
+                    $allRows = array_merge($allRows, $rows['data']);
+                }
+                } catch (Exception $e) {
+                    $logger->error("Error fetching ad insights chunk: " . $e->getMessage());
+                    if (str_contains($e->getMessage(), 'request limit reached')) {
+                        throw new FacebookRateLimitException($e->getMessage());
+                    }
+                }
+        }
+
+        $logger->info("Fetched " . count($allRows) . " bulk rows for ads in Ad Account " . $channeledAccountEntity->getPlatformId());
+
+        if (count($allRows) === 0) {
+            $logger->info("No bulk rows found for ads in Ad Account " . $channeledAccountEntity->getPlatformId());
+            return false;
+        }
+
+        $groupedRows = [];
+        foreach ($allRows as $row) {
+            $groupedRows[$row['ad_id']][] = $row;
+        }
+
+        try {
+            $campaignRepository = $manager->getRepository(Campaign::class);
+            $channeledCampaignRepository = $manager->getRepository(ChanneledCampaign::class);
+            $channeledAdGroupRepository = $manager->getRepository(ChanneledAdGroup::class);
+            $channeledAdRepository = $manager->getRepository(ChanneledAd::class);
+            $globalAllMetrics = new ArrayCollection();
+
+            foreach ($groupedRows as $adPlatformId => $adRows) {
+                Helpers::checkJobStatus($jobId);
+                $adgroupId = $channeledAdMap['mapAdGroup'][$adPlatformId];
+                $campaignId = $channeledAdGroupMap['mapCampaign'][$adgroupId];
+
+                $campaignEntity = $campaignRepository->findOneBy(['campaignId' => $campaignId]);
+                $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignId]);
+                $channeledAdGroupEntity = $channeledAdGroupRepository->findOneBy(['platformId' => $adgroupId]);
+                $channeledAdEntity = $channeledAdRepository->findOneBy(['platformId' => $adPlatformId]);
+
+                if (!$campaignEntity || !$channeledCampaignEntity || !$channeledAdGroupEntity || !$channeledAdEntity) {
+                    continue;
+                }
+
+                $metrics = FacebookMarketingMetricConvert::adMetrics(
+                    rows: $adRows,
+                    logger: $logger,
+                    channeledAccountEntity: $channeledAccountEntity,
+                    campaignEntity: $campaignEntity,
+                    channeledCampaignEntity: $channeledCampaignEntity,
+                    channeledAdGroupEntity: $channeledAdGroupEntity,
+                    channeledAdEntity: $channeledAdEntity,
+                    metricSet: MetricSet::KEY,
+                );
+
+                foreach ($metrics as $metric) {
+                    $metric->channeledAccount = $channeledAccountEntity;
+                    $metric->campaign = $campaignEntity;
+                    $metric->channeledCampaign = $channeledCampaignEntity;
+                    $metric->channeledAdGroup = $channeledAdGroupEntity;
+                    $metric->channeledAd = $channeledAdEntity;
+                    $globalAllMetrics->add($metric);
+                }
+            }
+
+            if (count($globalAllMetrics) > 0) {
+                try {
+                    $manager->getConnection()->beginTransaction();
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
+                        campaignMap: $campaignMap,
+                        channeledCampaignMap: $channeledCampaignMap,
+                        channeledAdGroupMap: $channeledAdGroupMap,
+                        channeledAdMap: $channeledAdMap,
+                    );
+                    $metricMap = MetricsProcessor::processMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricConfigMap: $metricConfigMap,
+                    );
+                    $channeledMetricMap = MetricsProcessor::processChanneledMetrics(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        logger: $logger,
+                    );
+                    MetricsProcessor::processChanneledMetricDimensions(
+                        metrics: $globalAllMetrics,
+                        manager: $manager,
+                        metricMap: $metricMap,
+                        channeledMetricMap: $channeledMetricMap,
+                        logger: $logger,
+                    );
+                    $manager->getConnection()->commit();
+                } catch (Exception $e) {
+                    if ($manager->getConnection()->isTransactionActive()) {
+                        $manager->getConnection()->rollback();
+                    }
+                    throw $e;
+                }
+            }
+            $logger->info("Completed bulk Meta ad account's ad insights request");
+            return true;
+        } catch (Exception $e) {
+            $logger->error("Error during bulk Meta account's ad insights request: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * @param FacebookGraphApi $api
+     * @param EntityManager $manager
+     * @param ChanneledAccount $channeledAccountEntity
+     * @param LoggerInterface $logger
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param int|null $jobId
+     * @return bool
+     * @throws Exception
+     */
+    private static function processCreativesBulk(
+        FacebookGraphApi $api,
+        EntityManager $manager,
+        ChanneledAccount $channeledAccountEntity,
+        LoggerInterface $logger,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?int $jobId = null,
+    ): bool {
+        $logger->info("Starting processCreativesBulk for ad account: " . $channeledAccountEntity->getPlatformId());
+        try {
+            $adAccountId = $channeledAccountEntity->getPlatformId();
+            
+            /** @var \Repositories\CreativeRepository $creativeRepository */
+            $creativeRepository = $manager->getRepository(Creative::class);
+            
+            $qb = $manager->createQueryBuilder();
+            $qb->select('DISTINCT c')
+                ->from(Creative::class, 'c')
+                ->join('c.channeledAds', 'ca')
+                ->where('ca.channeledAccount = :channeledAccount')
+                ->setParameter('channeledAccount', $channeledAccountEntity);
+                
+            $creatives = $qb->getQuery()->getResult();
+            $logger->info("Found " . count($creatives) . " creatives for account in DB");
+            $creativesMap = [];
+            foreach ($creatives as $creative) {
+                $creativesMap[$creative->getCreativeId()] = $creative;
+            }
+
+            $additionalParams = [
+                'breakdowns' => 'ad_creative_id',
+                'limit' => 100,
+            ];
+            if ($startDate) {
+                $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
+            }
+            
+            $insights = $api->getAdAccountInsights(
+                adAccountId: $adAccountId,
+                additionalParams: $additionalParams,
+                metricSet: MetricSet::FULL
+            );
+
+            $groupedRows = [];
+            foreach ($insights['data'] as $row) {
+                if (isset($row['ad_creative_id'])) {
+                    $groupedRows[$row['ad_creative_id']][] = $row;
+                }
+            }
+            $logger->info("Fetched insights for " . count($groupedRows) . " unique creatives");
+
+            $totalMetricsCount = 0;
+            foreach ($groupedRows as $creativePlatformId => $rows) {
+                Helpers::checkJobStatus($jobId);
+                
+                $creative = $creativesMap[$creativePlatformId] ?? null;
+                if (!$creative) {
+                    continue;
+                }
+
+                $metrics = FacebookMarketingMetricConvert::creativeMetrics(
+                    rows: $rows,
+                    logger: $logger,
+                    channeledAccountEntity: $channeledAccountEntity,
+                    creativeEntity: $creative,
+                    metricSet: MetricSet::FULL
+                );
+                
+                if ($metrics->count() > 0) {
+                    try {
+                        $manager->getConnection()->beginTransaction();
+                        $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                            metrics: $metrics,
+                            manager: $manager,
+                            channeledAccountMap: [
+                                'map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()],
+                                'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]
+                            ],
+                            creativeMap: [
+                                'map' => [$creative->getCreativeId() => $creative->getId()],
+                                'mapReverse' => [$creative->getId() => $creative->getCreativeId()]
+                            ]
+                        );
+                        $metricMap = MetricsProcessor::processMetrics(
+                            metrics: $metrics,
+                            manager: $manager,
+                            metricConfigMap: $metricConfigMap,
+                        );
+                        MetricsProcessor::processChanneledMetrics(
+                            metrics: $metrics,
+                            manager: $manager,
+                            metricMap: $metricMap,
+                            logger: $logger,
+                        );
+                        $manager->getConnection()->commit();
+                    } catch (Exception $e) {
+                        if ($manager->getConnection()->isTransactionActive()) {
+                            $manager->getConnection()->rollback();
+                        }
+                        throw $e;
+                    }
+                    $totalMetricsCount += $metrics->count();
+                }
+            }
+            $logger->info("Completed bulk Meta account's creative insights request: $totalMetricsCount metrics");
+            return true;
+        } catch (Exception $e) {
+            $logger->error("Error during bulk Meta account's creative insights request: " . $e->getMessage());
+            throw $e;
+        }
     }
 }

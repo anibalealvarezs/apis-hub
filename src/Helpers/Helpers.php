@@ -18,6 +18,11 @@ use ReflectionObject;
 use ReflectionProperty;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
+use Monolog\Handler\StreamHandler;
+use Monolog\Handler\NullHandler;
+use Monolog\Level;
+use Monolog\Logger;
+use Psr\Log\LoggerInterface;
 
 class Helpers
 {
@@ -32,29 +37,88 @@ class Helpers
     /**
      * @return array
      */
+    /**
+     * @return array
+     * @throws \Exceptions\ConfigurationException
+     */
     public static function getProjectConfig(): array
     {
-        if (self::$projectConfig === null) {
-            $projectConfigFile = getenv('PROJECT_CONFIG_FILE') ?: __DIR__ . '/../../deploy/project.yaml';
-            if ($projectConfigFile && file_exists($projectConfigFile)) {
-                try {
-                    $content = file_get_contents($projectConfigFile);
-                    // Interpolate environment variables: ${VAR:-default}
-                    $content = preg_replace_callback('/\$\{([^}:]+)(?::-([^}]+))?\}/', function($matches) {
-                        $envValue = getenv($matches[1]);
-                        return ($envValue !== false && $envValue !== '') ? $envValue : ($matches[2] ?? $matches[0]);
-                    }, $content);
+        if (self::$projectConfig !== null) {
+            return self::$projectConfig;
+        }
 
-                    $config = Yaml::parse($content);
-                    self::$projectConfig = is_array($config) ? $config : [];
-                } catch (Exception) {
-                    self::$projectConfig = [];
-                }
-            } else {
-                self::$projectConfig = [];
+        $config = [];
+        $rootConfigDir = __DIR__ . '/../../config';
+
+        // 0. Safeguard: Check for mandatory configuration files
+        $mandatoryFiles = ['database.yaml', 'security.yaml', 'app.yaml'];
+        $missing = [];
+        foreach ($mandatoryFiles as $mFile) {
+            if (!file_exists($rootConfigDir . '/' . $mFile)) {
+                $missing[] = $mFile;
             }
         }
-        return self::$projectConfig;
+
+        if (!empty($missing)) {
+            $fileList = implode(', ', $missing);
+            throw new \Exceptions\ConfigurationException(
+                "Critical configuration files are missing: $fileList. " .
+                "Please copy them from their .example templates in the config/ directory."
+            );
+        }
+
+        // 1. Load all split config files from config/
+        if (is_dir($rootConfigDir)) {
+            $files = self::globRecursive($rootConfigDir . '/*.yaml');
+            foreach ($files as $file) {
+                $fileConfig = self::loadYamlFile($file);
+                $config = array_replace_recursive($config, $fileConfig);
+            }
+        }
+
+        // 2. Load environment-specific override if PROJECT_CONFIG_FILE is set
+        $envFile = getenv('PROJECT_CONFIG_FILE');
+        if ($envFile && file_exists($envFile)) {
+            $legacyConfig = self::loadYamlFile($envFile);
+            $config = array_replace_recursive($config, $legacyConfig);
+        }
+
+        return self::$projectConfig = is_array($config) ? $config : [];
+    }
+
+    /**
+     * @param string $file
+     * @return array
+     */
+    private static function loadYamlFile(string $file): array
+    {
+        try {
+            $content = file_get_contents($file);
+            // Interpolate environment variables: ${VAR:-default}
+            $content = preg_replace_callback('/\$\{([^}:]+)(?::-([^}]+))?\}/', function($matches) {
+                $envValue = getenv($matches[1]);
+                return ($envValue !== false && $envValue !== '') ? $envValue : ($matches[2] ?? $matches[0]);
+            }, $content);
+
+            $parsed = Yaml::parse($content);
+            return is_array($parsed) ? $parsed : [];
+        } catch (Exception) {
+            return [];
+        }
+    }
+
+    /**
+     * @param string $pattern
+     * @param int $flags
+     * @return array
+     */
+    private static function globRecursive(string $pattern, int $flags = 0): array
+    {
+        $files = glob($pattern, $flags);
+        foreach (glob(dirname($pattern) . '/*', GLOB_ONLYDIR | GLOB_NOSORT) as $dir) {
+            $files = array_merge($files, self::globRecursive($dir . '/' . basename($pattern), $flags));
+        }
+        return $files;
     }
 
     /**
@@ -65,6 +129,15 @@ class Helpers
         $config = self::getProjectConfig();
         $timezone = $config['timezone'] ?? 'UTC';
         date_default_timezone_set($timezone);
+    }
+
+    /**
+     * @return bool
+     */
+    public static function isDebug(): bool
+    {
+        $config = self::getProjectConfig();
+        return (bool) ($config['debug'] ?? false);
     }
     /**
      * @return array
@@ -138,6 +211,10 @@ class Helpers
                 $config['user'] = getenv('DB_USER') ?: ($baseConfig['user'] ?? 'root');
                 $config['password'] = getenv('DB_PASSWORD') !== false ? getenv('DB_PASSWORD') : ($baseConfig['password'] ?? '');
                 $config['dbname'] = getenv('DB_NAME') ?: ($baseConfig['name'] ?? 'apis-hub');
+                $config['charset'] = 'utf8mb4';
+                $config['driverOptions'] = [
+                    1002 => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci' // PDO::MYSQL_ATTR_INIT_COMMAND
+                ];
 
                 self::$dbConfig = $config;
             } catch (Exception $e) {
@@ -199,6 +276,25 @@ class Helpers
                     }
                 }
 
+                // Normalize relative paths to project root to avoid CWD issues
+                $rootPath = dirname(__DIR__, 2);
+                $resolvePath = function($path) use ($rootPath) {
+                    if (is_string($path) && str_starts_with($path, './')) {
+                        return $rootPath . substr($path, 1);
+                    }
+                    return $path;
+                };
+
+                if (isset($config['google']['token_path'])) {
+                    $config['google']['token_path'] = $resolvePath($config['google']['token_path']);
+                }
+                if (isset($config['google_search_console']['token_path'])) {
+                    $config['google_search_console']['token_path'] = $resolvePath($config['google_search_console']['token_path']);
+                }
+                if (isset($config['facebook']['graph_token_path'])) {
+                    $config['facebook']['graph_token_path'] = $resolvePath($config['facebook']['graph_token_path']);
+                }
+
                 self::$channelsConfig = $config;
             } catch (Exception $e) {
                 throw new RuntimeException("Failed to load channels configuration: " . $e->getMessage());
@@ -213,7 +309,7 @@ class Helpers
     public static function getEntitiesConfig(): array
     {
         if (self::$entitiesConfig === null) {
-            $filePath = __DIR__ . '/../../config/yaml/entitiesconfig.yaml';
+            $filePath = __DIR__ . '/../../config/entitiesconfig.yaml';
             try {
                 if (!file_exists($filePath)) {
                     throw new RuntimeException("Entities configuration file not found: $filePath");
@@ -332,9 +428,6 @@ class Helpers
             try {
                 $config = self::getDbConfig();
                 $connection = DriverManager::getConnection($config);
-
-                // Set connection charset and collation
-                $connection->executeStatement("SET NAMES utf8mb4 COLLATE utf8mb4_bin");
 
                 // Create attribute metadata configuration
                 $ormConfig = ORMSetup::createAttributeMetadataConfiguration(
@@ -562,6 +655,85 @@ class Helpers
 
         if ($status == \Enums\JobStatus::failed->value || $status == \Enums\JobStatus::cancelled->value) {
             throw new \Exceptions\JobCancelledException("El Job #{$jobId} fue interrumpido o cancelado manualmente.");
+        }
+    }
+
+    /**
+     * @param string $level
+     * @return Level
+     */
+    public static function getLogLevel(string $level): Level
+    {
+        return match (strtolower($level)) {
+            'debug'     => Level::Debug,
+            'info'      => Level::Info,
+            'notice'    => Level::Notice,
+            'warning'   => Level::Warning,
+            'error'     => Level::Error,
+            'critical'  => Level::Critical,
+            'alert'     => Level::Alert,
+            'emergency' => Level::Emergency,
+            default     => Level::Info,
+        };
+    }
+
+    /**
+     * @param string $filename
+     * @param Level|int|string|null $level
+     * @return LoggerInterface
+     */
+    public static function setLogger(string $filename, Level|int|string|null $level = null): LoggerInterface
+    {
+        $projectConfig = self::getProjectConfig();
+        $logConfig = $projectConfig['logging'] ?? [];
+        $enabled = (bool) ($logConfig['enabled'] ?? true);
+        
+        $name = str_replace('.log', '', $filename);
+        $logger = new Logger($name);
+
+        if (!$enabled) {
+            $logger->pushHandler(new NullHandler());
+            return $logger;
+        }
+
+        // Determine base level from config
+        $configLevelStr = self::isDebug() 
+            ? ($logConfig['level'] ?? 'info') 
+            : ($logConfig['prod_level'] ?? 'error');
+            
+        $baseLevel = self::getLogLevel($configLevelStr);
+
+        // If a specific level was requested, we respect it if it's more restrictive
+        // or if debug is on.
+        if ($level !== null) {
+            $requested = ($level instanceof Level) 
+                ? $level 
+                : (is_int($level) ? Level::from($level) : self::getLogLevel($level));
+            
+            // In non-debug mode, we don't allow logging below the prod_level
+            if (!self::isDebug() && $requested->value < $baseLevel->value) {
+                $requested = $baseLevel;
+            }
+            $finalLevel = $requested;
+        } else {
+            $finalLevel = $baseLevel;
+        }
+
+        $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/' . $filename, $finalLevel));
+        return $logger;
+    }
+
+    /**
+     * @param EntityManager $em
+     * @return void
+     */
+    public static function reconnectIfNeeded(EntityManager $em): void
+    {
+        try {
+            $em->getConnection()->executeQuery('SELECT 1');
+        } catch (Exception $e) {
+            $em->getConnection()->close();
+            $em->getConnection()->connect();
         }
     }
 }

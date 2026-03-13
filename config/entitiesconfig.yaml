@@ -1,3 +1,115 @@
+account:
+  class: Entities\Analytics\Account
+  channeled_class: Entities\Analytics\Channeled\ChanneledAccount
+  crud_enabled: true
+  repository_class: Repositories\AccountRepository
+  repository_methods:
+    getByName:
+      parameters:
+        - name
+      return_type: Entities\Entity
+    existsByName:
+      parameters:
+        - name
+      return_type: bool
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+        - startDate
+        - endDate
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+        - startDate
+        - endDate
+        - extra
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
 campaign:
   class: Entities\Analytics\Campaign
   channeled_class: Entities\Analytics\Channeled\ChanneledCampaign
@@ -17,6 +129,18 @@ campaign:
       parameters:
         - campaignId
       return_type: bool
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     read:
       parameters:
         - id
@@ -29,6 +153,8 @@ campaign:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -38,6 +164,142 @@ campaign:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+channeled_account:
+  class: Entities\Analytics\Channeled\ChanneledAccount
+  crud_enabled: true
+  repository_class: Repositories\Channeled\ChanneledAccountRepository
+  repository_methods:
+    getByNameAndType:
+      parameters:
+        - name
+        - channel
+        - type
+      return_type: Entities\Entity
+    existsByNameAndType:
+      parameters:
+        - name
+        - channel
+        - type
+      return_type: bool
+    getByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: Entities\Entity
+    existsByPlatformId:
+      parameters:
+        - platformId
+        - channel
+      return_type: bool
+    countElements:
+      parameters:
+        - filters
+        - startDate
+        - endDate
+      return_type: int
+    getLastByPlatformId:
+      parameters:
+        - channel
+      return_type: array
+    getLastByPlatformCreatedAt:
+      parameters:
+        - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -116,6 +378,8 @@ channeled_ad:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -124,6 +388,18 @@ channeled_ad:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     read:
       parameters:
@@ -142,6 +418,9 @@ channeled_ad:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -220,6 +499,8 @@ channeled_ad_group:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -228,6 +509,18 @@ channeled_ad_group:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     read:
       parameters:
@@ -246,6 +539,9 @@ channeled_ad_group:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -324,6 +620,8 @@ channeled_campaign:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -332,6 +630,18 @@ channeled_campaign:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     read:
       parameters:
@@ -350,6 +660,9 @@ channeled_campaign:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -433,6 +746,8 @@ channeled_customer:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -441,6 +756,18 @@ channeled_customer:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     create:
       parameters:
@@ -464,6 +791,9 @@ channeled_customer:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -547,6 +877,8 @@ channeled_discount:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -555,6 +887,18 @@ channeled_discount:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     create:
       parameters:
@@ -578,6 +922,9 @@ channeled_discount:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -638,16 +985,37 @@ channeled_metric:
   crud_enabled: true
   repository_class: Repositories\Channeled\ChanneledMetricRepository
   repository_methods:
+    setIncludeRawData:
+      parameters:
+        - include
+      return_type: static
     create:
       parameters:
         - data
         - returnEntity
-      return_type: Entities\Analytics\Channeled\ChanneledMetric
+      return_type: Entities\Analytics\Channeled\ChanneledMetric|array|null
     findByDimension:
       parameters:
         - channel
         - key
         - value
+      return_type: array
+    getByPlatformIdAndMetric:
+      parameters:
+        - platformId
+        - channel
+        - metric
+      return_type: Entities\Entity
+    existsByPlatformIdAndMetric:
+      parameters:
+        - platformId
+        - channel
+        - metric
+      return_type: bool
+    getLastByPlatformCreatedAtForSite:
+      parameters:
+        - channel
+        - siteKey
       return_type: array
     getByPlatformId:
       parameters:
@@ -662,6 +1030,8 @@ channeled_metric:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -670,6 +1040,18 @@ channeled_metric:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     read:
       parameters:
@@ -688,6 +1070,9 @@ channeled_metric:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -753,11 +1138,28 @@ channeled_metric_dimension:
         - data
         - returnEntity
       return_type: Entities\Entity|array|null
+    existsByKeyAndValue:
+      parameters:
+        - key
+        - value
+      return_type: bool
+    existsByKeyValueAndMetric:
+      parameters:
+        - key
+        - value
+        - channeledMetric
+      return_type: bool
     findByKeyAndValue:
       parameters:
         - key
         - value
       return_type: array
+    findOneByKeyValueAndMetric:
+      parameters:
+        - dimensionKey
+        - dimensionValue
+        - channeledMetric
+      return_type: Entities\Analytics\Channeled\ChanneledMetricDimension
     findByChanneledMetric:
       parameters:
         - channeledMetric
@@ -767,27 +1169,17 @@ channeled_metric_dimension:
         - key
         - channel
       return_type: array
-    getByPlatformId:
+    setHideFields:
       parameters:
-        - platformId
-        - channel
-      return_type: Entities\Entity
-    existsByPlatformId:
+        - fields
+      return_type: static
+    aggregate:
       parameters:
-        - platformId
-        - channel
-      return_type: bool
-    countElements:
-      parameters:
+        - aggregations
+        - groupBy
         - filters
-      return_type: int
-    getLastByPlatformId:
-      parameters:
-        - channel
-      return_type: array
-    getLastByPlatformCreatedAt:
-      parameters:
-        - channel
+        - startDate
+        - endDate
       return_type: array
     read:
       parameters:
@@ -798,6 +1190,12 @@ channeled_metric_dimension:
     getCount:
       parameters: {  }
       return_type: int
+    countElements:
+      parameters:
+        - filters
+        - startDate
+        - endDate
+      return_type: int
     readMultiple:
       parameters:
         - limit
@@ -806,6 +1204,9 @@ channeled_metric_dimension:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -879,6 +1280,8 @@ channeled_order:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -887,6 +1290,18 @@ channeled_order:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     create:
       parameters:
@@ -910,6 +1325,9 @@ channeled_order:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -983,6 +1401,8 @@ channeled_price_rule:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -991,6 +1411,18 @@ channeled_price_rule:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     create:
       parameters:
@@ -1014,6 +1446,9 @@ channeled_price_rule:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -1097,6 +1532,8 @@ channeled_product:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -1105,6 +1542,18 @@ channeled_product:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     create:
       parameters:
@@ -1128,6 +1577,9 @@ channeled_product:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -1201,6 +1653,8 @@ channeled_product_category:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -1209,6 +1663,18 @@ channeled_product_category:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     create:
       parameters:
@@ -1232,6 +1698,9 @@ channeled_product_category:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -1315,6 +1784,8 @@ channeled_product_variant:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -1323,6 +1794,18 @@ channeled_product_variant:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     create:
       parameters:
@@ -1346,6 +1829,9 @@ channeled_product_variant:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -1429,6 +1915,8 @@ channeled_vendor:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     getLastByPlatformId:
       parameters:
@@ -1437,6 +1925,18 @@ channeled_vendor:
     getLastByPlatformCreatedAt:
       parameters:
         - channel
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     create:
       parameters:
@@ -1460,6 +1960,116 @@ channeled_vendor:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+country:
+  class: Entities\Analytics\Country
+  crud_enabled: true
+  repository_class: Repositories\CountryRepository
+  repository_methods:
+    getByCode:
+      parameters:
+        - code
+      return_type: Entities\Entity
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+        - startDate
+        - endDate
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -1548,6 +2158,18 @@ creative:
         - channel
         - limit
       return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     create:
       parameters:
         - data
@@ -1565,6 +2187,8 @@ creative:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -1574,6 +2198,9 @@ creative:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -1648,6 +2275,18 @@ customer:
       parameters:
         - email
       return_type: bool
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     read:
       parameters:
         - id
@@ -1660,6 +2299,8 @@ customer:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -1669,6 +2310,116 @@ customer:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+device:
+  class: Entities\Analytics\Device
+  crud_enabled: true
+  repository_class: Repositories\DeviceRepository
+  repository_methods:
+    getByType:
+      parameters:
+        - type
+      return_type: Entities\Entity
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    countElements:
+      parameters:
+        - filters
+        - startDate
+        - endDate
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -1738,6 +2489,18 @@ discount:
       parameters:
         - code
       return_type: bool
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     create:
       parameters:
         - data
@@ -1755,6 +2518,8 @@ discount:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -1764,6 +2529,9 @@ discount:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -1825,6 +2593,17 @@ metric:
   crud_enabled: true
   repository_class: Repositories\MetricRepository
   repository_methods:
+    create:
+      parameters:
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|null
+    countElements:
+      parameters:
+        - filters
+        - startDate
+        - endDate
+      return_type: int
     existsByChannelAndName:
       parameters:
         - channel
@@ -1854,6 +2633,10 @@ metric:
         - period
         - metricDate
         - dimensions
+        - queryEntity
+        - page
+        - country
+        - device
       return_type: Entities\Analytics\Metric
     findMetricsByPeriodAndDimensions:
       parameters:
@@ -1864,11 +2647,158 @@ metric:
         - end
         - dimensions
       return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
+    read:
+      parameters:
+        - id
+        - returnEntity
+        - filters
+      return_type: Entities\Entity|array|null
+    getCount:
+      parameters: {  }
+      return_type: int
+    readMultiple:
+      parameters:
+        - limit
+        - pagination
+        - ids
+        - filters
+        - orderBy
+        - orderDir
+        - startDate
+        - endDate
+        - extra
+      return_type: Doctrine\Common\Collections\ArrayCollection
+    update:
+      parameters:
+        - id
+        - data
+        - returnEntity
+      return_type: Entities\Entity|array|bool|null
+    delete:
+      parameters:
+        - id
+      return_type: bool
+    createQueryBuilder:
+      parameters:
+        - alias
+        - indexBy
+    createResultSetMappingBuilder:
+      parameters:
+        - alias
+    createNamedQuery:
+      parameters:
+        - queryName
+    createNativeNamedQuery:
+      parameters:
+        - queryName
+    clear:
+      parameters: {  }
+    find:
+      parameters:
+        - id
+        - lockMode
+        - lockVersion
+    findAll:
+      parameters: {  }
+    findBy:
+      parameters:
+        - criteria
+        - orderBy
+        - limit
+        - offset
+    findOneBy:
+      parameters:
+        - criteria
+        - orderBy
+    count:
+      parameters:
+        - criteria
+    __call:
+      parameters:
+        - method
+        - arguments
+    getClassName:
+      parameters: {  }
+    matching:
+      parameters:
+        - criteria
+metric_config:
+  class: Entities\Analytics\MetricConfig
+  crud_enabled: true
+  repository_class: Repositories\MetricConfigRepository
+  repository_methods:
     create:
       parameters:
         - data
         - returnEntity
       return_type: Entities\Entity|array|null
+    existsByChannelAndName:
+      parameters:
+        - channel
+        - name
+        - period
+        - metricDate
+      return_type: bool
+    getByChannelAndName:
+      parameters:
+        - channel
+        - name
+        - period
+        - metricDate
+      return_type: Entities\Analytics\Metric
+    findMetricConfigsByPeriod:
+      parameters:
+        - channel
+        - name
+        - period
+        - start
+        - end
+      return_type: array
+    findByChannelAndDimensions:
+      parameters:
+        - channel
+        - name
+        - period
+        - metricDate
+        - dimensions
+        - queryEntity
+        - page
+        - country
+        - device
+      return_type: Entities\Analytics\Metric
+    findMetricConfigsByPeriodAndDimensions:
+      parameters:
+        - channel
+        - name
+        - period
+        - start
+        - end
+        - dimensions
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     read:
       parameters:
         - id
@@ -1881,6 +2811,8 @@ metric:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -1890,6 +2822,9 @@ metric:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -1959,6 +2894,18 @@ order:
       parameters:
         - orderId
       return_type: bool
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     create:
       parameters:
         - data
@@ -1976,6 +2923,8 @@ order:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -1985,6 +2934,9 @@ order:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -2045,15 +2997,19 @@ page:
   crud_enabled: true
   repository_class: Repositories\PageRepository
   repository_methods:
-    findByUrl:
+    getByUrl:
       parameters:
         - url
       return_type: Entities\Analytics\Page
-    findByTitle:
+    getByTitle:
       parameters:
         - title
         - limit
       return_type: array
+    getByPlatformId:
+      parameters:
+        - platformId
+      return_type: Entities\Analytics\Page
     findByDataAttribute:
       parameters:
         - key
@@ -2070,6 +3026,18 @@ page:
         - value
         - operator
         - limit
+      return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
       return_type: array
     create:
       parameters:
@@ -2088,6 +3056,8 @@ page:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -2097,6 +3067,9 @@ page:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -2178,6 +3151,18 @@ post:
         - operator
         - limit
       return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     create:
       parameters:
         - data
@@ -2195,6 +3180,8 @@ post:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -2204,6 +3191,9 @@ post:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -2265,6 +3255,18 @@ price_rule:
   crud_enabled: true
   repository_class: Repositories\PriceRuleRepository
   repository_methods:
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     create:
       parameters:
         - data
@@ -2282,6 +3284,8 @@ price_rule:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -2291,6 +3295,9 @@ price_rule:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -2368,6 +3375,18 @@ product:
       parameters:
         - sku
       return_type: bool
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     create:
       parameters:
         - data
@@ -2385,6 +3404,8 @@ product:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -2394,6 +3415,9 @@ product:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -2463,6 +3487,18 @@ product_category:
       parameters:
         - productCategoryId
       return_type: bool
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     create:
       parameters:
         - data
@@ -2480,6 +3516,8 @@ product_category:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -2489,6 +3527,9 @@ product_category:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -2566,6 +3607,18 @@ product_variant:
       parameters:
         - sku
       return_type: bool
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     create:
       parameters:
         - data
@@ -2583,6 +3636,8 @@ product_variant:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -2592,6 +3647,9 @@ product_variant:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -2673,6 +3731,18 @@ query:
         - operator
         - limit
       return_type: array
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     create:
       parameters:
         - data
@@ -2690,6 +3760,8 @@ query:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -2699,6 +3771,9 @@ query:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -2768,6 +3843,18 @@ vendor:
       parameters:
         - name
       return_type: bool
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     create:
       parameters:
         - data
@@ -2785,6 +3872,8 @@ vendor:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -2794,6 +3883,9 @@ vendor:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     update:
       parameters:
@@ -2880,6 +3972,22 @@ job:
         - data
         - returnEntity
       return_type: array
+    claimJob:
+      parameters:
+        - id
+      return_type: bool
+    setHideFields:
+      parameters:
+        - fields
+      return_type: static
+    aggregate:
+      parameters:
+        - aggregations
+        - groupBy
+        - filters
+        - startDate
+        - endDate
+      return_type: array
     read:
       parameters:
         - id
@@ -2892,6 +4000,8 @@ job:
     countElements:
       parameters:
         - filters
+        - startDate
+        - endDate
       return_type: int
     readMultiple:
       parameters:
@@ -2901,6 +4011,9 @@ job:
         - filters
         - orderBy
         - orderDir
+        - startDate
+        - endDate
+        - extra
       return_type: Doctrine\Common\Collections\ArrayCollection
     delete:
       parameters:

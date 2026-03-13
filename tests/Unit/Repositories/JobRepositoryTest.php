@@ -412,7 +412,7 @@ class JobRepositoryTest extends TestCase
 
         $result = $this->repository->getJobsByStatus($status);
 
-        $this->assertEquals($expected, $result);
+        $this->assertEquals([$job], $result);
     }
 
     public function testGetJobsByUuid(): void
@@ -454,5 +454,88 @@ class JobRepositoryTest extends TestCase
         $result = $this->repository->update($id, $data);
 
         $this->assertEquals($expectedResult, $result);
+    }
+
+    public function testProcessResultWithCancelledStatus(): void
+    {
+        $data = [
+            'id' => 1,
+            'status' => JobStatus::cancelled->value,
+        ];
+        $expected = [
+            'id' => 1,
+            'status' => 'cancelled',
+        ];
+
+        $reflection = new ReflectionMethod($this->repository, 'processResult');
+        $result = $reflection->invoke($this->repository, $data);
+
+        $this->assertEquals($expected, $result);
+    }
+
+    public function testClaimJob(): void
+    {
+        $id = 123;
+        
+        $expr = $this->createMock(\Doctrine\ORM\Query\Expr::class);
+        $this->queryBuilder->method('expr')->willReturn($expr);
+
+        $this->queryBuilder->expects($this->once())
+            ->method('update')
+            ->with($this->entityName, 'e')
+            ->willReturnSelf();
+            
+        $this->queryBuilder->method('set')->willReturnSelf();
+
+        $this->queryBuilder->expects($this->exactly(4))
+            ->method('setParameter')
+            ->willReturnSelf();
+
+        $this->query->expects($this->once())
+            ->method('execute')
+            ->willReturn(1);
+
+        $result = $this->repository->claimJob($id);
+        
+        $this->assertTrue($result);
+    }
+
+    public function testHasSuccessfulRecentJob(): void
+    {
+        $instanceName = 'test-instance';
+        
+        $this->queryBuilder->expects($this->once())
+            ->method('select')
+            ->with('count(e.id)')
+            ->willReturnSelf();
+            
+        $this->queryBuilder->expects($this->once())
+            ->method('from')
+            ->with($this->entityName, 'e')
+            ->willReturnSelf();
+
+        $this->queryBuilder->expects($this->once())
+            ->method('where')
+            ->with('e.payload LIKE :instance_name_pattern')
+            ->willReturnSelf();
+
+        $this->queryBuilder->expects($this->exactly(2))
+            ->method('andWhere')
+            ->with($this->callback(function ($condition) {
+                return in_array($condition, ['e.status = :completed', 'e.updatedAt >= :since']);
+            }))
+            ->willReturnSelf();
+
+        $this->queryBuilder->expects($this->exactly(3))
+            ->method('setParameter')
+            ->willReturnSelf();
+
+        $this->query->expects($this->once())
+            ->method('getSingleScalarResult')
+            ->willReturn(1);
+
+        $result = $this->repository->hasSuccessfulRecentJob($instanceName);
+        
+        $this->assertTrue($result);
     }
 }

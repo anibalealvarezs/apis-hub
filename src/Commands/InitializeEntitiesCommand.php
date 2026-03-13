@@ -36,9 +36,7 @@ class InitializeEntitiesCommand extends Command
     public function __construct(EntityManagerInterface $entityManager)
     {
         $this->entityManager = $entityManager;
-        $logger = new Logger('initialize-entities');
-        $logger->pushHandler(new StreamHandler('logs/initialize-entities.log', Level::Info));
-        $this->logger = $logger;
+        $this->logger = Helpers::setLogger('initialize-entities.log');
         parent::__construct();
     }
 
@@ -195,13 +193,13 @@ class InitializeEntitiesCommand extends Command
 
                 // Initialize Instagram Account from facebook config
                 if ($page['ig_account']) {
-                    $channeledAccountEntity = $channeledAccountRepository->getByPlatformId($page['ig_account'], Channel::facebook->value);
+                    $channeledAccountEntity = $channeledAccountRepository->getByPlatformId($page['ig_account'], Channel::facebook_organic->value);
                     if (!$channeledAccountEntity) {
                         $channeledAccount = new ChanneledAccount();
                         $channeledAccount->addPlatformId($page['ig_account'])
                             ->addAccount($accountEntity)
                             ->addType(AccountEnum::INSTAGRAM)
-                            ->addChannel(Channel::facebook->value)
+                            ->addChannel(Channel::facebook_organic->value)
                             ->addName($fbConfig['accounts_group_name'])
                             ->addPlatformCreatedAt(new DateTime('2010-10-06'))
                             ->addData([]);
@@ -211,13 +209,13 @@ class InitializeEntitiesCommand extends Command
                 }
             }
             foreach ($fbConfig['ad_accounts'] as $adAccount) {
-                $adAccountEntity = $channeledAccountRepository->getByPlatformId($adAccount['id'], Channel::facebook->value);
+                $adAccountEntity = $channeledAccountRepository->getByPlatformId($adAccount['id'], Channel::facebook_marketing->value);
                 if (!$adAccountEntity) {
                     $channeledAccount = new ChanneledAccount();
                     $channeledAccount->addPlatformId($adAccount['id'])
                         ->addAccount($accountEntity)
                         ->addType(AccountEnum::META_AD_ACCOUNT)
-                        ->addChannel(Channel::facebook->value)
+                        ->addChannel(Channel::facebook_marketing->value)
                         ->addName($fbConfig['accounts_group_name'])
                         ->addPlatformCreatedAt(new DateTime('2010-10-06'))
                         ->addData([]);
@@ -231,10 +229,12 @@ class InitializeEntitiesCommand extends Command
             $this->logger->info("Flushed changes to database");
 
             // Output results
-            $output->writeln("<info>Initialized $countriesInitialized countries, skipped $countriesSkipped</info>");
-            $output->writeln("<info>Initialized $devicesInitialized devices, skipped $devicesSkipped</info>");
-            $output->writeln("<info>Initialized $pagesInitialized pages, skipped $pagesSkipped</info>");
-            $output->writeln("<info>Initialization completed successfully</info>");
+            if (Helpers::isDebug()) {
+                $output->writeln("<info>Initialized $countriesInitialized countries, skipped $countriesSkipped</info>");
+                $output->writeln("<info>Initialized $devicesInitialized devices, skipped $devicesSkipped</info>");
+                $output->writeln("<info>Initialized $pagesInitialized pages, skipped $pagesSkipped</info>");
+                $output->writeln("<info>Initialization completed successfully</info>");
+            }
             $this->logger->info("Completed app:initialize-entities command");
 
             return Command::SUCCESS;

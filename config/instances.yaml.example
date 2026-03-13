@@ -1,0 +1,7 @@
+instances:
+  - name: example-instance
+    port: 8081
+    channel: gsc
+    entity: metric
+    start_date: "2025-01-01"
+    end_date:   "2025-03-31"

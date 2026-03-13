@@ -11,6 +11,7 @@ use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Analytics\Country;
 use Entities\Analytics\Device;
 use Entities\Analytics\Metric;
+use Entities\Analytics\MetricConfig;
 use Entities\Analytics\Page;
 use Entities\Analytics\Query;
 use Entities\Entity;
@@ -120,6 +121,18 @@ class MetricConfigRepository extends BaseRepository
 
     /**
      * @throws NonUniqueResultException
+     */
+    public function findOneBySignature(string $signature): ?MetricConfig
+    {
+        return $this->createQueryBuilder('e')
+            ->where('e.configSignature = :signature')
+            ->setParameter('signature', $signature)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * @throws NonUniqueResultException
      * @throws NoResultException
      */
     public function existsByChannelAndName(int $channel, string $name, Period $period, DateTime $metricDate): bool
@@ -138,6 +151,7 @@ class MetricConfigRepository extends BaseRepository
                 ->getQuery()
                 ->getSingleScalarResult() > 0;
     }
+
 
     /**
      * @throws NonUniqueResultException
@@ -197,56 +211,28 @@ class MetricConfigRepository extends BaseRepository
         ?Device $device = null
     ): ?Metric {
         try {
+            $configSignature = \Classes\KeyGenerator::generateMetricConfigKey(
+                channel: $channel,
+                name: $name,
+                period: $period,
+                metricDate: $metricDate,
+                query: $queryEntity,
+                page: $page,
+                country: $country,
+                device: $device,
+                creative: $dimensions['creative'] ?? null,
+            );
+
             $qb = $this->createQueryBuilder('e')
-                ->where('e.channel = :channel')
-                ->andWhere('e.name = :name')
-                ->andWhere('e.period = :period')
-                ->andWhere('e.metricDate = :metricDate')
-                ->setParameters([
-                    'channel' => $channel,
-                    'name' => $name,
-                    'period' => $period->value,
-                    'metricDate' => $metricDate->format('Y-m-d'),
-                ]);
-
-            if ($queryEntity) {
-                $qb->andWhere('e.query = :query')
-                    ->setParameter('query', $queryEntity);
-            } else {
-                $qb->andWhere('e.query IS NULL');
-            }
-
-            if ($page) {
-                if (!$page->getId()) {
-                    error_log("MetricRepository::findByChannelAndDimensions: Unmanaged Page: url=" . $page->getUrl() . ", trace=" . (new Exception())->getTraceAsString());
-                    return null; // Skip query if page is unmanaged
-                }
-                $qb->andWhere('e.page = :page')
-                    ->setParameter('page', $page);
-            } else {
-                $qb->andWhere('e.page IS NULL');
-            }
-
-            if ($country) {
-                $qb->andWhere('e.country = :country')
-                    ->setParameter('country', $country);
-            } else {
-                $qb->andWhere('e.country IS NULL');
-            }
-
-            if ($device) {
-                $qb->andWhere('e.device = :device')
-                    ->setParameter('device', $device);
-            } else {
-                $qb->andWhere('e.device IS NULL');
-            }
+                ->where('e.configSignature = :signature')
+                ->setParameter('signature', $configSignature);
 
             if (!empty($dimensions)) {
                 $qb->leftJoin('e.metrics', 'm')
                     ->leftJoin('m.channeledMetrics', 'cm')
                     ->leftJoin('cm.dimensions', 'cmd');
                 foreach ($dimensions as $key => $value) {
-                    if (in_array($key, ['site', 'country', 'device'], true)) {
+                    if (in_array($key, ['site', 'country', 'device', 'creative'], true)) {
                         continue;
                     }
                     $qb->andWhere('cmd.dimensionKey = :dimensionKey_' . $key . ' AND cmd.dimensionValue = :dimensionValue_' . $key)
@@ -254,6 +240,7 @@ class MetricConfigRepository extends BaseRepository
                         ->setParameter('dimensionValue_' . $key, $value);
                 }
             }
+
 
             $query = $qb->setMaxResults(1)->getQuery();
 

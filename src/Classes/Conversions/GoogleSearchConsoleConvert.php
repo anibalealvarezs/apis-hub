@@ -38,7 +38,7 @@ class GoogleSearchConsoleConvert
         array $rows,
         string $siteUrl,
         string $siteKey,
-        LoggerInterface $logger = null,
+        ?LoggerInterface $logger = null,
         ?Page $pageEntity = null,
         ?EntityManager $em = null,
     ): ArrayCollection {
@@ -47,7 +47,6 @@ class GoogleSearchConsoleConvert
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $logger?->info("Starting metrics conversion for site $siteUrl, rows=$rowCount");
         // $logger?->warning("Note: 'searchAppearance' not fetched from GSC API due to dimension restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
         if ($pageEntity) {
             $pageEntity = $em->find(Page::class, $pageEntity->getId());
@@ -188,7 +187,6 @@ class GoogleSearchConsoleConvert
                     'ctr' => $aggregatedMetrics[$metricConfigKeys['impressions']]['ctr'],
                 ];
 
-                $logger?->warning("Temp data for country: ".$row['keys'][$flippedDimensions['country']]." and device ".$row['keys'][$flippedDimensions['device']].": " . json_encode($aggregatedMetrics[$metricConfigKeys['impressions']]));
 
                 $elements[$metricConfigKeys['impressions']][$metricName] = $channeledMetric;
             }

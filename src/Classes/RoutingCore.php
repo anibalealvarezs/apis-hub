@@ -68,8 +68,20 @@ class RoutingCore implements HttpKernelInterface
         } catch (ResourceNotFoundException) {
             $html = file_get_contents(__DIR__ . '/../views/404.html');
             $response = new Response($html, Response::HTTP_NOT_FOUND, ['Content-Type' => 'text/html']);
+        } catch (\Exceptions\ConfigurationException $e) {
+            $response = new Response(json_encode([
+                'status' => 'error',
+                'error' => 'Configuration Error',
+                'message' => $e->getMessage()
+            ]), Response::HTTP_INTERNAL_SERVER_ERROR, [
+                'Content-Type' => 'application/json'
+            ]);
         } catch (Exception $e) {
-            $response = new Response($e->getMessage(), Response::HTTP_INTERNAL_SERVER_ERROR, headers: [
+            $response = new Response(json_encode([
+                'status' => 'error',
+                'error' => 'Internal Server Error',
+                'message' => $e->getMessage()
+            ]), Response::HTTP_INTERNAL_SERVER_ERROR, [
                 'Content-Type' => 'application/json'
             ]);
         }

@@ -11,6 +11,7 @@ use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledAd;
 use Entities\Analytics\Channeled\ChanneledAdGroup;
 use Entities\Analytics\Channeled\ChanneledCampaign;
+use Entities\Analytics\Creative;
 use Entities\Analytics\Country;
 use Entities\Analytics\Customer;
 use Entities\Analytics\Device;
@@ -222,20 +223,6 @@ class MapGenerator
         EntityManager $manager,
         string $sql,
         array $params,
-        array $accountMap = [],
-        array $channeledAccountMap = [],
-        array $campaignMap = [],
-        array $channeledCampaignMap = [],
-        array $channeledAdGroupMap = [],
-        array $channeledAdMap = [],
-        array $pageMap = [],
-        array $queryMap = [],
-        array $postMap = [],
-        array $productMap = [],
-        array $customerMap = [],
-        array $orderMap = [],
-        array $countryMap = [],
-        array $deviceMap = [],
     ): array {
         // Update the metric map with the newly inserted metrics
         $existingMetricConfigs = $manager->getConnection()
@@ -245,31 +232,14 @@ class MapGenerator
         // Map metrics to their IDs and create a map for quick access
         $metricConfigMap = [];
         foreach ($existingMetricConfigs as $metricConfig) {
-            $metricConfigKey = KeyGenerator::generateMetricConfigKey(
-                channel: $metricConfig['channel'],
-                name: $metricConfig['name'],
-                period: $metricConfig['period'],
-                metricDate: $metricConfig['metricDate'],
-                account: isset($metricConfig['account_id']) ? ($accountMap[$metricConfig['account_id']] instanceof Account ? $accountMap[$metricConfig['account_id']]->getName() : $accountMap[$metricConfig['account_id']]) : null,
-                channeledAccount: isset($metricConfig['channeledAccount_id']) ? ($channeledAccountMap[$metricConfig['channeledAccount_id']] instanceof ChanneledAccount ? $channeledAccountMap[$metricConfig['channeledAccount_id']]->getPlatformId() : $channeledAccountMap[$metricConfig['channeledAccount_id']]) : null,
-                campaign: isset($metricConfig['campaign_id']) ? ($campaignMap[$metricConfig['campaign_id']] instanceof Campaign ? $campaignMap[$metricConfig['campaign_id']]->getCampaignId() : $campaignMap[$metricConfig['campaign_id']]) : null,
-                channeledCampaign: isset($metricConfig['channeledCampaign_id']) ? ($channeledCampaignMap[$metricConfig['channeledCampaign_id']] instanceof ChanneledCampaign ? $channeledCampaignMap[$metricConfig['channeledCampaign_id']]->getPlatformId() : $channeledCampaignMap[$metricConfig['channeledCampaign_id']]) : null,
-                channeledAdGroup: isset($metricConfig['channeledAdGroup_id']) ? ($channeledAdGroupMap[$metricConfig['channeledAdGroup_id']] instanceof ChanneledAdGroup ? $channeledAdGroupMap[$metricConfig['channeledAdGroup_id']]->getPlatformId() : $channeledAdGroupMap[$metricConfig['channeledAdGroup_id']]) : null,
-                channeledAd: isset($metricConfig['channeledAd_id']) ? ($channeledAdMap[$metricConfig['channeledAd_id']] instanceof ChanneledAd ? $channeledAdMap[$metricConfig['channeledAd_id']]->getPlatformId() : $channeledAdMap[$metricConfig['channeledAd_id']]) : null,
-                page: isset($metricConfig['page_id']) ? ($pageMap[$metricConfig['page_id']] instanceof Page ? $pageMap[$metricConfig['page_id']]->getUrl() : $pageMap[$metricConfig['page_id']]) : null,
-                query: isset($metricConfig['query_id']) ? ($queryMap[$metricConfig['query_id']] instanceof Query ? $queryMap[$metricConfig['query_id']]->getQuery() : $queryMap[$metricConfig['query_id']]) : null,
-                post: isset($metricConfig['post_id']) ? ($postMap[$metricConfig['post_id']] instanceof Post ? $postMap[$metricConfig['post_id']]->getPostId() : $postMap[$metricConfig['post_id']]) : null,
-                product: isset($metricConfig['product_id']) ? ($productMap[$metricConfig['product_id']] instanceof Product ? $productMap[$metricConfig['product_id']]->getProductId() : $productMap[$metricConfig['product_id']]) : null,
-                customer: isset($metricConfig['customer_id']) ? ($customerMap[$metricConfig['customer_id']] instanceof Customer ? $customerMap[$metricConfig['customer_id']]->getEmail() : $customerMap[$metricConfig['customer_id']]) : null,
-                order: isset($metricConfig['order_id']) ? ($orderMap[$metricConfig['order_id']] instanceof Order ? $orderMap[$metricConfig['order_id']]->getOrderId() : $orderMap[$metricConfig['order_id']]) : null,
-                country: isset($metricConfig['country_id']) ? ($countryMap[$metricConfig['country_id']] instanceof Country ? $countryMap[$metricConfig['country_id']]->getCode() : $countryMap[$metricConfig['country_id']]) : null,
-                device: isset($metricConfig['device_id']) ? ($deviceMap[$metricConfig['device_id']] instanceof Device ? $deviceMap[$metricConfig['device_id']]->getType() : $deviceMap[$metricConfig['device_id']]) : null,
-            );
-            $metricConfigMap[$metricConfigKey] = (int)$metricConfig['id'];
+            if (isset($metricConfig['configSignature'])) {
+                $metricConfigMap[$metricConfig['configSignature']] = (int)$metricConfig['id'];
+            }
         }
 
         return $metricConfigMap;
     }
+
 
     /**
      * Generates a map of metrics based on the provided SQL query and parameters.
@@ -559,6 +529,17 @@ class MapGenerator
         foreach ($existing as $item) {
             $key = KeyGenerator::generateChanneledPriceRuleKey((string)$item['channel'], (string)$item['platformId']);
             $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
+        }
+        return $map;
+    }
+
+    public static function getCreativeMap(EntityManager $manager, string $sql, array $params): array
+    {
+        $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
+        $map = [];
+        foreach ($existing as $item) {
+            $key = $item['creativeId'];
+            $map[$key] = (int)$item['id'];
         }
         return $map;
     }

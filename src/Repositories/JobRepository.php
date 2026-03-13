@@ -6,6 +6,7 @@ use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
+use Entities\Job;
 use Enums\AnalyticsEntity;
 use Enums\Channel;
 use Enums\JobStatus;
@@ -205,18 +206,37 @@ class JobRepository extends BaseRepository
      */
     public function getJobs(): array
     {
-        $list = $this->readMultiple()->toArray();
-        return $list;
+        return $this->readMultiple()->toArray();
     }
 
     /**
      * @param int $status
-     * @return array
+     * @param string|null $channel
+     * @param string|null $instanceName
+     * @return Job[]
      */
-    public function getJobsByStatus(int $status): array
+    public function getJobsByStatus(int $status, ?string $channel = null, ?string $instanceName = null): array
     {
-        $list = $this->readMultiple(filters: (object)['status' => $status])->toArray();
-        return count($list) > 0 ? $list[0] : [];
+        $filters = ['status' => $status];
+        if ($channel) {
+            $filters['channel'] = $channel;
+        }
+
+        $qb = $this->buildReadMultipleQuery(
+            ids: null,
+            filters: (object)$filters,
+            orderBy: 'id',
+            orderDir: 'ASC',
+            limit: 100,
+            pagination: 0
+        );
+
+        if ($instanceName) {
+            $qb->andWhere('e.payload LIKE :instance_name_pattern')
+               ->setParameter('instance_name_pattern', '%"instance_name": "' . $instanceName . '"%');
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     /**
@@ -286,14 +306,92 @@ class JobRepository extends BaseRepository
         $qb = $this->_em->createQueryBuilder();
         $updatedRows = $qb->update($this->getEntityName(), 'e')
             ->set('e.status', ':processing')
+            ->set('e.updatedAt', ':now')
             ->where('e.id = :id')
             ->andWhere($qb->expr()->in('e.status', ':claimable'))
             ->setParameter('processing', JobStatus::processing->value)
+            ->setParameter('now', new \DateTime())
             ->setParameter('id', $id)
             ->setParameter('claimable', [JobStatus::scheduled->value, JobStatus::delayed->value])
             ->getQuery()
             ->execute();
 
         return (int)$updatedRows > 0;
+    }
+
+    /**
+     * Resets a job to scheduled status.
+     *
+     * @param int $id
+     * @return bool
+     */
+    public function resetJob(int $id): bool
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $updatedRows = $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':scheduled')
+            ->set('e.updatedAt', ':now')
+            ->where('e.id = :id')
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('now', new \DateTime())
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->execute();
+
+        return (int)$updatedRows > 0;
+    }
+
+    /**
+     * Marks a job as delayed (e.g. for rate limiting).
+     *
+     * @param int $id
+     * @param string|null $message
+     * @return bool
+     */
+    public function markAsDelayed(int $id, ?string $message = null): bool
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':delayed')
+            ->set('e.updatedAt', ':now');
+        
+        if ($message) {
+            $qb->set('e.message', ':message')
+               ->setParameter('message', $message);
+        }
+
+        $updatedRows = $qb->where('e.id = :id')
+            ->setParameter('delayed', JobStatus::delayed->value)
+            ->setParameter('now', new \DateTime())
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->execute();
+
+        return (int)$updatedRows > 0;
+    }
+
+    /**
+     * @param string $instanceName
+     * @param int $withinHours
+     * @return bool
+     */
+    public function hasSuccessfulRecentJob(string $instanceName, int $withinHours = 24): bool
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $since = new \DateTime();
+        $since->modify("-$withinHours hours");
+
+        $count = $qb->select('count(e.id)')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.payload LIKE :instance_name_pattern')
+            ->andWhere('e.status = :completed')
+            ->andWhere('e.updatedAt >= :since')
+            ->setParameter('instance_name_pattern', '%"instance_name": "' . $instanceName . '"%')
+            ->setParameter('completed', JobStatus::completed->value)
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int)$count > 0;
     }
 }

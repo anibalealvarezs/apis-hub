@@ -14,6 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Services\DateResolver;
 use Symfony\Component\HttpFoundation\Response;
 use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
+use Doctrine\DBAL\Exception\LockWaitTimeoutException;
 use Throwable;
 
 class ProcessJobsCommand extends Command
@@ -38,15 +39,29 @@ class ProcessJobsCommand extends Command
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
 
-        $output->writeln("Querying scheduled and delayed jobs...");
+        $envChannel = getenv('API_SOURCE');
+        $envInstance = getenv('INSTANCE_NAME');
+        
+        if (Helpers::isDebug()) {
+            $output->writeln("Querying scheduled and delayed jobs...");
+        }
+
+        $jobs = $jobRepo->getJobsByStatus(
+            status: JobStatus::scheduled->value,
+            channel: $envChannel,
+            instanceName: $envInstance
+        );
+        $delayedJobs = $jobRepo->getJobsByStatus(
+            status: JobStatus::delayed->value,
+            channel: $envChannel,
+            instanceName: $envInstance
+        );
+        $jobs = array_merge($jobs, $delayedJobs);
 
         $envStartDate = getenv('START_DATE');
         $envEndDate = getenv('END_DATE');
 
-        $jobs = $jobRepo->findBy(['status' => [JobStatus::scheduled->value, JobStatus::delayed->value]]);
-
         if (empty($jobs)) {
-            $output->writeln("No jobs found.");
             return Command::SUCCESS;
         }
 
@@ -65,7 +80,15 @@ class ProcessJobsCommand extends Command
             $payload = $job->getPayload() ?? [];
             $params = $payload['params'] ?? [];
 
-            // If instance has specific range, filter out jobs not matching it
+            // 1. Instance Name Match (Primary Filter)
+            $envInstance = getenv('INSTANCE_NAME');
+            $jobInstance = $payload['instance_name'] ?? null;
+            if ($envInstance && $jobInstance && $envInstance !== $jobInstance) {
+                $stats['skipped']++;
+                continue;
+            }
+
+            // 2. Date Range Filters (Fallback/Secondary)
             if ($envStartDate !== false && $envStartDate !== '') {
                 $jobStart = $params['startDate'] ?? $params['start_date'] ?? null;
                 if ($jobStart !== $envStartDate) {
@@ -88,10 +111,13 @@ class ProcessJobsCommand extends Command
 
             // Global filters from env
             if ($envChannel = getenv('API_SOURCE')) {
-                if ($chanEnum = Channel::tryFromName($envChannel)) {
-                    $envChannel = $chanEnum->name;
-                }
-                if ($job->getChannel() !== $envChannel) {
+                $envChannelEnum = Channel::tryFromName($envChannel);
+                $jobChannelEnum = Channel::tryFromName($job->getChannel());
+                
+                $envMatch = $envChannelEnum ? $envChannelEnum->name : $envChannel;
+                $jobMatch = $jobChannelEnum ? $jobChannelEnum->name : $job->getChannel();
+
+                if ($jobMatch !== $envMatch) {
                     $stats['skipped']++;
                     continue;
                 }
@@ -111,22 +137,44 @@ class ProcessJobsCommand extends Command
                 if ($updatedAt) {
                     $elapsed = time() - $updatedAt->getTimestamp();
                     if ($elapsed < $cooldown) {
-                        $remaining = $cooldown - $elapsed;
-                        $minutes = ceil($remaining / 60);
-                        $output->writeln("<comment>Job {$job->getUuid()} is in cooldown. Skipping (available in {$minutes} mins).</comment>");
+                        if (Helpers::isDebug()) {
+                            $remaining = $cooldown - $elapsed;
+                            $minutes = ceil($remaining / 60);
+                            $output->writeln("<comment>Job {$job->getUuid()} is in cooldown. Skipping (available in {$minutes} mins).</comment>");
+                        }
                         $stats['skipped']++;
                         continue;
                     }
                 }
             }
 
-            $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
+            // Dependency check
+            $requires = $params['requires'] ?? null;
+            if ($requires) {
+                $requiredInstances = array_map('trim', explode(',', $requires));
+                foreach ($requiredInstances as $requiredInstance) {
+                    if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
+                        if (Helpers::isDebug()) {
+                            $output->writeln("<comment>Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.</comment>");
+                        }
+                        $stats['skipped']++;
+                        continue 2; // Skip to next job
+                    }
+                }
+            }
+
+            if (Helpers::isDebug()) {
+                $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
+            }
             $stats['total']++;
+            \Helpers\Helpers::reconnectIfNeeded($this->em);
 
             try {
                 // Atomic claim by repository
                 if (!$jobRepo->claimJob($job->getId())) {
-                    $output->writeln("Job {$job->getUuid()} already claimed by another worker. Skipping.");
+                    if (Helpers::isDebug()) {
+                        $output->writeln("Job {$job->getUuid()} already claimed by another worker. Skipping.");
+                    }
                     $stats['skipped']++;
                     $stats['total']--;
                     continue;
@@ -144,45 +192,72 @@ class ProcessJobsCommand extends Command
                 $params['jobId'] = $job->getId();
                 $body = $payload['body'] ?? null;
 
+                // Increase lock wait timeout for this connection to reduce contention
+                // when multiple containers write to shared tables simultaneously
+                $this->em->getConnection()->executeStatement('SET SESSION innodb_lock_wait_timeout = 120');
+
                 $result = $controller->fetchData($job->getEntity(), $channelEnum, $params, $body);
 
                 // Check if fetchData returned an error Response
                 if ($result instanceof Response && $result->getStatusCode() >= 400) {
                     $content = json_decode($result->getContent(), true);
                     $errorMsg = $content['error'] ?? 'Unknown error from fetchData';
+                    if ($result->getStatusCode() === 429) {
+                        throw new FacebookRateLimitException($errorMsg);
+                    }
                     throw new \Exception($errorMsg);
                 }
 
                 // Update to completed
-                $jobRepo->update($job->getId(), (object)['status' => JobStatus::completed->value]);
-                $output->writeln("<info>Successfully completed job {$job->getUuid()}</info>");
+                $jobRepo->update($job->getId(), (object)[
+                    'status' => JobStatus::completed->value,
+                    'message' => 'Success'
+                ]);
+                if (Helpers::isDebug()) {
+                    $output->writeln("<info>Successfully completed job {$job->getUuid()}</info>");
+                }
                 $stats['completed']++;
 
             } catch (FacebookRateLimitException $e) {
-                // Update to delayed
-                $jobRepo->update($job->getId(), (object)['status' => JobStatus::delayed->value]);
-                $output->writeln("<comment>Rate limit reached for job {$job->getUuid()}. Job delayed for cooldown.</comment>");
+                if (Helpers::isDebug()) {
+                    $output->writeln("<comment>Rate limit reached for job {$job->getUuid()}. Job delayed for cooldown.</comment>");
+                }
+                $jobRepo->markAsDelayed($job->getId(), $e->getMessage());
+                $stats['delayed']++;
+            } catch (LockWaitTimeoutException $e) {
+                if (Helpers::isDebug()) {
+                    $output->writeln("<comment>Lock timeout for job {$job->getUuid()}. Reset to scheduled for retry.</comment>");
+                }
+                $jobRepo->resetJob($job->getId());
                 $stats['delayed']++;
             } catch (Throwable $e) {
                 // Update to failed
-                $jobRepo->update($job->getId(), (object)['status' => JobStatus::failed->value]);
+                $jobRepo->update($job->getId(), (object)[
+                    'status' => JobStatus::failed->value,
+                    'message' => $e->getMessage()
+                ]);
                 $output->writeln("<error>Failed job {$job->getUuid()}: {$e->getMessage()}</error>");
+                if (Helpers::isDebug()) {
+                    $output->writeln($e->getTraceAsString());
+                }
                 $stats['failed']++;
             }
         }
 
-        $output->writeln("\nExecution Summary:");
-        $output->writeln("-----------------");
-        if ($stats['total'] > 0) {
-            $output->writeln("<info>Jobs Processed: {$stats['total']}</info>");
-            $output->writeln("  - <info>Completed: {$stats['completed']}</info>");
-            $output->writeln("  - <error>Failed: {$stats['failed']}</error>");
-            $output->writeln("  - <comment>Delayed: {$stats['delayed']}</comment>");
-        } else {
-            $output->writeln("No jobs were processed in this execution context.");
-        }
-        if ($stats['skipped'] > 0) {
-            $output->writeln("<comment>Jobs Skipped: {$stats['skipped']} (not matching instance context or in cooldown)</comment>");
+        if (Helpers::isDebug()) {
+            $output->writeln("\nExecution Summary:");
+            $output->writeln("-----------------");
+            if ($stats['total'] > 0) {
+                $output->writeln("<info>Jobs Processed: {$stats['total']}</info>");
+                $output->writeln("  - <info>Completed: {$stats['completed']}</info>");
+                $output->writeln("  - <error>Failed: {$stats['failed']}</error>");
+                $output->writeln("  - <comment>Delayed: {$stats['delayed']}</comment>");
+            } else {
+                $output->writeln("No jobs were processed in this execution context.");
+            }
+            if ($stats['skipped'] > 0) {
+                $output->writeln("<comment>Jobs Skipped: {$stats['skipped']} (not matching instance context or in cooldown)</comment>");
+            }
         }
 
         return Command::SUCCESS;

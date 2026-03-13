@@ -1,0 +1,4 @@
+logging:
+  enabled: true
+  level: info
+  prod_level: error

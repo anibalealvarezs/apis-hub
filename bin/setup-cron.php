@@ -12,6 +12,7 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Symfony\Component\Yaml\Yaml;
+use Helpers\Helpers;
 
 $projectName = $argv[1] ?? null;
 if (!$projectName) {
@@ -46,16 +47,27 @@ foreach ($envVars as $k => $v) {
     $cronLines[] = "{$k}=\"{$v}\"";
 }
 
+$instanceFilter = getenv('INSTANCE_NAME');
+
 foreach ($instances as $instance) {
+    $instanceName = $instance['name'] ?? null;
     $channel = $instance['channel'] ?? null;
     $entity = $instance['entity'] ?? null;
-    $frequency = $instance['frequency'] ?? '0 * * * *'; // Default to hourly
+    $frequency = $instance['frequency'] ?? null;
     
-    if (!$channel || !$entity) continue;
+    if (!$channel || !$entity || !$frequency) continue;
 
-    $params = [];
+    // Only schedule if it matches current container instance name
+    if (!$instanceFilter || $instanceName !== $instanceFilter) {
+        continue;
+    }
+
+    $params = [
+        'instance_name' => $instanceName
+    ];
     if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];
     if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
+    if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
     
     $paramString = "";
     if (!empty($params)) {
@@ -63,17 +75,19 @@ foreach ($instances as $instance) {
     }
 
     // Command to schedule the job in the database
-    $cronLines[] = "{$frequency} root cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} >> /var/log/cron.log 2>&1";
+    $cronLines[] = "{$frequency} root cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} >> /app/logs/cron.log 2>&1";
 }
 
 // Also add the job processor cron (runs every minute)
-$cronLines[] = "* * * * * root cd /app && /usr/local/bin/php bin/cli.php jobs:process >> /var/log/jobs.log 2>&1";
+$cronLines[] = "* * * * * root cd /app && /usr/local/bin/php bin/cli.php jobs:process >> /app/logs/jobs.log 2>&1";
 
 $cronFile = '/etc/cron.d/apis-hub-cron';
 file_put_contents($cronFile, implode("\n", $cronLines) . "\n");
 chmod($cronFile, 0644);
 
-echo "✔ Cron configuration generated from {$projectName}.yaml\n";
-foreach ($cronLines as $line) {
-    echo "  Applied: {$line}\n";
+if (Helpers::isDebug()) {
+    echo "✔ Cron configuration generated from {$projectName}.yaml\n";
+    foreach ($cronLines as $line) {
+        echo "  Applied: {$line}\n";
+    }
 }
