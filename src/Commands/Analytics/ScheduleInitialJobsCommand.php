@@ -69,38 +69,36 @@ class ScheduleInitialJobsCommand extends Command
             if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
 
             $shouldSchedule = true;
-            // 1. Try to find by instance_name in payload first (most accurate)
+            // Try to find ANY existing job for this instance (any status)
             $existingJob = $jobRepository->findOneBy([
                 'channel' => $channel,
                 'entity' => $entity,
-                'status' => [JobStatus::scheduled->value, JobStatus::processing->value]
             ]);
 
-            // If we found one, we must verify it really belongs to THIS instance
-            // because findOneBy above is too generic
             if ($existingJob) {
+                // If we found a generic match, verify it belongs to this instance
                 $payload = $existingJob->getPayload();
                 $jobInstance = $payload['instance_name'] ?? null;
                 $jobParams = $payload['params'] ?? [];
                 
-                // Match either by explicit instance name OR by exact params/dates
                 if ($jobInstance === $name || ($jobParams == $params)) {
                     $shouldSchedule = false;
                 } else {
-                    // It was a job for a DIFFERENT instance, so we need to look specifically for ours
-                    $specificJob = $jobRepository->getJobsByStatus(
-                        status: JobStatus::scheduled->value,
-                        channel: $channel,
-                        instanceName: $name
-                    );
-                    if (empty($specificJob)) {
-                        $specificJob = $jobRepository->getJobsByStatus(
-                            status: JobStatus::processing->value,
-                            channel: $channel,
-                            instanceName: $name
-                        );
-                    }
-                    if (!empty($specificJob)) {
+                    // Look specifically for a job with this instance name in its payload
+                    // Use a raw query or a repository helper that doesn't filter by status
+                    $qb = $this->entityManager->createQueryBuilder();
+                    $count = $qb->select('count(j.id)')
+                        ->from(Job::class, 'j')
+                        ->where('j.channel = :channel')
+                        ->andWhere('j.entity = :entity')
+                        ->andWhere('j.payload LIKE :instance_pattern')
+                        ->setParameter('channel', $channel)
+                        ->setParameter('entity', $entity)
+                        ->setParameter('instance_pattern', '%instance_name%' . $name . '%')
+                        ->getQuery()
+                        ->getSingleScalarResult();
+                    
+                    if ((int)$count > 0) {
                         $shouldSchedule = false;
                     }
                 }

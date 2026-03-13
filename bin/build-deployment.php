@@ -52,6 +52,7 @@ foreach ($instances as $instance) {
     $endDate   = $instance['end_date']   ?? null;
 
     $extractEnvVar = function($str) {
+        if (!str_contains((string)$str, '${')) return (string)$str;
         return preg_replace('/^\$\{.*:-(.*)\}$/', '$1', (string) $str);
     };
 
@@ -67,7 +68,7 @@ foreach ($instances as $instance) {
         "DB_NAME=" . $extractEnvVar($db['name'] ?? ''),
         "REDIS_HOST=" . $redis['host'],
         "REDIS_PORT=" . $redis['port'],
-        "PROJECT_CONFIG_FILE=/app/config",
+        "PROJECT_CONFIG_FILE=/app/config/" . ($config['project'] ?? 'apis-hub') . ".yaml",
         "INSTANCE_NAME={$name}",
     ];
 

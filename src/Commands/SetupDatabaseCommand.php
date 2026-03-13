@@ -28,18 +28,12 @@ class SetupDatabaseCommand extends Command
 
         try {
             // 1. Ensure Database Exists
-            $output->writeln("<info>🔍 Checking if database '{$dbName}' exists...</info>");
+            $output->writeln("<info>🔍 Ensuring database '{$dbName}' exists...</info>");
             $connection = DriverManager::getConnection($dbConfig);
-            $schemaManager = $connection->createSchemaManager();
-            $databases = $schemaManager->listDatabases();
-
-            if (!in_array($dbName, $databases)) {
-                $output->writeln("<comment>🏗  Database '{$dbName}' not found. Creating...</comment>");
-                $schemaManager->createDatabase($dbName);
-                $output->writeln("<info>✔  Database '{$dbName}' created.</info>");
-            } else {
-                $output->writeln("<info>✔  Database '{$dbName}' already exists.</info>");
-            }
+            
+            // Use a more robust check: try to create if not exists
+            $connection->executeStatement("CREATE DATABASE IF NOT EXISTS `{$dbName}`");
+            $output->writeln("<info>✔  Database '{$dbName}' is ready.</info>");
             $connection->close();
 
             // 2. Update Schema

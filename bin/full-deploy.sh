@@ -86,13 +86,21 @@ echo -e "${GREEN}✔ docker-compose.yml generated.${NC}"
 # ── Step 4: Build images and start containers ─────────────────────────────────
 echo ""
 echo -e "${YELLOW}🚀 [4/5] Orchestrating containers...${NC}"
-docker compose up -d --remove-orphans --build
+
+# Ensure a clean slate: stop existing and remove orphans before building
+if [ -f "docker-compose.yml" ]; then
+    echo "  🧹 Cleaning up existing deployment..."
+    docker compose --env-file .env down --remove-orphans || echo "  ⚠️ Cleanup had issues, continuing..."
+fi
+
+echo "  🏗️  Building and starting new containers..."
+docker compose --env-file .env up -d --remove-orphans --build
 
 # ── Step 5: Post-deployment Health Check ──────────────────────────────────────
 echo ""
 echo -e "${YELLOW}🩺 [5/5] Waiting for master instance to bootstrap...${NC}"
 # We wait a bit for the entities-sync instance to finish schema update
-sleep 5
+sleep 10
 echo -e "${GREEN}✔ Bootstrap initiated.${NC}"
 
 echo ""

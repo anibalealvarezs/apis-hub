@@ -9,20 +9,24 @@ if [[ "$INSTANCE_NAME" == *"entities-sync"* ]]; then
     echo "Master Instance ($INSTANCE_NAME): Initializing database and entities..."
     php bin/cli.php app:setup-db || echo "Database setup failed"
 else
-    echo "Worker Instance ($INSTANCE_NAME): Waiting for database state..."
-    # Wait for the jobs table to exist (up to 2 minutes)
+    # Wait for the database and jobs table to exist (up to 2 minutes)
     MAX_RETRIES=60
     RETRY_COUNT=0
-    while ! php bin/cli.php orm:info >/dev/null 2>&1 && [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        echo "Waiting for schema to be ready (Attempt $((RETRY_COUNT+1))/$MAX_RETRIES)..."
+    
+    # We use a robust PHP check that handles "Unknown database" error 
+    # without crashing, treating it as "not ready".
+    CHECK_CMD="require 'app/bootstrap.php'; try { \Helpers\Helpers::getManager()->getConnection()->executeQuery('SELECT 1 FROM jobs LIMIT 1'); echo 'READY'; } catch (Exception \$e) { echo 'NOT_READY'; }"
+    
+    while [ "$(php -r "$CHECK_CMD" 2>/dev/null)" != "READY" ] && [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        echo "Waiting for database '$DB_NAME' and 'jobs' table... (Attempt $((RETRY_COUNT+1))/$MAX_RETRIES)"
         sleep 2
         RETRY_COUNT=$((RETRY_COUNT+1))
     done
     
     if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-        echo "Warning: Database schema not detected after 2 minutes. Continuing anyway..."
+        echo "Warning: Database schema not ready after 2 minutes. Proceeding anyway..."
     else
-        echo "Database schema detected."
+        echo "Database schema detected and ready."
     fi
 fi
 

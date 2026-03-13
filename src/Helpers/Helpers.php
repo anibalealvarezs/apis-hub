@@ -65,6 +65,22 @@ class Helpers
         $config = [];
         $rootConfigDir = __DIR__ . '/../../config';
 
+        // 0. Load .env manually if it exists to ensure variables are available
+        $dotEnv = __DIR__ . '/../../.env';
+        if (file_exists($dotEnv)) {
+            $lines = file($dotEnv, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (str_starts_with(trim($line), '#')) continue;
+                if (str_contains($line, '=')) {
+                    list($name, $value) = explode('=', $line, 2);
+                    $name = trim($name);
+                    $value = trim($value, " \t\n\r\0\x0B\"'");
+                    if (!getenv($name)) putenv("$name=$value");
+                    if (!isset($_ENV[$name])) $_ENV[$name] = $value;
+                }
+            }
+        }
+
         // 0. Safeguard: Check for mandatory configuration files
         $mandatoryFiles = ['database.yaml', 'security.yaml', 'app.yaml'];
         $missing = [];
@@ -113,9 +129,16 @@ class Helpers
         try {
             $content = file_get_contents($file);
             // Interpolate environment variables: ${VAR:-default}
-            $content = preg_replace_callback('/\$\{([^}:]+)(?::-([^}]+))?\}/', function($matches) {
+            $content = preg_replace_callback('/\$\{([^}:]+)(?::-([^}]*))?\}/', function($matches) {
                 $envValue = getenv($matches[1]);
-                return ($envValue !== false && $envValue !== '') ? $envValue : ($matches[2] ?? $matches[0]);
+                if ($envValue === false && isset($_ENV[$matches[1]])) $envValue = $_ENV[$matches[1]];
+                if ($envValue === false && isset($_SERVER[$matches[1]])) $envValue = $_SERVER[$matches[1]];
+                
+                $val = ($envValue !== false) ? (string)$envValue : ($matches[2] ?? $matches[0]);
+                if (str_contains($matches[0], 'PASSWORD')) {
+                    file_put_contents(__DIR__ . '/../../logs/resolve.log', "Resolved {$matches[0]} to " . substr($val, 0, 1) . "...\n", FILE_APPEND);
+                }
+                return $val;
             }, $content);
 
             $parsed = Yaml::parse($content);
