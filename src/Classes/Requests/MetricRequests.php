@@ -263,14 +263,39 @@ class MetricRequests
                 $logger->warning("Account group '{$accountEntityName}' not found. Instagram accounts might not be processed correctly.");
             }
 
-            // Load pages and create a map
-            /** @var Page[] $pages */
-            $pages = $pageRepository->findAll();
+            // Load pages
+            $pagesToProcess = $config['facebook']['pages'] ?? [];
+            if (empty($pagesToProcess)) {
+                $logger->info("No specific pages listed in config. Fetching all available pages from database.");
+                $allPages = $pageRepository->findAll();
+                $globalPageConfig = $config['facebook']['PAGE'] ?? [
+                    'page_metrics' => false,
+                    'posts' => true,
+                    'post_metrics' => false,
+                    'ig_account_metrics' => false,
+                    'ig_account_media' => true,
+                    'ig_account_media_metrics' => false,
+                ];
+                foreach ($allPages as $p) {
+                    $pagesToProcess[] = array_merge($globalPageConfig, [
+                        'id' => $p->getPlatformId(),
+                        'url' => $p->getUrl(),
+                        'title' => $p->getTitle(),
+                        'enabled' => true,
+                        // If IG user ID is stored in data, we can try to extract it
+                        'ig_account' => $p->getData()['instagram_business_account']['id'] ?? null
+                    ]);
+                }
+            }
+
+            $logger->info("Processing " . count($pagesToProcess) . " Facebook pages");
+
+            // Create a map for active pages
             $pageMap = [
                 'map' => [],
                 'mapReverse' => [],
             ];
-            foreach ($pages as $p) { // Use simpler variable name
+            foreach ($pageRepository->findAll() as $p) {
                 $pageMap['map'][$p->getUrl()] = $p->getId();
                 $pageMap['mapReverse'][$p->getId()] = $p->getUrl();
             }
@@ -281,7 +306,7 @@ class MetricRequests
 
             // Process Pages & Instagram
             Helpers::reconnectIfNeeded($manager);
-            foreach ($config['facebook']['pages'] as $page) {
+            foreach ($pagesToProcess as $page) {
                 Helpers::checkJobStatus($jobId);
 
                 if (!$page['enabled']) {
@@ -462,7 +487,34 @@ class MetricRequests
 
             // Process Ad Accounts
             Helpers::reconnectIfNeeded($manager);
-            foreach ($config['facebook']['ad_accounts'] as $adAccount) {
+            $adAccountsToProcess = $config['facebook']['ad_accounts'] ?? [];
+            if (empty($adAccountsToProcess)) {
+                $logger->info("No specific ad accounts listed in config. Fetching all available ad accounts for channel from database.");
+                $allChanneledAccounts = $channeledAccountRepository->findBy([
+                    'channel' => Channel::facebook_marketing->value,
+                    'type' => AccountEnum::META_AD_ACCOUNT->value
+                ]);
+                $globalAdAccountConfig = $config['facebook']['AD_ACCOUNT'] ?? [
+                    'ad_account_metrics' => true,
+                    'campaigns' => true,
+                    'campaign_metrics' => true,
+                    'adsets' => false,
+                    'adset_metrics' => false,
+                    'ads' => false,
+                    'ad_metrics' => false,
+                    'creatives' => false,
+                    'creative_metrics' => false,
+                ];
+                foreach ($allChanneledAccounts as $ca) {
+                    $adAccountsToProcess[] = array_merge($globalAdAccountConfig, [
+                        'id' => $ca->getPlatformId(),
+                        'name' => $ca->getName(),
+                        'enabled' => true
+                    ]);
+                }
+            }
+
+            foreach ($adAccountsToProcess as $adAccount) {
                 Helpers::checkJobStatus($jobId);
 
                 $channeledAccountEntity = $channeledAccountRepository->findOneBy([
@@ -822,15 +874,49 @@ class MetricRequests
     }
 
     /**
-     * Validates Google and GSC configurations.
+     * Validates and returns the Facebook configuration with global defaults.
      *
-     * @param LoggerInterface $logger
+     * @param LoggerInterface|null $logger
      * @return array
-     * @throws Exception
      */
-    public static function validateFacebookConfig(LoggerInterface $logger): array
+    public static function validateFacebookConfig(?LoggerInterface $logger = null): array
     {
-        return FacebookGraphHelpers::validateFacebookConfig($logger);
+        $channels = Helpers::getChannelsConfig();
+        if (!isset($channels['facebook'])) {
+            $logger?->error("Facebook configuration not found in channels config.");
+            throw new RuntimeException("Facebook configuration not found in channels config.");
+        }
+
+        $config = $channels['facebook'];
+
+        // Apply global defaults for PAGES if they exist
+        if (isset($config['PAGE'])) {
+            $globalPageDefaults = $config['PAGE'];
+            $config['facebook']['pages'] = array_map(function ($page) use ($globalPageDefaults) {
+                return array_merge($globalPageDefaults, $page);
+            }, $config['facebook']['pages'] ?? []);
+        }
+
+        // Apply global defaults for AD_ACCOUNTS if they exist
+        if (isset($config['AD_ACCOUNT'])) {
+            $globalAdAccountDefaults = $config['AD_ACCOUNT'];
+            $config['facebook']['ad_accounts'] = array_map(function ($adAccount) use ($globalAdAccountDefaults) {
+                return array_merge($globalAdAccountDefaults, $adAccount);
+            }, $config['facebook']['ad_accounts'] ?? []);
+        }
+
+        // If 'pages' list is NOT provided or empty, we mark it as such so it's handled during request
+        if (!isset($config['pages']) || !is_array($config['pages'])) {
+             $config['pages'] = []; 
+        }
+
+        // If 'ad_accounts' list is NOT provided or empty
+        if (!isset($config['ad_accounts']) || !is_array($config['ad_accounts'])) {
+             $config['ad_accounts'] = [];
+        }
+
+        // Map back to expected structure if needed, or just return the facebook key data
+        return ['facebook' => $config];
     }
 
     /**
