@@ -63,8 +63,8 @@ class ProcessJobsTest extends BaseIntegrationTestCase
         $this->assertStringContainsString('Querying scheduled and delayed jobs', $outputContent);
         $this->assertStringContainsString('Processing job ' . $uuid, $outputContent);
         
-        // Refresh job
-        $this->entityManager->refresh($job);
+        // Re-fetch job to ensure we have the updated state from DB (detached after EM clear in command)
+        $job = $jobRepo->findOneBy(['uuid' => $uuid]);
         
         // The Status should have shifted natively to Completed or Failed by the CacheController
         $this->assertTrue(

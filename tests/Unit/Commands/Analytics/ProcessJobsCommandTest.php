@@ -58,7 +58,14 @@ class ProcessJobsCommandTest extends TestCase
         ]);
 
         $this->jobRepository->method('getJobsByStatus')
-            ->willReturnOnConsecutiveCalls([$mockJob], []);
+            ->willReturnCallback(function($status) use (&$mockJob) {
+                if ($status === JobStatus::scheduled->value && $mockJob) {
+                    $result = [$mockJob];
+                    $mockJob = null;
+                    return $result;
+                }
+                return [];
+            });
         
         // Mock hasSuccessfulRecentJob to return false
         $this->jobRepository->expects($this->once())
@@ -95,7 +102,14 @@ class ProcessJobsCommandTest extends TestCase
         ]);
 
         $this->jobRepository->method('getJobsByStatus')
-            ->willReturnOnConsecutiveCalls([$mockJob], []);
+            ->willReturnCallback(function($status) use (&$mockJob) {
+                if ($status === JobStatus::scheduled->value && $mockJob) {
+                    $result = [$mockJob];
+                    $mockJob = null;
+                    return $result;
+                }
+                return [];
+            });
         
         // Mock hasSuccessfulRecentJob to return true
         $this->jobRepository->expects($this->once())
