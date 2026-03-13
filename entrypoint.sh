@@ -5,14 +5,26 @@ set -e
 mkdir -p /app/logs
 
 # Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
-if [ "$INSTANCE_NAME" = "fb-entities-sync" ]; then
+if [[ "$INSTANCE_NAME" == *"entities-sync"* ]]; then
     echo "Master Instance ($INSTANCE_NAME): Initializing database and entities..."
-    php bin/cli.php orm:schema-tool:update --force || echo "Schema update failed"
+    php bin/cli.php orm:schema-tool:update --force || echo "Schema update failed (possibly already updated by another master)"
     php bin/cli.php app:initialize-entities || echo "Entity initialization failed"
 else
-    echo "Worker Instance ($INSTANCE_NAME): Waiting for master initialization..."
-    # Small sleep to allow master to finish schema updates
-    sleep 5
+    echo "Worker Instance ($INSTANCE_NAME): Waiting for database state..."
+    # Wait for the jobs table to exist (up to 2 minutes)
+    MAX_RETRIES=60
+    RETRY_COUNT=0
+    while ! php bin/cli.php orm:info >/dev/null 2>&1 && [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        echo "Waiting for schema to be ready (Attempt $((RETRY_COUNT+1))/$MAX_RETRIES)..."
+        sleep 2
+        RETRY_COUNT=$((RETRY_COUNT+1))
+    done
+    
+    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+        echo "Warning: Database schema not detected after 2 minutes. Continuing anyway..."
+    else
+        echo "Database schema detected."
+    fi
 fi
 
 # Each instance only schedules its OWN initial job to prevent massive duplication
