@@ -1,0 +1,24 @@
+# Rules for automatic instance generation
+# You can enable/disable channels and customize history depth or scheduling.
+
+rules:
+  facebook_marketing:
+    enabled: true
+    history_months: 24
+    entities_sync: facebook_marketing_entities
+    recent_cron_hour: 4
+    recent_cron_minute: 0
+  
+  facebook_organic:
+    enabled: true
+    history_months: 24
+    entities_sync: facebook_organic_entities
+    recent_cron_hour: 4
+    recent_cron_minute: 5
+
+  gsc:
+    enabled: true
+    history_months: 16
+    entities_sync: ~
+    recent_cron_hour: 4
+    recent_cron_minute: 10
