@@ -18,6 +18,7 @@ docker-compose.yml
 *entities.php*
 *stderr*
 *.log
+.antigravityrules
 
 # Development recurrences
 dev-recurrences.md

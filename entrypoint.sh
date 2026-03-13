@@ -7,8 +7,7 @@ mkdir -p /app/logs
 # Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
 if [[ "$INSTANCE_NAME" == *"entities-sync"* ]]; then
     echo "Master Instance ($INSTANCE_NAME): Initializing database and entities..."
-    php bin/cli.php orm:schema-tool:update --force || echo "Schema update failed (possibly already updated by another master)"
-    php bin/cli.php app:initialize-entities || echo "Entity initialization failed"
+    php bin/cli.php app:setup-db || echo "Database setup failed"
 else
     echo "Worker Instance ($INSTANCE_NAME): Waiting for database state..."
     # Wait for the jobs table to exist (up to 2 minutes)

@@ -96,6 +96,21 @@ foreach ($instances as $instance) {
     $services[$name] = $serviceConfig;
 }
 
+// ─── Add MySQL Service if DB_HOST is 'db' ─────────────────────────────────────
+$dbHost = $extractEnvVar($db['host'] ?? '');
+if (str_contains($dbHost, 'db') && !isset($services['db'])) {
+    $services['db'] = [
+        'image' => 'mysql:8.0',
+        'restart' => 'always',
+        'environment' => [
+            'MYSQL_ROOT_PASSWORD' => $extractEnvVar($db['password'] ?? 'root'),
+            'MYSQL_DATABASE' => $extractEnvVar($db['name'] ?? 'apis-hub'),
+        ],
+        'ports' => ['3306:3306'],
+        'volumes' => ['db_data:/var/lib/mysql'],
+    ];
+}
+
 $services['redis'] = [
     'image'   => 'redis:alpine',
     'restart' => 'always',
@@ -106,7 +121,10 @@ $services['redis'] = [
 $compose = [
     'name'     => 'apis-hub',
     'services' => $services,
-    'volumes'  => ['redis_data' => null],
+    'volumes'  => [
+        'redis_data' => null,
+        'db_data' => null
+    ],
 ];
 
 $composeYaml = Yaml::dump($compose, 6, 2, Yaml::DUMP_NULL_AS_TILDE);

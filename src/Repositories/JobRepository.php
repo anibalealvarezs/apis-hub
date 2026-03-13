@@ -136,6 +136,11 @@ class JobRepository extends BaseRepository
                         }
                     }
                 }
+                if ($key === 'channel') {
+                    if ($chanEnum = Channel::tryFromName($value)) {
+                        $value = $chanEnum->name;
+                    }
+                }
                 $query->andWhere('e.' . $key . ' = :' . $key)
                     ->setParameter($key, $value);
             }
@@ -191,6 +196,57 @@ class JobRepository extends BaseRepository
         return $query;
     }
 
+    public function countElements(
+        ?object $filters = null,
+        ?string $startDate = null,
+        ?string $endDate = null
+    ): int {
+        $query = $this->createBaseQueryBuilder(QueryBuilderType::COUNT);
+        $isGlobal = false;
+
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                if ($key === 'global' && $value) {
+                    $isGlobal = true;
+                    continue;
+                }
+                if ($key === 'status') {
+                    if (is_numeric($value)) {
+                        $value = (int) $value;
+                    } elseif (is_string($value)) {
+                        foreach (JobStatus::cases() as $case) {
+                            if (strtolower($case->name) === strtolower($value)) {
+                                $value = $case->value;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if ($key === 'channel') {
+                    if ($chanEnum = Channel::tryFromName($value)) {
+                        $value = $chanEnum->name;
+                    }
+                }
+                $query->andWhere('e.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        if (!$isGlobal) {
+            $envChannel = getenv('API_SOURCE');
+            if ($envChannel && (!is_object($filters) || !isset($filters->channel))) {
+                if ($chanEnum = Channel::tryFromName($envChannel)) {
+                    $envChannel = $chanEnum->name;
+                }
+                $query->andWhere('e.channel = :ctx_channel')->setParameter('ctx_channel', $envChannel);
+            }
+        }
+
+        $this->applyDateFilters($query, $startDate, $endDate);
+
+        return (int) $query->getQuery()->getSingleScalarResult();
+    }
+
     /**
      * @param array $result
      * @return array
@@ -219,6 +275,9 @@ class JobRepository extends BaseRepository
     {
         $filters = ['status' => $status];
         if ($channel) {
+            if ($chanEnum = Channel::tryFromName($channel)) {
+                $channel = $chanEnum->name;
+            }
             $filters['channel'] = $channel;
         }
 
@@ -233,7 +292,7 @@ class JobRepository extends BaseRepository
 
         if ($instanceName) {
             $qb->andWhere('e.payload LIKE :instance_name_pattern')
-               ->setParameter('instance_name_pattern', '%"instance_name": "' . $instanceName . '"%');
+               ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%');
         }
 
         return $qb->getQuery()->getResult();
@@ -386,7 +445,7 @@ class JobRepository extends BaseRepository
             ->where('e.payload LIKE :instance_name_pattern')
             ->andWhere('e.status = :completed')
             ->andWhere('e.updatedAt >= :since')
-            ->setParameter('instance_name_pattern', '%"instance_name": "' . $instanceName . '"%')
+            ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%')
             ->setParameter('completed', JobStatus::completed->value)
             ->setParameter('since', $since)
             ->getQuery()

@@ -35,6 +35,21 @@ class Helpers
     private static ?array $projectConfig = null;
 
     /**
+     * Resets all cached configurations to force a reload from files.
+     * Useful for testing.
+     *
+     * @return void
+     */
+    public static function resetConfigs(): void
+    {
+        self::$projectConfig = null;
+        self::$channelsConfig = null;
+        self::$entitiesConfig = null;
+        self::$dbConfig = null;
+        self::$cacheConfig = null;
+    }
+
+    /**
      * @return array
      */
     /**
@@ -739,5 +754,51 @@ class Helpers
             $em->getConnection()->close();
             $em->getConnection()->connect();
         }
+    }
+
+    /**
+     * Checks if a string matches inclusion/exclusion filters.
+     * Supports both plain text and regex (if delimited by /).
+     *
+     * @param string $value
+     * @param string|array|null $include
+     * @param string|array|null $exclude
+     * @return bool
+     */
+    public static function matchesFilter(string $value, $include = null, $exclude = null): bool
+    {
+        // If include is set, must match at least one
+        if (!empty($include)) {
+            $matchedInclude = false;
+            $includes = is_array($include) ? $include : [$include];
+            foreach ($includes as $pattern) {
+                if (empty($pattern)) continue;
+                if (str_starts_with($pattern, '/') && str_ends_with($pattern, '/')) {
+                    if (preg_match($pattern, $value)) {
+                        $matchedInclude = true;
+                        break;
+                    }
+                } elseif (stripos($value, $pattern) !== false) {
+                    $matchedInclude = true;
+                    break;
+                }
+            }
+            if (!$matchedInclude) return false;
+        }
+
+        // If exclude is set, must NOT match any
+        if (!empty($exclude)) {
+            $excludes = is_array($exclude) ? $exclude : [$exclude];
+            foreach ($excludes as $pattern) {
+                if (empty($pattern)) continue;
+                if (str_starts_with($pattern, '/') && str_ends_with($pattern, '/')) {
+                    if (preg_match($pattern, $value)) return false;
+                } elseif (stripos($value, $pattern) !== false) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }
