@@ -75,12 +75,14 @@ class ReadEntityCommand extends Command
             }
         }
 
+        $method = $params['method'] ?? ($id ? 'read' : 'list');
+
         if ($channel) {
             $controller = $this->channeledCrudController ?? new \Controllers\ChanneledCrudController();
             $result = $controller(
                 entity: $entity,
                 channel: $channel,
-                method: $id ? 'read' : 'list',
+                method: $method,
                 id: $id,
                 body: $body,
                 params: $params
@@ -89,7 +91,7 @@ class ReadEntityCommand extends Command
             $controller = $this->crudController ?? new CrudController();
             $result = $controller(
                 entity: $entity,
-                method: $id ? 'read' : 'list',
+                method: $method,
                 id: $id,
                 body: $body,
                 params: $params

@@ -14,19 +14,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use Symfony\Component\Yaml\Yaml;
 use Helpers\Helpers;
 
-$projectName = $argv[1] ?? null;
-if (!$projectName) {
-    fwrite(STDERR, "Usage: php bin/setup-cron.php <project-name>\n");
-    exit(1);
-}
-
-$projectFile = __DIR__ . "/../deploy/{$projectName}.yaml";
-if (!file_exists($projectFile)) {
-    fwrite(STDERR, "Project file not found: {$projectFile}\n");
-    exit(1);
-}
-
-$config = Yaml::parseFile($projectFile);
+$config = Helpers::getProjectConfig();
 $instances = $config['instances'] ?? [];
 
 // Capture relevant environment variables to pass to Cron
@@ -86,7 +74,8 @@ file_put_contents($cronFile, implode("\n", $cronLines) . "\n");
 chmod($cronFile, 0644);
 
 if (Helpers::isDebug()) {
-    echo "✔ Cron configuration generated from {$projectName}.yaml\n";
+    $projectName = $config['project'] ?? 'apis-hub';
+    echo "✔ Cron configuration generated for project: {$projectName}\n";
     foreach ($cronLines as $line) {
         echo "  Applied: {$line}\n";
     }

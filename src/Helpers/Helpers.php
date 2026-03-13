@@ -35,6 +35,21 @@ class Helpers
     private static ?array $projectConfig = null;
 
     /**
+     * Resets all cached configurations to force a reload from files.
+     * Useful for testing.
+     *
+     * @return void
+     */
+    public static function resetConfigs(): void
+    {
+        self::$projectConfig = null;
+        self::$channelsConfig = null;
+        self::$entitiesConfig = null;
+        self::$dbConfig = null;
+        self::$cacheConfig = null;
+    }
+
+    /**
      * @return array
      */
     /**
@@ -49,6 +64,22 @@ class Helpers
 
         $config = [];
         $rootConfigDir = __DIR__ . '/../../config';
+
+        // 0. Load .env manually if it exists to ensure variables are available
+        $dotEnv = __DIR__ . '/../../.env';
+        if (file_exists($dotEnv)) {
+            $lines = file($dotEnv, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (str_starts_with(trim($line), '#')) continue;
+                if (str_contains($line, '=')) {
+                    list($name, $value) = explode('=', $line, 2);
+                    $name = trim($name);
+                    $value = trim($value, " \t\n\r\0\x0B\"'");
+                    if (!getenv($name)) putenv("$name=$value");
+                    if (!isset($_ENV[$name])) $_ENV[$name] = $value;
+                }
+            }
+        }
 
         // 0. Safeguard: Check for mandatory configuration files
         $mandatoryFiles = ['database.yaml', 'security.yaml', 'app.yaml'];
@@ -78,7 +109,7 @@ class Helpers
 
         // 2. Load environment-specific override if PROJECT_CONFIG_FILE is set
         $envFile = getenv('PROJECT_CONFIG_FILE');
-        if ($envFile && file_exists($envFile)) {
+        if ($envFile && is_file($envFile)) {
             $legacyConfig = self::loadYamlFile($envFile);
             $config = array_replace_recursive($config, $legacyConfig);
         }
@@ -92,12 +123,22 @@ class Helpers
      */
     private static function loadYamlFile(string $file): array
     {
+        if (!is_file($file)) {
+            return [];
+        }
         try {
             $content = file_get_contents($file);
             // Interpolate environment variables: ${VAR:-default}
-            $content = preg_replace_callback('/\$\{([^}:]+)(?::-([^}]+))?\}/', function($matches) {
+            $content = preg_replace_callback('/\$\{([^}:]+)(?::-([^}]*))?\}/', function($matches) {
                 $envValue = getenv($matches[1]);
-                return ($envValue !== false && $envValue !== '') ? $envValue : ($matches[2] ?? $matches[0]);
+                if ($envValue === false && isset($_ENV[$matches[1]])) $envValue = $_ENV[$matches[1]];
+                if ($envValue === false && isset($_SERVER[$matches[1]])) $envValue = $_SERVER[$matches[1]];
+                
+                $val = ($envValue !== false) ? (string)$envValue : ($matches[2] ?? $matches[0]);
+                if (str_contains($matches[0], 'PASSWORD')) {
+                    file_put_contents(__DIR__ . '/../../logs/resolve.log', "Resolved {$matches[0]} to " . substr($val, 0, 1) . "...\n", FILE_APPEND);
+                }
+                return $val;
             }, $content);
 
             $parsed = Yaml::parse($content);
@@ -118,7 +159,7 @@ class Helpers
         foreach (glob(dirname($pattern) . '/*', GLOB_ONLYDIR | GLOB_NOSORT) as $dir) {
             $files = array_merge($files, self::globRecursive($dir . '/' . basename($pattern), $flags));
         }
-        return $files;
+        return array_filter($files, 'is_file');
     }
 
     /**
@@ -559,7 +600,8 @@ class Helpers
     public static function bodyToObject(?string $data = null): object
     {
         if ($data) {
-            return json_decode($data);
+            $decoded = json_decode($data);
+            return is_object($decoded) ? $decoded : (object)[];
         }
         return (object)[];
     }
@@ -735,5 +777,51 @@ class Helpers
             $em->getConnection()->close();
             $em->getConnection()->connect();
         }
+    }
+
+    /**
+     * Checks if a string matches inclusion/exclusion filters.
+     * Supports both plain text and regex (if delimited by /).
+     *
+     * @param string $value
+     * @param string|array|null $include
+     * @param string|array|null $exclude
+     * @return bool
+     */
+    public static function matchesFilter(string $value, $include = null, $exclude = null): bool
+    {
+        // If include is set, must match at least one
+        if (!empty($include)) {
+            $matchedInclude = false;
+            $includes = is_array($include) ? $include : [$include];
+            foreach ($includes as $pattern) {
+                if (empty($pattern)) continue;
+                if (str_starts_with($pattern, '/') && str_ends_with($pattern, '/')) {
+                    if (preg_match($pattern, $value)) {
+                        $matchedInclude = true;
+                        break;
+                    }
+                } elseif (stripos($value, $pattern) !== false) {
+                    $matchedInclude = true;
+                    break;
+                }
+            }
+            if (!$matchedInclude) return false;
+        }
+
+        // If exclude is set, must NOT match any
+        if (!empty($exclude)) {
+            $excludes = is_array($exclude) ? $exclude : [$exclude];
+            foreach ($excludes as $pattern) {
+                if (empty($pattern)) continue;
+                if (str_starts_with($pattern, '/') && str_ends_with($pattern, '/')) {
+                    if (preg_match($pattern, $value)) return false;
+                } elseif (stripos($value, $pattern) !== false) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }

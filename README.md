@@ -133,20 +133,16 @@ Detailed guides for setting up and maintaining the infrastructure:
 - [Cloud Architecture & Data Access Strategy](docs/cloud-architecture.md)
 - [Deployment Checklist](docs/deployment-checklist.md)
 
-## 🛠 Installation
+## 🛠 Installation & Deployment
 
-Before running queries, initialize your Cloud/Local Database schema with these idempotent commands:
+The easiest way to deploy the entire stack is using the built-in orchestrator:
 
 ```bash
-# 1. Start the Docker services (Redis + DB + PHP)
-docker-compose up -d
-
-# 2. Update schema structure
-docker-compose exec app php bin/cli.php orm:schema-tool:update --force
-
-# 3. Seed initial mandatory entities
-docker-compose exec app php bin/cli.php app:initialize-entities
+# Fully automated deployment
+bash bin/full-deploy.sh
 ```
+
+This script automates environment validation, dependency installation, instance regeneration, and container orchestration.
 
 ---
 

@@ -52,6 +52,7 @@ foreach ($instances as $instance) {
     $endDate   = $instance['end_date']   ?? null;
 
     $extractEnvVar = function($str) {
+        if (!str_contains((string)$str, '${')) return (string)$str;
         return preg_replace('/^\$\{.*:-(.*)\}$/', '$1', (string) $str);
     };
 
@@ -67,7 +68,7 @@ foreach ($instances as $instance) {
         "DB_NAME=" . $extractEnvVar($db['name'] ?? ''),
         "REDIS_HOST=" . $redis['host'],
         "REDIS_PORT=" . $redis['port'],
-        "PROJECT_CONFIG_FILE=/app/config",
+        "PROJECT_CONFIG_FILE=/app/config/" . ($config['project'] ?? 'apis-hub') . ".yaml",
         "INSTANCE_NAME={$name}",
     ];
 
@@ -96,6 +97,21 @@ foreach ($instances as $instance) {
     $services[$name] = $serviceConfig;
 }
 
+// ─── Add MySQL Service if DB_HOST is 'db' ─────────────────────────────────────
+$dbHost = $extractEnvVar($db['host'] ?? '');
+if (str_contains($dbHost, 'db') && !isset($services['db'])) {
+    $services['db'] = [
+        'image' => 'mysql:8.0',
+        'restart' => 'always',
+        'environment' => [
+            'MYSQL_ROOT_PASSWORD' => $extractEnvVar($db['password'] ?? 'root'),
+            'MYSQL_DATABASE' => $extractEnvVar($db['name'] ?? 'apis-hub'),
+        ],
+        'ports' => ['3306:3306'],
+        'volumes' => ['db_data:/var/lib/mysql'],
+    ];
+}
+
 $services['redis'] = [
     'image'   => 'redis:alpine',
     'restart' => 'always',
@@ -106,7 +122,10 @@ $services['redis'] = [
 $compose = [
     'name'     => 'apis-hub',
     'services' => $services,
-    'volumes'  => ['redis_data' => null],
+    'volumes'  => [
+        'redis_data' => null,
+        'db_data' => null
+    ],
 ];
 
 $composeYaml = Yaml::dump($compose, 6, 2, Yaml::DUMP_NULL_AS_TILDE);

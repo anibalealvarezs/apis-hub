@@ -32,10 +32,17 @@ class InstanceGeneratorService
 
         $currentPort = $basePort;
 
-        foreach ($channels as $channel => $rules) {
+        foreach ($channels as $channelName => $rules) {
             if (isset($rules['enabled']) && !$rules['enabled']) {
                 continue;
             }
+
+            if (!$this->hasActiveEntities($channelName)) {
+                continue;
+            }
+
+            $channel = $channelName;
+            
             $channelInstances = [];
             
             // 1. Entities Sync (if applicable)
@@ -107,6 +114,58 @@ class InstanceGeneratorService
     }
 
     /**
+     * @param string $channelName
+     * @return bool
+     */
+    private function hasActiveEntities(string $channelName): bool
+    {
+        $channelConfig = \Helpers\Helpers::getChannelsConfig();
+        
+        // Map rules channel name (from rules section in instances_rules.yaml) 
+        // to actual configuration keys and their target entity lists.
+        $mapping = [
+            'facebook_marketing' => ['channel' => 'facebook', 'key' => 'ad_accounts'],
+            'facebook_organic'   => ['channel' => 'facebook', 'key' => 'pages'],
+            'gsc'                => ['channel' => 'google_search_console', 'key' => 'sites'],
+            'google_search_console' => ['channel' => 'google_search_console', 'key' => 'sites'],
+        ];
+
+        // If we don't have a specific mapping for entity-level validation, 
+        // we default to true to allow standard processing based on top-level rules.
+        if (!isset($mapping[$channelName])) {
+            return true;
+        }
+
+        $target = $mapping[$channelName];
+        $config = $channelConfig[$target['channel']] ?? null;
+
+        // If the configuration for the channel is missing or explicitly disabled
+        if (!$config || (isset($config['enabled']) && !$config['enabled'])) {
+            return false;
+        }
+
+        // If cache_all is enabled, the channel is considered active even with an empty entity list
+        if (isset($config['cache_all']) && $config['cache_all']) {
+            return true;
+        }
+
+        // Check the specific list of entities (pages, ad_accounts, or sites)
+        $entities = $config[$target['key']] ?? [];
+        if (empty($entities)) {
+            return false;
+        }
+
+        // Search for at least one entity that is enabled: true
+        foreach ($entities as $entity) {
+            if (isset($entity['enabled']) && $entity['enabled']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param DateTimeImmutable $date
      * @return DateTimeImmutable
      */
@@ -115,10 +174,9 @@ class InstanceGeneratorService
         $month = (int)$date->format('n');
         $year = (int)$date->format('Y');
         
-        $currentQuarter = ceil($month / 3);
+        $currentQuarter = (int)ceil($month / 3);
         $endMonth = $currentQuarter * 3;
         
-        $lastDay = cal_days_in_month(CAL_GREGORIAN, $endMonth, $year);
-        return new DateTimeImmutable("$year-$endMonth-$lastDay");
+        return $date->setDate($year, $endMonth, 1)->modify('last day of this month');
     }
 }

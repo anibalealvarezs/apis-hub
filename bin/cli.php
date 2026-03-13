@@ -17,6 +17,7 @@ use Commands\Crud\UpdateEntityCommand;
 use Commands\GenerateEntitiesConfigCommand;
 use Commands\InitializeEntitiesCommand;
 use Commands\RefreshInstancesCommand;
+use Commands\SetupDatabaseCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use Helpers\Helpers;
 use Symfony\Component\Console\Application;
@@ -52,7 +53,8 @@ try {
         new ClearCacheCommand(),
         new HealthCheckCommand(),
         new AggregateEntityCommand(),
-        new RefreshInstancesCommand()
+        new RefreshInstancesCommand(),
+        new SetupDatabaseCommand()
     ]);
 
     // Runs console application

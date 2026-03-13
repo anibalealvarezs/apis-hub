@@ -180,23 +180,28 @@ class MonitoringController extends BaseController
             }
 
             // 2. Channeled Breakdown (Raw SQL for speed)
+            $channeledData = [];
             if ($config['channeled']) {
                 try {
                     $tableName = self::getTableNameForEntity($config['channeled']);
                     if ($tableName) {
                         $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
                         
-                        $channeledTotal = 0;
                         foreach ($results as $res) {
                             $channelId = (int)$res['channel'];
                             $channelCount = (int)$res['count'];
                             $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? \Enums\Channel::tryFromName($res['channel'])?->getCommonName() ?? "Ch $channelId";
-                            $entry['channels'][] = ['name' => $channelName, 'count' => $channelCount];
-                            $channeledTotal += $channelCount;
+                            
+                            if (!isset($channeledData[$channelName])) {
+                                $channeledData[$channelName] = ['name' => $channelName, 'count' => 0];
+                            }
+                            $channeledData[$channelName]['count'] += $channelCount;
                         }
                         
+                        $entry['channels'] = array_values($channeledData);
+                        
                         if (!$config['class']) {
-                            $entry['count'] = $channeledTotal;
+                            $entry['count'] = array_sum(array_column($channeledData, 'count'));
                         }
                     }
                 } catch (\Exception $e) {}
@@ -357,9 +362,15 @@ class MonitoringController extends BaseController
     {
         // 1. Define channel mapping for grouping
         $channelMap = [
-            'gsc' => 'Google Search Console',
-            'fb-ads' => 'Facebook',
-            'facebook' => 'Facebook',
+            'gsc' => 'GoogleSearchConsole',
+            'google_search_console' => 'GoogleSearchConsole',
+            'google-search-console' => 'GoogleSearchConsole',
+            'fb-ads' => 'FacebookMarketing',
+            'facebook' => 'FacebookOrganic',
+            'facebook-ads' => 'FacebookMarketing',
+            'facebook_marketing' => 'FacebookMarketing',
+            'facebook_organic' => 'FacebookOrganic',
+            'fb-organic' => 'FacebookOrganic',
         ];
 
         // 2. Group instances by mapped channel

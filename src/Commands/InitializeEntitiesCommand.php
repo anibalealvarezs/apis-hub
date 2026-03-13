@@ -23,6 +23,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Classes\Requests\MetricRequests;
 
 #[AsCommand(
     name: 'app:initialize-entities',
@@ -98,14 +99,47 @@ class InitializeEntitiesCommand extends Command
             $pageRepository = $this->entityManager->getRepository(Page::class);
             /** @var \Repositories\Channeled\ChanneledAccountRepository $channeledAccountRepository */
             $channeledAccountRepository = $this->entityManager->getRepository(ChanneledAccount::class);
-            $gscConfig = Helpers::getChannelsConfig()['google_search_console'] ?? null;
+            $gscConfigRaw = Helpers::getChannelsConfig();
+            $gscConfig = $gscConfigRaw['google_search_console'] ?? null;
             if (!$gscConfig) {
                 throw new Exception("Missing 'google_search_console' configuration in channels config");
             }
             $pagesInitialized = 0;
             $pagesSkipped = 0;
 
-            foreach ($gscConfig['sites'] as $site) {
+            $sitesToProcess = $gscConfig['sites'] ?? [];
+            if ($gscConfig['cache_all'] ?? false) {
+                $this->logger->info("GSC 'cache_all' enabled. Fetching all sites from API.");
+                try {
+                    $apiSites = $this->fetchGscSites($gscConfigRaw);
+                    if (isset($apiSites['siteEntry']) && is_array($apiSites['siteEntry'])) {
+                        foreach ($apiSites['siteEntry'] as $apiSite) {
+                            $siteUrl = $apiSite['siteUrl'];
+                            // Check if already in $sitesToProcess
+                            $alreadyInConfig = false;
+                            foreach ($sitesToProcess as $s) {
+                                if (rtrim($s['url'], '/') === rtrim($siteUrl, '/')) {
+                                    $alreadyInConfig = true;
+                                    break;
+                                }
+                            }
+                            if (!$alreadyInConfig) {
+                                if (Helpers::matchesFilter($siteUrl, $gscConfig['cache_include'] ?? null, $gscConfig['cache_exclude'] ?? null)) {
+                                    $sitesToProcess[] = [
+                                        'url' => $siteUrl,
+                                        'title' => $siteUrl,
+                                        'enabled' => true
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    $this->logger->error("Error fetching GSC sites: " . $e->getMessage());
+                }
+            }
+
+            foreach ($sitesToProcess as $site) {
                 $siteUrl = $site['url'];
                 $normalizedSiteUrl = rtrim($siteUrl, '/');
                 $title = $site['title'] ?? $siteUrl;
@@ -157,7 +191,44 @@ class InitializeEntitiesCommand extends Command
                 $this->logger->info("Initialized Account: Name={$fbConfig['accounts_group_name']}");
             }
 
-            foreach ($fbConfig['pages'] as $page) {
+            $pagesToProcess = $fbConfig['pages'] ?? [];
+            if ($fbConfig['cache_all'] ?? false) {
+                $this->logger->info("Facebook 'cache_all' enabled. Fetching all pages from API.");
+                try {
+                    $apiPages = $this->fetchFbPages($fbConfig);
+                    if (isset($apiPages['data']) && is_array($apiPages['data'])) {
+                        foreach ($apiPages['data'] as $apiPage) {
+                            $pageId = (string)$apiPage['id'];
+                            $alreadyInConfig = false;
+                            foreach ($pagesToProcess as $p) {
+                                if ((string)$p['id'] === $pageId) {
+                                    $alreadyInConfig = true;
+                                    break;
+                                }
+                            }
+                            if (!$alreadyInConfig) {
+                                $pageName = $apiPage['name'] ?? "Page " . $pageId;
+                                $includeFilter = MetricRequests::getFacebookFilter(['facebook' => $fbConfig], 'PAGE', 'cache_include');
+                                $excludeFilter = MetricRequests::getFacebookFilter(['facebook' => $fbConfig], 'PAGE', 'cache_exclude');
+                                if (Helpers::matchesFilter($pageName, $includeFilter, $excludeFilter) || Helpers::matchesFilter($pageId, $includeFilter, $excludeFilter)) {
+                                    $pagesToProcess[] = [
+                                        'id' => $pageId,
+                                        'url' => "https://www.facebook.com/" . $pageId,
+                                        'title' => $pageName,
+                                        'hostname' => 'www.facebook.com',
+                                        'ig_account' => $apiPage['instagram_business_account']['id'] ?? null,
+                                        'enabled' => true
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    $this->logger->error("Error fetching Facebook pages: " . $e->getMessage());
+                }
+            }
+
+            foreach ($pagesToProcess as $page) {
                 $pageUrl = $page['url'];
                 $title = $page['title'];
                 $hostname = $page['hostname'];
@@ -208,7 +279,41 @@ class InitializeEntitiesCommand extends Command
                     }
                 }
             }
-            foreach ($fbConfig['ad_accounts'] as $adAccount) {
+            $adAccountsToProcess = $fbConfig['ad_accounts'] ?? [];
+            if ($fbConfig['cache_all'] ?? false) {
+                $this->logger->info("Facebook 'cache_all' enabled. Fetching all ad accounts from API.");
+                try {
+                    $apiAdAccs = $this->fetchFbAdAccounts($fbConfig);
+                    if (isset($apiAdAccs['data']) && is_array($apiAdAccs['data'])) {
+                        foreach ($apiAdAccs['data'] as $apiAdAcc) {
+                            $adAccId = (string)$apiAdAcc['id'];
+                            $alreadyInConfig = false;
+                            foreach ($adAccountsToProcess as $aac) {
+                                if ((string)$aac['id'] === $adAccId) {
+                                    $alreadyInConfig = true;
+                                    break;
+                                }
+                            }
+                            if (!$alreadyInConfig) {
+                                $adAccName = $apiAdAcc['name'] ?? "Ad Account " . $adAccId;
+                                $includeFilter = MetricRequests::getFacebookFilter(['facebook' => $fbConfig], 'AD_ACCOUNT', 'cache_include');
+                                $excludeFilter = MetricRequests::getFacebookFilter(['facebook' => $fbConfig], 'AD_ACCOUNT', 'cache_exclude');
+                                if (Helpers::matchesFilter($adAccName, $includeFilter, $excludeFilter) || Helpers::matchesFilter($adAccId, $includeFilter, $excludeFilter)) {
+                                    $adAccountsToProcess[] = [
+                                        'id' => $adAccId,
+                                        'name' => $adAccName,
+                                        'enabled' => true
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    $this->logger->error("Error fetching Facebook ad accounts: " . $e->getMessage());
+                }
+            }
+
+            foreach ($adAccountsToProcess as $adAccount) {
                 $adAccountEntity = $channeledAccountRepository->getByPlatformId($adAccount['id'], Channel::facebook_marketing->value);
                 if (!$adAccountEntity) {
                     $channeledAccount = new ChanneledAccount();
@@ -243,5 +348,23 @@ class InitializeEntitiesCommand extends Command
             $output->writeln("<error>Error during initialization: {$e->getMessage()}</error>");
             return Command::FAILURE;
         }
+    }
+
+    protected function fetchGscSites(array $configRaw): array
+    {
+        $gscApi = MetricRequests::initializeSearchConsoleApi($configRaw, $this->logger);
+        return $gscApi->getSites();
+    }
+
+    protected function fetchFbPages(array $fbConfig): array
+    {
+        $fbApi = MetricRequests::initializeFacebookGraphApi(['facebook' => $fbConfig], $this->logger);
+        return $fbApi->getMyPages();
+    }
+
+    protected function fetchFbAdAccounts(array $fbConfig): array
+    {
+        $fbApi = MetricRequests::initializeFacebookGraphApi(['facebook' => $fbConfig], $this->logger);
+        return $fbApi->getMyAdAccounts();
     }
 }

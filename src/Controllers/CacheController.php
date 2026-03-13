@@ -156,6 +156,12 @@ class CacheController extends BaseController
                     ->setParameter('end_pattern1', '%endDate%' . $params['endDate'] . '%')
                     ->setParameter('end_pattern2', '%end_date%' . $params['endDate'] . '%');
             }
+            
+            // Be instance-specific if name is provided
+            if ($params && isset($params['instance_name'])) {
+                $qb->andWhere('j.payload LIKE :instance_pattern')
+                   ->setParameter('instance_pattern', '%instance_name%' . $params['instance_name'] . '%');
+            }
 
             $existingJobs = $qb->getQuery()->getResult();
             if (count($existingJobs) > 0) {
