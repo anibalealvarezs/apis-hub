@@ -78,7 +78,7 @@ class Helpers
 
         // 2. Load environment-specific override if PROJECT_CONFIG_FILE is set
         $envFile = getenv('PROJECT_CONFIG_FILE');
-        if ($envFile && file_exists($envFile)) {
+        if ($envFile && is_file($envFile)) {
             $legacyConfig = self::loadYamlFile($envFile);
             $config = array_replace_recursive($config, $legacyConfig);
         }
@@ -92,6 +92,9 @@ class Helpers
      */
     private static function loadYamlFile(string $file): array
     {
+        if (!is_file($file)) {
+            return [];
+        }
         try {
             $content = file_get_contents($file);
             // Interpolate environment variables: ${VAR:-default}
@@ -118,7 +121,7 @@ class Helpers
         foreach (glob(dirname($pattern) . '/*', GLOB_ONLYDIR | GLOB_NOSORT) as $dir) {
             $files = array_merge($files, self::globRecursive($dir . '/' . basename($pattern), $flags));
         }
-        return $files;
+        return array_filter($files, 'is_file');
     }
 
     /**
@@ -559,7 +562,8 @@ class Helpers
     public static function bodyToObject(?string $data = null): object
     {
         if ($data) {
-            return json_decode($data);
+            $decoded = json_decode($data);
+            return is_object($decoded) ? $decoded : (object)[];
         }
         return (object)[];
     }

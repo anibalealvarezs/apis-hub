@@ -115,10 +115,9 @@ class InstanceGeneratorService
         $month = (int)$date->format('n');
         $year = (int)$date->format('Y');
         
-        $currentQuarter = ceil($month / 3);
+        $currentQuarter = (int)ceil($month / 3);
         $endMonth = $currentQuarter * 3;
         
-        $lastDay = cal_days_in_month(CAL_GREGORIAN, $endMonth, $year);
-        return new DateTimeImmutable("$year-$endMonth-$lastDay");
+        return $date->setDate($year, $endMonth, 1)->modify('last day of this month');
     }
 }

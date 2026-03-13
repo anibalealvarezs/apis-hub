@@ -10,7 +10,7 @@ echo ""
 # ── Step 1: Install Composer dependencies ────────────────────────────────────
 # If vendor/ is missing or outdated, install it via the official Composer image.
 if [ ! -f "vendor/autoload.php" ]; then
-    echo "📦 [1/3] Composer dependencies not found. Installing..."
+    echo "📦 [1/4] Composer dependencies not found. Installing..."
     docker run --rm \
         -v "$(pwd):/app" \
         -w /app \
@@ -18,12 +18,22 @@ if [ ! -f "vendor/autoload.php" ]; then
         install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader
     echo "✔ Dependencies installed."
 else
-    echo "📦 [1/3] Composer dependencies already present. Skipping install."
+    echo "📦 [1/4] Composer dependencies already present. Skipping install."
 fi
 
-# ── Step 2: Generate docker-compose.yml from project.yaml ────────────────────
+# ── Step 2: Refresh Instances from rules ──────────────────────────────────────
 echo ""
-echo "📂 [2/3] Generating deployment manifests from deploy settings..."
+echo "🔄 [2/4] Refreshing instances configuration from rules..."
+docker run --rm \
+    -v "$(pwd):/app" \
+    -w /app \
+    php:8.3-cli \
+    php bin/cli.php app:refresh-instances
+echo "✔ Instances refreshed."
+
+# ── Step 3: Generate docker-compose.yml ───────────────────────────────────────
+echo ""
+echo "📂 [3/4] Generating deployment manifests from deploy settings..."
 
 docker run --rm \
     -v "$(pwd):/app" \
@@ -33,9 +43,9 @@ docker run --rm \
 
 echo "✔ docker-compose.yml generated successfully."
 
-# ── Step 3: Build images and start containers ─────────────────────────────────
+# ── Step 4: Build images and start containers ─────────────────────────────────
 echo ""
-echo "🚀 [3/3] Building images and starting containers..."
+echo "🚀 [4/4] Building images and starting containers..."
 docker compose up -d --build
 
 echo ""
