@@ -38,6 +38,7 @@ use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledAd;
 use Entities\Analytics\Channeled\ChanneledAdGroup;
 use Entities\Analytics\Channeled\ChanneledCampaign;
+use Entities\Analytics\Creative;
 use Entities\Analytics\Channeled\ChanneledMetric;
 use Entities\Analytics\Channeled\ChanneledMetricDimension;
 use Entities\Analytics\Country;
@@ -58,6 +59,7 @@ use Enums\Period;
 use Enums\Account as AccountEnum;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\FacebookGraphHelpers;
+use Repositories\CreativeRepository;
 use Helpers\GoogleSearchConsoleHelpers;
 use Helpers\Helpers;
 use Repositories\Channeled\ChanneledMetricRepository;
@@ -544,6 +546,18 @@ class MetricRequests
                                         );
                                     }
                                 }
+                            }
+
+                            if (!empty($adAccount['creatives']) && !empty($adAccount['creative_metrics'])) {
+                                self::processCreativesBulk(
+                                    api: $api,
+                                    manager: $manager,
+                                    channeledAccountEntity: $channeledAccountEntity,
+                                    logger: $logger,
+                                    startDate: $startDate,
+                                    endDate: $endDate,
+                                    jobId: $jobId,
+                                );
                             }
                         }
                     } catch (FacebookRateLimitException $e) {
@@ -4004,6 +4018,130 @@ class MetricRequests
             return true;
         } catch (Exception $e) {
             $logger->error("Error during bulk Meta account's ad insights request: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * @param FacebookGraphApi $api
+     * @param EntityManager $manager
+     * @param ChanneledAccount $channeledAccountEntity
+     * @param LoggerInterface $logger
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param int|null $jobId
+     * @return bool
+     * @throws Exception
+     */
+    private static function processCreativesBulk(
+        FacebookGraphApi $api,
+        EntityManager $manager,
+        ChanneledAccount $channeledAccountEntity,
+        LoggerInterface $logger,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?int $jobId = null,
+    ): bool {
+        $logger->info("Starting processCreativesBulk for ad account: " . $channeledAccountEntity->getPlatformId());
+        try {
+            $adAccountId = $channeledAccountEntity->getPlatformId();
+            
+            /** @var \Repositories\CreativeRepository $creativeRepository */
+            $creativeRepository = $manager->getRepository(Creative::class);
+            
+            $qb = $manager->createQueryBuilder();
+            $qb->select('DISTINCT c')
+                ->from(Creative::class, 'c')
+                ->join('c.channeledAds', 'ca')
+                ->where('ca.channeledAccount = :channeledAccount')
+                ->setParameter('channeledAccount', $channeledAccountEntity);
+                
+            $creatives = $qb->getQuery()->getResult();
+            $logger->info("Found " . count($creatives) . " creatives for account in DB");
+            $creativesMap = [];
+            foreach ($creatives as $creative) {
+                $creativesMap[$creative->getCreativeId()] = $creative;
+            }
+
+            $additionalParams = [
+                'breakdowns' => 'ad_creative_id',
+                'limit' => 100,
+            ];
+            if ($startDate) {
+                $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
+            }
+            
+            $insights = $api->getAdAccountInsights(
+                adAccountId: $adAccountId,
+                additionalParams: $additionalParams,
+                metricSet: MetricSet::FULL
+            );
+
+            $groupedRows = [];
+            foreach ($insights['data'] as $row) {
+                if (isset($row['ad_creative_id'])) {
+                    $groupedRows[$row['ad_creative_id']][] = $row;
+                }
+            }
+            $logger->info("Fetched insights for " . count($groupedRows) . " unique creatives");
+
+            $totalMetricsCount = 0;
+            foreach ($groupedRows as $creativePlatformId => $rows) {
+                Helpers::checkJobStatus($jobId);
+                
+                $creative = $creativesMap[$creativePlatformId] ?? null;
+                if (!$creative) {
+                    continue;
+                }
+
+                $metrics = FacebookMarketingMetricConvert::creativeMetrics(
+                    rows: $rows,
+                    logger: $logger,
+                    channeledAccountEntity: $channeledAccountEntity,
+                    creativeEntity: $creative,
+                    metricSet: MetricSet::FULL
+                );
+                
+                if ($metrics->count() > 0) {
+                    try {
+                        $manager->getConnection()->beginTransaction();
+                        $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                            metrics: $metrics,
+                            manager: $manager,
+                            channeledAccountMap: [
+                                'map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()],
+                                'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]
+                            ],
+                            creativeMap: [
+                                'map' => [$creative->getCreativeId() => $creative->getId()],
+                                'mapReverse' => [$creative->getId() => $creative->getCreativeId()]
+                            ]
+                        );
+                        $metricMap = MetricsProcessor::processMetrics(
+                            metrics: $metrics,
+                            manager: $manager,
+                            metricConfigMap: $metricConfigMap,
+                        );
+                        MetricsProcessor::processChanneledMetrics(
+                            metrics: $metrics,
+                            manager: $manager,
+                            metricMap: $metricMap,
+                            logger: $logger,
+                        );
+                        $manager->getConnection()->commit();
+                    } catch (Exception $e) {
+                        if ($manager->getConnection()->isTransactionActive()) {
+                            $manager->getConnection()->rollback();
+                        }
+                        throw $e;
+                    }
+                    $totalMetricsCount += $metrics->count();
+                }
+            }
+            $logger->info("Completed bulk Meta account's creative insights request: $totalMetricsCount metrics");
+            return true;
+        } catch (Exception $e) {
+            $logger->error("Error during bulk Meta account's creative insights request: " . $e->getMessage());
             throw $e;
         }
     }

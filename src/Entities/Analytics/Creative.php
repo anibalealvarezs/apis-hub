@@ -27,9 +27,13 @@ class Creative extends Entity
     #[ORM\OneToMany(mappedBy: 'creative', targetEntity: ChanneledAd::class)]
     protected Collection $channeledAds;
 
+    #[ORM\OneToMany(mappedBy: 'creative', targetEntity: MetricConfig::class)]
+    protected Collection $metricConfigs;
+
     public function __construct()
     {
         $this->channeledAds = new ArrayCollection();
+        $this->metricConfigs = new ArrayCollection();
     }
 
     /**

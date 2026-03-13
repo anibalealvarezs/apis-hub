@@ -46,7 +46,10 @@ class FacebookEntityRequests implements RequestInterface
             // 2. Sync AdGroups
             AdGroupRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
 
-            // 3. Sync Ads
+            // 3. Sync Creatives
+            CreativeRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+
+            // 4. Sync Ads
             AdRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
 
             $logger->info("Facebook Marketing entities sync completed");

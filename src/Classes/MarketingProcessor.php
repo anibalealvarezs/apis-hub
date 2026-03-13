@@ -11,6 +11,11 @@ use Helpers\Helpers;
 
 class MarketingProcessor
 {
+    private static function getLogger(): \Psr\Log\LoggerInterface
+    {
+        return Helpers::setLogger('marketing-processor.log');
+    }
+
     /**
      * @param ArrayCollection $channeledCollection
      * @param EntityManager $manager
@@ -41,6 +46,7 @@ class MarketingProcessor
                 . implode(', ', array_fill(0, count($campaigns), '(?, ?, ?, ?)'))
                 . ' ON DUPLICATE KEY UPDATE name = VALUES(name), startDate = VALUES(startDate), endDate = VALUES(endDate)';
             $conn->executeStatement($sql, $insertParams);
+            self::getLogger()->info("Processed " . count($campaigns) . " campaigns");
         }
 
         // 2. Fetch campaign IDs map
@@ -71,6 +77,7 @@ class MarketingProcessor
                 . implode(', ', array_fill(0, count($campaigns), '(?, ?, ?, ?, ?, ?, ?, ?, ?)'))
                 . ' ON DUPLICATE KEY UPDATE campaign_id = VALUES(campaign_id), budget = VALUES(budget), status = VALUES(status), objective = VALUES(objective), buyingType = VALUES(buyingType), data = VALUES(data)';
             $conn->executeStatement($sql, $channeledParams);
+            self::getLogger()->info("Processed " . count($campaigns) . " channeled campaigns");
         }
     }
 
@@ -128,6 +135,7 @@ class MarketingProcessor
                 . implode(', ', array_fill(0, count($adsets), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'))
                 . ' ON DUPLICATE KEY UPDATE campaign_id = VALUES(campaign_id), channeledCampaign_id = VALUES(channeledCampaign_id), name = VALUES(name), status = VALUES(status), targeting = VALUES(targeting), data = VALUES(data)';
             $conn->executeStatement($sql, $params);
+            self::getLogger()->info("Processed " . count($adsets) . " ad groups");
         }
     }
 
@@ -145,9 +153,10 @@ class MarketingProcessor
         $conn = $manager->getConnection();
         $ads = $channeledCollection->toArray();
 
-        // 1. Fetch relevant maps (Campaigns & AdGroups)
+        // 1. Fetch relevant maps (Campaigns, AdGroups & Creatives)
         $campaignPlatformIds = array_unique(array_filter(array_column($ads, 'channeledCampaignId')));
         $adsetPlatformIds = array_unique(array_filter(array_column($ads, 'channeledAdGroupId')));
+        $creativePlatformIds = array_unique(array_filter(array_column($ads, 'channeledCreativeId')));
 
         $campaignMap = [];
         if (!empty($campaignPlatformIds)) {
@@ -169,6 +178,16 @@ class MarketingProcessor
             }
         }
 
+        $creativeMap = [];
+        if (!empty($creativePlatformIds)) {
+            $sql = 'SELECT creativeId, id FROM creatives WHERE creativeId IN ('
+                . implode(', ', array_fill(0, count($creativePlatformIds), '?')) . ')';
+            $fetched = $conn->executeQuery($sql, array_values($creativePlatformIds))->fetchAllAssociative();
+            foreach ($fetched as $row) {
+                $creativeMap[$row['creativeId']] = $row['id'];
+            }
+        }
+
         // 2. Bulk Insert/Update channeled_ads
         $params = [];
         foreach ($ads as $a) {
@@ -177,16 +196,49 @@ class MarketingProcessor
             $params[] = $a->channeledAccountId;
             $params[] = $campaignMap[$a->channeledCampaignId] ?? null;
             $params[] = $adGroupMap[$a->channeledAdGroupId] ?? null;
+            $params[] = $creativeMap[$a->channeledCreativeId] ?? null;
             $params[] = $a->name;
             $params[] = $a->status ?? null;
             $params[] = json_encode($a->data);
         }
 
         if (!empty($params)) {
-            $sql = 'INSERT INTO channeled_ads (channel, platformId, channeledAccount_id, channeledCampaign_id, channeledAdGroup_id, name, status, data) VALUES '
-                . implode(', ', array_fill(0, count($ads), '(?, ?, ?, ?, ?, ?, ?, ?)'))
-                . ' ON DUPLICATE KEY UPDATE channeledCampaign_id = VALUES(channeledCampaign_id), channeledAdGroup_id = VALUES(channeledAdGroup_id), name = VALUES(name), status = VALUES(status), data = VALUES(data)';
+            $sql = 'INSERT INTO channeled_ads (channel, platformId, channeledAccount_id, channeledCampaign_id, channeledAdGroup_id, creative_id, name, status, data) VALUES '
+                . implode(', ', array_fill(0, count($ads), '(?, ?, ?, ?, ?, ?, ?, ?, ?)'))
+                . ' ON DUPLICATE KEY UPDATE channeledCampaign_id = VALUES(channeledCampaign_id), channeledAdGroup_id = VALUES(channeledAdGroup_id), creative_id = VALUES(creative_id), name = VALUES(name), status = VALUES(status), data = VALUES(data)';
             $conn->executeStatement($sql, $params);
+            self::getLogger()->info("Processed " . count($ads) . " ads");
+        }
+    }
+
+    /**
+     * @param ArrayCollection $channeledCollection
+     * @param EntityManager $manager
+     * @return void
+     */
+    public static function processCreatives(ArrayCollection $channeledCollection, EntityManager $manager): void
+    {
+        if ($channeledCollection->isEmpty()) {
+            return;
+        }
+
+        $conn = $manager->getConnection();
+        $creatives = $channeledCollection->toArray();
+
+        // 1. Bulk Insert/Update creatives (Global)
+        $insertParams = [];
+        foreach ($creatives as $c) {
+            $insertParams[] = $c->platformId;
+            $insertParams[] = $c->name;
+            $insertParams[] = json_encode($c->data);
+        }
+
+        if (!empty($insertParams)) {
+            $sql = 'INSERT INTO creatives (creativeId, name, data) VALUES '
+                . implode(', ', array_fill(0, count($creatives), '(?, ?, ?)'))
+                . ' ON DUPLICATE KEY UPDATE name = VALUES(name), data = VALUES(data)';
+            $conn->executeStatement($sql, $insertParams);
+            self::getLogger()->info("Processed " . count($creatives) . " creatives");
         }
     }
 }

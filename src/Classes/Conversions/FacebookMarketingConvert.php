@@ -75,8 +75,27 @@ class FacebookMarketingConvert
                 'channeledAccountId' => $channeledAccountId,
                 'channeledCampaignId' => $ad['campaign_id'] ?? null, // platformId of campaign
                 'channeledAdGroupId' => $ad['adset_id'] ?? null, // platformId of adset
+                'channeledCreativeId' => $ad['creative']['id'] ?? null, // platformId of creative
                 'data' => $ad,
             ];
         }, $ads));
+    }
+
+    /**
+     * @param array $creatives
+     * @param int|string|null $channeledAccountId
+     * @return ArrayCollection
+     */
+    public static function creatives(array $creatives, int|string|null $channeledAccountId = null): ArrayCollection
+    {
+        return new ArrayCollection(array_map(function ($creative) use ($channeledAccountId) {
+            return (object) [
+                'platformId' => $creative['id'] ?? null,
+                'name' => $creative['name'] ?? '',
+                'channel' => Channel::facebook_marketing->value,
+                'channeledAccountId' => $channeledAccountId,
+                'data' => $creative,
+            ];
+        }, $creatives));
     }
 }
