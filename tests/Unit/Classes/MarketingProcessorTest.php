@@ -26,15 +26,16 @@ class MarketingProcessorTest extends BaseUnitTestCase
 
     public function testProcessCampaigns(): void
     {
+        $platformId = $this->faker->uuid();
         $campaigns = new ArrayCollection([
             (object) [
-                'platformId' => '123',
-                'name' => 'Test Campaign',
+                'platformId' => $platformId,
+                'name' => $this->faker->sentence(3),
                 'startDate' => null,
                 'endDate' => null,
                 'channel' => 'facebook',
-                'channeledAccountId' => 1,
-                'budget' => 100,
+                'channeledAccountId' => $this->faker->randomNumber(),
+                'budget' => $this->faker->numberBetween(10, 1000),
                 'status' => 'ACTIVE',
                 'objective' => 'SALES',
                 'buyingType' => 'AUCTION',
@@ -50,7 +51,7 @@ class MarketingProcessorTest extends BaseUnitTestCase
         // Mock executeQuery for campaign map
         $result = $this->createMock(Result::class);
         $result->method('fetchAllAssociative')->willReturn([
-            ['id' => 10, 'campaignId' => '123']
+            ['id' => $this->faker->randomNumber(), 'campaignId' => $platformId]
         ]);
 
         $this->conn->method('executeQuery')->willReturn($result);
@@ -63,12 +64,14 @@ class MarketingProcessorTest extends BaseUnitTestCase
 
     public function testProcessAdGroups(): void
     {
+        $platformId = $this->faker->uuid();
+        $campaignPlatformId = $this->faker->uuid();
         $adsets = new ArrayCollection([
             (object) [
-                'platformId' => 'adset123',
-                'channeledCampaignId' => 'camp123',
-                'channeledAccountId' => 1,
-                'name' => 'Test AdSet',
+                'platformId' => $platformId,
+                'channeledCampaignId' => $campaignPlatformId,
+                'channeledAccountId' => $this->faker->randomNumber(),
+                'name' => $this->faker->sentence(3),
                 'startDate' => null,
                 'endDate' => null,
                 'status' => 'ACTIVE',
@@ -83,7 +86,7 @@ class MarketingProcessorTest extends BaseUnitTestCase
         // Mock executeQuery for campaign map
         $result = $this->createMock(Result::class);
         $result->method('fetchAllAssociative')->willReturn([
-            ['platformId' => 'camp123', 'id' => 20, 'campaign_id' => 10]
+            ['platformId' => $campaignPlatformId, 'id' => $this->faker->randomNumber(), 'campaign_id' => $this->faker->randomNumber()]
         ]);
 
         $this->conn->method('executeQuery')->willReturn($result);
@@ -98,19 +101,21 @@ class MarketingProcessorTest extends BaseUnitTestCase
     {
         $ads = new ArrayCollection([
             (object) [
-                'platformId' => 'ad123',
-                'channeledCampaignId' => 'camp123',
-                'channeledAdGroupId' => 'adset123',
-                'channeledAccountId' => 1,
-                'name' => 'Test Ad',
+                'platformId' => $this->faker->uuid(),
+                'channeledCampaignId' => $this->faker->uuid(),
+                'channeledAdGroupId' => $this->faker->uuid(),
+                'channeledCreativeId' => $this->faker->uuid(),
+                'channeledAccountId' => $this->faker->randomNumber(),
+                'name' => $this->faker->sentence(3),
                 'status' => 'ACTIVE',
                 'channel' => 'facebook',
                 'data' => []
             ]
         ]);
 
-        // 2 SELECT queries for maps
-        $this->conn->expects($this->exactly(2))
+
+        // 3 SELECT queries for maps (campaigns, adgroups, creatives)
+        $this->conn->expects($this->exactly(3))
             ->method('executeQuery')
             ->willReturn($this->createMock(Result::class));
 
@@ -120,4 +125,5 @@ class MarketingProcessorTest extends BaseUnitTestCase
 
         $this->assertTrue(true);
     }
+
 }

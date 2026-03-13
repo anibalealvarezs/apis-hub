@@ -27,11 +27,11 @@ class SocialProcessorTest extends BaseUnitTestCase
     {
         $pages = new ArrayCollection([
             (object) [
-                'url' => 'test-page',
-                'title' => 'Test Page',
-                'hostname' => 'facebook.com',
-                'platformId' => '123',
-                'accountId' => 1,
+                'url' => $this->faker->slug(),
+                'title' => $this->faker->sentence(2),
+                'hostname' => $this->faker->domainName(),
+                'platformId' => (string) $this->faker->randomNumber(8),
+                'accountId' => $this->faker->randomNumber(),
                 'data' => []
             ]
         ]);
@@ -49,10 +49,10 @@ class SocialProcessorTest extends BaseUnitTestCase
     {
         $posts = new ArrayCollection([
             (object) [
-                'platformId' => 'post123',
-                'pageId' => 10,
-                'accountId' => 1,
-                'channeledAccountId' => 2,
+                'platformId' => (string) $this->faker->randomNumber(8),
+                'pageId' => $this->faker->randomNumber(),
+                'accountId' => $this->faker->randomNumber(),
+                'channeledAccountId' => $this->faker->randomNumber(),
                 'data' => []
             ]
         ]);
@@ -65,4 +65,5 @@ class SocialProcessorTest extends BaseUnitTestCase
 
         $this->assertTrue(true);
     }
+
 }

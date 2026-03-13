@@ -5,14 +5,13 @@ namespace Tests\Unit\Controllers;
 use Controllers\MonitoringController;
 use Doctrine\ORM\EntityManager;
 use Entities\Job;
-use PHPUnit\Framework\TestCase;
 use Repositories\JobRepository;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Helpers\Helpers;
 use Enums\JobStatus;
+use Tests\Unit\BaseUnitTestCase;
 
-class MonitoringControllerTest extends TestCase
+class MonitoringControllerTest extends BaseUnitTestCase
 {
     private MonitoringController $controller;
     private $entityManager;
@@ -20,6 +19,7 @@ class MonitoringControllerTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->entityManager = $this->createMock(EntityManager::class);
         $this->jobRepository = $this->createMock(JobRepository::class);
         $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
@@ -78,7 +78,7 @@ class MonitoringControllerTest extends TestCase
 
     public function testJobActionInvalidAction(): void
     {
-        $jobId = 1;
+        $jobId = $this->faker->randomNumber();
         $mockJob = $this->createMock(Job::class);
         $this->jobRepository->method('find')->with($jobId)->willReturn($mockJob);
 
@@ -90,7 +90,7 @@ class MonitoringControllerTest extends TestCase
 
     public function testJobActionCancelSuccess(): void
     {
-        $jobId = 123;
+        $jobId = $this->faker->randomNumber();
         $mockJob = $this->createMock(Job::class);
         $this->jobRepository->method('find')->with($jobId)->willReturn($mockJob);
 
@@ -109,28 +109,34 @@ class MonitoringControllerTest extends TestCase
 
     public function testJobActionRetrySuccess(): void
     {
-        $jobId = 123;
+        $jobId = $this->faker->randomNumber();
+        $newJobId = $this->faker->randomNumber();
+        $channel = $this->faker->word();
+        $entity = $this->faker->word();
+        $payload = [$this->faker->word() => $this->faker->word()];
+
         $mockJob = $this->createMock(Job::class);
-        $mockJob->method('getChannel')->willReturn('facebook');
-        $mockJob->method('getEntity')->willReturn('metric');
-        $mockJob->method('getPayload')->willReturn(['foo' => 'bar']);
+        $mockJob->method('getChannel')->willReturn($channel);
+        $mockJob->method('getEntity')->willReturn($entity);
+        $mockJob->method('getPayload')->willReturn($payload);
         
         $this->jobRepository->method('find')->with($jobId)->willReturn($mockJob);
             
         $this->jobRepository->expects($this->once())
             ->method('create')
-            ->with($this->callback(function($data) {
-                return $data->channel === 'facebook' && 
-                       $data->entity === 'metric' &&
+            ->with($this->callback(function($data) use ($channel, $entity) {
+                return $data->channel === $channel && 
+                       $data->entity === $entity &&
                        $data->status === JobStatus::scheduled->value;
             }))
-            ->willReturn(['id' => 456]);
+            ->willReturn(['id' => $newJobId]);
 
         $request = new Request([], ['id' => $jobId, 'action' => 'retry']);
         $response = $this->controller->jobAction($request);
         
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
         $content = json_decode($response->getContent(), true);
-        $this->assertStringContainsString('Original #123 history preserved', $content['message']);
+        $this->assertStringContainsString("Original #$jobId history preserved", $content['message']);
     }
+
 }
