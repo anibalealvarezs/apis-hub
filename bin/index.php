@@ -49,9 +49,13 @@ try {
     $response = $app->handle($request);
     $response->send();
 } catch (Exception $e) {
-    $response = new Response();
-    $response->setContent($e->getMessage());
-    $response->setStatusCode(500);
+    $response = new Response(json_encode([
+        'status' => 'error',
+        'error' => ($e instanceof \Exceptions\ConfigurationException) ? 'Configuration Error' : 'Internal Server Error',
+        'message' => $e->getMessage()
+    ]), Response::HTTP_INTERNAL_SERVER_ERROR, [
+        'Content-Type' => 'application/json'
+    ]);
     $response->send();
 } finally {
     if ($entityManager !== null) {
