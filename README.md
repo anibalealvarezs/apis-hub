@@ -33,11 +33,18 @@ You can run this application locally or via Docker. The easiest way is using Doc
 
 ### 2. Environment Configuration
 
-The application uses a unified configuration system centered at `deploy/project.yaml`. It supports **Environment Variable Interpolation** and **Multi-Environment Blocks**.
+The application uses a unified configuration system centered at the `config/` directory. It supports **Environment Variable Interpolation** and **Multi-Environment Blocks**.
 
-1. **Create your config**: Copy `deploy/project.yaml.example` to `deploy/project.yaml`.
+1. **Create your config**: Copy the `.example` files from `config/` to their `.yaml` counterparts.
+   - `database.yaml`: Your DB credentials.
+   - `security.yaml`: API keys and IP whitelists.
+   - `app.yaml`: Global project settings.
+   - `instances_rules.yaml`: Rules for automatic worker generation.
 2. **Set Environment Variables**: You can override any value in the YAML using environment variables. The YAML uses `${VAR:-default}` syntax.
 3. **Switch Environments**: Set the `APP_ENV` variable to switch between `testing` (default) and `production` database blocks.
+
+> [!IMPORTANT]
+> A `ConfigurationException` will be thrown if mandatory YAML files are missing, ensuring you don't start the app with an incomplete setup.
 
 #### Common Environment Variables
 
@@ -65,11 +72,12 @@ APP_API_KEY=your-super-secure-random-key
 
 ## 🏗 Configuration Architecture
 
-The `deploy/project.yaml` is the single source of truth. It allows you to define:
+The `config/` directory is the single source of truth. It allows you to define:
 
 - **Database Contexts**: Separate credentials for local development vs. Docker containers.
 - **Worker Instances**: Define which channels and entities each worker should process.
-- **Channel Credentials**: Centralized storage for API keys (Google, FB, Shopify, etc.).
+- **Channel Rules**: Define which channels are enabled and their history depth in `config/instances_rules.yaml`.
+- **Project Overrides**: Specific settings can be placed in `config/projects/{project-name}/`.
 
 All values in the YAML can be dynamic. For example, `host: ${DB_HOST:-127.0.0.1}` will use the `DB_HOST` environment variable if present, otherwise it defaults to `127.0.0.1`.
 
@@ -186,34 +194,45 @@ We heavily rely on Redis caching to prevent API explosions and respect strict th
 - **Body Filter Bypass:** To avoid Memory exhaustion, any specific request containing `filters` in their HTTP Body completely bypasses Redis, polling data synchronously for specialized needs.
 - **Auto-Invalidation:** Every Create, Update, or Delete operation executed against a repository implicitly runs a SCAN wildcard deletion on Redis arrays preventing stale views.
 
-## 🏗 Worker Containerization & Deployment
-
 APIs Hub is designed to scale horizontally through **dedicated worker containers**. Each worker is a specialized instance focused on a specific Channel and Entity.
 
-### 1. Defining Instances
+### ⚡ Rapid Deployment Workflow
 
-In your `deploy/project.yaml`, you define a list of `instances`. Each instance becomes a standalone Docker service:
+Follow these steps to generate dozens of optimized workers in seconds:
+
+#### 1. Configure Rules
+
+In `config/instances_rules.yaml`, define which channels you want to process and how much historical data to pull:
 
 ```yaml
-instances:
-  - name: gsc-jan    # Docker service name
-    port: 8081       # External port (optional)
-    channel: gsc     # Integration channel
-    entity: metric   # Data entity
-    start_date: "..."
-    end_date: "..."
+rules:
+  facebook_marketing:
+    enabled: true
+    history_months: 24  # Pull 2 years of history
+  gsc:
+    enabled: true
+    history_months: 16  # Pull 16 months of history
 ```
 
-### 2. Generating Infrastructure
+#### 2. Auto-Generate Instances
 
-Instead of writing complex `docker-compose.yml` files manually, use the built-in deployment builder:
+Run the refresher to calculate quarterly splits, dependency chains, and staggered cron schedules:
 
 ```bash
-# Usage: php bin/build-deployment.php <project-filename-without-extension>
-php bin/build-deployment.php project
+# Regenerates config/instances.yaml based on your rules
+php bin/cli.php app:refresh-instances
 ```
 
-This script reads your YAML and automatically generates a `docker-compose.yml` tailored to your defined instances, injecting all necessary environment variables and database credentials.
+#### 3. Build Infrastructure
+
+The deployment builder will convert your instance list into a production-ready Docker Compose file:
+
+```bash
+# Usage: php bin/build-deployment.php
+php bin/build-deployment.php
+```
+
+This script injects all necessary environment variables, database credentials, and port mappings automatically.
 
 ### 3. Execution
 

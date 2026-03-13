@@ -80,7 +80,7 @@ While CLI commands are powerful for automation, the **Monitoring Dashboard** pro
 
 ### Accessing the Dashboard
 
-Navigate to `/monitoring` in your browser. You will see a list of all active containers (instances) defined in your `project.yaml`.
+Navigate to `/monitoring` in your browser. You will see a list of all active containers (instances) defined in your `config/instances.yaml`.
 
 ### Advanced Actions
 
