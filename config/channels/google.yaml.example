@@ -1,0 +1,11 @@
+channels:
+  google:
+    enabled: false
+    client_id: YOUR_CLIENT_ID
+    client_secret: YOUR_CLIENT_SECRET
+    redirect_uri: 'https://oauth.pstmn.io/v1/browser-callback'
+    refresh_token: YOUR_REFRESH_TOKEN
+    user_id: YOUR_EMAIL
+    token_path: ./storage/tokens/google_tokens.json
+    scopes:
+      - 'https://www.googleapis.com/auth/webmasters'

@@ -1,0 +1,42 @@
+channels:
+  facebook:
+    enabled: false
+    app_id: YOUR_APP_ID
+    app_secret: YOUR_APP_SECRET
+    app_redirect_uri: 'https://oauth.pstmn.io/v1/browser-callback'
+    graph_user_access_token: null
+    graph_page_access_token: null
+    graph_long_lived_user_access_token: YOUR_LONG_LIVED_TOKEN
+    graph_long_lived_page_access_token: null
+    graph_token_path: ./storage/tokens/facebook_tokens.json
+    user_id: YOUR_USER_ID
+    accounts_group_name: 'YOUR_GROUP_NAME'
+    exclude_from_caching: []
+    PAGE:
+      page_metrics: false
+      posts: true
+      post_metrics: false
+      ig_account_metrics: false
+      ig_account_media: true
+      ig_account_media_metrics: false
+      ig_account_media_stop_id: null
+    pages:
+      - id: "PAGE_ID"
+        url: 'https://www.facebook.com/PAGE_URL'
+        title: 'PAGE_TITLE'
+        hostname: example.com
+        ig_account: "IG_ACCOUNT_ID"
+        enabled: true
+    AD_ACCOUNT:
+      ad_account_metrics: true
+      campaigns: true
+      campaign_metrics: true
+      adsets: false
+      adset_metrics: false
+      ads: false
+      ad_metrics: false
+      creatives: false
+      creative_metrics: false
+    ad_accounts:
+      - id: "AD_ACCOUNT_ID"
+        enabled: true
