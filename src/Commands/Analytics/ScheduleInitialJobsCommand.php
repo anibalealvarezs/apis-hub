@@ -58,6 +58,10 @@ class ScheduleInitialJobsCommand extends Command
             $channel = $instance['channel'] ?? null;
             $entity = $instance['entity'] ?? null;
 
+            if ($channel && ($chanEnum = \Enums\Channel::tryFromName($channel))) {
+                $channel = $chanEnum->name;
+            }
+
             if (!$channel || !$entity) {
                 $output->writeln("<error>Instance $name is missing channel or entity. Skipping.</error>");
                 continue;

@@ -19,6 +19,7 @@ docker-compose.yml
 *stderr*
 *.log
 .antigravityrules
+.env
 
 # Development recurrences
 dev-recurrences.md

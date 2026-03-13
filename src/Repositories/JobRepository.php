@@ -76,7 +76,9 @@ class JobRepository extends BaseRepository
         if (!isset($data['channel'])) {
             throw new InvalidArgumentException('Channel is required');
         }
-        if (!Channel::tryFromName($data['channel'])) {
+        if ($chanEnum = Channel::tryFromName($data['channel'])) {
+            $data['channel'] = $chanEnum->name;
+        } else {
             throw new InvalidArgumentException('Invalid channel');
         }
 
