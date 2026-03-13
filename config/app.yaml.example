@@ -1,0 +1,3 @@
+project: example-project
+timezone: '${APP_TIMEZONE:-UTC}'
+debug: true

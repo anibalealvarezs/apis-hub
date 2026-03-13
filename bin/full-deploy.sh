@@ -4,9 +4,7 @@
 # Only requires: docker, docker compose, bash.
 set -e
 
-PROJECT_NAME=${1:-project}
-
-echo "⚒  Starting Full Deployment for project: $PROJECT_NAME"
+echo "⚒  Starting Full Deployment"
 echo ""
 
 # ── Step 1: Install Composer dependencies ────────────────────────────────────
@@ -25,13 +23,13 @@ fi
 
 # ── Step 2: Generate docker-compose.yml from project.yaml ────────────────────
 echo ""
-echo "📂 [2/3] Generating deployment manifests from deploy/${PROJECT_NAME}.yaml..."
+echo "📂 [2/3] Generating deployment manifests from deploy settings..."
 
 docker run --rm \
     -v "$(pwd):/app" \
     -w /app \
     php:8.3-cli \
-    php bin/build-deployment.php "$PROJECT_NAME"
+    php bin/build-deployment.php
 
 echo "✔ docker-compose.yml generated successfully."
 

@@ -1,0 +1,2 @@
+cli:
+  memory_limit: '${CLI_MEMORY_LIMIT:-1G}'
