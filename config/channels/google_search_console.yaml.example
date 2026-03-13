@@ -1,6 +1,9 @@
 channels:
   google_search_console:
-    enabled: false
+    enabled: true
+    cache_all: false # If true, will fetch all accessible sites if none are listed below
+    cache_include: null # Optional. Text or PCRE Regex to include sites by URL or Title
+    cache_exclude: null # Optional. Text or PCRE Regex to exclude sites
     scope: 'https://www.googleapis.com/auth/webmasters'
     token: YOUR_TOKEN
     sites:

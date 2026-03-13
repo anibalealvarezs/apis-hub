@@ -359,4 +359,93 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         }
         $this->assertTrue($foundImpressions, 'Impressions metric not found for ad');
     }
+
+    public function testProcessCampaignsBulkFiltersCampaigns(): void
+    {
+        // 1. Arrange
+        $adAccountId = 'act_123456';
+        $campaignPlatformId = 'camp_filtered';
+        
+        $account = new Account();
+        $account->addName('Main Facebook Account Filter');
+        $this->entityManager->persist($account);
+
+        $channeledAccount = new ChanneledAccount();
+        $channeledAccount->addPlatformId($adAccountId)
+            ->addName('Test Account Filter')
+            ->addChannel(Channel::facebook_marketing->value)
+            ->addType(AccountEnum::META_AD_ACCOUNT)
+            ->addAccount($account)
+            ->addPlatformCreatedAt(new \DateTime());
+        $this->entityManager->persist($channeledAccount);
+
+        $campaign = new Campaign();
+        $campaign->addCampaignId($campaignPlatformId)
+            ->addName('Filtered Out Campaign');
+        $this->entityManager->persist($campaign);
+
+        $channeledCampaign = new ChanneledCampaign();
+        $channeledCampaign->addPlatformId($campaignPlatformId)
+            ->addChannel(Channel::facebook_marketing->value)
+            ->addChanneledAccount($channeledAccount)
+            ->addCampaign($campaign)
+            ->addBudget(100.0);
+        $this->entityManager->persist($channeledCampaign);
+
+        $this->entityManager->flush();
+
+        $channeledCampaignMap = [
+            'map' => [$campaignPlatformId => $channeledCampaign->getId()],
+            'mapReverse' => [$channeledCampaign->getId() => $campaignPlatformId]
+        ];
+        $campaignMap = [
+            'map' => [$campaignPlatformId => $campaign->getId()],
+            'mapReverse' => [$campaign->getId() => $campaignPlatformId]
+        ];
+
+        $today = date('Y-m-d');
+        $this->api->method('getCampaignInsightsFromAdAccount')
+            ->willReturn([
+                'data' => [
+                    [
+                        'campaign_id' => $campaignPlatformId,
+                        'impressions' => '1000',
+                    ]
+                ]
+            ]);
+
+        // 2. Act - Try WITH filter that EXCLUDES this campaign
+        $reflection = new \ReflectionClass(MetricRequests::class);
+        $method = $reflection->getMethod('processCampaignsBulk');
+        $method->setAccessible(true);
+
+        $result = $method->invoke(
+            null,
+            $this->api,
+            $this->entityManager,
+            $channeledAccount,
+            $this->createMock(LoggerInterface::class),
+            null,
+            null,
+            $channeledCampaignMap,
+            $campaignMap,
+            null,
+            'Other Campaign', // include
+            'Filtered'        // exclude
+        );
+
+        // 3. Assert
+        $this->assertTrue($result);
+        $metrics = $this->entityManager->getRepository(ChanneledMetric::class)->findAll();
+        // Since other tests might have run and left data, but BaseIntegrationTestCase usually wipes the DB or similar?
+        // Actually, integration tests often don't wipe between methods unless told so.
+        // But our setup clears EM.
+        
+        // Let's filter metrics by channeled account to be sure.
+        $adAccountId = 'act_123456';
+        $filteredMetrics = array_filter($metrics, function($m) use ($adAccountId) {
+            return $m->getMetric()->getMetricConfig()->getChanneledAccount()->getPlatformId() === $adAccountId;
+        });
+        $this->assertCount(0, $filteredMetrics, 'Metrics should have been skipped due to filter');
+    }
 }

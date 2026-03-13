@@ -1,6 +1,9 @@
 channels:
   facebook:
-    enabled: false
+    enabled: true
+    cache_all: false # If true, will fetch all accessible ad accounts and pages if none are listed below
+    cache_include: null # Global include filter (fallback)
+    cache_exclude: null # Global exclude filter (fallback)
     app_id: YOUR_APP_ID
     app_secret: YOUR_APP_SECRET
     app_redirect_uri: 'https://oauth.pstmn.io/v1/browser-callback'
@@ -13,6 +16,8 @@ channels:
     accounts_group_name: 'YOUR_GROUP_NAME'
     exclude_from_caching: []
     PAGE:
+      cache_include: null # Specific filter for Pages
+      cache_exclude: null
       page_metrics: false
       posts: true
       post_metrics: false
@@ -28,6 +33,8 @@ channels:
         ig_account: "IG_ACCOUNT_ID"
         enabled: true
     AD_ACCOUNT:
+      cache_include: null # Specific filter for Ad Accounts
+      cache_exclude: null
       ad_account_metrics: true
       campaigns: true
       campaign_metrics: true
@@ -37,6 +44,24 @@ channels:
       ad_metrics: false
       creatives: false
       creative_metrics: false
+    CAMPAIGN:
+      cache_include: null
+      cache_exclude: null
+    ADSET:
+      cache_include: null
+      cache_exclude: null
+    AD:
+      cache_include: null
+      cache_exclude: null
+    CREATIVE:
+      cache_include: null
+      cache_exclude: null
+    POST:
+      cache_include: null
+      cache_exclude: null
+    IG_MEDIA:
+      cache_include: null
+      cache_exclude: null
     ad_accounts:
       - id: "AD_ACCOUNT_ID"
         enabled: true

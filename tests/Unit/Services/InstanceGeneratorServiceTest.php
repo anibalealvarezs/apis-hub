@@ -16,6 +16,7 @@ class InstanceGeneratorServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \Helpers\Helpers::resetConfigs();
         // We use the real Helpers::getProjectConfig() so we need to mock the environment or files if possible
         // But since we want to be safe, we'll try to use a mockable approach or just ensure the test config exists
         $this->configPath = __DIR__ . '/../../../config/app.yaml';

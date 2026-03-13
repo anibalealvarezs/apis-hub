@@ -269,7 +269,7 @@ class MetricRequests
 
             if (empty($pagesToProcess)) {
                 $logger->info("No specific pages listed in config. Fetching all available pages from database.");
-                $allPages = $pageRepository->findAll();
+                $allPages = $pageRepository->findByDataAttribute('source', 'fb_page');
                 $globalPageConfig = $config['facebook']['PAGE'] ?? [
                     'page_metrics' => false,
                     'posts' => true,
@@ -283,10 +283,16 @@ class MetricRequests
                     if (in_array($pageId, $globalExcludeIds)) {
                         continue;
                     }
+                    $pageName = $p->getTitle();
+                    $includeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_include');
+                    $excludeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_exclude');
+                    if (!Helpers::matchesFilter($pageName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($pageId, $includeFilter, $excludeFilter)) {
+                        continue;
+                    }
                     $pagesToProcess[] = array_merge($globalPageConfig, [
                         'id' => $pageId,
                         'url' => $p->getUrl(),
-                        'title' => $p->getTitle(),
+                        'title' => $pageName,
                         'enabled' => true,
                         // If IG user ID is stored in data, we can try to extract it
                         'ig_account' => $p->getData()['instagram_business_account']['id'] ?? null
@@ -314,6 +320,14 @@ class MetricRequests
             Helpers::reconnectIfNeeded($manager);
             foreach ($pagesToProcess as $page) {
                 Helpers::checkJobStatus($jobId);
+
+                $pageId = (string) ($page['id'] ?? '');
+                $pageTitle = $page['title'] ?? '';
+                $includeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_include');
+                $excludeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_exclude');
+                if (!Helpers::matchesFilter($pageTitle, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($pageId, $includeFilter, $excludeFilter)) {
+                    continue;
+                }
 
                 if (!$page['enabled'] || (!empty($page['exclude_from_caching']) && $page['exclude_from_caching'])) {
                     $logger->info("Skipping page: " . $page['id'] . ($page['enabled'] ? " (excluded from caching)" : " (disabled)"));
@@ -347,6 +361,12 @@ class MetricRequests
                                 try {
                                     $postEntity = $postRepository->find($postIdInDb);
                                     if ($postEntity) {
+                                        $postMsg = $postEntity->getData()['message'] ?? '';
+                                        $includeFilter = self::getFacebookFilter($config, 'POST', 'cache_include');
+                                        $excludeFilter = self::getFacebookFilter($config, 'POST', 'cache_exclude');
+                                        if (!Helpers::matchesFilter($postMsg, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($postEntity->getPostId(), $includeFilter, $excludeFilter)) {
+                                            continue;
+                                        }
                                         self::processFacebookPagePost(
                                             postEntity: $postEntity,
                                             pageEntity: $pageEntity,
@@ -365,7 +385,11 @@ class MetricRequests
                     }
 
                     if ($page['ig_account'] && $page['ig_account_metrics']) {
-                        if ($accountEntity) {
+                        $includeFilter = self::getFacebookFilter($config, 'IG_ACCOUNT', 'cache_include');
+                        $excludeFilter = self::getFacebookFilter($config, 'IG_ACCOUNT', 'cache_exclude');
+                        if (!Helpers::matchesFilter((string) $page['ig_account'], $includeFilter, $excludeFilter)) {
+                            $logger->info("Skipping Instagram account: " . $page['ig_account'] . " (filtered out)");
+                        } elseif ($accountEntity) {
                             self::processInstagramAccount(
                                 page: $page,
                                 api: $api,
@@ -398,6 +422,12 @@ class MetricRequests
                                     try {
                                         $mediaEntity = $postRepository->find($mediaIdInDb);
                                         if ($mediaEntity) {
+                                            $mediaCaption = $mediaEntity->getData()['caption'] ?? '';
+                                            $includeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_include');
+                                            $excludeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_exclude');
+                                            if (!Helpers::matchesFilter($mediaCaption, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($mediaEntity->getPostId(), $includeFilter, $excludeFilter)) {
+                                                continue;
+                                            }
                                             self::processInstagramMedia(
                                                 pageEntity: $pageEntity,
                                                 postEntity: $mediaEntity,
@@ -514,9 +544,15 @@ class MetricRequests
                     if (in_array($accId, $globalExcludeIds)) {
                         continue;
                     }
+                    $accName = $ca->getName();
+                    $includeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_include');
+                    $excludeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_exclude');
+                    if (!Helpers::matchesFilter($accName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($accId, $includeFilter, $excludeFilter)) {
+                        continue;
+                    }
                     $adAccountsToProcess[] = array_merge($globalAdAccountConfig, [
                         'id' => $accId,
-                        'name' => $ca->getName(),
+                        'name' => $accName,
                         'enabled' => true
                     ]);
                 }
@@ -524,6 +560,14 @@ class MetricRequests
 
             foreach ($adAccountsToProcess as $adAccount) {
                 Helpers::checkJobStatus($jobId);
+
+                $adAccId = (string) ($adAccount['id'] ?? '');
+                $adAccName = $adAccount['name'] ?? '';
+                $includeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_include');
+                $excludeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_exclude');
+                if (!Helpers::matchesFilter($adAccName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($adAccId, $includeFilter, $excludeFilter)) {
+                    continue;
+                }
 
                 $channeledAccountEntity = $channeledAccountRepository->findOneBy([
                     'platformId' => $adAccount['id'],
@@ -570,6 +614,8 @@ class MetricRequests
                                 channeledCampaignMap: $channeledCampaignMap,
                                 campaignMap: $campaignMap,
                                 jobId: $jobId,
+                                cacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
+                                cacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
                             );
                         }
 
@@ -588,6 +634,8 @@ class MetricRequests
                                     channeledCampaignMap: $channeledCampaignMap,
                                     channeledAdGroupMap: $channeledAdGroupMap,
                                     jobId: $jobId,
+                                    cacheInclude: self::getFacebookFilter($config, 'ADSET', 'cache_include'),
+                                    cacheExclude: self::getFacebookFilter($config, 'ADSET', 'cache_exclude'),
                                 );
                             }
 
@@ -607,6 +655,8 @@ class MetricRequests
                                         channeledAdGroupMap: $channeledAdGroupMap,
                                         channeledAdMap: $channeledAdMap,
                                         jobId: $jobId,
+                                        cacheInclude: self::getFacebookFilter($config, 'AD', 'cache_include'),
+                                        cacheExclude: self::getFacebookFilter($config, 'AD', 'cache_exclude'),
                                     );
                                 }
                             }
@@ -621,6 +671,8 @@ class MetricRequests
                                 startDate: $startDate,
                                 endDate: $endDate,
                                 jobId: $jobId,
+                                cacheInclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_include'),
+                                cacheExclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_exclude'),
                             );
                         }
                     }
@@ -778,8 +830,35 @@ class MetricRequests
             $totalDuplicates = 0;
 
             // Process each site
-            foreach ($config['google_search_console']['sites'] as $site) {
+            $sitesToProcess = $config['google_search_console']['sites'] ?? [];
+            if (empty($sitesToProcess)) {
+                $logger->info("No specific sites listed in config. Fetching all available sites from database.");
+                $allPages = $pageRepository->findByDataAttribute('source', 'gsc_site');
+                foreach ($allPages as $p) {
+                    $siteUrl = $p->getUrl();
+                    $siteTitle = $p->getTitle();
+                    if (!Helpers::matchesFilter($siteUrl, $config['google_search_console']['cache_include'] ?? null, $config['google_search_console']['cache_exclude'] ?? null) && !Helpers::matchesFilter($siteTitle, $config['google_search_console']['cache_include'] ?? null, $config['google_search_console']['cache_exclude'] ?? null)) {
+                        continue;
+                    }
+                    $sitesToProcess[] = [
+                        'url' => $siteUrl,
+                        'title' => $siteTitle,
+                        'enabled' => true,
+                        // Defaults for GSC sites if not in config
+                        'target_keywords' => [],
+                        'target_countries' => [],
+                    ];
+                }
+            }
+
+            foreach ($sitesToProcess as $site) {
                 Helpers::checkJobStatus($jobId);
+
+                $siteUrl = $site['url'];
+                $siteTitle = $site['title'] ?? $siteUrl;
+                if (!Helpers::matchesFilter($siteUrl, $config['google_search_console']['cache_include'] ?? null, $config['google_search_console']['cache_exclude'] ?? null) && !Helpers::matchesFilter($siteTitle, $config['google_search_console']['cache_include'] ?? null, $config['google_search_console']['cache_exclude'] ?? null)) {
+                    continue;
+                }
 
                 if (!$site['enabled']) {
                     $logger->info("Skipping disabled site: " . $site['url']);
@@ -951,7 +1030,7 @@ class MetricRequests
      * @return SearchConsoleApi
      * @throws Exception
      */
-    private static function initializeSearchConsoleApi(array $config, LoggerInterface $logger): SearchConsoleApi
+    public static function initializeSearchConsoleApi(array $config, LoggerInterface $logger): SearchConsoleApi
     {
         $maxApiRetries = 3;
         $apiRetryCount = 0;
@@ -3723,7 +3802,9 @@ class MetricRequests
         ?string $endDate,
         array $channeledCampaignMap,
         array $campaignMap,
-        ?int $jobId = null
+        ?int $jobId = null,
+        $cacheInclude = null,
+        $cacheExclude = null
     ): bool {
         $campaignPlatformIds = array_values($channeledCampaignMap['mapReverse']);
         if (empty($campaignPlatformIds)) {
@@ -3782,6 +3863,11 @@ class MetricRequests
                 $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignPlatformId]);
 
                 if (!$campaignEntity || !$channeledCampaignEntity) {
+                    continue;
+                }
+
+                $campaignName = $campaignEntity->getName();
+                if (!Helpers::matchesFilter($campaignName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter($campaignPlatformId, $cacheInclude, $cacheExclude)) {
                     continue;
                 }
 
@@ -3856,7 +3942,9 @@ class MetricRequests
         array $campaignMap,
         array $channeledCampaignMap,
         array $channeledAdGroupMap,
-        ?int $jobId = null
+        ?int $jobId = null,
+        $cacheInclude = null,
+        $cacheExclude = null
     ): bool {
         $adsetPlatformIds = array_keys($channeledAdGroupMap['mapCampaign']);
         if (empty($adsetPlatformIds)) {
@@ -3918,6 +4006,11 @@ class MetricRequests
                 $channeledAdGroupEntity = $channeledAdGroupRepository->findOneBy(['platformId' => $adsetPlatformId]);
 
                 if (!$campaignEntity || !$channeledCampaignEntity || !$channeledAdGroupEntity) {
+                    continue;
+                }
+
+                $adsetName = $channeledAdGroupEntity->getName();
+                if (!Helpers::matchesFilter($adsetName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter($adsetPlatformId, $cacheInclude, $cacheExclude)) {
                     continue;
                 }
 
@@ -3996,7 +4089,9 @@ class MetricRequests
         array $channeledCampaignMap,
         array $channeledAdGroupMap,
         array $channeledAdMap,
-        ?int $jobId = null
+        ?int $jobId = null,
+        $cacheInclude = null,
+        $cacheExclude = null
     ): bool {
         $adPlatformIds = array_keys($channeledAdMap['mapAdGroup']);
         if (empty($adPlatformIds)) {
@@ -4062,6 +4157,11 @@ class MetricRequests
                 $channeledAdEntity = $channeledAdRepository->findOneBy(['platformId' => $adPlatformId]);
 
                 if (!$campaignEntity || !$channeledCampaignEntity || !$channeledAdGroupEntity || !$channeledAdEntity) {
+                    continue;
+                }
+
+                $adName = $channeledAdEntity->getName();
+                if (!Helpers::matchesFilter($adName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter($adPlatformId, $cacheInclude, $cacheExclude)) {
                     continue;
                 }
 
@@ -4151,6 +4251,8 @@ class MetricRequests
         ?string $startDate = null,
         ?string $endDate = null,
         ?int $jobId = null,
+        $cacheInclude = null,
+        $cacheExclude = null
     ): bool {
         $logger->info("Starting processCreativesBulk for ad account: " . $channeledAccountEntity->getPlatformId());
         try {
@@ -4204,6 +4306,11 @@ class MetricRequests
                     continue;
                 }
 
+                $creativeName = $creative->getName();
+                if (!Helpers::matchesFilter($creativeName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter($creativePlatformId, $cacheInclude, $cacheExclude)) {
+                    continue;
+                }
+
                 $metrics = FacebookMarketingMetricConvert::creativeMetrics(
                     rows: $rows,
                     logger: $logger,
@@ -4254,5 +4361,24 @@ class MetricRequests
             $logger->error("Error during bulk Meta account's creative insights request: " . $e->getMessage());
             throw $e;
         }
+    }
+    /**
+     * Helper to get entity-specific or global Facebook filter.
+     *
+     * @param array $config
+     * @param string|null $entityKey
+     * @param string $filterType 'cache_include' or 'cache_exclude'
+     * @return string|null
+     */
+    public static function getFacebookFilter(array $config, ?string $entityKey, string $filterType): ?string
+    {
+        $fbConfig = $config['facebook'] ?? [];
+        if ($entityKey && isset($fbConfig[$entityKey]) && is_array($fbConfig[$entityKey])) {
+            $filter = $fbConfig[$entityKey][$filterType] ?? null;
+            if ($filter) {
+                return $filter;
+            }
+        }
+        return $fbConfig[$filterType] ?? null;
     }
 }
