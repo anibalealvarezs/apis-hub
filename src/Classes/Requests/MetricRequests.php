@@ -265,6 +265,8 @@ class MetricRequests
 
             // Load pages
             $pagesToProcess = $config['facebook']['pages'] ?? [];
+            $globalExcludeIds = array_map('strval', $config['facebook']['exclude_from_caching'] ?? []);
+
             if (empty($pagesToProcess)) {
                 $logger->info("No specific pages listed in config. Fetching all available pages from database.");
                 $allPages = $pageRepository->findAll();
@@ -277,8 +279,12 @@ class MetricRequests
                     'ig_account_media_metrics' => false,
                 ];
                 foreach ($allPages as $p) {
+                    $pageId = (string) $p->getPlatformId();
+                    if (in_array($pageId, $globalExcludeIds)) {
+                        continue;
+                    }
                     $pagesToProcess[] = array_merge($globalPageConfig, [
-                        'id' => $p->getPlatformId(),
+                        'id' => $pageId,
                         'url' => $p->getUrl(),
                         'title' => $p->getTitle(),
                         'enabled' => true,
@@ -309,8 +315,8 @@ class MetricRequests
             foreach ($pagesToProcess as $page) {
                 Helpers::checkJobStatus($jobId);
 
-                if (!$page['enabled']) {
-                    $logger->info("Skipping disabled page: " . $page['id']);
+                if (!$page['enabled'] || (!empty($page['exclude_from_caching']) && $page['exclude_from_caching'])) {
+                    $logger->info("Skipping page: " . $page['id'] . ($page['enabled'] ? " (excluded from caching)" : " (disabled)"));
                     continue;
                 }
 
@@ -320,8 +326,8 @@ class MetricRequests
                     continue;
                 }
 
-                if ($page['page_metrics']) {
-                    try {
+                try {
+                    if ($page['page_metrics']) {
                         self::processFacebookPage(
                             page: $page,
                             startDate: $startDate,
@@ -332,38 +338,34 @@ class MetricRequests
                             logger: $logger,
                             pageMap: $pageMap,
                         );
-                    } catch (Exception $e) {
-                        $logger->error("Error processing page " . $page['id'] . ": " . $e->getMessage());
                     }
-                }
 
-                if ($page['posts']) {
-                    $postMap = self::getPostMap($manager, $pageEntity);
-                    if ($page['post_metrics']) {
-                        foreach ($postMap['map'] as $postIdInDb) {
-                            try {
-                                $postEntity = $postRepository->find($postIdInDb);
-                                if ($postEntity) {
-                                    self::processFacebookPagePost(
-                                        postEntity: $postEntity,
-                                        pageEntity: $pageEntity,
-                                        api: $api,
-                                        manager: $manager,
-                                        logger: $logger,
-                                        postMap: $postMap,
-                                        pageMap: $pageMap,
-                                    );
+                    if ($page['posts']) {
+                        $postMap = self::getPostMap($manager, $pageEntity);
+                        if ($page['post_metrics']) {
+                            foreach ($postMap['map'] as $postIdInDb) {
+                                try {
+                                    $postEntity = $postRepository->find($postIdInDb);
+                                    if ($postEntity) {
+                                        self::processFacebookPagePost(
+                                            postEntity: $postEntity,
+                                            pageEntity: $pageEntity,
+                                            api: $api,
+                                            manager: $manager,
+                                            logger: $logger,
+                                            postMap: $postMap,
+                                            pageMap: $pageMap,
+                                        );
+                                    }
+                                } catch (Exception $e) {
+                                    $logger->error("Error processing Facebook post " . $postIdInDb . ": " . $e->getMessage());
                                 }
-                            } catch (Exception $e) {
-                                $logger->error("Error processing Facebook post " . $postIdInDb . ": " . $e->getMessage());
                             }
                         }
                     }
-                }
 
-                if ($page['ig_account'] && $page['ig_account_metrics']) {
-                    if ($accountEntity) {
-                        try {
+                    if ($page['ig_account'] && $page['ig_account_metrics']) {
+                        if ($accountEntity) {
                             self::processInstagramAccount(
                                 page: $page,
                                 api: $api,
@@ -375,48 +377,48 @@ class MetricRequests
                                 startDate: $startDate,
                                 endDate: $endDate,
                             );
-                        } catch (Exception $e) {
-                            $logger->error("Error processing Instagram account " . $page['ig_account'] . ": " . $e->getMessage());
+                        } else {
+                            $logger->error("Cannot process Instagram account " . $page['ig_account'] . " because accountEntity is null.");
                         }
-                    } else {
-                        $logger->error("Cannot process Instagram account " . $page['ig_account'] . " because accountEntity is null.");
                     }
-                }
 
-                if ($page['ig_account_media']) {
-                    $channeledAccountEntity = $channeledAccountRepository->findOneBy([
-                        'platformId' => $page['ig_account'],
-                        'account' => $accountEntity,
-                    ]);
+                    if ($page['ig_account_media']) {
+                        $channeledAccountEntity = $channeledAccountRepository->findOneBy([
+                            'platformId' => $page['ig_account'],
+                            'account' => $accountEntity,
+                        ]);
 
-                    if ($channeledAccountEntity) {
-                        $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
-                        if ($page['ig_account_media_metrics']) {
-                            foreach ($mediaMap['map'] as $mediaIdInDb) {
-                                if ($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$mediaIdInDb] == $page['ig_account_media_stop_id'])) {
-                                    break;
-                                }
-                                try {
-                                    $mediaEntity = $postRepository->find($mediaIdInDb);
-                                    if ($mediaEntity) {
-                                        self::processInstagramMedia(
-                                            pageEntity: $pageEntity,
-                                            postEntity: $mediaEntity,
-                                            accountEntity: $accountEntity,
-                                            channeledAccountEntity: $channeledAccountEntity,
-                                            api: $api,
-                                            manager: $manager,
-                                            logger: $logger,
-                                            mediaMap: $mediaMap,
-                                            pageMap: $pageMap,
-                                        );
+                        if ($channeledAccountEntity) {
+                            $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
+                            if ($page['ig_account_media_metrics']) {
+                                foreach ($mediaMap['map'] as $mediaIdInDb) {
+                                    if ($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$mediaIdInDb] == $page['ig_account_media_stop_id'])) {
+                                        break;
                                     }
-                                } catch (Exception $e) {
-                                    $logger->error("Error processing Instagram media " . $mediaIdInDb . ": " . $e->getMessage());
+                                    try {
+                                        $mediaEntity = $postRepository->find($mediaIdInDb);
+                                        if ($mediaEntity) {
+                                            self::processInstagramMedia(
+                                                pageEntity: $pageEntity,
+                                                postEntity: $mediaEntity,
+                                                accountEntity: $accountEntity,
+                                                channeledAccountEntity: $channeledAccountEntity,
+                                                api: $api,
+                                                manager: $manager,
+                                                logger: $logger,
+                                                mediaMap: $mediaMap,
+                                                pageMap: $pageMap,
+                                            );
+                                        }
+                                    } catch (Exception $e) {
+                                        $logger->error("Error processing Instagram media " . $mediaIdInDb . ": " . $e->getMessage());
+                                    }
                                 }
                             }
                         }
                     }
+                } catch (Exception $e) {
+                    $logger->error("Error processing page " . $page['id'] . ": " . $e->getMessage());
                 }
             }
 
@@ -488,6 +490,8 @@ class MetricRequests
             // Process Ad Accounts
             Helpers::reconnectIfNeeded($manager);
             $adAccountsToProcess = $config['facebook']['ad_accounts'] ?? [];
+            $globalExcludeIds = array_map('strval', $config['facebook']['exclude_from_caching'] ?? []);
+
             if (empty($adAccountsToProcess)) {
                 $logger->info("No specific ad accounts listed in config. Fetching all available ad accounts for channel from database.");
                 $allChanneledAccounts = $channeledAccountRepository->findBy([
@@ -506,8 +510,12 @@ class MetricRequests
                     'creative_metrics' => false,
                 ];
                 foreach ($allChanneledAccounts as $ca) {
+                    $accId = (string) $ca->getPlatformId();
+                    if (in_array($accId, $globalExcludeIds)) {
+                        continue;
+                    }
                     $adAccountsToProcess[] = array_merge($globalAdAccountConfig, [
-                        'id' => $ca->getPlatformId(),
+                        'id' => $accId,
                         'name' => $ca->getName(),
                         'enabled' => true
                     ]);
@@ -527,45 +535,67 @@ class MetricRequests
                     continue;
                 }
 
-                if ($adAccount['enabled']) {
-                    try {
-                        if ($adAccount['ad_account_metrics']) {
-                            self::processAdAccount(
-                                adAccount: $adAccount,
+                if (!$adAccount['enabled'] || (!empty($adAccount['exclude_from_caching']) && $adAccount['exclude_from_caching'])) {
+                    $logger->info("Skipping ad account: " . $adAccount['id'] . ($adAccount['enabled'] ? " (excluded from caching)" : " (disabled)"));
+                    continue;
+                }
+
+                try {
+                    if ($adAccount['ad_account_metrics']) {
+                        self::processAdAccount(
+                            adAccount: $adAccount,
+                            api: $api,
+                            manager: $manager,
+                            accountEntity: $accountEntity,
+                            channeledAccountEntity: $channeledAccountEntity,
+                            logger: $logger,
+                            startDate: $startDate,
+                            endDate: $endDate,
+                        );
+                    }
+
+                    if ($adAccount['campaigns']) {
+                        $campaignsMultiMap = self::getCampaignMaps($manager, $channeledAccountEntity);
+                        $campaignMap = $campaignsMultiMap['campaignMap'];
+                        $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
+
+                        if ($adAccount['campaign_metrics']) {
+                            self::processCampaignsBulk(
                                 api: $api,
                                 manager: $manager,
-                                accountEntity: $accountEntity,
                                 channeledAccountEntity: $channeledAccountEntity,
                                 logger: $logger,
                                 startDate: $startDate,
                                 endDate: $endDate,
+                                channeledCampaignMap: $channeledCampaignMap,
+                                campaignMap: $campaignMap,
+                                jobId: $jobId,
                             );
                         }
 
-                        if ($adAccount['campaigns']) {
-                            $campaignsMultiMap = self::getCampaignMaps($manager, $channeledAccountEntity);
-                            $campaignMap = $campaignsMultiMap['campaignMap'];
-                            $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
+                        if ($adAccount['adsets']) {
+                            $channeledAdGroupMap = self::getAdGroupMap($manager, $channeledAccountEntity);
 
-                            if ($adAccount['campaign_metrics']) {
-                                self::processCampaignsBulk(
+                            if ($adAccount['adset_metrics']) {
+                                self::processAdsetsBulk(
                                     api: $api,
                                     manager: $manager,
                                     channeledAccountEntity: $channeledAccountEntity,
                                     logger: $logger,
                                     startDate: $startDate,
                                     endDate: $endDate,
-                                    channeledCampaignMap: $channeledCampaignMap,
                                     campaignMap: $campaignMap,
+                                    channeledCampaignMap: $channeledCampaignMap,
+                                    channeledAdGroupMap: $channeledAdGroupMap,
                                     jobId: $jobId,
                                 );
                             }
 
-                            if ($adAccount['adsets']) {
-                                $channeledAdGroupMap = self::getAdGroupMap($manager, $channeledAccountEntity);
+                            if ($adAccount['ads']) {
+                                $channeledAdMap = self::getAdMap($manager, $channeledAccountEntity);
 
-                                if ($adAccount['adset_metrics']) {
-                                    self::processAdsetsBulk(
+                                if ($adAccount['ad_metrics']) {
+                                    self::processAdsBulk(
                                         api: $api,
                                         manager: $manager,
                                         channeledAccountEntity: $channeledAccountEntity,
@@ -575,48 +605,29 @@ class MetricRequests
                                         campaignMap: $campaignMap,
                                         channeledCampaignMap: $channeledCampaignMap,
                                         channeledAdGroupMap: $channeledAdGroupMap,
+                                        channeledAdMap: $channeledAdMap,
                                         jobId: $jobId,
                                     );
                                 }
-
-                                if ($adAccount['ads']) {
-                                    $channeledAdMap = self::getAdMap($manager, $channeledAccountEntity);
-
-                                    if ($adAccount['ad_metrics']) {
-                                        self::processAdsBulk(
-                                            api: $api,
-                                            manager: $manager,
-                                            channeledAccountEntity: $channeledAccountEntity,
-                                            logger: $logger,
-                                            startDate: $startDate,
-                                            endDate: $endDate,
-                                            campaignMap: $campaignMap,
-                                            channeledCampaignMap: $channeledCampaignMap,
-                                            channeledAdGroupMap: $channeledAdGroupMap,
-                                            channeledAdMap: $channeledAdMap,
-                                            jobId: $jobId,
-                                        );
-                                    }
-                                }
-                            }
-
-                            if (!empty($adAccount['creatives']) && !empty($adAccount['creative_metrics'])) {
-                                self::processCreativesBulk(
-                                    api: $api,
-                                    manager: $manager,
-                                    channeledAccountEntity: $channeledAccountEntity,
-                                    logger: $logger,
-                                    startDate: $startDate,
-                                    endDate: $endDate,
-                                    jobId: $jobId,
-                                );
                             }
                         }
-                    } catch (FacebookRateLimitException $e) {
-                        throw $e;
-                    } catch (Exception $e) {
-                        $logger->error("Error processing ad account " . $adAccount['id'] . ": " . $e->getMessage());
+
+                        if (!empty($adAccount['creatives']) && !empty($adAccount['creative_metrics'])) {
+                            self::processCreativesBulk(
+                                api: $api,
+                                manager: $manager,
+                                channeledAccountEntity: $channeledAccountEntity,
+                                logger: $logger,
+                                startDate: $startDate,
+                                endDate: $endDate,
+                                jobId: $jobId,
+                            );
+                        }
                     }
+                } catch (FacebookRateLimitException $e) {
+                    throw $e;
+                } catch (Exception $e) {
+                    $logger->error("Error processing ad account " . $adAccount['id'] . ": " . $e->getMessage());
                 }
             }
 
@@ -889,20 +900,34 @@ class MetricRequests
 
         $config = $channels['facebook'];
 
+        // Global exclusion list
+        $globalExclude = $config['exclude_from_caching'] ?? [];
+        if (!is_array($globalExclude)) {
+            $globalExclude = [$globalExclude];
+        }
+
         // Apply global defaults for PAGES if they exist
         if (isset($config['PAGE'])) {
             $globalPageDefaults = $config['PAGE'];
-            $config['facebook']['pages'] = array_map(function ($page) use ($globalPageDefaults) {
-                return array_merge($globalPageDefaults, $page);
-            }, $config['facebook']['pages'] ?? []);
+            $config['pages'] = array_map(function ($page) use ($globalPageDefaults, $globalExclude) {
+                $merged = array_merge($globalPageDefaults, $page);
+                if (in_array((string) $merged['id'], array_map('strval', $globalExclude))) {
+                    $merged['exclude_from_caching'] = true;
+                }
+                return $merged;
+            }, $config['pages'] ?? []);
         }
 
         // Apply global defaults for AD_ACCOUNTS if they exist
         if (isset($config['AD_ACCOUNT'])) {
             $globalAdAccountDefaults = $config['AD_ACCOUNT'];
-            $config['facebook']['ad_accounts'] = array_map(function ($adAccount) use ($globalAdAccountDefaults) {
-                return array_merge($globalAdAccountDefaults, $adAccount);
-            }, $config['facebook']['ad_accounts'] ?? []);
+            $config['ad_accounts'] = array_map(function ($adAccount) use ($globalAdAccountDefaults, $globalExclude) {
+                $merged = array_merge($globalAdAccountDefaults, $adAccount);
+                if (in_array((string) $merged['id'], array_map('strval', $globalExclude))) {
+                    $merged['exclude_from_caching'] = true;
+                }
+                return $merged;
+            }, $config['ad_accounts'] ?? []);
         }
 
         // If 'pages' list is NOT provided or empty, we mark it as such so it's handled during request
@@ -915,7 +940,6 @@ class MetricRequests
              $config['ad_accounts'] = [];
         }
 
-        // Map back to expected structure if needed, or just return the facebook key data
         return ['facebook' => $config];
     }
 

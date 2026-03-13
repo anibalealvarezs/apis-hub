@@ -208,6 +208,7 @@ class MonitoringController extends BaseController
             'containers' => $containers,
             'groupedJobs' => $groupedJobs,
             'dbTotals' => $dbTotals,
+            'projectName' => $config['project'] ?? 'APIs Hub',
             'timestamp' => date('Y-m-d H:i:s')
         ]);
     }

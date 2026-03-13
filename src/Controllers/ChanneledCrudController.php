@@ -69,7 +69,7 @@ class ChanneledCrudController extends BaseController
             return $this->createResponse(
                 data: null,
                 status: 'error',
-                error: "The channel '$channel' is not configured in your project. Please add it to the 'channels' section in your deploy/project.yaml.",
+                error: "The channel '$channel' is not configured in your project. Please add it to the 'channels' section in your config/ directory.",
                 httpStatus: Response::HTTP_NOT_FOUND
             );
         }
