@@ -29,4 +29,10 @@ class PageController
         $json = file_get_contents(__DIR__ . '/../views/openapi.json');
         return new Response($json, 200, ['Content-Type' => 'application/json']);
     }
+
+    public function logs(): Response
+    {
+        $html = file_get_contents(__DIR__ . '/../views/logs.html');
+        return new Response($html, 200, ['Content-Type' => 'text/html']);
+    }
 }

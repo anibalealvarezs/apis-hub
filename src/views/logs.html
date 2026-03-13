@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APIs Hub | Log Explorer</title>
+    <link rel="icon" type="image/png" href="/assets/images/apishub-favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0c10;
+            --bg-card: rgba(22, 27, 34, 0.7);
+            --bg-accent: #21262d;
+            --primary: #58a6ff;
+            --primary-glow: rgba(88, 166, 255, 0.3);
+            --secondary: #238636;
+            --danger: #f85149;
+            --warning: #d29922;
+            --info: #3fb950;
+            --text-main: #c9d1d9;
+            --text-dim: #8b949e;
+            --border: rgba(48, 54, 61, 0.8);
+            --header-h: 70px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(88, 166, 255, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(35, 134, 54, 0.05) 0%, transparent 40%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            height: var(--header-h);
+            background: rgba(13, 17, 23, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            text-decoration: none;
+        }
+
+        .logo img { height: 28px; width: auto; }
+
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .nav-link {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link.active {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            color: var(--primary);
+        }
+
+        main {
+            flex-grow: 1;
+            padding: calc(var(--header-h) + 20px) 20px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            max-width: 1800px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .log-explorer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: var(--bg-card);
+            padding: 15px 25px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .log-select {
+            background: var(--bg-accent);
+            color: #fff;
+            border: 1px solid var(--border);
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            outline: none;
+            cursor: pointer;
+            min-width: 250px;
+        }
+
+        .log-select:hover { border-color: var(--primary); }
+
+        .refresh-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .console-wrapper {
+            flex-grow: 1;
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .console-toolbar {
+            background: #161b22;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        #log-console {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #d1d5da;
+            white-space: pre-wrap;
+            word-break: break-all;
+            scroll-behavior: smooth;
+        }
+
+        /* Log Level Highlighting */
+        .log-line-info { color: var(--info); }
+        .log-line-warning { color: var(--warning); }
+        .log-line-error { color: var(--danger); }
+        .log-timestamp { color: #8b949e; margin-right: 10px; font-weight: 300; }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-dim);
+            gap: 15px;
+        }
+
+        .loader {
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-accent);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+
+        .btn:hover { background: #30363d; border-color: var(--text-dim); }
+        .btn-clear { color: var(--danger); font-size: 0.75rem; padding: 4px 10px; }
+
+        footer {
+            padding: 20px;
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border);
+            margin-top: auto;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: #0a0c10; }
+        ::-webkit-scrollbar-thumb { background: #21262d; border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #30363d; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="/" class="logo">
+            <img src="/assets/images/apishub-trans-light-600.png" alt="APIs Hub Logo">
+            <span>Log Explorer</span>
+        </a>
+        <nav class="nav-links">
+            <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
+            <a href="/monitoring" class="nav-link"><i data-lucide="activity"></i> Monitoring</a>
+            <a href="/logs" class="nav-link active"><i data-lucide="scroll"></i> Logs</a>
+            <a href="/command-builder" class="nav-link"><i data-lucide="terminal"></i> Builder</a>
+        </nav>
+    </header>
+
+    <main>
+        <div class="log-explorer-header">
+            <div class="log-controls">
+                <select id="log-file-selector" class="log-select" onchange="changeLogFile()">
+                    <option value="">-- Loading log files --</option>
+                </select>
+                <div class="btn" onclick="fetchLogs()">
+                    <i data-lucide="refresh-cw"></i> Refresh
+                </div>
+            </div>
+            <div class="log-controls">
+                <label class="refresh-toggle">
+                    <input type="checkbox" id="auto-refresh-check" checked onchange="toggleAutoRefresh()">
+                    Auto-refresh (10s)
+                </label>
+                <label class="refresh-toggle">
+                    <input type="checkbox" id="auto-scroll-check" checked>
+                    Auto-scroll
+                </label>
+                <div class="btn btn-clear" onclick="clearConsole()">
+                    <i data-lucide="trash-2"></i> Clear View
+                </div>
+            </div>
+        </div>
+
+        <div class="console-wrapper">
+            <div class="console-toolbar">
+                <div id="log-info-label">Select a log file to begin</div>
+                <div id="last-updated-label">Last check: Never</div>
+            </div>
+            <div id="log-console">
+                <div class="empty-state">
+                    <i data-lucide="scroll" style="width: 48px; height: 48px; opacity: 0.2;"></i>
+                    <p>Select a log file from the dropdown to start exploring real-time activity.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 APIs Hub Central | Interactive Log Explorer</p>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        let autoRefreshInterval = null;
+        let lastTimestamp = null;
+
+        async function fetchLogList() {
+            try {
+                const response = await fetch('/api/monitoring/logs/list');
+                const data = await response.json();
+                const selector = document.getElementById('log-file-selector');
+                const currentVal = selector.value;
+                
+                selector.innerHTML = '<option value="">-- Choose log file --</option>';
+                data.logs.forEach(log => {
+                    const opt = document.createElement('option');
+                    opt.value = log.name;
+                    opt.textContent = `${log.name} (${log.size})`;
+                    selector.appendChild(opt);
+                });
+
+                if (currentVal && Array.from(selector.options).some(o => o.value === currentVal)) {
+                    selector.value = currentVal;
+                } else if (!currentVal && data.logs.find(l => l.name === 'jobs.log')) {
+                    selector.value = 'jobs.log';
+                    changeLogFile();
+                }
+            } catch (error) {
+                console.error('Error fetching log list:', error);
+            }
+        }
+
+        function changeLogFile() {
+            const selector = document.getElementById('log-file-selector');
+            const file = selector.value;
+            if (!file) return;
+
+            document.getElementById('log-info-label').textContent = `Reading ${file}...`;
+            fetchLogs(true);
+        }
+
+        async function fetchLogs(isInitial = false) {
+            const selector = document.getElementById('log-file-selector');
+            const consoleBox = document.getElementById('log-console');
+            const file = selector.value;
+            if (!file) return;
+
+            try {
+                const response = await fetch(`/api/monitoring/logs?file=${file}&lines=1000`);
+                const data = await response.json();
+                
+                const content = data.content || 'No content found.';
+                const formattedContent = colorizeLogs(content);
+
+                if (isInitial) {
+                    consoleBox.innerHTML = formattedContent;
+                } else {
+                    // Simple diff check to avoid flickering if nothing changed
+                    if (consoleBox.innerHTML !== formattedContent) {
+                        consoleBox.innerHTML = formattedContent;
+                    }
+                }
+
+                if (document.getElementById('auto-scroll-check').checked) {
+                    consoleBox.scrollTop = consoleBox.scrollHeight;
+                }
+
+                document.getElementById('last-updated-label').textContent = `Last check: ${new Date().toLocaleTimeString()}`;
+                document.getElementById('log-info-label').textContent = `File: ${file}`;
+
+            } catch (error) {
+                console.error('Error fetching logs:', error);
+            }
+        }
+
+        function colorizeLogs(text) {
+            // Very basic highlighter for Monolog standard format
+            return text.split('\n').map(line => {
+                let cssClass = '';
+                if (line.includes('.INFO:')) cssClass = 'log-line-info';
+                if (line.includes('.WARNING:')) cssClass = 'log-line-warning';
+                if (line.includes('.ERROR:')) cssClass = 'log-line-error';
+                
+                // Try to highlight timestamp
+                line = line.replace(/^\[(.*?)\]/, '<span class="log-timestamp">[$1]</span>');
+                
+                return `<div class="${cssClass}">${line}</div>`;
+            }).join('');
+        }
+
+        function toggleAutoRefresh() {
+            const isEnabled = document.getElementById('auto-refresh-check').checked;
+            if (isEnabled) {
+                autoRefreshInterval = setInterval(() => fetchLogs(), 10000);
+            } else {
+                clearInterval(autoRefreshInterval);
+            }
+        }
+
+        function clearConsole() {
+            document.getElementById('log-console').innerHTML = '<div class="empty-state">Console cleared.</div>';
+        }
+
+        // Initialize
+        fetchLogList();
+        toggleAutoRefresh();
+        setInterval(fetchLogList, 60000); // Refresh file list every minute
+    </script>
+</body>
+</html>

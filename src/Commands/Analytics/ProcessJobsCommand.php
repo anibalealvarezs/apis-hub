@@ -42,7 +42,9 @@ class ProcessJobsCommand extends Command
         $envChannel = getenv('API_SOURCE');
         $envInstance = getenv('INSTANCE_NAME');
         
-        $output->writeln("Querying scheduled and delayed jobs...");
+        if (Helpers::isDebug()) {
+            $output->writeln("Querying scheduled and delayed jobs...");
+        }
 
         $jobs = $jobRepo->getJobsByStatus(
             status: JobStatus::scheduled->value,
@@ -235,7 +237,9 @@ class ProcessJobsCommand extends Command
                     'message' => $e->getMessage()
                 ]);
                 $output->writeln("<error>Failed job {$job->getUuid()}: {$e->getMessage()}</error>");
-                $output->writeln($e->getTraceAsString());
+                if (Helpers::isDebug()) {
+                    $output->writeln($e->getTraceAsString());
+                }
                 $stats['failed']++;
             }
         }

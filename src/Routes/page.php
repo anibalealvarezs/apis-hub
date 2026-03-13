@@ -21,6 +21,12 @@ return [
         'public' => true,
         'html' => true
     ],
+    '/logs' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new PageController())->logs(),
+        'public' => true,
+        'html' => true
+    ],
     '/api/spec' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->apiSpec(),
@@ -57,6 +63,14 @@ return [
         'callable' => function (...$args) {
             $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
             return (new \Controllers\MonitoringController())->logs($request);
+        },
+        'public' => true,
+        'html' => false
+    ],
+    '/api/monitoring/logs/list' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            return (new \Controllers\MonitoringController())->logList();
         },
         'public' => true,
         'html' => false

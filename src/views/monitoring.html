@@ -588,6 +588,7 @@
         <nav class="nav-links">
             <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
             <a href="/monitoring" class="nav-link active"><i data-lucide="activity"></i> Monitoring</a>
+            <a href="/logs" class="nav-link"><i data-lucide="scroll"></i> Logs</a>
             <a href="/command-builder" class="nav-link"><i data-lucide="terminal"></i> Builder</a>
             <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
         </nav>
@@ -615,22 +616,6 @@
                     </div>
                 </div>
 
-                <div class="card">
-                    <h2 class="card-title">
-                        <div><i data-lucide="terminal"></i> System Log Console</div>
-                        <select id="log-file-selector" class="log-select" onchange="fetchLogs()">
-                            <option value="jobs">Job Processor (jobs.log)</option>
-                            <option value="cron">Cron Service (cron.log)</option>
-                            <option value="gsc">App Errors (gsc.log)</option>
-                        </select>
-                    </h2>
-                    <div id="log-console" class="log-console">
-                        <div class="empty-state">
-                            <i data-lucide="loader" class="loader"></i>
-                            Initializing console...
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Right Column: Detailed Jobs & System Info -->
@@ -1029,32 +1014,8 @@
             }
         }
 
-        async function fetchLogs() {
-            const selector = document.getElementById('log-file-selector');
-            const consoleBox = document.getElementById('log-console');
-            const file = selector.value;
-            
-            try {
-                const response = await fetch(`/api/monitoring/logs?file=${file}&lines=500`);
-                const data = await response.json();
-                
-                // Keep scroll at bottom if user hasn't scrolled up
-                const isAtBottom = consoleBox.scrollHeight - consoleBox.clientHeight <= consoleBox.scrollTop + 50;
-                
-                consoleBox.textContent = data.content || 'No content found in this log.';
-                
-                if (isAtBottom) {
-                    consoleBox.scrollTop = consoleBox.scrollHeight;
-                }
-            } catch (error) {
-                console.error('Error fetching logs:', error);
-            }
-        }
-
         fetchData();
-        fetchLogs();
         setInterval(fetchData, 15000);
-        setInterval(fetchLogs, 10000);
     </script>
 
     <script>

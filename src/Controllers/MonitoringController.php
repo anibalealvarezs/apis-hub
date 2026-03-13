@@ -273,15 +273,21 @@ class MonitoringController extends BaseController
 
     public function logs(Request $request): JsonResponse
     {
-        $logFile = $request->query->get('file', 'jobs');
+        $logFile = $request->query->get('file', 'jobs.log');
         $lines = (int)$request->query->get('lines', 500);
         
-        $filePath = '';
-        switch ($logFile) {
-            case 'jobs': $filePath = '/app/logs/jobs.log'; break;
-            case 'cron': $filePath = '/app/logs/cron.log'; break;
-            case 'gsc':  $filePath = '/app/logs/gsc.log';  break;
-            default: return new JsonResponse(['error' => 'Invalid log file'], 400);
+        // Security: Prevent directory traversal
+        $logFile = basename($logFile);
+        if (!str_ends_with($logFile, '.log')) {
+             $logFile .= '.log';
+        }
+
+        $logDir = realpath(__DIR__ . '/../../logs/');
+        $filePath = $logDir . DIRECTORY_SEPARATOR . $logFile;
+
+        // Security: Ensure the file is within the logs directory
+        if (strpos($filePath, $logDir) !== 0) {
+            return new JsonResponse(['error' => 'Unauthorized access'], 403);
         }
 
         if (!file_exists($filePath)) {
@@ -290,6 +296,27 @@ class MonitoringController extends BaseController
 
         $content = $this->readLastLines($filePath, $lines);
         return new JsonResponse(['content' => $content, 'file' => $logFile]);
+    }
+
+    public function logList(): JsonResponse
+    {
+        $logDir = realpath(__DIR__ . '/../../logs/');
+        $files = glob($logDir . '/*.log');
+        
+        $logList = array_map(function($f) {
+            return [
+                'name' => basename($f),
+                'size' => round(filesize($f) / 1024, 2) . ' KB',
+                'modified' => date('Y-m-d H:i:s', filemtime($f))
+            ];
+        }, $files);
+
+        // Sort by modification time (newest first)
+        usort($logList, function($a, $b) {
+            return strcmp($b['modified'], $a['modified']);
+        });
+
+        return new JsonResponse(['logs' => $logList]);
     }
 
     private function readLastLines(string $filename, int $lines): string

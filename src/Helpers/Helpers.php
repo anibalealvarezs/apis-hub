@@ -19,6 +19,7 @@ use ReflectionProperty;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 use Monolog\Handler\StreamHandler;
+use Monolog\Handler\NullHandler;
 use Monolog\Level;
 use Monolog\Logger;
 use Psr\Log\LoggerInterface;
@@ -599,21 +600,67 @@ class Helpers
     }
 
     /**
+     * @param string $level
+     * @return Level
+     */
+    public static function getLogLevel(string $level): Level
+    {
+        return match (strtolower($level)) {
+            'debug'     => Level::Debug,
+            'info'      => Level::Info,
+            'notice'    => Level::Notice,
+            'warning'   => Level::Warning,
+            'error'     => Level::Error,
+            'critical'  => Level::Critical,
+            'alert'     => Level::Alert,
+            'emergency' => Level::Emergency,
+            default     => Level::Info,
+        };
+    }
+
+    /**
      * @param string $filename
-     * @param Level $level
+     * @param Level|int|string|null $level
      * @return LoggerInterface
      */
-    public static function setLogger(string $filename, Level|int $level = Level::Info): LoggerInterface
+    public static function setLogger(string $filename, Level|int|string|null $level = null): LoggerInterface
     {
-        $requestedLevel = ($level instanceof Level) ? $level : Level::from($level);
-
-        if (!self::isDebug() && $requestedLevel->value < Level::Error->value) {
-            $requestedLevel = Level::Error;
-        }
-
+        $projectConfig = self::getProjectConfig();
+        $logConfig = $projectConfig['logging'] ?? [];
+        $enabled = (bool) ($logConfig['enabled'] ?? true);
+        
         $name = str_replace('.log', '', $filename);
         $logger = new Logger($name);
-        $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/' . $filename, $requestedLevel));
+
+        if (!$enabled) {
+            $logger->pushHandler(new NullHandler());
+            return $logger;
+        }
+
+        // Determine base level from config
+        $configLevelStr = self::isDebug() 
+            ? ($logConfig['level'] ?? 'info') 
+            : ($logConfig['prod_level'] ?? 'error');
+            
+        $baseLevel = self::getLogLevel($configLevelStr);
+
+        // If a specific level was requested, we respect it if it's more restrictive
+        // or if debug is on.
+        if ($level !== null) {
+            $requested = ($level instanceof Level) 
+                ? $level 
+                : (is_int($level) ? Level::from($level) : self::getLogLevel($level));
+            
+            // In non-debug mode, we don't allow logging below the prod_level
+            if (!self::isDebug() && $requested->value < $baseLevel->value) {
+                $requested = $baseLevel;
+            }
+            $finalLevel = $requested;
+        } else {
+            $finalLevel = $baseLevel;
+        }
+
+        $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/' . $filename, $finalLevel));
         return $logger;
     }
 
