@@ -74,5 +74,29 @@ return [
         },
         'public' => true,
         'html' => false
+    ],
+    '/config-manager' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new \Controllers\ConfigManagerController())->index(),
+        'public' => true,
+        'html' => true
+    ],
+    '/api/config-manager/assets' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
+            return (new \Controllers\ConfigManagerController())->fetchAssets($request);
+        },
+        'public' => true,
+        'html' => false
+    ],
+    '/api/config-manager/update' => [
+        'httpMethod' => 'POST',
+        'callable' => function (...$args) {
+            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
+            return (new \Controllers\ConfigManagerController())->updateConfig($request);
+        },
+        'public' => true,
+        'html' => false
     ]
 ];
