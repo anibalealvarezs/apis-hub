@@ -53,7 +53,7 @@ class InstanceGeneratorService
                     'port' => $currentPort++,
                     'channel' => $channel,
                     'entity' => $rules['entities_sync'],
-                    'frequency' => sprintf('%d %d * * *', ($rules['recent_cron_minute'] + 5) % 60, $rules['recent_cron_hour']) // Just an example, maybe offset from recent
+                    'frequency' => sprintf('0 %d * * *', $rules['recent_cron_hour'])
                 ];
             }
 

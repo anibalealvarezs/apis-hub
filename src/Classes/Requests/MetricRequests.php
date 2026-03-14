@@ -958,7 +958,7 @@ class MetricRequests
      * @return array
      * @throws Exception
      */
-    private static function validateGoogleConfig(LoggerInterface $logger): array
+    public static function validateGoogleConfig(LoggerInterface $logger): array
     {
         return GoogleSearchConsoleHelpers::validateGoogleConfig($logger);
     }

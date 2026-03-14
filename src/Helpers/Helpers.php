@@ -651,7 +651,7 @@ class Helpers
      */
     public static function str_contains_any(string $haystack, array $needles): bool
     {
-        return array_reduce($needles, fn ($a, $n) => $a || str_contains($haystack, $n), false);
+        return array_reduce($needles, fn ($a, $n) => $a || stripos($haystack, $n) !== false, false);
     }
 
     /**
