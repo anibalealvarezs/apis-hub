@@ -10,6 +10,9 @@ use Doctrine\ORM\EntityManager;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
+use Entities\Analytics\Channeled\DimensionSet;
+use Entities\Analytics\Channeled\DimensionKey;
+use Entities\Analytics\Channeled\DimensionValue;
 
 class MetricsProcessor
 {
@@ -235,31 +238,6 @@ class MetricsProcessor
 
     /**
      * Processes metrics and returns a map of metric IDs.
-     * @param ArrayCollection $metrics
-     * @param EntityManager $manager
-     * @param bool $processQueries
-     * @param bool $processAccounts
-     * @param bool $processChanneledAccounts
-     * @param bool $processCampaigns
-     * @param bool $processChanneledCampaigns
-     * @param bool $processChanneledAdGroups
-     * @param bool $processChanneledAds
-     * @param bool $processPosts
-     * @param bool $processProducts
-     * @param bool $processCustomers
-     * @param bool $processOrders
-     * @param array|null $countryMap
-     * @param array|null $deviceMap
-     * @param array|null $pageMap
-     * @param array|null $postMap
-     * @param array|null $accountMap
-     * @param array|null $channeledAccountMap
-     * @param array|null $campaignMap
-     * @param array|null $channeledCampaignMap
-     * @param array|null $channeledAdGroupMap
-     * @param array|null $channeledAdMap
-     * @return array
-     * @throws Exception
      */
     public static function processMetricConfigs(
         ArrayCollection $metrics,
@@ -296,90 +274,57 @@ class MetricsProcessor
 
         // Map queries
         if ($processQueries) {
-            $queryMap = self::processQueries(
-                $metrics,
-                $manager,
-            );
+            $queryMap = self::processQueries($metrics, $manager);
         }
 
         // Map accounts
         if ($processAccounts) {
-            $accountMap = self::processAccounts(
-                $metrics,
-                $manager,
-            );
+            $accountMap = self::processAccounts($metrics, $manager);
         }
 
         // Map channeled accounts
         if ($processChanneledAccounts) {
-            $channeledAccountMap = self::processChanneledAccounts(
-                $metrics,
-                $manager,
-            );
+            $channeledAccountMap = self::processChanneledAccounts($metrics, $manager);
         }
 
         // Map campaigns
         if ($processCampaigns) {
-            $campaignMap = self::processCampaigns(
-                $metrics,
-                $manager,
-            );
+            $campaignMap = self::processCampaigns($metrics, $manager);
         }
 
         // Map channeled campaigns
         if ($processChanneledCampaigns) {
-            $channeledCampaignMap = self::processChanneledCampaigns(
-                $metrics,
-                $manager,
-            );
+            $channeledCampaignMap = self::processChanneledCampaigns($metrics, $manager);
         }
 
         // Map channeled campaigns
         if ($processChanneledAdGroups) {
-            $channeledAdGroupMap = self::processChanneledAdGroups(
-                $metrics,
-                $manager,
-            );
+            $channeledAdGroupMap = self::processChanneledAdGroups($metrics, $manager);
         }
 
         // Map channeled ads
         if ($processChanneledAds) {
-            $channeledAdMap = self::processChanneledAds(
-                $metrics,
-                $manager,
-            );
+            $channeledAdMap = self::processChanneledAds($metrics, $manager);
         }
 
         // Map posts
         if ($processPosts) {
-            $postMap = self::processPosts(
-                $metrics,
-                $manager,
-            );
+            $postMap = self::processPosts($metrics, $manager);
         }
 
         // Map products
         if ($processProducts) {
-            $productMap = self::processProducts(
-                $metrics,
-                $manager,
-            );
+            $productMap = self::processProducts($metrics, $manager);
         }
 
         // Map customers
         if ($processCustomers) {
-            $customerMap = self::processCustomers(
-                $metrics,
-                $manager,
-            );
+            $customerMap = self::processCustomers($metrics, $manager);
         }
 
         // Map orders
         if ($processOrders) {
-            $orderMap = self::processOrders(
-                $metrics,
-                $manager,
-            );
+            $orderMap = self::processOrders($metrics, $manager);
         }
 
         // Extract metrics from metrics
@@ -481,9 +426,7 @@ class MetricsProcessor
             }
         }
 
-        // INSERT IGNORE: atomic upsert — UNIQUE composite constraint prevents duplicates across concurrent containers.
-        // If another container already inserted the same metric_config, the insert is silently skipped.
-        // INSERT IGNORE: atomic upsert — configSignature prevents duplicates.
+        // INSERT IGNORE: atomic upsert.
         if (!empty($uniqueMetricConfigs)) {
             $insertParams = [];
             foreach ($uniqueMetricConfigs as $metricConfig) {
@@ -516,7 +459,7 @@ class MetricsProcessor
             );
         }
 
-        // Always re-fetch ALL metric_configs for these keys — covers both newly inserted and already-existing rows.
+        // Re-fetch all metric_configs
         $reFetchParams = [];
         $conditions = [];
         foreach ($uniqueMetricConfigs as $row) {
@@ -530,7 +473,6 @@ class MetricsProcessor
             $metricConfigMap[$metricConfig['configSignature']] = (int)$metricConfig['id'];
         }
 
-
         return [
             'map' => $metricConfigMap,
             'mapReverse' => array_flip($metricConfigMap),
@@ -538,21 +480,17 @@ class MetricsProcessor
     }
 
     /**
-     * Processes metrics and returns a map of metric IDs.
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
      * @param array $metricConfigMap
      * @return array
-     * @throws Exception
      */
     public static function processMetrics(
         ArrayCollection $metrics,
         EntityManager $manager,
         array $metricConfigMap,
     ): array {
-        // Extract metrics from $metrics
         $uniqueMetrics = [];
-        /** @var \stdClass&object{dimensions: array, metricConfigKey: string, value: float|int, metadata?: array} $metric */
         foreach ($metrics->toArray() as $metric) {
             $dimensions = array_map(function ($dimension) {
                 return [ 'dimensionKey' => $dimension['dimensionKey'], 'dimensionValue' => $dimension['dimensionValue'] ];
@@ -572,10 +510,9 @@ class MetricsProcessor
             ];
         }
 
-        // Batch select metrics from list
+        // Select existing
         $conditions = [];
         $selectParams = [];
-
         $fields = ['dimensionsHash', 'metricConfig_id'];
 
         foreach ($uniqueMetrics as $m) {
@@ -595,7 +532,6 @@ class MetricsProcessor
                 FROM metrics
                 WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
 
-        // Map metrics to their IDs
         $metricMap = MapGenerator::getMetricMap(
             manager: $manager,
             sql: $sql,
@@ -603,7 +539,6 @@ class MetricsProcessor
             metricConfigMap: $metricConfigMap
         );
 
-        // Get the list of metrics that need to be inserted and updated
         $metricsToInsert = [];
         $metricsToUpdate = [];
         foreach ($uniqueMetrics as $key => $metric) {
@@ -623,7 +558,6 @@ class MetricsProcessor
             }
         }
 
-        // INSERT IGNORE: atomic upsert — UNIQUE(metricConfig_id, dimensionsHash) prevents duplicates.
         if (!empty($metricsToInsert)) {
             $insertParams = [];
             foreach ($metricsToInsert as $row) {
@@ -638,7 +572,6 @@ class MetricsProcessor
                 $insertParams
             );
 
-            // Re-fetch newly inserted metrics to get their DB IDs
             $reFetchParams = [];
             $reFetchConditions = [];
             foreach ($metricsToInsert as $row) {
@@ -646,8 +579,7 @@ class MetricsProcessor
                 $reFetchParams[] = $row['dimensionsHash'];
                 $reFetchParams[] = $row['metricConfig_id'];
             }
-            $reFetchSql = 'SELECT id, dimensionsHash, metricConfig_id FROM metrics WHERE '
-                . implode(' OR ', $reFetchConditions);
+            $reFetchSql = 'SELECT id, dimensionsHash, metricConfig_id FROM metrics WHERE ' . implode(' OR ', $reFetchConditions);
             $newMetrics = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
             foreach ($newMetrics as $metric) {
                 $metricKey = KeyGenerator::generateMetricKey(
@@ -658,32 +590,13 @@ class MetricsProcessor
             }
         }
 
-
-        // Bulk Update metrics (High-Water Mark / Monotonic)
         if (!empty($metricsToUpdate)) {
-            $updateCases = [];
-            $updateParams = [];
-            $ids = [];
             foreach ($metricsToUpdate as $update) {
-                $id = (int)$update['id'];
-                $newValue = $update['value'];
-                $updateCases[] = "WHEN id = ? THEN GREATEST(COALESCE(value, 0), ?)";
-                $updateParams[] = $id;
-                $updateParams[] = $newValue;
-                $ids[] = $id;
+                $manager->getConnection()->executeStatement(
+                    "UPDATE metrics SET value = GREATEST(COALESCE(value, 0), ?) WHERE id = ?",
+                    [$update['value'], $update['id']]
+                );
             }
-            $caseSql = implode("\n", $updateCases);
-            $idPlaceholders = implode(', ', array_fill(0, count($ids), '?'));
-            $finalParams = array_merge($updateParams, $ids);
-
-            $manager->getConnection()->executeStatement("
-                UPDATE metrics
-                SET value = CASE
-                    $caseSql
-                    ELSE value
-                END
-                WHERE id IN ($idPlaceholders)
-            ", $finalParams);
         }
 
         return [
@@ -698,7 +611,6 @@ class MetricsProcessor
      * @param array $metricMap
      * @param LoggerInterface $logger
      * @return array
-     * @throws Exception
      */
     public static function processChanneledMetrics(
         ArrayCollection $metrics,
@@ -706,26 +618,15 @@ class MetricsProcessor
         array $metricMap,
         LoggerInterface $logger,
     ): array {
-        // Extract channeled metrics from metrics
         $uniqueChanneledMetrics = [];
-        /** @var \stdClass&object{dimensionsHash: string, metricConfigKey: string, channel: string, platformId: string, platformCreatedAt: string|\DateTime, data?: array} $metric */
         foreach ($metrics->toArray() as $metric) {
             $metricKey = KeyGenerator::generateMetricKey(
                 dimensionsHash: $metric->dimensionsHash,
                 metricConfigKey: $metric->metricConfigKey,
             );
 
-            if (!isset($metricMap['map'][$metricKey])) {
-                $logger->error("Metric mapping not found for key: $metricKey", [
-                    'metric' => (array) $metric,
-                    'metricMap_keys' => array_keys($metricMap['map'] ?? []),
-                ]);
-                continue;
-            }
-            if (empty($metric->platformId)) {
-                $logger->warning("Skipping channeled metric: platformId is empty, metricKey=$metricKey");
-                continue;
-            }
+            if (!isset($metricMap['map'][$metricKey])) continue;
+            if (empty($metric->platformId)) continue;
 
             $channeledMetricKey = KeyGenerator::generateChanneledMetricKey(
                 channel: $metric->channel,
@@ -744,10 +645,8 @@ class MetricsProcessor
             ];
         }
 
-        // Batch select channeled metrics from list
         $conditions = [];
         $selectParams = [];
-
         foreach ($uniqueChanneledMetrics as $m) {
             $conditions[] = '(channel = ? AND platformId = ? AND metric_id = ? AND platformCreatedAt = ?)';
             $selectParams[] = $m['channel'];
@@ -760,286 +659,78 @@ class MetricsProcessor
             FROM channeled_metrics
             WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
 
-        // Map metrics to their IDs
-        $channeledMetricMap = MapGenerator::getChanneledMetricMap(
-            $manager,
-            $sql,
-            $selectParams,
-            $metricMap,
-        );
+        $channeledMetricMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
 
-        // Get list of channeled metrics that need to be inserted and updated
+        $dimManager = new \Classes\DimensionManager($manager);
         $channeledMetricsToInsert = [];
         $channeledMetricsToUpdate = [];
         foreach ($uniqueChanneledMetrics as $key => $channeledMetric) {
             if (!isset($channeledMetricMap[$key]) && !isset($channeledMetricsToInsert[$key])) {
+                $originalMetric = null;
+                foreach ($metrics as $m) {
+                    $mKey = KeyGenerator::generateMetricKey(dimensionsHash: $m->dimensionsHash, metricConfigKey: $m->metricConfigKey);
+                    if ($mKey === $channeledMetric['metricKey']) {
+                        $originalMetric = $m;
+                        break;
+                    }
+                }
+
+                $dimensionSetId = null;
+                if ($originalMetric && isset($originalMetric->dimensions) && !empty($originalMetric->dimensions)) {
+                    $dimensionSetId = $dimManager->resolveDimensionSet((array)$originalMetric->dimensions)->getId();
+                }
+
                 $channeledMetricsToInsert[$key] = [
                     'channel' => $channeledMetric['channel'],
                     'platformId' => $channeledMetric['platformId'],
                     'metric_id' => $channeledMetric['metric_id'],
                     'platformCreatedAt' => $channeledMetric['platformCreatedAt'],
                     'data' => json_encode($channeledMetric['data']),
+                    'dimension_set_id' => $dimensionSetId
                 ];
-                // $logger->info("Queuing channeled metric for insert: channeledMetricKey=$key, metric_id={$channeledMetric['metric_id']}, metricKey={$channeledMetric['metricKey']}, platformId={$channeledMetric['platformId']}");
             } elseif (isset($channeledMetricsToInsert[$key])) {
-                // Update data
                 $data = json_decode($channeledMetricsToInsert[$key]['data'], true);
-                $newData = $channeledMetric['data'];
-
-                $data = array_merge($data, $newData);
-                if (isset($newData['impressions'])) $data['impressions'] = max($data['impressions'] ?? 0, $newData['impressions']);
-                if (isset($newData['clicks'])) $data['clicks'] = max($data['clicks'] ?? 0, $newData['clicks']);
-                if (isset($newData['position_weighted'])) $data['position_weighted'] = max($data['position_weighted'] ?? 0, $newData['position_weighted']);
-                if (isset($newData['ctr'])) $data['ctr'] = max($data['ctr'] ?? 0, $newData['ctr']);
-
+                $data = array_merge($data, $channeledMetric['data']);
                 $channeledMetricsToInsert[$key]['data'] = json_encode($data);
-                // $logger->info("Updated queued channeled metric: channeledMetricKey=$key, metric_id={$channeledMetric['metric_id']}");
             } else {
-                // Update existing
                 $data = json_decode($channeledMetricMap[$key]['data'], true);
-                $newData = $channeledMetric['data'];
-
-                $data = array_merge($data, $newData);
-                if (isset($newData['impressions'])) $data['impressions'] = max($data['impressions'] ?? 0, $newData['impressions']);
-                if (isset($newData['clicks'])) $data['clicks'] = max($data['clicks'] ?? 0, $newData['clicks']);
-                if (isset($newData['position_weighted'])) $data['position_weighted'] = max($data['position_weighted'] ?? 0, $newData['position_weighted']);
-                if (isset($newData['ctr'])) $data['ctr'] = max($data['ctr'] ?? 0, $newData['ctr']);
-
+                $data = array_merge($data, $channeledMetric['data']);
                 $channeledMetricsToUpdate[$key] = [
                     'id' => $channeledMetricMap[$key]['id'],
                     'data' => json_encode($data, JSON_UNESCAPED_UNICODE),
                 ];
-                // $logger->info("Queuing channeled metric for update: channeledMetricKey=$key, metric_id={$channeledMetric['metric_id']}");
             }
         }
 
-        // INSERT IGNORE: atomic upsert — UNIQUE(platformId, channel, metric_id, platformCreatedAt) prevents duplicates.
         if (!empty($channeledMetricsToInsert)) {
-            $insertPlaceholders = implode(', ', array_fill(0, count($channeledMetricsToInsert), '(?, ?, ?, ?, ?)'));
-            $insertParams = [];
+            $placeholders = implode(', ', array_fill(0, count($channeledMetricsToInsert), '(?, ?, ?, ?, ?, ?)'));
+            $params = [];
             foreach ($channeledMetricsToInsert as $row) {
-                $insertParams[] = $row['channel'];
-                $insertParams[] = $row['platformId'];
-                $insertParams[] = $row['metric_id'];
-                $insertParams[] = $row['platformCreatedAt'];
-                $insertParams[] = $row['data'];
+                $params[] = $row['channel']; $params[] = $row['platformId']; $params[] = $row['metric_id'];
+                $params[] = $row['platformCreatedAt']; $params[] = $row['data']; $params[] = $row['dimension_set_id'];
             }
             $manager->getConnection()->executeStatement(
-                'INSERT IGNORE INTO channeled_metrics (channel, platformId, metric_id, platformCreatedAt, data)
-                    VALUES ' . $insertPlaceholders,
-                $insertParams
+                "INSERT IGNORE INTO channeled_metrics (channel, platformId, metric_id, platformCreatedAt, data, dimension_set_id) VALUES $placeholders",
+                $params
             );
-
-            $selectParams = [];
-            $selectPlaceholders = [];
-            foreach ($channeledMetricsToInsert as $m) {
-                $selectPlaceholders[] = '(?, ?, ?, ?)';
-                $selectParams[] = $m['channel'];
-                $selectParams[] = $m['platformId'];
-                $selectParams[] = $m['metric_id'];
-                $selectParams[] = $m['platformCreatedAt'];
-            }
-            $sql = "SELECT id, channel, platformId, metric_id, platformCreatedAt, data
-                    FROM channeled_metrics
-                    WHERE (channel, platformId, metric_id, platformCreatedAt) IN (" . implode(', ', $selectPlaceholders) . ")";
         }
 
-        // Bulk Update channeled metrics
         if (!empty($channeledMetricsToUpdate)) {
-            $updateCases = [];
-            $updateParams = [];
-            $ids = [];
             foreach ($channeledMetricsToUpdate as $update) {
-                $id = $update['id'];
-                $data = $update['data'];
-                $updateCases[] = "WHEN id = ? THEN ?";
-                $updateParams[] = $id;
-                $updateParams[] = $data;
-                $ids[] = $id;
-            }
-            $caseSql = implode("\n", $updateCases);
-            $idPlaceholders = implode(', ', array_fill(0, count($ids), '?'));
-            $whereParams = $ids;
-            $updateParams = array_merge($updateParams, $whereParams);
-            // $logger->info("Updating " . count($channeledMetricsToUpdate) . " channeled metrics");
-            $updateSql = "UPDATE channeled_metrics
-                      SET data = CASE
-                                     $caseSql
-                                     ELSE data
-                                 END
-                      WHERE id IN ($idPlaceholders)";
-            $manager->getConnection()->executeStatement($updateSql, $updateParams);
-        }
-
-        // Re-fetch channeled metrics
-        $channeledMetricMap = MapGenerator::getChanneledMetricMap(
-            $manager,
-            $sql,
-            $selectParams,
-            $metricMap,
-        );
-
-        $channeledMetricMapFlipped = [];
-        foreach ($channeledMetricMap as $originalKey => $value) {
-            if (isset($value['id'])) {
-                $id = (string)$value['id'];
-                $channeledMetricMapFlipped[$id] = [
-                    'id' => $originalKey,
-                    'data' => $value['data'],
-                ];
-            }
-        }
-
-        return [
-            'map' => $channeledMetricMap,
-            'mapReverse' => $channeledMetricMapFlipped,
-        ];
-    }
-
-    /**
-     * Processes channeled metric dimensions from the given metrics.
-     * @param ArrayCollection $metrics
-     * @param EntityManager $manager
-     * @param array $metricMap
-     * @param array $channeledMetricMap
-     * @param LoggerInterface $logger
-     * @throws Exception
-     */
-    public static function processChanneledMetricDimensions(
-        ArrayCollection $metrics,
-        EntityManager $manager,
-        array $metricMap,
-        array $channeledMetricMap,
-        LoggerInterface $logger
-    ): void {
-        // $logger->info("Processing " . count($metrics->toArray()) . " metrics in processChanneledMetricDimensions");
-        // Extract dimensions from metrics
-
-        $uniqueDimensions = [];
-        /** @var \stdClass&object{dimensions: array, dimensionsHash: string, metricConfigKey: string, channel: string, platformId: string, platformCreatedAt: string|\DateTime} $metric */
-        foreach ($metrics->toArray() as $metric) {
-            $dimensions = $metric->dimensions;
-            foreach ($dimensions as $dimension) {
-                $metricKey = KeyGenerator::generateMetricKey(
-                    dimensionsHash: $metric->dimensionsHash,
-                    metricConfigKey: $metric->metricConfigKey,
-                );
-
-                if (!isset($metricMap['map'][$metricKey])) {
-                    $logger->warning("Skipping dimension: metricKey=$metricKey not found in metricMap");
-                    continue;
-                }
-
-                // $logger->info("Dimensions Inputs: metricKey=$metricKey, channel={$metric->channel}, platformId=" . ($metric->platformId ?? 'null') . ", metric_id={$metricMap['map'][$metricKey]}, platformCreatedAt=" . ($metric->platformCreatedAt->format('Y-m-d H:i:s')));
-                $channeledMetricKey = KeyGenerator::generateChanneledMetricKey(
-                    channel: $metric->channel,
-                    platformId: $metric->platformId,
-                    metric: $metricMap['map'][$metricKey],
-                    platformCreatedAt: Carbon::parse($metric->platformCreatedAt)->format('Y-m-d'),
-                );
-
-                if (!isset($channeledMetricMap['map'][$channeledMetricKey])) {
-                    $logger->error("ChanneledMetric not found for key=$channeledMetricKey, metricId=".$metricMap['map'][$metricKey]." metricKey=$metricKey, platformId=" . ($metric->platformId ?? 'null') . ", platformCreatedAt=" . Carbon::parse($metric->platformCreatedAt)->format('Y-m-d'));
-                    continue;
-                }
-
-                $dimensionKey = KeyGenerator::generateChanneledMetricDimensionKey(
-                    channeledMetric: $channeledMetricMap['map'][$channeledMetricKey]['id'],
-                    dimensionKey: $dimension['dimensionKey'],
-                    dimensionValue: $dimension['dimensionValue'],
-                );
-
-                $uniqueDimensions[$dimensionKey] = [
-                    'dimensionKey' => $dimension['dimensionKey'],
-                    'dimensionValue' => $dimension['dimensionValue'],
-                    'channeledMetric_id' => $channeledMetricMap['map'][$channeledMetricKey]['id'],
-                ];
-            }
-        }
-
-        // Batch select dimensions from list
-        $selectParams = [];
-        $selectPlaceholders = [];
-        $nullConditions = [];
-
-        foreach ($uniqueDimensions as $d) {
-            $channeledMetricId = $d['channeledMetric_id'];
-            $dimensionKey = $d['dimensionKey'];
-            $dimensionValue = $d['dimensionValue'];
-
-            if ($dimensionKey === null || $dimensionValue === null) {
-                // Use IS NULL-safe fallback condition for NULLs
-                $conditions = [];
-                $conditions[] = 'channeledMetric_id = ?';
-                $selectParams[] = $channeledMetricId;
-
-                $conditions[] = $dimensionKey === null ? 'dimensionKey IS NULL' : 'dimensionKey = ?';
-                if ($dimensionKey !== null) {
-                    $selectParams[] = $dimensionKey;
-                }
-
-                $conditions[] = $dimensionValue === null ? 'dimensionValue IS NULL' : 'dimensionValue = ?';
-                if ($dimensionValue !== null) {
-                    $selectParams[] = $dimensionValue;
-                }
-
-                $nullConditions[] = '(' . implode(' AND ', $conditions) . ')';
-            } else {
-                $selectParams[] = $channeledMetricId;
-                $selectParams[] = $dimensionKey;
-                $selectParams[] = $dimensionValue;
-                $selectPlaceholders[] = '(?, ?, ?)';
-            }
-        }
-
-        $whereParts = [];
-
-        if (!empty($selectPlaceholders)) {
-            $whereParts[] = '(channeledMetric_id, dimensionKey, dimensionValue) IN (' . implode(', ', $selectPlaceholders) . ')';
-        }
-
-        if (!empty($nullConditions)) {
-            $whereParts[] = implode(' OR ', $nullConditions);
-        }
-
-        $sql = "SELECT id, dimensionKey, dimensionValue, channeledMetric_id
-                FROM channeled_metric_dimensions";
-
-        if (!empty($whereParts)) {
-            $sql .= ' WHERE ' . implode(' OR ', $whereParts);
-        } else {
-            $sql .= ' WHERE 1=0'; // Safe fallback if no dimensions to match
-        }
-
-        // Map dimensions to their IDs
-        $dimensionMap = MapGenerator::getDimensionMap(
-            $manager,
-            $sql,
-            $selectParams,
-        );
-
-        // Get list of dimensions that need to be inserted
-        // INSERT IGNORE: handle race conditions during concurrent insertion
-        if (!empty($uniqueDimensions)) {
-            $insertPlaceholders = implode(', ', array_fill(0, count($uniqueDimensions), '(?, ?, ?)'));
-            $insertParams = [];
-            foreach ($uniqueDimensions as $dimension) {
-                $insertParams[] = $dimension['channeledMetric_id'];
-                $insertParams[] = $dimension['dimensionKey'];
-                $insertParams[] = $dimension['dimensionValue'];
-            }
-
-            try {
                 $manager->getConnection()->executeStatement(
-                    "INSERT INTO channeled_metric_dimensions (channeledMetric_id, dimensionKey, dimensionValue) 
-                 VALUES $insertPlaceholders
-                 ON DUPLICATE KEY UPDATE dimensionValue=dimensionValue",
-                    $insertParams
+                    "UPDATE channeled_metrics SET data = ? WHERE id = ?",
+                    [$update['data'], $update['id']]
                 );
-            } catch (Exception $e) {
-                // Dimensons errors should not necessarily fail the whole process but we log it if it happens
-                error_log("Failed to insert dimensions: " . $e->getMessage());
             }
         }
+
+        $channeledMetricMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
+        $flipped = [];
+        foreach ($channeledMetricMap as $k => $v) {
+            if (isset($v['id'])) $flipped[(string)$v['id']] = ['id' => $k, 'data' => $v['data']];
+        }
+
+        return ['map' => $channeledMetricMap, 'mapReverse' => $flipped];
     }
+
 }

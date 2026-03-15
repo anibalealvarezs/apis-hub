@@ -9,7 +9,6 @@ use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Analytics\Channeled\ChanneledMetric;
-use Entities\Analytics\Channeled\ChanneledMetricDimension;
 use Entities\Analytics\Metric;
 use Entities\Entity;
 use Enums\Channel;
@@ -50,10 +49,10 @@ class ChanneledMetricRepository extends ChanneledBaseRepository
         if ($type === QueryBuilderType::SELECT || $type === QueryBuilderType::AGGREGATE || $type === QueryBuilderType::LAST) {
             $query->addSelect('partial m.{id, value, dimensionsHash, metadata}')
                 ->addSelect('partial mc.{id, channel, name, period, metricDate}')
-                ->addSelect('partial dim.{id, dimensionKey, dimensionValue}')
+                ->addSelect('ds')
                 ->leftJoin('e.metric', 'm')
                 ->leftJoin('m.metricConfig', 'mc')
-                ->leftJoin('e.dimensions', 'dim');
+                ->leftJoin('e.dimensionSet', 'ds');
         }
 
         return $query;
@@ -138,18 +137,13 @@ class ChanneledMetricRepository extends ChanneledBaseRepository
                     ->addMetric($data['metric'])
                     ->addData($data['data'] ?? null);
 
-                if (isset($data['dimensions'])) {
-                    foreach ((array) $data['dimensions'] as $dimensionData) {
-                        $dimensionData = (array) $dimensionData;
-                        $dimension = new ChanneledMetricDimension();
-                        $dimension->addDimensionKey($dimensionData['dimensionKey'])
-                            ->addDimensionValue($dimensionData['dimensionValue'])
-                            ->addChanneledMetric($channeledMetric);
-                        $channeledMetric->addDimension($dimension);
-                    }
+                if (isset($data['dimensions']) && !empty($data['dimensions'])) {
+                    $dimManager = new \Classes\DimensionManager($this->getEntityManager());
+                    $dimensionSet = $dimManager->resolveDimensionSet((array) $data['dimensions']);
+                    $channeledMetric->setDimensionSet($dimensionSet);
                 }
 
-                $this->getEntityManager()->persist($channeledMetric); // Use $_em
+                $this->getEntityManager()->persist($channeledMetric);
                 $this->getEntityManager()->flush();
 
                 return $returnEntity ? $channeledMetric : null;
@@ -165,22 +159,6 @@ class ChanneledMetricRepository extends ChanneledBaseRepository
             }
         }
         return null;
-    }
-
-    public function findByDimension(int $channel, string $key, string $value): array
-    {
-        return $this->createQueryBuilder('cm')
-            ->join('cm.dimensions', 'cmd')
-            ->where('cm.channel = :channel')
-            ->andWhere('cmd.key = :key')
-            ->andWhere('cmd.value = :value')
-            ->setParameters([
-                'channel' => $channel,
-                'key' => $key,
-                'value' => $value,
-            ])
-            ->getQuery()
-            ->getResult();
     }
 
     /**

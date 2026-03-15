@@ -236,14 +236,6 @@ class KeyGenerator
         ], JSON_UNESCAPED_UNICODE));
     }
 
-    public static function generateChanneledMetricDimensionKey(
-        ChanneledMetric|int $channeledMetric,
-        string $dimensionKey,
-        ?string $dimensionValue
-    ): string {
-        return md5(($channeledMetric instanceof ChanneledMetric ? $channeledMetric->getId() : $channeledMetric) . $dimensionKey . $dimensionValue);
-    }
-
     public static function generateCustomerKey(string $email): string
     {
         return md5(strtolower(trim($email)));

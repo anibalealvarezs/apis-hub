@@ -105,7 +105,9 @@ class MetricRepository extends BaseRepository
                 ->addSelect('pr')
                 ->addSelect('cu')
                 ->addSelect('o')
-                ->addSelect('partial md.{id, dimensionKey, dimensionValue}')
+                ->addSelect('ds')
+                ->addSelect('dv')
+                ->addSelect('dk')
                 ->leftJoin('e.channeledMetrics', 'cm')
                 ->leftJoin('mc.channeledAccount', 'ca')
                 ->leftJoin('mc.channeledCampaign', 'cc')
@@ -117,7 +119,9 @@ class MetricRepository extends BaseRepository
                 ->leftJoin('mc.product', 'pr')
                 ->leftJoin('mc.customer', 'cu')
                 ->leftJoin('mc.order', 'o')
-                ->leftJoin('cm.dimensions', 'md');
+                ->leftJoin('cm.dimensionSet', 'ds')
+                ->leftJoin('ds.values', 'dv')
+                ->leftJoin('dv.dimensionKey', 'dk');
         }
 
         return $query;
@@ -371,15 +375,22 @@ class MetricRepository extends BaseRepository
             }
 
             if (!empty($dimensions)) {
-                $qb->leftJoin('m.channeledMetrics', 'cm')
-                    ->leftJoin('cm.dimensions', 'cmd');
+                $qb->join('m.channeledMetrics', 'cm');
+                $i = 0;
                 foreach ($dimensions as $key => $value) {
                     if (in_array($key, ['site', 'country', 'device'], true)) {
                         continue;
                     }
-                    $qb->andWhere('cmd.dimensionKey = :dimensionKey_' . $key . ' AND cmd.dimensionValue = :dimensionValue_' . $key)
-                        ->setParameter('dimensionKey_' . $key, $key)
-                        ->setParameter('dimensionValue_' . $key, $value);
+                    $dsAlias = "ds$i";
+                    $dvAlias = "dv$i";
+                    $dkAlias = "dk$i";
+                    $qb->join('cm.dimensionSet', $dsAlias)
+                       ->join("$dsAlias.values", $dvAlias)
+                       ->join("$dvAlias.dimensionKey", $dkAlias)
+                       ->andWhere("$dkAlias.name = :dkname_$i AND $dvAlias.value = :dvval_$i")
+                       ->setParameter("dkname_$i", $key)
+                       ->setParameter("dvval_$i", $value);
+                    $i++;
                 }
             }
 
@@ -412,7 +423,6 @@ class MetricRepository extends BaseRepository
         $qb = $this->createQueryBuilder('m')
             ->join('m.metricConfig', 'mc')
             ->join('m.channeledMetrics', 'cm')
-            ->join('cm.dimensions', 'cmd')
             ->where('mc.channel = :channel')
             ->andWhere('mc.name = :name')
             ->andWhere('mc.period = :period')
@@ -425,11 +435,20 @@ class MetricRepository extends BaseRepository
                 'end' => $end,
             ]);
 
-        foreach ($dimensions as $key => $value) {
-            $alias = 'd'.$key;
-            $qb->join('cm.dimensions', $alias, 'WITH', "$alias.dimensionKey = :dimensionKey_$key AND $alias.dimensionValue = :dimensionValue_$key")
-                ->setParameter("dimensionKey_$key", $key)
-                ->setParameter("dimensionValue_$key", $value);
+        if (!empty($dimensions)) {
+            $i = 0;
+            foreach ($dimensions as $key => $value) {
+                $dsAlias = "ds$i";
+                $dvAlias = "dv$i";
+                $dkAlias = "dk$i";
+                $qb->join('cm.dimensionSet', $dsAlias)
+                   ->join("$dsAlias.values", $dvAlias)
+                   ->join("$dvAlias.dimensionKey", $dkAlias)
+                   ->andWhere("$dkAlias.name = :dkname_$i AND $dvAlias.value = :dvval_$i")
+                   ->setParameter("dkname_$i", $key)
+                   ->setParameter("dvval_$i", $value);
+                $i++;
+            }
         }
 
         return $qb->getQuery()->getResult();
@@ -470,7 +489,31 @@ class MetricRepository extends BaseRepository
         $result = $this->replaceChannelName($result);
         $result = $this->stripPositionWeighted($result);
         $result = $this->formatDate($result);
+        $result = $this->flattenDimensions($result);
         return parent::processResult($result);
+    }
+
+    /**
+     * Flattens normalized dimensions into the legacy 'dimensions' format for compatibility.
+     */
+    protected function flattenDimensions(array $result): array
+    {
+        if (isset($result['channeledMetrics'])) {
+            foreach ($result['channeledMetrics'] as &$cm) {
+                $dimensions = [];
+                if (isset($cm['dimensionSet']['values'])) {
+                    foreach ($cm['dimensionSet']['values'] as $val) {
+                        $dimensions[] = [
+                            'dimensionKey' => $val['dimensionKey']['name'] ?? 'unknown',
+                            'dimensionValue' => $val['value'] ?? ''
+                        ];
+                    }
+                }
+                $cm['dimensions'] = $dimensions;
+                unset($cm['dimensionSet']);
+            }
+        }
+        return $result;
     }
 
     /**

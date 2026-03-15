@@ -40,7 +40,6 @@ use Entities\Analytics\Channeled\ChanneledAdGroup;
 use Entities\Analytics\Channeled\ChanneledCampaign;
 use Entities\Analytics\Creative;
 use Entities\Analytics\Channeled\ChanneledMetric;
-use Entities\Analytics\Channeled\ChanneledMetricDimension;
 use Entities\Analytics\Channeled\ChanneledSyncError;
 use Entities\Analytics\Country;
 use Entities\Analytics\Device;
@@ -57,7 +56,6 @@ use GuzzleHttp\Exception\GuzzleException;
 use Helpers\GoogleSearchConsoleHelpers;
 use Helpers\Helpers;
 use Repositories\Channeled\ChanneledMetricRepository;
-use Repositories\Channeled\ChanneledMetricDimensionRepository;
 use Repositories\QueryRepository;
 use Repositories\MetricRepository;
 use Psr\Log\LoggerInterface;
@@ -817,7 +815,7 @@ class MetricRequests
             // Custom filter for dimensions disabled for GSC given the strict structure. Config dimensions used instead
 
             $logger->info("Initialized repositories, dimensions=" . implode(',', GoogleSearchConsoleHelpers::$allDimensions) . ", metricNames=" . json_encode($metricNames));
-            $logger->warning("Note: 'searchAppearance' is not included in dimensions due to GSC API restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
+            $logger->warning("Note: 'searchAppearance' is not included in dimensions due to GSC API restrictions; defaulting to 'WEB' in normalized dimensions");
 
             // Load countries and create a map
             /** @var Country[] $countries */
@@ -1346,13 +1344,6 @@ class MetricRequests
                 );
 
                 // Map dimensions
-                MetricsProcessor::processChanneledMetricDimensions(
-                    metrics: $allMetrics,
-                    manager: $manager,
-                    metricMap: $metricMap,
-                    channeledMetricMap: $channeledMetricMap,
-                    logger: $logger,
-                );
 
                 $manager->getConnection()->commit();
             } catch (Exception $e) {
@@ -1477,13 +1468,6 @@ class MetricRequests
                 );
 
                 // Map dimensions
-                MetricsProcessor::processChanneledMetricDimensions(
-                    metrics: $allMetrics,
-                    manager: $manager,
-                    metricMap: $metricMap,
-                    channeledMetricMap: $channeledMetricMap,
-                    logger: $logger,
-                );
                 $manager->getConnection()->commit();
             } catch (Exception $e) {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -1648,13 +1632,6 @@ class MetricRequests
                 );
 
                 // Map dimensions
-                MetricsProcessor::processChanneledMetricDimensions(
-                    metrics: $allMetrics,
-                    manager: $manager,
-                    metricMap: $metricMap,
-                    channeledMetricMap: $channeledMetricMap,
-                    logger: $logger,
-                );
                 $manager->getConnection()->commit();
             } catch (Exception $e) {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -1776,13 +1753,6 @@ class MetricRequests
                 );
 
                 // Map dimensions
-                MetricsProcessor::processChanneledMetricDimensions(
-                    metrics: $allMetrics,
-                    manager: $manager,
-                    metricMap: $metricMap,
-                    channeledMetricMap: $channeledMetricMap,
-                    logger: $logger,
-                );
                 $manager->getConnection()->commit();
             } catch (Exception $e) {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -1896,13 +1866,6 @@ class MetricRequests
                 );
 
                 // Map dimensions
-                MetricsProcessor::processChanneledMetricDimensions(
-                    metrics: $allMetrics,
-                    manager: $manager,
-                    metricMap: $metricMap,
-                    channeledMetricMap: $channeledMetricMap,
-                    logger: $logger,
-                );
                 $manager->getConnection()->commit();
             } catch (Exception $e) {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -2025,13 +1988,6 @@ class MetricRequests
                 );
 
                 // Map dimensions
-                MetricsProcessor::processChanneledMetricDimensions(
-                    metrics: $allMetrics,
-                    manager: $manager,
-                    metricMap: $metricMap,
-                    channeledMetricMap: $channeledMetricMap,
-                    logger: $logger,
-                );
                 $manager->getConnection()->commit();
             } catch (Exception $e) {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -2161,13 +2117,6 @@ class MetricRequests
                 );
 
                 // Map dimensions
-                MetricsProcessor::processChanneledMetricDimensions(
-                    metrics: $allMetrics,
-                    manager: $manager,
-                    metricMap: $metricMap,
-                    channeledMetricMap: $channeledMetricMap,
-                    logger: $logger,
-                );
                 $manager->getConnection()->commit();
             } catch (Exception $e) {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -2390,13 +2339,6 @@ class MetricRequests
                 );
 
                 // Map dimensions
-                MetricsProcessor::processChanneledMetricDimensions(
-                    metrics: $allMetrics,
-                    manager: $manager,
-                    metricMap: $metricMap,
-                    channeledMetricMap: $channeledMetricMap,
-                    logger: $logger,
-                );
                 $manager->getConnection()->commit();
             } catch (Exception $e) {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -2571,13 +2513,6 @@ class MetricRequests
                 );
 
                 // Map dimensions
-                MetricsProcessor::processChanneledMetricDimensions(
-                    metrics: $allMetrics,
-                    manager: $manager,
-                    metricMap: $metricMap,
-                    channeledMetricMap: $channeledMetricMap,
-                    logger: $logger,
-                );
                 $manager->getConnection()->commit();
             } catch (Exception $e) {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -2883,7 +2818,6 @@ class MetricRequests
                 channeledMetric: $metric,
                 manager: $manager,
                 repository: $repos['channeledMetric'],
-                dimensionRepository: $repos['channeledMetricDimension'],
                 logger: $logger,
                 channeledMetricCache: $channeledMetricCache,
                 dimensionCache: $dimensionCache
@@ -3055,7 +2989,6 @@ class MetricRequests
                     $manager->flush();
                     $manager->clear(Metric::class);
                     $manager->clear(ChanneledMetric::class);
-                    $manager->clear(ChanneledMetricDimension::class);
                     $manager->clear(Query::class);
                     gc_collect_cycles();
                 }
@@ -3071,7 +3004,6 @@ class MetricRequests
                 $manager->flush();
                 $manager->clear(Metric::class);
                 $manager->clear(ChanneledMetric::class);
-                $manager->clear(ChanneledMetricDimension::class);
                 $manager->clear(Query::class);
                 gc_collect_cycles();
             }
@@ -3142,7 +3074,6 @@ class MetricRequests
         return [
             'metric' => $manager->getRepository(Metric::class),
             'channeledMetric' => $manager->getRepository(ChanneledMetric::class),
-            'channeledMetricDimension' => $manager->getRepository(ChanneledMetricDimension::class),
             'query' => $manager->getRepository(Query::class),
         ];
     }
@@ -3369,7 +3300,6 @@ class MetricRequests
      * @param object $channeledMetric
      * @param EntityManager $manager
      * @param ChanneledMetricRepository $repository
-     * @param ChanneledMetricDimensionRepository $dimensionRepository
      * @param LoggerInterface $logger
      * @param array $channeledMetricCache
      * @param array $dimensionCache
@@ -3383,7 +3313,6 @@ class MetricRequests
         object $channeledMetric,
         EntityManager $manager,
         ChanneledMetricRepository $repository,
-        ChanneledMetricDimensionRepository $dimensionRepository,
         LoggerInterface $logger,
         array &$channeledMetricCache = [],
         array &$dimensionCache = []
@@ -3432,8 +3361,6 @@ class MetricRequests
                     $logger,
                     $channeledMetricEntity,
                     $dimensionCache,
-                    $dimensionRepository,
-                    $dimensionsToPersist,
                     $manager
                 );
 
@@ -3503,8 +3430,6 @@ class MetricRequests
      * @param LoggerInterface $logger
      * @param mixed $channeledMetricEntity
      * @param array $dimensionCache
-     * @param ChanneledMetricDimensionRepository $dimensionRepository
-     * @param array $dimensionsToPersist
      * @param EntityManager $manager
      * @return array
      * @throws ORMException
@@ -3514,64 +3439,23 @@ class MetricRequests
         LoggerInterface $logger,
         mixed $channeledMetricEntity,
         array $dimensionCache,
-        ChanneledMetricDimensionRepository $dimensionRepository,
-        array $dimensionsToPersist,
         EntityManager $manager
     ): array {
-        // Process dimensions
-        if (isset($channeledMetric->dimensions)) {
-            foreach ($channeledMetric->dimensions as $dimensionData) {
-                $dimensionKey = $dimensionData['dimensionKey'] ?? null;
-                $dimensionValue = $dimensionData['dimensionKey'] ?? null;
-                if (!$dimensionKey || !$dimensionValue || in_array($dimensionKey, ['site', 'country', 'device'])) {
-                    $logger->warning("Skipping invalid dimension: key=" . ($dimensionKey ?? 'null') . ", value=" . ($dimensionValue ?? 'null') . " for ChanneledMetric ID={$channeledMetricEntity->getId()}");
-                    continue;
-                }
-                $dimCacheKey = md5($channeledMetricEntity->getId() . $dimensionKey . $dimensionValue);
-                if (!isset($dimensionCache[$dimCacheKey])) {
-                    $existingDimension = $dimensionRepository->findOneByKeyValueAndMetric(
-                        $dimensionKey,
-                        $dimensionValue,
-                        $channeledMetricEntity
-                    );
-                    if ($existingDimension) {
-                        $dimensionCache[$dimCacheKey] = $existingDimension;
-                        $logger->info("Found ChanneledMetricDimension: key=$dimensionKey, value=$dimensionValue");
-                    } else {
-                        $dimension = new ChanneledMetricDimension();
-                        $dimension->addDimensionKey($dimensionKey)
-                            ->addDimensionValue($dimensionValue)
-                            ->addChanneledMetric($channeledMetricEntity);
-                        $dimensionsToPersist[] = $dimension;
-                        $dimensionCache[$dimCacheKey] = $dimension;
-                        $logger->info("Created ChanneledMetricDimension: key=$dimensionKey, value=$dimensionValue");
-                    }
-                }
+        // Process dimensions using normalized system
+        if (isset($channeledMetric->dimensions) && !empty($channeledMetric->dimensions)) {
+            try {
+                $dimManager = new \Classes\DimensionManager($manager);
+                $dimensionSet = $dimManager->resolveDimensionSet((array) $channeledMetric->dimensions);
+                $channeledMetricEntity->setDimensionSet($dimensionSet);
+                $manager->persist($channeledMetricEntity);
+                $logger->info("Assigned DimensionSet (hash: {$dimensionSet->getHash()}) to ChanneledMetric ID={$channeledMetricEntity->getId()}");
+            } catch (\Exception $e) {
+                $logger->error("Error resolving DimensionSet for ChanneledMetric ID={$channeledMetricEntity->getId()}: " . $e->getMessage());
+                // We don't throw here to follow the "No Block" policy if possible, 
+                // but DimensionSet is quite important. However, let's keep it robust.
             }
         }
 
-        // Persist dimensions
-        foreach ($dimensionsToPersist as $dimension) {
-            try {
-                $manager->persist($dimension);
-            } catch (ORMException $e) {
-                if (str_contains($e->getMessage(), 'SQLSTATE[23000]')) {
-                    $logger->warning("Duplicate ChanneledMetricDimension: key=" . $dimension->getDimensionKey() . ", value=" . $dimension->getDimensionValue());
-                    $existingDimension = $dimensionRepository->findOneByKeyValueAndMetric(
-                        $dimension->getDimensionKey(),
-                        $dimension->getDimensionValue(),
-                        $channeledMetricEntity
-                    );
-                    if ($existingDimension) {
-                        $dimCacheKey = md5($channeledMetricEntity->getId() . $dimension->getDimensionKey() . $dimension->getDimensionValue());
-                        $dimensionCache[$dimCacheKey] = $existingDimension;
-                        continue;
-                    }
-                }
-                $logger->error("Error persisting ChanneledMetricDimension: key=" . $dimension->getDimensionKey() . ", value=" . $dimension->getDimensionValue() . ": " . $e->getMessage());
-                throw $e;
-            }
-        }
         return array($dimensionCache);
     }
 
@@ -3939,13 +3823,6 @@ class MetricRequests
                         metricMap: $metricMap,
                         logger: $logger,
                     );
-                    MetricsProcessor::processChanneledMetricDimensions(
-                        metrics: $globalAllMetrics,
-                        manager: $manager,
-                        metricMap: $metricMap,
-                        channeledMetricMap: $channeledMetricMap,
-                        logger: $logger,
-                    );
                     $manager->getConnection()->commit();
                 } catch (Exception $e) {
                     if ($manager->getConnection()->isTransactionActive()) {
@@ -4083,13 +3960,6 @@ class MetricRequests
                         metrics: $globalAllMetrics,
                         manager: $manager,
                         metricMap: $metricMap,
-                        logger: $logger,
-                    );
-                    MetricsProcessor::processChanneledMetricDimensions(
-                        metrics: $globalAllMetrics,
-                        manager: $manager,
-                        metricMap: $metricMap,
-                        channeledMetricMap: $channeledMetricMap,
                         logger: $logger,
                     );
                     $manager->getConnection()->commit();
@@ -4237,13 +4107,6 @@ class MetricRequests
                         metrics: $globalAllMetrics,
                         manager: $manager,
                         metricMap: $metricMap,
-                        logger: $logger,
-                    );
-                    MetricsProcessor::processChanneledMetricDimensions(
-                        metrics: $globalAllMetrics,
-                        manager: $manager,
-                        metricMap: $metricMap,
-                        channeledMetricMap: $channeledMetricMap,
                         logger: $logger,
                     );
                     $manager->getConnection()->commit();

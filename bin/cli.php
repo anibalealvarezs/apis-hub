@@ -54,7 +54,7 @@ try {
         new HealthCheckCommand(),
         new AggregateEntityCommand(),
         new RefreshInstancesCommand(),
-        new SetupDatabaseCommand()
+        new SetupDatabaseCommand(),
     ]);
 
     // Runs console application

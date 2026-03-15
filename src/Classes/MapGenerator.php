@@ -166,38 +166,6 @@ class MapGenerator
     }
 
     /**
-     * Generates a map of dimension keys to their IDs based on the provided SQL query and parameters.
-     * @param EntityManager $manager
-     * @param string $sql
-     * @param array $params
-     * @return array
-     * @throws Exception
-     */
-    public static function getDimensionMap(
-        EntityManager $manager,
-        string $sql,
-        array $params
-    ): array {
-        // Update the metric map with the newly inserted dimensions
-        $existingDimensions = $manager->getConnection()
-            ->executeQuery($sql, $params)
-            ->fetchAllAssociative();
-
-        // Map dimensions to their IDs and create a map for quick access
-        $dimensionMap = [];
-        foreach ($existingDimensions as $dimension) {
-            $dimensionKey = KeyGenerator::generateChanneledMetricDimensionKey(
-                channeledMetric: $dimension['channeledMetric_id'],
-                dimensionKey: $dimension['dimensionKey'],
-                dimensionValue: $dimension['dimensionValue'],
-            );
-            $dimensionMap[$dimensionKey] = (int)$dimension['id'];
-        }
-
-        return $dimensionMap;
-    }
-
-    /**
      * Generates a map of metrics based on the provided SQL query and parameters.
      * @param EntityManager $manager
      * @param string $sql

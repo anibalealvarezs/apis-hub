@@ -47,7 +47,7 @@ class GoogleSearchConsoleConvert
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        // $logger?->warning("Note: 'searchAppearance' not fetched from GSC API due to dimension restrictions; defaulting to 'WEB' in ChanneledMetricDimension");
+        // $logger?->warning("Note: 'searchAppearance' not fetched from GSC API due to dimension restrictions; defaulting to 'WEB' in normalized dimensions");
         if ($pageEntity) {
             $pageEntity = $em->find(Page::class, $pageEntity->getId());
         }
