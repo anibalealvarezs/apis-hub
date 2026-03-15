@@ -90,6 +90,7 @@ echo -e "${YELLOW}🚀 [4/5] Orchestrating containers...${NC}"
 # Ensure a clean slate: stop existing and remove orphans before building
 if [ -f "docker-compose.yml" ]; then
     echo "  🧹 Cleaning up existing deployment..."
+    rm -rf storage/db_lock
     docker compose --env-file .env down --remove-orphans || echo "  ⚠️ Cleanup had issues, continuing..."
 fi
 

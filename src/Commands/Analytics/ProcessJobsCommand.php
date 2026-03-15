@@ -15,8 +15,15 @@ use Services\DateResolver;
 use Symfony\Component\HttpFoundation\Response;
 use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
 use Doctrine\DBAL\Exception\LockWaitTimeoutException;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Input\InputOption;
 use Throwable;
 
+#[AsCommand(
+    name: 'app:process-jobs',
+    description: 'Processes scheduled caching jobs.',
+    aliases: ['jobs:process']
+)]
 class ProcessJobsCommand extends Command
 {
     protected static $defaultName = 'jobs:process';
@@ -30,8 +37,8 @@ class ProcessJobsCommand extends Command
 
     protected function configure(): void
     {
-        $this->setDescription('Processes scheduled caching jobs.')
-             ->setHelp('This command looks for scheduled jobs in the database and executes them via the CacheController.');
+        $this->setHelp('This command looks for scheduled jobs in the database and executes them via the CacheController.')
+             ->addOption('force-all', 'f', InputOption::VALUE_NONE, 'Ignore instance/date filters and process all scheduled jobs.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -41,8 +48,9 @@ class ProcessJobsCommand extends Command
 
         $envChannel = getenv('API_SOURCE');
         $envInstance = getenv('INSTANCE_NAME');
+        $forceAll = $input->getOption('force-all');
         
-        if (Helpers::isDebug()) {
+        if (Helpers::isDebug() || $forceAll) {
             $output->writeln("Querying scheduled and delayed jobs...");
         }
 
@@ -65,13 +73,13 @@ class ProcessJobsCommand extends Command
 
             $jobs = $jobRepo->getJobsByStatus(
                 status: JobStatus::scheduled->value,
-                channel: $envChannel,
-                instanceName: $envInstance
+                channel: ($forceAll ? null : $envChannel),
+                instanceName: ($forceAll ? null : $envInstance)
             );
             $delayedJobs = $jobRepo->getJobsByStatus(
                 status: JobStatus::delayed->value,
-                channel: $envChannel,
-                instanceName: $envInstance
+                channel: ($forceAll ? null : $envChannel),
+                instanceName: ($forceAll ? null : $envInstance)
             );
             $jobsList = array_merge($jobs, $delayedJobs);
 
@@ -85,9 +93,8 @@ class ProcessJobsCommand extends Command
                 $params = $payload['params'] ?? [];
 
                 // 1. Instance Name Match (Primary Filter)
-                $envInstance = getenv('INSTANCE_NAME');
                 $jobInstance = $payload['instance_name'] ?? null;
-                if ($envInstance && $jobInstance && $envInstance !== $jobInstance) {
+                if (!$forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance) {
                     $stats['skipped']++;
                     continue;
                 }
