@@ -44,6 +44,7 @@ echo "⚒  Building deployment for environment: " . strtoupper($env) . "\n";
 // ─── Build docker-compose.yml ─────────────────────────────────────────────────
 $services = [];
 foreach ($instances as $instance) {
+    $ports     = [];
     $name      = $instance['name'];
     $port      = $instance['port'] ?? null;
     $channel   = $instance['channel'];
@@ -90,16 +91,22 @@ foreach ($instances as $instance) {
         'extra_hosts' => ['host.docker.internal:host-gateway'],
     ];
 
-    $serviceConfig['ports'] = [];
-    if ($port) {
-        $serviceConfig['ports'][] = "{$port}:8080";
+    // Gateway pattern: Only map PHP and MCP ports for the first master sync instance found
+    if (str_contains($name, 'entities-sync')) {
+        if (!isset($gatewayAssigned)) {
+            // Map PHP port if defined in config
+            if ($port) {
+                $ports[] = "{$port}:8080";
+                $gatewayAssigned = $name;
+            }
+            // Map MCP port
+            $mcpHostPort = getenv('MCP_PORT') ?: 3000;
+            $ports[] = "{$mcpHostPort}:3000";
+        }
     }
 
-    // Assign MCP port mapping (3000) only to the primary sync instance to avoid host port conflicts
-    if (!isset($mcpAssigned) && str_contains($name, 'entities-sync')) {
-        $mcpHostPort = getenv('MCP_PORT') ?: 3000;
-        $serviceConfig['ports'][] = "{$mcpHostPort}:3000";
-        $mcpAssigned = true;
+    if (!empty($ports)) {
+        $serviceConfig['ports'] = $ports;
     }
 
     $services[$name] = $serviceConfig;
