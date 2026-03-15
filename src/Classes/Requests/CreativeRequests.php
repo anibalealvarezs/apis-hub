@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
 use Classes\Conversions\FacebookMarketingConvert;
 use Classes\MarketingProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
+use Entities\Analytics\Channeled\ChanneledSyncError;
 use Enums\Channel;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -47,10 +47,14 @@ class CreativeRequests implements RequestInterface
             $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
             $manager = Helpers::getManager();
 
+            $hasErrors = false;
             $adAccounts = $config['facebook']['ad_accounts'] ?? [];
             if ($adAccountIds) {
                 $adAccounts = array_filter($adAccounts, fn($acc) => in_array($acc['id'], $adAccountIds));
             }
+
+            /** @var \Repositories\Channeled\ChanneledSyncErrorRepository $syncErrorRepo */
+            $syncErrorRepo = $manager->getRepository(ChanneledSyncError::class);
 
             foreach ($adAccounts as $adAccount) {
                 Helpers::checkJobStatus($jobId);
@@ -70,25 +74,42 @@ class CreativeRequests implements RequestInterface
                     continue;
                 }
 
-                $additionalParams = [];
-                // No date filters for creatives usually, but we keep it for consistency if needed
-                // if ($startDate) $additionalParams['since'] = $startDate;
-                // if ($endDate) $additionalParams['until'] = $endDate;
+                try {
+                    $additionalParams = [];
+                    // No date filters for creatives usually, but we keep it for consistency if needed
+                    // if ($startDate) $additionalParams['since'] = $startDate;
+                    // if ($endDate) $additionalParams['until'] = $endDate;
 
-                $creatives = $api->getCreatives(
-                    adAccountId: $adAccountId,
-                    additionalParams: $additionalParams
-                );
-                $logger->info("Fetched " . count($creatives['data']) . " creatives for ad account $adAccountId");
+                    $creatives = $api->getCreatives(
+                        adAccountId: $adAccountId,
+                        additionalParams: $additionalParams
+                    );
+                    $logger->info("Fetched " . count($creatives['data']) . " creatives for ad account $adAccountId");
 
-                if (!empty($creatives['data'])) {
-                    self::process(FacebookMarketingConvert::creatives($creatives['data'], $channeledAccount->getId()));
+                    if (!empty($creatives['data'])) {
+                        self::process(FacebookMarketingConvert::creatives($creatives['data'], $channeledAccount->getId()));
+                    }
+                } catch (\Exception $e) {
+                    $hasErrors = true;
+                    $logger->error("Error fetching/processing creatives for ad account $adAccountId: " . $e->getMessage());
+                    $syncErrorRepo->logError([
+                        'platformId' => $adAccountId,
+                        'channel' => Channel::facebook_marketing->value,
+                        'syncType' => 'entity',
+                        'entityType' => 'creative',
+                        'errorMessage' => $e->getMessage(),
+                        'extraData' => ['jobId' => $jobId]
+                    ]);
                 }
+            }
+
+            if ($hasErrors) {
+                throw new \Exception("Finished with partial errors. Check channeled_sync_errors table or logs for details.");
             }
 
             return new Response(json_encode(['Creatives synchronized']));
         } catch (\Exception $e) {
-            $logger->error("Error in CreativeRequests::getListFromFacebookMarketing: " . $e->getMessage());
+            $logger->error("Error in CreativeRequests::getListFromFacebookMarketing initialization: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);
         }
     }

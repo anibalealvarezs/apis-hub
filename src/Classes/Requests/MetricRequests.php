@@ -8,6 +8,7 @@ use Anibalealvarezs\FacebookGraphApi\Enums\MediaType;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricBreakdown;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
+use Classes\Overrides\FacebookGraphApiOverride;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Dimension;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\GroupType;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Operator;
@@ -19,7 +20,6 @@ use Classes\Conversions\FacebookMarketingMetricConvert;
 use Classes\Conversions\FacebookOrganicMetricConvert;
 use Classes\Conversions\GoogleSearchConsoleConvert;
 use Classes\Conversions\KlaviyoConvert;
-use Classes\MapGenerator;
 use Classes\MetricsProcessor;
 use Classes\Overrides\GoogleApi\SearchConsoleApi\SearchConsoleApi;
 use Classes\Overrides\KlaviyoApi\KlaviyoApi;
@@ -41,34 +41,25 @@ use Entities\Analytics\Channeled\ChanneledCampaign;
 use Entities\Analytics\Creative;
 use Entities\Analytics\Channeled\ChanneledMetric;
 use Entities\Analytics\Channeled\ChanneledMetricDimension;
+use Entities\Analytics\Channeled\ChanneledSyncError;
 use Entities\Analytics\Country;
 use Entities\Analytics\Device;
 use Entities\Analytics\Metric;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
 use Entities\Analytics\Query;
-use Enums\BillingEvent;
-use Enums\CampaignBuyingType;
-use Enums\CampaignObjective;
-use Enums\CampaignStatus;
 use Enums\Channel;
 use Enums\Country as CountryEnum;
 use Enums\Device as DeviceEnum;
-use Enums\OptimizationGoal;
 use Enums\Period;
 use Enums\Account as AccountEnum;
 use GuzzleHttp\Exception\GuzzleException;
-use Helpers\FacebookGraphHelpers;
-use Repositories\CreativeRepository;
 use Helpers\GoogleSearchConsoleHelpers;
 use Helpers\Helpers;
 use Repositories\Channeled\ChanneledMetricRepository;
 use Repositories\Channeled\ChanneledMetricDimensionRepository;
 use Repositories\QueryRepository;
 use Repositories\MetricRepository;
-use Monolog\Handler\StreamHandler;
-use Monolog\Level;
-use Monolog\Logger;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Services\CacheService;
@@ -286,7 +277,7 @@ class MetricRequests
                     $pageName = $p->getTitle();
                     $includeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_include');
                     $excludeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_exclude');
-                    if (!Helpers::matchesFilter($pageName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($pageId, $includeFilter, $excludeFilter)) {
+                    if (!Helpers::matchesFilter((string)$pageName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter((string)$pageId, $includeFilter, $excludeFilter)) {
                         continue;
                     }
                     $pagesToProcess[] = array_merge($globalPageConfig, [
@@ -325,7 +316,7 @@ class MetricRequests
                 $pageTitle = $page['title'] ?? '';
                 $includeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_include');
                 $excludeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_exclude');
-                if (!Helpers::matchesFilter($pageTitle, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($pageId, $includeFilter, $excludeFilter)) {
+                if (!Helpers::matchesFilter((string)$pageTitle, $includeFilter, $excludeFilter) && !Helpers::matchesFilter((string)$pageId, $includeFilter, $excludeFilter)) {
                     continue;
                 }
 
@@ -341,107 +332,116 @@ class MetricRequests
                 }
 
                 try {
-                    if ($page['page_metrics']) {
-                        self::processFacebookPage(
-                            page: $page,
-                            startDate: $startDate,
-                            endDate: $endDate,
-                            api: $api,
-                            manager: $manager,
-                            pageRepository: $pageRepository,
-                            logger: $logger,
-                            pageMap: $pageMap,
-                        );
-                    }
+                    $cacheChunkSize = $config['facebook']['cache_chunk_size'] ?? '1 week';
+                    $chunks = Helpers::getDateChunks($startDate, $endDate, $cacheChunkSize);
+                    foreach ($chunks as $chunk) {
+                        Helpers::checkJobStatus($jobId);
+                        $cStart = $chunk['start'];
+                        $cEnd = $chunk['end'];
+                        $logger->info("Processing page chunk: $cStart to $cEnd");
 
-                    if ($page['posts']) {
-                        $postMap = self::getPostMap($manager, $pageEntity);
-                        if ($page['post_metrics']) {
-                            foreach ($postMap['map'] as $postIdInDb) {
-                                try {
-                                    $postEntity = $postRepository->find($postIdInDb);
-                                    if ($postEntity) {
-                                        $postMsg = $postEntity->getData()['message'] ?? '';
-                                        $includeFilter = self::getFacebookFilter($config, 'POST', 'cache_include');
-                                        $excludeFilter = self::getFacebookFilter($config, 'POST', 'cache_exclude');
-                                        if (!Helpers::matchesFilter($postMsg, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($postEntity->getPostId(), $includeFilter, $excludeFilter)) {
-                                            continue;
-                                        }
-                                        self::processFacebookPagePost(
-                                            postEntity: $postEntity,
-                                            pageEntity: $pageEntity,
-                                            api: $api,
-                                            manager: $manager,
-                                            logger: $logger,
-                                            postMap: $postMap,
-                                            pageMap: $pageMap,
-                                        );
-                                    }
-                                } catch (Exception $e) {
-                                    $logger->error("Error processing Facebook post " . $postIdInDb . ": " . $e->getMessage());
-                                }
-                            }
-                        }
-                    }
-
-                    if ($page['ig_account'] && $page['ig_account_metrics']) {
-                        $includeFilter = self::getFacebookFilter($config, 'IG_ACCOUNT', 'cache_include');
-                        $excludeFilter = self::getFacebookFilter($config, 'IG_ACCOUNT', 'cache_exclude');
-                        if (!Helpers::matchesFilter((string) $page['ig_account'], $includeFilter, $excludeFilter)) {
-                            $logger->info("Skipping Instagram account: " . $page['ig_account'] . " (filtered out)");
-                        } elseif ($accountEntity) {
-                            self::processInstagramAccount(
+                        if ($page['page_metrics']) {
+                            self::processFacebookPage(
                                 page: $page,
+                                startDate: $cStart,
+                                endDate: $cEnd,
                                 api: $api,
                                 manager: $manager,
-                                accountEntity: $accountEntity,
-                                pageEntity: $pageEntity,
+                                pageRepository: $pageRepository,
                                 logger: $logger,
                                 pageMap: $pageMap,
-                                startDate: $startDate,
-                                endDate: $endDate,
                             );
-                        } else {
-                            $logger->error("Cannot process Instagram account " . $page['ig_account'] . " because accountEntity is null.");
                         }
-                    }
 
-                    if ($page['ig_account_media']) {
-                        $channeledAccountEntity = $channeledAccountRepository->findOneBy([
-                            'platformId' => $page['ig_account'],
-                            'account' => $accountEntity,
-                        ]);
-
-                        if ($channeledAccountEntity) {
-                            $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
-                            if ($page['ig_account_media_metrics']) {
-                                foreach ($mediaMap['map'] as $mediaIdInDb) {
-                                    if ($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$mediaIdInDb] == $page['ig_account_media_stop_id'])) {
-                                        break;
-                                    }
+                        if ($page['posts']) {
+                            $postMap = self::getPostMap($manager, $pageEntity);
+                            if ($page['post_metrics']) {
+                                foreach ($postMap['map'] as $postIdInDb) {
                                     try {
-                                        $mediaEntity = $postRepository->find($mediaIdInDb);
-                                        if ($mediaEntity) {
-                                            $mediaCaption = $mediaEntity->getData()['caption'] ?? '';
-                                            $includeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_include');
-                                            $excludeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_exclude');
-                                            if (!Helpers::matchesFilter($mediaCaption, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($mediaEntity->getPostId(), $includeFilter, $excludeFilter)) {
+                                        $postEntity = $postRepository->find($postIdInDb);
+                                        if ($postEntity) {
+                                            $postMsg = $postEntity->getData()['message'] ?? '';
+                                            $includeFilter = self::getFacebookFilter($config, 'POST', 'cache_include');
+                                            $excludeFilter = self::getFacebookFilter($config, 'POST', 'cache_exclude');
+                                            if (!Helpers::matchesFilter($postMsg, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($postEntity->getPostId(), $includeFilter, $excludeFilter)) {
                                                 continue;
                                             }
-                                            self::processInstagramMedia(
+                                            self::processFacebookPagePost(
+                                                postEntity: $postEntity,
                                                 pageEntity: $pageEntity,
-                                                postEntity: $mediaEntity,
-                                                accountEntity: $accountEntity,
-                                                channeledAccountEntity: $channeledAccountEntity,
                                                 api: $api,
                                                 manager: $manager,
                                                 logger: $logger,
-                                                mediaMap: $mediaMap,
+                                                postMap: $postMap,
                                                 pageMap: $pageMap,
                                             );
                                         }
                                     } catch (Exception $e) {
-                                        $logger->error("Error processing Instagram media " . $mediaIdInDb . ": " . $e->getMessage());
+                                        $logger->error("Error processing Facebook post " . $postIdInDb . ": " . $e->getMessage());
+                                    }
+                                }
+                            }
+                        }
+
+                        if ($page['ig_account'] && $page['ig_account_metrics']) {
+                            $includeFilter = self::getFacebookFilter($config, 'IG_ACCOUNT', 'cache_include');
+                            $excludeFilter = self::getFacebookFilter($config, 'IG_ACCOUNT', 'cache_exclude');
+                            if (!Helpers::matchesFilter((string) $page['ig_account'], $includeFilter, $excludeFilter)) {
+                                $logger->info("Skipping Instagram account: " . $page['ig_account'] . " (filtered out)");
+                            } elseif ($accountEntity) {
+                                self::processInstagramAccount(
+                                    page: $page,
+                                    api: $api,
+                                    manager: $manager,
+                                    accountEntity: $accountEntity,
+                                    pageEntity: $pageEntity,
+                                    logger: $logger,
+                                    pageMap: $pageMap,
+                                    startDate: $cStart,
+                                    endDate: $cEnd,
+                                );
+                            } else {
+                                $logger->error("Cannot process Instagram account " . $page['ig_account'] . " because accountEntity is null.");
+                            }
+                        }
+
+                        if ($page['ig_account_media']) {
+                            $channeledAccountEntity = $channeledAccountRepository->findOneBy([
+                                'platformId' => $page['ig_account'],
+                                'account' => $accountEntity,
+                            ]);
+
+                            if ($channeledAccountEntity) {
+                                $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
+                                if ($page['ig_account_media_metrics']) {
+                                    foreach ($mediaMap['map'] as $mediaIdInDb) {
+                                        if ($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$mediaIdInDb] == $page['ig_account_media_stop_id'])) {
+                                            break;
+                                        }
+                                        try {
+                                            $mediaEntity = $postRepository->find($mediaIdInDb);
+                                            if ($mediaEntity) {
+                                                $mediaCaption = $mediaEntity->getData()['caption'] ?? '';
+                                                $includeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_include');
+                                                $excludeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_exclude');
+                                                if (!Helpers::matchesFilter($mediaCaption, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($mediaEntity->getPostId(), $includeFilter, $excludeFilter)) {
+                                                    continue;
+                                                }
+                                                self::processInstagramMedia(
+                                                    pageEntity: $pageEntity,
+                                                    postEntity: $mediaEntity,
+                                                    accountEntity: $accountEntity,
+                                                    channeledAccountEntity: $channeledAccountEntity,
+                                                    api: $api,
+                                                    manager: $manager,
+                                                    logger: $logger,
+                                                    mediaMap: $mediaMap,
+                                                    pageMap: $pageMap,
+                                                );
+                                            }
+                                        } catch (Exception $e) {
+                                            $logger->error("Error processing Instagram media " . $mediaIdInDb . ": " . $e->getMessage());
+                                        }
                                     }
                                 }
                             }
@@ -516,11 +516,15 @@ class MetricRequests
             $totalMetrics = 0;
             $totalRows = 0;
             $totalDuplicates = 0;
+            $hasErrors = false;
 
             // Process Ad Accounts
             Helpers::reconnectIfNeeded($manager);
             $adAccountsToProcess = $config['facebook']['ad_accounts'] ?? [];
             $globalExcludeIds = array_map('strval', $config['facebook']['exclude_from_caching'] ?? []);
+
+            /** @var \Repositories\Channeled\ChanneledSyncErrorRepository $syncErrorRepo */
+            $syncErrorRepo = $manager->getRepository(ChanneledSyncError::class);
 
             if (empty($adAccountsToProcess)) {
                 $logger->info("No specific ad accounts listed in config. Fetching all available ad accounts for channel from database.");
@@ -547,7 +551,7 @@ class MetricRequests
                     $accName = $ca->getName();
                     $includeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_include');
                     $excludeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_exclude');
-                    if (!Helpers::matchesFilter($accName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($accId, $includeFilter, $excludeFilter)) {
+                    if (!Helpers::matchesFilter((string)$accName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter((string)$accId, $includeFilter, $excludeFilter)) {
                         continue;
                     }
                     $adAccountsToProcess[] = array_merge($globalAdAccountConfig, [
@@ -565,7 +569,7 @@ class MetricRequests
                 $adAccName = $adAccount['name'] ?? '';
                 $includeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_include');
                 $excludeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_exclude');
-                if (!Helpers::matchesFilter($adAccName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($adAccId, $includeFilter, $excludeFilter)) {
+                if (!Helpers::matchesFilter((string)$adAccName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter((string)$adAccId, $includeFilter, $excludeFilter)) {
                     continue;
                 }
 
@@ -585,102 +589,128 @@ class MetricRequests
                 }
 
                 try {
-                    if ($adAccount['ad_account_metrics']) {
-                        self::processAdAccount(
-                            adAccount: $adAccount,
-                            api: $api,
-                            manager: $manager,
-                            accountEntity: $accountEntity,
-                            channeledAccountEntity: $channeledAccountEntity,
-                            logger: $logger,
-                            startDate: $startDate,
-                            endDate: $endDate,
-                        );
-                    }
+                    $cacheChunkSize = $config['facebook']['cache_chunk_size'] ?? '1 week';
+                    $chunks = Helpers::getDateChunks($startDate, $endDate, $cacheChunkSize);
+                    foreach ($chunks as $chunk) {
+                        Helpers::checkJobStatus($jobId);
+                        $cStart = $chunk['start'];
+                        $cEnd = $chunk['end'];
+                        $logger->info("Processing ad account chunk: $cStart to $cEnd");
 
-                    if ($adAccount['campaigns']) {
-                        $campaignsMultiMap = self::getCampaignMaps($manager, $channeledAccountEntity);
-                        $campaignMap = $campaignsMultiMap['campaignMap'];
-                        $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
-
-                        if ($adAccount['campaign_metrics']) {
-                            self::processCampaignsBulk(
+                        if ($adAccount['ad_account_metrics']) {
+                            self::processAdAccount(
+                                adAccount: $adAccount,
                                 api: $api,
                                 manager: $manager,
+                                accountEntity: $accountEntity,
                                 channeledAccountEntity: $channeledAccountEntity,
                                 logger: $logger,
-                                startDate: $startDate,
-                                endDate: $endDate,
-                                channeledCampaignMap: $channeledCampaignMap,
-                                campaignMap: $campaignMap,
-                                jobId: $jobId,
-                                cacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
-                                cacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
+                                startDate: $cStart,
+                                endDate: $cEnd,
                             );
                         }
 
-                        if ($adAccount['adsets']) {
-                            $channeledAdGroupMap = self::getAdGroupMap($manager, $channeledAccountEntity);
+                        if ($adAccount['campaigns']) {
+                            $campaignsMultiMap = self::getCampaignMaps($manager, $channeledAccountEntity);
+                            $campaignMap = $campaignsMultiMap['campaignMap'];
+                            $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
 
-                            if ($adAccount['adset_metrics']) {
-                                self::processAdsetsBulk(
+                            if ($adAccount['campaign_metrics']) {
+                                self::processCampaignsBulk(
                                     api: $api,
                                     manager: $manager,
                                     channeledAccountEntity: $channeledAccountEntity,
                                     logger: $logger,
-                                    startDate: $startDate,
-                                    endDate: $endDate,
-                                    campaignMap: $campaignMap,
+                                    startDate: $cStart,
+                                    endDate: $cEnd,
                                     channeledCampaignMap: $channeledCampaignMap,
-                                    channeledAdGroupMap: $channeledAdGroupMap,
+                                    campaignMap: $campaignMap,
                                     jobId: $jobId,
-                                    cacheInclude: self::getFacebookFilter($config, 'ADSET', 'cache_include'),
-                                    cacheExclude: self::getFacebookFilter($config, 'ADSET', 'cache_exclude'),
+                                    cacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
+                                    cacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
                                 );
                             }
 
-                            if ($adAccount['ads']) {
-                                $channeledAdMap = self::getAdMap($manager, $channeledAccountEntity);
+                            if ($adAccount['adsets']) {
+                                $channeledAdGroupMap = self::getAdGroupMap($manager, $channeledAccountEntity);
 
-                                if ($adAccount['ad_metrics']) {
-                                    self::processAdsBulk(
+                                if ($adAccount['adset_metrics']) {
+                                    self::processAdsetsBulk(
                                         api: $api,
                                         manager: $manager,
                                         channeledAccountEntity: $channeledAccountEntity,
                                         logger: $logger,
-                                        startDate: $startDate,
-                                        endDate: $endDate,
+                                        startDate: $cStart,
+                                        endDate: $cEnd,
                                         campaignMap: $campaignMap,
                                         channeledCampaignMap: $channeledCampaignMap,
                                         channeledAdGroupMap: $channeledAdGroupMap,
-                                        channeledAdMap: $channeledAdMap,
                                         jobId: $jobId,
-                                        cacheInclude: self::getFacebookFilter($config, 'AD', 'cache_include'),
-                                        cacheExclude: self::getFacebookFilter($config, 'AD', 'cache_exclude'),
+                                        cacheInclude: self::getFacebookFilter($config, 'ADSET', 'cache_include'),
+                                        cacheExclude: self::getFacebookFilter($config, 'ADSET', 'cache_exclude'),
                                     );
                                 }
-                            }
-                        }
 
-                        if (!empty($adAccount['creatives']) && !empty($adAccount['creative_metrics'])) {
-                            self::processCreativesBulk(
-                                api: $api,
-                                manager: $manager,
-                                channeledAccountEntity: $channeledAccountEntity,
-                                logger: $logger,
-                                startDate: $startDate,
-                                endDate: $endDate,
-                                jobId: $jobId,
-                                cacheInclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_include'),
-                                cacheExclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_exclude'),
-                            );
+                                if ($adAccount['ads']) {
+                                    $channeledAdMap = self::getAdMap($manager, $channeledAccountEntity);
+
+                                    if ($adAccount['ad_metrics']) {
+                                        self::processAdsBulk(
+                                            api: $api,
+                                            manager: $manager,
+                                            channeledAccountEntity: $channeledAccountEntity,
+                                            logger: $logger,
+                                            startDate: $cStart,
+                                            endDate: $cEnd,
+                                            campaignMap: $campaignMap,
+                                            channeledCampaignMap: $channeledCampaignMap,
+                                            channeledAdGroupMap: $channeledAdGroupMap,
+                                            channeledAdMap: $channeledAdMap,
+                                            jobId: $jobId,
+                                            cacheInclude: self::getFacebookFilter($config, 'AD', 'cache_include'),
+                                            cacheExclude: self::getFacebookFilter($config, 'AD', 'cache_exclude'),
+                                        );
+                                    }
+                                }
+                            }
+
+                            if (!empty($adAccount['creatives']) && !empty($adAccount['creative_metrics'])) {
+                                self::processCreativesBulk(
+                                    api: $api,
+                                    manager: $manager,
+                                    channeledAccountEntity: $channeledAccountEntity,
+                                    logger: $logger,
+                                    startDate: $cStart,
+                                    endDate: $cEnd,
+                                    jobId: $jobId,
+                                    cacheInclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_include'),
+                                    cacheExclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_exclude'),
+                                );
+                            }
                         }
                     }
                 } catch (FacebookRateLimitException $e) {
                     throw $e;
                 } catch (Exception $e) {
+                    $hasErrors = true;
                     $logger->error("Error processing ad account " . $adAccount['id'] . ": " . $e->getMessage());
+                    $syncErrorRepo->logError([
+                        'platformId' => $adAccount['id'],
+                        'channel' => Channel::facebook_marketing->value,
+                        'syncType' => 'metric',
+                        'entityType' => 'ad_account',
+                        'errorMessage' => $e->getMessage(),
+                        'extraData' => [
+                            'startDate' => $startDate,
+                            'endDate' => $endDate,
+                            'account_id' => $adAccount['id']
+                        ]
+                    ]);
                 }
+            }
+
+            if ($hasErrors) {
+                throw new Exception("Finished with partial errors. Check channeled_sync_errors table or logs for details.");
             }
 
             return self::finalizeTransaction($totalMetrics, $totalRows, $totalDuplicates, $logger, $startDate, $endDate);
@@ -1086,7 +1116,7 @@ class MetricRequests
         $apiRetryCount = 0;
         while ($apiRetryCount < $maxApiRetries) {
             try {
-                $apiInstance = new FacebookGraphApi(
+                $apiInstance = new FacebookGraphApiOverride(
                     userId: (string) $config['facebook']['user_id'],
                     appId: (string) $config['facebook']['app_id'],
                     appSecret: $config['facebook']['app_secret'],
@@ -1167,7 +1197,7 @@ class MetricRequests
         $logger->info("Target keywords: " . implode(',', $targetKeywords) . ", countries: " . implode(',', $targetCountries));
 
         // Get page entity
-        $pageEntity = $pageRepository->findOneBy(['url' => $normalizedSiteUrl]);
+        $pageEntity = $pageRepository->getByUrl($normalizedSiteUrl);
         if (!$pageEntity) {
             $logger->error("Page entity not found for URL=$normalizedSiteUrl. Run app:initialize-entities command.");
             throw new Exception("Page entity not found for URL=$normalizedSiteUrl");
@@ -3867,7 +3897,7 @@ class MetricRequests
                 }
 
                 $campaignName = $campaignEntity->getName();
-                if (!Helpers::matchesFilter($campaignName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter($campaignPlatformId, $cacheInclude, $cacheExclude)) {
+                if (!Helpers::matchesFilter((string)$campaignName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter((string)$campaignPlatformId, $cacheInclude, $cacheExclude)) {
                     continue;
                 }
 
@@ -4010,7 +4040,7 @@ class MetricRequests
                 }
 
                 $adsetName = $channeledAdGroupEntity->getName();
-                if (!Helpers::matchesFilter($adsetName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter($adsetPlatformId, $cacheInclude, $cacheExclude)) {
+                if (!Helpers::matchesFilter((string)$adsetName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter((string)$adsetPlatformId, $cacheInclude, $cacheExclude)) {
                     continue;
                 }
 
@@ -4161,7 +4191,7 @@ class MetricRequests
                 }
 
                 $adName = $channeledAdEntity->getName();
-                if (!Helpers::matchesFilter($adName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter($adPlatformId, $cacheInclude, $cacheExclude)) {
+                if (!Helpers::matchesFilter((string)$adName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter((string)$adPlatformId, $cacheInclude, $cacheExclude)) {
                     continue;
                 }
 
