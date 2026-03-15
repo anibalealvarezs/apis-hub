@@ -90,8 +90,16 @@ foreach ($instances as $instance) {
         'extra_hosts' => ['host.docker.internal:host-gateway'],
     ];
 
+    $serviceConfig['ports'] = [];
     if ($port) {
-        $serviceConfig['ports'] = ["{$port}:8080"];
+        $serviceConfig['ports'][] = "{$port}:8080";
+    }
+
+    // Assign MCP port mapping (3000) only to the primary sync instance to avoid host port conflicts
+    if (!isset($mcpAssigned) && str_contains($name, 'entities-sync')) {
+        $mcpHostPort = getenv('MCP_PORT') ?: 3000;
+        $serviceConfig['ports'][] = "{$mcpHostPort}:3000";
+        $mcpAssigned = true;
     }
 
     $services[$name] = $serviceConfig;
