@@ -75,6 +75,13 @@ fi
 echo "Starting cron service..."
 service cron start
 
+# Start MCP Server in SSE mode (background)
+echo "Starting MCP Server on port 3000..."
+export MCP_MODE=sse
+export MCP_PORT=3000
+node mcp-server/index.js &
+
 # Run the web server
 echo "Starting PHP server on port $PORT..."
 exec php -S 0.0.0.0:${PORT} -t . bin/index.php
+
