@@ -41,9 +41,9 @@ class FacebookOrganicConvert
     {
         return new ArrayCollection(array_map(function ($page) use ($accountId) {
             return (object) [
-                'url' => $page['id'] ?? null,
-                'title' => $page['name'] ?? $page['id'] ?? '',
-                'hostname' => 'facebook.com',
+                'url' => $page['url'] ?? $page['id'] ?? null,
+                'title' => $page['title'] ?? $page['name'] ?? $page['id'] ?? '',
+                'hostname' => $page['hostname'] ?? 'facebook.com',
                 'platformId' => $page['id'] ?? null,
                 'accountId' => $accountId,
                 'data' => $page,

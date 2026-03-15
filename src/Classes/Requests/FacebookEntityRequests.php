@@ -40,19 +40,42 @@ class FacebookEntityRequests implements RequestInterface
         try {
             $logger->info("Starting Facebook Marketing entities sync via FacebookEntityRequests");
 
+            $success = true;
+            $errors = [];
+
             // 1. Sync Campaigns
-            CampaignRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+            $campResponse = CampaignRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+            if ($campResponse->getStatusCode() >= 400) {
+                $success = false;
+                $errors[] = "Campaigns sync failed: " . ($campResponse->getContent() ?: "Unknown error");
+            }
 
             // 2. Sync AdGroups
-            AdGroupRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+            $adGroupResponse = AdGroupRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+            if ($adGroupResponse->getStatusCode() >= 400) {
+                $success = false;
+                $errors[] = "AdGroups sync failed: " . ($adGroupResponse->getContent() ?: "Unknown error");
+            }
 
             // 3. Sync Creatives
-            CreativeRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+            $creativeResponse = CreativeRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+            if ($creativeResponse->getStatusCode() >= 400) {
+                $success = false;
+                $errors[] = "Creatives sync failed: " . ($creativeResponse->getContent() ?: "Unknown error");
+            }
 
             // 4. Sync Ads
-            AdRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+            $adResponse = AdRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+            if ($adResponse->getStatusCode() >= 400) {
+                $success = false;
+                $errors[] = "Ads sync failed: " . ($adResponse->getContent() ?: "Unknown error");
+            }
 
             $logger->info("Facebook Marketing entities sync completed");
+
+            if (!$success) {
+                return new Response(json_encode(['error' => implode('; ', $errors)]), 500);
+            }
 
             return new Response(json_encode(['Facebook Marketing entities synchronized']));
         } catch (\Exception $e) {
@@ -81,13 +104,28 @@ class FacebookEntityRequests implements RequestInterface
         try {
             $logger->info("Starting Facebook Organic entities sync via FacebookEntityRequests");
 
+            $success = true;
+            $errors = [];
+
             // 1. Sync Pages
-            PageRequests::getListFromFacebookOrganic($startDate, $endDate, $logger, $jobId);
+            $pageResponse = PageRequests::getListFromFacebookOrganic($startDate, $endDate, $logger, $jobId);
+            if ($pageResponse->getStatusCode() >= 400) {
+                $success = false;
+                $errors[] = "Pages sync failed: " . ($pageResponse->getContent() ?: "Unknown error");
+            }
 
             // 2. Sync Posts
-            PostRequests::getListFromFacebookOrganic($startDate, $endDate, $logger, $jobId);
+            $postResponse = PostRequests::getListFromFacebookOrganic($startDate, $endDate, $logger, $jobId);
+            if ($postResponse->getStatusCode() >= 400) {
+                $success = false;
+                $errors[] = "Posts sync failed: " . ($postResponse->getContent() ?: "Unknown error");
+            }
 
             $logger->info("Facebook Organic entities sync completed");
+
+            if (!$success) {
+                return new Response(json_encode(['error' => implode('; ', $errors)]), 500);
+            }
 
             return new Response(json_encode(['Facebook Organic entities synchronized']));
         } catch (\Exception $e) {

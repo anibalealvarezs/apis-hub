@@ -788,8 +788,9 @@ class Helpers
      * @param string|array|null $exclude
      * @return bool
      */
-    public static function matchesFilter(string $value, $include = null, $exclude = null): bool
+    public static function matchesFilter(string|int $value, $include = null, $exclude = null): bool
     {
+        $value = (string)$value;
         // If include is set, must match at least one
         if (!empty($include)) {
             $matchedInclude = false;
@@ -823,5 +824,42 @@ class Helpers
         }
 
         return true;
+    }
+
+    /**
+     * Splits a date range into smaller chunks.
+     *
+     * @param string $startDate
+     * @param string $endDate
+     * @param string $interval e.g. '1 week', '1 month', '7 days'
+     * @return array Array of ['start' => string, 'end' => string]
+     */
+    public static function getDateChunks(string $startDate, string $endDate, string $interval = '1 week'): array
+    {
+        $start = \Carbon\Carbon::parse($startDate);
+        $end = \Carbon\Carbon::parse($endDate);
+
+        if ($start->isAfter($end)) {
+            return [];
+        }
+
+        $chunks = [];
+        $currentStart = $start->copy();
+
+        while ($currentStart->isBefore($end) || $currentStart->isSameDay($end)) {
+            $currentEnd = $currentStart->copy()->add($interval)->subDay();
+            if ($currentEnd->isAfter($end)) {
+                $currentEnd = $end->copy();
+            }
+
+            $chunks[] = [
+                'start' => $currentStart->format('Y-m-d'),
+                'end' => $currentEnd->format('Y-m-d')
+            ];
+
+            $currentStart = $currentEnd->copy()->addDay();
+        }
+
+        return $chunks;
     }
 }

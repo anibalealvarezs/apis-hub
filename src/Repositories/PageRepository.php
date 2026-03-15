@@ -57,7 +57,7 @@ class PageRepository extends BaseRepository
     public function getByPlatformId(string $platformId): ?Page
     {
         return $this->createQueryBuilder('p')
-            ->where('p.platformId LIKE :platformId')
+            ->where('p.platformId = :platformId')
             ->setParameter('platformId', $platformId)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
