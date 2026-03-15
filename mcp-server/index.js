@@ -131,11 +131,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "process_jobs",
-        description: "Manually trigger the job processing command",
+        name: "check_coverage",
+        description: "Analyze data gaps for a specific channel (e.g. facebook_marketing, gsc)",
         inputSchema: {
           type: "object",
-          properties: {},
+          properties: {
+            channel: { type: "string", description: "The channel identifier" },
+            days: { type: "number", description: "Optional: Number of days to look back (default 30)", default: 30 }
+          },
+          required: ["channel"],
         },
       }
     ],
@@ -189,6 +193,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     } catch (error) {
       return {
         content: [{ type: "text", text: `Job processing failed: ${error.message}` }],
+        isError: true,
+      };
+    }
+  }
+
+  if (name === "check_coverage") {
+    const { channel, days = 30 } = args;
+    try {
+      const { stdout } = await execAsync(`php bin/cli.php app:check-coverage --channel="${channel}" --days=${days}`, {
+        cwd: APIS_HUB_ROOT,
+      });
+      return {
+        content: [{ type: "text", text: stdout }],
+      };
+    } catch (error) {
+      return {
+        content: [{ type: "text", text: `Coverage check failed: ${error.message}` }],
         isError: true,
       };
     }

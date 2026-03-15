@@ -8,6 +8,7 @@ use Commands\Analytics\ScheduleInitialJobsCommand;
 use Commands\Analytics\CacheEntityCommand;
 use Commands\Analytics\ProcessJobsCommand;
 use Commands\Analytics\ClearCacheCommand;
+use Commands\Analytics\CheckCoverageCommand;
 use Commands\HealthCheckCommand;
 use Commands\Crud\AggregateEntityCommand;
 use Commands\Crud\CreateEntityCommand;
@@ -51,6 +52,7 @@ try {
         new CacheEntityCommand(),
         new ProcessJobsCommand(),
         new ClearCacheCommand(),
+        new CheckCoverageCommand(),
         new HealthCheckCommand(),
         new AggregateEntityCommand(),
         new RefreshInstancesCommand(),
