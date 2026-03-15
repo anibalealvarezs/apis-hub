@@ -128,6 +128,7 @@ class ConfigManagerController
                 'gsc' => [], // url => [target_countries, target_keywords]
                 'fb_page_ids' => [],
                 'fb_ad_account_ids' => [],
+                'fb_cache_chunk_size' => '1 week',
             ];
 
             if (file_exists($this->gscConfigPath)) {
@@ -143,6 +144,7 @@ class ConfigManagerController
 
             if (file_exists($this->fbConfigPath)) {
                 $fbConf = Yaml::parseFile($this->fbConfigPath);
+                $currentConfig['fb_cache_chunk_size'] = $fbConf['channels']['facebook']['cache_chunk_size'] ?? '1 week';
                 $pages = $fbConf['channels']['facebook']['pages'] ?? [];
                 foreach ($pages as $p) {
                     $currentConfig['fb_page_ids'][] = (string)$p['id'];
@@ -176,7 +178,7 @@ class ConfigManagerController
             if ($type === 'gsc') {
                 $this->updateGscConfig($assets);
             } elseif ($type === 'facebook') {
-                $this->updateFacebookConfig($assets);
+                $this->updateFacebookConfig($assets, $data['cache_chunk_size'] ?? null);
             } else {
                 return new Response(json_encode(['error' => 'Invalid type']), 400, ['Content-Type' => 'application/json']);
             }
@@ -242,9 +244,13 @@ class ConfigManagerController
         return rtrim(strtolower($url), '/');
     }
 
-    private function updateFacebookConfig(array $assets): void
+    private function updateFacebookConfig(array $assets, ?string $cacheChunkSize = null): void
     {
         $config = Yaml::parseFile($this->fbConfigPath);
+
+        if ($cacheChunkSize) {
+            $config['channels']['facebook']['cache_chunk_size'] = $cacheChunkSize;
+        }
         
         // Handle Pages Sync
         if (isset($assets['pages'])) {
@@ -286,6 +292,13 @@ class ConfigManagerController
             // Keep existing accounts still selected
             foreach ($currentAccs as $acc) {
                 if (in_array((string)$acc['id'], $selectedAccIds)) {
+                    // Update name if provided in assets
+                    foreach ($assets['ad_accounts'] as $newAcc) {
+                        if ((string)$newAcc['id'] === (string)$acc['id'] && isset($newAcc['name'])) {
+                            $acc['name'] = $newAcc['name'];
+                            break;
+                        }
+                    }
                     $newAccsList[] = $acc;
                 }
             }
@@ -296,6 +309,7 @@ class ConfigManagerController
                 if (!in_array((string)$newAcc['id'], $existingAccIds)) {
                     $newAccsList[] = [
                         'id' => (string)$newAcc['id'],
+                        'name' => $newAcc['name'] ?? '',
                         'enabled' => true,
                         'exclude_from_caching' => false,
                     ];

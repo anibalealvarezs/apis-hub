@@ -569,6 +569,22 @@
             text-transform: uppercase;
             font-weight: 600;
         }
+
+        /* Loading Animation */
+        .loader {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -895,7 +911,7 @@
                 'account', 'campaign', 'adGroup', 'ad', 'query', 'page', 'country', 'device',
                 'dimensions.gender', 'dimensions.age', 'dimensions.searchAppearance', 'dimensions.platform'
             ],
-            containers: ['gsc-jan', 'gsc-feb', 'fb-ads', 'gsc-recent', 'fb-recent', 'redis'],
+            containers: [], // Populated dynamically
             jobStatuses: ['scheduled', 'processing', 'completed', 'failed', 'delayed']
         };
 
@@ -914,10 +930,10 @@
             endDate: new Date().toISOString().split('T')[0],
             flags: ['--pretty'],
             // Docker State
-            selectedContainers: ['gsc-jan'],
+            selectedContainers: [],
             dockerOp: 'restart',
             jobStatus: 'scheduled',
-            semanticContainer: 'gsc-jan',
+            semanticContainer: '',
             semanticOp: '',
             // History
             history: JSON.parse(localStorage.getItem('commandHistory') || '[]')
@@ -971,18 +987,53 @@
             updatePreview();
         };
 
+        async function fetchActualContainers() {
+            try {
+                // Show loading state
+                containerSelectorEl.innerHTML = '<div class="hint"><i data-lucide="loader" class="loader" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:5px"></i> Fetching active containers...</div>';
+                
+                const response = await fetch('/api/monitoring/data');
+                const data = await response.json();
+                
+                if (data.containers && data.containers.length > 0) {
+                    DICTIONARY.containers = data.containers; // Store full objects
+                    
+                    // Set defaults if empty
+                    if (state.selectedContainers.length === 0) {
+                        state.selectedContainers = [DICTIONARY.containers[0].id];
+                    }
+                    if (!state.semanticContainer) {
+                        state.semanticContainer = DICTIONARY.containers[0].id;
+                    }
+                    
+                    renderContainers();
+                    updatePreview();
+                } else {
+                    containerSelectorEl.innerHTML = '<div class="hint">No containers found in project configuration.</div>';
+                }
+            } catch (error) {
+                console.error('Error fetching containers:', error);
+                containerSelectorEl.innerHTML = '<div class="hint" style="color:var(--danger)">Failed to fetch actual containers. API offline or misconfigured.</div>';
+            }
+            lucide.createIcons();
+        }
+
         function renderContainers() {
+            if (DICTIONARY.containers.length === 0) return;
+
             containerSelectorEl.innerHTML = DICTIONARY.containers.map(c => `
-                <div class="badge ${state.selectedContainers.includes(c) ? 'active' : ''}" onclick="toggleContainer('${c}')">
-                    <i data-lucide="${state.selectedContainers.includes(c) ? 'check-circle-2' : 'circle'}"></i> ${c}
+                <div class="badge ${state.selectedContainers.includes(c.id) ? 'active' : ''}" onclick="toggleContainer('${c.id}')" title="${c.group || ''}">
+                    <i data-lucide="${state.selectedContainers.includes(c.id) ? 'check-circle-2' : 'circle'}"></i> 
+                    ${c.name}
                 </div>
             `).join('');
 
             const semanticSelector = document.getElementById('semantic-container-selector');
             if (semanticSelector) {
                 semanticSelector.innerHTML = DICTIONARY.containers.map(c => `
-                    <div class="badge ${state.semanticContainer === c ? 'active' : ''}" onclick="setSemanticContainer('${c}')">
-                        <i data-lucide="${state.semanticContainer === c ? 'check-circle-2' : 'circle'}"></i> ${c}
+                    <div class="badge ${state.semanticContainer === c.id ? 'active' : ''}" onclick="setSemanticContainer('${c.id}')" title="${c.group || ''}">
+                        <i data-lucide="${state.semanticContainer === c.id ? 'check-circle-2' : 'circle'}"></i> 
+                        ${c.name}
                     </div>
                 `).join('');
             }
@@ -1373,8 +1424,8 @@
                 document.getElementById('copy-body-btn').style.display = state.lastApiBody ? 'flex' : 'none';
 
             } else if (state.activeTab === 'docker') {
-                const targets = state.selectedContainers.join(' ');
-                const first = state.selectedContainers[0] || 'gsc-jan';
+                const targets = state.selectedContainers.join(' ') || '<container>';
+                const first = state.selectedContainers[0] || (DICTIONARY.containers[0]?.id || 'instance');
                 switch(state.dockerOp) {
                     case 'restart': cmd = `docker compose restart ${targets}`; break;
                     case 'redeploy': cmd = `docker compose up -d --no-deps --build ${targets}`; break;
@@ -1389,7 +1440,7 @@
                     case 'build-deployment': cmd = `php bin/build-deployment.php project`; break;
                 }
             } else if (state.activeTab === 'semantic') {
-                const main = state.semanticContainer || 'gsc-jan';
+                const main = state.semanticContainer || (DICTIONARY.containers[0]?.id || 'instance');
                 const channel = state.channel || '<channel>';
                 const entity = state.entity || '<entity>';
 
@@ -1484,7 +1535,7 @@
         renderAggregations();
         renderFilters();
         renderGroupBy();
-        renderContainers();
+        fetchActualContainers();
         renderHistory();
     </script>
 </body>

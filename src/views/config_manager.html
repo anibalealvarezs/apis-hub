@@ -578,7 +578,23 @@
             <div class="card">
                 <div class="actions-bar">
                     <div class="asset-count" id="fb-organic-count">0 pages found</div>
-                    <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        <div class="config-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <span class="config-label" style="text-transform: none; font-size: 0.85rem; color: var(--text-main);">Update Periodicity:</span>
+                            <select class="config-input fb-periodicity-select" style="width: auto; padding: 5px 10px;">
+                                <option value="1 day">Daily</option>
+                                <option value="2 days">2 days</option>
+                                <option value="3 days">3 days</option>
+                                <option value="5 days">5 days</option>
+                                <option value="1 week">Weekly</option>
+                                <option value="10 days">10 days</option>
+                                <option value="2 weeks">Biweekly</option>
+                                <option value="3 weeks">3 weeks</option>
+                                <option value="1 month">Monthly</option>
+                                <option value="2 months">2 months</option>
+                                <option value="3 months">Quarterly</option>
+                            </select>
+                        </div>
                         <button class="btn btn-secondary" onclick="fetchAssets('facebook', true)"><i data-lucide="refresh-cw"></i> Refresh</button>
                         <button class="btn btn-primary" onclick="confirmUpdate('facebook-organic')"><i data-lucide="save"></i> Apply</button>
                     </div>
@@ -602,7 +618,23 @@
             <div class="card">
                 <div class="actions-bar">
                     <div class="asset-count" id="fb-marketing-count">0 ad accounts found</div>
-                    <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        <div class="config-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                            <span class="config-label" style="text-transform: none; font-size: 0.85rem; color: var(--text-main);">Update Periodicity:</span>
+                            <select class="config-input fb-periodicity-select" style="width: auto; padding: 5px 10px;">
+                                <option value="1 day">Daily</option>
+                                <option value="2 days">2 days</option>
+                                <option value="3 days">3 days</option>
+                                <option value="5 days">5 days</option>
+                                <option value="1 week">Weekly</option>
+                                <option value="10 days">10 days</option>
+                                <option value="2 weeks">Biweekly</option>
+                                <option value="3 weeks">3 weeks</option>
+                                <option value="1 month">Monthly</option>
+                                <option value="2 months">2 months</option>
+                                <option value="3 months">Quarterly</option>
+                            </select>
+                        </div>
                         <button class="btn btn-secondary" onclick="fetchAssets('facebook', true)"><i data-lucide="refresh-cw"></i> Refresh</button>
                         <button class="btn btn-primary" onclick="confirmUpdate('facebook-marketing')"><i data-lucide="save"></i> Apply</button>
                     </div>
@@ -692,6 +724,14 @@
                 }
                 
                 renderAssets();
+                
+                // Set initial periodicity
+                if (currentConfig.fb_cache_chunk_size) {
+                    document.querySelectorAll('.fb-periodicity-select').forEach(select => {
+                        select.value = currentConfig.fb_cache_chunk_size;
+                    });
+                }
+
                 if (force) showToast('Assets refreshed successfully!');
             } catch (err) {
                 showToast('Error: ' + err.message, true);
@@ -850,7 +890,7 @@
                     const isChecked = currentConfig.fb_ad_account_ids.includes(String(acc.id)) ? 'checked' : '';
                     return `
                         <div class="asset-item ${isChecked ? 'synced' : ''}">
-                            <input type="checkbox" data-id="${acc.id}" ${isChecked}>
+                            <input type="checkbox" data-id="${acc.id}" data-name="${acc.name}" ${isChecked}>
                             <div class="asset-info">
                                 <div class="asset-title">${acc.name}</div>
                                 <div class="asset-meta">
@@ -902,15 +942,18 @@
             const selected = {};
             let selector = '';
             let apiType = type;
+            let cacheChunkSize = null;
 
             if (type === 'gsc') {
                 selector = '#gsc-list input:checked';
             } else if (type === 'facebook-organic') {
                 selector = '#fb-pages-list input:checked';
                 apiType = 'facebook';
+                cacheChunkSize = document.querySelector('#tab-facebook-organic .fb-periodicity-select').value;
             } else if (type === 'facebook-marketing') {
                 selector = '#fb-ad-accounts-list input:checked';
                 apiType = 'facebook';
+                cacheChunkSize = document.querySelector('#tab-facebook-marketing .fb-periodicity-select').value;
             }
             
             const selectedArray = [];
@@ -939,7 +982,8 @@
                 } else if (type === 'facebook-marketing') {
                     if (!selected.ad_accounts) selected.ad_accounts = [];
                     selected.ad_accounts.push({
-                        id: input.dataset.id
+                        id: input.dataset.id,
+                        name: input.dataset.name
                     });
                 }
             });
@@ -958,7 +1002,11 @@
                 const response = await fetch('/api/config-manager/update', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: apiType, assets: payloadAssets })
+                    body: JSON.stringify({ 
+                        type: apiType, 
+                        assets: payloadAssets,
+                        cache_chunk_size: cacheChunkSize
+                    })
                 });
                 const result = await response.json();
                 if (result.success) {
