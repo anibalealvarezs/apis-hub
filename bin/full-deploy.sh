@@ -55,7 +55,7 @@ if [ ! -d "vendor" ] || [ "$1" == "--update" ]; then
         -v "$(pwd):/app" \
         -w /app \
         composer:latest \
-        install --no-scripts --no-interaction --prefer-dist --optimize-autoloader
+        install --no-scripts --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
     echo -e "${GREEN}✔ Dependencies installed.${NC}"
 else
     echo -e "${YELLOW}📦 [1/5] Dependencies already present. Skipping install.${NC}"
