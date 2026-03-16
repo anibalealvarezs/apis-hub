@@ -13,12 +13,16 @@ class ConfigManagerController
 {
     private string $gscConfigPath;
     private string $fbConfigPath;
+    private string $fbOrganicPath;
+    private string $fbMarketingPath;
     private string $assetsBackupPath;
 
     public function __construct()
     {
         $this->gscConfigPath = __DIR__ . '/../../config/channels/google_search_console.yaml';
         $this->fbConfigPath = __DIR__ . '/../../config/channels/facebook.yaml';
+        $this->fbOrganicPath = __DIR__ . '/../../config/channels/facebook_organic.yaml';
+        $this->fbMarketingPath = __DIR__ . '/../../config/channels/facebook_marketing.yaml';
         $this->assetsBackupPath = __DIR__ . '/../../config/assets_backup.yaml';
     }
 
@@ -142,14 +146,25 @@ class ConfigManagerController
                 }
             }
 
-            if (file_exists($this->fbConfigPath)) {
-                $fbConf = Yaml::parseFile($this->fbConfigPath);
-                $currentConfig['fb_cache_chunk_size'] = $fbConf['channels']['facebook']['cache_chunk_size'] ?? '1 week';
-                $pages = $fbConf['channels']['facebook']['pages'] ?? [];
+            // Merge all Facebook config files to get complete state
+            $fbGlobal = file_exists($this->fbConfigPath) ? Yaml::parseFile($this->fbConfigPath) : [];
+            $fbOrganic = file_exists($this->fbOrganicPath) ? Yaml::parseFile($this->fbOrganicPath) : [];
+            $fbMarketing = file_exists($this->fbMarketingPath) ? Yaml::parseFile($this->fbMarketingPath) : [];
+            
+            // Extract from their respective keys
+            $fbGlobalConfig = $fbGlobal['channels']['facebook'] ?? [];
+            $fbOrganicConfig = $fbOrganic['channels']['facebook_organic'] ?? [];
+            $fbMarketingConfig = $fbMarketing['channels']['facebook_marketing'] ?? [];
+            
+            $fbConf = array_replace_recursive($fbGlobalConfig, $fbOrganicConfig, $fbMarketingConfig);
+            
+            if (!empty($fbConf)) {
+                $currentConfig['fb_cache_chunk_size'] = $fbConf['cache_chunk_size'] ?? '1 week';
+                $pages = $fbConf['pages'] ?? [];
                 foreach ($pages as $p) {
                     $currentConfig['fb_page_ids'][] = (string)$p['id'];
                 }
-                $ads = $fbConf['channels']['facebook']['ad_accounts'] ?? [];
+                $ads = $fbConf['ad_accounts'] ?? [];
                 foreach ($ads as $a) {
                     $currentConfig['fb_ad_account_ids'][] = (string)$a['id'];
                 }
@@ -246,16 +261,24 @@ class ConfigManagerController
 
     private function updateFacebookConfig(array $assets, ?string $cacheChunkSize = null): void
     {
-        $config = Yaml::parseFile($this->fbConfigPath);
+        // Ensure directory exists
+        $configDir = dirname($this->fbConfigPath);
+        if (!is_dir($configDir)) {
+            mkdir($configDir, 0755, true);
+        }
 
+        // 1. Update Global Config
         if ($cacheChunkSize) {
+            $config = file_exists($this->fbConfigPath) ? Yaml::parseFile($this->fbConfigPath) : ['channels' => ['facebook' => []]];
             $config['channels']['facebook']['cache_chunk_size'] = $cacheChunkSize;
+            file_put_contents($this->fbConfigPath, Yaml::dump($config, 10, 2));
         }
         
-        // Handle Pages Sync
+        // 2. Handle Pages Sync (Organic)
         if (isset($assets['pages'])) {
+            $config = file_exists($this->fbOrganicPath) ? Yaml::parseFile($this->fbOrganicPath) : ['channels' => ['facebook_organic' => []]];
             $selectedPageIds = array_column($assets['pages'], 'id');
-            $currentPages = $config['channels']['facebook']['pages'] ?? [];
+            $currentPages = $config['channels']['facebook_organic']['pages'] ?? [];
             $newPagesList = [];
 
             // Keep existing pages still selected
@@ -280,13 +303,15 @@ class ConfigManagerController
                     ];
                 }
             }
-            $config['channels']['facebook']['pages'] = $newPagesList;
+            $config['channels']['facebook_organic']['pages'] = $newPagesList;
+            file_put_contents($this->fbOrganicPath, Yaml::dump($config, 10, 2));
         }
 
-        // Handle Ad Accounts Sync
+        // 3. Handle Ad Accounts Sync (Marketing)
         if (isset($assets['ad_accounts'])) {
+            $config = file_exists($this->fbMarketingPath) ? Yaml::parseFile($this->fbMarketingPath) : ['channels' => ['facebook_marketing' => []]];
             $selectedAccIds = array_column($assets['ad_accounts'], 'id');
-            $currentAccs = $config['channels']['facebook']['ad_accounts'] ?? [];
+            $currentAccs = $config['channels']['facebook_marketing']['ad_accounts'] ?? [];
             $newAccsList = [];
 
             // Keep existing accounts still selected
@@ -315,10 +340,9 @@ class ConfigManagerController
                     ];
                 }
             }
-            $config['channels']['facebook']['ad_accounts'] = $newAccsList;
+            $config['channels']['facebook_marketing']['ad_accounts'] = $newAccsList;
+            file_put_contents($this->fbMarketingPath, Yaml::dump($config, 10, 2));
         }
-
-        file_put_contents($this->fbConfigPath, Yaml::dump($config, 10, 2));
     }
 
     private function deriveTitleFromUrl(string $url): string

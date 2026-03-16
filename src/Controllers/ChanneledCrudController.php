@@ -53,8 +53,9 @@ class ChanneledCrudController extends BaseController
         }
 
         $channelsConfig = Helpers::getChannelsConfig();
-        $isRegisteredInEnum = defined(constant_name: Channel::class . '::' . $channel);
-        $isConfigured = in_array(needle: $channel, haystack: array_keys(array: $channelsConfig));
+        $channelEnum = Channel::tryFromName($channel);
+        $isRegisteredInEnum = $channelEnum !== null;
+        $isConfigured = in_array(needle: $channel, haystack: array_keys(array: $channelsConfig)) || ($isRegisteredInEnum && in_array(needle: $channelEnum->name, haystack: array_keys(array: $channelsConfig)));
 
         if (!$isRegisteredInEnum) {
             return $this->createResponse(
@@ -65,16 +66,19 @@ class ChanneledCrudController extends BaseController
             );
         }
 
-        if (!$isConfigured) {
+        // Use the normalized name from the enum if the direct name is not in config
+        $configKey = in_array(needle: $channel, haystack: array_keys(array: $channelsConfig)) ? $channel : $channelEnum->name;
+
+        if (!isset($channelsConfig[$configKey])) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
-                error: "The channel '$channel' is not configured in your project. Please add it to the 'channels' section in your config/ directory.",
+                error: "The channel '$channel' (normalized as '$configKey') is not configured in your project. Please add it to the 'channels' section in your config/ directory.",
                 httpStatus: Response::HTTP_NOT_FOUND
             );
         }
 
-        if (($channelsConfig[$channel]['enabled'] ?? false) === false) {
+        if (($channelsConfig[$configKey]['enabled'] ?? false) === false) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -83,7 +87,7 @@ class ChanneledCrudController extends BaseController
             );
         }
 
-        $channelConstant = (new ReflectionEnum(objectOrClass: Channel::class))->getConstant(name: $channel);
+        $channelConstant = $channelEnum;
         $rawData    = filter_var($params['rawData'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $hideFields = array_filter(array_map('trim', explode(',', $params['hideFields'] ?? '')));
 

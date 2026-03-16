@@ -367,6 +367,14 @@ class BaseRepository extends EntityRepository
                     LIMIT 1
                 )) / NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0)',
                 'unique_clicks' => 'SUM(CASE WHEN mc.name = "unique_clicks" THEN m.value ELSE 0 END)',
+                'results'       => 'SUM(CASE WHEN mc.name = "results" THEN m.value ELSE 0 END)',
+                'cost_per_result' => 'SUM(CASE WHEN mc.name = "spend" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "results" THEN m.value ELSE 0 END), 0)',
+                'result_rate'     => 'SUM(CASE WHEN mc.name = "results" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0)',
+                'roas'            => 'AVG(CASE WHEN mc.name = "purchase_roas" THEN m.value ELSE NULL END)',
+                'website_roas'    => 'AVG(CASE WHEN mc.name = "website_purchase_roas" THEN m.value ELSE NULL END)',
+                'actions'         => 'SUM(CASE WHEN mc.name = "actions" THEN m.value ELSE 0 END)',
+                'purchase_roas'   => 'AVG(CASE WHEN mc.name = "purchase_roas" THEN m.value ELSE NULL END)',
+                'website_purchase_roas' => 'AVG(CASE WHEN mc.name = "website_purchase_roas" THEN m.value ELSE NULL END)',
             ];
 
             if (isset($formulas[$lowerField])) {

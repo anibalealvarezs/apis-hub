@@ -1000,12 +1000,18 @@ class MetricRequests
     public static function validateFacebookConfig(?LoggerInterface $logger = null): array
     {
         $channels = Helpers::getChannelsConfig();
-        if (!isset($channels['facebook'])) {
+        
+        $config = $channels['facebook'] ?? [];
+        $organic = $channels['facebook_organic'] ?? [];
+        $marketing = $channels['facebook_marketing'] ?? [];
+
+        // Merge specialized files into the main config array
+        $config = array_replace_recursive($config, $organic, $marketing);
+
+        if (empty($config)) {
             $logger?->error("Facebook configuration not found in channels config.");
             throw new RuntimeException("Facebook configuration not found in channels config.");
         }
-
-        $config = $channels['facebook'];
 
         // Global exclusion list
         $globalExclude = $config['exclude_from_caching'] ?? [];
@@ -1047,7 +1053,11 @@ class MetricRequests
              $config['ad_accounts'] = [];
         }
 
-        return ['facebook' => $config];
+        return [
+            'facebook' => $config,
+            'facebook_organic' => $organic,
+            'facebook_marketing' => $marketing
+        ];
     }
 
     /**
