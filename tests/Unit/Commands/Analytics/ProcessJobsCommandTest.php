@@ -73,7 +73,8 @@ class ProcessJobsCommandTest extends TestCase
             ->with('other-instance')
             ->willReturn(false);
 
-        $input = new ArrayInput([]);
+        $input = $this->createMock(\Symfony\Component\Console\Input\InputInterface::class);
+        $input->method('getOption')->with('force-all')->willReturn(false);
         $output = new BufferedOutput();
 
         // Use reflection to call protected execute
@@ -121,7 +122,8 @@ class ProcessJobsCommandTest extends TestCase
         // or mock the rest of the dependencies if we want full test.
         $this->jobRepository->method('claimJob')->willReturn(false); 
 
-        $input = new ArrayInput([]);
+        $input = $this->createMock(\Symfony\Component\Console\Input\InputInterface::class);
+        $input->method('getOption')->with('force-all')->willReturn(false);
         $output = new BufferedOutput();
 
         $method = new \ReflectionMethod(ProcessJobsCommand::class, 'execute');

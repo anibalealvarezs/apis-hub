@@ -67,14 +67,14 @@ class MetricRepositoryTest extends TestCase
             ->method('select')
             ->with('partial e.{id, value, metadata}')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(13))
+        $this->queryBuilder->expects($this->exactly(14))
             ->method('addSelect')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('from')
             ->with($this->entityName, 'e')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this->exactly(13))
+        $this->queryBuilder->expects($this->exactly(14))
             ->method('leftJoin')
             ->willReturnSelf();
 
