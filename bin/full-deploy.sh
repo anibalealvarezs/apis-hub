@@ -55,10 +55,20 @@ if [ ! -d "vendor" ] || [ "$1" == "--update" ]; then
         -v "$(pwd):/app" \
         -w /app \
         composer:latest \
-        install --no-scripts --no-interaction --prefer-dist --optimize-autoloader
+        install --no-scripts --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs
     echo -e "${GREEN}✔ Dependencies installed.${NC}"
 else
     echo -e "${YELLOW}📦 [1/5] Dependencies already present. Skipping install.${NC}"
+fi
+
+# ── Step 1b: Fetch Remote Configuration (Optional) ──────────────────────────
+echo ""
+echo -e "${YELLOW}📡 [1.5/5] Checking for remote configuration...${NC}"
+# Use local PHP if available, otherwise skip (this runs before containers are up)
+if command -v php &> /dev/null; then
+    php bin/fetch-remote-config.php || echo "  ⚠️ Remote config fetch failed, continuing with local config..."
+else
+    echo "  ⚠️ php-cli not found locally, skipping remote config fetch."
 fi
 
 # ── Step 2: Refresh Instances from rules ──────────────────────────────────────
@@ -90,6 +100,7 @@ echo -e "${YELLOW}🚀 [4/5] Orchestrating containers...${NC}"
 # Ensure a clean slate: stop existing and remove orphans before building
 if [ -f "docker-compose.yml" ]; then
     echo "  🧹 Cleaning up existing deployment..."
+    rm -rf storage/db_lock
     docker compose --env-file .env down --remove-orphans || echo "  ⚠️ Cleanup had issues, continuing..."
 fi
 

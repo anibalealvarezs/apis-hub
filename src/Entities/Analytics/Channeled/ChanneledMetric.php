@@ -2,8 +2,6 @@
 
 namespace Entities\Analytics\Channeled;
 
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Entities\Analytics\Metric;
 use Repositories\Channeled\ChanneledMetricRepository;
@@ -23,12 +21,12 @@ class ChanneledMetric extends ChanneledEntity
     #[ORM\JoinColumn(name: 'metric_id', onDelete: 'CASCADE')]
     protected Metric $metric;
 
-    #[ORM\OneToMany(mappedBy: 'channeledMetric', targetEntity: ChanneledMetricDimension::class, cascade: ['persist', 'remove'])]
-    protected Collection $dimensions;
+    #[ORM\ManyToOne(targetEntity: DimensionSet::class, inversedBy: 'channeledMetrics')]
+    #[ORM\JoinColumn(name: 'dimension_set_id', nullable: true, onDelete: 'SET NULL')]
+    protected ?DimensionSet $dimensionSet = null;
 
     public function __construct()
     {
-        $this->dimensions = new ArrayCollection();
     }
 
     /**
@@ -49,52 +47,14 @@ class ChanneledMetric extends ChanneledEntity
         return $this;
     }
 
-    /**
-     * @return Collection
-     */
-    public function getDimensions(): Collection
+    public function getDimensionSet(): ?DimensionSet
     {
-        return $this->dimensions;
+        return $this->dimensionSet;
     }
 
-    /**
-     * @param ChanneledMetricDimension $dimension
-     * @return ChanneledMetric
-     */
-    public function addDimension(ChanneledMetricDimension $dimension): self
+    public function setDimensionSet(?DimensionSet $dimensionSet): self
     {
-        if (!$this->dimensions->contains($dimension)) {
-            $this->dimensions->add($dimension);
-            $dimension->addChanneledMetric($this);
-        }
-        return $this;
-    }
-
-    /**
-     * @param ArrayCollection $dimensions
-     * @return ChanneledMetric
-     */
-    public function addDimensions(ArrayCollection $dimensions): self
-    {
-        foreach ($dimensions as $dimension) {
-            if (!$this->dimensions->contains($dimension)) {
-                $this->addDimension($dimension);
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * @param ChanneledMetricDimension $dimension
-     * @return ChanneledMetric
-     */
-    public function removeDimension(ChanneledMetricDimension $dimension): self
-    {
-        if ($this->dimensions->removeElement($dimension)) {
-            if ($dimension->getChanneledMetric() === $this) {
-                $dimension->addChanneledMetric(null);
-            }
-        }
+        $this->dimensionSet = $dimensionSet;
         return $this;
     }
 }

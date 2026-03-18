@@ -98,5 +98,23 @@ return [
         },
         'public' => true,
         'html' => false
+    ],
+    '/api/config-manager/validate-tokens' => [
+        'httpMethod' => 'POST',
+        'callable' => function (...$args) {
+            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
+            return (new \Controllers\ConfigManagerController())->validateTokens($request);
+        },
+        'public' => true,
+        'html' => false
+    ],
+    '/api/config-manager/export' => [
+        'httpMethod' => 'POST',
+        'callable' => function (...$args) {
+            $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
+            return (new \Controllers\ConfigManagerController())->exportConfig($request);
+        },
+        'public' => true,
+        'html' => false
     ]
 ];

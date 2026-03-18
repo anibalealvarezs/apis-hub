@@ -572,6 +572,27 @@
         .log-select:hover {
             border-color: var(--primary);
         }
+
+        /* Modals */
+        .modal-backdrop { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:2000; justify-content:center; align-items:center; opacity: 0; transition: opacity 0.2s ease; }
+        .modal-backdrop.show { display:flex; opacity: 1; }
+        .modal-box { background:var(--bg-card); padding:30px; border-radius:16px; border:1px solid var(--border); width:450px; max-width:90%; color:#fff; box-shadow: 0 10px 40px rgba(0,0,0,0.6); transform: scale(0.95); transition: transform 0.2s ease; }
+        .modal-backdrop.show .modal-box { transform: scale(1); }
+        .modal-header { font-size:1.2rem; font-weight:600; margin-bottom:15px; display:flex; align-items:center; gap:10px; color:#f0f6fc; }
+        .modal-body { color:var(--text-dim); font-size:0.95rem; margin-bottom:25px; line-height: 1.5; }
+        .modal-footer { display:flex; justify-content:flex-end; gap:12px; }
+        .modal-option { display:flex; align-items:center; justify-content:space-between; background:var(--bg-dark); padding:15px; border-radius:8px; border:1px solid var(--border); margin-bottom:15px; cursor:pointer; transition:border 0.2s; }
+        .modal-option:hover { border-color: rgba(88,166,255,0.4); }
+        .modal-option label { cursor:pointer; font-size:0.95rem; font-weight:500; color:var(--text-main); flex-grow:1; user-select:none; }
+        .modal-option small { display:block; font-size:0.8rem; color:var(--text-dim); font-weight:400; margin-top:2px; }
+        
+        /* Switch UI */
+        .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink:0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .3s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: var(--text-dim); transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: rgba(35, 134, 54, 0.3); border-color: var(--secondary); }
+        input:checked + .slider:before { transform: translateX(16px); background-color: var(--info); }
      </style>
 </head>
 <body>
@@ -601,19 +622,19 @@
             <div class="col">
                 <div class="card">
                     <h2 class="card-title">
-                        <div><i data-lucide="box"></i> Infrastructure</div>
+                        <div><i data-lucide="database"></i> Records Distribution</div>
                     </h2>
-                    <div class="container-grid" id="container-grid">
-                        <!-- Containers will be loaded here -->
+                    <div class="container-grid" id="db-totals-grid">
+                        <!-- DB Totals will be loaded here -->
                     </div>
                 </div>
 
                 <div class="card">
                     <h2 class="card-title">
-                        <div><i data-lucide="database"></i> Records Distribution</div>
+                        <div><i data-lucide="box"></i> Infrastructure</div>
                     </h2>
-                    <div class="container-grid" id="db-totals-grid">
-                        <!-- DB Totals will be loaded here -->
+                    <div class="container-grid" id="container-grid">
+                        <!-- Containers will be loaded here -->
                     </div>
                 </div>
 
@@ -655,6 +676,43 @@
             <p>&copy; 2026 APIs Hub Central. Developed by <a href="https://anibalalvarez.com" target="_blank" class="subtle-link">Aníbal Álvarez</a>.</p>
         </footer>
     </main>
+
+    <div id="simple-modal" class="modal-backdrop">
+        <div class="modal-box">
+            <div class="modal-header" id="sm-title">Confirm Action</div>
+            <div class="modal-body" id="sm-body">Are you sure you want to proceed?</div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModals(false)">Cancel</button>
+                <button class="btn btn-primary" onclick="closeModals(true)">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="retry-modal" class="modal-backdrop">
+        <div class="modal-box">
+            <div class="modal-header"><i data-lucide="refresh-cw" style="color:var(--primary)"></i> Re-schedule Job</div>
+            <div class="modal-body" style="margin-bottom:15px;">Configure the execution parameters before pushing the job back to the active queue.</div>
+            
+            <div class="modal-option" onclick="document.getElementById('switch-smart-resume').click()">
+                <label for="switch-smart-resume">Smart Resume
+                    <small>Fast-forward extraction from last cached date</small>
+                </label>
+                <div class="switch"><input type="checkbox" id="switch-smart-resume" checked onclick="event.stopPropagation()"><span class="slider"></span></div>
+            </div>
+
+            <div class="modal-option" onclick="document.getElementById('switch-bypass').click()">
+                <label for="switch-bypass">Bypass Dependencies
+                    <small>Force execution without waiting for prerequisite jobs</small>
+                </label>
+                <div class="switch"><input type="checkbox" id="switch-bypass" onclick="event.stopPropagation()"><span class="slider"></span></div>
+            </div>
+
+            <div class="modal-footer" style="margin-top:25px;">
+                <button class="btn btn-secondary" onclick="closeModals(null)">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmRetry()">Re-schedule</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Init Lucide
@@ -987,9 +1045,63 @@
             });
         }
 
+        let activeModalResolver = null;
+
+        function showSimpleModal(icon, title, message) {
+            return new Promise(resolve => {
+                const modal = document.getElementById('simple-modal');
+                activeModalResolver = resolve;
+                document.getElementById('sm-title').innerHTML = `<i data-lucide="${icon}" style="color:var(--warning); width:20px; height:20px;"></i> ${title}`;
+                document.getElementById('sm-body').innerHTML = message;
+                modal.classList.add('show');
+                lucide.createIcons();
+            });
+        }
+
+        function showRetryModal() {
+            return new Promise(resolve => {
+                const modal = document.getElementById('retry-modal');
+                activeModalResolver = resolve;
+                document.getElementById('switch-smart-resume').checked = true;
+                document.getElementById('switch-bypass').checked = false;
+                modal.classList.add('show');
+            });
+        }
+
+        function confirmRetry() {
+            if (activeModalResolver) {
+                activeModalResolver({
+                    smartResume: document.getElementById('switch-smart-resume').checked,
+                    bypass: document.getElementById('switch-bypass').checked
+                });
+                activeModalResolver = null;
+            }
+            document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.remove('show'));
+        }
+
+        function closeModals(result) {
+            document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.remove('show'));
+            if (activeModalResolver) {
+                activeModalResolver(result);
+                activeModalResolver = null;
+            }
+        }
+
         async function handleJobAction(id, action, btnElement) {
-            if (action === 'cancel' && !confirm('Are you sure you want to discard/deactivate this job? It will be marked as failed for history.')) return;
-            if (action === 'process' && !confirm('Confirm: Trigger workflow execution in background? You will see logs in the console below.')) return;
+            let resumeParam = '';
+            if (action === 'cancel') {
+                const confirmed = await showSimpleModal('alert-triangle', 'Cancel Job', 'Are you sure you want to discard/deactivate this job? It will be marked as failed for history.');
+                if (!confirmed) return;
+            } else if (action === 'process') {
+                const confirmed = await showSimpleModal('play-circle', 'Execute Job', 'Trigger workflow execution in background? You will see logs in the console below.');
+                if (!confirmed) return;
+            } else if (action === 'retry') {
+                const options = await showRetryModal();
+                if (!options) return; // Cancelled
+                
+                resumeParam = (options.smartResume ? '&resume=true' : '&resume=false') + 
+                              (options.bypass ? '&bypass_dependency=true' : '&bypass_dependency=false');
+            }
 
             // Simple visual feedback
             if (btnElement) {
@@ -1003,19 +1115,19 @@
                 const response = await fetch('/api/monitoring/jobs/action', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `id=${id}&action=${action}`
+                    body: `id=${id}&action=${action}${resumeParam}`
                 });
                 
                 const result = await response.json();
                 if (result.success) {
                     fetchData(); // Refresh dashboard
                 } else {
-                    alert('Error: ' + result.error);
+                    await showSimpleModal('x-circle', 'Error', result.error);
                     if (btnElement) btnElement.disabled = false;
                 }
             } catch (error) {
                 console.error('Job action failed:', error);
-                alert('Connection error while executing action.');
+                await showSimpleModal('x-circle', 'Connection Error', 'Failed to communicate with the server.');
                 if (btnElement) btnElement.disabled = false;
             }
         }

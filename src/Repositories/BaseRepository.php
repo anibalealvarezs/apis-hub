@@ -142,10 +142,13 @@ class BaseRepository extends EntityRepository
             if ($this->isChanneledMetric && str_starts_with($field, 'dimensions.')) {
                 $dimKey = substr($field, 11);
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
-                $qb->leftJoin('e', 'channeled_metric_dimensions', $dimAlias, "e.id = $dimAlias.channeledMetric_id AND $dimAlias.dimensionKey = :key_$dimAlias")
+                // Join chain: channeled_metrics (e) -> dimension_set_items (dsi) -> dimension_values (dv) -> dimension_keys (dk)
+                $qb->leftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id")
+                   ->leftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id")
+                   ->leftJoin("dv_$dimAlias", 'dimension_keys', "dk_$dimAlias", "dv_$dimAlias.dimension_key_id = dk_$dimAlias.id AND dk_$dimAlias.name = :key_$dimAlias")
                    ->setParameter("key_$dimAlias", $dimKey)
-                   ->addSelect("$dimAlias.dimensionValue AS $quotedField")
-                   ->addGroupBy("$dimAlias.dimensionValue");
+                   ->addSelect("dv_$dimAlias.value AS $quotedField")
+                   ->addGroupBy("dv_$dimAlias.value");
             } elseif ($this->isChanneledMetric && isset($relationMap[$field])) {
                 $map = $relationMap[$field];
                 if (!isset($activeJoins[$field])) {
@@ -166,9 +169,11 @@ class BaseRepository extends EntityRepository
                 if ($this->isChanneledMetric && str_starts_with($key, 'dimensions.')) {
                     $dimKey = substr($key, 11);
                     $dimAlias = "f_dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
-                    $qb->join('e', 'channeled_metric_dimensions', $dimAlias, "e.id = $dimAlias.channeledMetric_id AND $dimAlias.dimensionKey = :key_$dimAlias")
+                    $qb->join('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id")
+                       ->join("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id")
+                       ->join("dv_$dimAlias", 'dimension_keys', "dk_$dimAlias", "dv_$dimAlias.dimension_key_id = dk_$dimAlias.id AND dk_$dimAlias.name = :key_$dimAlias")
                        ->setParameter("key_$dimAlias", $dimKey)
-                       ->andWhere("$dimAlias.dimensionValue = :val_$dimAlias")
+                       ->andWhere("dv_$dimAlias.value = :val_$dimAlias")
                        ->setParameter("val_$dimAlias", $value);
                 } elseif ($this->isChanneledMetric && isset($relationMap[$key])) {
                     $map = $relationMap[$key];
@@ -362,6 +367,14 @@ class BaseRepository extends EntityRepository
                     LIMIT 1
                 )) / NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0)',
                 'unique_clicks' => 'SUM(CASE WHEN mc.name = "unique_clicks" THEN m.value ELSE 0 END)',
+                'results'       => 'SUM(CASE WHEN mc.name = "results" THEN m.value ELSE 0 END)',
+                'cost_per_result' => 'SUM(CASE WHEN mc.name = "spend" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "results" THEN m.value ELSE 0 END), 0)',
+                'result_rate'     => 'SUM(CASE WHEN mc.name = "results" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0)',
+                'roas'            => 'AVG(CASE WHEN mc.name = "purchase_roas" THEN m.value ELSE NULL END)',
+                'website_roas'    => 'AVG(CASE WHEN mc.name = "website_purchase_roas" THEN m.value ELSE NULL END)',
+                'actions'         => 'SUM(CASE WHEN mc.name = "actions" THEN m.value ELSE 0 END)',
+                'purchase_roas'   => 'AVG(CASE WHEN mc.name = "purchase_roas" THEN m.value ELSE NULL END)',
+                'website_purchase_roas' => 'AVG(CASE WHEN mc.name = "website_purchase_roas" THEN m.value ELSE NULL END)',
             ];
 
             if (isset($formulas[$lowerField])) {

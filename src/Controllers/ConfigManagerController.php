@@ -13,12 +13,16 @@ class ConfigManagerController
 {
     private string $gscConfigPath;
     private string $fbConfigPath;
+    private string $fbOrganicPath;
+    private string $fbMarketingPath;
     private string $assetsBackupPath;
 
     public function __construct()
     {
         $this->gscConfigPath = __DIR__ . '/../../config/channels/google_search_console.yaml';
         $this->fbConfigPath = __DIR__ . '/../../config/channels/facebook.yaml';
+        $this->fbOrganicPath = __DIR__ . '/../../config/channels/facebook_organic.yaml';
+        $this->fbMarketingPath = __DIR__ . '/../../config/channels/facebook_marketing.yaml';
         $this->assetsBackupPath = __DIR__ . '/../../config/assets_backup.yaml';
     }
 
@@ -125,14 +129,33 @@ class ConfigManagerController
 
             // Load current config for sync state
             $currentConfig = [
-                'gsc' => [], // url => [target_countries, target_keywords]
+                'gsc' => [], 
+                'gsc_cache_history_range' => '16 months',
+                'gsc_enabled' => true,
                 'fb_page_ids' => [],
                 'fb_ad_account_ids' => [],
+                'fb_cache_chunk_size' => '1 week',
+                'fb_organic_history_range' => '2 years',
+                'fb_marketing_history_range' => '2 years',
+                'fb_entity_filters' => [], // entity => include_string
+                'fb_organic_enabled' => true,
+                'fb_marketing_enabled' => true,
+                'jobs_timeout_hours' => 6,
+                'cache_raw_metrics' => false,
             ];
 
             if (file_exists($this->gscConfigPath)) {
-                $gscConf = Yaml::parseFile($this->gscConfigPath);
-                $sites = $gscConf['channels']['google_search_console']['sites'] ?? [];
+            $gscConf = Yaml::parseFile($this->gscConfigPath);
+            $appConfigPath = __DIR__ . '/../../config/app.yaml';
+            if (file_exists($appConfigPath)) {
+                $appConf = Yaml::parseFile($appConfigPath);
+                $currentConfig['jobs_timeout_hours'] = $appConf['jobs']['timeout_hours'] ?? 6;
+                $currentConfig['cache_raw_metrics'] = filter_var($appConf['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            }
+                $gsc = $gscConf['channels']['google_search_console'] ?? [];
+                $currentConfig['gsc_cache_history_range'] = $gsc['cache_history_range'] ?? '16 months';
+                $currentConfig['gsc_enabled'] = $gsc['enabled'] ?? true;
+                $sites = $gsc['sites'] ?? [];
                 foreach ($sites as $site) {
                     $currentConfig['gsc'][$site['url']] = [
                         'target_countries' => $site['target_countries'] ?? [],
@@ -141,15 +164,68 @@ class ConfigManagerController
                 }
             }
 
-            if (file_exists($this->fbConfigPath)) {
-                $fbConf = Yaml::parseFile($this->fbConfigPath);
-                $pages = $fbConf['channels']['facebook']['pages'] ?? [];
+            // Merge all Facebook config files to get complete state
+            $fbGlobal = file_exists($this->fbConfigPath) ? Yaml::parseFile($this->fbConfigPath) : [];
+            $fbOrganic = file_exists($this->fbOrganicPath) ? Yaml::parseFile($this->fbOrganicPath) : [];
+            $fbMarketing = file_exists($this->fbMarketingPath) ? Yaml::parseFile($this->fbMarketingPath) : [];
+            
+            // Extract from their respective keys
+            $fbGlobalConfig = $fbGlobal['channels']['facebook'] ?? [];
+            $fbOrganicConfig = $fbOrganic['channels']['facebook_organic'] ?? [];
+            $fbMarketingConfig = $fbMarketing['channels']['facebook_marketing'] ?? [];
+            
+            $fbConf = array_replace_recursive($fbGlobalConfig, $fbOrganicConfig, $fbMarketingConfig);
+            
+            if (!empty($fbConf)) {
+                $currentConfig['fb_cache_chunk_size'] = $fbGlobalConfig['cache_chunk_size'] ?? '1 week';
+                $currentConfig['fb_organic_history_range'] = $fbOrganicConfig['cache_history_range'] ?? '2 years';
+                $currentConfig['fb_marketing_history_range'] = $fbMarketingConfig['cache_history_range'] ?? '2 years';
+                $currentConfig['fb_organic_enabled'] = $fbOrganicConfig['enabled'] ?? true;
+                $currentConfig['fb_marketing_enabled'] = $fbMarketingConfig['enabled'] ?? true;
+                
+                $entities = ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA', 'CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'];
+                foreach ($entities as $e) {
+                    $currentConfig['fb_entity_filters'][$e] = $fbConf[$e]['cache_include'] ?? '';
+                }
+
+                $pages = $fbConf['pages'] ?? [];
                 foreach ($pages as $p) {
                     $currentConfig['fb_page_ids'][] = (string)$p['id'];
                 }
-                $ads = $fbConf['channels']['facebook']['ad_accounts'] ?? [];
+                $ads = $fbConf['ad_accounts'] ?? [];
                 foreach ($ads as $a) {
                     $currentConfig['fb_ad_account_ids'][] = (string)$a['id'];
+                }
+
+                $fbOrganicFeatures = [
+                    'page_metrics' => false,
+                    'posts' => true,
+                    'post_metrics' => false,
+                    'ig_accounts' => true,
+                    'ig_account_metrics' => false,
+                    'ig_account_media' => true,
+                    'ig_account_media_metrics' => false,
+                ];
+                $fbMarketingFeatures = [
+                    'ad_account_metrics' => true,
+                    'campaigns' => true,
+                    'campaign_metrics' => true,
+                    'adsets' => false,
+                    'adset_metrics' => false,
+                    'ads' => false,
+                    'ad_metrics' => false,
+                    'creatives' => false,
+                    'creative_metrics' => false,
+                ];
+                
+                $currentConfig['fb_feature_toggles'] = [];
+                // From Organic (PAGE defaults)
+                foreach ($fbOrganicFeatures as $f => $default) {
+                    $currentConfig['fb_feature_toggles'][$f] = $fbOrganicConfig['PAGE'][$f] ?? $default;
+                }
+                // From Marketing (AD_ACCOUNT defaults)
+                foreach ($fbMarketingFeatures as $f => $default) {
+                    $currentConfig['fb_feature_toggles'][$f] = $fbMarketingConfig['AD_ACCOUNT'][$f] ?? $default;
                 }
             }
 
@@ -174,11 +250,34 @@ class ConfigManagerController
             $assets = $data['assets'] ?? [];
 
             if ($type === 'gsc') {
-                $this->updateGscConfig($assets);
-            } elseif ($type === 'facebook') {
-                $this->updateFacebookConfig($assets);
+                $this->updateGscConfig($assets, $data['cache_history_range'] ?? null, $data['enabled'] ?? true);
+            } elseif ($type === 'facebook' || $type === 'facebook-organic' || $type === 'facebook-marketing') {
+                $this->updateFacebookConfig(
+                    assets: $assets, 
+                    cacheChunkSize: $data['cache_chunk_size'] ?? null,
+                    organicHistoryRange: $data['organic_history_range'] ?? null,
+                    marketingHistoryRange: $data['marketing_history_range'] ?? null,
+                    entityFilters: $data['entity_filters'] ?? [],
+                    featureToggles: $data['feature_toggles'] ?? [],
+                    enabled: $data['enabled'] ?? true,
+                    type: $type
+                );
+            } elseif ($type === 'global') {
+                $appConfigPath = __DIR__ . '/../../config/app.yaml';
+                $appConf = file_exists($appConfigPath) ? (Yaml::parseFile($appConfigPath) ?: []) : [];
+                if (!isset($appConf['jobs'])) {
+                    $appConf['jobs'] = [];
+                }
+                $appConf['jobs']['timeout_hours'] = (int) ($data['jobs_timeout_hours'] ?? 6);
+
+                if (!isset($appConf['analytics'])) {
+                    $appConf['analytics'] = [];
+                }
+                $appConf['analytics']['cache_raw_metrics'] = filter_var($data['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+                file_put_contents($appConfigPath, Yaml::dump($appConf, 10, 2));
             } else {
-                return new Response(json_encode(['error' => 'Invalid type']), 400, ['Content-Type' => 'application/json']);
+                return new Response(json_encode(['error' => 'Invalid type: ' . $type]), 400, ['Content-Type' => 'application/json']);
             }
 
             return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
@@ -187,9 +286,79 @@ class ConfigManagerController
         }
     }
 
-    private function updateGscConfig(array $selectedSites): void
+    public function validateTokens(Request $request): Response
     {
-        $config = Yaml::parseFile($this->gscConfigPath);
+        try {
+            $logger = Helpers::setLogger('config-manager.log');
+            $data = json_decode($request->getContent(), true);
+            $type = $data['type'] ?? 'all'; // 'gsc', 'facebook', or 'all'
+            
+            $results = [];
+
+            if ($type === 'gsc' || $type === 'all') {
+                try {
+                    $gscConfig = MetricRequests::validateGoogleConfig($logger);
+                    $gscApi = MetricRequests::initializeSearchConsoleApi($gscConfig, $logger);
+                    // This call will trigger a token refresh if the current one is expired
+                    $gscApi->getSites();
+                    $results['gsc'] = ['status' => 'valid', 'message' => 'GSC token is valid and working.'];
+                } catch (Exception $e) {
+                    $results['gsc'] = ['status' => 'error', 'message' => 'GSC Error: ' . $e->getMessage()];
+                }
+            }
+
+            if ($type === 'facebook' || $type === 'all') {
+                try {
+                    $fbConfig = MetricRequests::validateFacebookConfig($logger);
+                    $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $logger);
+                    // Test call to 'me'
+                    $fbApi->performRequest('GET', 'me', ['fields' => 'id,name']);
+                    $results['facebook'] = ['status' => 'valid', 'message' => 'Facebook token is valid and working.'];
+                } catch (Exception $e) {
+                    $results['facebook'] = ['status' => 'error', 'message' => 'Facebook Error: ' . $e->getMessage()];
+                }
+            }
+
+            return new Response(json_encode(['success' => true, 'results' => $results]), 200, ['Content-Type' => 'application/json']);
+        } catch (Exception $e) {
+            return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
+        }
+    }
+
+    public function exportConfig(Request $request): Response
+    {
+        try {
+            $providedToken = $request->headers->get('X-Config-Token');
+            $secretToken = $_ENV['CONFIG_SECRET_TOKEN'] ?? null;
+
+            if (!$secretToken || $providedToken !== $secretToken) {
+                return new Response(json_encode(['error' => 'Unauthorized']), 401, ['Content-Type' => 'application/json']);
+            }
+
+            $configs = [
+                'google_search_console.yaml' => file_exists($this->gscConfigPath) ? file_get_contents($this->gscConfigPath) : null,
+                'facebook.yaml' => file_exists($this->fbConfigPath) ? file_get_contents($this->fbConfigPath) : null,
+                'facebook_organic.yaml' => file_exists($this->fbOrganicPath) ? file_get_contents($this->fbOrganicPath) : null,
+                'facebook_marketing.yaml' => file_exists($this->fbMarketingPath) ? file_get_contents($this->fbMarketingPath) : null,
+                'instances_rules.yaml' => file_exists(__DIR__ . '/../../config/instances_rules.yaml') ? file_get_contents(__DIR__ . '/../../config/instances_rules.yaml') : null,
+            ];
+
+            return new Response(json_encode(['success' => true, 'configs' => $configs]), 200, ['Content-Type' => 'application/json']);
+        } catch (Exception $e) {
+            return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
+        }
+    }
+
+    private function updateGscConfig(array $selectedSites, ?string $historyRange = null, bool $enabled = true): void
+    {
+        $config = file_exists($this->gscConfigPath) ? (Yaml::parseFile($this->gscConfigPath) ?: []) : [];
+        if (!isset($config['channels']['google_search_console'])) {
+            $config['channels']['google_search_console'] = [];
+        }
+        if ($historyRange) {
+            $config['channels']['google_search_console']['cache_history_range'] = $historyRange;
+        }
+        $config['channels']['google_search_console']['enabled'] = $enabled;
         $currentSites = $config['channels']['google_search_console']['sites'] ?? [];
         $newSitesList = [];
         
@@ -242,14 +411,87 @@ class ConfigManagerController
         return rtrim(strtolower($url), '/');
     }
 
-    private function updateFacebookConfig(array $assets): void
-    {
-        $config = Yaml::parseFile($this->fbConfigPath);
+    private function updateFacebookConfig(
+        array $assets, 
+        ?string $cacheChunkSize = null,
+        ?string $organicHistoryRange = null,
+        ?string $marketingHistoryRange = null,
+        array $entityFilters = [],
+        array $featureToggles = [],
+        bool $enabled = true,
+        string $type = 'facebook'
+    ): void {
+        // Ensure directory exists
+        $configDir = dirname($this->fbConfigPath);
+        if (!is_dir($configDir)) {
+            mkdir($configDir, 0755, true);
+        }
+
+        // 1. Update Global Config (Chunk Size)
+        $globalConfig = file_exists($this->fbConfigPath) ? (Yaml::parseFile($this->fbConfigPath) ?: []) : [];
+        if (!isset($globalConfig['channels']['facebook'])) {
+            $globalConfig['channels']['facebook'] = [];
+        }
+        if ($cacheChunkSize) {
+            $globalConfig['channels']['facebook']['cache_chunk_size'] = $cacheChunkSize;
+            file_put_contents($this->fbConfigPath, Yaml::dump($globalConfig, 10, 2));
+        }
+
+        // 2. Update Organic Config
+        $orgConfig = file_exists($this->fbOrganicPath) ? (Yaml::parseFile($this->fbOrganicPath) ?: []) : [];
+        if (!isset($orgConfig['channels']['facebook_organic'])) {
+            $orgConfig['channels']['facebook_organic'] = [];
+        }
+        if ($organicHistoryRange) {
+            $orgConfig['channels']['facebook_organic']['cache_history_range'] = $organicHistoryRange;
+        }
+        if ($type === 'facebook' || $type === 'facebook-organic') {
+            $orgConfig['channels']['facebook_organic']['enabled'] = $enabled;
+        }
+        $organicEntities = ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA'];
+        foreach ($organicEntities as $e) {
+            if (isset($entityFilters[$e])) {
+                $orgConfig['channels']['facebook_organic'][$e]['cache_include'] = $entityFilters[$e];
+            }
+        }
         
-        // Handle Pages Sync
+        $markConfig = file_exists($this->fbMarketingPath) ? (Yaml::parseFile($this->fbMarketingPath) ?: []) : [];
+        if (!isset($markConfig['channels']['facebook_marketing'])) {
+            $markConfig['channels']['facebook_marketing'] = [];
+        }
+        if ($marketingHistoryRange) {
+            $markConfig['channels']['facebook_marketing']['cache_history_range'] = $marketingHistoryRange;
+        }
+        if ($type === 'facebook' || $type === 'facebook-marketing') {
+            $markConfig['channels']['facebook_marketing']['enabled'] = $enabled;
+        }
+
+        $marketingEntities = ['CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'];
+        foreach ($marketingEntities as $e) {
+            if (isset($entityFilters[$e])) {
+                $markConfig['channels']['facebook_marketing'][$e]['cache_include'] = $entityFilters[$e];
+            }
+        }
+
+        // 4. Update Feature Toggles (Global Defaults)
+        $fbOrganicFeatures = ['page_metrics', 'posts', 'post_metrics', 'ig_accounts', 'ig_account_metrics', 'ig_account_media', 'ig_account_media_metrics'];
+        foreach ($fbOrganicFeatures as $f) {
+            if (isset($featureToggles[$f])) {
+                $orgConfig['channels']['facebook_organic']['PAGE'][$f] = (bool)$featureToggles[$f];
+            }
+        }
+
+        $fbMarketingFeatures = ['ad_account_metrics', 'campaigns', 'campaign_metrics', 'adsets', 'adset_metrics', 'ads', 'ad_metrics', 'creatives', 'creative_metrics'];
+        foreach ($fbMarketingFeatures as $f) {
+            if (isset($featureToggles[$f])) {
+                $markConfig['channels']['facebook_marketing']['AD_ACCOUNT'][$f] = (bool)$featureToggles[$f];
+            }
+        }
+        
+        // 2. Handle Pages Sync (Organic)
         if (isset($assets['pages'])) {
             $selectedPageIds = array_column($assets['pages'], 'id');
-            $currentPages = $config['channels']['facebook']['pages'] ?? [];
+            $currentPages = $orgConfig['channels']['facebook_organic']['pages'] ?? [];
             $newPagesList = [];
 
             // Keep existing pages still selected
@@ -274,13 +516,14 @@ class ConfigManagerController
                     ];
                 }
             }
-            $config['channels']['facebook']['pages'] = $newPagesList;
+            $orgConfig['channels']['facebook_organic']['pages'] = $newPagesList;
         }
+        file_put_contents($this->fbOrganicPath, Yaml::dump($orgConfig, 10, 2));
 
-        // Handle Ad Accounts Sync
+        // 3. Handle Ad Accounts Sync (Marketing)
         if (isset($assets['ad_accounts'])) {
             $selectedAccIds = array_column($assets['ad_accounts'], 'id');
-            $currentAccs = $config['channels']['facebook']['ad_accounts'] ?? [];
+            $currentAccs = $markConfig['channels']['facebook_marketing']['ad_accounts'] ?? [];
             $newAccsList = [];
 
             // Keep existing accounts still selected
@@ -296,15 +539,15 @@ class ConfigManagerController
                 if (!in_array((string)$newAcc['id'], $existingAccIds)) {
                     $newAccsList[] = [
                         'id' => (string)$newAcc['id'],
+                        'name' => $newAcc['name'] ?? '',
                         'enabled' => true,
                         'exclude_from_caching' => false,
                     ];
                 }
             }
-            $config['channels']['facebook']['ad_accounts'] = $newAccsList;
+            $markConfig['channels']['facebook_marketing']['ad_accounts'] = $newAccsList;
         }
-
-        file_put_contents($this->fbConfigPath, Yaml::dump($config, 10, 2));
+        file_put_contents($this->fbMarketingPath, Yaml::dump($markConfig, 10, 2));
     }
 
     private function deriveTitleFromUrl(string $url): string

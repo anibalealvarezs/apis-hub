@@ -1,11 +1,15 @@
 FROM php:8.3-cli
 
-# Instalar dependencias del sistema operativo
+# Instalar dependencias del sistema operativo y Node.js
 RUN apt-get update && apt-get install -y \
     unzip \
     git \
     cron \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Obtener el instalador de extensiones profesional
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
@@ -35,6 +39,10 @@ COPY . /app
 
 # Ejecutar scripts de composer que faltaron
 RUN composer dump-autoload --optimize
+
+# Instalar dependencias del servidor MCP
+RUN cd mcp-server && npm install --omit=dev
+
 
 # Configurar el entrypoint
 RUN chmod +x /app/entrypoint.sh

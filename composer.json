@@ -16,15 +16,15 @@
     "require": {
         "php": ">=8.1",
         "ext-json": "*",
-        "anibalealvarezs/api-client-skeleton": "@dev",
-        "anibalealvarezs/amazon-api": "@dev",
-        "anibalealvarezs/facebook-graph-api": "@dev",
+        "anibalealvarezs/api-client-skeleton": "dev-main",
+        "anibalealvarezs/amazon-api": "dev-main",
+        "anibalealvarezs/facebook-graph-api": "dev-main",
         "anibalealvarezs/google-api": "dev-develop",
-        "anibalealvarezs/klaviyo-api": "@dev",
-        "anibalealvarezs/mailchimp-api": "@dev",
-        "anibalealvarezs/netsuite-api": "@dev",
-        "anibalealvarezs/shopify-api": "@dev",
-        "anibalealvarezs/triple-whale-api": "@dev",
+        "anibalealvarezs/klaviyo-api": "dev-main",
+        "anibalealvarezs/mailchimp-api": "dev-main",
+        "anibalealvarezs/netsuite-api": "dev-main",
+        "anibalealvarezs/shopify-api": "dev-main",
+        "anibalealvarezs/triple-whale-api": "dev-main",
         "doctrine/orm": "^2.12.3",
         "doctrine/dbal": "^3.3.7",
         "fakerphp/faker": "^1.20",
@@ -36,13 +36,25 @@
         "symfony/http-kernel": "^6.1",
         "symfony/cache": "^6.1",
         "symfony/console": "^6.0",
-        "symfony/redis-messenger": "5.4.x-dev",
-        "symfony/cache-contracts": "3.6.x-dev",
+        "symfony/redis-messenger": "^5.4",
+        "symfony/cache-contracts": "^3.0",
         "predis/predis": "dev-main"
     },
     "autoload": {
         "psr-4": {
-            "": "src/"
+            "Classes\\": "src/Classes/",
+            "Commands\\": "src/Commands/",
+            "Controllers\\": "src/Controllers/",
+            "Entities\\": "src/Entities/",
+            "Enums\\": "src/Enums/",
+            "Exceptions\\": "src/Exceptions/",
+            "Fixtures\\": "src/Fixtures/",
+            "Helpers\\": "src/Helpers/",
+            "Interfaces\\": "src/Interfaces/",
+            "Repositories\\": "src/Repositories/",
+            "Routes\\": "src/Routes/",
+            "Services\\": "src/Services/",
+            "Traits\\": "src/Traits/"
         }
     },
     "autoload-dev": {
@@ -63,5 +75,10 @@
         }
     ],
     "minimum-stability": "dev",
-    "prefer-stable": false
+    "prefer-stable": false,
+    "config": {
+        "platform": {
+            "php": "8.1.99"
+        }
+    }
 }

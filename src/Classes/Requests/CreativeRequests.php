@@ -8,6 +8,7 @@ use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
 use Classes\Conversions\FacebookMarketingConvert;
 use Classes\MarketingProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
+use Entities\Analytics\Channeled\ChanneledSyncError;
 use Enums\Channel;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -36,7 +37,8 @@ class CreativeRequests implements RequestInterface
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
-        ?array $adAccountIds = null
+        ?array $adAccountIds = null,
+        ?FacebookGraphApi $api = null
     ): Response {
         if (!$logger) {
             $logger = Helpers::setLogger('facebook-entities.log');
@@ -44,13 +46,19 @@ class CreativeRequests implements RequestInterface
 
         try {
             $config = MetricRequests::validateFacebookConfig($logger);
-            $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
+            if (!$api) {
+                $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
+            }
             $manager = Helpers::getManager();
 
-            $adAccounts = $config['facebook']['ad_accounts'] ?? [];
+            $hasErrors = false;
+            $adAccounts = $config['ad_accounts'] ?? [];
             if ($adAccountIds) {
                 $adAccounts = array_filter($adAccounts, fn($acc) => in_array($acc['id'], $adAccountIds));
             }
+
+            /** @var \Repositories\Channeled\ChanneledSyncErrorRepository $syncErrorRepo */
+            $syncErrorRepo = $manager->getRepository(ChanneledSyncError::class);
 
             foreach ($adAccounts as $adAccount) {
                 Helpers::checkJobStatus($jobId);
@@ -70,25 +78,77 @@ class CreativeRequests implements RequestInterface
                     continue;
                 }
 
-                $additionalParams = [];
-                // No date filters for creatives usually, but we keep it for consistency if needed
-                // if ($startDate) $additionalParams['since'] = $startDate;
-                // if ($endDate) $additionalParams['until'] = $endDate;
+                $maxRetries = 3;
+                $retryCount = 0;
+                $fetched = false;
 
-                $creatives = $api->getCreatives(
-                    adAccountId: $adAccountId,
-                    additionalParams: $additionalParams
-                );
-                $logger->info("Fetched " . count($creatives['data']) . " creatives for ad account $adAccountId");
+                while ($retryCount < $maxRetries && !$fetched) {
+                    try {
+                        $additionalParams = [];
+                        // No date filters for creatives usually
+                        
+                        $cacheInclude = MetricRequests::getFacebookFilter($config, 'CREATIVE', 'cache_include');
+                        $cacheExclude = MetricRequests::getFacebookFilter($config, 'CREATIVE', 'cache_exclude');
 
-                if (!empty($creatives['data'])) {
-                    self::process(FacebookMarketingConvert::creatives($creatives['data'], $channeledAccount->getId()));
+                        if ($cacheInclude && !is_array($cacheInclude) && !str_starts_with($cacheInclude, '/')) {
+                            if (!isset($additionalParams['filtering'])) $additionalParams['filtering'] = [];
+                            $additionalParams['filtering'][] = [
+                                'field' => 'name',
+                                'operator' => 'CONTAIN',
+                                'value' => $cacheInclude
+                            ];
+                        }
+
+                        $creatives = $api->getCreatives(
+                            adAccountId: $adAccountId,
+                            additionalParams: $additionalParams
+                        );
+
+                        if (!empty($creatives['data'])) {
+                            $data = $creatives['data'];
+                            if ($cacheInclude || $cacheExclude) {
+                                $data = array_filter($data, function ($c) use ($cacheInclude, $cacheExclude) {
+                                    return Helpers::matchesFilter((string) ($c['name'] ?? ''), $cacheInclude, $cacheExclude) ||
+                                        Helpers::matchesFilter((string) ($c['id'] ?? ''), $cacheInclude, $cacheExclude);
+                                });
+                            }
+                            $logger->info("Fetched " . count($creatives['data']) . " creatives, kept " . count($data) . " after filtering for ad account $adAccountId");
+
+                            if (!empty($data)) {
+                                self::process(FacebookMarketingConvert::creatives($data, $channeledAccount->getId()));
+                            }
+                        } else {
+                            $logger->info("Fetched 0 creatives for ad account $adAccountId");
+                        }
+                        $fetched = true;
+                    } catch (\Exception $e) {
+                        $retryCount++;
+                        if ($retryCount >= $maxRetries) {
+                            $hasErrors = true;
+                            $logger->error("Error fetching/processing creatives for ad account $adAccountId after $maxRetries retries: " . $e->getMessage());
+                            $syncErrorRepo->logError([
+                                'platformId' => $adAccountId,
+                                'channel' => Channel::facebook_marketing->value,
+                                'syncType' => 'entity',
+                                'entityType' => 'creative',
+                                'errorMessage' => $e->getMessage(),
+                                'extraData' => ['jobId' => $jobId]
+                            ]);
+                        } else {
+                            $logger->warning("Retry $retryCount/$maxRetries for creatives sync $adAccountId: " . $e->getMessage());
+                            usleep(200000 * $retryCount);
+                        }
+                    }
                 }
+            }
+
+            if ($hasErrors) {
+                throw new \Exception("Finished with partial errors. Check channeled_sync_errors table or logs for details.");
             }
 
             return new Response(json_encode(['Creatives synchronized']));
         } catch (\Exception $e) {
-            $logger->error("Error in CreativeRequests::getListFromFacebookMarketing: " . $e->getMessage());
+            $logger->error("Error in CreativeRequests::getListFromFacebookMarketing initialization: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);
         }
     }

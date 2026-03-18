@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
 use Classes\Conversions\FacebookOrganicConvert;
-use Classes\SocialProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use Helpers\Helpers;
@@ -49,7 +47,7 @@ class PageRequests implements RequestInterface
             $manager = Helpers::getManager();
             $accountRepo = $manager->getRepository(\Entities\Analytics\Account::class);
 
-            $pagesToProcess = $config['facebook']['pages'] ?? [];
+            $pagesToProcess = $config['pages'] ?? [];
             $logger->info("Processing " . count($pagesToProcess) . " configured Facebook pages");
 
             $channeledCollection = new ArrayCollection();
@@ -62,9 +60,10 @@ class PageRequests implements RequestInterface
                     continue;
                 }
 
-                $account = $accountRepo->findOneBy(['name' => $pageCfg['account']]);
+                $accountName = $pageCfg['account'] ?? $config['accounts_group_name'] ?? null;
+                $account = $accountName ? $accountRepo->findOneBy(['name' => $accountName]) : null;
                 if (!$account) {
-                    $logger->warning("Account not found: " . $pageCfg['account']);
+                    $logger->warning("Account not found: " . ($accountName ?? 'null') . " for page " . ($pageCfg['title'] ?? $pageCfg['id']));
                     continue;
                 }
 

@@ -65,15 +65,20 @@ class InstanceGeneratorCacheAllTest extends TestCase
     public function testHasActiveEntitiesWithCacheAll(): void
     {
         $mockChannelsConfig = [
-            'facebook' => [
+            'facebook_marketing' => [
                 'enabled' => true,
                 'cache_all' => true,
-                'ad_accounts' => [] // Empty but cache_all is true
+                'ad_accounts' => []
+            ],
+            'facebook_organic' => [
+                'enabled' => true,
+                'cache_all' => true,
+                'pages' => []
             ],
             'google_search_console' => [
                 'enabled' => true,
                 'cache_all' => true,
-                'sites' => [] // Empty but cache_all is true
+                'sites' => []
             ]
         ];
 
@@ -92,7 +97,7 @@ class InstanceGeneratorCacheAllTest extends TestCase
     public function testHasActiveEntitiesWithoutCacheAllAndEmptyList(): void
     {
         $mockChannelsConfig = [
-            'facebook' => [
+            'facebook_marketing' => [
                 'enabled' => true,
                 'cache_all' => false,
                 'ad_accounts' => []
@@ -125,7 +130,7 @@ class InstanceGeneratorCacheAllTest extends TestCase
         $this->setMockProjectConfig($mockProjectConfig);
 
         $mockChannelsConfig = [
-            'facebook' => [
+            'facebook_marketing' => [
                 'enabled' => true,
                 'cache_all' => true,
                 'ad_accounts' => []
