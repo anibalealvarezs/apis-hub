@@ -491,7 +491,7 @@ class MetricsProcessor
         EntityManager $manager,
         array $metricConfigMap
     ): array {
-        $config = \Helpers\Helpers::getProjectConfig();
+        $config = Helpers::getProjectConfig();
         $cacheRawMetrics = filter_var($config['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $uniqueMetrics = [];
