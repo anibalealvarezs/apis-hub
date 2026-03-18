@@ -39,6 +39,11 @@ class ProcessJobsCommandTest extends TestCase
         $emProperty->setAccessible(true);
         $emProperty->setValue($this->command, $this->entityManager);
 
+        // Set strict test-level environment parameters to avoid container mismatches
+        putenv('API_SOURCE=');
+        putenv('API_ENTITY=');
+        putenv('INSTANCE_NAME=');
+        
         $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
         $this->entityManager->method('getConnection')->willReturn($connection);
     }
@@ -74,7 +79,7 @@ class ProcessJobsCommandTest extends TestCase
             ->willReturn(false);
 
         $input = $this->createMock(\Symfony\Component\Console\Input\InputInterface::class);
-        $input->method('getOption')->with('force-all')->willReturn(false);
+        $input->method('getOption')->with('force-all')->willReturn(true);
         $output = new BufferedOutput();
 
         // Use reflection to call protected execute
@@ -123,7 +128,7 @@ class ProcessJobsCommandTest extends TestCase
         $this->jobRepository->method('claimJob')->willReturn(false); 
 
         $input = $this->createMock(\Symfony\Component\Console\Input\InputInterface::class);
-        $input->method('getOption')->with('force-all')->willReturn(false);
+        $input->method('getOption')->with('force-all')->willReturn(true);
         $output = new BufferedOutput();
 
         $method = new \ReflectionMethod(ProcessJobsCommand::class, 'execute');
