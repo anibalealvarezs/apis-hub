@@ -61,6 +61,16 @@ else
     echo -e "${YELLOW}📦 [1/5] Dependencies already present. Skipping install.${NC}"
 fi
 
+# ── Step 1b: Fetch Remote Configuration (Optional) ──────────────────────────
+echo ""
+echo -e "${YELLOW}📡 [1.5/5] Checking for remote configuration...${NC}"
+# Use local PHP if available, otherwise skip (this runs before containers are up)
+if command -v php &> /dev/null; then
+    php bin/fetch-remote-config.php || echo "  ⚠️ Remote config fetch failed, continuing with local config..."
+else
+    echo "  ⚠️ php-cli not found locally, skipping remote config fetch."
+fi
+
 # ── Step 2: Refresh Instances from rules ──────────────────────────────────────
 echo ""
 echo -e "${YELLOW}🔄 [2/5] Calculating instance nodes and splits...${NC}"

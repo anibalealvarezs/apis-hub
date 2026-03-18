@@ -351,6 +351,7 @@ class MetricsProcessor
                 device: $metric->deviceType ?? null,
                 creative: isset($metric->creative) ? $metric->creative->getCreativeId() : null,
             );
+            $metric->metricConfigKey = $metricConfigKey;
 
             $uniqueMetricConfigs[$metricConfigKey] = [
                 'channel' => $metric->channel,
@@ -379,24 +380,25 @@ class MetricsProcessor
         }
 
         // Batch select metrics from list by signature
-        $conditions = [];
-        $selectParams = [];
-
-        foreach ($uniqueMetricConfigs as $mc) {
-            $conditions[] = 'configSignature = ?';
-            $selectParams[] = $mc['key'];
+        $selectParams = array_column($uniqueMetricConfigs, 'key');
+        $metricConfigMap = [];
+        
+        if (!empty($selectParams)) {
+            foreach (array_chunk($selectParams, 1000) as $chunkParams) {
+                $placeholders = implode(', ', array_fill(0, count($chunkParams), '?'));
+                $sql = "SELECT id, configSignature FROM metric_configs WHERE configSignature IN ($placeholders)";
+                
+                $chunkMap = MapGenerator::getMetricConfigMap(
+                    manager: $manager,
+                    sql: $sql,
+                    params: $chunkParams,
+                );
+                
+                foreach ($chunkMap as $k => $v) {
+                    $metricConfigMap[$k] = $v;
+                }
+            }
         }
-
-        $sql = "SELECT id, configSignature
-                FROM metric_configs
-                WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
-
-        // Map metric configs to their IDs
-        $metricConfigMap = MapGenerator::getMetricConfigMap(
-            manager: $manager,
-            sql: $sql,
-            params: $selectParams,
-        );
 
         // Get the list of metrics that need to be inserted
         $metricConfigsToInsert = [];
@@ -460,17 +462,16 @@ class MetricsProcessor
         }
 
         // Re-fetch all metric_configs
-        $reFetchParams = [];
-        $conditions = [];
-        foreach ($uniqueMetricConfigs as $row) {
-            $conditions[] = 'configSignature = ?';
-            $reFetchParams[] = $row['key'];
-        }
-
-        $reFetchSql = "SELECT id, configSignature FROM metric_configs WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
-        $allMetricConfigs = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
-        foreach ($allMetricConfigs as $metricConfig) {
-            $metricConfigMap[$metricConfig['configSignature']] = (int)$metricConfig['id'];
+        $reFetchParams = array_column($uniqueMetricConfigs, 'key');
+        if (!empty($reFetchParams)) {
+            foreach (array_chunk($reFetchParams, 1000) as $chunkParams) {
+                $placeholders = implode(', ', array_fill(0, count($chunkParams), '?'));
+                $reFetchSql = "SELECT id, configSignature FROM metric_configs WHERE configSignature IN ($placeholders)";
+                $allMetricConfigs = $manager->getConnection()->executeQuery($reFetchSql, $chunkParams)->fetchAllAssociative();
+                foreach ($allMetricConfigs as $metricConfig) {
+                    $metricConfigMap[$metricConfig['configSignature']] = (int)$metricConfig['id'];
+                }
+            }
         }
 
         return [
@@ -486,10 +487,13 @@ class MetricsProcessor
      * @return array
      */
     public static function processMetrics(
-        ArrayCollection $metrics,
+        \Doctrine\Common\Collections\Collection|array $metrics,
         EntityManager $manager,
-        array $metricConfigMap,
+        array $metricConfigMap
     ): array {
+        $config = \Helpers\Helpers::getProjectConfig();
+        $cacheRawMetrics = filter_var($config['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
         $uniqueMetrics = [];
         foreach ($metrics->toArray() as $metric) {
             $dimensions = array_map(function ($dimension) {
@@ -511,33 +515,29 @@ class MetricsProcessor
         }
 
         // Select existing
-        $conditions = [];
-        $selectParams = [];
-        $fields = ['dimensionsHash', 'metricConfig_id'];
-
-        foreach ($uniqueMetrics as $m) {
-            $subConditions = [];
-            foreach ($fields as $field) {
-                if (array_key_exists($field, $m) && $m[$field] === null) {
-                    $subConditions[] = "$field IS NULL";
-                } else {
-                    $subConditions[] = "$field = ?";
-                    $selectParams[] = $m[$field];
+        $metricMap = [];
+        foreach (array_chunk($uniqueMetrics, 1000, true) as $chunkMetrics) {
+            $selectParams = [];
+            $tuples = [];
+            foreach ($chunkMetrics as $m) {
+                if (isset($m['dimensionsHash']) && isset($m['metricConfig_id'])) {
+                    $selectParams[] = $m['dimensionsHash'];
+                    $selectParams[] = $m['metricConfig_id'];
+                    $tuples[] = '(?, ?)';
                 }
             }
-            $conditions[] = '(' . implode(' AND ', $subConditions) . ')';
+            if (!empty($tuples)) {
+                $placeholders = implode(', ', $tuples);
+                $sql = "SELECT id, dimensionsHash, metricConfig_id 
+                        FROM metrics 
+                        WHERE (dimensionsHash, metricConfig_id) IN ($placeholders)";
+                
+                $chunkMap = MapGenerator::getMetricMap($manager, $sql, $selectParams, $metricConfigMap);
+                foreach ($chunkMap as $k => $v) {
+                    $metricMap[$k] = $v;
+                }
+            }
         }
-
-        $sql = "SELECT id, " . implode(', ', $fields) . "
-                FROM metrics
-                WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
-
-        $metricMap = MapGenerator::getMetricMap(
-            manager: $manager,
-            sql: $sql,
-            params: $selectParams,
-            metricConfigMap: $metricConfigMap
-        );
 
         $metricsToInsert = [];
         $metricsToUpdate = [];
@@ -545,7 +545,7 @@ class MetricsProcessor
             if (!isset($metricMap[$key])) {
                 $metricsToInsert[] = [
                     'value' => $metric['value'],
-                    'metadata' => json_encode($metric['metadata'] ?? []),
+                    'metadata' => $cacheRawMetrics ? json_encode($metric['metadata'] ?? []) : null,
                     'dimensionsHash' => $metric['dimensionsHash'],
                     'metricConfig_id' => $metric['metricConfig_id'],
                     'key' => $key,
@@ -572,21 +572,24 @@ class MetricsProcessor
                 $insertParams
             );
 
-            $reFetchParams = [];
-            $reFetchConditions = [];
-            foreach ($metricsToInsert as $row) {
-                $reFetchConditions[] = '(dimensionsHash = ? AND metricConfig_id = ?)';
-                $reFetchParams[] = $row['dimensionsHash'];
-                $reFetchParams[] = $row['metricConfig_id'];
-            }
-            $reFetchSql = 'SELECT id, dimensionsHash, metricConfig_id FROM metrics WHERE ' . implode(' OR ', $reFetchConditions);
-            $newMetrics = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
-            foreach ($newMetrics as $metric) {
-                $metricKey = KeyGenerator::generateMetricKey(
-                    dimensionsHash: $metric['dimensionsHash'],
-                    metricConfigKey: $metricConfigMap['mapReverse'][$metric['metricConfig_id']],
-                );
-                $metricMap[$metricKey] = (int)$metric['id'];
+            foreach (array_chunk($metricsToInsert, 1000) as $chunk) {
+                $reFetchParams = [];
+                $tuples = [];
+                foreach ($chunk as $row) {
+                    $reFetchParams[] = $row['dimensionsHash'];
+                    $reFetchParams[] = $row['metricConfig_id'];
+                    $tuples[] = '(?, ?)';
+                }
+                $placeholders = implode(', ', $tuples);
+                $reFetchSql = "SELECT id, dimensionsHash, metricConfig_id FROM metrics WHERE (dimensionsHash, metricConfig_id) IN ($placeholders)";
+                $newMetrics = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
+                foreach ($newMetrics as $metric) {
+                    $metricKey = KeyGenerator::generateMetricKey(
+                        dimensionsHash: $metric['dimensionsHash'],
+                        metricConfigKey: $metricConfigMap['mapReverse'][$metric['metricConfig_id']],
+                    );
+                    $metricMap[$metricKey] = (int)$metric['id'];
+                }
             }
         }
 
@@ -618,6 +621,9 @@ class MetricsProcessor
         array $metricMap,
         LoggerInterface $logger,
     ): array {
+        $config = \Helpers\Helpers::getProjectConfig();
+        $cacheRawMetrics = filter_var($config['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
         $uniqueChanneledMetrics = [];
         foreach ($metrics->toArray() as $metric) {
             $metricKey = KeyGenerator::generateMetricKey(
@@ -645,21 +651,29 @@ class MetricsProcessor
             ];
         }
 
-        $conditions = [];
-        $selectParams = [];
-        foreach ($uniqueChanneledMetrics as $m) {
-            $conditions[] = '(channel = ? AND platformId = ? AND metric_id = ? AND platformCreatedAt = ?)';
-            $selectParams[] = $m['channel'];
-            $selectParams[] = $m['platformId'];
-            $selectParams[] = $m['metric_id'];
-            $selectParams[] = $m['platformCreatedAt'];
+        $channeledMetricMap = [];
+        foreach (array_chunk($uniqueChanneledMetrics, 1000, true) as $chunk) {
+            $selectParams = [];
+            $tuples = [];
+            foreach ($chunk as $m) {
+                $selectParams[] = $m['channel'];
+                $selectParams[] = $m['platformId'];
+                $selectParams[] = $m['metric_id'];
+                $selectParams[] = $m['platformCreatedAt'];
+                $tuples[] = '(?, ?, ?, ?)';
+            }
+            if (!empty($tuples)) {
+                $placeholders = implode(', ', $tuples);
+                $sql = "SELECT id, channel, platformId, metric_id, platformCreatedAt, data
+                        FROM channeled_metrics
+                        WHERE (channel, platformId, metric_id, platformCreatedAt) IN ($placeholders)";
+                
+                $chunkMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
+                foreach ($chunkMap as $k => $v) {
+                    $channeledMetricMap[$k] = $v;
+                }
+            }
         }
-
-        $sql = "SELECT id, channel, platformId, metric_id, platformCreatedAt, data
-            FROM channeled_metrics
-            WHERE " . (empty($conditions) ? '1=0' : implode(' OR ', $conditions));
-
-        $channeledMetricMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
 
         $dimManager = new \Classes\DimensionManager($manager);
         $channeledMetricsToInsert = [];
@@ -685,20 +699,24 @@ class MetricsProcessor
                     'platformId' => $channeledMetric['platformId'],
                     'metric_id' => $channeledMetric['metric_id'],
                     'platformCreatedAt' => $channeledMetric['platformCreatedAt'],
-                    'data' => json_encode($channeledMetric['data']),
+                    'data' => $cacheRawMetrics ? json_encode($channeledMetric['data']) : null,
                     'dimension_set_id' => $dimensionSetId
                 ];
             } elseif (isset($channeledMetricsToInsert[$key])) {
-                $data = json_decode($channeledMetricsToInsert[$key]['data'], true);
-                $data = array_merge($data, $channeledMetric['data']);
-                $channeledMetricsToInsert[$key]['data'] = json_encode($data);
+                if ($cacheRawMetrics) {
+                    $data = json_decode($channeledMetricsToInsert[$key]['data'], true) ?? [];
+                    $data = array_merge($data, $channeledMetric['data'] ?? []);
+                    $channeledMetricsToInsert[$key]['data'] = json_encode($data);
+                }
             } else {
-                $data = json_decode($channeledMetricMap[$key]['data'], true);
-                $data = array_merge($data, $channeledMetric['data']);
-                $channeledMetricsToUpdate[$key] = [
-                    'id' => $channeledMetricMap[$key]['id'],
-                    'data' => json_encode($data, JSON_UNESCAPED_UNICODE),
-                ];
+                if ($cacheRawMetrics) {
+                    $data = json_decode($channeledMetricMap[$key]['data'], true) ?? [];
+                    $data = array_merge($data, $channeledMetric['data'] ?? []);
+                    $channeledMetricsToUpdate[$key] = [
+                        'id' => $channeledMetricMap[$key]['id'],
+                        'data' => json_encode($data, JSON_UNESCAPED_UNICODE),
+                    ];
+                }
             }
         }
 
@@ -724,7 +742,29 @@ class MetricsProcessor
             }
         }
 
-        $channeledMetricMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
+        $channeledMetricMap = [];
+        foreach (array_chunk($uniqueChanneledMetrics, 1000, true) as $chunk) {
+            $selectParams = [];
+            $tuples = [];
+            foreach ($chunk as $m) {
+                $selectParams[] = $m['channel'];
+                $selectParams[] = $m['platformId'];
+                $selectParams[] = $m['metric_id'];
+                $selectParams[] = $m['platformCreatedAt'];
+                $tuples[] = '(?, ?, ?, ?)';
+            }
+            if (!empty($tuples)) {
+                $placeholders = implode(', ', $tuples);
+                $sql = "SELECT id, channel, platformId, metric_id, platformCreatedAt, data
+                        FROM channeled_metrics
+                        WHERE (channel, platformId, metric_id, platformCreatedAt) IN ($placeholders)";
+                
+                $chunkMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
+                foreach ($chunkMap as $k => $v) {
+                    $channeledMetricMap[$k] = $v;
+                }
+            }
+        }
         $flipped = [];
         foreach ($channeledMetricMap as $k => $v) {
             if (isset($v['id'])) $flipped[(string)$v['id']] = ['id' => $k, 'data' => $v['data']];

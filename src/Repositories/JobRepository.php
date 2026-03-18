@@ -352,7 +352,7 @@ class JobRepository extends BaseRepository
             $data['status'] = $mappedStatus->value;
         }
 
-        return parent::update($id, (object) $data);
+        return parent::update($id, (object) $data) ?: null;
     }
 
     /**
@@ -454,5 +454,74 @@ class JobRepository extends BaseRepository
             ->getSingleScalarResult();
 
         return (int)$count > 0;
+    }
+
+    /**
+     * @param string $instanceName
+     * @return \DateTime|null
+     */
+    public function getLastSuccessfulJobTime(string $instanceName): ?\DateTime
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $job = $qb->select('e')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.payload LIKE :instance_name_pattern')
+            ->andWhere('e.status = :completed')
+            ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%')
+            ->setParameter('completed', JobStatus::completed->value)
+            ->orderBy('e.updatedAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $job ? $job->getUpdatedAt() : null;
+    }
+
+    /**
+     * @param string $instanceName
+     * @param int|null $excludeJobId
+     * @return bool
+     */
+    public function isAnotherJobProcessing(string $instanceName, ?int $excludeJobId = null): bool
+    {
+        $qb = $this->_em->createQueryBuilder();
+        $qb->select('count(e.id)')
+            ->from($this->getEntityName(), 'e')
+            ->where('e.payload LIKE :instance_name_pattern')
+            ->andWhere('e.status = :processing')
+            ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%')
+            ->setParameter('processing', JobStatus::processing->value);
+
+        if ($excludeJobId) {
+            $qb->andWhere('e.id != :excludeId')
+               ->setParameter('excludeId', $excludeJobId);
+        }
+
+        return (int)$qb->getQuery()->getSingleScalarResult() > 0;
+    }
+
+    /**
+     * @param int $hours
+     * @return int
+     */
+    public function cleanupStuckJobs(int $hours = 6): int
+    {
+        $since = new \DateTime();
+        $since->modify("-$hours hours");
+
+        $qb = $this->_em->createQueryBuilder();
+        return $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':failed')
+            ->set('e.message', ':message')
+            ->set('e.updatedAt', ':now')
+            ->where('e.status = :processing')
+            ->andWhere('e.updatedAt <= :since')
+            ->setParameter('failed', JobStatus::failed->value)
+            ->setParameter('message', "Job timed out after $hours hours")
+            ->setParameter('now', new \DateTime())
+            ->setParameter('processing', JobStatus::processing->value)
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->execute();
     }
 }

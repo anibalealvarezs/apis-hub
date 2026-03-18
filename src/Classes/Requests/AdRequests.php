@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
+use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
 use Classes\Conversions\FacebookMarketingConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Channeled\ChanneledSyncError;
@@ -35,7 +36,8 @@ class AdRequests implements RequestInterface
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
-        ?array $adAccountIds = null
+        ?array $adAccountIds = null,
+        ?FacebookGraphApi $api = null
     ): Response {
         if (!$logger) {
             $logger = Helpers::setLogger('facebook-entities.log');
@@ -43,11 +45,13 @@ class AdRequests implements RequestInterface
 
         try {
             $config = MetricRequests::validateFacebookConfig($logger);
-            $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
+            if (!$api) {
+                $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
+            }
             $manager = Helpers::getManager();
 
             $hasErrors = false;
-            $adAccounts = $config['facebook']['ad_accounts'] ?? [];
+            $adAccounts = $config['ad_accounts'] ?? [];
             if ($adAccountIds) {
                 $adAccounts = array_filter($adAccounts, fn($acc) => in_array($acc['id'], $adAccountIds));
             }
@@ -73,31 +77,82 @@ class AdRequests implements RequestInterface
                     continue;
                 }
 
-                try {
-                    $additionalParams = [];
-                    if ($startDate) $additionalParams['since'] = $startDate;
-                    if ($endDate) $additionalParams['until'] = $endDate;
+                $maxRetries = 3;
+                $retryCount = 0;
+                $fetched = false;
 
-                    $ads = $api->getAds(
-                        adAccountId: $adAccountId,
-                        additionalParams: $additionalParams
-                    );
-                    $logger->info("Fetched " . count($ads['data']) . " ads for ad account $adAccountId");
+                while ($retryCount < $maxRetries && !$fetched) {
+                    try {
+                        $additionalParams = [];
+                        if ($startDate) {
+                            if (!isset($additionalParams['filtering'])) $additionalParams['filtering'] = [];
+                            $additionalParams['filtering'][] = [
+                                'field' => 'updated_time',
+                                'operator' => 'GREATER_THAN',
+                                'value' => strtotime($startDate)
+                            ];
+                        }
+                        if ($endDate) {
+                            if (!isset($additionalParams['filtering'])) $additionalParams['filtering'] = [];
+                            $additionalParams['filtering'][] = [
+                                'field' => 'updated_time',
+                                'operator' => 'LESS_THAN',
+                                'value' => strtotime($endDate)
+                            ];
+                        }
 
-                    if (!empty($ads['data'])) {
-                        self::process(FacebookMarketingConvert::ads($ads['data'], $channeledAccount->getId()));
+                        $cacheInclude = MetricRequests::getFacebookFilter($config, 'AD', 'cache_include');
+                        $cacheExclude = MetricRequests::getFacebookFilter($config, 'AD', 'cache_exclude');
+
+                        if ($cacheInclude && !is_array($cacheInclude) && !str_starts_with($cacheInclude, '/')) {
+                            if (!isset($additionalParams['filtering'])) $additionalParams['filtering'] = [];
+                            $additionalParams['filtering'][] = [
+                                'field' => 'name',
+                                'operator' => 'CONTAIN',
+                                'value' => $cacheInclude
+                            ];
+                        }
+
+                        $ads = $api->getAds(
+                            adAccountId: $adAccountId,
+                            additionalParams: $additionalParams
+                        );
+
+                        if (!empty($ads['data'])) {
+                            $data = $ads['data'];
+                            if ($cacheInclude || $cacheExclude) {
+                                $data = array_filter($data, function ($a) use ($cacheInclude, $cacheExclude) {
+                                    return Helpers::matchesFilter((string) ($a['name'] ?? ''), $cacheInclude, $cacheExclude) ||
+                                        Helpers::matchesFilter((string) ($a['id'] ?? ''), $cacheInclude, $cacheExclude);
+                                });
+                            }
+                            $logger->info("Fetched " . count($ads['data']) . " ads, kept " . count($data) . " after filtering for ad account $adAccountId");
+
+                            if (!empty($data)) {
+                                self::process(FacebookMarketingConvert::ads($data, $channeledAccount->getId()));
+                            }
+                        } else {
+                            $logger->info("Fetched 0 ads for ad account $adAccountId");
+                        }
+                        $fetched = true;
+                    } catch (\Exception $e) {
+                        $retryCount++;
+                        if ($retryCount >= $maxRetries) {
+                            $hasErrors = true;
+                            $logger->error("Error fetching/processing ads for ad account $adAccountId after $maxRetries retries: " . $e->getMessage());
+                            $syncErrorRepo->logError([
+                                'platformId' => $adAccountId,
+                                'channel' => Channel::facebook_marketing->value,
+                                'syncType' => 'entity',
+                                'entityType' => 'ad',
+                                'errorMessage' => $e->getMessage(),
+                                'extraData' => ['jobId' => $jobId]
+                            ]);
+                        } else {
+                            $logger->warning("Retry $retryCount/$maxRetries for ads sync $adAccountId: " . $e->getMessage());
+                            usleep(200000 * $retryCount);
+                        }
                     }
-                } catch (\Exception $e) {
-                    $hasErrors = true;
-                    $logger->error("Error fetching/processing ads for ad account $adAccountId: " . $e->getMessage());
-                    $syncErrorRepo->logError([
-                        'platformId' => $adAccountId,
-                        'channel' => Channel::facebook_marketing->value,
-                        'syncType' => 'entity',
-                        'entityType' => 'ad',
-                        'errorMessage' => $e->getMessage(),
-                        'extraData' => ['jobId' => $jobId]
-                    ]);
                 }
             }
 

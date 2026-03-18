@@ -67,6 +67,40 @@ class ScheduleInitialJobsCommand extends Command
                 continue;
             }
 
+            // Check if channel is enabled and history range
+            $channelsConfig = Helpers::getChannelsConfig();
+            $chanKey = $channel;
+            if (!isset($channelsConfig[$chanKey])) {
+                $chanKey = str_replace(['facebook_marketing', 'facebook_organic'], ['facebook', 'facebook'], $channel);
+            }
+            // Specific check for split facebook configs
+            $chanConfig = $channelsConfig[$channel] ?? $channelsConfig[$chanKey] ?? null;
+
+            if ($chanConfig) {
+                if (isset($chanConfig['enabled']) && !$chanConfig['enabled']) {
+                    if (Helpers::isDebug()) {
+                        $output->writeln("<comment>Skipping $name: channel $channel is disabled.</comment>");
+                    }
+                    continue;
+                }
+
+                if (!empty($instance['end_date']) && !empty($chanConfig['cache_history_range']) && $instance['end_date'] !== 'yesterday') {
+                    try {
+                        $limitDate = new \DateTime();
+                        $limitDate->modify('-' . $chanConfig['cache_history_range']);
+                        $jobEndDate = new \DateTime($instance['end_date']);
+                        if ($jobEndDate < $limitDate) {
+                            if (Helpers::isDebug()) {
+                                $output->writeln("<comment>Skipping $name: end date {$instance['end_date']} is outside caching history ({$chanConfig['cache_history_range']}).</comment>");
+                            }
+                            continue;
+                        }
+                    } catch (\Exception $e) {
+                        // ignore malformed dates
+                    }
+                }
+            }
+
             $params = [];
             if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];
             if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];

@@ -241,10 +241,29 @@ class MonitoringController extends BaseController
                     if ($job->getStatus() === JobStatus::processing->value) {
                         return new JsonResponse(['error' => 'Cannot re-schedule a job that is already processing to avoid overlap.'], 400);
                     }
+                    
+                    $payload = $job->getPayload() ?? [];
+                    $resumeStr = $request->request->get('resume');
+                    if (!$resumeStr && isset($content['resume'])) {
+                        $resumeStr = $content['resume'];
+                    }
+
+                    if ($resumeStr !== null) {
+                        if (!isset($payload['params'])) {
+                            $payload['params'] = [];
+                        }
+                        $payload['params']['resume'] = filter_var($resumeStr, FILTER_VALIDATE_BOOLEAN);
+                    }
+
+                    $bypassDependencyStr = $request->request->get('bypass_dependency') ?? $content['bypass_dependency'] ?? null;
+                    if ($bypassDependencyStr !== null && filter_var($bypassDependencyStr, FILTER_VALIDATE_BOOLEAN)) {
+                        unset($payload['params']['requires']);
+                    }
+
                     $newJobData = [
                         'channel' => $job->getChannel(),
                         'entity' => $job->getEntity(),
-                        'payload' => $job->getPayload(),
+                        'payload' => $payload,
                         'status' => JobStatus::scheduled->value
                     ];
                     $jobRepo->create((object)$newJobData);

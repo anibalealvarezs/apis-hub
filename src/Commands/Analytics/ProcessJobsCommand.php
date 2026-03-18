@@ -54,6 +54,13 @@ class ProcessJobsCommand extends Command
             $output->writeln("Querying scheduled and delayed jobs...");
         }
 
+        // 0. Cleanup stuck jobs (e.g. processing for > 6 hours)
+        $timeoutHours = Helpers::getProjectConfig()['jobs']['timeout_hours'] ?? 6;
+        $cleaned = $jobRepo->cleanupStuckJobs($timeoutHours);
+        if ($cleaned > 0 && (Helpers::isDebug() || $forceAll)) {
+            $output->writeln("<comment>Cleanup: Marked {$cleaned} stuck processing jobs as failed.</comment>");
+        }
+
         $envStartDate = getenv('START_DATE');
         $envEndDate = getenv('END_DATE');
 
@@ -169,6 +176,16 @@ class ProcessJobsCommand extends Command
                     }
                 }
 
+                // Guard: Prevent another job for the same instance from running if one is already processing
+                $instanceName = $payload['instance_name'] ?? null;
+                if ($instanceName && $jobRepo->isAnotherJobProcessing($instanceName)) {
+                    if (Helpers::isDebug()) {
+                        $output->writeln("<comment>Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.</comment>");
+                    }
+                    $stats['skipped']++;
+                    continue;
+                }
+
                 if (Helpers::isDebug()) {
                     $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
                 }
@@ -190,8 +207,40 @@ class ProcessJobsCommand extends Command
                         throw new \Exception("Invalid channel enum: " . $job->getChannel());
                     }
 
+                    // Check if channel is enabled
+                    $channelsConfig = Helpers::getChannelsConfig();
+                    $chanKey = $job->getChannel();
+                    if (!isset($channelsConfig[$chanKey])) {
+                        $chanKey = str_replace(['facebook_marketing', 'facebook_organic'], ['facebook', 'facebook'], $chanKey);
+                    }
+                    $chanConfig = $channelsConfig[$job->getChannel()] ?? $channelsConfig[$chanKey] ?? null;
+                    if ($chanConfig && isset($chanConfig['enabled']) && !$chanConfig['enabled']) {
+                        $jobRepo->update($job->getId(), (object)[
+                            'status' => JobStatus::failed->value,
+                            'message' => 'Channel is disabled in configuration'
+                        ]);
+                        if (Helpers::isDebug()) {
+                            $output->writeln("<comment>Job {$job->getUuid()} marked as failed because channel {$job->getChannel()} is disabled.</comment>");
+                        }
+                        $stats['failed']++;
+                        continue;
+                    }
+
                     // Resolve relative dates (e.g. 'yesterday' -> '2024-03-05')
                     $resolvedParams = DateResolver::resolveParams($params);
+
+                    // Intelligent incremental sync for entities
+                    $instanceName = $payload['instance_name'] ?? null;
+                    if ($instanceName && str_ends_with($instanceName, '-entities-sync')) {
+                        if (empty($resolvedParams['startDate'])) {
+                            $lastRun = $jobRepo->getLastSuccessfulJobTime($instanceName);
+                            if ($lastRun) {
+                                // Fetch only what changed since the last successful sync
+                                $resolvedParams['startDate'] = $lastRun->format('Y-m-d H:i:s');
+                            }
+                        }
+                    }
+
                     $resolvedParams['jobId'] = $job->getId();
                     $body = $payload['body'] ?? null;
 

@@ -66,6 +66,8 @@ class InitializeEntitiesCommand extends Command
                     $this->logger->info("Skipped Country: $countryEnum->value (already exists)");
                 }
             }
+            $this->entityManager->flush();
+            $this->logger->info("Flushed countries");
 
             // Initialize Devices
             /** @var \Repositories\DeviceRepository $deviceRepository */
@@ -93,16 +95,21 @@ class InitializeEntitiesCommand extends Command
                     $this->logger->info("Skipped Device: {$data['type']->value} (already exists)");
                 }
             }
+            $this->entityManager->flush();
+            $this->logger->info("Flushed devices");
 
             // Initialize Pages from google_search_console config
             /** @var \Repositories\PageRepository $pageRepository */
             $pageRepository = $this->entityManager->getRepository(Page::class);
             /** @var \Repositories\Channeled\ChanneledAccountRepository $channeledAccountRepository */
             $channeledAccountRepository = $this->entityManager->getRepository(ChanneledAccount::class);
-            $gscConfigRaw = Helpers::getChannelsConfig();
-            $gscConfig = $gscConfigRaw['google_search_console'] ?? null;
+            $channelsConfig = Helpers::getChannelsConfig();
+            $gscConfig = $channelsConfig['google_search_console'] ?? null;
             if (!$gscConfig) {
-                throw new Exception("Missing 'google_search_console' configuration in channels config");
+                $gscConfig = $channelsConfig['gsc'] ?? null;
+            }
+            if (!$gscConfig) {
+                throw new Exception("Missing 'google_search_console' or 'gsc' configuration in channels config");
             }
             $pagesInitialized = 0;
             $pagesSkipped = 0;
@@ -111,7 +118,7 @@ class InitializeEntitiesCommand extends Command
             if ($gscConfig['cache_all'] ?? false) {
                 $this->logger->info("GSC 'cache_all' enabled. Fetching all sites from API.");
                 try {
-                    $apiSites = $this->fetchGscSites($gscConfigRaw);
+                    $apiSites = $this->fetchGscSites($channelsConfig);
                     if (isset($apiSites['siteEntry']) && is_array($apiSites['siteEntry'])) {
                         foreach ($apiSites['siteEntry'] as $apiSite) {
                             $siteUrl = $apiSite['siteUrl'];
@@ -171,32 +178,43 @@ class InitializeEntitiesCommand extends Command
                     }
                 }
             }
+            $this->entityManager->flush();
+            $this->logger->info("Flushed GSC pages");
 
             // Initialize Pages from facebook config
             /** @var \Repositories\PageRepository $pageRepository */
             $pageRepository = $this->entityManager->getRepository(Page::class);
-            $fbConfig = Helpers::getChannelsConfig()['facebook'] ?? null;
-            if (!$fbConfig) {
-                throw new Exception("Missing 'facebook' configuration in channels config");
+            $channelsConfig = Helpers::getChannelsConfig();
+            $fbConfig = $channelsConfig['facebook'] ?? [];
+            $fbMarketingConfig = $channelsConfig['facebook_marketing'] ?? [];
+            $fbOrganicConfig = $channelsConfig['facebook_organic'] ?? [];
+            
+            $fbGroupName = $fbConfig['accounts_group_name'] ?? $fbMarketingConfig['accounts_group_name'] ?? $fbOrganicConfig['accounts_group_name'] ?? null;
+            if (!$fbGroupName) {
+                throw new Exception("Missing 'accounts_group_name' in facebook configurations");
             }
 
             /** @var \Repositories\AccountRepository $accountRepository */
             $accountRepository = $this->entityManager->getRepository(Account::class);
             /** @var Account|null $accountEntity */
-            $accountEntity = $accountRepository->getByName($fbConfig['accounts_group_name']);
+            $accountEntity = $accountRepository->getByName($fbGroupName);
             if (!$accountEntity) {
                 $accountEntity = new Account();
-                $accountEntity->addName($fbConfig['accounts_group_name']);
+                $accountEntity->addName($fbGroupName);
                 $this->entityManager->persist($accountEntity);
-                $this->logger->info("Initialized Account: Name={$fbConfig['accounts_group_name']}");
+                $this->logger->info("Initialized Account: Name={$fbGroupName}");
             }
+            $this->entityManager->flush();
+            $this->logger->info("Flushed Facebook account");
 
-            $pagesToProcess = $fbConfig['pages'] ?? [];
+            $mergedFbConfig = array_merge($fbConfig, $fbMarketingConfig, $fbOrganicConfig);
+
+            $pagesToProcess = $mergedFbConfig['pages'] ?? [];
             $apiPagesMap = [];
-            if ($fbConfig['cache_all'] ?? false) {
+            if ($mergedFbConfig['cache_all'] ?? false) {
                 $this->logger->info("Facebook 'cache_all' enabled. Fetching all pages from API.");
                 try {
-                    $apiPages = $this->fetchFbPages($fbConfig);
+                    $apiPages = $this->fetchFbPages($mergedFbConfig);
                     if (isset($apiPages['data']) && is_array($apiPages['data'])) {
                         foreach ($apiPages['data'] as $apiPage) {
                             $pageId = (string)$apiPage['id'];
@@ -211,8 +229,8 @@ class InitializeEntitiesCommand extends Command
                             }
                             if (!$alreadyInConfig) {
                                 $pageName = $apiPage['name'] ?? "Page " . $pageId;
-                                $includeFilter = MetricRequests::getFacebookFilter(['facebook' => $fbConfig], 'PAGE', 'cache_include');
-                                $excludeFilter = MetricRequests::getFacebookFilter(['facebook' => $fbConfig], 'PAGE', 'cache_exclude');
+                                $includeFilter = MetricRequests::getFacebookFilter($mergedFbConfig, 'PAGE', 'cache_include');
+                                $excludeFilter = MetricRequests::getFacebookFilter($mergedFbConfig, 'PAGE', 'cache_exclude');
                                 if (Helpers::matchesFilter($pageName, $includeFilter, $excludeFilter) || Helpers::matchesFilter($pageId, $includeFilter, $excludeFilter)) {
                                     $pagesToProcess[] = [
                                         'id' => $pageId,
@@ -289,12 +307,14 @@ class InitializeEntitiesCommand extends Command
                     }
                 }
             }
-            $adAccountsToProcess = $fbConfig['ad_accounts'] ?? [];
+            $this->entityManager->flush();
+            $this->logger->info("Flushed Facebook pages and Instagram accounts");
+            $adAccountsToProcess = $mergedFbConfig['ad_accounts'] ?? [];
             $apiAdAccsMap = [];
-            if ($fbConfig['cache_all'] ?? false) {
+            if ($mergedFbConfig['cache_all'] ?? false) {
                 $this->logger->info("Facebook 'cache_all' enabled. Fetching all ad accounts from API.");
                 try {
-                    $apiAdAccs = $this->fetchFbAdAccounts($fbConfig);
+                    $apiAdAccs = $this->fetchFbAdAccounts($mergedFbConfig);
                     if (isset($apiAdAccs['data']) && is_array($apiAdAccs['data'])) {
                         foreach ($apiAdAccs['data'] as $apiAdAcc) {
                             $adAccId = (string)$apiAdAcc['id'];
@@ -309,8 +329,8 @@ class InitializeEntitiesCommand extends Command
                             }
                             if (!$alreadyInConfig) {
                                 $adAccName = $apiAdAcc['name'] ?? "Ad Account " . $adAccId;
-                                $includeFilter = MetricRequests::getFacebookFilter(['facebook' => $fbConfig], 'AD_ACCOUNT', 'cache_include');
-                                $excludeFilter = MetricRequests::getFacebookFilter(['facebook' => $fbConfig], 'AD_ACCOUNT', 'cache_exclude');
+                                $includeFilter = MetricRequests::getFacebookFilter($mergedFbConfig, 'AD_ACCOUNT', 'cache_include');
+                                $excludeFilter = MetricRequests::getFacebookFilter($mergedFbConfig, 'AD_ACCOUNT', 'cache_exclude');
                                 if (Helpers::matchesFilter($adAccName, $includeFilter, $excludeFilter) || Helpers::matchesFilter($adAccId, $includeFilter, $excludeFilter)) {
                                     $adAccountsToProcess[] = [
                                         'id' => $adAccId,
@@ -331,7 +351,7 @@ class InitializeEntitiesCommand extends Command
                 $adAccountEntity = $channeledAccountRepository->getByPlatformId($adAccount['id'], Channel::facebook_marketing->value);
                 if (!$adAccountEntity) {
                     $channeledAccount = new ChanneledAccount();
-                    $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbConfig['accounts_group_name'];
+                    $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbGroupName;
                     $channeledAccount->addPlatformId($adAccount['id'])
                         ->addAccount($accountEntity)
                         ->addType(AccountEnum::META_AD_ACCOUNT)
@@ -342,7 +362,7 @@ class InitializeEntitiesCommand extends Command
                     $this->entityManager->persist($channeledAccount);
                     $this->logger->info("Initialized Ad Account: ID={$adAccount['id']}, Name={$channeledAccountName}");
                 } else {
-                    $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbConfig['accounts_group_name'];
+                    $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbGroupName;
                     if ($adAccountEntity->getName() !== $channeledAccountName) {
                         $adAccountEntity->addName($channeledAccountName);
                         $this->entityManager->persist($adAccountEntity);
@@ -380,13 +400,13 @@ class InitializeEntitiesCommand extends Command
 
     protected function fetchFbPages(array $fbConfig): array
     {
-        $fbApi = MetricRequests::initializeFacebookGraphApi(['facebook' => $fbConfig], $this->logger);
+        $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $this->logger);
         return $fbApi->getMyPages();
     }
 
     protected function fetchFbAdAccounts(array $fbConfig): array
     {
-        $fbApi = MetricRequests::initializeFacebookGraphApi(['facebook' => $fbConfig], $this->logger);
+        $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $this->logger);
         return $fbApi->getMyAdAccounts();
     }
 }

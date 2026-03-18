@@ -124,8 +124,8 @@ class InstanceGeneratorService
         // Map rules channel name (from rules section in instances_rules.yaml) 
         // to actual configuration keys and their target entity lists.
         $mapping = [
-            'facebook_marketing' => ['channel' => 'facebook', 'key' => 'ad_accounts'],
-            'facebook_organic'   => ['channel' => 'facebook', 'key' => 'pages'],
+            'facebook_marketing' => ['channel' => 'facebook_marketing', 'key' => 'ad_accounts'],
+            'facebook_organic'   => ['channel' => 'facebook_organic', 'key' => 'pages'],
             'gsc'                => ['channel' => 'google_search_console', 'key' => 'sites'],
             'google_search_console' => ['channel' => 'google_search_console', 'key' => 'sites'],
         ];

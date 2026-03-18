@@ -64,7 +64,7 @@ class PostRequests implements RequestInterface
             $pageRepo = $manager->getRepository(Page::class);
             $channeledAccountRepo = $manager->getRepository(ChanneledAccount::class);
 
-            $pagesToProcess = $config['facebook']['pages'] ?? [];
+            $pagesToProcess = $config['pages'] ?? [];
             if ($pageIds) {
                 $pagesToProcess = array_filter($pagesToProcess, fn($p) => in_array($p['id'], $pageIds));
             }
@@ -90,60 +90,113 @@ class PostRequests implements RequestInterface
                     $logger->info("Fetching Facebook posts for page: " . ($pageCfg['title'] ?? $pageCfg['id']) . ($startDate ? " since $startDate" : "") . ($endDate ? " until $endDate" : ""));
 
                     $additionalParams = [];
-                    if ($startDate) {
-                        $additionalParams['since'] = $startDate;
-                    }
-                    if ($endDate) {
-                        $additionalParams['until'] = $endDate;
-                    }
+                    if ($startDate) $additionalParams['since'] = $startDate;
+                    if ($endDate) $additionalParams['until'] = $endDate;
 
                     // Set pageId in API instance to allow correct token resolution
                     $api->setPageId((string)$pageCfg['id']);
 
-                    $fbPosts = $api->getFacebookPosts(
-                        pageId: (string)$pageCfg['id'],
-                        limit: 100,
-                        additionalParams: $additionalParams
-                    );
-                    if (!empty($fbPosts['data'])) {
-                        $logger->info("Retrieved " . count($fbPosts['data']) . " Facebook posts for page: " . ($pageCfg['title'] ?? $pageCfg['id']));
-                        $converted = FacebookOrganicConvert::posts(
-                            posts: $fbPosts['data'],
-                            pageId: $pageEntity->getId(),
-                            accountId: $accountEntity->getId()
-                        );
-                        self::process($converted);
-                    } else {
-                        $logger->info("No Facebook posts found for page: " . ($pageCfg['title'] ?? $pageCfg['id']));
+                    $maxRetries = 3;
+                    $retryCount = 0;
+                    $fetched = false;
+
+                    while ($retryCount < $maxRetries && !$fetched) {
+                        try {
+                            $fbPosts = $api->getFacebookPosts(
+                                pageId: (string)$pageCfg['id'],
+                                limit: 100,
+                                additionalParams: $additionalParams
+                            );
+                            if (!empty($fbPosts['data'])) {
+                                $cacheInclude = MetricRequests::getFacebookFilter($config, 'POST', 'cache_include');
+                                $cacheExclude = MetricRequests::getFacebookFilter($config, 'POST', 'cache_exclude');
+
+                                $data = $fbPosts['data'];
+                                if ($cacheInclude || $cacheExclude) {
+                                    $data = array_filter($data, function ($p) use ($cacheInclude, $cacheExclude) {
+                                        return Helpers::matchesFilter((string) ($p['message'] ?? $p['story'] ?? ''), $cacheInclude, $cacheExclude) ||
+                                            Helpers::matchesFilter((string) ($p['id'] ?? ''), $cacheInclude, $cacheExclude);
+                                    });
+                                }
+                                $logger->info("Retrieved " . count($fbPosts['data']) . " Facebook posts, kept " . count($data) . " after filtering for page: " . ($pageCfg['title'] ?? $pageCfg['id']));
+
+                                if (!empty($data)) {
+                                    $converted = FacebookOrganicConvert::posts(
+                                        posts: $data,
+                                        pageId: $pageEntity->getId(),
+                                        accountId: $accountEntity->getId()
+                                    );
+                                    self::process($converted);
+                                }
+                            } else {
+                                $logger->info("No Facebook posts found for page: " . ($pageCfg['title'] ?? $pageCfg['id']));
+                            }
+                            $fetched = true;
+                        } catch (\Exception $e) {
+                            $retryCount++;
+                            if ($retryCount >= $maxRetries) {
+                                $logger->error("Failed to fetch Facebook posts after $maxRetries retries for page " . $pageCfg['id'] . ": " . $e->getMessage());
+                                throw $e;
+                            }
+                            $logger->warning("Retry $retryCount/$maxRetries for Facebook posts page " . $pageCfg['id'] . ": " . $e->getMessage());
+                            usleep(200000 * $retryCount);
+                        }
                     }
 
                     // 2. Fetch Instagram Media if applicable
-                    if (!empty($pageCfg['ig_account']) && !empty($pageCfg['ig_account_media'])) {
+                    if (!empty($pageCfg['ig_account']) && !empty($pageCfg['ig_accounts']) && !empty($pageCfg['ig_account_media'])) {
                         $logger->info("Fetching Instagram media for page: " . ($pageCfg['title'] ?? $pageCfg['id']));
 
-                        // We need a channeled account for IG media as per existing logic
-                        // The config might specify which an account to use, or we try to find one linked to the same account
                         $channeledAccount = $channeledAccountRepo->findOneBy([
                             'channel' => Channel::facebook_organic->value,
                             'account' => $accountEntity->getId(),
                         ]);
 
-                        $igMedia = $api->getInstagramMedia(
-                            igUserId: (string)$pageCfg['ig_account'],
-                            limit: 100,
-                            additionalParams: $additionalParams
-                        );
-                        if (!empty($igMedia['data'])) {
-                            $logger->info("Retrieved " . count($igMedia['data']) . " Instagram media items for page: " . ($pageCfg['title'] ?? $pageCfg['id']));
-                            $converted = FacebookOrganicConvert::posts(
-                                posts: $igMedia['data'],
-                                pageId: $pageEntity->getId(),
-                                accountId: $accountEntity->getId(),
-                                channeledAccountId: $channeledAccount ? $channeledAccount->getId() : null
-                            );
-                            self::process($converted);
-                        } else {
-                            $logger->info("No Instagram media items found for page: " . ($pageCfg['title'] ?? $pageCfg['id']));
+                        $retryCount = 0;
+                        $fetched = false;
+
+                        while ($retryCount < $maxRetries && !$fetched) {
+                            try {
+                                $igMedia = $api->getInstagramMedia(
+                                    igUserId: (string)$pageCfg['ig_account'],
+                                    limit: 100,
+                                    additionalParams: $additionalParams
+                                );
+                                if (!empty($igMedia['data'])) {
+                                    $cacheInclude = MetricRequests::getFacebookFilter($config, 'IG_MEDIA', 'cache_include');
+                                    $cacheExclude = MetricRequests::getFacebookFilter($config, 'IG_MEDIA', 'cache_exclude');
+
+                                    $data = $igMedia['data'];
+                                    if ($cacheInclude || $cacheExclude) {
+                                        $data = array_filter($data, function ($m) use ($cacheInclude, $cacheExclude) {
+                                            return Helpers::matchesFilter((string) ($m['caption'] ?? ''), $cacheInclude, $cacheExclude) ||
+                                                Helpers::matchesFilter((string) ($m['id'] ?? ''), $cacheInclude, $cacheExclude);
+                                        });
+                                    }
+                                    $logger->info("Retrieved " . count($igMedia['data']) . " Instagram media items, kept " . count($data) . " after filtering for page: " . ($pageCfg['title'] ?? $pageCfg['id']));
+
+                                    if (!empty($data)) {
+                                        $converted = FacebookOrganicConvert::posts(
+                                            posts: $data,
+                                            pageId: $pageEntity->getId(),
+                                            accountId: $accountEntity->getId(),
+                                            channeledAccountId: $channeledAccount ? $channeledAccount->getId() : null
+                                        );
+                                        self::process($converted);
+                                    }
+                                } else {
+                                    $logger->info("No Instagram media items found for page: " . ($pageCfg['title'] ?? $pageCfg['id']));
+                                }
+                                $fetched = true;
+                            } catch (\Exception $e) {
+                                $retryCount++;
+                                if ($retryCount >= $maxRetries) {
+                                    $logger->error("Failed to fetch Instagram media after $maxRetries retries for page " . $pageCfg['id'] . ": " . $e->getMessage());
+                                    throw $e;
+                                }
+                                $logger->warning("Retry $retryCount/$maxRetries for Instagram media page " . $pageCfg['id'] . ": " . $e->getMessage());
+                                usleep(200000 * $retryCount);
+                            }
                         }
                     }
                 } catch (\Exception $e) {

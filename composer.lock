@@ -771,12 +771,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/collections.git",
-                "reference": "f162dd73116a6e90d9b2bdfe55feb8554a7a78f4"
+                "reference": "532f25e0eafe1c89b2f2f44770b80ddb1ef33f31"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/collections/zipball/f162dd73116a6e90d9b2bdfe55feb8554a7a78f4",
-                "reference": "f162dd73116a6e90d9b2bdfe55feb8554a7a78f4",
+                "url": "https://api.github.com/repos/doctrine/collections/zipball/532f25e0eafe1c89b2f2f44770b80ddb1ef33f31",
+                "reference": "532f25e0eafe1c89b2f2f44770b80ddb1ef33f31",
                 "shasum": ""
             },
             "require": {
@@ -849,7 +849,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-01-21T06:47:38+00:00"
+            "time": "2026-03-15T22:39:14+00:00"
         },
         {
             "name": "doctrine/common",
@@ -2765,12 +2765,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/cache.git",
-                "reference": "77f5eca135d1b5471de4301b99496649e4f62878"
+                "reference": "b64349671566d62f70577ba455d0a575ae3db9ee"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/cache/zipball/77f5eca135d1b5471de4301b99496649e4f62878",
-                "reference": "77f5eca135d1b5471de4301b99496649e4f62878",
+                "url": "https://api.github.com/repos/symfony/cache/zipball/b64349671566d62f70577ba455d0a575ae3db9ee",
+                "reference": "b64349671566d62f70577ba455d0a575ae3db9ee",
                 "shasum": ""
             },
             "require": {
@@ -2857,7 +2857,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-05T20:47:12+00:00"
+            "time": "2026-03-16T13:41:56+00:00"
         },
         {
             "name": "symfony/cache-contracts",
@@ -4771,12 +4771,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/service-contracts.git",
-                "reference": "639fa48ea277babeb67e1432ce60a029d795bd63"
+                "reference": "d714f7788dd07a4a93cd0d6cc63fbf487ba67014"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/service-contracts/zipball/639fa48ea277babeb67e1432ce60a029d795bd63",
-                "reference": "639fa48ea277babeb67e1432ce60a029d795bd63",
+                "url": "https://api.github.com/repos/symfony/service-contracts/zipball/d714f7788dd07a4a93cd0d6cc63fbf487ba67014",
+                "reference": "d714f7788dd07a4a93cd0d6cc63fbf487ba67014",
                 "shasum": ""
             },
             "require": {
@@ -4851,7 +4851,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-02-13T20:42:21+00:00"
+            "time": "2026-03-15T18:28:19+00:00"
         },
         {
             "name": "symfony/string",
@@ -5454,12 +5454,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/data-fixtures.git",
-                "reference": "fe1ab006750fdf81582e1178bd50d1fa9c5740e0"
+                "reference": "a5a95dcc0ad84f067b246068e303a573fe760204"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/data-fixtures/zipball/fe1ab006750fdf81582e1178bd50d1fa9c5740e0",
-                "reference": "fe1ab006750fdf81582e1178bd50d1fa9c5740e0",
+                "url": "https://api.github.com/repos/doctrine/data-fixtures/zipball/a5a95dcc0ad84f067b246068e303a573fe760204",
+                "reference": "a5a95dcc0ad84f067b246068e303a573fe760204",
                 "shasum": ""
             },
             "require": {
@@ -5532,7 +5532,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-02T07:52:27+00:00"
+            "time": "2026-03-16T08:08:13+00:00"
         },
         {
             "name": "mikey179/vfsstream",

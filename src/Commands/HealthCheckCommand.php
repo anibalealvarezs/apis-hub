@@ -93,15 +93,17 @@ class HealthCheckCommand extends Command
             $allPassed = false;
         }
 
-        // 4. Catalog Entities (Countries/Devices)
+        // 4. Catalog Entities (Countries/Devices/Accounts/Pages)
         $output->write("🌱 <comment>Catalog Integrity:</comment> ");
         try {
             $db = Helpers::getManager()->getConnection();
             $countries = $db->fetchOne("SELECT COUNT(*) FROM countries");
             $devices = $db->fetchOne("SELECT COUNT(*) FROM devices");
+            $accounts = $db->fetchOne("SELECT COUNT(*) FROM channeled_accounts");
+            $pages = $db->fetchOne("SELECT COUNT(*) FROM pages");
             
             if ($countries > 0 && $devices > 0) {
-                $output->writeln("<info>INITIALIZED ($countries countries, $devices devices)</info>");
+                $output->writeln("<info>INITIALIZED ($countries countries, $devices devices, $accounts accounts, $pages pages)</info>");
             } else {
                 $output->writeln("<error>EMPTY TABLES (Run app:initialize-entities)</error>");
                 $allPassed = false;
