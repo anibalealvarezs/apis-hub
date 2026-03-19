@@ -171,15 +171,17 @@ class JobRepository extends BaseRepository
                 $query->andWhere('e.entity IN (:ctx_entities)')->setParameter('ctx_entities', array_unique($equivalents));
             }
 
+            $payloadField = $this->isPostgreSQL() ? 'CAST(e.payload AS text)' : 'e.payload';
+
             // Differentiate by Date Range in payload (e.g. gsc-jan vs gsc-feb)
             // We use a loose LIKE pattern to be compatible with MySQL JSON columns without custom DQL functions.
             if ($envStart && (!is_object($filters) || !isset($filters->startDate))) {
-                $query->andWhere('(e.payload LIKE :ctx_start_pattern1 OR e.payload LIKE :ctx_start_pattern2)')
+                $query->andWhere("({$payloadField} LIKE :ctx_start_pattern1 OR {$payloadField} LIKE :ctx_start_pattern2)")
                     ->setParameter('ctx_start_pattern1', '%startDate%' . $envStart . '%')
                     ->setParameter('ctx_start_pattern2', '%start_date%' . $envStart . '%');
             }
             if ($envEnd && (!is_object($filters) || !isset($filters->endDate))) {
-                $query->andWhere('(e.payload LIKE :ctx_end_pattern1 OR e.payload LIKE :ctx_end_pattern2)')
+                $query->andWhere("({$payloadField} LIKE :ctx_end_pattern1 OR {$payloadField} LIKE :ctx_end_pattern2)")
                     ->setParameter('ctx_end_pattern1', '%endDate%' . $envEnd . '%')
                     ->setParameter('ctx_end_pattern2', '%end_date%' . $envEnd . '%');
             }
@@ -293,7 +295,8 @@ class JobRepository extends BaseRepository
         );
 
         if ($instanceName) {
-            $qb->andWhere('e.payload LIKE :instance_name_pattern')
+            $payloadField = $this->isPostgreSQL() ? 'CAST(e.payload AS text)' : 'e.payload';
+            $qb->andWhere("{$payloadField} LIKE :instance_name_pattern")
                ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%');
         }
 
@@ -442,9 +445,11 @@ class JobRepository extends BaseRepository
         $since = new \DateTime();
         $since->modify("-$withinHours hours");
 
+        $payloadField = $this->isPostgreSQL() ? 'CAST(e.payload AS text)' : 'e.payload';
+
         $count = $qb->select('count(e.id)')
             ->from($this->getEntityName(), 'e')
-            ->where('e.payload LIKE :instance_name_pattern')
+            ->where("{$payloadField} LIKE :instance_name_pattern")
             ->andWhere('e.status = :completed')
             ->andWhere('e.updatedAt >= :since')
             ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%')
@@ -463,9 +468,11 @@ class JobRepository extends BaseRepository
     public function getLastSuccessfulJobTime(string $instanceName): ?\DateTime
     {
         $qb = $this->_em->createQueryBuilder();
+        $payloadField = $this->isPostgreSQL() ? 'CAST(e.payload AS text)' : 'e.payload';
+
         $job = $qb->select('e')
             ->from($this->getEntityName(), 'e')
-            ->where('e.payload LIKE :instance_name_pattern')
+            ->where("{$payloadField} LIKE :instance_name_pattern")
             ->andWhere('e.status = :completed')
             ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%')
             ->setParameter('completed', JobStatus::completed->value)
@@ -485,9 +492,11 @@ class JobRepository extends BaseRepository
     public function isAnotherJobProcessing(string $instanceName, ?int $excludeJobId = null): bool
     {
         $qb = $this->_em->createQueryBuilder();
+        $payloadField = $this->isPostgreSQL() ? 'CAST(e.payload AS text)' : 'e.payload';
+
         $qb->select('count(e.id)')
             ->from($this->getEntityName(), 'e')
-            ->where('e.payload LIKE :instance_name_pattern')
+            ->where("{$payloadField} LIKE :instance_name_pattern")
             ->andWhere('e.status = :processing')
             ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%')
             ->setParameter('processing', JobStatus::processing->value);
@@ -523,5 +532,12 @@ class JobRepository extends BaseRepository
             ->setParameter('since', $since)
             ->getQuery()
             ->execute();
+    }
+    /**
+     * @return bool
+     */
+    private function isPostgreSQL(): bool
+    {
+        return $this->_em->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
     }
 }
