@@ -30,6 +30,10 @@ try {
     ini_set('memory_limit', $cliConfig['memory_limit'] ?? '1G');
 
     $entityManager = require_once __DIR__ . "/../app/bootstrap.php";
+    
+    // Safety check: ensure CAST_TEXT is registered for CLI context
+    $entityManager->getConfiguration()->addCustomStringFunction('CAST_TEXT', \Classes\Doctrine\DqlFunctions\Cast::class);
+
     $helperSet = require_once __DIR__ . "/../config/cli-config.php";
 
     $cli = new Application(
