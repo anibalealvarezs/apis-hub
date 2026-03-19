@@ -480,6 +480,9 @@ class Helpers
                     isDevMode: true
                 );
 
+                // Register custom DQL functions
+                $ormConfig->addCustomStringFunction('CAST', \Classes\Doctrine\DqlFunctions\Cast::class);
+
                 // Create EntityManager
                 self::$entityManager = new EntityManager($connection, $ormConfig);
             } catch (Exception $e) {
