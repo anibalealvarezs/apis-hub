@@ -24,6 +24,7 @@ class BaseRepository extends EntityRepository
      */
     private array $hideFields = [];
     protected bool $isChanneledMetric = false;
+    private array $activeAggregateJoins = [];
 
     /**
      * Set the list of fields to hide from the result.
@@ -103,10 +104,13 @@ class BaseRepository extends EntityRepository
         $qb->from($tableName, 'e');
 
         // Specialized logic for ChanneledMetric to support deep joins in aggregation
+        $this->activeAggregateJoins = [];
         $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
         if ($this->isChanneledMetric) {
             $qb->join('e', 'metrics', 'm', 'e.metric_id = m.id')
                ->join('m', 'metric_configs', 'mc', 'm.metric_config_id = mc.id');
+            $this->activeAggregateJoins['m'] = true;
+            $this->activeAggregateJoins['mc'] = true;
         }
 
         // Selects with aggregation functions
@@ -167,25 +171,25 @@ class BaseRepository extends EntityRepository
                 $channeledMap = $relationMap[$channeledKey];
                 
                 // Join management (ensure unique aliases)
-                if (!isset($activeJoins[$genericMap['alias']])) {
+                if (!isset($this->activeAggregateJoins[$genericMap['alias']])) {
                     $qb->leftJoin('mc', $genericMap['table'], $genericMap['alias'], "mc.{$genericMap['fk']} = {$genericMap['alias']}.id");
-                    $activeJoins[$genericMap['alias']] = true;
+                    $this->activeAggregateJoins[$genericMap['alias']] = true;
                 }
-                if (!isset($activeJoins[$channeledMap['alias']])) {
+                if (!isset($this->activeAggregateJoins[$channeledMap['alias']])) {
                     $qb->leftJoin('mc', $channeledMap['table'], $channeledMap['alias'], "mc.{$channeledMap['fk']} = {$channeledMap['alias']}.id");
-                    $activeJoins[$channeledMap['alias']] = true;
+                    $this->activeAggregateJoins[$channeledMap['alias']] = true;
                 }
 
                 if ($isAccount) {
                     // Advanced fallback: try to find account via campaign if direct link is missing
                     $campaignMap = $relationMap['channeledCampaign'];
-                    if (!isset($activeJoins[$campaignMap['alias']])) {
+                    if (!isset($this->activeAggregateJoins[$campaignMap['alias']])) {
                         $qb->leftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
-                        $activeJoins[$campaignMap['alias']] = true;
+                        $this->activeAggregateJoins[$campaignMap['alias']] = true;
                     }
-                    if (!isset($activeJoins['rca_fallback'])) {
+                    if (!isset($this->activeAggregateJoins['rca_fallback'])) {
                         $qb->leftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
-                        $activeJoins['rca_fallback'] = true;
+                        $this->activeAggregateJoins['rca_fallback'] = true;
                     }
                     
                     $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
@@ -203,9 +207,9 @@ class BaseRepository extends EntityRepository
                 }
             } elseif ($this->isChanneledMetric && isset($relationMap[$field])) {
                 $map = $relationMap[$field];
-                if (!isset($activeJoins[$map['alias']])) {
+                if (!isset($this->activeAggregateJoins[$map['alias']])) {
                     $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
-                    $activeJoins[$map['alias']] = true;
+                    $this->activeAggregateJoins[$map['alias']] = true;
                 }
                 $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS CHAR), 'Unknown') AS $quotedField")
                    ->addGroupBy("{$map['alias']}.{$map['field']}")
@@ -232,9 +236,9 @@ class BaseRepository extends EntityRepository
                        ->setParameter("val_$dimAlias", $value);
                 } elseif ($this->isChanneledMetric && isset($relationMap[$key])) {
                     $map = $relationMap[$key];
-                    if (!isset($activeJoins[$map['alias']])) {
+                    if (!isset($this->activeAggregateJoins[$map['alias']])) {
                         $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
-                        $activeJoins[$map['alias']] = true;
+                        $this->activeAggregateJoins[$map['alias']] = true;
                     }
                     $qb->andWhere("{$map['alias']}.{$map['field']} = :f_$key")
                        ->setParameter("f_$key", $value);
