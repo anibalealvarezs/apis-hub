@@ -138,7 +138,7 @@ class BaseRepository extends EntityRepository
 
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
-            $quotedField = "`$field`";
+            $quotedField = "\"$field\"";
             if ($this->isChanneledMetric && str_starts_with($field, 'dimensions.')) {
                 $dimKey = substr($field, 11);
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
@@ -347,34 +347,34 @@ class BaseRepository extends EntityRepository
         $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
         if ($this->isChanneledMetric && $isAggregate) {
             $formulas = [
-                'spend'       => 'SUM(CASE WHEN mc.name = "spend" THEN m.value ELSE 0 END)',
-                'clicks'      => 'SUM(CASE WHEN mc.name = "clicks" THEN m.value ELSE 0 END)',
-                'impressions' => 'SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END)',
-                'reach'       => 'SUM(CASE WHEN mc.name = "reach" THEN m.value ELSE 0 END)',
-                'frequency'   => 'SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "reach" THEN m.value ELSE 0 END), 0)',
-                'ctr'         => 'SUM(CASE WHEN mc.name = "clicks" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0)',
-                'cpc'         => 'SUM(CASE WHEN mc.name = "spend" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "clicks" THEN m.value ELSE 0 END), 0)',
-                'cpm'         => 'SUM(CASE WHEN mc.name = "spend" THEN m.value ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0) / 1000)',
-                'position'    => 'SUM(CASE WHEN mc.name = "position" THEN m.value ELSE 0 END * (
+                'spend'       => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END)",
+                'clicks'      => "SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END)",
+                'impressions' => "SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END)",
+                'reach'       => "SUM(CASE WHEN mc.name = 'reach' THEN m.value ELSE 0 END)",
+                'frequency'   => "SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'reach' THEN m.value ELSE 0 END), 0)",
+                'ctr'         => "SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0)",
+                'cpc'         => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END), 0)",
+                'cpm'         => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0) / 1000)",
+                'position'    => "SUM(CASE WHEN mc.name = 'position' THEN m.value ELSE 0 END * (
                     SELECT m2.value 
                     FROM metrics m2 
                     JOIN metric_configs mc2 ON m2.metricConfig_id = mc2.id 
-                    WHERE mc2.name = "impressions" 
+                    WHERE mc2.name = 'impressions' 
                     AND mc2.metricDate = mc.metricDate 
                     AND mc2.channel = mc.channel
                     AND (mc2.query_id = mc.query_id OR (mc2.query_id IS NULL AND mc.query_id IS NULL))
                     AND (mc2.page_id = mc.page_id OR (mc2.page_id IS NULL AND mc.page_id IS NULL))
                     LIMIT 1
-                )) / NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0)',
-                'unique_clicks' => 'SUM(CASE WHEN mc.name = "unique_clicks" THEN m.value ELSE 0 END)',
-                'results'       => 'SUM(CASE WHEN mc.name = "results" THEN m.value ELSE 0 END)',
-                'cost_per_result' => 'SUM(CASE WHEN mc.name = "spend" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "results" THEN m.value ELSE 0 END), 0)',
-                'result_rate'     => 'SUM(CASE WHEN mc.name = "results" THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = "impressions" THEN m.value ELSE 0 END), 0)',
-                'roas'            => 'AVG(CASE WHEN mc.name = "purchase_roas" THEN m.value ELSE NULL END)',
-                'website_roas'    => 'AVG(CASE WHEN mc.name = "website_purchase_roas" THEN m.value ELSE NULL END)',
-                'actions'         => 'SUM(CASE WHEN mc.name = "actions" THEN m.value ELSE 0 END)',
-                'purchase_roas'   => 'AVG(CASE WHEN mc.name = "purchase_roas" THEN m.value ELSE NULL END)',
-                'website_purchase_roas' => 'AVG(CASE WHEN mc.name = "website_purchase_roas" THEN m.value ELSE NULL END)',
+                )) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0)",
+                'unique_clicks' => "SUM(CASE WHEN mc.name = 'unique_clicks' THEN m.value ELSE 0 END)",
+                'results'       => "SUM(CASE WHEN mc.name = 'results' THEN m.value ELSE 0 END)",
+                'cost_per_result' => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'results' THEN m.value ELSE 0 END), 0)",
+                'result_rate'     => "SUM(CASE WHEN mc.name = 'results' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0)",
+                'roas'            => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN m.value ELSE NULL END)",
+                'website_roas'    => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN m.value ELSE NULL END)",
+                'actions'         => "SUM(CASE WHEN mc.name = 'actions' THEN m.value ELSE 0 END)",
+                'purchase_roas'   => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN m.value ELSE NULL END)",
+                'website_purchase_roas' => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN m.value ELSE NULL END)",
             ];
 
             if (isset($formulas[$lowerField])) {
