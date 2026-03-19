@@ -68,12 +68,12 @@ if [ -n "$PROJECT_CONFIG_FILE" ]; then
 }
 EOF
 
-    crontab /etc/cron.d/apis-hub-cron || echo "Crontab load failed"
+    crontab /tmp/apis-hub-cron || echo "Crontab load failed"
 fi
 
 # Start cron service
 echo "Starting cron service..."
-service cron start
+cron || service cron start || echo "Cron service startup failed"
 
 # Start MCP Server in SSE mode (background)
 echo "Starting MCP Server on port 3000..."
