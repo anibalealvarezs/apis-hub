@@ -481,7 +481,7 @@ class Helpers
                 );
 
                 // Register custom DQL functions
-                $ormConfig->addCustomStringFunction('PG_CAST', \Classes\Doctrine\DqlFunctions\Cast::class);
+                $ormConfig->addCustomStringFunction('Z_PG_CAST', \Classes\Doctrine\DqlFunctions\Cast::class);
 
                 // Create EntityManager
                 self::$entityManager = new EntityManager($connection, $ormConfig);

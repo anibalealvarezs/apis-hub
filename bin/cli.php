@@ -31,8 +31,8 @@ try {
 
     $entityManager = require_once __DIR__ . "/../app/bootstrap.php";
     
-    // Safety check: ensure PG_CAST is registered for CLI context
-    $entityManager->getConfiguration()->addCustomStringFunction('PG_CAST', \Classes\Doctrine\DqlFunctions\Cast::class);
+    // Safety check: ensure Z_PG_CAST is registered for CLI context
+    $entityManager->getConfiguration()->addCustomStringFunction('Z_PG_CAST', \Classes\Doctrine\DqlFunctions\Cast::class);
 
     $helperSet = require_once __DIR__ . "/../config/cli-config.php";
 
