@@ -30,7 +30,7 @@ class Cast extends FunctionNode
         $parser->match(Lexer::T_AS);
 
         $parser->match(Lexer::T_IDENTIFIER);
-        $this->type = $parser->getLexer()->token['value'];
+        $this->type = $parser->getLexer()->token->value;
 
         $parser->match(Lexer::T_CLOSE_PARENTHESIS);
     }
