@@ -571,6 +571,8 @@ class MetricsProcessor
             }
         }
 
+        Helpers::setLogger('facebook-marketing.log')->info("Metrics analysis: " . count($metricsToInsert) . " new metrics to insert, " . count($metricsToUpdate) . " existing metrics to update.");
+
         if (!empty($metricsToInsert)) {
             $cols = ['value', 'metadata', 'dimensions_hash', 'metric_config_id'];
             $numCols = count($cols);
@@ -746,6 +748,8 @@ class MetricsProcessor
                 }
             }
         }
+
+        Helpers::setLogger('facebook-marketing.log')->info("Channeled metrics analysis: " . count($channeledMetricsToInsert) . " new, " . count($channeledMetricsToUpdate) . " to update.");
 
         if (!empty($channeledMetricsToInsert)) {
             $cols = ['channel', 'platform_id', 'metric_id', 'platform_created_at', 'data', 'dimension_set_id'];
