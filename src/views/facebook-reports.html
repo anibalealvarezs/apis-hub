@@ -343,7 +343,7 @@
                 <div class="stat-value" id="total-ctr">0.00%</div>
             </div>
             <div class="card-stat">
-                <div class="stat-label"><i data-lucide="shopping-bag"></i> ROAS</div>
+                <div class="stat-label" id="total-roas-label"><i data-lucide="shopping-bag"></i> ROAS</div>
                 <div class="stat-value" id="total-roas">0.00x</div>
             </div>
         </div>
@@ -368,11 +368,15 @@
                             <th class="text-right">Spend</th>
                             <th class="text-right">Impr.</th>
                             <th class="text-right">Reach</th>
+                            <th class="text-right">Freq.</th>
                             <th class="text-right">Clicks</th>
                             <th class="text-right">CTR</th>
                             <th class="text-right">CPC</th>
                             <th class="text-right">CPM</th>
-                            <th class="text-right">ROAS</th>
+                            <th class="text-right">Results</th>
+                            <th class="text-right">Cost/Res</th>
+                            <th class="text-right">Res. Rate</th>
+                            <th class="text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
@@ -425,21 +429,25 @@
             try {
                 const payload = {
                     aggregations: {
-                        spend: "formula",
-                        clicks: "formula",
-                        impressions: "formula",
-                        ctr: "formula",
-                        cpc: "formula",
-                        cpm: "formula",
-                        reach: "formula",
-                        roas: "formula"
+                        total_spend: "spend",
+                        total_clicks: "clicks",
+                        total_impressions: "impressions",
+                        total_reach: "reach",
+                        total_results: "results",
+                        total_actions: "actions",
+                        average_ctr: "ctr",
+                        average_cpc: "cpc",
+                        average_cpm: "cpm",
+                        average_frequency: "frequency",
+                        average_cost_per_result: "cost_per_result",
+                        average_result_rate: "result_rate"
                     },
                     groupBy: ["platform_id"],
                     startDate: start,
                     endDate: end
                 };
 
-                const response = await fetch('/facebook_marketing/channeled_metric/aggregate', {
+                const response = await fetch('/facebook_marketing/metric/aggregate', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -475,14 +483,18 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="campaign-name">${row.platform_id}</td>
-                    <td class="text-right metric-cell">€${formatNum(row.spend)}</td>
-                    <td class="text-right metric-cell">${formatInt(row.impressions)}</td>
-                    <td class="text-right metric-cell">${formatInt(row.reach)}</td>
-                    <td class="text-right metric-cell">${formatInt(row.clicks)}</td>
-                    <td class="text-right metric-cell ${row.ctr > 1 ? 'pos' : ''}">${formatPct(row.ctr)}</td>
-                    <td class="text-right metric-cell">€${formatNum(row.cpc)}</td>
-                    <td class="text-right metric-cell">€${formatNum(row.cpm)}</td>
-                    <td class="text-right metric-cell ${row.roas > 2 ? 'pos' : ''}">${formatNum(row.roas)}x</td>
+                    <td class="text-right metric-cell">€${formatNum(row.total_spend)}</td>
+                    <td class="text-right metric-cell">${formatInt(row.total_impressions)}</td>
+                    <td class="text-right metric-cell">${formatInt(row.total_reach)}</td>
+                    <td class="text-right metric-cell">${formatNum(row.average_frequency)}x</td>
+                    <td class="text-right metric-cell">${formatInt(row.total_clicks)}</td>
+                    <td class="text-right metric-cell ${row.average_ctr > 1 ? 'pos' : ''}">${formatPct(row.average_ctr)}</td>
+                    <td class="text-right metric-cell">€${formatNum(row.average_cpc)}</td>
+                    <td class="text-right metric-cell">€${formatNum(row.average_cpm)}</td>
+                    <td class="text-right metric-cell">${formatInt(row.total_results)}</td>
+                    <td class="text-right metric-cell">€${formatNum(row.average_cost_per_result)}</td>
+                    <td class="text-right metric-cell">${formatPct(row.average_result_rate)}</td>
+                    <td class="text-right metric-cell">${formatInt(row.total_actions)}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -490,21 +502,24 @@
 
         function renderSummary(data) {
             const totals = data.reduce((acc, row) => {
-                acc.spend += parseFloat(row.spend || 0);
-                acc.impressions += parseInt(row.impressions || 0);
-                acc.clicks += parseInt(row.clicks || 0);
-                acc.roas += parseFloat(row.roas || 0);
+                acc.spend += parseFloat(row.total_spend || 0);
+                acc.impressions += parseInt(row.total_impressions || 0);
+                acc.clicks += parseInt(row.total_clicks || 0);
+                acc.results += parseInt(row.total_results || 0);
                 return acc;
-            }, { spend: 0, impressions: 0, clicks: 0, roas: 0 });
+            }, { spend: 0, impressions: 0, clicks: 0, results: 0 });
 
             const avgCtr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
-            const avgRoas = data.length > 0 ? (totals.roas / data.length) : 0;
+            const avgCpr = totals.results > 0 ? (totals.spend / totals.results) : 0;
 
             document.getElementById('total-spend').textContent = `€${formatNum(totals.spend)}`;
             document.getElementById('total-impressions').textContent = formatInt(totals.impressions);
             document.getElementById('total-clicks').textContent = formatInt(totals.clicks);
             document.getElementById('total-ctr').textContent = `${formatPct(avgCtr)}`;
-            document.getElementById('total-roas').textContent = `${formatNum(avgRoas)}x`;
+            document.getElementById('total-roas').textContent = totals.results > 0 ? formatInt(totals.results) : '0';
+            
+            // Re-purposing the ROAS card for "Total Results" if ROAS formula isn't in core yet
+            document.getElementById('total-roas-label').innerHTML = '<i data-lucide="shopping-bag"></i> Total Results';
         }
 
         function resetSummary() {
