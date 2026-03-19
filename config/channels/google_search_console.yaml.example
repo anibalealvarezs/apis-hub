@@ -5,7 +5,7 @@ channels:
     cache_include: null # Optional. Text or PCRE Regex to include sites by URL or Title
     cache_exclude: null # Optional. Text or PCRE Regex to exclude sites
     scope: 'https://www.googleapis.com/auth/webmasters'
-    token: YOUR_TOKEN
+    token: '${GOOGLE_SEARCH_CONSOLE_TOKEN}'
     sites:
       - url: 'sc-domain:example.com'
         title: 'Example Site'

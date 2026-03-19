@@ -27,3 +27,7 @@ dev-recurrences.md
 
 # Storage (Generated tokens, logs, etc.)
 /storage/
+
+.env.llenatucentro
+
+find_vars.py
