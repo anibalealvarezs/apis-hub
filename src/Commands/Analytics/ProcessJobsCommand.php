@@ -29,9 +29,9 @@ class ProcessJobsCommand extends Command
     protected static $defaultName = 'jobs:process';
     private EntityManager $em;
 
-    public function __construct()
+    public function __construct(?EntityManager $em = null)
     {
-        $this->em = Helpers::getManager();
+        $this->em = $em ?? Helpers::getManager();
         parent::__construct();
     }
 
