@@ -347,6 +347,15 @@ class Helpers
     }
 
     /**
+     * @return bool
+     */
+    public static function isPostgres(): bool
+    {
+        $config = self::getDbConfig();
+        return ($config['driver'] === 'pdo_pgsql');
+    }
+
+    /**
      * @return array
      */
     public static function getChannelsConfig(): array

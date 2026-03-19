@@ -104,7 +104,7 @@ class BaseRepository extends EntityRepository
         $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
         if ($this->isChanneledMetric) {
             $qb->join('e', 'metrics', 'm', 'e.metric_id = m.id')
-               ->join('m', 'metric_configs', 'mc', 'm.metricConfig_id = mc.id');
+               ->join('m', 'metric_configs', 'mc', 'm.metric_config_id = mc.id');
         }
 
         // Selects with aggregation functions
@@ -129,8 +129,8 @@ class BaseRepository extends EntityRepository
             'page'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rp'],
             'account'  => ['table' => 'accounts', 'fk' => 'account_id', 'field' => 'name', 'alias' => 'ra'],
             'campaign' => ['table' => 'campaigns', 'fk' => 'campaign_id', 'field' => 'name', 'alias' => 'rc'],
-            'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeledAdGroup_id', 'field' => 'name', 'alias' => 'rag'],
-            'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeledAd_id', 'field' => 'name', 'alias' => 'rad'],
+            'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeled_ad_group_id', 'field' => 'name', 'alias' => 'rag'],
+            'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'name', 'alias' => 'rad'],
             'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
             'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'name', 'alias' => 'rd'],
         ];
@@ -358,9 +358,9 @@ class BaseRepository extends EntityRepository
                 'position'    => "SUM(CASE WHEN mc.name = 'position' THEN m.value ELSE 0 END * (
                     SELECT m2.value 
                     FROM metrics m2 
-                    JOIN metric_configs mc2 ON m2.metricConfig_id = mc2.id 
+                    JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id 
                     WHERE mc2.name = 'impressions' 
-                    AND mc2.metricDate = mc.metricDate 
+                    AND mc2.metric_date = mc.metric_date 
                     AND mc2.channel = mc.channel
                     AND (mc2.query_id = mc.query_id OR (mc2.query_id IS NULL AND mc.query_id IS NULL))
                     AND (mc2.page_id = mc.page_id OR (mc2.page_id IS NULL AND mc.page_id IS NULL))
@@ -416,6 +416,10 @@ class BaseRepository extends EntityRepository
             if (!$isData && str_ends_with($this->getEntityName(), 'ChanneledMetric')) {
                 $source = 'm.metadata';
             }
+            $isPostgres = Helpers::isPostgres();
+            if ($isPostgres) {
+                return "$source->>'$path'";
+            }
             return "JSON_UNQUOTE(JSON_EXTRACT($source, '$.$path'))";
         }
 
@@ -424,38 +428,76 @@ class BaseRepository extends EntityRepository
             return "m." . substr($field, 7);
         }
         if (str_starts_with($field, 'metricConfig.')) {
-            return "mc." . substr($field, 13);
+            $subField = substr($field, 13);
+            if ($subField === 'metricDate') $subField = 'metric_date';
+            return "mc." . $subField;
         }
 
         // Common aliasing for metricDate and name
-        if ($field === 'metricDate' || $field === 'name' || $field === 'period') {
+        if ($field === 'metricDate') {
+            return "mc.metric_date";
+        }
+        if ($field === 'name' || $field === 'period') {
             return "mc.$field";
         }
         
         // Temporal virtual fields
-        $baseDate = str_ends_with($this->getEntityName(), 'ChanneledMetric') ? 'mc.metricDate' : 'e.platformCreatedAt';
-        $dateParts = [
-            'year'      => "YEAR($baseDate)",
-            'month'     => "MONTH($baseDate)",
-            'day'       => "DAY($baseDate)",
-            'week'      => "WEEK($baseDate)",
-            'quarter'   => "QUARTER($baseDate)",
-            'dayofweek' => "DAYOFWEEK($baseDate)",
-            'dayname'   => "DAYNAME($baseDate)",
-            'monthname' => "MONTHNAME($baseDate)",
-            // Friendly grouping keys
-            'daily'     => "DATE($baseDate)",
-            'weekly'    => "CONCAT(YEAR($baseDate), '-W', LPAD(WEEK($baseDate), 2, '0'))",
-            'monthly'   => "CONCAT(YEAR($baseDate), '-', LPAD(MONTH($baseDate), 2, '0'))",
-            'quarterly' => "CONCAT(YEAR($baseDate), '-Q', QUARTER($baseDate))",
-            'yearly'    => "YEAR($baseDate)",
-        ];
+        if ($this->isChanneledMetric) {
+            $baseDate = 'mc.metric_date';
+        } else {
+            $baseDate = 'e.platform_created_at';
+            if (!$this->_class->hasField('platformCreatedAt')) {
+                 $baseDate = $this->_class->hasField('createdAt') ? 'e.created_at' : 'e.date';
+            }
+        }
+
+        $isPostgres = Helpers::isPostgres();
+        if ($isPostgres) {
+            $dateParts = [
+                'year'      => "EXTRACT(YEAR FROM $baseDate)",
+                'month'     => "EXTRACT(MONTH FROM $baseDate)",
+                'day'       => "EXTRACT(DAY FROM $baseDate)",
+                'week'      => "EXTRACT(WEEK FROM $baseDate)",
+                'quarter'   => "EXTRACT(QUARTER FROM $baseDate)",
+                'dayofweek' => "EXTRACT(DOW FROM $baseDate)",
+                'dayname'   => "TO_CHAR($baseDate, 'Day')",
+                'monthname' => "TO_CHAR($baseDate, 'Month')",
+                // Friendly grouping keys
+                'daily'     => "TO_CHAR($baseDate, 'YYYY-MM-DD')",
+                'weekly'    => "TO_CHAR($baseDate, 'IYYY-\"W\"IW')",
+                'monthly'   => "TO_CHAR($baseDate, 'YYYY-MM')",
+                'quarterly' => "CONCAT(EXTRACT(YEAR FROM $baseDate), '-Q', EXTRACT(QUARTER FROM $baseDate))",
+                'yearly'    => "EXTRACT(YEAR FROM $baseDate)",
+            ];
+        } else {
+            $dateParts = [
+                'year'      => "YEAR($baseDate)",
+                'month'     => "MONTH($baseDate)",
+                'day'       => "DAY($baseDate)",
+                'week'      => "WEEK($baseDate)",
+                'quarter'   => "QUARTER($baseDate)",
+                'dayofweek' => "DAYOFWEEK($baseDate)",
+                'dayname'   => "DAYNAME($baseDate)",
+                'monthname' => "MONTHNAME($baseDate)",
+                // Friendly grouping keys
+                'daily'     => "DATE($baseDate)",
+                'weekly'    => "CONCAT(YEAR($baseDate), '-W', LPAD(WEEK($baseDate), 2, '0'))",
+                'monthly'   => "CONCAT(YEAR($baseDate), '-', LPAD(MONTH($baseDate), 2, '0'))",
+                'quarterly' => "CONCAT(YEAR($baseDate), '-Q', QUARTER($baseDate))",
+                'yearly'    => "YEAR($baseDate)",
+            ];
+        }
         if (isset($dateParts[$lowerField])) {
             return $dateParts[$lowerField];
         }
 
         if ($field === 'value') {
             return str_ends_with($this->getEntityName(), 'Metric') ? (str_ends_with($this->getEntityName(), 'ChanneledMetric') ? 'm.value' : 'e.value') : "e.$field";
+        }
+
+        // Default: translate camelCase properties to snake_case columns
+        if ($this->_class->hasField($field)) {
+            return "e." . $this->_class->getColumnName($field);
         }
 
         return "e.$field";
