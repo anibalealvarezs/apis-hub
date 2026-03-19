@@ -3,3 +3,5 @@ timezone: '${APP_TIMEZONE:-UTC}'
 debug: true
 jobs:
   timeout_hours: 6
+analytics:
+  cache_raw_metrics: false

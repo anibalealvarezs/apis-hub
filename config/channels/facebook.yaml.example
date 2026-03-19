@@ -4,16 +4,16 @@ channels:
     cache_all: false # If true, will fetch all accessible ad accounts and pages if none are listed below
     cache_include: null # Global include filter (fallback)
     cache_exclude: null # Global exclude filter (fallback)
-    app_id: YOUR_APP_ID
-    app_secret: YOUR_APP_SECRET
-    app_redirect_uri: 'https://oauth.pstmn.io/v1/browser-callback'
+    app_id: '${FACEBOOK_APP_ID}'
+    app_secret: '${FACEBOOK_APP_SECRET}'
+    app_redirect_uri: '${FACEBOOK_REDIRECT_URI}'
     graph_user_access_token: null
     graph_page_access_token: null
-    graph_long_lived_user_access_token: YOUR_LONG_LIVED_TOKEN
+    graph_long_lived_user_access_token: '${FACEBOOK_USER_TOKEN}'
     graph_long_lived_page_access_token: null
-    graph_token_path: ./storage/tokens/facebook_tokens.json
-    user_id: YOUR_USER_ID
-    accounts_group_name: 'YOUR_GROUP_NAME'
+    graph_token_path: '${FACEBOOK_TOKEN_PATH}'
+    user_id: '${FACEBOOK_USER_ID}'
+    accounts_group_name: '${FACEBOOK_ACCOUNTS_GROUP}'
     exclude_from_caching: []
     PAGE:
       cache_include: null # Specific filter for Pages

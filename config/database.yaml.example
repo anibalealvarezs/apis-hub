@@ -1,15 +1,15 @@
 database:
   testing:
-    driver: pdo_mysql
+    driver: ${DB_DRIVER:-pdo_mysql}
     host: '${DB_HOST:-127.0.0.1}'
-    port: 3306
-    user: root
+    port: ${DB_PORT:-3306}
+    user: ${DB_USER:-root}
     password: '${DB_PASSWORD:-YOUR_PASSWORD}'
-    name: '${DB_NAME:-apis-hub-14}'
+    name: '${DB_NAME:-apis-hub-testing}'
   production:
-    driver: pdo_mysql
-    host: '${PROD_DB_HOST:-host.docker.internal}'
-    port: 3306
-    user: root
-    password: '${PROD_DB_PASSWORD:-YOUR_PROD_PASSWORD}'
-    name: '${PROD_DB_NAME:-apis-hub-production}'
+    driver: ${DB_DRIVER:-pdo_mysql}
+    host: '${DB_HOST:-db}'
+    port: ${DB_PORT:-3306}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    name: ${DB_NAME}
