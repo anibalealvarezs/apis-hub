@@ -31,3 +31,5 @@ dev-recurrences.md
 .env.llenatucentro
 
 find_vars.py
+
+check_yaml.py
