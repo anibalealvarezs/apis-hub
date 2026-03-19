@@ -364,7 +364,8 @@
                 <table id="reports-table">
                     <thead>
                         <tr>
-                            <th>Platform ID</th>
+                            <th>Ad Account</th>
+                            <th>Campaign Name</th>
                             <th class="text-right">Spend</th>
                             <th class="text-right">Impr.</th>
                             <th class="text-right">Reach</th>
@@ -442,7 +443,7 @@
                         average_cost_per_result: "cost_per_result",
                         average_result_rate: "result_rate"
                     },
-                    groupBy: ["platform_id"],
+                    groupBy: ["account", "campaign"],
                     startDate: start,
                     endDate: end
                 };
@@ -482,7 +483,8 @@
             data.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="campaign-name">${row.platform_id}</td>
+                    <td class="stat-label" style="font-weight:600; font-size: 0.8rem;">${row.account || 'Unknown'}</td>
+                    <td class="campaign-name">${row.campaign || 'Unknown'}</td>
                     <td class="text-right metric-cell">€${formatNum(row.total_spend)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_impressions)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_reach)}</td>
