@@ -258,6 +258,10 @@ class Helpers
             $uniqueClause = is_array($uniqueCols) ? implode(', ', $uniqueCols) : $uniqueCols;
             $updateClauses = [];
             foreach ($updateCols as $col) {
+                if ($col === 'updatedAt') {
+                    $updateClauses[] = "updatedAt = CURRENT_TIMESTAMP";
+                    continue;
+                }
                 $updateClauses[] = "{$col} = EXCLUDED.{$col}";
             }
             $updateString = implode(', ', $updateClauses);
@@ -267,11 +271,42 @@ class Helpers
             // MySQL syntax: ON DUPLICATE KEY UPDATE col = VALUES(col)
             $updateClauses = [];
             foreach ($updateCols as $col) {
+                if ($col === 'updatedAt') {
+                    $updateClauses[] = "updatedAt = CURRENT_TIMESTAMP";
+                    continue;
+                }
                 $updateClauses[] = "{$col} = VALUES({$col})";
             }
             $updateString = implode(', ', $updateClauses);
             
             return "INSERT INTO {$table} ({$colString}) VALUES {$valuesString} ON DUPLICATE KEY UPDATE {$updateString}";
+        }
+    }
+
+    /**
+     * Generates a platform-specific "Insert Ignore" SQL query.
+     * Supports MySQL (INSERT IGNORE) and PostgreSQL (ON CONFLICT DO NOTHING).
+     *
+     * @param string $table The table name
+     * @param array $insertCols Simple array of column names to insert
+     * @param array|string $uniqueCols Single column or array of columns that form the unique constraint (required for Postgres)
+     * @param int $rowCount Number of rows to be inserted in bulk
+     * @return string The generated SQL
+     */
+    public static function buildInsertIgnoreSql(string $table, array $insertCols, array|string $uniqueCols, int $rowCount = 1): string
+    {
+        $dbConfig = self::getDbConfig();
+        $isPostgres = ($dbConfig['driver'] === 'pdo_pgsql');
+
+        $colString = implode(', ', $insertCols);
+        $placeholders = '(' . implode(', ', array_fill(0, count($insertCols), '?')) . ')';
+        $valuesString = implode(', ', array_fill(0, $rowCount, $placeholders));
+
+        if ($isPostgres) {
+            $uniqueClause = is_array($uniqueCols) ? implode(', ', $uniqueCols) : $uniqueCols;
+            return "INSERT INTO {$table} ({$colString}) VALUES {$valuesString} ON CONFLICT ({$uniqueClause}) DO NOTHING";
+        } else {
+            return "INSERT IGNORE INTO {$table} ({$colString}) VALUES {$valuesString}";
         }
     }
 

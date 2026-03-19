@@ -15,19 +15,19 @@ use Repositories\MetricConfigRepository;
 
 #[ORM\Entity(repositoryClass: MetricConfigRepository::class)]
 #[ORM\Table(name: 'metric_configs')]
-#[ORM\Index(columns: ['channel', 'name', 'period', 'metricDate'], name: 'idx_metric_configs_metricDate_idx')]
-#[ORM\Index(columns: ['channel', 'name', 'metricDate'], name: 'idx_metric_configs_metricDate_idx')]
+#[ORM\Index(columns: ['channel', 'name', 'period', 'metricDate'], name: 'idx_metric_configs_metricDate_period_idx')]
+#[ORM\Index(columns: ['channel', 'name', 'metricDate'], name: 'idx_metric_configs_metricDate_base_idx')]
 #[ORM\Index(
     columns: ['channel', 'name', 'period', 'metricDate', 'query_id', 'page_id', 'country_id', 'device_id'],
-    name: 'idx_metric_configs_metricConfig_lookup_idx'
+    name: 'idx_metric_configs_lookup_full_idx'
 )]
 #[ORM\Index(
     columns: ['channel', 'name', 'period', 'metricDate', 'channeledAccount_id'],
-    name: 'idx_metric_configs_metricConfig_lookup_idx'
+    name: 'idx_metric_configs_lookup_channeled_idx'
 )]
 #[ORM\Index(
     columns: ['channel', 'name', 'period', 'metricDate', 'account_id'],
-    name: 'idx_metric_configs_metricConfig_lookup_idx'
+    name: 'idx_metric_configs_lookup_account_idx'
 )]
 #[ORM\UniqueConstraint(name: 'metric_config_signature_unique', columns: ['configSignature'])]
 #[ORM\HasLifecycleCallbacks]

@@ -570,9 +570,8 @@ class OrderProcessor
                 foreach ($chunk as $row) {
                     $params = array_merge($params, $row);
                 }
-                $placeholders = implode(', ', array_fill(0, count($chunk), '(' . implode(', ', array_fill(0, count($insertCols), '?')) . ')'));
-                $colsStr = implode(', ', $insertCols);
-                $conn->executeStatement("INSERT IGNORE INTO $table ($colsStr) VALUES $placeholders", $params);
+                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'customers' ? 'email' : 'orderId'), count($chunk));
+                $conn->executeStatement($sql, $params);
             }
 
             foreach ($chunks as $chunk) {
@@ -621,7 +620,14 @@ class OrderProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $colStr = implode(', ', $columns);
+        $uniqueCols = ['channel', 'platformId'];
+        if ($table === 'channeled_discounts') { $uniqueCols = ['channel', 'code']; }
+        if (str_contains($table, '_channeled_')) {
+            if ($table === 'channeled_order_channeled_products') { $uniqueCols = ['channeledorder_id', 'channeledproduct_id']; }
+            if ($table === 'channeled_order_channeled_product_variants') { $uniqueCols = ['channeledorder_id', 'channeledproductvariant_id']; }
+            if ($table === 'channeled_order_channeled_discounts') { $uniqueCols = ['channeledorder_id', 'channeleddiscount_id']; }
+        }
+
         foreach ($chunks as $chunk) {
             $params = [];
             foreach ($chunk as $row) {
@@ -629,8 +635,8 @@ class OrderProcessor
                     $params[] = $row[$col];
                 }
             }
-            $placeholders = implode(', ', array_fill(0, count($chunk), '(' . implode(', ', array_fill(0, count($columns), '?')) . ')'));
-            $conn->executeStatement("INSERT IGNORE INTO $table ($colStr) VALUES $placeholders", $params);
+            $sql = Helpers::buildInsertIgnoreSql($table, $columns, $uniqueCols, count($chunk));
+            $conn->executeStatement($sql, $params);
         }
     }
 
@@ -640,17 +646,11 @@ class OrderProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $colStr = implode(', ', $columns);
-
-        $updateStrings = [];
+        
+        $updateCols = [];
         foreach ($updateMap as $key => $val) {
-            if (is_int($key)) {
-                $updateStrings[] = "$val = VALUES($val)";
-            } else {
-                $updateStrings[] = "$key = $val";
-            }
+            $updateCols[] = is_int($key) ? $val : $key;
         }
-        $updateClause = implode(', ', $updateStrings);
 
         foreach ($chunks as $chunk) {
             $params = [];
@@ -659,8 +659,8 @@ class OrderProcessor
                     $params[] = $row[$col] ?? null;
                 }
             }
-            $placeholders = implode(', ', array_fill(0, count($chunk), '(' . implode(', ', array_fill(0, count($columns), '?')) . ')'));
-            $conn->executeStatement("INSERT INTO $table ($colStr) VALUES $placeholders ON DUPLICATE KEY UPDATE $updateClause", $params);
+            $sql = Helpers::buildUpsertSql($table, $columns, $updateCols, 'id', count($chunk));
+            $conn->executeStatement($sql, $params);
         }
     }
 }
