@@ -149,7 +149,7 @@ if (str_contains($dbHost, 'db') && !isset($services['db'])) {
                 'POSTGRES_PASSWORD' => $extractEnvVar($db['password'] ?? 'postgres'),
                 'POSTGRES_DB' => $extractEnvVar($db['name'] ?? 'apis-hub'),
             ],
-            'ports' => ['5432:5432'],
+            'ports' => ['127.0.0.1:5432:5432'],
             'volumes' => ['db_data:/var/lib/postgresql/data'],
         ];
     } else {
@@ -160,7 +160,7 @@ if (str_contains($dbHost, 'db') && !isset($services['db'])) {
                 'MYSQL_ROOT_PASSWORD' => $extractEnvVar($db['password'] ?? 'root'),
                 'MYSQL_DATABASE' => $extractEnvVar($db['name'] ?? 'apis-hub'),
             ],
-            'ports' => ['3306:3306'],
+            'ports' => ['127.0.0.1:3306:3306'],
             'volumes' => ['db_data:/var/lib/mysql'],
         ];
     }
