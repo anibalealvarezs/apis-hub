@@ -13,7 +13,7 @@ use Repositories\CampaignRepository;
 
 #[ORM\Entity(repositoryClass: CampaignRepository::class)]
 #[ORM\Table(name: 'campaigns')]
-#[ORM\Index(columns: ['campaignId'], name: 'idx_campaigns_campaignId_idx')]
+#[ORM\Index(columns: ['campaign_id'], name: 'idx_campaigns_campaign_id_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Campaign extends Entity
 {
