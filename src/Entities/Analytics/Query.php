@@ -14,7 +14,7 @@ use Repositories\QueryRepository;
 #[ORM\HasLifecycleCallbacks]
 class Query extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true, options: ['collation' => 'utf8mb4_bin'])]
+    #[ORM\Column(type: 'string', unique: true)]
     protected string $query;
 
     #[ORM\Column(type: 'json', nullable: true)]
