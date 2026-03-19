@@ -57,6 +57,30 @@ foreach ($instances as $instance) {
         return preg_replace('/^\$\{.*:-(.*)\}$/', '$1', (string) $str);
     };
 
+    // --- Filter by Cache History Range ---
+    if (!empty($endDate) && $endDate !== 'yesterday' && !str_contains($name, 'entities-sync')) {
+        $channelsConfig = Helpers::getChannelsConfig();
+        $chanKey = $channel;
+        if (!isset($channelsConfig[$chanKey])) {
+            $chanKey = str_replace(['facebook_marketing', 'facebook_organic'], ['facebook', 'facebook'], $channel);
+        }
+        $chanConfig = $channelsConfig[$channel] ?? $channelsConfig[$chanKey] ?? null;
+
+        if ($chanConfig && !empty($chanConfig['cache_history_range'])) {
+            try {
+                $limitDate = new \DateTime();
+                $limitDate->modify('-' . $chanConfig['cache_history_range']);
+                $instanceEndDate = new \DateTime($endDate);
+                if ($instanceEndDate < $limitDate) {
+                    echo "  ⏭️  Skipping instance '{$name}': expired (outside {$chanConfig['cache_history_range']})\n";
+                    continue;
+                }
+            } catch (\Exception $e) {
+                // ignore malformed dates
+            }
+        }
+    }
+
     $envBlock = [
         "PORT=8080",
         "API_SOURCE={$channel}",
