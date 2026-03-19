@@ -116,5 +116,11 @@ return [
         },
         'public' => true,
         'html' => false
+    ],
+    '/fb-reports' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new PageController())->facebookReports(),
+        'public' => true,
+        'html' => true
     ]
 ];

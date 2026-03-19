@@ -35,4 +35,10 @@ class PageController
         $html = file_get_contents(__DIR__ . '/../views/logs.html');
         return new Response($html, 200, ['Content-Type' => 'text/html']);
     }
+
+    public function facebookReports(): Response
+    {
+        $html = file_get_contents(__DIR__ . '/../views/facebook-reports.html');
+        return new Response($html, 200, ['Content-Type' => 'text/html']);
+    }
 }
