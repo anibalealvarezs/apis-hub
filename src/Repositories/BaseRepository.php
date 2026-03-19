@@ -166,22 +166,28 @@ class BaseRepository extends EntityRepository
                 $genericMap = $relationMap[$genericKey];
                 $channeledMap = $relationMap[$channeledKey];
                 
-                if (!isset($activeJoins[$field])) {
-                    $qb->leftJoin('mc', $genericMap['table'], $genericMap['alias'], "mc.{$genericMap['fk']} = {$genericMap['alias']}.id")
-                       ->leftJoin('mc', $channeledMap['table'], $channeledMap['alias'], "mc.{$channeledMap['fk']} = {$channeledMap['alias']}.id");
-                    
-                    if ($isAccount) {
-                        // Advanced fallback: try to find account via campaign if direct link is missing
-                        $campaignMap = $relationMap['channeledCampaign'];
-                        if (!isset($activeJoins['campaign'])) {
-                            $qb->leftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
-                        }
-                        $qb->leftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
-                    }
-                    $activeJoins[$field] = true;
+                // Join management (ensure unique aliases)
+                if (!isset($activeJoins[$genericMap['alias']])) {
+                    $qb->leftJoin('mc', $genericMap['table'], $genericMap['alias'], "mc.{$genericMap['fk']} = {$genericMap['alias']}.id");
+                    $activeJoins[$genericMap['alias']] = true;
                 }
-                
+                if (!isset($activeJoins[$channeledMap['alias']])) {
+                    $qb->leftJoin('mc', $channeledMap['table'], $channeledMap['alias'], "mc.{$channeledMap['fk']} = {$channeledMap['alias']}.id");
+                    $activeJoins[$channeledMap['alias']] = true;
+                }
+
                 if ($isAccount) {
+                    // Advanced fallback: try to find account via campaign if direct link is missing
+                    $campaignMap = $relationMap['channeledCampaign'];
+                    if (!isset($activeJoins[$campaignMap['alias']])) {
+                        $qb->leftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
+                        $activeJoins[$campaignMap['alias']] = true;
+                    }
+                    if (!isset($activeJoins['rca_fallback'])) {
+                        $qb->leftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
+                        $activeJoins['rca_fallback'] = true;
+                    }
+                    
                     $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("rca_fallback.name")
@@ -197,9 +203,9 @@ class BaseRepository extends EntityRepository
                 }
             } elseif ($this->isChanneledMetric && isset($relationMap[$field])) {
                 $map = $relationMap[$field];
-                if (!isset($activeJoins[$field])) {
+                if (!isset($activeJoins[$map['alias']])) {
                     $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
-                    $activeJoins[$field] = $map['alias'];
+                    $activeJoins[$map['alias']] = true;
                 }
                 $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS CHAR), 'Unknown') AS $quotedField")
                    ->addGroupBy("{$map['alias']}.{$map['field']}")
