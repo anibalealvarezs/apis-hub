@@ -252,10 +252,14 @@ class Helpers
                 $config['user'] = getenv('DB_USER') ?: ($baseConfig['user'] ?? 'root');
                 $config['password'] = getenv('DB_PASSWORD') !== false ? getenv('DB_PASSWORD') : ($baseConfig['password'] ?? '');
                 $config['dbname'] = getenv('DB_NAME') ?: ($baseConfig['name'] ?? 'apis-hub');
-                $config['charset'] = 'utf8mb4';
-                $config['driverOptions'] = [
-                    1002 => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci' // PDO::MYSQL_ATTR_INIT_COMMAND
-                ];
+                $isPgsql = $config['driver'] === 'pdo_pgsql';
+                $config['charset'] = $isPgsql ? 'UTF8' : 'utf8mb4';
+                
+                if (!$isPgsql) {
+                    $config['driverOptions'] = [
+                        1002 => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci' // PDO::MYSQL_ATTR_INIT_COMMAND
+                    ];
+                }
 
                 self::$dbConfig = $config;
             } catch (Exception $e) {
