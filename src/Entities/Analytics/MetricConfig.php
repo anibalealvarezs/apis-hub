@@ -49,7 +49,7 @@ class MetricConfig extends Entity
     protected Collection $metrics;
 
     #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'account_id', onDelete: 'SET NULL')]
     protected ?Account $account = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'metricConfigs')]
@@ -57,19 +57,19 @@ class MetricConfig extends Entity
     protected ?ChanneledAccount $channeledAccount = null;
 
     #[ORM\ManyToOne(targetEntity: Campaign::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'campaign_id', onDelete: 'SET NULL')]
     protected ?Campaign $campaign = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledCampaign::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_campaign_id', onDelete: 'SET NULL')]
     protected ?ChanneledCampaign $channeledCampaign = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAdGroup::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_ad_group_id', onDelete: 'SET NULL')]
     protected ?ChanneledAdGroup $channeledAdGroup = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAd::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_ad_id', onDelete: 'SET NULL')]
     protected ?ChanneledAd $channeledAd = null;
 
     #[ORM\ManyToOne(targetEntity: Creative::class, inversedBy: 'metricConfigs')]
@@ -77,35 +77,35 @@ class MetricConfig extends Entity
     protected ?Creative $creative = null;
 
     #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'page_id', onDelete: 'SET NULL')]
     protected ?Page $page = null;
 
     #[ORM\ManyToOne(targetEntity: Query::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'query_id', onDelete: 'SET NULL')]
     protected ?Query $query = null;
 
     #[ORM\ManyToOne(targetEntity: Post::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'post_id', onDelete: 'SET NULL')]
     protected ?Post $post = null;
 
     #[ORM\ManyToOne(targetEntity: Product::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'product_id', onDelete: 'SET NULL')]
     protected ?Product $product = null;
 
     #[ORM\ManyToOne(targetEntity: Customer::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'customer_id', onDelete: 'SET NULL')]
     protected ?Customer $customer = null;
 
     #[ORM\ManyToOne(targetEntity: Order::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'order_id', onDelete: 'SET NULL')]
     protected ?Order $order = null;
 
     #[ORM\ManyToOne(targetEntity: Country::class)]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'country_id', onDelete: 'SET NULL')]
     protected ?Country $country = null;
 
     #[ORM\ManyToOne(targetEntity: Device::class)]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'device_id', onDelete: 'SET NULL')]
     protected ?Device $device = null;
 
     #[ORM\Column(name: 'config_signature', type: 'string', length: 32, unique: true)]

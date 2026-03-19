@@ -33,7 +33,7 @@ class ChanneledAccount extends ChanneledEntity
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'channeledAccounts')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'account_id', onDelete: 'cascade')]
     protected Account $account;
 
     #[ORM\OneToMany(mappedBy: 'channeledAccount', targetEntity: ChanneledCampaign::class, orphanRemoval: true)]

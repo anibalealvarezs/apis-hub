@@ -37,13 +37,13 @@ class ChanneledAdGroup extends ChanneledEntity
     #[ORM\Column(name: 'end_date', type: 'datetime', nullable: true)]
     protected ?DateTime $endDate = null;
 
-    #[ORM\Column(type: 'string', nullable: true, enumType: OptimizationGoal::class)]
+    #[ORM\Column(name: 'optimization_goal', type: 'string', nullable: true, enumType: OptimizationGoal::class)]
     protected ?OptimizationGoal $optimizationGoal = null;
 
     #[ORM\Column(type: 'string', nullable: true, enumType: CampaignStatus::class)]
     protected ?CampaignStatus $status = null;
 
-    #[ORM\Column(type: 'string', nullable: true, enumType: BillingEvent::class)]
+    #[ORM\Column(name: 'billing_event', type: 'string', nullable: true, enumType: BillingEvent::class)]
     protected ?BillingEvent $billingEvent = null;
 
     #[ORM\Column(type: 'json', nullable: true)]

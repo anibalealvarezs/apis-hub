@@ -19,7 +19,7 @@ class ChanneledOrder extends ChanneledEntity
     // Relationships with channeled entities
 
     #[ORM\ManyToOne(targetEntity:ChanneledCustomer::class, inversedBy: 'channeledOrders')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'channeled_customer_id', onDelete: 'cascade')]
     protected ChanneledCustomer $channeledCustomer;
 
     #[ORM\ManyToMany(targetEntity: ChanneledProduct::class, inversedBy: 'channeledOrders')]
@@ -43,7 +43,7 @@ class ChanneledOrder extends ChanneledEntity
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: Order::class, inversedBy: 'channeledOrders')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'order_id', onDelete: 'cascade')]
     protected Order $order;
 
     public function __construct()

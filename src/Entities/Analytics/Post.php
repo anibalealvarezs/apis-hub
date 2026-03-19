@@ -35,7 +35,7 @@ class Post extends Entity
     protected ?array $data = [];
 
     #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'posts')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'account_id', onDelete: 'SET NULL')]
     protected ?Account $account = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'posts')]
@@ -43,7 +43,7 @@ class Post extends Entity
     protected ?ChanneledAccount $channeledAccount = null;
 
     #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'posts')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'page_id', onDelete: 'SET NULL')]
     protected ?Page $page = null;
 
     #[ORM\OneToMany(mappedBy: 'post', targetEntity: MetricConfig::class, orphanRemoval: true)]
