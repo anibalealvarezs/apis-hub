@@ -619,8 +619,8 @@ class OrderProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $uniqueCols = ['channel', 'platform_id'];
-        if ($table === 'channeled_discounts') { $uniqueCols = ['channel', 'code']; }
+        $uniqueCols = ['platform_id', 'channel'];
+        if ($table === 'channeled_discounts') { $uniqueCols = ['code', 'channel']; }
         if (str_contains($table, '_channeled_')) {
             if ($table === 'channeled_order_channeled_products') { $uniqueCols = ['channeled_order_id', 'channeled_product_id']; }
             if ($table === 'channeled_order_channeled_product_variants') { $uniqueCols = ['channeled_order_id', 'channeled_product_variant_id']; }

@@ -572,7 +572,7 @@ class MetricsProcessor
             $sql = Helpers::buildInsertIgnoreSql(
                 'metrics', 
                 ['value', 'metadata', 'dimensions_hash', 'metric_config_id'], 
-                ['dimensions_hash', 'metric_config_id'], 
+                ['metric_config_id', 'dimensions_hash'], 
                 count($metricsToInsert)
             );
             $manager->getConnection()->executeStatement($sql, $insertParams);
@@ -739,7 +739,7 @@ class MetricsProcessor
             $sql = Helpers::buildInsertIgnoreSql(
                 'channeled_metrics', 
                 ['channel', 'platform_id', 'metric_id', 'platform_created_at', 'data', 'dimension_set_id'], 
-                ['channel', 'platform_id', 'metric_id', 'platform_created_at'], 
+                ['platform_id', 'channel', 'metric_id', 'platform_created_at'], 
                 count($channeledMetricsToInsert)
             );
             $manager->getConnection()->executeStatement($sql, $params);

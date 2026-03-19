@@ -13,6 +13,7 @@ use Repositories\Channeled\ChanneledPriceRuleRepository;
 #[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_price_rules_platform_id_channel_idx')]
 #[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_price_rules_platform_id_idx')]
 #[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_price_rules_platform_created_at_idx')]
+#[ORM\UniqueConstraint(name: 'channeled_price_rules_full_unique', columns: ['platform_id', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledPriceRule extends ChanneledEntity
 {

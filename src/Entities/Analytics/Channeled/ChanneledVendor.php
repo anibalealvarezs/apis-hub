@@ -16,6 +16,7 @@ use Repositories\Channeled\ChanneledVendorRepository;
 #[ORM\Index(columns: ['platform_id'], name: 'idx_cv_platform_id_idx')]
 #[ORM\Index(columns: ['platform_created_at'], name: 'idx_cv_platform_created_at_idx')]
 #[ORM\Index(columns: ['name'], name: 'idx_cv_name')]
+#[ORM\UniqueConstraint(name: 'channeled_vendors_full_unique', columns: ['name', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledVendor extends ChanneledEntity
 {

@@ -19,6 +19,7 @@ use Repositories\Channeled\ChanneledProductRepository;
 #[ORM\Index(columns: ['platform_id', 'platform_created_at'], name: 'idx_channeled_products_pid_created_idx')]
 #[ORM\Index(columns: ['sku', 'platform_created_at'], name: 'idx_channeled_products_sku_created_idx')]
 #[ORM\Index(columns: ['platform_id', 'sku', 'platform_created_at'], name: 'idx_channeled_products_full_idx')]
+#[ORM\UniqueConstraint(name: 'channeled_products_full_unique', columns: ['platform_id', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProduct extends ChanneledEntity
 {

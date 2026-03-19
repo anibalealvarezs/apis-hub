@@ -565,7 +565,7 @@ class ProductProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $uniqueCols = ($table === 'channeled_vendors' ? ['channel', 'name'] : ['channel', 'platform_id']);
+        $uniqueCols = ($table === 'channeled_vendors' ? ['name', 'channel'] : ['platform_id', 'channel']);
         if ($table === 'channeled_product_categories_channeled_products') {
             $uniqueCols = ['channeled_product_category_id', 'channeled_product_id'];
         }

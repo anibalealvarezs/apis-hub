@@ -16,6 +16,7 @@ use Repositories\Channeled\ChanneledDiscountRepository;
 #[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_discounts_platform_id_idx')]
 #[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_discounts_platform_created_at_idx')]
 #[ORM\Index(columns: ['code'], name: 'idx_channeled_discounts_code_idx')]
+#[ORM\UniqueConstraint(name: 'channeled_discounts_full_unique', columns: ['code', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledDiscount extends ChanneledEntity
 {

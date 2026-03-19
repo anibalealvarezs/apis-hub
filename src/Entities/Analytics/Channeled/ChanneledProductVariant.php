@@ -13,6 +13,7 @@ use Repositories\Channeled\ChanneledProductVariantRepository;
 #[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_product_variants_platform_id_channel_idx')]
 #[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_product_variants_platform_id_idx')]
 #[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_product_variants_platform_created_at_idx')]
+#[ORM\UniqueConstraint(name: 'channeled_product_variants_full_unique', columns: ['platform_id', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProductVariant extends ChanneledEntity
 {

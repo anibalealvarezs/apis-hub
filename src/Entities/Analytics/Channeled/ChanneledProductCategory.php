@@ -13,6 +13,7 @@ use Repositories\Channeled\ChanneledProductCategoryRepository;
 #[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_product_categories_platform_channel_idx')]
 #[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_product_categories_platform_id_idx')]
 #[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_product_categories_platform_created_at_idx')]
+#[ORM\UniqueConstraint(name: 'channeled_product_categories_full_unique', columns: ['platform_id', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProductCategory extends ChanneledEntity
 {

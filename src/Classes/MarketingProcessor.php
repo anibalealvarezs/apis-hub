@@ -80,8 +80,8 @@ class MarketingProcessor
             $sql = Helpers::buildUpsertSql(
                 'channeled_campaigns', 
                 ['channel', 'platform_id', 'campaign_id', 'channeled_account_id', 'budget', 'status', 'objective', 'buying_type', 'data'], 
-                ['campaign_id', 'budget', 'status', 'objective', 'buying_type', 'data'], 
-                ['channel', 'platform_id'], 
+                ['budget', 'status', 'objective', 'buying_type', 'data'], 
+                ['platform_id', 'channeled_account_id'], 
                 count($campaigns)
             );
             $conn->executeStatement($sql, $channeledParams);
@@ -143,7 +143,7 @@ class MarketingProcessor
                 'channeled_ad_groups', 
                 ['channel', 'platform_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'name', 'start_date', 'end_date', 'status', 'optimization_goal', 'billing_event', 'targeting', 'data'], 
                 ['campaign_id', 'channeled_campaign_id', 'name', 'status', 'targeting', 'data'], 
-                ['channel', 'platform_id'], 
+                ['platform_id', 'channeled_account_id'], 
                 count($adsets)
             );
             $conn->executeStatement($sql, $params);
@@ -219,7 +219,7 @@ class MarketingProcessor
                 'channeled_ads', 
                 ['channel', 'platform_id', 'channeled_account_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'creative_id', 'name', 'status', 'data'], 
                 ['channeled_campaign_id', 'channeled_ad_group_id', 'creative_id', 'name', 'status', 'data'], 
-                ['channel', 'platform_id'], 
+                ['platform_id', 'channeled_campaign_id'], 
                 count($ads)
             );
             $conn->executeStatement($sql, $params);

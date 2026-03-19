@@ -16,7 +16,7 @@ use Repositories\Channeled\ChanneledCustomerRepository;
 #[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_customers_platform_id_idx')]
 #[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_customers_platform_created_at_idx')]
 #[ORM\Index(columns: ['email'], name: 'idx_channeled_customers_email_idx')]
-
+#[ORM\UniqueConstraint(name: 'channeled_customers_full_unique', columns: ['platform_id', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledCustomer extends ChanneledEntity
 {
