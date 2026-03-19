@@ -42,9 +42,13 @@ class MarketingProcessor
         }
 
         if (!empty($insertParams)) {
-            $sql = 'INSERT INTO campaigns (campaignId, name, startDate, endDate) VALUES '
-                . implode(', ', array_fill(0, count($campaigns), '(?, ?, ?, ?)'))
-                . ' ON DUPLICATE KEY UPDATE name = VALUES(name), startDate = VALUES(startDate), endDate = VALUES(endDate)';
+            $sql = Helpers::buildUpsertSql(
+                'campaigns', 
+                ['campaignId', 'name', 'startDate', 'endDate'], 
+                ['name', 'startDate', 'endDate'], 
+                'campaignId', 
+                count($campaigns)
+            );
             $conn->executeStatement($sql, $insertParams);
             self::getLogger()->info("Processed " . count($campaigns) . " campaigns");
         }
@@ -73,9 +77,13 @@ class MarketingProcessor
         }
 
         if (!empty($channeledParams)) {
-            $sql = 'INSERT INTO channeled_campaigns (channel, platformId, campaign_id, channeledAccount_id, budget, status, objective, buyingType, data) VALUES '
-                . implode(', ', array_fill(0, count($campaigns), '(?, ?, ?, ?, ?, ?, ?, ?, ?)'))
-                . ' ON DUPLICATE KEY UPDATE campaign_id = VALUES(campaign_id), budget = VALUES(budget), status = VALUES(status), objective = VALUES(objective), buyingType = VALUES(buyingType), data = VALUES(data)';
+            $sql = Helpers::buildUpsertSql(
+                'channeled_campaigns', 
+                ['channel', 'platformId', 'campaign_id', 'channeledAccount_id', 'budget', 'status', 'objective', 'buyingType', 'data'], 
+                ['campaign_id', 'budget', 'status', 'objective', 'buyingType', 'data'], 
+                ['channel', 'platformId'], 
+                count($campaigns)
+            );
             $conn->executeStatement($sql, $channeledParams);
             self::getLogger()->info("Processed " . count($campaigns) . " channeled campaigns");
         }
@@ -131,9 +139,13 @@ class MarketingProcessor
         }
 
         if (!empty($params)) {
-            $sql = 'INSERT INTO channeled_ad_groups (channel, platformId, channeledAccount_id, campaign_id, channeledCampaign_id, name, startDate, endDate, status, optimizationGoal, billingEvent, targeting, data) VALUES '
-                . implode(', ', array_fill(0, count($adsets), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'))
-                . ' ON DUPLICATE KEY UPDATE campaign_id = VALUES(campaign_id), channeledCampaign_id = VALUES(channeledCampaign_id), name = VALUES(name), status = VALUES(status), targeting = VALUES(targeting), data = VALUES(data)';
+            $sql = Helpers::buildUpsertSql(
+                'channeled_ad_groups', 
+                ['channel', 'platformId', 'channeledAccount_id', 'campaign_id', 'channeledCampaign_id', 'name', 'startDate', 'endDate', 'status', 'optimizationGoal', 'billingEvent', 'targeting', 'data'], 
+                ['campaign_id', 'channeledCampaign_id', 'name', 'status', 'targeting', 'data'], 
+                ['channel', 'platformId'], 
+                count($adsets)
+            );
             $conn->executeStatement($sql, $params);
             self::getLogger()->info("Processed " . count($adsets) . " ad groups");
         }
@@ -203,9 +215,13 @@ class MarketingProcessor
         }
 
         if (!empty($params)) {
-            $sql = 'INSERT INTO channeled_ads (channel, platformId, channeledAccount_id, channeledCampaign_id, channeledAdGroup_id, creative_id, name, status, data) VALUES '
-                . implode(', ', array_fill(0, count($ads), '(?, ?, ?, ?, ?, ?, ?, ?, ?)'))
-                . ' ON DUPLICATE KEY UPDATE channeledCampaign_id = VALUES(channeledCampaign_id), channeledAdGroup_id = VALUES(channeledAdGroup_id), creative_id = VALUES(creative_id), name = VALUES(name), status = VALUES(status), data = VALUES(data)';
+            $sql = Helpers::buildUpsertSql(
+                'channeled_ads', 
+                ['channel', 'platformId', 'channeledAccount_id', 'channeledCampaign_id', 'channeledAdGroup_id', 'creative_id', 'name', 'status', 'data'], 
+                ['channeledCampaign_id', 'channeledAdGroup_id', 'creative_id', 'name', 'status', 'data'], 
+                ['channel', 'platformId'], 
+                count($ads)
+            );
             $conn->executeStatement($sql, $params);
             self::getLogger()->info("Processed " . count($ads) . " ads");
         }
@@ -234,9 +250,13 @@ class MarketingProcessor
         }
 
         if (!empty($insertParams)) {
-            $sql = 'INSERT INTO creatives (creativeId, name, data) VALUES '
-                . implode(', ', array_fill(0, count($creatives), '(?, ?, ?)'))
-                . ' ON DUPLICATE KEY UPDATE name = VALUES(name), data = VALUES(data)';
+            $sql = Helpers::buildUpsertSql(
+                'creatives', 
+                ['creativeId', 'name', 'data'], 
+                ['name', 'data'], 
+                'creativeId', 
+                count($creatives)
+            );
             $conn->executeStatement($sql, $insertParams);
             self::getLogger()->info("Processed " . count($creatives) . " creatives");
         }
