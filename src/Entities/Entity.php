@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\HasLifecycleCallbacks]
 class Entity
 {
-    #[ORM\Id, ORM\Column(type: 'integer'), ORM\GeneratedValue]
+    #[ORM\Id, ORM\Column(type: 'integer'), ORM\GeneratedValue(strategy: 'IDENTITY')]
     protected ?int $id = null;
 
     #[ORM\Column(name: 'created_at', type: 'datetime', options: ['default' => 'CURRENT_TIMESTAMP'])]
