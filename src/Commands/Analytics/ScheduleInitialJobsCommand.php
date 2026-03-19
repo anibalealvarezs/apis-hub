@@ -123,18 +123,27 @@ class ScheduleInitialJobsCommand extends Command
                     $shouldSchedule = false;
                 } else {
                     // Look specifically for a job with this instance name in its payload
-                    // Use a raw query or a repository helper that doesn't filter by status
-                    $qb = $this->entityManager->createQueryBuilder();
-                    $count = $qb->select('count(j.id)')
-                        ->from(Job::class, 'j')
-                        ->where('j.channel = :channel')
-                        ->andWhere('j.entity = :entity')
-                        ->andWhere('j.payload LIKE :instance_pattern')
-                        ->setParameter('channel', $channel)
-                        ->setParameter('entity', $entity)
-                        ->setParameter('instance_pattern', '%instance_name%' . $name . '%')
-                        ->getQuery()
-                        ->getSingleScalarResult();
+                    if ($this->isPostgreSQL()) {
+                        $sql = "SELECT count(j.id) FROM jobs j WHERE j.channel = :channel AND j.entity = :entity AND CAST(j.payload AS text) LIKE :instance_pattern";
+                        $stmt = $this->entityManager->getConnection()->prepare($sql);
+                        $count = $stmt->executeQuery([
+                            'channel' => $channel,
+                            'entity' => $entity,
+                            'instance_pattern' => '%instance_name%' . $name . '%',
+                        ])->fetchOne();
+                    } else {
+                        $qb = $this->entityManager->createQueryBuilder();
+                        $count = $qb->select('count(j.id)')
+                            ->from(Job::class, 'j')
+                            ->where('j.channel = :channel')
+                            ->andWhere('j.entity = :entity')
+                            ->andWhere('j.payload LIKE :instance_pattern')
+                            ->setParameter('channel', $channel)
+                            ->setParameter('entity', $entity)
+                            ->setParameter('instance_pattern', '%instance_name%' . $name . '%')
+                            ->getQuery()
+                            ->getSingleScalarResult();
+                    }
                     
                     if ((int)$count > 0) {
                         $shouldSchedule = false;
@@ -176,5 +185,13 @@ class ScheduleInitialJobsCommand extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @return bool
+     */
+    private function isPostgreSQL(): bool
+    {
+        return $this->entityManager->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
     }
 }
