@@ -31,8 +31,8 @@ try {
 
     $entityManager = require_once __DIR__ . "/../app/bootstrap.php";
     
-    // Safety check: ensure CAST_TEXT is registered for CLI context
-    $entityManager->getConfiguration()->addCustomStringFunction('CAST_TEXT', \Classes\Doctrine\DqlFunctions\Cast::class);
+    // Safety check: ensure PG_CAST is registered for CLI context
+    $entityManager->getConfiguration()->addCustomStringFunction('PG_CAST', \Classes\Doctrine\DqlFunctions\Cast::class);
 
     $helperSet = require_once __DIR__ . "/../config/cli-config.php";
 
@@ -56,7 +56,7 @@ try {
         new InitializeEntitiesCommand(Helpers::getManager()),
         new ScheduleInitialJobsCommand($entityManager),
         new CacheEntityCommand(),
-        new ProcessJobsCommand(),
+        new ProcessJobsCommand($entityManager),
         new ClearCacheCommand(),
         new CheckCoverageCommand(),
         new InspectJobsCommand(),

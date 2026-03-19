@@ -546,6 +546,6 @@ class JobRepository extends BaseRepository
      */
     private function getPayloadField(): string
     {
-        return $this->isPostgreSQL() ? 'CAST_TEXT(e.payload AS text)' : 'e.payload';
+        return $this->isPostgreSQL() ? 'PG_CAST(e.payload AS text)' : 'e.payload';
     }
 }
