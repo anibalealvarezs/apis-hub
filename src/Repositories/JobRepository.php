@@ -19,7 +19,6 @@ class JobRepository extends BaseRepository
     public function __construct(\Doctrine\ORM\EntityManagerInterface $em, \Doctrine\ORM\Mapping\ClassMetadata $class)
     {
         parent::__construct($em, $class);
-        $this->_em->getConfiguration()->addCustomStringFunction('Z_PG_CAST', \Classes\Doctrine\DqlFunctions\Cast::class);
     }
     
     /**
@@ -177,19 +176,21 @@ class JobRepository extends BaseRepository
                 $query->andWhere('e.entity IN (:ctx_entities)')->setParameter('ctx_entities', array_unique($equivalents));
             }
 
-            $payloadField = $this->getPayloadField();
-
             // Differentiate by Date Range in payload (e.g. gsc-jan vs gsc-feb)
-            // We use a loose LIKE pattern to be compatible with MySQL JSON columns without custom DQL functions.
-            if ($envStart && (!is_object($filters) || !isset($filters->startDate))) {
-                $query->andWhere("({$payloadField} LIKE :ctx_start_pattern1 OR {$payloadField} LIKE :ctx_start_pattern2)")
-                    ->setParameter('ctx_start_pattern1', '%startDate%' . $envStart . '%')
-                    ->setParameter('ctx_start_pattern2', '%start_date%' . $envStart . '%');
-            }
-            if ($envEnd && (!is_object($filters) || !isset($filters->endDate))) {
-                $query->andWhere("({$payloadField} LIKE :ctx_end_pattern1 OR {$payloadField} LIKE :ctx_end_pattern2)")
-                    ->setParameter('ctx_end_pattern1', '%endDate%' . $envEnd . '%')
-                    ->setParameter('ctx_end_pattern2', '%end_date%' . $envEnd . '%');
+            // We use a loose LIKE pattern to be compatible with MySQL JSON columns.
+            // In PostgreSQL, this is handled via Native SQL in the calling methods to avoid DQL parsing issues.
+            if (!$this->isPostgreSQL()) {
+                $payloadField = 'e.payload';
+                if ($envStart && (!is_object($filters) || !isset($filters->startDate))) {
+                    $query->andWhere("({$payloadField} LIKE :ctx_start_pattern1 OR {$payloadField} LIKE :ctx_start_pattern2)")
+                        ->setParameter('ctx_start_pattern1', '%startDate%' . $envStart . '%')
+                        ->setParameter('ctx_start_pattern2', '%start_date%' . $envStart . '%');
+                }
+                if ($envEnd && (!is_object($filters) || !isset($filters->endDate))) {
+                    $query->andWhere("({$payloadField} LIKE :ctx_end_pattern1 OR {$payloadField} LIKE :ctx_end_pattern2)")
+                        ->setParameter('ctx_end_pattern1', '%endDate%' . $envEnd . '%')
+                        ->setParameter('ctx_end_pattern2', '%end_date%' . $envEnd . '%');
+                }
             }
         }
 
@@ -283,9 +284,34 @@ class JobRepository extends BaseRepository
      */
     public function getJobsByStatus(int $status, ?string $channel = null, ?string $instanceName = null): array
     {
+        if ($this->isPostgreSQL()) {
+            $sql = "SELECT * FROM jobs WHERE status = :status";
+            $params = ['status' => $status];
+            
+            if ($channel) {
+                $sql .= " AND channel = :channel";
+                $params['channel'] = $channel;
+            }
+            
+            if ($instanceName) {
+                $sql .= " AND CAST(payload AS text) LIKE :instance_name_pattern";
+                $params['instance_name_pattern'] = '%instance_name%' . $instanceName . '%';
+            }
+            
+            $sql .= " ORDER BY id ASC LIMIT 100";
+            
+            $rsm = new \Doctrine\ORM\Query\ResultSetMappingBuilder($this->_em);
+            $rsm->addRootEntityFromClassMetadata($this->getEntityName(), 'j');
+            
+            $query = $this->_em->createNativeQuery($sql, $rsm);
+            $query->setParameters($params);
+            
+            return $query->getResult();
+        }
+
         $filters = ['status' => $status];
         if ($channel) {
-            if ($chanEnum = Channel::tryFromName($channel)) {
+            if ($chanEnum = \Enums\Channel::tryFromName($channel)) {
                 $channel = $chanEnum->name;
             }
             $filters['channel'] = $channel;
@@ -301,7 +327,7 @@ class JobRepository extends BaseRepository
         );
 
         if ($instanceName) {
-            $payloadField = $this->getPayloadField();
+            $payloadField = 'e.payload';
             $qb->andWhere("{$payloadField} LIKE :instance_name_pattern")
                ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%');
         }
@@ -447,11 +473,27 @@ class JobRepository extends BaseRepository
      */
     public function hasSuccessfulRecentJob(string $instanceName, int $withinHours = 24): bool
     {
+        if ($this->isPostgreSQL()) {
+            $since = new \DateTime();
+            $since->modify("-$withinHours hours");
+
+            $sql = "SELECT count(j.id) FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :completed AND j.updated_at >= :since";
+            
+            $stmt = $this->_em->getConnection()->prepare($sql);
+            $result = $stmt->executeQuery([
+                'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
+                'completed' => JobStatus::completed->value,
+                'since' => $since->format('Y-m-d H:i:s')
+            ]);
+            
+            return (int)$result->fetchOne() > 0;
+        }
+
         $qb = $this->_em->createQueryBuilder();
         $since = new \DateTime();
         $since->modify("-$withinHours hours");
 
-        $payloadField = $this->getPayloadField();
+        $payloadField = 'e.payload';
 
         $count = $qb->select('count(e.id)')
             ->from($this->getEntityName(), 'e')
@@ -473,8 +515,21 @@ class JobRepository extends BaseRepository
      */
     public function getLastSuccessfulJobTime(string $instanceName): ?\DateTime
     {
+        if ($this->isPostgreSQL()) {
+            $sql = "SELECT j.updated_at FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :completed ORDER BY j.updated_at DESC LIMIT 1";
+            
+            $stmt = $this->_em->getConnection()->prepare($sql);
+            $result = $stmt->executeQuery([
+                'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
+                'completed' => JobStatus::completed->value
+            ]);
+            
+            $val = $result->fetchOne();
+            return $val ? new \DateTime($val) : null;
+        }
+
         $qb = $this->_em->createQueryBuilder();
-        $payloadField = $this->getPayloadField();
+        $payloadField = 'e.payload';
 
         $job = $qb->select('e')
             ->from($this->getEntityName(), 'e')
@@ -497,8 +552,24 @@ class JobRepository extends BaseRepository
      */
     public function isAnotherJobProcessing(string $instanceName, ?int $excludeJobId = null): bool
     {
+        if ($this->isPostgreSQL()) {
+            $sql = "SELECT count(j.id) FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :processing";
+            if ($excludeJobId) {
+                $sql .= " AND j.id != :excludeId";
+            }
+            
+            $stmt = $this->_em->getConnection()->prepare($sql);
+            $result = $stmt->executeQuery([
+                'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
+                'processing' => JobStatus::processing->value,
+                'excludeId' => $excludeJobId
+            ]);
+            
+            return (int)$result->fetchOne() > 0;
+        }
+
         $qb = $this->_em->createQueryBuilder();
-        $payloadField = $this->getPayloadField();
+        $payloadField = 'e.payload';
 
         $qb->select('count(e.id)')
             ->from($this->getEntityName(), 'e')
@@ -545,13 +616,5 @@ class JobRepository extends BaseRepository
     private function isPostgreSQL(): bool
     {
         return $this->_em->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
-    }
-
-    /**
-     * @return string
-     */
-    private function getPayloadField(): string
-    {
-        return $this->isPostgreSQL() ? 'Z_PG_CAST(e.payload, \'text\')' : 'e.payload';
     }
 }
