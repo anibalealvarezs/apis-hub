@@ -201,18 +201,25 @@
         }
 
         .table-responsive {
-            overflow-x: auto;
+            max-height: 70vh;
+            overflow: auto;
+            position: relative;
         }
 
         table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             font-size: 0.9rem;
             text-align: left;
         }
 
         thead {
+            position: sticky;
+            top: 0;
             background: var(--meta-hover);
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
 
         th {
@@ -223,14 +230,16 @@
             white-space: nowrap;
             cursor: pointer;
             user-select: none;
+            background: var(--meta-card-bg);
         }
 
-        th:hover { color: var(--meta-blue); }
+        th:hover { color: var(--meta-blue); background: var(--meta-hover); }
 
         td {
             padding: 14px 20px;
             border-bottom: 1px solid var(--meta-border);
             vertical-align: middle;
+            background: var(--meta-card-bg);
         }
 
         tr:hover td {
@@ -579,8 +588,8 @@
         }
 
         function getCtrClass(v) {
-            if (v > 0.3) return 'pos';
-            if (v >= 0.2 && v <= 0.3) return 'badge-normal';
+            if (v > 0.03) return 'pos';
+            if (v >= 0.02 && v <= 0.03) return 'badge-normal';
             return 'neg';
         }
 
