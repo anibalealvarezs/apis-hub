@@ -19,6 +19,7 @@ use ReflectionProperty;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 use Monolog\Handler\StreamHandler;
+use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\NullHandler;
 use Monolog\Level;
 use Monolog\Logger;
@@ -851,7 +852,8 @@ class Helpers
             $finalLevel = $baseLevel;
         }
 
-        $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/' . $filename, $finalLevel));
+        $maxFiles = $logConfig['max_days'] ?? 7;
+        $logger->pushHandler(new RotatingFileHandler(__DIR__ . '/../../logs/' . $filename, $maxFiles, $finalLevel));
         return $logger;
     }
 
