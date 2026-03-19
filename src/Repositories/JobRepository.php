@@ -16,6 +16,12 @@ use InvalidArgumentException;
 
 class JobRepository extends BaseRepository
 {
+    public function __construct(\Doctrine\ORM\EntityManagerInterface $em, \Doctrine\ORM\Mapping\ClassMetadata $class)
+    {
+        parent::__construct($em, $class);
+        $this->_em->getConfiguration()->addCustomStringFunction('PG_CAST', \Classes\Doctrine\DqlFunctions\Cast::class);
+    }
+    
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
