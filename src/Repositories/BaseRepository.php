@@ -135,7 +135,7 @@ class BaseRepository extends EntityRepository
             'page'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rp'],
             'account'  => ['table' => 'accounts', 'fk' => 'account_id', 'field' => 'name', 'alias' => 'ra'],
             'campaign' => ['table' => 'campaigns', 'fk' => 'campaign_id', 'field' => 'name', 'alias' => 'rc'],
-            'channeledAccount'  => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'platform_id', 'alias' => 'rca'],
+            'channeledAccount'  => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
             'channeledCampaign' => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'platform_id', 'alias' => 'rcc'],
             'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeled_ad_group_id', 'field' => 'platform_id', 'alias' => 'rag'],
             'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'platform_id', 'alias' => 'rad'],
@@ -186,16 +186,17 @@ class BaseRepository extends EntityRepository
                     $safeLeftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
                     $safeLeftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
                     
-                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
+                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST({$channeledMap['alias']}.platform_id AS CHAR), CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("rca_fallback.name")
                        ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
+                       ->addGroupBy("{$channeledMap['alias']}.platform_id")
                        ->addGroupBy("mc.{$channeledMap['fk']}")
                        ->addGroupBy("mc.{$genericMap['fk']}");
                 } else {
-                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, {$genericMap['alias']}.{$genericMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
-                       ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
+                    $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
                        ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
+                       ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("mc.{$channeledMap['fk']}")
                        ->addGroupBy("mc.{$genericMap['fk']}");
                 }
