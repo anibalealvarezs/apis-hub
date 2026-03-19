@@ -176,12 +176,12 @@ class JobRepository extends BaseRepository
             // Differentiate by Date Range in payload (e.g. gsc-jan vs gsc-feb)
             // We use a loose LIKE pattern to be compatible with MySQL JSON columns without custom DQL functions.
             if ($envStart && (!is_object($filters) || !isset($filters->startDate))) {
-                $query->andWhere("({$payloadField} LIKE :ctx_start_pattern1 OR {$payloadField} LIKE :ctx_start_pattern2)")
+                $query->andWhere("{$payloadField} LIKE :ctx_start_pattern1 OR {$payloadField} LIKE :ctx_start_pattern2")
                     ->setParameter('ctx_start_pattern1', '%startDate%' . $envStart . '%')
                     ->setParameter('ctx_start_pattern2', '%start_date%' . $envStart . '%');
             }
             if ($envEnd && (!is_object($filters) || !isset($filters->endDate))) {
-                $query->andWhere("({$payloadField} LIKE :ctx_end_pattern1 OR {$payloadField} LIKE :ctx_end_pattern2)")
+                $query->andWhere("{$payloadField} LIKE :ctx_end_pattern1 OR {$payloadField} LIKE :ctx_end_pattern2")
                     ->setParameter('ctx_end_pattern1', '%endDate%' . $envEnd . '%')
                     ->setParameter('ctx_end_pattern2', '%end_date%' . $envEnd . '%');
             }
