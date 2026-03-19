@@ -124,7 +124,7 @@ class CustomerProcessor
         foreach ($uniqueChanneledCustomers as $key => $cc) {
             $channeledCustomersByPlatform[] = [
                 'channel' => $cc['channel'],
-                'platformId' => $cc['platformId'],
+                'platform_id' => $cc['platform_id'],
             ];
         }
 

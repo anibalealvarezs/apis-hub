@@ -418,7 +418,7 @@ class ProductProcessor
                     'product_category_id' => $categoryId,
                     'channel' => $ccRow['channel'],
                     'platform_id' => $ccRow['platform_id'],
-                    'isSmartCollection' => 0, // Fallback if needed, check DB schema
+                    'is_smart_collection' => 0, // Fallback if needed, check DB schema
                     'platform_created_at' => $ccRow['platform_created_at'] instanceof DateTime ? $ccRow['platform_created_at']->format('Y-m-d H:i:s') : $ccRow['platform_created_at'],
                     'data' => json_encode($ccRow['data'])
                 ];
@@ -431,8 +431,8 @@ class ProductProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_product_categories', ['product_category_id', 'channel', 'platform_id', 'isSmartCollection', 'platform_created_at', 'data'], $insertRows);
-            self::bulkUpsert($conn, 'channeled_product_categories', ['id', 'product_category_id', 'channel', 'platform_id', 'isSmartCollection', 'platform_created_at', 'data'], ['product_category_id', 'channel', 'platform_id', 'isSmartCollection', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
+            self::bulkInsert($conn, 'channeled_product_categories', ['product_category_id', 'channel', 'platform_id', 'is_smart_collection', 'platform_created_at', 'data'], $insertRows);
+            self::bulkUpsert($conn, 'channeled_product_categories', ['id', 'product_category_id', 'channel', 'platform_id', 'is_smart_collection', 'platform_created_at', 'data'], ['product_category_id', 'channel', 'platform_id', 'is_smart_collection', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
 
             $channeledCategoryMap = self::fetchChanneledEntities(
                 $conn,
@@ -461,13 +461,13 @@ class ProductProcessor
                     $ccId = $channeledCategoryMap[$ccKey]['id'];
                     // Using IGNORE to skip existing relationships safely
                     $pivotInserts[] = [
-                        'channeledproductcategory_id' => $ccId,
-                        'channeledproduct_id' => $cpId
+                        'channeled_product_category_id' => $ccId,
+                        'channeled_product_id' => $cpId
                     ];
                 }
             }
             if (!empty($pivotInserts)) {
-                self::bulkInsert($conn, 'channeled_product_categories_channeled_products', ['channeledproductcategory_id', 'channeledproduct_id'], $pivotInserts);
+                self::bulkInsert($conn, 'channeled_product_categories_channeled_products', ['channeled_product_category_id', 'channeled_product_id'], $pivotInserts);
             }
         }
 
@@ -567,7 +567,7 @@ class ProductProcessor
         $chunks = array_chunk($rows, $chunkSize);
         $uniqueCols = ($table === 'channeled_vendors' ? ['channel', 'name'] : ['channel', 'platform_id']);
         if ($table === 'channeled_product_categories_channeled_products') {
-            $uniqueCols = ['channeledproductcategory_id', 'channeledproduct_id'];
+            $uniqueCols = ['channeled_product_category_id', 'channeled_product_id'];
         }
         
         foreach ($chunks as $chunk) {

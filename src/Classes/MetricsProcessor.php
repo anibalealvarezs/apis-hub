@@ -523,9 +523,9 @@ class MetricsProcessor
             $selectParams = [];
             $tuples = [];
             foreach ($chunkMetrics as $m) {
-                if (isset($m['dimensionsHash']) && isset($m['metricConfig_id'])) {
-                    $selectParams[] = $m['dimensionsHash'];
-                    $selectParams[] = $m['metricConfig_id'];
+                if (isset($m['dimensions_hash']) && isset($m['metric_config_id'])) {
+                    $selectParams[] = $m['dimensions_hash'];
+                    $selectParams[] = $m['metric_config_id'];
                     $tuples[] = '(?, ?)';
                 }
             }
@@ -566,8 +566,8 @@ class MetricsProcessor
             foreach ($metricsToInsert as $row) {
                 $insertParams[] = $row['value'];
                 $insertParams[] = $row['metadata'];
-                $insertParams[] = $row['dimensionsHash'];
-                $insertParams[] = $row['metricConfig_id'];
+                $insertParams[] = $row['dimensions_hash'];
+                $insertParams[] = $row['metric_config_id'];
             }
             $sql = Helpers::buildInsertIgnoreSql(
                 'metrics', 
@@ -581,8 +581,8 @@ class MetricsProcessor
                 $reFetchParams = [];
                 $tuples = [];
                 foreach ($chunk as $row) {
-                    $reFetchParams[] = $row['dimensionsHash'];
-                    $reFetchParams[] = $row['metricConfig_id'];
+                    $reFetchParams[] = $row['dimensions_hash'];
+                    $reFetchParams[] = $row['metric_config_id'];
                     $tuples[] = '(?, ?)';
                 }
                 $placeholders = implode(', ', $tuples);
@@ -729,8 +729,12 @@ class MetricsProcessor
             $placeholders = implode(', ', array_fill(0, count($channeledMetricsToInsert), '(?, ?, ?, ?, ?, ?)'));
             $params = [];
             foreach ($channeledMetricsToInsert as $row) {
-                $params[] = $row['channel']; $params[] = $row['platformId']; $params[] = $row['metric_id'];
-                $params[] = $row['platformCreatedAt']; $params[] = $row['data']; $params[] = $row['dimension_set_id'];
+                $params[] = $row['channel']; 
+                $params[] = $row['platform_id']; 
+                $params[] = $row['metric_id'];
+                $params[] = $row['platform_created_at']; 
+                $params[] = $row['data']; 
+                $params[] = $row['dimension_set_id'];
             }
             $sql = Helpers::buildInsertIgnoreSql(
                 'channeled_metrics', 

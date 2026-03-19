@@ -2358,11 +2358,11 @@ class MetricRequests
         EntityManager $manager,
         Page $pageEntity,
     ): array {
-        $sql = "SELECT id, postId FROM posts WHERE page_id = ? AND channeledAccount_id IS NULL";
+        $sql = "SELECT id, post_id FROM posts WHERE page_id = ? AND channeled_account_id IS NULL";
         $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId()])->fetchAllAssociative();
         $map = [];
         foreach ($fetched as $row) {
-            $map[$row['postId']] = (int)$row['id'];
+            $map[$row['post_id']] = (int)$row['id'];
         }
         return [
             'map' => $map,
@@ -2378,11 +2378,11 @@ class MetricRequests
         if (!$channeledAccountEntity) {
              return ['map' => [], 'mapReverse' => []];
         }
-        $sql = "SELECT id, postId FROM posts WHERE page_id = ? AND channeledAccount_id = ?";
+        $sql = "SELECT id, post_id FROM posts WHERE page_id = ? AND channeled_account_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId(), $channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
         foreach ($fetched as $row) {
-            $map[$row['postId']] = (int)$row['id'];
+            $map[$row['post_id']] = (int)$row['id'];
         }
         return [
             'map' => $map,
@@ -2404,11 +2404,11 @@ class MetricRequests
         }
 
         // 2. Channeled Campaign Map
-        $sqlCC = "SELECT id, platformId FROM channeled_campaigns WHERE channeledAccount_id = ?";
+        $sqlCC = "SELECT id, platform_id FROM channeled_campaigns WHERE channeled_account_id = ?";
         $fetchedCC = $conn->executeQuery($sqlCC, [$channeledAccountEntity->getId()])->fetchAllAssociative();
         $channeledCampaignMap = [];
         foreach ($fetchedCC as $row) {
-            $channeledCampaignMap[$row['platformId']] = (int)$row['id'];
+            $channeledCampaignMap[$row['platform_id']] = (int)$row['id'];
         }
 
         return [
@@ -2427,16 +2427,16 @@ class MetricRequests
         EntityManager $manager,
         ChanneledAccount $channeledAccountEntity,
     ): array {
-        $sql = "SELECT cag.id, cag.platformId, cc.platformId as campaignPlatformId 
+        $sql = "SELECT cag.id, cag.platform_id, cc.platform_id as campaignPlatformId 
                 FROM channeled_ad_groups cag
-                LEFT JOIN channeled_campaigns cc ON cag.channeledCampaign_id = cc.id
-                WHERE cag.channeledAccount_id = ?";
+                LEFT JOIN channeled_campaigns cc ON cag.channeled_campaign_id = cc.id
+                WHERE cag.channeled_account_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
         $mapCampaign = [];
         foreach ($fetched as $row) {
-            $map[$row['platformId']] = (int)$row['id'];
-            $mapCampaign[$row['platformId']] = $row['campaignPlatformId'];
+            $map[$row['platform_id']] = (int)$row['id'];
+            $mapCampaign[$row['platform_id']] = $row['campaignPlatformId'];
         }
         return [
             'map' => $map,
@@ -2449,16 +2449,16 @@ class MetricRequests
         EntityManager $manager,
         ChanneledAccount $channeledAccountEntity,
     ): array {
-        $sql = "SELECT ca.id, ca.platformId, cag.platformId as adGroupPlatformId 
+        $sql = "SELECT ca.id, ca.platform_id, cag.platform_id as adGroupPlatformId 
                 FROM channeled_ads ca
-                LEFT JOIN channeled_ad_groups cag ON ca.channeledAdGroup_id = cag.id
-                WHERE ca.channeledAccount_id = ?";
+                LEFT JOIN channeled_ad_groups cag ON ca.channeled_ad_group_id = cag.id
+                WHERE ca.channeled_account_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
         $mapAdGroup = [];
         foreach ($fetched as $row) {
-            $map[$row['platformId']] = (int)$row['id'];
-            $mapAdGroup[$row['platformId']] = $row['adGroupPlatformId'];
+            $map[$row['platform_id']] = (int)$row['id'];
+            $mapAdGroup[$row['platform_id']] = $row['adGroupPlatformId'];
         }
         return [
             'map' => $map,
@@ -2791,7 +2791,7 @@ class MetricRequests
             $connection = $manager->getConnection();
             $connection->executeStatement("
             UPDATE metrics m
-            JOIN metric_configs mc ON mc.id = m.metricConfig_id
+            JOIN metric_configs mc ON mc.id = m.metric_config_id
             JOIN (
                 SELECT 
                     cm.metric_id,
@@ -2802,9 +2802,9 @@ class MetricRequests
                     COALESCE(SUM(JSON_EXTRACT(cm.data, '$.ctr')), 0) as total_ctr
                 FROM channeled_metrics cm
                 JOIN metrics m ON cm.metric_id = m.id
-                JOIN metric_configs mc ON mc.id = m.metricConfig_id
+                JOIN metric_configs mc ON mc.id = m.metric_config_id
                 WHERE cm.channel = :channel
-                AND cm.platformCreatedAt LIKE :date
+                AND cm.platform_created_at LIKE :date
                 GROUP BY cm.metric_id, mc.name
             ) cm_agg ON m.id = cm_agg.metric_id
             SET m.value = CASE cm_agg.name
@@ -3266,7 +3266,7 @@ class MetricRequests
                         SUM(JSON_EXTRACT(cm.data, '$.position_weighted')) as total_position_weighted
                     FROM channeled_metrics cm
                     JOIN metrics m ON cm.metric_id = m.id
-                    JOIN metric_configs mc ON m.metricConfig_id = mc.id
+                    JOIN metric_configs mc ON m.metric_config_id = mc.id
                     WHERE cm.channel = :channel
                     GROUP BY cm.metric_id, mc.name
                 ) cm_agg ON m.id = cm_agg.metric_id

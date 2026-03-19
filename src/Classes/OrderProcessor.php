@@ -48,7 +48,7 @@ class OrderProcessor
             $oKey = KeyGenerator::generateOrderKey((string)$co->platformId);
             if (!isset($uOrd[$oKey])) {
                 $uOrd[$oKey] = [
-                    'orderId' => (string)$co->platformId,
+                    'order_id' => (string)$co->platformId,
                 ];
             }
 
@@ -201,8 +201,8 @@ class OrderProcessor
             $channeledCustomerMap = self::fetchChanneledEntities(
                 $conn,
                 $ccKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_customers WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_customers WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledCustomerMap($manager, $sql, $params)
             );
 
@@ -241,8 +241,8 @@ class OrderProcessor
             $channeledCustomerMap = self::fetchChanneledEntities(
                 $conn,
                 $ccKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_customers WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_customers WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledCustomerMap($manager, $sql, $params)
             );
         }
@@ -295,7 +295,7 @@ class OrderProcessor
         if (!empty($uCProd)) {
             $cpKeys = [];
             foreach ($uCProd as $cp) {
-                $cpKeys[] = ['channel' => $cp['channel'], 'platformId' => $cp['platformId']];
+                $cpKeys[] = ['channel' => $cp['channel'], 'platform_id' => $cp['platform_id']];
             }
             $channeledProductMap = self::fetchChanneledEntities(
                 $conn,
@@ -334,7 +334,7 @@ class OrderProcessor
         if (!empty($uCVar)) {
             $cvKeys = [];
             foreach ($uCVar as $cv) {
-                $cvKeys[] = ['channel' => $cv['channel'], 'platformId' => $cv['platformId']];
+                $cvKeys[] = ['channel' => $cv['channel'], 'platform_id' => $cv['platform_id']];
             }
             $channeledVariantMap = self::fetchChanneledEntities(
                 $conn,
@@ -377,7 +377,7 @@ class OrderProcessor
         // ============================================
         $orderMap = ['map' => [], 'mapReverse' => []];
         if (!empty($uOrd)) {
-            $orderIds = array_column($uOrd, 'orderId');
+            $orderIds = array_column($uOrd, 'order_id');
             $orderMap = self::fetchAndInsertEntities(
                 $conn,
                 'orders',
@@ -410,7 +410,7 @@ class OrderProcessor
             $insertRows = [];
             $updateRows = [];
             foreach ($uCOrd as $k => $co) {
-                $oKey = KeyGenerator::generateOrderKey($co['orderId']);
+                $oKey = KeyGenerator::generateOrderKey($co['order_id']);
                 if (!isset($orderMap['map'][$oKey])) {
                     continue;
                 }
@@ -469,13 +469,13 @@ class OrderProcessor
                     }
                     $cpId = $channeledProductMap[$cpKey]['id'];
                     $pivotInserts[] = [
-                        'channeledorder_id' => $coId,
-                        'channeledproduct_id' => $cpId
+                        'channeled_order_id' => $coId,
+                        'channeled_product_id' => $cpId
                     ];
                 }
             }
             if (!empty($pivotInserts)) {
-                self::bulkInsert($conn, 'channeled_order_channeled_products', ['channeledorder_id', 'channeledproduct_id'], $pivotInserts);
+                self::bulkInsert($conn, 'channeled_order_channeled_products', ['channeled_order_id', 'channeled_product_id'], $pivotInserts);
             }
         }
 
@@ -494,13 +494,13 @@ class OrderProcessor
                     }
                     $cvId = $channeledVariantMap[$cvKey]['id'];
                     $pivotInserts[] = [
-                        'channeledorder_id' => $coId,
-                        'channeledproductvariant_id' => $cvId
+                        'channeled_order_id' => $coId,
+                        'channeled_product_variant_id' => $cvId
                     ];
                 }
             }
             if (!empty($pivotInserts)) {
-                self::bulkInsert($conn, 'channeled_order_channeled_product_variants', ['channeledorder_id', 'channeledproductvariant_id'], $pivotInserts);
+                self::bulkInsert($conn, 'channeled_order_channeled_product_variants', ['channeled_order_id', 'channeled_product_variant_id'], $pivotInserts);
             }
         }
 
@@ -519,24 +519,24 @@ class OrderProcessor
                     }
                     $cdId = $channeledDiscountMap[$cdKey]['id'];
                     $pivotInserts[] = [
-                        'channeledorder_id' => $coId,
-                        'channeleddiscount_id' => $cdId
+                        'channeled_order_id' => $coId,
+                        'channeled_discount_id' => $cdId
                     ];
                 }
             }
             if (!empty($pivotInserts)) {
-                self::bulkInsert($conn, 'channeled_order_channeled_discounts', ['channeledorder_id', 'channeleddiscount_id'], $pivotInserts);
+                self::bulkInsert($conn, 'channeled_order_channeled_discounts', ['channeled_order_id', 'channeled_discount_id'], $pivotInserts);
             }
         }
 
         return [
-            'orders' => array_column($uOrd, 'orderId'),
-            'channeledOrders' => array_column($uCOrd, 'platformId'),
+            'orders' => array_column($uOrd, 'order_id'),
+            'channeledOrders' => array_column($uCOrd, 'platform_id'),
             'channels' => array_unique(array_column($uCOrd, 'channel')),
             'discounts' => array_column($uCDisc, 'code'),
-            'channeledCustomers' => array_column($uCCust, 'platformId'),
-            'channeledProducts' => array_column($uCProd, 'platformId'),
-            'channeledVariants' => array_column($uCVar, 'platformId'),
+            'channeledCustomers' => array_column($uCCust, 'platform_id'),
+            'channeledProducts' => array_column($uCProd, 'platform_id'),
+            'channeledVariants' => array_column($uCVar, 'platform_id'),
         ];
     }
 
@@ -622,9 +622,9 @@ class OrderProcessor
         $uniqueCols = ['channel', 'platform_id'];
         if ($table === 'channeled_discounts') { $uniqueCols = ['channel', 'code']; }
         if (str_contains($table, '_channeled_')) {
-            if ($table === 'channeled_order_channeled_products') { $uniqueCols = ['channeledorder_id', 'channeledproduct_id']; }
-            if ($table === 'channeled_order_channeled_product_variants') { $uniqueCols = ['channeledorder_id', 'channeledproductvariant_id']; }
-            if ($table === 'channeled_order_channeled_discounts') { $uniqueCols = ['channeledorder_id', 'channeleddiscount_id']; }
+            if ($table === 'channeled_order_channeled_products') { $uniqueCols = ['channeled_order_id', 'channeled_product_id']; }
+            if ($table === 'channeled_order_channeled_product_variants') { $uniqueCols = ['channeled_order_id', 'channeled_product_variant_id']; }
+            if ($table === 'channeled_order_channeled_discounts') { $uniqueCols = ['channeled_order_id', 'channeled_discount_id']; }
         }
 
         foreach ($chunks as $chunk) {

@@ -79,8 +79,8 @@ class MarketingProcessor
         if (!empty($channeledParams)) {
             $sql = Helpers::buildUpsertSql(
                 'channeled_campaigns', 
-                ['channel', 'platform_id', 'campaign_id', 'channeledaccount_id', 'budget', 'status', 'objective', 'buyingtype', 'data'], 
-                ['campaign_id', 'budget', 'status', 'objective', 'buyingtype', 'data'], 
+                ['channel', 'platform_id', 'campaign_id', 'channeled_account_id', 'budget', 'status', 'objective', 'buying_type', 'data'], 
+                ['campaign_id', 'budget', 'status', 'objective', 'buying_type', 'data'], 
                 ['channel', 'platform_id'], 
                 count($campaigns)
             );
@@ -141,8 +141,8 @@ class MarketingProcessor
         if (!empty($params)) {
             $sql = Helpers::buildUpsertSql(
                 'channeled_ad_groups', 
-                ['channel', 'platform_id', 'channeledaccount_id', 'campaign_id', 'channeledcampaign_id', 'name', 'start_date', 'end_date', 'status', 'optimizationgoal', 'billingevent', 'targeting', 'data'], 
-                ['campaign_id', 'channeledcampaign_id', 'name', 'status', 'targeting', 'data'], 
+                ['channel', 'platform_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'name', 'start_date', 'end_date', 'status', 'optimization_goal', 'billing_event', 'targeting', 'data'], 
+                ['campaign_id', 'channeled_campaign_id', 'name', 'status', 'targeting', 'data'], 
                 ['channel', 'platform_id'], 
                 count($adsets)
             );
@@ -217,8 +217,8 @@ class MarketingProcessor
         if (!empty($params)) {
             $sql = Helpers::buildUpsertSql(
                 'channeled_ads', 
-                ['channel', 'platform_id', 'channeledaccount_id', 'channeledcampaign_id', 'channeledadgroup_id', 'creative_id', 'name', 'status', 'data'], 
-                ['channeledcampaign_id', 'channeledadgroup_id', 'creative_id', 'name', 'status', 'data'], 
+                ['channel', 'platform_id', 'channeled_account_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'creative_id', 'name', 'status', 'data'], 
+                ['channeled_campaign_id', 'channeled_ad_group_id', 'creative_id', 'name', 'status', 'data'], 
                 ['channel', 'platform_id'], 
                 count($ads)
             );
