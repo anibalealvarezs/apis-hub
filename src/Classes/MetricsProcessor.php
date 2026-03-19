@@ -604,7 +604,9 @@ class MetricsProcessor
                 }
                 $placeholders = implode(', ', $tuples);
                 $isPostgres = Helpers::isPostgres();
-                $reFetchSql = "SELECT id, dimensions_hash, metric_config_id FROM metrics WHERE (dimensions_hash, metric_config_id) IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
+                $reFetchSql = "SELECT id, dimensions_hash, metric_config_id FROM metrics WHERE " .
+                    ($isPostgres ? "(dimensions_hash::text, metric_config_id::integer) " : "(dimensions_hash, metric_config_id) ") .
+                    "IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
                 $fetched = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
                 foreach ($fetched as $metricRow) {
                     $metricKey = KeyGenerator::generateMetricKey(
@@ -794,7 +796,7 @@ class MetricsProcessor
                 $isPostgres = Helpers::isPostgres();
                 $sql = "SELECT id, channel, platform_id, metric_id, platform_created_at, data
                         FROM channeled_metrics
-                        WHERE (channel, platform_id, metric_id, platform_created_at) IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
+                        WHERE " . ($isPostgres ? "(channel::text, platform_id::text, metric_id::integer, platform_created_at::text)" : "(channel, platform_id, metric_id, platform_created_at)") . " IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
                 
                 $chunkMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
                 foreach ($chunkMap as $k => $v) {
