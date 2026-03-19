@@ -142,17 +142,18 @@ class BaseRepository extends EntityRepository
             'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
             'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'name', 'alias' => 'rd'],
         ];
-        $activeJoins = [];
-
         $standardRelations = array_keys($relationMap);
         $dateFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'year', 'month', 'day', 'week', 'quarter', 'dayofweek', 'dayname', 'monthname', 'metricDate', 'platformCreatedAt', 'createdAt', 'date'];
 
-        // Initial Join scan to prevent collisions from the start
-        $currentJoins = $qb->getQueryPart('join');
-        $registeredAliases = ['e' => true, 'm' => true, 'mc' => true];
-        foreach ($currentJoins as $fromAlias => $joins) {
-            foreach ($joins as $join) { $registeredAliases[$join['joinAlias']] = true; }
-        }
+        $safeLeftJoin = function(string $from, string $table, string $alias, string $condition) use ($qb) {
+            $currentJoins = $qb->getQueryPart('join');
+            foreach ($currentJoins as $joins) {
+                foreach ($joins as $join) {
+                    if ($join['joinAlias'] === $alias) return;
+                }
+            }
+            $qb->leftJoin($from, $table, $alias, $condition);
+        };
 
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
@@ -163,19 +164,10 @@ class BaseRepository extends EntityRepository
             // Automatic dimension detection: if it's a ChanneledMetric and not a standard relation/date/field
             if ($this->isChanneledMetric && ($isDimension || (!in_array($field, $standardRelations) && !in_array($field, $dateFields) && !$this->_class->hasField($field)))) {
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
-                // Join chain: channeled_metrics (e) -> dimension_set_items (dsi) -> dimension_values (dv) -> dimension_keys (dk)
-                if (!isset($registeredAliases["dsi_$dimAlias"])) {
-                    $qb->leftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id");
-                    $registeredAliases["dsi_$dimAlias"] = true;
-                }
-                if (!isset($registeredAliases["dv_$dimAlias"])) {
-                    $qb->leftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
-                    $registeredAliases["dv_$dimAlias"] = true;
-                }
-                if (!isset($registeredAliases["dk_$dimAlias"])) {
-                    $qb->leftJoin("dv_$dimAlias", 'dimension_keys', "dk_$dimAlias", "dv_$dimAlias.dimension_key_id = dk_$dimAlias.id AND dk_$dimAlias.name = :key_$dimAlias");
-                    $registeredAliases["dk_$dimAlias"] = true;
-                }
+                $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id");
+                $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
+                $safeLeftJoin("dv_$dimAlias", 'dimension_keys', "dk_$dimAlias", "dv_$dimAlias.dimension_key_id = dk_$dimAlias.id AND dk_$dimAlias.name = :key_$dimAlias");
+                
                 $qb->setParameter("key_$dimAlias", $dimKey)
                    ->addSelect("dv_$dimAlias.value AS $quotedField")
                    ->addGroupBy("dv_$dimAlias.value");
@@ -186,26 +178,13 @@ class BaseRepository extends EntityRepository
                 $genericMap = $relationMap[$genericKey];
                 $channeledMap = $relationMap[$channeledKey];
                 
-                if (!isset($registeredAliases[$genericMap['alias']])) {
-                    $qb->leftJoin('mc', $genericMap['table'], $genericMap['alias'], "mc.{$genericMap['fk']} = {$genericMap['alias']}.id");
-                    $registeredAliases[$genericMap['alias']] = true;
-                }
-                if (!isset($registeredAliases[$channeledMap['alias']])) {
-                    $qb->leftJoin('mc', $channeledMap['table'], $channeledMap['alias'], "mc.{$channeledMap['fk']} = {$channeledMap['alias']}.id");
-                    $registeredAliases[$channeledMap['alias']] = true;
-                }
+                $safeLeftJoin('mc', $genericMap['table'], $genericMap['alias'], "mc.{$genericMap['fk']} = {$genericMap['alias']}.id");
+                $safeLeftJoin('mc', $channeledMap['table'], $channeledMap['alias'], "mc.{$channeledMap['fk']} = {$channeledMap['alias']}.id");
 
                 if ($isAccount) {
-                    // Advanced fallback: try to find account via campaign if direct link is missing
                     $campaignMap = $relationMap['channeledCampaign'];
-                    if (!isset($registeredAliases[$campaignMap['alias']])) {
-                        $qb->leftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
-                        $registeredAliases[$campaignMap['alias']] = true;
-                    }
-                    if (!isset($registeredAliases['rca_fallback'])) {
-                        $qb->leftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
-                        $registeredAliases['rca_fallback'] = true;
-                    }
+                    $safeLeftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
+                    $safeLeftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
                     
                     $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
@@ -222,10 +201,8 @@ class BaseRepository extends EntityRepository
                 }
             } elseif ($this->isChanneledMetric && isset($relationMap[$field])) {
                 $map = $relationMap[$field];
-                if (!isset($registeredAliases[$map['alias']])) {
-                    $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
-                    $registeredAliases[$map['alias']] = true;
-                }
+                $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
+                
                 $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS CHAR), 'Unknown') AS $quotedField")
                    ->addGroupBy("{$map['alias']}.{$map['field']}")
                    ->addGroupBy("mc.{$map['fk']}");
@@ -243,27 +220,17 @@ class BaseRepository extends EntityRepository
 
                 if ($this->isChanneledMetric && ($isDimension || (!in_array($key, $standardRelations) && !in_array($key, $dateFields) && !$this->_class->hasField($key)))) {
                     $dimAlias = "f_dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
-                    if (!isset($registeredAliases["dsi_$dimAlias"])) {
-                        $qb->join('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id");
-                        $registeredAliases["dsi_$dimAlias"] = true;
-                    }
-                    if (!isset($registeredAliases["dv_$dimAlias"])) {
-                        $qb->join("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
-                        $registeredAliases["dv_$dimAlias"] = true;
-                    }
-                    if (!isset($registeredAliases["dk_$dimAlias"])) {
-                        $qb->join("dv_$dimAlias", 'dimension_keys', "dk_$dimAlias", "dv_$dimAlias.dimension_key_id = dk_$dimAlias.id AND dk_$dimAlias.name = :key_$dimAlias");
-                        $registeredAliases["dk_$dimAlias"] = true;
-                    }
+                    $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id");
+                    $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
+                    $safeLeftJoin("dv_$dimAlias", 'dimension_keys', "dk_$dimAlias", "dv_$dimAlias.dimension_key_id = dk_$dimAlias.id AND dk_$dimAlias.name = :key_$dimAlias");
+                    
                     $qb->setParameter("key_$dimAlias", $dimKey)
                        ->andWhere("dv_$dimAlias.value = :val_$dimAlias")
                        ->setParameter("val_$dimAlias", $value);
                 } elseif ($this->isChanneledMetric && isset($relationMap[$key])) {
                     $map = $relationMap[$key];
-                    if (!isset($registeredAliases[$map['alias']])) {
-                        $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
-                        $registeredAliases[$map['alias']] = true;
-                    }
+                    $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
+                    
                     $qb->andWhere("{$map['alias']}.{$map['field']} = :f_$key")
                        ->setParameter("f_$key", $value);
                 } else {
