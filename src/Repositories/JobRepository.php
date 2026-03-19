@@ -171,7 +171,7 @@ class JobRepository extends BaseRepository
                 $query->andWhere('e.entity IN (:ctx_entities)')->setParameter('ctx_entities', array_unique($equivalents));
             }
 
-            $payloadField = $this->isPostgreSQL() ? 'CAST(e.payload AS text)' : 'e.payload';
+            $payloadField = $this->getPayloadField();
 
             // Differentiate by Date Range in payload (e.g. gsc-jan vs gsc-feb)
             // We use a loose LIKE pattern to be compatible with MySQL JSON columns without custom DQL functions.
@@ -295,7 +295,7 @@ class JobRepository extends BaseRepository
         );
 
         if ($instanceName) {
-            $payloadField = $this->isPostgreSQL() ? 'CAST(e.payload AS text)' : 'e.payload';
+            $payloadField = $this->getPayloadField();
             $qb->andWhere("{$payloadField} LIKE :instance_name_pattern")
                ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%');
         }
@@ -445,7 +445,7 @@ class JobRepository extends BaseRepository
         $since = new \DateTime();
         $since->modify("-$withinHours hours");
 
-        $payloadField = $this->isPostgreSQL() ? 'CAST(e.payload AS text)' : 'e.payload';
+        $payloadField = $this->getPayloadField();
 
         $count = $qb->select('count(e.id)')
             ->from($this->getEntityName(), 'e')
@@ -468,7 +468,7 @@ class JobRepository extends BaseRepository
     public function getLastSuccessfulJobTime(string $instanceName): ?\DateTime
     {
         $qb = $this->_em->createQueryBuilder();
-        $payloadField = $this->isPostgreSQL() ? 'CAST(e.payload AS text)' : 'e.payload';
+        $payloadField = $this->getPayloadField();
 
         $job = $qb->select('e')
             ->from($this->getEntityName(), 'e')
@@ -492,7 +492,7 @@ class JobRepository extends BaseRepository
     public function isAnotherJobProcessing(string $instanceName, ?int $excludeJobId = null): bool
     {
         $qb = $this->_em->createQueryBuilder();
-        $payloadField = $this->isPostgreSQL() ? 'CAST(e.payload AS text)' : 'e.payload';
+        $payloadField = $this->getPayloadField();
 
         $qb->select('count(e.id)')
             ->from($this->getEntityName(), 'e')
@@ -539,5 +539,13 @@ class JobRepository extends BaseRepository
     private function isPostgreSQL(): bool
     {
         return $this->_em->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+    }
+
+    /**
+     * @return string
+     */
+    private function getPayloadField(): string
+    {
+        return $this->isPostgreSQL() ? 'CAST_TEXT(e.payload AS text)' : 'e.payload';
     }
 }
