@@ -25,23 +25,27 @@ class SocialProcessor
         $conn = $manager->getConnection();
         $pages = $channeledCollection->toArray();
 
-        $params = [];
-        foreach ($pages as $p) {
-            $params[] = $p->url;
-            $params[] = $p->title ?? null;
-            $params[] = $p->hostname ?? null;
-            $params[] = $p->platformId;
-            $params[] = $p->accountId;
-            $params[] = json_encode($p->data ?? []);
-        }
+        $cols = ['url', 'title', 'hostname', 'platform_id', 'account_id', 'data'];
+        $numCols = count($cols);
+        $chunkSize = (int)floor(64000 / $numCols);
 
-        if (!empty($params)) {
+        foreach (array_chunk($pages, $chunkSize) as $chunk) {
+            $params = [];
+            foreach ($chunk as $p) {
+                $params[] = $p->url;
+                $params[] = $p->title ?? null;
+                $params[] = $p->hostname ?? null;
+                $params[] = $p->platformId;
+                $params[] = $p->accountId;
+                $params[] = json_encode($p->data ?? []);
+            }
+
             $sql = Helpers::buildUpsertSql(
                 'pages', 
-                ['url', 'title', 'hostname', 'platform_id', 'account_id', 'data'], 
+                $cols, 
                 ['title', 'platform_id', 'data'], 
                 'url', 
-                count($pages)
+                count($chunk)
             );
             $conn->executeStatement($sql, $params);
         }
@@ -61,22 +65,26 @@ class SocialProcessor
         $conn = $manager->getConnection();
         $posts = $channeledCollection->toArray();
 
-        $params = [];
-        foreach ($posts as $p) {
-            $params[] = $p->platformId;
-            $params[] = $p->pageId;
-            $params[] = $p->accountId;
-            $params[] = $p->channeledAccountId ?? null;
-            $params[] = json_encode($p->data ?? []);
-        }
+        $cols = ['post_id', 'page_id', 'account_id', 'channeled_account_id', 'data'];
+        $numCols = count($cols);
+        $chunkSize = (int)floor(64000 / $numCols);
 
-        if (!empty($params)) {
+        foreach (array_chunk($posts, $chunkSize) as $chunk) {
+            $params = [];
+            foreach ($chunk as $p) {
+                $params[] = $p->platformId;
+                $params[] = $p->pageId;
+                $params[] = $p->accountId;
+                $params[] = $p->channeledAccountId ?? null;
+                $params[] = json_encode($p->data ?? []);
+            }
+
             $sql = Helpers::buildUpsertSql(
                 'posts', 
-                ['post_id', 'page_id', 'account_id', 'channeled_account_id', 'data'], 
+                $cols, 
                 ['data'], 
                 ['post_id', 'page_id', 'account_id', 'channeled_account_id'], 
-                count($posts)
+                count($chunk)
             );
             $conn->executeStatement($sql, $params);
         }

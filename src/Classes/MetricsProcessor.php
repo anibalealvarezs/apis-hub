@@ -562,20 +562,27 @@ class MetricsProcessor
         }
 
         if (!empty($metricsToInsert)) {
-            $insertParams = [];
-            foreach ($metricsToInsert as $row) {
-                $insertParams[] = $row['value'];
-                $insertParams[] = $row['metadata'];
-                $insertParams[] = $row['dimensions_hash'];
-                $insertParams[] = $row['metric_config_id'];
+            $cols = ['value', 'metadata', 'dimensions_hash', 'metric_config_id'];
+            $numCols = count($cols);
+            $chunkSize = floor(65000 / $numCols); // Safe buffer under 65535
+            
+            foreach (array_chunk($metricsToInsert, (int)$chunkSize) as $chunk) {
+                $insertParams = [];
+                foreach ($chunk as $row) {
+                    $insertParams[] = $row['value'];
+                    $insertParams[] = $row['metadata'];
+                    $insertParams[] = $row['dimensions_hash'];
+                    $insertParams[] = $row['metric_config_id'];
+                }
+                
+                $sql = Helpers::buildInsertIgnoreSql(
+                    'metrics', 
+                    $cols, 
+                    ['metric_config_id', 'dimensions_hash'], 
+                    count($chunk)
+                );
+                $manager->getConnection()->executeStatement($sql, $insertParams);
             }
-            $sql = Helpers::buildInsertIgnoreSql(
-                'metrics', 
-                ['value', 'metadata', 'dimensions_hash', 'metric_config_id'], 
-                ['metric_config_id', 'dimensions_hash'], 
-                count($metricsToInsert)
-            );
-            $manager->getConnection()->executeStatement($sql, $insertParams);
 
             foreach (array_chunk($metricsToInsert, 1000) as $chunk) {
                 $reFetchParams = [];
@@ -726,23 +733,29 @@ class MetricsProcessor
         }
 
         if (!empty($channeledMetricsToInsert)) {
-            $placeholders = implode(', ', array_fill(0, count($channeledMetricsToInsert), '(?, ?, ?, ?, ?, ?)'));
-            $params = [];
-            foreach ($channeledMetricsToInsert as $row) {
-                $params[] = $row['channel']; 
-                $params[] = $row['platform_id']; 
-                $params[] = $row['metric_id'];
-                $params[] = $row['platform_created_at']; 
-                $params[] = $row['data']; 
-                $params[] = $row['dimension_set_id'];
+            $cols = ['channel', 'platform_id', 'metric_id', 'platform_created_at', 'data', 'dimension_set_id'];
+            $numCols = count($cols);
+            $chunkSize = floor(64000 / $numCols); // Safe buffer under 65535
+
+            foreach (array_chunk($channeledMetricsToInsert, (int)$chunkSize) as $chunk) {
+                $params = [];
+                foreach ($chunk as $row) {
+                    $params[] = $row['channel']; 
+                    $params[] = $row['platform_id']; 
+                    $params[] = $row['metric_id'];
+                    $params[] = $row['platform_created_at']; 
+                    $params[] = $row['data']; 
+                    $params[] = $row['dimension_set_id'];
+                }
+                
+                $sql = Helpers::buildInsertIgnoreSql(
+                    'channeled_metrics', 
+                    $cols, 
+                    ['platform_id', 'channel', 'metric_id', 'platform_created_at'], 
+                    count($chunk)
+                );
+                $manager->getConnection()->executeStatement($sql, $params);
             }
-            $sql = Helpers::buildInsertIgnoreSql(
-                'channeled_metrics', 
-                ['channel', 'platform_id', 'metric_id', 'platform_created_at', 'data', 'dimension_set_id'], 
-                ['platform_id', 'channel', 'metric_id', 'platform_created_at'], 
-                count($channeledMetricsToInsert)
-            );
-            $manager->getConnection()->executeStatement($sql, $params);
         }
 
         if (!empty($channeledMetricsToUpdate)) {
