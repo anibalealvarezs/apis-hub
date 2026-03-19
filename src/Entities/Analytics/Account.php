@@ -11,7 +11,7 @@ use Repositories\AccountRepository;
 
 #[ORM\Entity(repositoryClass: AccountRepository::class)]
 #[ORM\Table(name: 'accounts')]
-#[ORM\Index(columns: ['name'], name: 'name_idx')]
+#[ORM\Index(columns: ['name'], name: 'idx_account_name')]
 #[ORM\HasLifecycleCallbacks]
 class Account extends Entity
 {

@@ -10,12 +10,12 @@ use Repositories\Channeled\ChanneledVendorRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledVendorRepository::class)]
 #[ORM\Table(name: 'channeled_vendors')]
-#[ORM\Index(columns: ['name', 'platformId', 'channel'], name: 'name_platformId_channel_idx')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
-#[ORM\Index(columns: ['name', 'channel'], name: 'email_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'platformCreatedAt_idx')]
-#[ORM\Index(columns: ['name'], name: 'name_idx')]
+#[ORM\Index(columns: ['name', 'platformId', 'channel'], name: 'idx_cv_full')]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_cv_platform_channel')]
+#[ORM\Index(columns: ['name', 'channel'], name: 'idx_cv_name_channel')]
+#[ORM\Index(columns: ['platformId'], name: 'idx_cv_platformId')]
+#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_cv_createdAt')]
+#[ORM\Index(columns: ['name'], name: 'idx_cv_name')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledVendor extends ChanneledEntity
 {

@@ -11,7 +11,7 @@ use Repositories\VendorRepository;
 
 #[ORM\Entity(repositoryClass: VendorRepository::class)]
 #[ORM\Table(name: 'vendors')]
-#[ORM\Index(columns: ['name'], name: 'name_idx')]
+#[ORM\Index(columns: ['name'], name: 'idx_vendor_name')]
 #[ORM\HasLifecycleCallbacks]
 class Vendor extends Entity
 {
