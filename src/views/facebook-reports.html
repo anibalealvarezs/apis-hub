@@ -231,24 +231,29 @@
             cursor: pointer;
             user-select: none;
             background: var(--meta-card-bg);
+            font-size: 0.8rem;
         }
 
         th:hover { color: var(--meta-blue); background: var(--meta-hover); }
 
         td {
-            padding: 14px 20px;
+            padding: 12px 20px;
             border-bottom: 1px solid var(--meta-border);
             vertical-align: middle;
             background: var(--meta-card-bg);
+            font-size: 0.85rem;
+        }
+
+        tr:nth-child(even) td {
+            background: rgba(255, 255, 255, 0.02);
         }
 
         tr:hover td {
-            background: var(--meta-hover);
+            background: rgba(24, 119, 242, 0.08) !important;
         }
 
-        .metric-cell {
-            font-family: 'Fira Code', monospace;
-            font-weight: 500;
+        tr td:first-child {
+            border-right: 1px solid var(--meta-border);
         }
 
         .campaign-name {
@@ -259,7 +264,6 @@
             word-wrap: break-word;
             white-space: normal;
             line-height: 1.3;
-            padding: 10px 0;
             cursor: pointer;
         }
 
@@ -268,14 +272,9 @@
         .account-name {
             font-weight: 500;
             color: var(--meta-text-dim);
-            font-size: 0.8rem;
             max-width: 180px;
             white-space: normal;
             line-height: 1.2;
-        }
-
-        tr td:first-child {
-            border-right: 1px solid var(--meta-border);
         }
 
         /* Responsive Metric Colors */
