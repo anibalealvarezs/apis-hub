@@ -554,16 +554,18 @@ class JobRepository extends BaseRepository
     {
         if ($this->isPostgreSQL()) {
             $sql = "SELECT count(j.id) FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :processing";
+            $params = [
+                'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
+                'processing' => JobStatus::processing->value,
+            ];
+            
             if ($excludeJobId) {
                 $sql .= " AND j.id != :excludeId";
+                $params['excludeId'] = $excludeJobId;
             }
             
             $stmt = $this->_em->getConnection()->prepare($sql);
-            $result = $stmt->executeQuery([
-                'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
-                'processing' => JobStatus::processing->value,
-                'excludeId' => $excludeJobId
-            ]);
+            $result = $stmt->executeQuery($params);
             
             return (int)$result->fetchOne() > 0;
         }
