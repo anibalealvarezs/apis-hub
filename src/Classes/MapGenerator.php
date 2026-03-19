@@ -46,7 +46,7 @@ class MapGenerator
         // Map dimensions to their IDs and create a map for quick access
         $postMap = [];
         foreach ($existingPosts as $post) {
-            $postKey = $post['postId'];
+            $postKey = $post['post_id'];
             $postMap[$postKey] = (int)$post['id'];
         }
 
@@ -74,7 +74,7 @@ class MapGenerator
         // Map dimensions to their IDs and create a map for quick access
         $campaignMap = [];
         foreach ($existingCampaigns as $campaign) {
-            $campaignKey = $campaign['campaignId'];
+            $campaignKey = $campaign['campaign_id'];
             $campaignMap[$campaignKey] = (int)$campaign['id'];
         }
 
@@ -102,7 +102,7 @@ class MapGenerator
         // Map dimensions to their IDs and create a map for quick access
         $channeledCampaignMap = [];
         foreach ($existingChanneledCampaigns as $channeledCampaign) {
-            $channeledCampaignKey = $channeledCampaign['platformId'];
+            $channeledCampaignKey = $channeledCampaign['platform_id'];
             $channeledCampaignMap[$channeledCampaignKey] = (int)$channeledCampaign['id'];
         }
 
@@ -130,7 +130,7 @@ class MapGenerator
         // Map dimensions to their IDs and create a map for quick access
         $channeledAdGroupMap = [];
         foreach ($existingChanneledAdGroups as $channeledAdGroup) {
-            $channeledAdGroupKey = $channeledAdGroup['platformId'];
+            $channeledAdGroupKey = $channeledAdGroup['platform_id'];
             $channeledAdGroupMap[$channeledAdGroupKey] = (int)$channeledAdGroup['id'];
         }
 
@@ -158,7 +158,7 @@ class MapGenerator
         // Map dimensions to their IDs and create a map for quick access
         $channeledAdMap = [];
         foreach ($existingChanneledAds as $channeledAd) {
-            $channeledAdKey = $channeledAd['platformId'];
+            $channeledAdKey = $channeledAd['platform_id'];
             $channeledAdMap[$channeledAdKey] = (int)$channeledAd['id'];
         }
 
@@ -233,8 +233,8 @@ class MapGenerator
         $metricMap = [];
         foreach ($existingMetrics as $metric) {
             $metricKey = KeyGenerator::generateMetricKey(
-                dimensionsHash: $metric['dimensionsHash'],
-                metricConfigKey: $metricConfigMap['mapReverse'][$metric['metricConfig_id']]
+                dimensionsHash: $metric['dimensions_hash'],
+                metricConfigKey: $metricConfigMap['mapReverse'][$metric['metric_config_id']]
             );
             $metricMap[$metricKey] = (int)$metric['id'];
         }
@@ -271,9 +271,9 @@ class MapGenerator
             }
             $metricKey = KeyGenerator::generateChanneledMetricKey(
                 channel: $channeledMetric['channel'],
-                platformId: $channeledMetric['platformId'],
+                platformId: $channeledMetric['platform_id'],
                 metric: $channeledMetric['metric_id'],
-                platformCreatedAt: (new DateTimeImmutable($channeledMetric['platformCreatedAt']))->format('Y-m-d'),
+                platformCreatedAt: (new DateTimeImmutable($channeledMetric['platform_created_at']))->format('Y-m-d'),
             );
             $channeledMetricMap[$metricKey] = [
                 'id' => (int)$channeledMetric['id'],
@@ -330,7 +330,7 @@ class MapGenerator
 
         $channeledCustomerMap = [];
         foreach ($existingChanneledCustomers as $channeledCustomer) {
-            $key = KeyGenerator::generateChanneledCustomerKey((string) $channeledCustomer['channel'], (string) $channeledCustomer['platformId']);
+            $key = KeyGenerator::generateChanneledCustomerKey((string) $channeledCustomer['channel'], (string) $channeledCustomer['platform_id']);
             $channeledCustomerMap[$key] = [
                 'id' => (int)$channeledCustomer['id'],
                 'data' => $channeledCustomer['data'],
@@ -345,8 +345,8 @@ class MapGenerator
         $existingProducts = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existingProducts as $product) {
-            $key = KeyGenerator::generateProductKey($product['productId']);
-            $map['map'][$key] = ['id' => (int)$product['id'], 'productId' => $product['productId'], 'sku' => $product['sku']];
+            $key = KeyGenerator::generateProductKey($product['product_id']);
+            $map['map'][$key] = ['id' => (int)$product['id'], 'productId' => $product['product_id'], 'sku' => $product['sku']];
             $map['mapReverse'][$product['id']] = $key;
         }
         return $map;
@@ -357,7 +357,7 @@ class MapGenerator
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
-            $key = KeyGenerator::generateChanneledProductKey((string)$item['channel'], (string)$item['platformId']);
+            $key = KeyGenerator::generateChanneledProductKey((string)$item['channel'], (string)$item['platform_id']);
             $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
         }
         return $map;
@@ -391,8 +391,8 @@ class MapGenerator
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existing as $item) {
-            $key = KeyGenerator::generateProductVariantKey($item['productVariantId']);
-            $map['map'][$key] = ['id' => (int)$item['id'], 'productVariantId' => $item['productVariantId'], 'sku' => $item['sku']];
+            $key = KeyGenerator::generateProductVariantKey($item['product_variant_id']);
+            $map['map'][$key] = ['id' => (int)$item['id'], 'productVariantId' => $item['product_variant_id'], 'sku' => $item['sku']];
             $map['mapReverse'][$item['id']] = $key;
         }
         return $map;
@@ -403,7 +403,7 @@ class MapGenerator
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
-            $key = KeyGenerator::generateChanneledProductVariantKey((string)$item['channel'], (string)$item['platformId']);
+            $key = KeyGenerator::generateChanneledProductVariantKey((string)$item['channel'], (string)$item['platform_id']);
             $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
         }
         return $map;
@@ -414,8 +414,8 @@ class MapGenerator
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existing as $item) {
-            $key = KeyGenerator::generateProductCategoryKey($item['productCategoryId']);
-            $map['map'][$key] = ['id' => (int)$item['id'], 'productCategoryId' => $item['productCategoryId']];
+            $key = KeyGenerator::generateProductCategoryKey($item['product_category_id']);
+            $map['map'][$key] = ['id' => (int)$item['id'], 'productCategoryId' => $item['product_category_id']];
             $map['mapReverse'][$item['id']] = $key;
         }
         return $map;
@@ -426,7 +426,7 @@ class MapGenerator
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
-            $key = KeyGenerator::generateChanneledProductCategoryKey((string)$item['channel'], (string)$item['platformId']);
+            $key = KeyGenerator::generateChanneledProductCategoryKey((string)$item['channel'], (string)$item['platform_id']);
             $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
         }
         return $map;
@@ -437,8 +437,8 @@ class MapGenerator
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existing as $item) {
-            $key = KeyGenerator::generateOrderKey((string)$item['orderId']);
-            $map['map'][$key] = ['id' => (int)$item['id'], 'orderId' => $item['orderId']];
+            $key = KeyGenerator::generateOrderKey((string)$item['order_id']);
+            $map['map'][$key] = ['id' => (int)$item['id'], 'orderId' => $item['order_id']];
             $map['mapReverse'][$item['id']] = $key;
         }
         return $map;
@@ -449,7 +449,7 @@ class MapGenerator
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
-            $key = KeyGenerator::generateChanneledOrderKey((string)$item['channel'], (string)$item['platformId']);
+            $key = KeyGenerator::generateChanneledOrderKey((string)$item['channel'], (string)$item['platform_id']);
             $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
         }
         return $map;
@@ -483,8 +483,8 @@ class MapGenerator
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = ['map' => [], 'mapReverse' => []];
         foreach ($existing as $item) {
-            $key = KeyGenerator::generatePriceRuleKey((string)$item['priceRuleId']);
-            $map['map'][$key] = ['id' => (int)$item['id'], 'priceRuleId' => $item['priceRuleId']];
+            $key = KeyGenerator::generatePriceRuleKey((string)$item['price_rule_id']);
+            $map['map'][$key] = ['id' => (int)$item['id'], 'priceRuleId' => $item['price_rule_id']];
             $map['mapReverse'][$item['id']] = $key;
         }
         return $map;
@@ -495,7 +495,7 @@ class MapGenerator
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
-            $key = KeyGenerator::generateChanneledPriceRuleKey((string)$item['channel'], (string)$item['platformId']);
+            $key = KeyGenerator::generateChanneledPriceRuleKey((string)$item['channel'], (string)$item['platform_id']);
             $map[$key] = ['id' => (int)$item['id'], 'data' => $item['data']];
         }
         return $map;
@@ -506,7 +506,7 @@ class MapGenerator
         $existing = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
         $map = [];
         foreach ($existing as $item) {
-            $key = $item['creativeId'];
+            $key = $item['creative_id'];
             $map[$key] = (int)$item['id'];
         }
         return $map;
