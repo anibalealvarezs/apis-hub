@@ -2396,11 +2396,11 @@ class MetricRequests
         $conn = $manager->getConnection();
 
         // 1. Campaign Map
-        $sqlCampaign = "SELECT id, campaignId FROM campaigns";
+        $sqlCampaign = "SELECT id, campaign_id FROM campaigns";
         $fetchedCampaigns = $conn->executeQuery($sqlCampaign)->fetchAllAssociative();
         $campaignMap = [];
         foreach ($fetchedCampaigns as $row) {
-            $campaignMap[$row['campaignId']] = (int)$row['id'];
+            $campaignMap[$row['campaign_id']] = (int)$row['id'];
         }
 
         // 2. Channeled Campaign Map
@@ -2427,7 +2427,7 @@ class MetricRequests
         EntityManager $manager,
         ChanneledAccount $channeledAccountEntity,
     ): array {
-        $sql = "SELECT cag.id, cag.platform_id, cc.platform_id as campaignPlatformId 
+        $sql = "SELECT cag.id, cag.platform_id, cc.platform_id as campaign_platform_id 
                 FROM channeled_ad_groups cag
                 LEFT JOIN channeled_campaigns cc ON cag.channeled_campaign_id = cc.id
                 WHERE cag.channeled_account_id = ?";
@@ -2436,7 +2436,7 @@ class MetricRequests
         $mapCampaign = [];
         foreach ($fetched as $row) {
             $map[$row['platform_id']] = (int)$row['id'];
-            $mapCampaign[$row['platform_id']] = $row['campaignPlatformId'];
+            $mapCampaign[$row['platform_id']] = $row['campaign_platform_id'];
         }
         return [
             'map' => $map,
@@ -2449,7 +2449,7 @@ class MetricRequests
         EntityManager $manager,
         ChanneledAccount $channeledAccountEntity,
     ): array {
-        $sql = "SELECT ca.id, ca.platform_id, cag.platform_id as adGroupPlatformId 
+        $sql = "SELECT ca.id, ca.platform_id, cag.platform_id as ad_group_platform_id 
                 FROM channeled_ads ca
                 LEFT JOIN channeled_ad_groups cag ON ca.channeled_ad_group_id = cag.id
                 WHERE ca.channeled_account_id = ?";
@@ -2458,7 +2458,7 @@ class MetricRequests
         $mapAdGroup = [];
         foreach ($fetched as $row) {
             $map[$row['platform_id']] = (int)$row['id'];
-            $mapAdGroup[$row['platform_id']] = $row['adGroupPlatformId'];
+            $mapAdGroup[$row['platform_id']] = $row['ad_group_platform_id'];
         }
         return [
             'map' => $map,

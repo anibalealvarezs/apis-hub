@@ -107,13 +107,13 @@ class MarketingProcessor
         $campaignPlatformIds = array_unique(array_filter(array_column($adsets, 'channeledCampaignId')));
         $campaignMap = [];
         if (!empty($campaignPlatformIds)) {
-            // We need to map platformId (campaign_id in FB) to our DB ids for channeled_campaigns and global campaigns
+            // We need to map platform_id (campaign_id in FB) to our DB ids for channeled_campaigns and global campaigns
             // For AdGroup, we need channeledCampaign_id and campaign_id
-            $sql = 'SELECT platformId, id, campaign_id FROM channeled_campaigns WHERE platformId IN ('
+            $sql = 'SELECT platform_id, id, campaign_id FROM channeled_campaigns WHERE platform_id IN ('
                 . implode(', ', array_fill(0, count($campaignPlatformIds), '?')) . ')';
             $fetched = $conn->executeQuery($sql, array_values($campaignPlatformIds))->fetchAllAssociative();
             foreach ($fetched as $row) {
-                $campaignMap[$row['platformId']] = [
+                $campaignMap[$row['platform_id']] = [
                     'channeled_id' => $row['id'],
                     'global_id' => $row['campaign_id']
                 ];
@@ -172,31 +172,31 @@ class MarketingProcessor
 
         $campaignMap = [];
         if (!empty($campaignPlatformIds)) {
-            $sql = 'SELECT platformId, id FROM channeled_campaigns WHERE platformId IN ('
+            $sql = 'SELECT platform_id, id FROM channeled_campaigns WHERE platform_id IN ('
                 . implode(', ', array_fill(0, count($campaignPlatformIds), '?')) . ')';
             $fetched = $conn->executeQuery($sql, array_values($campaignPlatformIds))->fetchAllAssociative();
             foreach ($fetched as $row) {
-                $campaignMap[$row['platformId']] = $row['id'];
+                $campaignMap[$row['platform_id']] = $row['id'];
             }
         }
 
         $adGroupMap = [];
         if (!empty($adsetPlatformIds)) {
-            $sql = 'SELECT platformId, id FROM channeled_ad_groups WHERE platformId IN ('
+            $sql = 'SELECT platform_id, id FROM channeled_ad_groups WHERE platform_id IN ('
                 . implode(', ', array_fill(0, count($adsetPlatformIds), '?')) . ')';
             $fetched = $conn->executeQuery($sql, array_values($adsetPlatformIds))->fetchAllAssociative();
             foreach ($fetched as $row) {
-                $adGroupMap[$row['platformId']] = $row['id'];
+                $adGroupMap[$row['platform_id']] = $row['id'];
             }
         }
 
         $creativeMap = [];
         if (!empty($creativePlatformIds)) {
-            $sql = 'SELECT creativeId, id FROM creatives WHERE creativeId IN ('
+            $sql = 'SELECT creative_id, id FROM creatives WHERE creative_id IN ('
                 . implode(', ', array_fill(0, count($creativePlatformIds), '?')) . ')';
             $fetched = $conn->executeQuery($sql, array_values($creativePlatformIds))->fetchAllAssociative();
             foreach ($fetched as $row) {
-                $creativeMap[$row['creativeId']] = $row['id'];
+                $creativeMap[$row['creative_id']] = $row['id'];
             }
         }
 
