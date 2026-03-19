@@ -298,10 +298,16 @@ class ConfigManagerController
             if ($type === 'gsc' || $type === 'all') {
                 try {
                     $gscConfig = MetricRequests::validateGoogleConfig($logger);
-                    $gscApi = MetricRequests::initializeSearchConsoleApi($gscConfig, $logger);
-                    // This call will trigger a token refresh if the current one is expired
-                    $gscApi->getSites();
-                    $results['gsc'] = ['status' => 'valid', 'message' => 'GSC token is valid and working.'];
+                    $isEnabled = $gscConfig['google_search_console']['enabled'] ?? false;
+                    
+                    if ($isEnabled) {
+                        $gscApi = MetricRequests::initializeSearchConsoleApi($gscConfig, $logger);
+                        // This call will trigger a token refresh if the current one is expired
+                        $gscApi->getSites();
+                        $results['gsc'] = ['status' => 'valid', 'message' => 'GSC token is valid and working.'];
+                    } else {
+                        $results['gsc'] = ['status' => 'info', 'message' => 'GSC channel is disabled in configuration. Skipping.'];
+                    }
                 } catch (Exception $e) {
                     $results['gsc'] = ['status' => 'error', 'message' => 'GSC Error: ' . $e->getMessage()];
                 }

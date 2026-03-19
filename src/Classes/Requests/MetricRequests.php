@@ -1143,10 +1143,18 @@ class MetricRequests
                     $scopes = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $scopes))));
                 }
 
+                $redirectUri = $config['google_search_console']['redirect_uri'] ?? ($config['google']['redirect_uri'] ?? null);
+                $clientId = $config['google_search_console']['client_id'] ?? ($config['google']['client_id'] ?? null);
+                $clientSecret = $config['google_search_console']['client_secret'] ?? ($config['google']['client_secret'] ?? null);
+
+                if (!$clientId || !$clientSecret) {
+                    throw new Exception("Google Search Console credentials (client_id/client_secret) are missing. Please check your .env file.");
+                }
+
                 $apiInstance = new SearchConsoleApi(
-                    redirectUrl: $config['google_search_console']['redirect_uri'] ?? ($config['google']['redirect_uri'] ?? null),
-                    clientId: $config['google_search_console']['client_id'] ?? ($config['google']['client_id'] ?? null),
-                    clientSecret: $config['google_search_console']['client_secret'] ?? ($config['google']['client_secret'] ?? null),
+                    redirectUrl: $redirectUri,
+                    clientId: $clientId,
+                    clientSecret: $clientSecret,
                     refreshToken: $config['google_search_console']['refresh_token'] ?? ($config['google']['refresh_token'] ?? null),
                     userId: $config['google_search_console']['user_id'] ?? ($config['google']['user_id'] ?? null),
                     scopes: $scopes,
