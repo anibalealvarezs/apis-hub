@@ -6,16 +6,18 @@ mkdir -p /app/logs
 
 # Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
 if [[ "$INSTANCE_NAME" == *"entities-sync"* ]]; then
-    LOCKFILE="/app/storage/db_setup.lock"
-    # Use mkdir for atomic lock (works across containers if volume is shared)
+    # Use mkdir for atomic lock
     if mkdir "/app/storage/db_lock" 2>/dev/null; then
         echo "Master Instance ($INSTANCE_NAME): Acquired lock. Initializing database and entities..."
-        php bin/cli.php app:setup-db || echo "Database setup failed"
-        # Keep the lock dir to indicate setup is done, or remove it? 
-        # Actually, let's just use it as a "done" flag too for this deployment.
+        if php bin/cli.php app:setup-db; then
+            echo "Database setup successful."
+        else
+            echo "Database setup failed. Removing lock to allow retries."
+            rmdir "/app/storage/db_lock"
+            exit 1 # Exit with error to signal failure
+        fi
     else
-        echo "Instance ($INSTANCE_NAME): Database setup already in progress or completed by another instance. Waiting..."
-        # Fallback to the waiting logic below
+        echo "Instance ($INSTANCE_NAME): Database setup already in progress or completed. Waiting..."
         INSTANCE_TYPE="waiting-master"
     fi
 fi
