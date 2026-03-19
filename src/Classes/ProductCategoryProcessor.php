@@ -5,6 +5,7 @@ namespace Classes;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Helpers\Helpers;
 
 class ProductCategoryProcessor
 {
@@ -242,9 +243,8 @@ class ProductCategoryProcessor
                 foreach ($chunk as $row) {
                     $params = array_merge($params, $row);
                 }
-                $placeholders = implode(', ', array_fill(0, count($chunk), '(' . implode(', ', array_fill(0, count($insertCols), '?')) . ')'));
-                $colsStr = implode(', ', $insertCols);
-                $conn->executeStatement("INSERT IGNORE INTO $table ($colsStr) VALUES $placeholders", $params);
+                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, 'productCategoryId', count($chunk));
+                $conn->executeStatement($sql, $params);
             }
 
             foreach ($chunks as $chunk) {
@@ -281,7 +281,11 @@ class ProductCategoryProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $colStr = implode(', ', $columns);
+        $uniqueCols = ['channel', 'platformId'];
+        if ($table === 'channeled_product_categories_channeled_products') {
+            $uniqueCols = ['channeledproductcategory_id', 'channeledproduct_id'];
+        }
+
         foreach ($chunks as $chunk) {
             $params = [];
             foreach ($chunk as $row) {
@@ -289,8 +293,8 @@ class ProductCategoryProcessor
                     $params[] = $row[$col];
                 }
             }
-            $placeholders = implode(', ', array_fill(0, count($chunk), '(' . implode(', ', array_fill(0, count($columns), '?')) . ')'));
-            $conn->executeStatement("INSERT IGNORE INTO $table ($colStr) VALUES $placeholders", $params);
+            $sql = Helpers::buildInsertIgnoreSql($table, $columns, $uniqueCols, count($chunk));
+            $conn->executeStatement($sql, $params);
         }
     }
 
@@ -300,17 +304,11 @@ class ProductCategoryProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $colStr = implode(', ', $columns);
-
-        $updateStrings = [];
+        
+        $updateCols = [];
         foreach ($updateMap as $key => $val) {
-            if (is_int($key)) {
-                $updateStrings[] = "$val = VALUES($val)";
-            } else {
-                $updateStrings[] = "$key = $val";
-            }
+            $updateCols[] = is_int($key) ? $val : $key;
         }
-        $updateClause = implode(', ', $updateStrings);
 
         foreach ($chunks as $chunk) {
             $params = [];
@@ -319,8 +317,8 @@ class ProductCategoryProcessor
                     $params[] = $row[$col] ?? null;
                 }
             }
-            $placeholders = implode(', ', array_fill(0, count($chunk), '(' . implode(', ', array_fill(0, count($columns), '?')) . ')'));
-            $conn->executeStatement("INSERT INTO $table ($colStr) VALUES $placeholders ON DUPLICATE KEY UPDATE $updateClause", $params);
+            $sql = Helpers::buildUpsertSql($table, $columns, $updateCols, 'id', count($chunk));
+            $conn->executeStatement($sql, $params);
         }
     }
 }

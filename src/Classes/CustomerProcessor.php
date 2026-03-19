@@ -100,11 +100,13 @@ class CustomerProcessor
             $insertChunks = array_chunk($customersToInsert, 1000);
             foreach ($insertChunks as $chunk) {
                 $insertPlaceholders = implode(', ', array_fill(0, count($chunk), '(?)'));
-                // Using INSERT IGNORE to prevent race conditions
-                $manager->getConnection()->executeStatement(
-                    "INSERT IGNORE INTO customers (email) VALUES $insertPlaceholders",
-                    $chunk
+                $sql = Helpers::buildInsertIgnoreSql(
+                    'customers', 
+                    ['email'], 
+                    'email', 
+                    count($chunk)
                 );
+                $manager->getConnection()->executeStatement($sql, $chunk);
             }
 
             // Re-fetch to get IDs
@@ -232,20 +234,14 @@ class CustomerProcessor
                     $updateParams[] = $row['data'];
                 }
 
-                $placeholders = implode(', ', array_fill(0, count($chunk), '(?, ?, ?, ?, ?, ?, ?)'));
-                $manager->getConnection()->executeStatement(
-                    "INSERT INTO channeled_customers (id, customer_id, email, platformId, channel, platformCreatedAt, data) 
-                     VALUES $placeholders
-                     ON DUPLICATE KEY UPDATE 
-                        customer_id = VALUES(customer_id),
-                        email = VALUES(email),
-                        platformId = VALUES(platformId),
-                        channel = VALUES(channel),
-                        platformCreatedAt = VALUES(platformCreatedAt),
-                        data = VALUES(data),
-                        updatedAt = CURRENT_TIMESTAMP",
-                    $updateParams
+                $sql = Helpers::buildUpsertSql(
+                    'channeled_customers', 
+                    ['id', 'customer_id', 'email', 'platformId', 'channel', 'platformCreatedAt', 'data'], 
+                    ['customer_id', 'email', 'platformId', 'channel', 'platformCreatedAt', 'data', 'updatedAt'], 
+                    'id', 
+                    count($chunk)
                 );
+                $manager->getConnection()->executeStatement($sql, $updateParams);
             }
         }
 

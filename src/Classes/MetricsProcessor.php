@@ -59,11 +59,13 @@ class MetricsProcessor
         if (!empty($queriesToInsert)) {
             $insertPlaceholders = implode(', ', array_fill(0, count($queriesToInsert), '(?)'));
             try {
-                $manager->getConnection()->executeStatement(
-                    "INSERT INTO queries (query) VALUES $insertPlaceholders
-                     ON DUPLICATE KEY UPDATE query=query",
-                    array_values($queriesToInsert)
+                $sql = Helpers::buildInsertIgnoreSql(
+                    'queries', 
+                    ['query'], 
+                    ['query'], 
+                    count($queriesToInsert)
                 );
+                $manager->getConnection()->executeStatement($sql, array_values($queriesToInsert));
             } catch (Exception $e) {
                 throw new RuntimeException("Failed to insert queries: " . $e->getMessage(), 0, $e);
             }
@@ -453,12 +455,13 @@ class MetricsProcessor
                 $insertParams[] = $metricConfig['device_id'] ?? null;
                 $insertParams[] = $metricConfig['key']; // configSignature
             }
-            $manager->getConnection()->executeStatement(
-                'INSERT IGNORE INTO metric_configs (channel, name, period, metricDate, account_id, channeledAccount_id, campaign_id, channeledCampaign_id, channeledAdGroup_id,
-                            channeledAd_id, creative_id, query_id, page_id, post_id, product_id, customer_id, order_id, country_id, device_id, configSignature)
-                     VALUES ' . implode(', ', array_fill(0, count($uniqueMetricConfigs), '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')),
-                $insertParams
+            $sql = Helpers::buildInsertIgnoreSql(
+                'metric_configs', 
+                ['channel', 'name', 'period', 'metricDate', 'account_id', 'channeledAccount_id', 'campaign_id', 'channeledCampaign_id', 'channeledAdGroup_id', 'channeledAd_id', 'creative_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id', 'configSignature'], 
+                ['configSignature'], 
+                count($uniqueMetricConfigs)
             );
+            $manager->getConnection()->executeStatement($sql, $insertParams);
         }
 
         // Re-fetch all metric_configs
@@ -566,11 +569,13 @@ class MetricsProcessor
                 $insertParams[] = $row['dimensionsHash'];
                 $insertParams[] = $row['metricConfig_id'];
             }
-            $manager->getConnection()->executeStatement(
-                'INSERT IGNORE INTO metrics (value, metadata, dimensionsHash, metricConfig_id)
-                     VALUES ' . implode(', ', array_fill(0, count($metricsToInsert), '(?, ?, ?, ?)')),
-                $insertParams
+            $sql = Helpers::buildInsertIgnoreSql(
+                'metrics', 
+                ['value', 'metadata', 'dimensionsHash', 'metricConfig_id'], 
+                ['dimensionsHash', 'metricConfig_id'], 
+                count($metricsToInsert)
             );
+            $manager->getConnection()->executeStatement($sql, $insertParams);
 
             foreach (array_chunk($metricsToInsert, 1000) as $chunk) {
                 $reFetchParams = [];
@@ -727,10 +732,13 @@ class MetricsProcessor
                 $params[] = $row['channel']; $params[] = $row['platformId']; $params[] = $row['metric_id'];
                 $params[] = $row['platformCreatedAt']; $params[] = $row['data']; $params[] = $row['dimension_set_id'];
             }
-            $manager->getConnection()->executeStatement(
-                "INSERT IGNORE INTO channeled_metrics (channel, platformId, metric_id, platformCreatedAt, data, dimension_set_id) VALUES $placeholders",
-                $params
+            $sql = Helpers::buildInsertIgnoreSql(
+                'channeled_metrics', 
+                ['channel', 'platformId', 'metric_id', 'platformCreatedAt', 'data', 'dimension_set_id'], 
+                ['channel', 'platformId', 'metric_id', 'platformCreatedAt'], 
+                count($channeledMetricsToInsert)
             );
+            $manager->getConnection()->executeStatement($sql, $params);
         }
 
         if (!empty($channeledMetricsToUpdate)) {

@@ -6,6 +6,7 @@ use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Helpers\Helpers;
 
 class ProductProcessor
 {
@@ -525,9 +526,8 @@ class ProductProcessor
                 foreach ($chunk as $row) {
                     $params = array_merge($params, $row);
                 }
-                $placeholders = implode(', ', array_fill(0, count($chunk), '(' . implode(', ', array_fill(0, count($insertCols), '?')) . ')'));
-                $colsStr = implode(', ', $insertCols);
-                $conn->executeStatement("INSERT IGNORE INTO $table ($colsStr) VALUES $placeholders", $params);
+                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'vendors' ? 'name' : ($table === 'products' ? 'productId' : ($table === 'product_variants' ? 'productVariantId' : 'productCategoryId'))), count($chunk));
+                $conn->executeStatement($sql, $params);
             }
 
             // Re-fetch to update map with inserted IDs
@@ -565,7 +565,11 @@ class ProductProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $colStr = implode(', ', $columns);
+        $uniqueCols = ($table === 'channeled_vendors' ? ['channel', 'name'] : ['channel', 'platformId']);
+        if ($table === 'channeled_product_categories_channeled_products') {
+            $uniqueCols = ['channeledproductcategory_id', 'channeledproduct_id'];
+        }
+        
         foreach ($chunks as $chunk) {
             $params = [];
             foreach ($chunk as $row) {
@@ -573,8 +577,8 @@ class ProductProcessor
                     $params[] = $row[$col];
                 }
             }
-            $placeholders = implode(', ', array_fill(0, count($chunk), '(' . implode(', ', array_fill(0, count($columns), '?')) . ')'));
-            $conn->executeStatement("INSERT IGNORE INTO $table ($colStr) VALUES $placeholders", $params);
+            $sql = Helpers::buildInsertIgnoreSql($table, $columns, $uniqueCols, count($chunk));
+            $conn->executeStatement($sql, $params);
         }
     }
 
@@ -584,17 +588,12 @@ class ProductProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $colStr = implode(', ', $columns);
-
-        $updateStrings = [];
+        
+        // Convert updateMap to updateCols array (ignoring val since Helpers handles CURRENT_TIMESTAMP)
+        $updateCols = [];
         foreach ($updateMap as $key => $val) {
-            if (is_int($key)) {
-                $updateStrings[] = "$val = VALUES($val)";
-            } else {
-                $updateStrings[] = "$key = $val";
-            }
+            $updateCols[] = is_int($key) ? $val : $key;
         }
-        $updateClause = implode(', ', $updateStrings);
 
         foreach ($chunks as $chunk) {
             $params = [];
@@ -603,8 +602,9 @@ class ProductProcessor
                     $params[] = $row[$col] ?? null;
                 }
             }
-            $placeholders = implode(', ', array_fill(0, count($chunk), '(' . implode(', ', array_fill(0, count($columns), '?')) . ')'));
-            $conn->executeStatement("INSERT INTO $table ($colStr) VALUES $placeholders ON DUPLICATE KEY UPDATE $updateClause", $params);
+            // All bulkUpsert calls in this class currently use 'id' as unique because they are updates of existing IDs
+            $sql = Helpers::buildUpsertSql($table, $columns, $updateCols, ['id'], count($chunk));
+            $conn->executeStatement($sql, $params);
         }
     }
 }

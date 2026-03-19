@@ -10,12 +10,12 @@ use Repositories\Channeled\ChanneledDiscountRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledDiscountRepository::class)]
 #[ORM\Table(name: 'channeled_discounts')]
-#[ORM\Index(columns: ['code', 'platformId', 'channel'], name: 'idx_channeled_discounts_platformId_channel_idx')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_discounts_platformId_channel_idx')]
-#[ORM\Index(columns: ['code', 'channel'], name: 'idx_channeled_discounts_idx')]
+#[ORM\Index(columns: ['code', 'platformId', 'channel'], name: 'idx_channeled_discounts_full_idx')]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_discounts_pid_channel_idx')]
+#[ORM\Index(columns: ['code', 'channel'], name: 'idx_channeled_discounts_code_channel_idx')]
 #[ORM\Index(columns: ['platformId'], name: 'idx_channeled_discounts_platformId_idx')]
 #[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_discounts_platformCreatedAt_idx')]
-#[ORM\Index(columns: ['code'], name: 'idx_channeled_discounts_idx')]
+#[ORM\Index(columns: ['code'], name: 'idx_channeled_discounts_code_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledDiscount extends ChanneledEntity
 {
