@@ -244,8 +244,15 @@ class ProcessJobsCommand extends Command
                     $resolvedParams['jobId'] = $job->getId();
                     $body = $payload['body'] ?? null;
 
-                    // Increase lock wait timeout for this connection
-                    $this->em->getConnection()->executeStatement('SET SESSION innodb_lock_wait_timeout = 120');
+                    // Set long timeout for the session to avoid lock waits
+            $connection = $this->em->getConnection();
+            $platform = $connection->getDatabasePlatform();
+            if ($platform instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+                // PostgreSQL uses milliseconds for lock_timeout
+                $connection->executeStatement("SET lock_timeout = '300s'");
+            } else {
+                $connection->executeStatement("SET SESSION innodb_lock_wait_timeout = 300");
+            }
 
                     $result = $controller->fetchData($job->getEntity(), $channelEnum, $resolvedParams, $body);
 
