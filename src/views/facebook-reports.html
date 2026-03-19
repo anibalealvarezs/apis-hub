@@ -513,7 +513,8 @@
             currentData.forEach(row => {
                 const tr = document.createElement('tr');
                 const cpr = parseFloat(row.average_cost_per_result || 0);
-                const ctr = parseFloat(row.average_ctr || 0);
+                const ctr = parseFloat(row.average_ctr || 0) * 100;
+                const resRate = parseFloat(row.average_result_rate || 0) * 100;
                 
                 tr.innerHTML = `
                     <td class="account-name">${row.account || 'Unknown'}</td>
@@ -528,7 +529,7 @@
                     <td class="text-right metric-cell">€${formatNum(row.average_cpm)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_results)}</td>
                     <td class="text-right metric-cell"><span class="${getCostClass(cpr)}">€${formatNum(cpr)}</span></td>
-                    <td class="text-right metric-cell">${formatPct(row.average_result_rate)}</td>
+                    <td class="text-right metric-cell">${formatPct(resRate)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_actions)}</td>
                 `;
                 tbody.appendChild(tr);
@@ -588,8 +589,8 @@
         }
 
         function getCtrClass(v) {
-            if (v > 0.03) return 'pos';
-            if (v >= 0.02 && v <= 0.03) return 'badge-normal';
+            if (v > 3) return 'pos';
+            if (v >= 2 && v <= 3) return 'badge-normal';
             return 'neg';
         }
 
