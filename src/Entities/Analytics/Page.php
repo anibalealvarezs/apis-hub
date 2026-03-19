@@ -10,7 +10,7 @@ use Repositories\PageRepository;
 
 #[ORM\Entity(repositoryClass: PageRepository::class)]
 #[ORM\Table(name: 'pages')]
-#[ORM\Index(columns: ['url'], name: 'idx_pages_url_idx')]
+#[ORM\Index(columns: ['url'], name: 'idx_pages_idx')]
 #[ORM\Index(columns: ['platformId'], name: 'idx_pages_platformId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Page extends Entity

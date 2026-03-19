@@ -12,7 +12,7 @@ use Repositories\ProductRepository;
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
 #[ORM\Table(name: 'products')]
 #[ORM\Index(columns: ['productId'], name: 'idx_products_productId_idx')]
-#[ORM\Index(columns: ['sku'], name: 'idx_products_sku_idx')]
+#[ORM\Index(columns: ['sku'], name: 'idx_products_idx')]
 #[ORM\Index(columns: ['productId', 'sku'], name: 'idx_products_productId_sku_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Product extends Entity

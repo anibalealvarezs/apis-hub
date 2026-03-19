@@ -11,7 +11,7 @@ use Repositories\DiscountRepository;
 
 #[ORM\Entity(repositoryClass: DiscountRepository::class)]
 #[ORM\Table(name: 'discounts')]
-#[ORM\Index(columns: ['code'], name: 'idx_discounts_code_idx')]
+#[ORM\Index(columns: ['code'], name: 'idx_discounts_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Discount extends Entity
 {
