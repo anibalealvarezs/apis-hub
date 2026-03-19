@@ -258,8 +258,8 @@ class Helpers
             $uniqueClause = is_array($uniqueCols) ? implode(', ', $uniqueCols) : $uniqueCols;
             $updateClauses = [];
             foreach ($updateCols as $col) {
-                if ($col === 'updatedAt') {
-                    $updateClauses[] = "updatedAt = CURRENT_TIMESTAMP";
+                if ($col === 'updatedAt' || $col === 'updated_at') {
+                    $updateClauses[] = "{$col} = CURRENT_TIMESTAMP";
                     continue;
                 }
                 $updateClauses[] = "{$col} = EXCLUDED.{$col}";
@@ -271,8 +271,8 @@ class Helpers
             // MySQL syntax: ON DUPLICATE KEY UPDATE col = VALUES(col)
             $updateClauses = [];
             foreach ($updateCols as $col) {
-                if ($col === 'updatedAt') {
-                    $updateClauses[] = "updatedAt = CURRENT_TIMESTAMP";
+                if ($col === 'updatedAt' || $col === 'updated_at') {
+                    $updateClauses[] = "{$col} = CURRENT_TIMESTAMP";
                     continue;
                 }
                 $updateClauses[] = "{$col} = VALUES({$col})";

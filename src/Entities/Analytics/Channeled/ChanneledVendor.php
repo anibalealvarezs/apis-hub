@@ -10,11 +10,11 @@ use Repositories\Channeled\ChanneledVendorRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledVendorRepository::class)]
 #[ORM\Table(name: 'channeled_vendors')]
-#[ORM\Index(columns: ['name', 'platformId', 'channel'], name: 'idx_cv_full')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_cv_platform_channel')]
+#[ORM\Index(columns: ['name', 'platform_id', 'channel'], name: 'idx_cv_full')]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_cv_platform_channel')]
 #[ORM\Index(columns: ['name', 'channel'], name: 'idx_cv_name_channel')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_cv_platformId')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_cv_createdAt')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_cv_platform_id_idx')]
+#[ORM\Index(columns: ['platform_created_at'], name: 'idx_cv_platform_created_at_idx')]
 #[ORM\Index(columns: ['name'], name: 'idx_cv_name')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledVendor extends ChanneledEntity
@@ -30,7 +30,7 @@ class ChanneledVendor extends ChanneledEntity
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: Vendor::class, inversedBy: 'channeledVendors')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'vendor_id', onDelete: 'cascade')]
     protected Vendor $vendor;
 
     public function __construct()

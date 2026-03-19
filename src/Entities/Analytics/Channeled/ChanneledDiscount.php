@@ -10,11 +10,11 @@ use Repositories\Channeled\ChanneledDiscountRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledDiscountRepository::class)]
 #[ORM\Table(name: 'channeled_discounts')]
-#[ORM\Index(columns: ['code', 'platformId', 'channel'], name: 'idx_channeled_discounts_full_idx')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_discounts_pid_channel_idx')]
+#[ORM\Index(columns: ['code', 'platform_id', 'channel'], name: 'idx_channeled_discounts_full_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_discounts_pid_channel_idx')]
 #[ORM\Index(columns: ['code', 'channel'], name: 'idx_channeled_discounts_code_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_discounts_platformId_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_discounts_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_discounts_platform_id_idx')]
+#[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_discounts_platform_created_at_idx')]
 #[ORM\Index(columns: ['code'], name: 'idx_channeled_discounts_code_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledDiscount extends ChanneledEntity
@@ -28,13 +28,13 @@ class ChanneledDiscount extends ChanneledEntity
     protected Collection $channeledOrders;
 
     #[ORM\ManyToOne(targetEntity: ChanneledPriceRule::class, inversedBy: 'channeledDiscounts')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'channeled_price_rule_id', onDelete: 'cascade')]
     protected ChanneledPriceRule $channeledPriceRule;
 
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: Discount::class, inversedBy: 'channeledDiscounts')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'discount_id', onDelete: 'cascade')]
     protected Discount $discount;
 
     public function __construct()

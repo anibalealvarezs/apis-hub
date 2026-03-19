@@ -15,13 +15,13 @@ class ChanneledSyncError extends ChanneledEntity
     #[ORM\Column(type: 'string', length: 255)]
     protected string $identifier;
 
-    #[ORM\Column(type: 'string', length: 50)]
+    #[ORM\Column(name: 'sync_type', type: 'string', length: 50)]
     protected string $syncType; // e.g. 'metric', 'entity'
 
-    #[ORM\Column(type: 'string', length: 50)]
+    #[ORM\Column(name: 'entity_type', type: 'string', length: 50)]
     protected string $entityType; // e.g. 'campaign', 'ad', 'metric'
 
-    #[ORM\Column(type: 'text', nullable: true)]
+    #[ORM\Column(name: 'error_message', type: 'text', nullable: true)]
     protected ?string $errorMessage = null;
 
     /**

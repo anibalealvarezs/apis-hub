@@ -58,8 +58,8 @@ class ProductProcessor
                         'vendor_name' => $vendorName, // Reference for lookup later
                         'channel' => $chan,
                         'name' => $vendorName,
-                        'platformId' => $cp->vendor->platformId ?? $vendorName,
-                        'platformCreatedAt' => $cp->vendor->platformCreatedAt ?? null,
+                        'platform_id' => $cp->vendor->platformId ?? $vendorName,
+                        'platform_created_at' => $cp->vendor->platformCreatedAt ?? null,
                         'data' => $cp->vendor->data ?? [],
                     ];
                 }
@@ -69,7 +69,7 @@ class ProductProcessor
             $pKey = KeyGenerator::generateProductKey((string)$cp->platformId);
             if (!isset($uProd[$pKey])) {
                 $uProd[$pKey] = [
-                    'productId' => (string)$cp->platformId,
+                    'product_id' => (string)$cp->platformId,
                     'sku' => $cp->sku,
                 ];
             }
@@ -77,11 +77,11 @@ class ProductProcessor
             $cpKey = KeyGenerator::generateChanneledProductKey($chan, (string)$cp->platformId);
             if (!isset($uCProd[$cpKey])) {
                 $uCProd[$cpKey] = [
-                    'productId' => (string)$cp->platformId,
+                    'product_id' => (string)$cp->platformId,
                     'vendorRef' => $vendorKey,
                     'channel' => $chan,
-                    'platformId' => (string)$cp->platformId,
-                    'platformCreatedAt' => $cp->platformCreatedAt ?? null,
+                    'platform_id' => (string)$cp->platformId,
+                    'platform_created_at' => $cp->platformCreatedAt ?? null,
                     'data' => $cp->data ?? [],
                 ];
             }
@@ -104,8 +104,8 @@ class ProductProcessor
                             'variantPId' => $varPId,
                             'channeledProductRef' => $cpKey,
                             'channel' => $chan,
-                            'platformId' => $varPId,
-                            'platformCreatedAt' => $var->platformCreatedAt ?? null,
+                            'platform_id' => $varPId,
+                            'platform_created_at' => $var->platformCreatedAt ?? null,
                             'data' => $var->data ?? [],
                         ];
                     }
@@ -129,8 +129,8 @@ class ProductProcessor
                         $uCCat[$ccKey] = [
                             'categoryPId' => $catPId,
                             'channel' => $chan,
-                            'platformId' => $catPId,
-                            'platformCreatedAt' => $cat->platformCreatedAt ?? null,
+                            'platform_id' => $catPId,
+                            'platform_created_at' => $cat->platformCreatedAt ?? null,
                             'data' => $cat->data ?? [],
                         ];
                     }
@@ -190,8 +190,8 @@ class ProductProcessor
                     'vendor_id' => $vendorId,
                     'channel' => $cv['channel'],
                     'name' => $cv['name'],
-                    'platformId' => $cv['platformId'],
-                    'platformCreatedAt' => $cv['platformCreatedAt'] instanceof DateTime ? $cv['platformCreatedAt']->format('Y-m-d H:i:s') : $cv['platformCreatedAt'],
+                    'platform_id' => $cv['platform_id'],
+                    'platform_created_at' => $cv['platform_created_at'] instanceof DateTime ? $cv['platform_created_at']->format('Y-m-d H:i:s') : $cv['platform_created_at'],
                     'data' => json_encode($cv['data'])
                 ];
 
@@ -203,8 +203,8 @@ class ProductProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_vendors', ['vendor_id', 'channel', 'name', 'platformId', 'platformCreatedAt', 'data'], $insertRows);
-            self::bulkUpsert($conn, 'channeled_vendors', ['id', 'vendor_id', 'channel', 'name', 'platformId', 'platformCreatedAt', 'data'], ['vendor_id', 'channel', 'name', 'platformId', 'platformCreatedAt', 'data', 'updatedAt' => 'CURRENT_TIMESTAMP'], $updateRows);
+            self::bulkInsert($conn, 'channeled_vendors', ['vendor_id', 'channel', 'name', 'platform_id', 'platform_created_at', 'data'], $insertRows);
+            self::bulkUpsert($conn, 'channeled_vendors', ['id', 'vendor_id', 'channel', 'name', 'platform_id', 'platform_created_at', 'data'], ['vendor_id', 'channel', 'name', 'platform_id', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
 
             // Re-fetch maps to have IDs
             $channeledVendorMap = self::fetchChanneledEntities(
@@ -221,15 +221,15 @@ class ProductProcessor
         // ============================================
         $productMap = ['map' => [], 'mapReverse' => []];
         if (!empty($uProd)) {
-            $productIds = array_column($uProd, 'productId');
+            $productIds = array_column($uProd, 'product_id');
             $productMap = self::fetchAndInsertEntities(
                 $conn,
                 'products',
-                'productId',
+                'product_id',
                 $productIds,
-                ['productId', 'sku'],
-                [$uProd, fn ($p) => [$p['productId'], $p['sku']]],
-                fn ($chunk) => "SELECT id, productId, sku FROM products WHERE productId IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
+                ['product_id', 'sku'],
+                [$uProd, fn ($p) => [$p['product_id'], $p['sku']]],
+                fn ($chunk) => "SELECT id, product_id, sku FROM products WHERE product_id IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
                 fn ($conn, $sql, $params) => MapGenerator::getProductMap($manager, $sql, $params)
             );
         }
@@ -238,38 +238,38 @@ class ProductProcessor
         $channeledProductMap = [];
         if (!empty($uCProd)) {
             $cpKeys = [];
-            foreach ($uCProd as $cp) {
-                $cpKeys[] = ['channel' => $cp['channel'], 'platformId' => $cp['platformId']];
+            foreach ($uCProd as $cpRow) {
+                $cpKeys[] = ['channel' => $cpRow['channel'], 'platform_id' => $cpRow['platform_id']];
             }
             $channeledProductMap = self::fetchChanneledEntities(
                 $conn,
                 $cpKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductMap($manager, $sql, $params)
             );
 
             $insertRows = [];
             $updateRows = [];
-            foreach ($uCProd as $k => $cp) {
-                $pKey = KeyGenerator::generateProductKey($cp['productId']);
+            foreach ($uCProd as $k => $cpRow) {
+                $pKey = KeyGenerator::generateProductKey($cpRow['product_id']);
                 if (!isset($productMap['map'][$pKey])) {
                     continue;
                 }
                 $productId = $productMap['map'][$pKey]['id'];
 
                 $vendorId = null;
-                if ($cp['vendorRef'] && isset($channeledVendorMap[$cp['vendorRef']])) {
-                    $vendorId = $channeledVendorMap[$cp['vendorRef']]['id'];
+                if ($cpRow['vendorRef'] && isset($channeledVendorMap[$cpRow['vendorRef']])) {
+                    $vendorId = $channeledVendorMap[$cpRow['vendorRef']]['id'];
                 }
 
                 $row = [
                     'product_id' => $productId,
                     'channeled_vendor_id' => $vendorId,
-                    'channel' => $cp['channel'],
-                    'platformId' => $cp['platformId'],
-                    'platformCreatedAt' => $cp['platformCreatedAt'] instanceof DateTime ? $cp['platformCreatedAt']->format('Y-m-d H:i:s') : $cp['platformCreatedAt'],
-                    'data' => json_encode($cp['data'])
+                    'channel' => $cpRow['channel'],
+                    'platform_id' => $cpRow['platform_id'],
+                    'platform_created_at' => $cpRow['platform_created_at'] instanceof DateTime ? $cpRow['platform_created_at']->format('Y-m-d H:i:s') : $cpRow['platform_created_at'],
+                    'data' => json_encode($cpRow['data'])
                 ];
 
                 if (isset($channeledProductMap[$k])) {
@@ -280,14 +280,14 @@ class ProductProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_products', ['product_id', 'channeled_vendor_id', 'channel', 'platformId', 'platformCreatedAt', 'data'], $insertRows);
-            self::bulkUpsert($conn, 'channeled_products', ['id', 'product_id', 'channeled_vendor_id', 'channel', 'platformId', 'platformCreatedAt', 'data'], ['product_id', 'channeled_vendor_id', 'channel', 'platformId', 'platformCreatedAt', 'data', 'updatedAt' => 'CURRENT_TIMESTAMP'], $updateRows);
+            self::bulkInsert($conn, 'channeled_products', ['product_id', 'channeled_vendor_id', 'channel', 'platform_id', 'platform_created_at', 'data'], $insertRows);
+            self::bulkUpsert($conn, 'channeled_products', ['id', 'product_id', 'channeled_vendor_id', 'channel', 'platform_id', 'platform_created_at', 'data'], ['product_id', 'channeled_vendor_id', 'channel', 'platform_id', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
 
             $channeledProductMap = self::fetchChanneledEntities(
                 $conn,
                 $cpKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductMap($manager, $sql, $params)
             );
         }
@@ -297,15 +297,15 @@ class ProductProcessor
         // ============================================
         $variantMap = ['map' => [], 'mapReverse' => []];
         if (!empty($uVar)) {
-            $variantIds = array_column($uVar, 'productVariantId');
+            $variantIds = array_column($uVar, 'product_variant_id');
             $variantMap = self::fetchAndInsertEntities(
                 $conn,
                 'product_variants',
-                'productVariantId',
+                'product_variant_id',
                 $variantIds,
-                ['productVariantId', 'sku'],
-                [$uVar, fn ($v) => [$v['productVariantId'], $v['sku']]],
-                fn ($chunk) => "SELECT id, productVariantId, sku FROM product_variants WHERE productVariantId IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
+                ['product_variant_id', 'sku'],
+                [$uVar, fn ($v) => [$v['product_variant_id'], $v['sku']]],
+                fn ($chunk) => "SELECT id, product_variant_id, sku FROM product_variants WHERE product_variant_id IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
                 fn ($conn, $sql, $params) => MapGenerator::getProductVariantMap($manager, $sql, $params)
             );
         }
@@ -314,29 +314,29 @@ class ProductProcessor
         $channeledVariantMap = [];
         if (!empty($uCVar)) {
             $cvKeys = [];
-            foreach ($uCVar as $cv) {
-                $cvKeys[] = ['channel' => $cv['channel'], 'platformId' => $cv['platformId']];
+            foreach ($uCVar as $cvRow) {
+                $cvKeys[] = ['channel' => $cvRow['channel'], 'platform_id' => $cvRow['platform_id']];
             }
             $channeledVariantMap = self::fetchChanneledEntities(
                 $conn,
                 $cvKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_product_variants WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_product_variants WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductVariantMap($manager, $sql, $params)
             );
 
             $insertRows = [];
             $updateRows = [];
-            foreach ($uCVar as $k => $cv) {
-                $vKey = KeyGenerator::generateProductVariantKey($cv['variantPId']);
+            foreach ($uCVar as $k => $cvRow) {
+                $vKey = KeyGenerator::generateProductVariantKey($cvRow['variantPId']);
                 if (!isset($variantMap['map'][$vKey])) {
                     continue;
                 }
                 $variantId = $variantMap['map'][$vKey]['id'];
 
                 $cProductId = null;
-                if ($cv['channeledProductRef'] && isset($channeledProductMap[$cv['channeledProductRef']])) {
-                    $cProductId = $channeledProductMap[$cv['channeledProductRef']]['id'];
+                if ($cvRow['channeledProductRef'] && isset($channeledProductMap[$cvRow['channeledProductRef']])) {
+                    $cProductId = $channeledProductMap[$cvRow['channeledProductRef']]['id'];
                 }
 
                 if (!$cProductId) {
@@ -346,10 +346,10 @@ class ProductProcessor
                 $row = [
                     'product_variant_id' => $variantId,
                     'channeled_product_id' => $cProductId,
-                    'channel' => $cv['channel'],
-                    'platformId' => $cv['platformId'],
-                    'platformCreatedAt' => $cv['platformCreatedAt'] instanceof DateTime ? $cv['platformCreatedAt']->format('Y-m-d H:i:s') : $cv['platformCreatedAt'],
-                    'data' => json_encode($cv['data'])
+                    'channel' => $cvRow['channel'],
+                    'platform_id' => $cvRow['platform_id'],
+                    'platform_created_at' => $cvRow['platform_created_at'] instanceof DateTime ? $cvRow['platform_created_at']->format('Y-m-d H:i:s') : $cvRow['platform_created_at'],
+                    'data' => json_encode($cvRow['data'])
                 ];
 
                 if (isset($channeledVariantMap[$k])) {
@@ -360,14 +360,14 @@ class ProductProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_product_variants', ['product_variant_id', 'channeled_product_id', 'channel', 'platformId', 'platformCreatedAt', 'data'], $insertRows);
-            self::bulkUpsert($conn, 'channeled_product_variants', ['id', 'product_variant_id', 'channeled_product_id', 'channel', 'platformId', 'platformCreatedAt', 'data'], ['product_variant_id', 'channeled_product_id', 'channel', 'platformId', 'platformCreatedAt', 'data', 'updatedAt' => 'CURRENT_TIMESTAMP'], $updateRows);
+            self::bulkInsert($conn, 'channeled_product_variants', ['product_variant_id', 'channeled_product_id', 'channel', 'platform_id', 'platform_created_at', 'data'], $insertRows);
+            self::bulkUpsert($conn, 'channeled_product_variants', ['id', 'product_variant_id', 'channeled_product_id', 'channel', 'platform_id', 'platform_created_at', 'data'], ['product_variant_id', 'channeled_product_id', 'channel', 'platform_id', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
 
             $channeledVariantMap = self::fetchChanneledEntities(
                 $conn,
                 $cvKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_product_variants WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_product_variants WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductVariantMap($manager, $sql, $params)
             );
         }
@@ -377,15 +377,15 @@ class ProductProcessor
         // ============================================
         $categoryMap = ['map' => [], 'mapReverse' => []];
         if (!empty($uCat)) {
-            $catIds = array_column($uCat, 'productCategoryId');
+            $catIds = array_column($uCat, 'product_category_id');
             $categoryMap = self::fetchAndInsertEntities(
                 $conn,
                 'product_categories',
-                'productCategoryId',
+                'product_category_id',
                 $catIds,
-                ['productCategoryId', 'isSmartCollection'],
-                [$uCat, fn ($c) => [$c['productCategoryId'], $c['isSmartCollection'] ? 1 : 0]],
-                fn ($chunk) => "SELECT id, productCategoryId FROM product_categories WHERE productCategoryId IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
+                ['product_category_id', 'isSmartCollection'],
+                [$uCat, fn ($c) => [$c['product_category_id'], $c['isSmartCollection'] ? 1 : 0]],
+                fn ($chunk) => "SELECT id, product_category_id FROM product_categories WHERE product_category_id IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
                 fn ($conn, $sql, $params) => MapGenerator::getProductCategoryMap($manager, $sql, $params)
             );
         }
@@ -394,21 +394,21 @@ class ProductProcessor
         $channeledCategoryMap = [];
         if (!empty($uCCat)) {
             $ccKeys = [];
-            foreach ($uCCat as $cc) {
-                $ccKeys[] = ['channel' => $cc['channel'], 'platformId' => $cc['platformId']];
+            foreach ($uCCat as $ccRow) {
+                $ccKeys[] = ['channel' => $ccRow['channel'], 'platform_id' => $ccRow['platform_id']];
             }
             $channeledCategoryMap = self::fetchChanneledEntities(
                 $conn,
                 $ccKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_product_categories WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_product_categories WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductCategoryMap($manager, $sql, $params)
             );
 
             $insertRows = [];
             $updateRows = [];
-            foreach ($uCCat as $k => $cc) {
-                $cKey = KeyGenerator::generateProductCategoryKey($cc['categoryPId']);
+            foreach ($uCCat as $k => $ccRow) {
+                $cKey = KeyGenerator::generateProductCategoryKey($ccRow['categoryPId']);
                 if (!isset($categoryMap['map'][$cKey])) {
                     continue;
                 }
@@ -416,11 +416,11 @@ class ProductProcessor
 
                 $row = [
                     'product_category_id' => $categoryId,
-                    'channel' => $cc['channel'],
-                    'platformId' => $cc['platformId'],
+                    'channel' => $ccRow['channel'],
+                    'platform_id' => $ccRow['platform_id'],
                     'isSmartCollection' => 0, // Fallback if needed, check DB schema
-                    'platformCreatedAt' => $cc['platformCreatedAt'] instanceof DateTime ? $cc['platformCreatedAt']->format('Y-m-d H:i:s') : $cc['platformCreatedAt'],
-                    'data' => json_encode($cc['data'])
+                    'platform_created_at' => $ccRow['platform_created_at'] instanceof DateTime ? $ccRow['platform_created_at']->format('Y-m-d H:i:s') : $ccRow['platform_created_at'],
+                    'data' => json_encode($ccRow['data'])
                 ];
 
                 if (isset($channeledCategoryMap[$k])) {
@@ -431,14 +431,14 @@ class ProductProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_product_categories', ['product_category_id', 'channel', 'platformId', 'isSmartCollection', 'platformCreatedAt', 'data'], $insertRows);
-            self::bulkUpsert($conn, 'channeled_product_categories', ['id', 'product_category_id', 'channel', 'platformId', 'isSmartCollection', 'platformCreatedAt', 'data'], ['product_category_id', 'channel', 'platformId', 'isSmartCollection', 'platformCreatedAt', 'data', 'updatedAt' => 'CURRENT_TIMESTAMP'], $updateRows);
+            self::bulkInsert($conn, 'channeled_product_categories', ['product_category_id', 'channel', 'platform_id', 'isSmartCollection', 'platform_created_at', 'data'], $insertRows);
+            self::bulkUpsert($conn, 'channeled_product_categories', ['id', 'product_category_id', 'channel', 'platform_id', 'isSmartCollection', 'platform_created_at', 'data'], ['product_category_id', 'channel', 'platform_id', 'isSmartCollection', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
 
             $channeledCategoryMap = self::fetchChanneledEntities(
                 $conn,
                 $ccKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_product_categories WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_product_categories WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductCategoryMap($manager, $sql, $params)
             );
         }
@@ -472,11 +472,11 @@ class ProductProcessor
         }
 
         return [
-            'products' => array_column($uProd, 'productId'),
-            'channeledProducts' => array_column($uCProd, 'platformId'),
+            'products' => array_column($uProd, 'product_id'),
+            'channeledProducts' => array_column($uCProd, 'platform_id'),
             'vendors' => array_column($uVend, 'name'),
-            'productVariants' => array_column($uVar, 'productVariantId'),
-            'productCategories' => array_column($uCat, 'productCategoryId'),
+            'productVariants' => array_column($uVar, 'product_variant_id'),
+            'productCategories' => array_column($uCat, 'product_category_id'),
             'channels' => array_unique(array_column($uCProd, 'channel'))
         ];
     }
@@ -526,7 +526,7 @@ class ProductProcessor
                 foreach ($chunk as $row) {
                     $params = array_merge($params, $row);
                 }
-                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'vendors' ? 'name' : ($table === 'products' ? 'productId' : ($table === 'product_variants' ? 'productVariantId' : 'productCategoryId'))), count($chunk));
+                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'vendors' ? 'name' : ($table === 'products' ? 'product_id' : ($table === 'product_variants' ? 'product_variant_id' : 'product_category_id'))), count($chunk));
                 $conn->executeStatement($sql, $params);
             }
 
@@ -565,7 +565,7 @@ class ProductProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $uniqueCols = ($table === 'channeled_vendors' ? ['channel', 'name'] : ['channel', 'platformId']);
+        $uniqueCols = ($table === 'channeled_vendors' ? ['channel', 'name'] : ['channel', 'platform_id']);
         if ($table === 'channeled_product_categories_channeled_products') {
             $uniqueCols = ['channeledproductcategory_id', 'channeledproduct_id'];
         }

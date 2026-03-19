@@ -12,14 +12,14 @@ use Repositories\Channeled\ChanneledAdRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledAdRepository::class)]
 #[ORM\Table(name: 'channeled_ads')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_ads_platformId_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_ads_platform_id_idx')]
 #[ORM\Index(columns: ['channel'], name: 'idx_channeled_ads_channel_idx')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_ads_platform_channel_idx')]
-#[ORM\Index(columns: ['channeledAdGroup_id'], name: 'idx_channeled_ads_channeledAdGroup_id_idx')]
-#[ORM\Index(columns: ['channeledCampaign_id'], name: 'idx_channeled_ads_channeledCampaign_id_idx')]
-#[ORM\Index(columns: ['channeledCampaign_id', 'channeledAdGroup_id'], name: 'idx_527b69f31c_channeledCampaign_id_channeledAdGroup_id_idx')]
-#[ORM\Index(columns: ['platformId', 'channel', 'channeledCampaign_id', 'channeledAdGroup_id'], name: 'idx_e6a76661d6_platformId_channel_channeledCampaign_id_channeledAdGroup_id_idx')]
-#[ORM\UniqueConstraint(name: 'platformId_channeledCampaign_id_ad_uidx', columns: ['platformId', 'channeledCampaign_id'])]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_ads_platform_channel_idx')]
+#[ORM\Index(columns: ['channeled_ad_group_id'], name: 'idx_channeled_ads_channeled_ad_group_id_idx')]
+#[ORM\Index(columns: ['channeled_campaign_id'], name: 'idx_channeled_ads_channeled_campaign_id_idx')]
+#[ORM\Index(columns: ['channeled_campaign_id', 'channeled_ad_group_id'], name: 'idx_channeled_ads_campaign_ad_group_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel', 'channeled_campaign_id', 'channeled_ad_group_id'], name: 'idx_channeled_ads_full_idx')]
+#[ORM\UniqueConstraint(name: 'channeled_ads_platform_id_campaign_id_uidx', columns: ['platform_id', 'channeled_campaign_id'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledAd extends ChanneledEntity
 {
@@ -30,19 +30,19 @@ class ChanneledAd extends ChanneledEntity
     protected ?CampaignStatus $status = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAdGroup::class, inversedBy: 'channeledAds')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_ad_group_id', onDelete: 'SET NULL')]
     protected ?ChanneledAdGroup $channeledAdGroup = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledCampaign::class, inversedBy: 'channeledAds')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_campaign_id', onDelete: 'SET NULL')]
     protected ?ChanneledCampaign $channeledCampaign = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'channeledAds')]
-    #[ORM\JoinColumn(onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'channeled_account_id', onDelete: 'CASCADE')]
     protected ChanneledAccount $channeledAccount;
 
     #[ORM\ManyToOne(targetEntity: Creative::class, inversedBy: 'channeledAds')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'creative_id', onDelete: 'SET NULL')]
     protected ?Creative $creative = null;
 
     #[ORM\OneToMany(mappedBy: 'channeledAd', targetEntity: MetricConfig::class, orphanRemoval: true)]

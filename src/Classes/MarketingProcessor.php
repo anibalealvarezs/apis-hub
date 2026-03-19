@@ -44,9 +44,9 @@ class MarketingProcessor
         if (!empty($insertParams)) {
             $sql = Helpers::buildUpsertSql(
                 'campaigns', 
-                ['campaignId', 'name', 'startDate', 'endDate'], 
-                ['name', 'startDate', 'endDate'], 
-                'campaignId', 
+                ['campaign_id', 'name', 'start_date', 'end_date'], 
+                ['name', 'start_date', 'end_date'], 
+                'campaign_id', 
                 count($campaigns)
             );
             $conn->executeStatement($sql, $insertParams);
@@ -54,12 +54,12 @@ class MarketingProcessor
         }
 
         // 2. Fetch campaign IDs map
-        $sqlMap = 'SELECT id, campaignId FROM campaigns WHERE campaignId IN ('
+        $sqlMap = 'SELECT id, campaign_id FROM campaigns WHERE campaign_id IN ('
             . implode(', ', array_fill(0, count($campaignIds), '?')) . ')';
         $fetched = $conn->executeQuery($sqlMap, $campaignIds)->fetchAllAssociative();
         $campaignMap = [];
         foreach ($fetched as $row) {
-            $campaignMap[$row['campaignId']] = $row['id'];
+            $campaignMap[$row['campaign_id']] = $row['id'];
         }
 
         // 3. Bulk Insert/Update channeled_campaigns
@@ -79,9 +79,9 @@ class MarketingProcessor
         if (!empty($channeledParams)) {
             $sql = Helpers::buildUpsertSql(
                 'channeled_campaigns', 
-                ['channel', 'platformId', 'campaign_id', 'channeledAccount_id', 'budget', 'status', 'objective', 'buyingType', 'data'], 
-                ['campaign_id', 'budget', 'status', 'objective', 'buyingType', 'data'], 
-                ['channel', 'platformId'], 
+                ['channel', 'platform_id', 'campaign_id', 'channeledaccount_id', 'budget', 'status', 'objective', 'buyingtype', 'data'], 
+                ['campaign_id', 'budget', 'status', 'objective', 'buyingtype', 'data'], 
+                ['channel', 'platform_id'], 
                 count($campaigns)
             );
             $conn->executeStatement($sql, $channeledParams);
@@ -141,9 +141,9 @@ class MarketingProcessor
         if (!empty($params)) {
             $sql = Helpers::buildUpsertSql(
                 'channeled_ad_groups', 
-                ['channel', 'platformId', 'channeledAccount_id', 'campaign_id', 'channeledCampaign_id', 'name', 'startDate', 'endDate', 'status', 'optimizationGoal', 'billingEvent', 'targeting', 'data'], 
-                ['campaign_id', 'channeledCampaign_id', 'name', 'status', 'targeting', 'data'], 
-                ['channel', 'platformId'], 
+                ['channel', 'platform_id', 'channeledaccount_id', 'campaign_id', 'channeledcampaign_id', 'name', 'start_date', 'end_date', 'status', 'optimizationgoal', 'billingevent', 'targeting', 'data'], 
+                ['campaign_id', 'channeledcampaign_id', 'name', 'status', 'targeting', 'data'], 
+                ['channel', 'platform_id'], 
                 count($adsets)
             );
             $conn->executeStatement($sql, $params);
@@ -217,9 +217,9 @@ class MarketingProcessor
         if (!empty($params)) {
             $sql = Helpers::buildUpsertSql(
                 'channeled_ads', 
-                ['channel', 'platformId', 'channeledAccount_id', 'channeledCampaign_id', 'channeledAdGroup_id', 'creative_id', 'name', 'status', 'data'], 
-                ['channeledCampaign_id', 'channeledAdGroup_id', 'creative_id', 'name', 'status', 'data'], 
-                ['channel', 'platformId'], 
+                ['channel', 'platform_id', 'channeledaccount_id', 'channeledcampaign_id', 'channeledadgroup_id', 'creative_id', 'name', 'status', 'data'], 
+                ['channeledcampaign_id', 'channeledadgroup_id', 'creative_id', 'name', 'status', 'data'], 
+                ['channel', 'platform_id'], 
                 count($ads)
             );
             $conn->executeStatement($sql, $params);
@@ -252,9 +252,9 @@ class MarketingProcessor
         if (!empty($insertParams)) {
             $sql = Helpers::buildUpsertSql(
                 'creatives', 
-                ['creativeId', 'name', 'data'], 
+                ['creative_id', 'name', 'data'], 
                 ['name', 'data'], 
-                'creativeId', 
+                'creative_id', 
                 count($creatives)
             );
             $conn->executeStatement($sql, $insertParams);

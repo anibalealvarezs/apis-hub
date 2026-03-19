@@ -17,7 +17,7 @@ use Repositories\ProductVariantRepository;
 #[ORM\HasLifecycleCallbacks]
 class ProductVariant extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(name: 'product_variant_id', type: 'string', unique: true)]
     protected int|string $productVariantId;
 
     #[ORM\Column(type: 'string', nullable: true)]

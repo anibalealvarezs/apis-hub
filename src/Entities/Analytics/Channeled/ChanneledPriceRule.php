@@ -10,9 +10,9 @@ use Repositories\Channeled\ChanneledPriceRuleRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledPriceRuleRepository::class)]
 #[ORM\Table(name: 'channeled_price_rules')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_price_rules_platformId_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_price_rules_platformId_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_price_rules_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_price_rules_platform_id_channel_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_price_rules_platform_id_idx')]
+#[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_price_rules_platform_created_at_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledPriceRule extends ChanneledEntity
 {
@@ -24,7 +24,7 @@ class ChanneledPriceRule extends ChanneledEntity
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: PriceRule::class, inversedBy: 'channeledPriceRules')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'price_rule_id', onDelete: 'cascade')]
     protected PriceRule $priceRule;
 
     public function __construct()

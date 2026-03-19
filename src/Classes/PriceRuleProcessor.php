@@ -36,16 +36,16 @@ class PriceRuleProcessor
 
             $prKey = KeyGenerator::generatePriceRuleKey($pId);
             if (!isset($uPR[$prKey])) {
-                $uPR[$prKey] = ['priceRuleId' => $pId];
+                $uPR[$prKey] = ['price_rule_id' => $pId];
             }
 
             $cprKey = KeyGenerator::generateChanneledPriceRuleKey($chan, $pId);
             if (!isset($uCPR[$cprKey])) {
                 $uCPR[$cprKey] = [
-                    'priceRuleId' => $pId,
+                    'price_rule_id' => $pId,
                     'channel' => $chan,
-                    'platformId' => $pId,
-                    'platformCreatedAt' => isset($cpr->platformCreatedAt) ? $cpr->platformCreatedAt : null,
+                    'platform_id' => $pId,
+                    'platform_created_at' => isset($cpr->platformCreatedAt) ? $cpr->platformCreatedAt : null,
                     'data' => is_object($cpr->data) ? clone $cpr->data : (object)($cpr->data ?? []),
                 ];
             }
@@ -54,15 +54,15 @@ class PriceRuleProcessor
         // PRICE RULES
         $priceRuleMap = ['map' => [], 'mapReverse' => []];
         if (!empty($uPR)) {
-            $prIds = array_column($uPR, 'priceRuleId');
+            $prIds = array_column($uPR, 'price_rule_id');
             $priceRuleMap = self::fetchAndInsertEntities(
                 $conn,
                 'price_rules',
-                'priceRuleId',
+                'price_rule_id',
                 $prIds,
-                ['priceRuleId'],
-                [$uPR, fn ($p) => [$p['priceRuleId']]],
-                fn ($chunk) => "SELECT id, priceRuleId FROM price_rules WHERE priceRuleId IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
+                ['price_rule_id'],
+                [$uPR, fn ($p) => [$p['price_rule_id']]],
+                fn ($chunk) => "SELECT id, price_rule_id FROM price_rules WHERE price_rule_id IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
                 fn ($conn, $sql, $params) => MapGenerator::getPriceRuleMap($manager, $sql, $params)
             );
         }
@@ -71,23 +71,23 @@ class PriceRuleProcessor
         $cprMap = [];
         if (!empty($uCPR)) {
             $cprKeys = [];
-            foreach ($uCPR as $cpr) {
-                $cprKeys[] = ['channel' => $cpr['channel'], 'platformId' => $cpr['platformId']];
+            foreach ($uCPR as $cprRow) {
+                $cprKeys[] = ['channel' => $cprRow['channel'], 'platform_id' => $cprRow['platform_id']];
             }
 
             $cprMap = self::fetchChanneledEntities(
                 $conn,
                 $cprKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_price_rules WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_price_rules WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledPriceRuleMap($manager, $sql, $params)
             );
 
             $insertRows = [];
             $updateRows = [];
 
-            foreach ($uCPR as $k => $cpr) {
-                $prKey = KeyGenerator::generatePriceRuleKey($cpr['priceRuleId']);
+            foreach ($uCPR as $k => $cprRow) {
+                $prKey = KeyGenerator::generatePriceRuleKey($cprRow['price_rule_id']);
                 if (!isset($priceRuleMap['map'][$prKey])) {
                     continue;
                 }
@@ -95,10 +95,10 @@ class PriceRuleProcessor
 
                 $row = [
                     'price_rule_id' => $prId,
-                    'channel' => $cpr['channel'],
-                    'platformId' => $cpr['platformId'],
-                    'platformCreatedAt' => $cpr['platformCreatedAt'] instanceof \DateTime ? $cpr['platformCreatedAt']->format('Y-m-d H:i:s') : $cpr['platformCreatedAt'],
-                    'data' => json_encode($cpr['data'])
+                    'channel' => $cprRow['channel'],
+                    'platform_id' => $cprRow['platform_id'],
+                    'platform_created_at' => $cprRow['platform_created_at'] instanceof \DateTime ? $cprRow['platform_created_at']->format('Y-m-d H:i:s') : $cprRow['platform_created_at'],
+                    'data' => json_encode($cprRow['data'])
                 ];
 
                 if (isset($cprMap[$k])) {
@@ -109,29 +109,29 @@ class PriceRuleProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_price_rules', ['price_rule_id', 'channel', 'platformId', 'platformCreatedAt', 'data'], $insertRows);
-            self::bulkUpsert($conn, 'channeled_price_rules', ['id', 'price_rule_id', 'channel', 'platformId', 'platformCreatedAt', 'data'], ['price_rule_id', 'channel', 'platformId', 'platformCreatedAt', 'data', 'updatedAt' => 'CURRENT_TIMESTAMP'], $updateRows);
+            self::bulkInsert($conn, 'channeled_price_rules', ['price_rule_id', 'channel', 'platform_id', 'platform_created_at', 'data'], $insertRows);
+            self::bulkUpsert($conn, 'channeled_price_rules', ['id', 'price_rule_id', 'channel', 'platform_id', 'platform_created_at', 'data'], ['price_rule_id', 'channel', 'platform_id', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
 
             $cprMap = self::fetchChanneledEntities(
                 $conn,
                 $cprKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_price_rules WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_price_rules WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledPriceRuleMap($manager, $sql, $params)
             );
         }
 
         // We return the database ID of ChanneledPriceRule so we can use it to attach discounts
         $channeledEntities = [];
-        foreach ($uCPR as $k => $cpr) {
+        foreach ($uCPR as $k => $cprRow) {
             if (isset($cprMap[$k])) {
-                $channeledEntities[$cpr['platformId']] = $cprMap[$k]['id'];
+                $channeledEntities[$cprRow['platform_id']] = $cprMap[$k]['id'];
             }
         }
 
         return [
-            'priceRules' => array_column($uPR, 'priceRuleId'),
-            'channeledPriceRules' => array_column($uCPR, 'platformId'),
+            'priceRules' => array_column($uPR, 'price_rule_id'),
+            'channeledPriceRules' => array_column($uCPR, 'platform_id'),
             'channels' => array_unique(array_column($uCPR, 'channel')),
             'cprDbIds' => $channeledEntities,
         ];
@@ -177,8 +177,8 @@ class PriceRuleProcessor
                 $uCDisc[$cdKey] = [
                     'code' => $code,
                     'channel' => $chan,
-                    'platformId' => (string)$cd->platformId,
-                    'platformCreatedAt' => isset($cd->platformCreatedAt) ? $cd->platformCreatedAt : null,
+                    'platform_id' => (string)$cd->platformId,
+                    'platform_created_at' => isset($cd->platformCreatedAt) ? $cd->platformCreatedAt : null,
                     'data' => is_object($cd->data) ? clone $cd->data : (object)($cd->data ?? []),
                 ];
             }
@@ -219,8 +219,8 @@ class PriceRuleProcessor
             $insertRows = [];
             $updateRows = [];
 
-            foreach ($uCDisc as $k => $cd) {
-                $dKey = KeyGenerator::generateDiscountKey($cd['code']);
+            foreach ($uCDisc as $k => $cdRow) {
+                $dKey = KeyGenerator::generateDiscountKey($cdRow['code']);
                 if (!isset($discountMap['map'][$dKey])) {
                     continue;
                 }
@@ -229,11 +229,11 @@ class PriceRuleProcessor
                 $row = [
                     'discount_id' => $dId,
                     'channeled_price_rule_id' => $channeledPriceRuleDbId,
-                    'channel' => $cd['channel'],
-                    'platformId' => $cd['platformId'],
-                    'code' => $cd['code'],
-                    'platformCreatedAt' => $cd['platformCreatedAt'] instanceof \DateTime ? $cd['platformCreatedAt']->format('Y-m-d H:i:s') : $cd['platformCreatedAt'],
-                    'data' => json_encode($cd['data'])
+                    'channel' => $cdRow['channel'],
+                    'platform_id' => $cdRow['platform_id'],
+                    'code' => $cdRow['code'],
+                    'platform_created_at' => $cdRow['platform_created_at'] instanceof \DateTime ? $cdRow['platform_created_at']->format('Y-m-d H:i:s') : $cdRow['platform_created_at'],
+                    'data' => json_encode($cdRow['data'])
                 ];
 
                 if (isset($cdMap[$k])) {
@@ -244,8 +244,8 @@ class PriceRuleProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_discounts', ['discount_id', 'channeled_price_rule_id', 'channel', 'platformId', 'code', 'platformCreatedAt', 'data'], $insertRows);
-            self::bulkUpsert($conn, 'channeled_discounts', ['id', 'discount_id', 'channeled_price_rule_id', 'channel', 'platformId', 'code', 'platformCreatedAt', 'data'], ['discount_id', 'channeled_price_rule_id', 'channel', 'platformId', 'code', 'platformCreatedAt', 'data', 'updatedAt' => 'CURRENT_TIMESTAMP'], $updateRows);
+            self::bulkInsert($conn, 'channeled_discounts', ['discount_id', 'channeled_price_rule_id', 'channel', 'platform_id', 'code', 'platform_created_at', 'data'], $insertRows);
+            self::bulkUpsert($conn, 'channeled_discounts', ['id', 'discount_id', 'channeled_price_rule_id', 'channel', 'platform_id', 'code', 'platform_created_at', 'data'], ['discount_id', 'channeled_price_rule_id', 'channel', 'platform_id', 'code', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
         }
 
         return [
@@ -283,7 +283,7 @@ class PriceRuleProcessor
                 foreach ($chunk as $row) {
                     $params = array_merge($params, $row);
                 }
-                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'price_rules' ? 'priceRuleId' : 'code'), count($chunk));
+                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'price_rules' ? 'price_rule_id' : 'code'), count($chunk));
                 $conn->executeStatement($sql, $params);
             }
 
@@ -321,7 +321,7 @@ class PriceRuleProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $uniqueCols = ($table === 'channeled_price_rules' ? ['channel', 'platformId'] : ['channel', 'code']);
+        $uniqueCols = ($table === 'channeled_price_rules' ? ['channel', 'platform_id'] : ['channel', 'code']);
         
         foreach ($chunks as $chunk) {
             $params = [];

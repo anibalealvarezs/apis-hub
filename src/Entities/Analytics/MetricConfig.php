@@ -15,21 +15,21 @@ use Repositories\MetricConfigRepository;
 
 #[ORM\Entity(repositoryClass: MetricConfigRepository::class)]
 #[ORM\Table(name: 'metric_configs')]
-#[ORM\Index(columns: ['channel', 'name', 'period', 'metricDate'], name: 'idx_metric_configs_metricDate_period_idx')]
-#[ORM\Index(columns: ['channel', 'name', 'metricDate'], name: 'idx_metric_configs_metricDate_base_idx')]
+#[ORM\Index(columns: ['channel', 'name', 'period', 'metric_date'], name: 'idx_metric_configs_metricDate_period_idx')]
+#[ORM\Index(columns: ['channel', 'name', 'metric_date'], name: 'idx_metric_configs_metricDate_base_idx')]
 #[ORM\Index(
-    columns: ['channel', 'name', 'period', 'metricDate', 'query_id', 'page_id', 'country_id', 'device_id'],
+    columns: ['channel', 'name', 'period', 'metric_date', 'query_id', 'page_id', 'country_id', 'device_id'],
     name: 'idx_metric_configs_lookup_full_idx'
 )]
 #[ORM\Index(
-    columns: ['channel', 'name', 'period', 'metricDate', 'channeledAccount_id'],
+    columns: ['channel', 'name', 'period', 'metric_date', 'channeled_account_id'],
     name: 'idx_metric_configs_lookup_channeled_idx'
 )]
 #[ORM\Index(
-    columns: ['channel', 'name', 'period', 'metricDate', 'account_id'],
+    columns: ['channel', 'name', 'period', 'metric_date', 'account_id'],
     name: 'idx_metric_configs_lookup_account_idx'
 )]
-#[ORM\UniqueConstraint(name: 'metric_config_signature_unique', columns: ['configSignature'])]
+#[ORM\UniqueConstraint(name: 'metric_config_signature_unique', columns: ['config_signature'])]
 #[ORM\HasLifecycleCallbacks]
 class MetricConfig extends Entity
 {
@@ -42,7 +42,7 @@ class MetricConfig extends Entity
     #[ORM\Column(type: 'string')]
     protected string $period;
 
-    #[ORM\Column(type: 'date')]
+    #[ORM\Column(name: 'metric_date', type: 'date')]
     protected DateTimeInterface $metricDate;
 
     #[ORM\OneToMany(mappedBy: 'metricConfig', targetEntity: Metric::class, orphanRemoval: true)]
@@ -53,7 +53,7 @@ class MetricConfig extends Entity
     protected ?Account $account = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_account_id', onDelete: 'SET NULL')]
     protected ?ChanneledAccount $channeledAccount = null;
 
     #[ORM\ManyToOne(targetEntity: Campaign::class, inversedBy: 'metricConfigs')]
@@ -108,7 +108,7 @@ class MetricConfig extends Entity
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     protected ?Device $device = null;
 
-    #[ORM\Column(type: 'string', length: 32, unique: true)]
+    #[ORM\Column(name: 'config_signature', type: 'string', length: 32, unique: true)]
     protected string $configSignature;
 
     /* #[ORM\Column(type: 'json', nullable: true)]

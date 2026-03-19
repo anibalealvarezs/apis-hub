@@ -38,8 +38,8 @@ class SocialProcessor
         if (!empty($params)) {
             $sql = Helpers::buildUpsertSql(
                 'pages', 
-                ['url', 'title', 'hostname', 'platformId', 'account_id', 'data'], 
-                ['title', 'platformId', 'data'], 
+                ['url', 'title', 'hostname', 'platform_id', 'account_id', 'data'], 
+                ['title', 'platform_id', 'data'], 
                 'url', 
                 count($pages)
             );
@@ -73,9 +73,9 @@ class SocialProcessor
         if (!empty($params)) {
             $sql = Helpers::buildUpsertSql(
                 'posts', 
-                ['postId', 'page_id', 'account_id', 'channeledAccount_id', 'data'], 
+                ['post_id', 'page_id', 'account_id', 'channeled_account_id', 'data'], 
                 ['data'], 
-                ['postId', 'page_id', 'account_id', 'channeledAccount_id'], 
+                ['post_id', 'page_id', 'account_id', 'channeled_account_id'], 
                 count($posts)
             );
             $conn->executeStatement($sql, $params);

@@ -10,25 +10,27 @@ use Repositories\Channeled\ChanneledProductCategoryRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledProductCategoryRepository::class)]
 #[ORM\Table(name: 'channeled_product_categories')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_product_categories_platformId_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_product_categories_platformId_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_product_categories_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_product_categories_platform_channel_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_product_categories_platform_id_idx')]
+#[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_product_categories_platform_created_at_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProductCategory extends ChanneledEntity
 {
-    #[ORM\Column(type: 'boolean')]
+    #[ORM\Column(name: 'is_smart_collection', type: 'boolean')]
     protected bool $isSmartCollection;
 
     // Relationships with channeled entities
 
     #[ORM\ManyToMany(targetEntity: ChanneledProduct::class, inversedBy: 'channeledProductCategories', cascade: ['persist'])]
     #[ORM\JoinTable(name: 'channeled_product_categories_channeled_products')]
+    #[ORM\JoinColumn(name: 'channeled_product_category_id', referencedColumnName: 'id')]
+    #[ORM\InverseJoinColumn(name: 'channeled_product_id', referencedColumnName: 'id')]
     protected Collection $channeledProducts;
 
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: ProductCategory::class, inversedBy: 'channeledProductCategories')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'product_category_id', onDelete: 'cascade')]
     protected ProductCategory $productCategory;
 
     public function __construct()

@@ -17,16 +17,16 @@ use Repositories\CampaignRepository;
 #[ORM\HasLifecycleCallbacks]
 class Campaign extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(name: 'campaign_id', type: 'string', unique: true)]
     protected string $campaignId;
 
     #[ORM\Column(type: 'string')]
     protected string $name;
 
-    #[ORM\Column(type: 'datetime', nullable: true)]
+    #[ORM\Column(name: 'start_date', type: 'datetime', nullable: true)]
     protected ?DateTime $startDate = null;
 
-    #[ORM\Column(type: 'datetime', nullable: true)]
+    #[ORM\Column(name: 'end_date', type: 'datetime', nullable: true)]
     protected ?DateTime $endDate = null;
 
     #[ORM\OneToMany(mappedBy: 'campaign', targetEntity: ChanneledCampaign::class, orphanRemoval: true)]

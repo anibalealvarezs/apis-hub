@@ -10,15 +10,15 @@ use Entities\Entity;
 use Repositories\ProductCategoryRepository;
 
 #[ORM\Entity(repositoryClass: ProductCategoryRepository::class)]
-#[ORM\Table(name: 'productCategories')]
-#[ORM\Index(columns: ['productCategoryId'], name: 'idx_3ad0dab979_productCategories_productCategoryId_idx')]
+#[ORM\Table(name: 'product_categories')]
+#[ORM\Index(columns: ['product_category_id'], name: 'idx_product_categories_product_category_id_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ProductCategory extends Entity
 {
-    #[ORM\Column(type: 'bigint', unique: true)]
+    #[ORM\Column(name: 'product_category_id', type: 'bigint', unique: true)]
     protected int|string $productCategoryId;
 
-    #[ORM\Column(type: 'boolean')]
+    #[ORM\Column(name: 'is_smart_collection', type: 'boolean')]
     protected bool $isSmartCollection;
 
     #[ORM\OneToMany(mappedBy: 'productCategory', targetEntity: ChanneledProductCategory::class, orphanRemoval: true)]

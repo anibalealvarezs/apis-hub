@@ -41,15 +41,15 @@ use Repositories\PostRepository;
     name: 'idx_posts_postId_channeledAccount_lookup_idx'
 )]
 #[ORM\UniqueConstraint(name: 'post_unique', columns: [
-    'postId',
+    'post_id',
     'page_id',
     'account_id',
-    'channeledAccount_id'
+    'channeled_account_id'
 ])]
 #[ORM\HasLifecycleCallbacks]
 class Post extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(name: 'post_id', type: 'string', unique: true)]
     protected string $postId;
 
     #[ORM\Column(type: 'json', nullable: true)]
@@ -60,7 +60,7 @@ class Post extends Entity
     protected ?Account $account = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'posts')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_account_id', onDelete: 'SET NULL')]
     protected ?ChanneledAccount $channeledAccount = null;
 
     #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'posts')]

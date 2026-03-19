@@ -15,7 +15,7 @@ use Repositories\OrderRepository;
 #[ORM\HasLifecycleCallbacks]
 class Order extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(name: 'order_id', type: 'string', unique: true)]
     protected int|string $orderId;
 
     #[ORM\OneToMany(mappedBy: 'order', targetEntity: ChanneledOrder::class, orphanRemoval: true)]

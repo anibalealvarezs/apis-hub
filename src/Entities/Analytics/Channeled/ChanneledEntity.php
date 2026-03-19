@@ -9,7 +9,7 @@ use Interfaces\ChannelInterface;
 #[ORM\MappedSuperclass]
 class ChanneledEntity extends Entity implements ChannelInterface
 {
-    #[ORM\Column(type: 'string')]
+    #[ORM\Column(name: 'platform_id', type: 'string')]
     protected int|string $platformId;
 
     #[ORM\Column(type: 'integer')]
@@ -18,7 +18,7 @@ class ChanneledEntity extends Entity implements ChannelInterface
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $data = null;
 
-    #[ORM\Column(type: 'datetime', nullable: true)]
+    #[ORM\Column(name: 'platform_created_at', type: 'datetime', nullable: true)]
     protected ?\DateTimeInterface $platformCreatedAt = null;
 
     /**

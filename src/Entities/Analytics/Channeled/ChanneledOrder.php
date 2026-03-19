@@ -10,9 +10,9 @@ use Repositories\Channeled\ChanneledOrderRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledOrderRepository::class)]
 #[ORM\Table(name: 'channeled_orders')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_orders_platformId_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_orders_platformId_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_orders_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_orders_platform_id_channel_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_orders_platform_id_idx')]
+#[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_orders_platform_created_at_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledOrder extends ChanneledEntity
 {
@@ -24,14 +24,20 @@ class ChanneledOrder extends ChanneledEntity
 
     #[ORM\ManyToMany(targetEntity: ChanneledProduct::class, inversedBy: 'channeledOrders')]
     #[ORM\JoinTable(name: 'channeled_order_channeled_products')]
+    #[ORM\JoinColumn(name: 'channeled_order_id', referencedColumnName: 'id')]
+    #[ORM\InverseJoinColumn(name: 'channeled_product_id', referencedColumnName: 'id')]
     protected Collection $channeledProducts;
 
     #[ORM\ManyToMany(targetEntity: ChanneledProductVariant::class, inversedBy: 'channeledOrders')]
     #[ORM\JoinTable(name: 'channeled_order_channeled_product_variants')]
+    #[ORM\JoinColumn(name: 'channeled_order_id', referencedColumnName: 'id')]
+    #[ORM\InverseJoinColumn(name: 'channeled_product_variant_id', referencedColumnName: 'id')]
     protected Collection $channeledProductVariants;
 
     #[ORM\ManyToMany(targetEntity: ChanneledDiscount::class, inversedBy: 'channeledOrders')]
     #[ORM\JoinTable(name: 'channeled_order_channeled_discounts')]
+    #[ORM\JoinColumn(name: 'channeled_order_id', referencedColumnName: 'id')]
+    #[ORM\InverseJoinColumn(name: 'channeled_discount_id', referencedColumnName: 'id')]
     protected Collection $channeledDiscounts;
 
     // Relationships with non-channeled entities

@@ -10,11 +10,11 @@ use Repositories\Channeled\ChanneledCustomerRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledCustomerRepository::class)]
 #[ORM\Table(name: 'channeled_customers')]
-#[ORM\Index(columns: ['email', 'platformId', 'channel'], name: 'idx_channeled_customers_full_idx')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_customers_pid_channel_idx')]
+#[ORM\Index(columns: ['email', 'platform_id', 'channel'], name: 'idx_channeled_customers_full_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_customers_pid_channel_idx')]
 #[ORM\Index(columns: ['email', 'channel'], name: 'idx_channeled_customers_email_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_customers_platformId_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_customers_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_customers_platform_id_idx')]
+#[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_customers_platform_created_at_idx')]
 #[ORM\Index(columns: ['email'], name: 'idx_channeled_customers_email_idx')]
 
 #[ORM\HasLifecycleCallbacks]
@@ -31,7 +31,7 @@ class ChanneledCustomer extends ChanneledEntity
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: Customer::class, inversedBy: 'channeledCustomers')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'customer_id', onDelete: 'CASCADE')]
     protected Customer $customer;
 
     public function __construct()

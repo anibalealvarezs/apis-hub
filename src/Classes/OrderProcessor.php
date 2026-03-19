@@ -64,11 +64,11 @@ class OrderProcessor
                 }
 
                 $uCOrd[$coKey] = [
-                    'orderId' => (string)$co->platformId,
-                    'customerRef' => $customerRef,
+                    'order_id' => (string)$co->platformId,
+                    'customer_ref' => $customerRef,
                     'channel' => $chan,
-                    'platformId' => (string)$co->platformId,
-                    'platformCreatedAt' => isset($co->platformCreatedAt) ? $co->platformCreatedAt : null,
+                    'platform_id' => (string)$co->platformId,
+                    'platform_created_at' => isset($co->platformCreatedAt) ? $co->platformCreatedAt : null,
                     'data' => is_object($co->data) ? clone $co->data : (object)($co->data ?? []),
                 ];
             } else {
@@ -102,9 +102,9 @@ class OrderProcessor
                     $uCCust[$ccKey] = [
                         'customer_email' => $cEmail,
                         'channel' => $chan,
-                        'platformId' => (string)$cPId,
+                        'platform_id' => (string)$cPId,
                         'email' => $cEmail,
-                        'platformCreatedAt' => null, // Typically not provided directly in order obj
+                        'platform_created_at' => null, 
                         'data' => (object)[]
                     ];
                 }
@@ -121,8 +121,8 @@ class OrderProcessor
                         $uCDisc[$cdKey] = [
                             'code' => $code,
                             'channel' => $chan,
-                            'platformId' => '0',
-                            'platformCreatedAt' => null,
+                            'platform_id' => '0',
+                            'platform_created_at' => null,
                             'data' => (object)[]
                         ];
                     }
@@ -148,8 +148,8 @@ class OrderProcessor
                         if (!isset($uCProd[$cpKey])) {
                             $uCProd[$cpKey] = [
                                 'channel' => $chan,
-                                'platformId' => (string)$pId,
-                                'platformCreatedAt' => null,
+                                'platform_id' => (string)$pId,
+                                'platform_created_at' => null,
                                 'data' => (object)[]
                             ];
                         }
@@ -161,8 +161,8 @@ class OrderProcessor
                                 $uCVar[$cvKey] = [
                                     'channeledProductRef' => $cpKey,
                                     'channel' => $chan,
-                                    'platformId' => (string)$vId,
-                                    'platformCreatedAt' => null,
+                                    'platform_id' => (string)$vId,
+                                    'platform_created_at' => null,
                                     'data' => (object)[]
                                 ];
                             }
@@ -196,8 +196,7 @@ class OrderProcessor
         if (!empty($uCCust)) {
             $ccKeys = [];
             foreach ($uCCust as $cc) {
-                // If platformId is empty but email exists, map differently? MapGenerator uses platformId for keys right now
-                $ccKeys[] = ['channel' => $cc['channel'], 'platformId' => $cc['platformId']];
+                $ccKeys[] = ['channel' => $cc['channel'], 'platform_id' => $cc['platform_id']];
             }
             $channeledCustomerMap = self::fetchChanneledEntities(
                 $conn,
@@ -223,8 +222,8 @@ class OrderProcessor
                     'customer_id' => $customerId,
                     'channel' => $cc['channel'],
                     'email' => $cc['email'],
-                    'platformId' => $cc['platformId'],
-                    'platformCreatedAt' => $cc['platformCreatedAt'],
+                    'platform_id' => $cc['platform_id'],
+                    'platform_created_at' => $cc['platform_created_at'],
                     'data' => json_encode($cc['data'])
                 ];
 
@@ -236,7 +235,7 @@ class OrderProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_customers', ['customer_id', 'channel', 'email', 'platformId', 'platformCreatedAt', 'data'], $insertRows);
+            self::bulkInsert($conn, 'channeled_customers', ['customer_id', 'channel', 'email', 'platform_id', 'platform_created_at', 'data'], $insertRows);
             // Assuming no update for CC in this phase as it's just placeholder
 
             $channeledCustomerMap = self::fetchChanneledEntities(
@@ -270,15 +269,15 @@ class OrderProcessor
                 if (!isset($channeledDiscountMap[$k])) {
                     $insertRows[] = [
                         'channel' => $cd['channel'],
-                        'platformId' => $cd['platformId'],
+                        'platform_id' => $cd['platform_id'],
                         'code' => $cd['code'],
-                        'platformCreatedAt' => $cd['platformCreatedAt'],
+                        'platform_created_at' => $cd['platform_created_at'],
                         'data' => json_encode($cd['data'])
                     ];
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_discounts', ['channel', 'platformId', 'code', 'platformCreatedAt', 'data'], $insertRows);
+            self::bulkInsert($conn, 'channeled_discounts', ['channel', 'platform_id', 'code', 'platform_created_at', 'data'], $insertRows);
 
             $channeledDiscountMap = self::fetchChanneledEntities(
                 $conn,
@@ -301,8 +300,8 @@ class OrderProcessor
             $channeledProductMap = self::fetchChanneledEntities(
                 $conn,
                 $cpKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductMap($manager, $sql, $params)
             );
 
@@ -311,19 +310,19 @@ class OrderProcessor
                 if (!isset($channeledProductMap[$k])) {
                     $insertRows[] = [
                         'channel' => $cp['channel'],
-                        'platformId' => $cp['platformId'],
-                        'platformCreatedAt' => $cp['platformCreatedAt'],
+                        'platform_id' => $cp['platform_id'],
+                        'platform_created_at' => $cp['platform_created_at'],
                         'data' => json_encode($cp['data'])
                     ];
                 }
             }
-            self::bulkInsert($conn, 'channeled_products', ['channel', 'platformId', 'platformCreatedAt', 'data'], $insertRows);
+            self::bulkInsert($conn, 'channeled_products', ['channel', 'platform_id', 'platform_created_at', 'data'], $insertRows);
 
             $channeledProductMap = self::fetchChanneledEntities(
                 $conn,
                 $cpKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductMap($manager, $sql, $params)
             );
         }
@@ -340,8 +339,8 @@ class OrderProcessor
             $channeledVariantMap = self::fetchChanneledEntities(
                 $conn,
                 $cvKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_product_variants WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_product_variants WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductVariantMap($manager, $sql, $params)
             );
 
@@ -356,19 +355,19 @@ class OrderProcessor
                     $insertRows[] = [
                         'channeled_product_id' => $cProdId,
                         'channel' => $cv['channel'],
-                        'platformId' => $cv['platformId'],
-                        'platformCreatedAt' => $cv['platformCreatedAt'],
+                        'platform_id' => $cv['platform_id'],
+                        'platform_created_at' => $cv['platform_created_at'],
                         'data' => json_encode($cv['data'])
                     ];
                 }
             }
-            self::bulkInsert($conn, 'channeled_product_variants', ['channeled_product_id', 'channel', 'platformId', 'platformCreatedAt', 'data'], $insertRows);
+            self::bulkInsert($conn, 'channeled_product_variants', ['channeled_product_id', 'channel', 'platform_id', 'platform_created_at', 'data'], $insertRows);
 
             $channeledVariantMap = self::fetchChanneledEntities(
                 $conn,
                 $cvKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_product_variants WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_product_variants WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductVariantMap($manager, $sql, $params)
             );
         }
@@ -382,11 +381,11 @@ class OrderProcessor
             $orderMap = self::fetchAndInsertEntities(
                 $conn,
                 'orders',
-                'orderId',
+                'order_id',
                 $orderIds,
-                ['orderId'],
+                ['order_id'],
                 [$uOrd, fn ($o) => [$o['orderId']]],
-                fn ($chunk) => "SELECT id, orderId FROM orders WHERE orderId IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
+                fn ($chunk) => "SELECT id, order_id FROM orders WHERE order_id IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
                 fn ($conn, $sql, $params) => MapGenerator::getOrderMap($manager, $sql, $params)
             );
         }
@@ -397,14 +396,14 @@ class OrderProcessor
         $channeledOrderMap = [];
         if (!empty($uCOrd)) {
             $coKeys = [];
-            foreach ($uCOrd as $co) {
-                $coKeys[] = ['channel' => $co['channel'], 'platformId' => $co['platformId']];
+            foreach ($uCOrd as $coRow) {
+                $coKeys[] = ['channel' => $coRow['channel'], 'platform_id' => $coRow['platform_id']];
             }
             $channeledOrderMap = self::fetchChanneledEntities(
                 $conn,
                 $coKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_orders WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_orders WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledOrderMap($manager, $sql, $params)
             );
 
@@ -425,10 +424,10 @@ class OrderProcessor
                 $row = [
                     'order_id' => $orderId,
                     'channeled_customer_id' => $cCustId,
-                    'channel' => $co['channel'],
-                    'platformId' => $co['platformId'],
-                    'platformCreatedAt' => $co['platformCreatedAt'] instanceof DateTime ? $co['platformCreatedAt']->format('Y-m-d H:i:s') : $co['platformCreatedAt'],
-                    'data' => json_encode($co['data'])
+                    'channel' => $coRow['channel'],
+                    'platform_id' => $coRow['platform_id'],
+                    'platform_created_at' => $coRow['platform_created_at'] instanceof DateTime ? $coRow['platform_created_at']->format('Y-m-d H:i:s') : $coRow['platform_created_at'],
+                    'data' => json_encode($coRow['data'])
                 ];
 
                 if (isset($channeledOrderMap[$k])) {
@@ -439,14 +438,14 @@ class OrderProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_orders', ['order_id', 'channeled_customer_id', 'channel', 'platformId', 'platformCreatedAt', 'data'], $insertRows);
-            self::bulkUpsert($conn, 'channeled_orders', ['id', 'order_id', 'channeled_customer_id', 'channel', 'platformId', 'platformCreatedAt', 'data'], ['order_id', 'channeled_customer_id', 'channel', 'platformId', 'platformCreatedAt', 'data', 'updatedAt' => 'CURRENT_TIMESTAMP'], $updateRows);
+            self::bulkInsert($conn, 'channeled_orders', ['order_id', 'channeled_customer_id', 'channel', 'platform_id', 'platform_created_at', 'data'], $insertRows);
+            self::bulkUpsert($conn, 'channeled_orders', ['id', 'order_id', 'channeled_customer_id', 'channel', 'platform_id', 'platform_created_at', 'data'], ['order_id', 'channeled_customer_id', 'channel', 'platform_id', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
 
             $channeledOrderMap = self::fetchChanneledEntities(
                 $conn,
                 $coKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_orders WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_orders WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledOrderMap($manager, $sql, $params)
             );
         }
@@ -570,7 +569,7 @@ class OrderProcessor
                 foreach ($chunk as $row) {
                     $params = array_merge($params, $row);
                 }
-                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'customers' ? 'email' : 'orderId'), count($chunk));
+                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'customers' ? 'email' : 'order_id'), count($chunk));
                 $conn->executeStatement($sql, $params);
             }
 
@@ -620,7 +619,7 @@ class OrderProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $uniqueCols = ['channel', 'platformId'];
+        $uniqueCols = ['channel', 'platform_id'];
         if ($table === 'channeled_discounts') { $uniqueCols = ['channel', 'code']; }
         if (str_contains($table, '_channeled_')) {
             if ($table === 'channeled_order_channeled_products') { $uniqueCols = ['channeledorder_id', 'channeledproduct_id']; }
