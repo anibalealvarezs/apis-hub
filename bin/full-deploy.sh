@@ -33,14 +33,14 @@ if [ ! -f ".env" ]; then
 fi
 
 # Check mandatory YAML files
-CONFIG_FILES=("database" "security" "app" "instances_rules" "logging" "redis")
-for FILE in "${CONFIG_FILES[@]}"; do
+CONFIG_FILES="database security app instances_rules logging redis"
+for FILE in $CONFIG_FILES; do
     if [ ! -f "config/$FILE.yaml" ]; then
         if [ -f "config/$FILE.yaml.example" ]; then
             echo "  ⚠️  config/$FILE.yaml missing. Creating from example..."
             cp "config/$FILE.yaml.example" "config/$FILE.yaml"
         else
-            echo -e "  ${RED}❌ Error: config/$FILE.yaml missing and no example found.${NC}"
+            printf "  ${RED}❌ Error: config/$FILE.yaml missing and no example found.${NC}\n"
             exit 1
         fi
     fi
