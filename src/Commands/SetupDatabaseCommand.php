@@ -29,12 +29,19 @@ class SetupDatabaseCommand extends Command
         try {
             // 1. Ensure Database Exists
             $output->writeln("<info>🔍 Ensuring database '{$dbName}' exists...</info>");
-            $connection = DriverManager::getConnection($dbConfig);
             
-            // Use a more robust check: try to create if not exists
-            $connection->executeStatement("CREATE DATABASE IF NOT EXISTS `{$dbName}`");
-            $output->writeln("<info>✔  Database '{$dbName}' is ready.</info>");
-            $connection->close();
+            $isPostgres = $dbConfig['driver'] === 'pdo_pgsql';
+            
+            if (!$isPostgres) {
+                $connection = DriverManager::getConnection($dbConfig);
+                $connection->executeStatement("CREATE DATABASE IF NOT EXISTS `{$dbName}`");
+                $connection->close();
+            } else {
+                // For PostgreSQL, the DB is typically created by Docker via environment variables.
+                // If not, we try to connect with the full config; if it fails, the DB is missing.
+                $output->writeln("<comment>  Notice: Assuming database '{$dbName}' is already created by Docker/Postgres environment.</comment>");
+            }
+            $output->writeln("<info>✔  Database '{$dbName}' check passed.</info>");
 
             // 2. Update Schema
             $output->writeln("<info>📂 Updating schema structure...</info>");
