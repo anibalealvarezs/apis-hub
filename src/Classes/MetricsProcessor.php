@@ -551,6 +551,7 @@ class MetricsProcessor
                 }
             }
         }
+        Helpers::setLogger('facebook-marketing.log')->info("Metrics mapping complete: " . count($metricMap) . " existing global metrics found in DB.");
 
         $metricsToInsert = [];
         $metricsToUpdate = [];
@@ -703,6 +704,7 @@ class MetricsProcessor
                 }
             }
         }
+        Helpers::setLogger('facebook-marketing.log')->info("Channeled mapping complete: " . count($channeledMetricMap) . " existing channeled metrics found in DB.");
 
         $dimManager = new \Classes\DimensionManager($manager);
         $channeledMetricsToInsert = [];
