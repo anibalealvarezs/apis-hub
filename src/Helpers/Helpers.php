@@ -234,6 +234,48 @@ class Helpers
     }
 
     /**
+     * Generates a platform-specific Upsert (Insert or Update) SQL query.
+     * Supports MySQL (ON DUPLICATE KEY UPDATE) and PostgreSQL (ON CONFLICT DO UPDATE).
+     *
+     * @param string $table The table name
+     * @param array $insertCols Simple array of column names to insert
+     * @param array $updateCols Simple array of column names to update on conflict
+     * @param array|string $uniqueCols Single column or array of columns that form the unique constraint (required for Postgres)
+     * @param int $rowCount Number of rows to be inserted in bulk
+     * @return string The generated SQL
+     */
+    public static function buildUpsertSql(string $table, array $insertCols, array $updateCols, array|string $uniqueCols, int $rowCount = 1): string
+    {
+        $dbConfig = self::getDbConfig();
+        $isPostgres = ($dbConfig['driver'] === 'pdo_pgsql');
+
+        $colString = implode(', ', $insertCols);
+        $placeholders = '(' . implode(', ', array_fill(0, count($insertCols), '?')) . ')';
+        $valuesString = implode(', ', array_fill(0, $rowCount, $placeholders));
+
+        if ($isPostgres) {
+            // PostgreSQL syntax: ON CONFLICT (unique_cols) DO UPDATE SET col = EXCLUDED.col
+            $uniqueClause = is_array($uniqueCols) ? implode(', ', $uniqueCols) : $uniqueCols;
+            $updateClauses = [];
+            foreach ($updateCols as $col) {
+                $updateClauses[] = "{$col} = EXCLUDED.{$col}";
+            }
+            $updateString = implode(', ', $updateClauses);
+            
+            return "INSERT INTO {$table} ({$colString}) VALUES {$valuesString} ON CONFLICT ({$uniqueClause}) DO UPDATE SET {$updateString}";
+        } else {
+            // MySQL syntax: ON DUPLICATE KEY UPDATE col = VALUES(col)
+            $updateClauses = [];
+            foreach ($updateCols as $col) {
+                $updateClauses[] = "{$col} = VALUES({$col})";
+            }
+            $updateString = implode(', ', $updateClauses);
+            
+            return "INSERT INTO {$table} ({$colString}) VALUES {$valuesString} ON DUPLICATE KEY UPDATE {$updateString}";
+        }
+    }
+
+    /**
      * @return array
      */
     public static function getDbConfig(): array
