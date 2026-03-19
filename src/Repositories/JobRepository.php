@@ -19,7 +19,7 @@ class JobRepository extends BaseRepository
     public function __construct(\Doctrine\ORM\EntityManagerInterface $em, \Doctrine\ORM\Mapping\ClassMetadata $class)
     {
         parent::__construct($em, $class);
-        $this->_em->getConfiguration()->addCustomStringFunction('PG_CAST', \Classes\Doctrine\DqlFunctions\Cast::class);
+        $this->_em->getConfiguration()->addCustomStringFunction('Z_PG_CAST', \Classes\Doctrine\DqlFunctions\Cast::class);
     }
     
     /**
@@ -552,6 +552,6 @@ class JobRepository extends BaseRepository
      */
     private function getPayloadField(): string
     {
-        return $this->isPostgreSQL() ? 'PG_CAST(e.payload AS text)' : 'e.payload';
+        return $this->isPostgreSQL() ? 'Z_PG_CAST(e.payload, \'text\')' : 'e.payload';
     }
 }

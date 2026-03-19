@@ -19,7 +19,7 @@ class Cast extends FunctionNode
     {
         return 'CAST(' .
             $this->expression->dispatch($sqlWalker) . ' AS ' .
-            $this->type .
+            str_replace(['\'', '"'], '', $this->type->dispatch($sqlWalker)) .
             ')';
     }
 
@@ -27,11 +27,8 @@ class Cast extends FunctionNode
     {
         $parser->match(Lexer::T_OPEN_PARENTHESIS);
         $this->expression = $parser->ArithmeticExpression();
-        $parser->match(Lexer::T_AS);
-
-        $parser->match(Lexer::T_IDENTIFIER);
-        $this->type = $parser->getLexer()->token->value;
-
+        $parser->match(Lexer::T_COMMA);
+        $this->type = $parser->ArithmeticPrimary();
         $parser->match(Lexer::T_CLOSE_PARENTHESIS);
     }
 }
