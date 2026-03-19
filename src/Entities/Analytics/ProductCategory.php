@@ -11,7 +11,7 @@ use Repositories\ProductCategoryRepository;
 
 #[ORM\Entity(repositoryClass: ProductCategoryRepository::class)]
 #[ORM\Table(name: 'productCategories')]
-#[ORM\Index(columns: ['productCategoryId'], name: 'productCategoryId_idx')]
+#[ORM\Index(columns: ['productCategoryId'], name: 'idx_productCategories_productCategoryId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ProductCategory extends Entity
 {

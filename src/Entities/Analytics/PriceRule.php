@@ -11,7 +11,7 @@ use Repositories\PriceRuleRepository;
 
 #[ORM\Entity(repositoryClass: PriceRuleRepository::class)]
 #[ORM\Table(name: 'priceRules')]
-#[ORM\Index(columns: ['priceRuleId'], name: 'priceRuleId_idx')]
+#[ORM\Index(columns: ['priceRuleId'], name: 'idx_priceRules_priceRuleId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class PriceRule extends Entity
 {

@@ -12,15 +12,15 @@ use Repositories\MetricRepository;
 #[ORM\Table(name: 'metrics')]
 #[ORM\Index(
     columns: ['metricConfig_id', 'dimensionsHash'],
-    name: 'metricConfig_dimensionsHash_lookup_idx'
+    name: 'idx_metrics_metricConfig_dimensionsHash_lookup_idx'
 )]
 #[ORM\Index(
     columns: ['dimensionsHash'],
-    name: 'dimensionsHash_lookup_idx'
+    name: 'idx_metrics_dimensionsHash_lookup_idx'
 )]
 #[ORM\Index(
     columns: ['metricConfig_id'],
-    name: 'metricConfig_lookup_idx'
+    name: 'idx_metrics_metricConfig_lookup_idx'
 )]
 #[ORM\UniqueConstraint(name: 'metric_unique', columns: ['metricConfig_id', 'dimensionsHash'])]
 #[ORM\HasLifecycleCallbacks]

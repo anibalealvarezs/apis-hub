@@ -10,9 +10,9 @@ use Repositories\Channeled\ChanneledPriceRuleRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledPriceRuleRepository::class)]
 #[ORM\Table(name: 'channeled_price_rules')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_price_rules_platformId_channel_idx')]
+#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_price_rules_platformId_idx')]
+#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_price_rules_platformCreatedAt_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledPriceRule extends ChanneledEntity
 {

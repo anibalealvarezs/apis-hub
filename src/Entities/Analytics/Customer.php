@@ -11,7 +11,7 @@ use Repositories\CustomerRepository;
 
 #[ORM\Entity(repositoryClass: CustomerRepository::class)]
 #[ORM\Table(name: 'customers')]
-#[ORM\Index(columns: ['email'], name: 'email_idx')]
+#[ORM\Index(columns: ['email'], name: 'idx_customers_email_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Customer extends Entity
 {
