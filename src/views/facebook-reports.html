@@ -419,7 +419,7 @@
                     endDate: end
                 };
 
-                const response = await fetch('/api/v1/channeled/metrics/facebook_marketing/aggregate', {
+                const response = await fetch('/facebook_marketing/channeled_metric/aggregate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
