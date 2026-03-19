@@ -232,9 +232,9 @@ class BaseRepository extends EntityRepository
                        ->setParameter("val_$dimAlias", $value);
                 } elseif ($this->isChanneledMetric && isset($relationMap[$key])) {
                     $map = $relationMap[$key];
-                    if (!isset($activeJoins[$key])) {
+                    if (!isset($activeJoins[$map['alias']])) {
                         $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
-                        $activeJoins[$key] = true;
+                        $activeJoins[$map['alias']] = true;
                     }
                     $qb->andWhere("{$map['alias']}.{$map['field']} = :f_$key")
                        ->setParameter("f_$key", $value);
