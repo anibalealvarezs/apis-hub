@@ -50,8 +50,9 @@ RUN chmod +x /app/entrypoint.sh
 # Cloud Run escucha por defecto en el puerto 8080 (o donde le mande la variable $PORT)
 ENV PORT=8080
 
-# Al levantar el contenedor, ejecutar el script de entrada
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Al levantar el contenedor, ejecutar el script de entrada usando bash
+# para evitar problemas de permisos de ejecución en volúmenes montados.
+ENTRYPOINT ["bash", "/app/entrypoint.sh"]
 
 # El servidor PHP se ejecuta en el entrypoint.sh final.
 # El servidor PHP se ejecuta en el entrypoint.sh final, pero por consistencia el CMD default será este:
