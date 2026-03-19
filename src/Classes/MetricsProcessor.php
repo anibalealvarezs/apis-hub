@@ -596,10 +596,11 @@ class MetricsProcessor
             foreach (array_chunk($metricsToInsert, 1000) as $chunk) {
                 $reFetchParams = [];
                 $tuples = [];
+                $isPostgres = Helpers::isPostgres();
                 foreach ($chunk as $row) {
                     $reFetchParams[] = $row['dimensions_hash'];
-                    $reFetchParams[] = $row['metric_config_id'];
-                    $tuples[] = '(?, ?)';
+                    $reFetchParams[] = (int)$row['metric_config_id'];
+                    $tuples[] = $isPostgres ? '(?::text, ?::integer)' : '(?, ?)';
                 }
                 $placeholders = implode(', ', $tuples);
                 $isPostgres = Helpers::isPostgres();
@@ -782,11 +783,11 @@ class MetricsProcessor
             $selectParams = [];
             $tuples = [];
             foreach ($chunk as $m) {
-                $selectParams[] = $m['channel'];
-                $selectParams[] = $m['platform_id'];
-                $selectParams[] = $m['metric_id'];
-                $selectParams[] = $m['platform_created_at'];
-                $tuples[] = '(?, ?, ?, ?)';
+                $selectParams[] = (string)$m['channel'];
+                $selectParams[] = (string)$m['platform_id'];
+                $selectParams[] = (int)$m['metric_id'];
+                $selectParams[] = (string)$m['platform_created_at'];
+                $tuples[] = Helpers::isPostgres() ? '(?::text, ?::text, ?::integer, ?::text)' : '(?, ?, ?, ?)';
             }
             if (!empty($tuples)) {
                 $placeholders = implode(', ', $tuples);
