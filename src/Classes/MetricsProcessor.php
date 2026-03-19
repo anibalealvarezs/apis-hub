@@ -469,7 +469,8 @@ class MetricsProcessor
                     ['config_signature'], 
                     count($chunk)
                 );
-                $manager->getConnection()->executeStatement($sql, $insertParams);
+                $affected = $manager->getConnection()->executeStatement($sql, $insertParams);
+                Helpers::setLogger('facebook-marketing.log')->info("Inserted metric_configs chunk: $affected rows affected.");
             }
         }
 
@@ -590,7 +591,8 @@ class MetricsProcessor
                     ['metric_config_id', 'dimensions_hash'], 
                     count($chunk)
                 );
-                $manager->getConnection()->executeStatement($sql, $insertParams);
+                $affected = $manager->getConnection()->executeStatement($sql, $insertParams);
+                Helpers::setLogger('facebook-marketing.log')->info("Inserted metrics chunk: $affected rows affected.");
             }
 
             foreach (array_chunk($metricsToInsert, 1000) as $chunk) {
@@ -767,7 +769,8 @@ class MetricsProcessor
                     ['platform_id', 'channel', 'metric_id', 'platform_created_at'], 
                     count($chunk)
                 );
-                $manager->getConnection()->executeStatement($sql, $params);
+                $affected = $manager->getConnection()->executeStatement($sql, $params);
+                Helpers::setLogger('facebook-marketing.log')->info("Inserted channeled metrics chunk: $affected rows affected.");
             }
         }
 

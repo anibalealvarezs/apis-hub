@@ -97,7 +97,8 @@ class MarketingProcessor
                     ['platform_id', 'channeled_account_id'], 
                     count($chunk)
                 );
-                $conn->executeStatement($sql, $channeledParams);
+                $affected = $conn->executeStatement($sql, $channeledParams);
+                self::getLogger()->info("Inserted/Updated " . count($chunk) . " channeled campaigns: $affected rows affected");
             }
             self::getLogger()->info("Processed " . count($campaigns) . " channeled campaigns");
         }
@@ -164,7 +165,8 @@ class MarketingProcessor
                     ['platform_id', 'channeled_account_id'], 
                     count($chunk)
                 );
-                $conn->executeStatement($sql, $params);
+                $affected = $conn->executeStatement($sql, $params);
+                self::getLogger()->info("Inserted/Updated " . count($chunk) . " channeled ad groups: $affected rows affected");
             }
             self::getLogger()->info("Processed " . count($adsets) . " ad groups");
         }
@@ -241,11 +243,12 @@ class MarketingProcessor
                 $sql = Helpers::buildUpsertSql(
                     'channeled_ads', 
                     $cols, 
-                    ['channeled_campaign_id', 'channeled_ad_group_id', 'creative_id', 'name', 'status', 'data'], 
-                    ['platform_id', 'channeled_campaign_id'], 
+                    ['channeled_account_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'creative_id', 'name', 'status', 'data'], 
+                    ['platform_id', 'channel'], 
                     count($chunk)
                 );
-                $conn->executeStatement($sql, $params);
+                $affected = $conn->executeStatement($sql, $params);
+                self::getLogger()->info("Inserted/Updated " . count($chunk) . " channeled ads: $affected rows affected");
             }
             self::getLogger()->info("Processed " . count($ads) . " ads");
         }
