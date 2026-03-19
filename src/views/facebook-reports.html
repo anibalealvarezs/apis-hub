@@ -445,7 +445,9 @@
                     },
                     groupBy: ["account", "campaign"],
                     startDate: start,
-                    endDate: end
+                    endDate: end,
+                    orderBy: "campaign",
+                    orderDir: "ASC"
                 };
 
                 const response = await fetch('/facebook_marketing/metric/aggregate', {

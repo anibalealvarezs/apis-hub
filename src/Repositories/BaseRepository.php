@@ -93,7 +93,9 @@ class BaseRepository extends EntityRepository
         array $groupBy = [],
         ?object $filters = null,
         ?string $startDate = null,
-        ?string $endDate = null
+        ?string $endDate = null,
+        ?string $orderBy = null,
+        ?string $orderDir = 'ASC'
     ): array {
         $connection = $this->_em->getConnection();
         $qb = $connection->createQueryBuilder();
@@ -129,6 +131,8 @@ class BaseRepository extends EntityRepository
             'page'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rp'],
             'account'  => ['table' => 'accounts', 'fk' => 'account_id', 'field' => 'name', 'alias' => 'ra'],
             'campaign' => ['table' => 'campaigns', 'fk' => 'campaign_id', 'field' => 'name', 'alias' => 'rc'],
+            'channeledAccount'  => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
+            'channeledCampaign' => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'name', 'alias' => 'rcc'],
             'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeled_ad_group_id', 'field' => 'name', 'alias' => 'rag'],
             'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'name', 'alias' => 'rad'],
             'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
@@ -141,7 +145,7 @@ class BaseRepository extends EntityRepository
 
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
-            $quotedField = "\"$field\"";
+            $quotedField = $field;
             $isDimension = str_starts_with($field, 'dimensions.');
             $dimKey = $isDimension ? substr($field, 11) : $field;
 
@@ -155,14 +159,51 @@ class BaseRepository extends EntityRepository
                    ->setParameter("key_$dimAlias", $dimKey)
                    ->addSelect("dv_$dimAlias.value AS $quotedField")
                    ->addGroupBy("dv_$dimAlias.value");
+            } elseif ($this->isChanneledMetric && in_array($field, ['account', 'campaign'])) {
+                $isAccount = $field === 'account';
+                $genericKey = $isAccount ? 'account' : 'campaign';
+                $channeledKey = $isAccount ? 'channeledAccount' : 'channeledCampaign';
+                $genericMap = $relationMap[$genericKey];
+                $channeledMap = $relationMap[$channeledKey];
+                
+                if (!isset($activeJoins[$field])) {
+                    $qb->leftJoin('mc', $genericMap['table'], $genericMap['alias'], "mc.{$genericMap['fk']} = {$genericMap['alias']}.id")
+                       ->leftJoin('mc', $channeledMap['table'], $channeledMap['alias'], "mc.{$channeledMap['fk']} = {$channeledMap['alias']}.id");
+                    
+                    if ($isAccount) {
+                        // Advanced fallback: try to find account via campaign if direct link is missing
+                        $campaignMap = $relationMap['channeledCampaign'];
+                        if (!isset($activeJoins['campaign'])) {
+                            $qb->leftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
+                        }
+                        $qb->leftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
+                    }
+                    $activeJoins[$field] = true;
+                }
+                
+                if ($isAccount) {
+                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
+                       ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
+                       ->addGroupBy("rca_fallback.name")
+                       ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
+                       ->addGroupBy("mc.{$channeledMap['fk']}")
+                       ->addGroupBy("mc.{$genericMap['fk']}");
+                } else {
+                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, {$genericMap['alias']}.{$genericMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
+                       ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
+                       ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
+                       ->addGroupBy("mc.{$channeledMap['fk']}")
+                       ->addGroupBy("mc.{$genericMap['fk']}");
+                }
             } elseif ($this->isChanneledMetric && isset($relationMap[$field])) {
                 $map = $relationMap[$field];
                 if (!isset($activeJoins[$field])) {
                     $qb->leftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
-                    $activeJoins[$field] = true;
+                    $activeJoins[$field] = $map['alias'];
                 }
-                $qb->addSelect("{$map['alias']}.{$map['field']} AS $quotedField")
-                   ->addGroupBy("{$map['alias']}.{$map['field']}");
+                $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS CHAR), 'Unknown') AS $quotedField")
+                   ->addGroupBy("{$map['alias']}.{$map['field']}")
+                   ->addGroupBy("mc.{$map['fk']}");
             } else {
                 $sqlField = $this->mapFieldToSql($field);
                 $qb->addSelect("$sqlField AS $quotedField")->addGroupBy($sqlField);
@@ -216,6 +257,12 @@ class BaseRepository extends EntityRepository
                 $qb->andWhere("$sqlDateField <= :endDate")
                    ->setParameter('endDate', $endDate);
             }
+        }
+
+        // Apply ordering
+        if ($orderBy) {
+            $direction = (strtoupper($orderDir) === 'DESC') ? 'DESC' : 'ASC';
+            $qb->orderBy($orderBy, $direction);
         }
 
         $results = $qb->executeQuery()->fetchAllAssociative();

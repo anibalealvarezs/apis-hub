@@ -358,7 +358,9 @@ class ChanneledCrudController extends BaseController
                 groupBy: $groupBy,
                 filters: $params['filters'] ?? null,
                 startDate: $params['startDate'] ?? null,
-                endDate: $params['endDate'] ?? null
+                endDate: $params['endDate'] ?? null,
+                orderBy: $params['orderBy'] ?? null,
+                orderDir: $params['orderDir'] ?? 'ASC'
             );
 
             return $this->createResponse(
