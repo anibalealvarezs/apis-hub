@@ -308,6 +308,10 @@
         
         <div class="controls">
             <div class="date-picker-wrap">
+                <i data-lucide="shield-lock" size="16" style="color:var(--meta-positive)"></i>
+                <input type="password" id="apiKey" class="date-input" placeholder="API Key..." style="width: 120px;">
+            </div>
+            <div class="date-picker-wrap">
                 <i data-lucide="calendar" size="16"></i>
                 <input type="date" id="startDate" class="date-input">
                 <span style="color:var(--meta-text-dim)">to</span>
@@ -388,15 +392,31 @@
         lucide.createIcons();
 
         // Default dates: Last 7 days
-        document.getElementById('endDate').value = dayjs().format('YYYY-MM-DD');
-        document.getElementById('startDate').value = dayjs().subtract(7, 'day').format('YYYY-MM-DD');
+        if (document.getElementById('endDate')) {
+            document.getElementById('endDate').value = dayjs().format('YYYY-MM-DD');
+            document.getElementById('startDate').value = dayjs().subtract(7, 'day').format('YYYY-MM-DD');
+        }
+
+        // Restore API Key if exists (for convenience within session)
+        if (sessionStorage.getItem('apis_hub_token')) {
+            document.getElementById('apiKey').value = sessionStorage.getItem('apis_hub_token');
+        }
 
         async function loadReport() {
+            const token = document.getElementById('apiKey').value;
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
             const loader = document.getElementById('loader');
             const tbody = document.getElementById('table-body');
             const emptyMsg = document.getElementById('empty-msg');
+
+            if (!token) {
+                alert('Please enter your APIs Hub API Key to authorize the request.');
+                return;
+            }
+
+            // Save for session duration
+            sessionStorage.setItem('apis_hub_token', token);
 
             loader.style.display = 'flex';
             emptyMsg.style.display = 'none';
@@ -421,7 +441,10 @@
 
                 const response = await fetch('/facebook_marketing/channeled_metric/aggregate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
                     body: JSON.stringify(payload)
                 });
 
@@ -497,8 +520,10 @@
         function formatInt(n) { return parseInt(n).toLocaleString('de-DE'); }
         function formatPct(n) { return parseFloat(n).toFixed(2) + '%'; }
 
-        // Load initial
-        loadReport();
+        // Load initial if token already exists in session
+        if (sessionStorage.getItem('apis_hub_token')) {
+            loadReport();
+        }
     </script>
 </body>
 </html>
