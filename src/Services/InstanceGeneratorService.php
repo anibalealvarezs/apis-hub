@@ -45,6 +45,20 @@ class InstanceGeneratorService
             
             $channelInstances = [];
             
+            // 0. Get Caching Limits for this channel
+            $channelsConfig = \Helpers\Helpers::getChannelsConfig();
+            $chanKey = $channel;
+            if (!isset($channelsConfig[$chanKey])) {
+                $chanKey = str_replace(['facebook_marketing', 'facebook_organic'], ['facebook', 'facebook'], $channel);
+            }
+            $chanConfig = $channelsConfig[$channel] ?? $channelsConfig[$chanKey] ?? null;
+            $limitDate = null;
+            if ($chanConfig && !empty($chanConfig['cache_history_range'])) {
+                try {
+                    $limitDate = $today->modify('-' . $chanConfig['cache_history_range']);
+                } catch (\Exception $e) { /* ignore malformed ranges */ }
+            }
+
             // 1. Entities Sync (if applicable)
             if ($rules['entities_sync']) {
                 $instanceName = str_replace('_', '-', $channel) . '-entities-sync';
@@ -59,6 +73,12 @@ class InstanceGeneratorService
 
             // 2. Historics (Quarters)
             $historyStart = $today->modify("-{$rules['history_months']} months");
+            
+            // Limit history start by cache history range if stricter
+            if ($limitDate && $historyStart < $limitDate) {
+                $historyStart = $limitDate;
+            }
+
             $tempStart = $historyStart;
             
             while ($tempStart < $yesterday) {
@@ -66,6 +86,13 @@ class InstanceGeneratorService
                 $quarterEnd = $this->getEndOfQuarter($tempStart);
                 if ($quarterEnd >= $yesterday) {
                     $quarterEnd = $yesterday;
+                }
+
+                // If the entire quarter is before the limit date, skip it
+                if ($limitDate && $quarterEnd < $limitDate) {
+                    $tempStart = $quarterEnd->modify('+1 day');
+                    if ($tempStart >= $yesterday) break;
+                    continue;
                 }
 
                 $year = $tempStart->format('Y');
@@ -99,9 +126,6 @@ class InstanceGeneratorService
 
             // 4. Handle dependencies (Optional)
             if ($useDependencies) {
-                // The order should be: Entities Sync -> Historics (Oldest to Newest) -> Recent
-                // To avoid overlap, we link them in reverse order of your requirement? 
-                // "A partir del segundo job en la cola por canal, se debe asignar el job anterior como dependencia"
                 for ($i = 1; $i < count($channelInstances); $i++) {
                     $channelInstances[$i]['requires'] = $channelInstances[$i - 1]['name'];
                 }
