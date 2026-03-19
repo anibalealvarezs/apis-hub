@@ -112,19 +112,34 @@ foreach ($instances as $instance) {
     $services[$name] = $serviceConfig;
 }
 
-// ─── Add MySQL Service if DB_HOST is 'db' ─────────────────────────────────────
+// ─── Add Database Service if DB_HOST is 'db' ─────────────────────────────────────
 $dbHost = $extractEnvVar($db['host'] ?? '');
+$dbDriver = $extractEnvVar($db['driver'] ?? 'pdo_mysql');
 if (str_contains($dbHost, 'db') && !isset($services['db'])) {
-    $services['db'] = [
-        'image' => 'mysql:8.0',
-        'restart' => 'always',
-        'environment' => [
-            'MYSQL_ROOT_PASSWORD' => $extractEnvVar($db['password'] ?? 'root'),
-            'MYSQL_DATABASE' => $extractEnvVar($db['name'] ?? 'apis-hub'),
-        ],
-        'ports' => ['3306:3306'],
-        'volumes' => ['db_data:/var/lib/mysql'],
-    ];
+    if ($dbDriver === 'pdo_pgsql') {
+        $services['db'] = [
+            'image' => 'postgres:16-alpine',
+            'restart' => 'always',
+            'environment' => [
+                'POSTGRES_USER' => $extractEnvVar($db['user'] ?? 'postgres'),
+                'POSTGRES_PASSWORD' => $extractEnvVar($db['password'] ?? 'postgres'),
+                'POSTGRES_DB' => $extractEnvVar($db['name'] ?? 'apis-hub'),
+            ],
+            'ports' => ['5432:5432'],
+            'volumes' => ['db_data:/var/lib/postgresql/data'],
+        ];
+    } else {
+        $services['db'] = [
+            'image' => 'mysql:8.0',
+            'restart' => 'always',
+            'environment' => [
+                'MYSQL_ROOT_PASSWORD' => $extractEnvVar($db['password'] ?? 'root'),
+                'MYSQL_DATABASE' => $extractEnvVar($db['name'] ?? 'apis-hub'),
+            ],
+            'ports' => ['3306:3306'],
+            'volumes' => ['db_data:/var/lib/mysql'],
+        ];
+    }
 }
 
 $services['redis'] = [
