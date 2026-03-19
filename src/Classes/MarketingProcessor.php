@@ -39,7 +39,7 @@ class MarketingProcessor
         if (!empty($campaigns)) {
             $cols = ['campaign_id', 'name', 'start_date', 'end_date'];
             $numCols = count($cols);
-            $chunkSize = (int)floor(64000 / $numCols);
+            $chunkSize = (int)floor(30000 / $numCols);
 
             foreach (array_chunk($campaigns, $chunkSize) as $chunk) {
                 $params = [];
@@ -75,7 +75,7 @@ class MarketingProcessor
         if (!empty($campaigns)) {
             $cols = ['channel', 'platform_id', 'campaign_id', 'channeled_account_id', 'budget', 'status', 'objective', 'buying_type', 'data'];
             $numCols = count($cols);
-            $chunkSize = (int)floor(64000 / $numCols);
+            $chunkSize = (int)floor(30000 / $numCols);
 
             foreach (array_chunk($campaigns, $chunkSize) as $chunk) {
                 $channeledParams = [];
@@ -138,7 +138,7 @@ class MarketingProcessor
         if (!empty($adsets)) {
             $cols = ['channel', 'platform_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'name', 'start_date', 'end_date', 'status', 'optimization_goal', 'billing_event', 'targeting', 'data'];
             $numCols = count($cols);
-            $chunkSize = (int)floor(64000 / $numCols);
+            $chunkSize = (int)floor(30000 / $numCols);
 
             foreach (array_chunk($adsets, $chunkSize) as $chunk) {
                 $params = [];
@@ -223,7 +223,7 @@ class MarketingProcessor
         if (!empty($ads)) {
             $cols = ['channel', 'platform_id', 'channeled_account_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'creative_id', 'name', 'status', 'data'];
             $numCols = count($cols);
-            $chunkSize = (int)floor(64000 / $numCols);
+            $chunkSize = (int)floor(30000 / $numCols);
 
             foreach (array_chunk($ads, $chunkSize) as $chunk) {
                 $params = [];

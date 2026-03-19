@@ -136,11 +136,17 @@ class BaseRepository extends EntityRepository
         ];
         $activeJoins = [];
 
+        $standardRelations = array_keys($relationMap);
+        $dateFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'year', 'month', 'day', 'week', 'quarter', 'dayofweek', 'dayname', 'monthname', 'metricDate', 'platformCreatedAt', 'createdAt', 'date'];
+
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
             $quotedField = "\"$field\"";
-            if ($this->isChanneledMetric && str_starts_with($field, 'dimensions.')) {
-                $dimKey = substr($field, 11);
+            $isDimension = str_starts_with($field, 'dimensions.');
+            $dimKey = $isDimension ? substr($field, 11) : $field;
+
+            // Automatic dimension detection: if it's a ChanneledMetric and not a standard relation/date/field
+            if ($this->isChanneledMetric && ($isDimension || (!in_array($field, $standardRelations) && !in_array($field, $dateFields) && !$this->_class->hasField($field)))) {
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                 // Join chain: channeled_metrics (e) -> dimension_set_items (dsi) -> dimension_values (dv) -> dimension_keys (dk)
                 $qb->leftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id")
@@ -166,8 +172,10 @@ class BaseRepository extends EntityRepository
         // Apply filters
         if ($filters) {
             foreach ($filters as $key => $value) {
-                if ($this->isChanneledMetric && str_starts_with($key, 'dimensions.')) {
-                    $dimKey = substr($key, 11);
+                $isDimension = str_starts_with($key, 'dimensions.');
+                $dimKey = $isDimension ? substr($key, 11) : $key;
+
+                if ($this->isChanneledMetric && ($isDimension || (!in_array($key, $standardRelations) && !in_array($key, $dateFields) && !$this->_class->hasField($key)))) {
                     $dimAlias = "f_dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                     $qb->join('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id")
                        ->join("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id")

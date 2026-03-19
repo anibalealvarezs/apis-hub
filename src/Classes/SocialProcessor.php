@@ -27,7 +27,7 @@ class SocialProcessor
 
         $cols = ['url', 'title', 'hostname', 'platform_id', 'account_id', 'data'];
         $numCols = count($cols);
-        $chunkSize = (int)floor(64000 / $numCols);
+        $chunkSize = (int)floor(30000 / $numCols);
 
         foreach (array_chunk($pages, $chunkSize) as $chunk) {
             $params = [];
