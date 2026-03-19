@@ -10,7 +10,7 @@ use Repositories\QueryRepository;
 
 #[ORM\Entity(repositoryClass: QueryRepository::class)]
 #[ORM\Table(name: 'queries')]
-#[ORM\Index(columns: ['query'], name: 'query_idx')]
+#[ORM\Index(columns: ['query'], name: 'idx_queries_query_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Query extends Entity
 {

@@ -11,9 +11,9 @@ use Repositories\ProductVariantRepository;
 
 #[ORM\Entity(repositoryClass: ProductVariantRepository::class)]
 #[ORM\Table(name: 'product_variants')]
-#[ORM\Index(columns: ['productVariantId'], name: 'productVariantId_idx')]
-#[ORM\Index(columns: ['sku'], name: 'sku_idx')]
-#[ORM\Index(columns: ['productVariantId', 'sku'], name: 'productVariantId_sku_idx')]
+#[ORM\Index(columns: ['productVariantId'], name: 'idx_product_variants_productVariantId_idx')]
+#[ORM\Index(columns: ['sku'], name: 'idx_product_variants_sku_idx')]
+#[ORM\Index(columns: ['productVariantId', 'sku'], name: 'idx_product_variants_productVariantId_sku_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ProductVariant extends Entity
 {

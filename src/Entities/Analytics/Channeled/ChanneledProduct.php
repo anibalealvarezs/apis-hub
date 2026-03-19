@@ -10,14 +10,14 @@ use Repositories\Channeled\ChanneledProductRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledProductRepository::class)]
 #[ORM\Table(name: 'channeled_products')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
-#[ORM\Index(columns: ['sku'], name: 'sku_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'platformCreatedAt_idx')]
-#[ORM\Index(columns: ['platformId', 'sku'], name: 'platformId_sku_idx')]
-#[ORM\Index(columns: ['platformId', 'platformCreatedAt'], name: 'platformId_platformCreatedAt_idx')]
-#[ORM\Index(columns: ['sku', 'platformCreatedAt'], name: 'sku_platformCreatedAt_idx')]
-#[ORM\Index(columns: ['platformId', 'sku', 'platformCreatedAt'], name: 'platformId_sku_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_products_platformId_channel_idx')]
+#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_products_platformId_idx')]
+#[ORM\Index(columns: ['sku'], name: 'idx_channeled_products_sku_idx')]
+#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_products_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platformId', 'sku'], name: 'idx_channeled_products_platformId_sku_idx')]
+#[ORM\Index(columns: ['platformId', 'platformCreatedAt'], name: 'idx_channeled_products_platformId_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['sku', 'platformCreatedAt'], name: 'idx_channeled_products_sku_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platformId', 'sku', 'platformCreatedAt'], name: 'idx_channeled_products_platformId_sku_platformCreatedAt_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProduct extends ChanneledEntity
 {

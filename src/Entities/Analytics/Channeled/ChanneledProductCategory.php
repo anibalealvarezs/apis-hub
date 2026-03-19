@@ -10,9 +10,9 @@ use Repositories\Channeled\ChanneledProductCategoryRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledProductCategoryRepository::class)]
 #[ORM\Table(name: 'channeled_product_categories')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'platformId_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'platformId_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_product_categories_platformId_channel_idx')]
+#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_product_categories_platformId_idx')]
+#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_product_categories_platformCreatedAt_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProductCategory extends ChanneledEntity
 {

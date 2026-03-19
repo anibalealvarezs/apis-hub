@@ -11,34 +11,34 @@ use Repositories\PostRepository;
 
 #[ORM\Entity(repositoryClass: PostRepository::class)]
 #[ORM\Table(name: 'posts')]
-#[ORM\Index(columns: ['postId'], name: 'postId_idx')]
+#[ORM\Index(columns: ['postId'], name: 'idx_posts_postId_idx')]
 #[ORM\Index(
     columns: ['postId', 'page_id'],
-    name: 'postId_page_lookup_idx'
+    name: 'idx_posts_postId_page_lookup_idx'
 )]
 #[ORM\Index(
     columns: ['postId', 'page_id', 'account_id'],
-    name: 'postId_page_account_lookup_idx'
+    name: 'idx_posts_postId_page_account_lookup_idx'
 )]
 #[ORM\Index(
     columns: ['postId', 'page_id', 'channeledAccount_id'],
-    name: 'postId_page_channeledAccount_lookup_idx'
+    name: 'idx_posts_postId_page_channeledAccount_lookup_idx'
 )]
 #[ORM\Index(
     columns: ['postId', 'page_id', 'account_id', 'channeledAccount_id'],
-    name: 'postId_page_account_channeledAccount_lookup_idx'
+    name: 'idx_posts_postId_page_account_channeledAccount_lookup_idx'
 )]
 #[ORM\Index(
     columns: ['postId', 'account_id'],
-    name: 'postId_account_lookup_idx'
+    name: 'idx_posts_postId_account_lookup_idx'
 )]
 #[ORM\Index(
     columns: ['postId', 'account_id', 'channeledAccount_id'],
-    name: 'postId_account_channeledAccount_lookup_idx'
+    name: 'idx_posts_postId_account_channeledAccount_lookup_idx'
 )]
 #[ORM\Index(
     columns: ['postId', 'channeledAccount_id'],
-    name: 'postId_channeledAccount_lookup_idx'
+    name: 'idx_posts_postId_channeledAccount_lookup_idx'
 )]
 #[ORM\UniqueConstraint(name: 'post_unique', columns: [
     'postId',

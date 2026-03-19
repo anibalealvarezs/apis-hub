@@ -11,7 +11,7 @@ use Repositories\OrderRepository;
 
 #[ORM\Entity(repositoryClass: OrderRepository::class)]
 #[ORM\Table(name: 'orders')]
-#[ORM\Index(columns: ['orderId'], name: 'orderId_idx')]
+#[ORM\Index(columns: ['orderId'], name: 'idx_orders_orderId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Order extends Entity
 {

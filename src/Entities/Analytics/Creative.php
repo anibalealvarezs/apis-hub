@@ -11,7 +11,7 @@ use Repositories\CreativeRepository;
 
 #[ORM\Entity(repositoryClass: CreativeRepository::class)]
 #[ORM\Table(name: 'creatives')]
-#[ORM\Index(columns: ['creativeId'], name: 'creativeId_idx')]
+#[ORM\Index(columns: ['creativeId'], name: 'idx_creatives_creativeId_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Creative extends Entity
 {
