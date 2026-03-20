@@ -754,13 +754,31 @@
             }
         }
 
-        function renderBreakdownTable(container, data) {
+        function renderBreakdownTable(container, data, dims = ['gender', 'age']) {
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="empty-state">No breakdown data available</div>';
+                return;
+            }
+
+            // Standardize dimensions to lowercase for key matching
+            const dimKeys = dims.map(d => d.toLowerCase());
+
+            // Universal Hierarchical Sort based on provided dimensions
+            data.sort((a, b) => {
+                for (const dim of dimKeys) {
+                    const valA = (a[`dimensions.${dim}`] || '').toString();
+                    const valB = (b[`dimensions.${dim}`] || '').toString();
+                    const comp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+                    if (comp !== 0) return comp;
+                }
+                return 0;
+            });
+
             let html = `
                 <table class="breakdown-table">
                     <thead>
                         <tr>
-                            <th>Gender</th>
-                            <th>Age</th>
+                            ${dimKeys.map(d => `<th>${d.charAt(0).toUpperCase() + d.slice(1)}</th>`).join('')}
                             <th class="text-right">Spend</th>
                             <th class="text-right">Impr.</th>
                             <th class="text-right">Reach</th>
@@ -770,36 +788,23 @@
                             <th class="text-right">CPC</th>
                             <th class="text-right">CPM</th>
                             <th class="text-right">Results</th>
-                            <th class="text-right">Cost/Res</th>
                             <th class="text-right">Res. Rate</th>
                             <th class="text-right">Actions</th>
+                            <th class="text-right">Cost/Res</th>
                         </tr>
                     </thead>
                     <tbody>
             `;
 
-            // Sort Gender -> Age
-            data.sort((a, b) => {
-                const genA = (a['dimensions.gender'] || '').toLowerCase();
-                const genB = (b['dimensions.gender'] || '').toLowerCase();
-                if (genA !== genB) return genA.localeCompare(genB);
-                
-                const ageA = a['dimensions.age'] || '';
-                const ageB = b['dimensions.age'] || '';
-                return ageA.localeCompare(ageB);
-            });
-
             data.forEach(row => {
-                const age = row['dimensions.age'] || 'Unknown';
-                const gender = (row['dimensions.gender'] || 'Unknown').charAt(0).toUpperCase() + (row['dimensions.gender'] || 'Unknown').slice(1);
+                const dimCells = dimKeys.map(d => `<td>${row[`dimensions.${d}`] || 'Unknown'}</td>`).join('');
                 const cpr = parseFloat(row.average_cost_per_result || 0);
-                const ctr = parseFloat(row.average_ctr || 0) * 100;
-                const resRate = parseFloat(row.average_result_rate || 0) * 100;
+                const ctr = parseFloat(row.average_ctr || 0);
+                const resRate = parseFloat(row.average_result_rate || 0);
 
                 html += `
                     <tr>
-                        <td style="font-weight:600; color:var(--meta-blue);">${gender}</td>
-                        <td style="font-weight:600;">${age}</td>
+                        ${dimCells}
                         <td class="text-right">€${formatNum(row.total_spend)}</td>
                         <td class="text-right">${formatInt(row.total_impressions)}</td>
                         <td class="text-right">${formatInt(row.total_reach)}</td>
@@ -809,9 +814,9 @@
                         <td class="text-right">€${formatNum(row.average_cpc)}</td>
                         <td class="text-right">€${formatNum(row.average_cpm)}</td>
                         <td class="text-right">${formatInt(row.total_results)}</td>
-                        <td class="text-right"><span class="${getCostClass(cpr)}">€${formatNum(cpr)}</span></td>
                         <td class="text-right">${formatPct(resRate)}</td>
                         <td class="text-right">${formatInt(row.total_actions)}</td>
+                        <td class="text-right"><span class="${getCostClass(cpr)}">€${formatNum(cpr)}</span></td>
                     </tr>
                 `;
             });
