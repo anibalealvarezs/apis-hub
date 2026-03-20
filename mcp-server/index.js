@@ -327,16 +327,11 @@ if (MODE === "sse") {
     console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
     
     // Detección ultra-robusta de Host y Protocolo para túneles SSH
-    const host = '127.0.0.1:3010'; // FORZAMOS ESTE HOST PARA EVITAR QUE EL SDK LO TRONQUE A RELATIVO
+    const host = 'localhost:3010'; // FORZAMOS LOCALHOST PARA QUE COINCIDA CON TU TÚNEL
     const protocol = 'http';
     
     // Construir URL absoluta con validación
-    let endpoint;
-    try {
-        endpoint = new URL("/mcp/messages", `${protocol}://${host}`).toString();
-    } catch (e) {
-        endpoint = `http://${host}/mcp/messages`; // Último recurso si falla URL parser
-    }
+    const endpoint = `http://localhost:3010/mcp/messages`;
     
     console.error(`[SSE] Publicando endpoint ABSOLUTO: ${endpoint}`);
     
@@ -346,9 +341,9 @@ if (MODE === "sse") {
         if (chunk) {
             let str = chunk.toString();
             if (str.includes('event: endpoint') && str.includes('data: /mcp/messages')) {
-                // Reemplazamos la ruta relativa que el SDK intenta forzar por la absoluta
+                // Forzamos el reemplazo a localhost
                 str = str.replace('data: /mcp/messages', `data: ${endpoint}`);
-                console.error(`[SSE] HACK: URL relativa interceptada y convertida a: ${endpoint}`);
+                console.error(`[SSE] HACK: URL reconvertida a: ${endpoint}`);
                 return originalWrite(Buffer.from(str), encoding, callback);
             }
         }
