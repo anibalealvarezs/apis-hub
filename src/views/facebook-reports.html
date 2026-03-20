@@ -918,19 +918,20 @@
 
         function getCostClass(v) {
             v = parseFloat(v);
-            if (v === 0 || isNaN(v)) return '';
-            if (v < 1.0) return 'badge-excellent';
-            if (v <= 2.5) return 'badge-good';
-            if (v <= 5.0) return 'badge-normal';
-            return 'badge-bad';
+            if (isNaN(v) || Math.abs(v) < 0.000001) return '';
+            if (v < 6.0) return 'badge-excellent';
+            if (v >= 6.0 && v <= 7.0) return 'badge-good';
+            if (v > 7.0 && v <= 8.0) return 'badge-normal';
+            if (v > 8.0 && v <= 10.0) return 'badge-warning';
+            if (v > 10.0 && v <= 15.0) return 'badge-bad';
+            return 'badge-grave';
         }
 
         function getCtrClass(v) {
             v = parseFloat(v);
             if (isNaN(v)) return '';
-            if (v > 5.0) return 'badge-excellent';
-            if (v >= 2.0) return 'badge-good';
-            if (v >= 1.0) return 'badge-normal';
+            if (v > 3.0) return 'badge-excellent';
+            if (v >= 2.0 && v <= 3.0) return 'badge-normal';
             return 'badge-bad';
         }
 
