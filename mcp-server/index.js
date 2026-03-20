@@ -457,7 +457,8 @@ if (MODE === "sse") {
     const transport = sessions.get(sessionId);
     
     if (transport) {
-      console.error(`[POST] Procesando mensaje para sesión ${sessionId}. Body: ${JSON.stringify(req.body).substring(0, 100)}...`);
+      const bodyPreview = req.body ? JSON.stringify(req.body).substring(0, 100) : "Raw Stream";
+      console.error(`[POST] Procesando mensaje para sesión ${sessionId}. Body: ${bodyPreview}...`);
       try {
         await transport.handlePostMessage(req, res);
       } catch (err) {
