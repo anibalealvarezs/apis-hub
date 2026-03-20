@@ -329,11 +329,11 @@ if (MODE === "sse") {
     next();
   });
 
-  // Manejador para el endpoint SSE (GET inicia el stream, POST damos soporte por si el cliente lo intenta)
+  // Manejador para el endpoint SSE (GET inicia el stream, otros métodos devolvemos 200 para compatibilidad)
   app.all("/mcp/sse", async (req, res) => {
-    if (req.method === "POST") {
-        console.error(`[DEBUG-REQ] Posteando en SSE. Antigravity está probando compatibilidad.`);
-        return res.status(405).send("Please use GET for SSE stream");
+    if (req.method !== "GET") {
+        console.error(`[DEBUG-REQ] Antigravity probando método ${req.method} en SSE. Respondiendo 200 OK.`);
+        return res.status(200).json({ status: "ok" });
     }
 
     console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
