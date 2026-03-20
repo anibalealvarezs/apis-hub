@@ -16,6 +16,7 @@ This document lists common command chains needed during development to keep loca
   - [Running Unit Tests](#running-unit-tests)
   - [Running Static Analysis (PHPStan)](#running-static-analysis-phpstan)
 - [6. Remote Deployment (Hetzner)](#6-remote-deployment-hetzner)
+- [7. Database Maintenance & Reset (Nuclear Operations)](#7-database-maintenance--reset-nuclear-operations)
 
 ---
 
@@ -85,9 +86,6 @@ docker compose exec gsc-jan php bin/cli.php app:read --entity=job --params="glob
 ```bash
 # Follow logs for all services
 docker compose logs -f
-
-# Follow logs for a specific service (e.g., Facebook Ads)
-docker compose logs -f fb-ads
 ```
 
 ### Managing and Monitoring Instance Jobs
@@ -140,8 +138,8 @@ docker compose exec gsc-jan php bin/cli.php cache:clear --channel=shopify --enti
 Before running tests or after a rebuild, verify the health of the entire infrastructure:
 
 ```bash
-# Perform a comprehensive diagnostic (DB, Redis, Schema, Catalog)
-docker compose exec gsc-jan php bin/cli.php app:health-check
+# Perform a comprehensive diagnostic (DB, Redis, Schema, Catalog, MCP)
+docker compose exec facebook-marketing-entities-sync php bin/cli.php app:health-check
 ```
 
 ---
@@ -153,9 +151,6 @@ docker compose exec gsc-jan php bin/cli.php app:health-check
 ```bash
 # Run all tests
 docker compose exec gsc-jan vendor/bin/phpunit tests
-
-# Run a specific test class
-docker compose exec gsc-jan vendor/bin/phpunit tests/Controllers/CacheControllerTest.php
 ```
 
 ### Running Static Analysis (PHPStan)
@@ -180,43 +175,50 @@ scp .env.llenatucentro root@178.104.61.99:/root/apis-hub/.env
 scp -r config/*.yaml root@178.104.61.99:/root/apis-hub/config/
 
 # 3. Copy channel-specific configuration files (facebook, google, etc.)
-#    This is a recursive copy of the entire channels folder.
 scp -r config/channels/ root@178.104.61.99:/root/apis-hub/config/
-```
 
-### Quick "Sync All Configs" Shortcut
-
-To synchronize the entire `config` directory in one go (including subfolders and `.example` files):
-
-```powershell
+# 4. Sync entire config folder (Optional but recommended)
 scp -r config/ root@178.104.61.99:/root/apis-hub/
 ```
 
-> [!NOTE]
-> After copying the configuration files, remember to log into the server and run `php bin/build-deployment.php` to regenerate the `docker-compose.yml` if necessary, and then `docker compose up -d --build`.
+### Secure Tunneling (SSH Port Forwarding)
+
+Use these commands from your local machine to connect securely to the infrastructure.
+
+```powershell
+# 1. Database Tunnel (PostgreSQL)
+# Local Port 5433 -> Remote Port 5432
+ssh -L 5433:localhost:5432 root@178.104.61.99 -N
+
+# 2. Intel Bridge Tunnel (MCP Server)
+# Local Port 3010 -> Remote Port 3000
+ssh -L 3010:localhost:3000 root@178.104.61.99 -N
+```
+
+> [!TIP]
+> Use the `-N` flag to forward ports without opening a remote shell.
 
 ---
 
 ## 7. Database Maintenance & Reset (Nuclear Operations)
 
-Use these commands when you need to completely wipe the data and start from a clean state. **WARNING: This is irreversible.**
+Use these commands when you need to completely wipe data. **WARNING: IRREVERSIBLE.**
 
 ### Step-by-Step Reset Chain
 
 ```bash
-# 1. Nuclear Drop (Force disconnects all active sessions)
-# Replace 'apis-hub-production' with your actual DB Name (DB_NAME env)
+# 1. Nuclear Drop (Force disconnects sessions)
 docker compose exec facebook-marketing-entities-sync php bin/cli.php db:query "DROP DATABASE \"apis-hub-production\" --force"
 
 # 2. Create Fresh Database
 docker compose exec facebook-marketing-entities-sync php bin/cli.php db:query "CREATE DATABASE \"apis-hub-production\""
 
-# 3. Master Setup Trigger (Schema creation + Entity seeding)
+# 3. Master Setup Trigger (Schema + Seeding)
 docker compose exec facebook-marketing-entities-sync php bin/cli.php app:setup-db
 
-# 4. Verify Schema (Optional)
+# 4. Verify Health
 docker compose exec facebook-marketing-entities-sync php bin/cli.php app:health-check
 ```
 
-> [!TIP]
-> Use the `facebook-marketing-entities-sync` container for these commands as it is usually the "Master" instance configured with the most permissions in `entrypoint.sh`.
+> [!NOTE]
+> Use the `facebook-marketing-entities-sync` container for these master commands.
