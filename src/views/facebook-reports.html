@@ -533,9 +533,10 @@
                         average_frequency: "frequency",
                         average_cost_per_result: "cost_per_result",
                         average_result_rate: "result_rate",
+                        purchase_roas: "purchase_roas",
                         campaign_status: "campaign_status"
                     },
-                    groupBy: ["account", "campaign"],
+                    groupBy: ["channeledAccount", "channeledCampaign", "account", "campaign"],
                     startDate: start,
                     endDate: end
                 };
@@ -619,8 +620,9 @@
             const btn = mainRow.querySelector('.btn-expand');
             const nextRow = mainRow.nextElementSibling;
             
-            const account = rowData.account;
-            const campaign = rowData.campaign;
+            const accountId = rowData.channeledAccount;
+            const campaignId = rowData.channeledCampaign;
+            const campaignName = rowData.campaign;
 
             // If already open, close it
             if (nextRow && nextRow.classList.contains('breakdown-row')) {
@@ -634,10 +636,10 @@
             const breakdownRow = document.createElement('tr');
             breakdownRow.className = 'breakdown-row';
             breakdownRow.innerHTML = `
-                <td colspan="16">
+                <td colspan="17">
                     <div class="breakdown-container">
                         <div class="breakdown-title">
-                            <i data-lucide="users" size="14"></i> Age & Gender Breakdown: <strong>${campaign}</strong>
+                            <i data-lucide="users" size="14"></i> Age & Gender Breakdown: <strong>${campaignName}</strong>
                             <span id="loader-${rowId}" style="margin-left:10px;"><i data-lucide="loader" class="spinner" style="width:14px; height:14px; display:inline-block; border-width:2px;"></i></span>
                         </div>
                         <div id="content-${rowId}"></div>
@@ -666,8 +668,8 @@
                     },
                     groupBy: ["dimensions.age", "dimensions.gender"],
                     filters: {
-                        account: account,
-                        campaign: campaign
+                        channeledAccount: accountId,
+                        channeledCampaign: campaignId
                     },
                     startDate: start,
                     endDate: end
