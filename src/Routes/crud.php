@@ -11,7 +11,8 @@ return [
                 method: 'create',
                 body: $body
             );
-        }
+        },
+        'admin' => true
     ],
     '/entity/{entity}/aggregate' => [
         'httpMethod' => 'POST',
@@ -33,7 +34,8 @@ return [
                 body: $body,
                 params: $params,
             );
-        }
+        },
+        'admin' => true
     ],
     '/entity/{entity}/{id}' => [
         'httpMethod' => 'GET',
@@ -43,7 +45,8 @@ return [
                 method: 'read',
                 id: $id
             );
-        }
+        },
+        'admin' => true
     ],
     '/entity/{entity}' => [
         'httpMethod' => 'GET',
@@ -54,7 +57,8 @@ return [
                 body: $body,
                 params: $params,
             );
-        }
+        },
+        'admin' => true
     ],
     '/entity/{entity}/{id}/update' => [
         'httpMethod' => 'PUT',
@@ -65,7 +69,8 @@ return [
                 id: $id,
                 body: $body
             );
-        }
+        },
+        'admin' => true
     ],
     '/entity/{entity}/{id}/delete' => [
         'httpMethod' => 'DELETE',
@@ -75,6 +80,7 @@ return [
                 method: 'delete',
                 id: $id
             );
-        }
+        },
+        'admin' => true
     ]
 ];
