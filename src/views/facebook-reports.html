@@ -343,7 +343,7 @@
         <div class="controls">
             <div class="date-picker-wrap">
                 <i data-lucide="shield-lock" size="16" style="color:var(--meta-positive)"></i>
-                <input type="password" id="apiKey" class="date-input" placeholder="API Key..." style="width: 120px;">
+                <span style="font-size: 0.8rem; font-weight: 500; color: var(--meta-positive);">Secured Session</span>
             </div>
             <div class="date-picker-wrap">
                 <i data-lucide="calendar" size="16"></i>
@@ -442,19 +442,35 @@
         document.getElementById('startDate').value = dayjs().subtract(8, 'day').format('YYYY-MM-DD');
         document.getElementById('startDate').max = yesterday;
 
-        if (sessionStorage.getItem('apis_hub_token')) {
-            document.getElementById('apiKey').value = sessionStorage.getItem('apis_hub_token');
+        function getAdminHeaders() {
+            const EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
+            const now = Date.now();
+            let auth = JSON.parse(localStorage.getItem('apis_hub_admin_auth') || '{}');
+            
+            if (!auth.token || (now - auth.timestamp > EXPIRATION_TIME)) {
+                const token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
+                if (token) {
+                    auth = { token, timestamp: now };
+                    localStorage.setItem('apis_hub_admin_auth', JSON.stringify(auth));
+                } else {
+                    return {};
+                }
+            }
+            
+            return {
+                'Authorization': 'Bearer ' + auth.token,
+                'Content-Type': 'application/json'
+            };
         }
 
         async function loadReport() {
-            const token = document.getElementById('apiKey').value;
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
             const loader = document.getElementById('loader');
             const emptyMsg = document.getElementById('empty-msg');
 
-            if (!token) { alert('API Key Required'); return; }
-            sessionStorage.setItem('apis_hub_token', token);
+            const headers = getAdminHeaders();
+            if (!headers.Authorization) return;
 
             loader.style.display = 'flex';
             emptyMsg.style.display = 'none';
@@ -483,12 +499,16 @@
 
                 const response = await fetch('/facebook_marketing/metric/aggregate', {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
+                    headers: headers,
                     body: JSON.stringify(payload)
                 });
+
+                if (response.status === 401) {
+                    localStorage.removeItem('apis_hub_admin_auth');
+                    alert('Session Expired or Invalid Key. Please reload and provide your key again.');
+                    loader.style.display = 'none';
+                    return;
+                }
 
                 const result = await response.json();
                 if (result.status === 'success' && result.data) {
