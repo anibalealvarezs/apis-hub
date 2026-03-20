@@ -308,20 +308,22 @@
 
     <script>
         function getAdminHeaders() {
-            let token = sessionStorage.getItem('apis_hub_admin_token');
-            if (!token) {
-                token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
+            const EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
+            const now = Date.now();
+            let auth = JSON.parse(localStorage.getItem('apis_hub_admin_auth') || '{}');
+            
+            if (!auth.token || (now - auth.timestamp > EXPIRATION_TIME)) {
+                const token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
                 if (token) {
-                    sessionStorage.setItem('apis_hub_admin_token', token);
-                    return {
-                        'Authorization': 'Bearer ' + token,
-                        'Content-Type': 'application/json'
-                    };
+                    auth = { token, timestamp: now };
+                    localStorage.setItem('apis_hub_admin_auth', JSON.stringify(auth));
+                } else {
+                    return {};
                 }
-                return {};
             }
+            
             return {
-                'Authorization': 'Bearer ' + token,
+                'Authorization': 'Bearer ' + auth.token,
                 'Content-Type': 'application/json'
             };
         }
@@ -329,18 +331,15 @@
         async function fetchLogList() {
             try {
                 const headers = getAdminHeaders();
-                if (!headers.Authorization) {
-                    console.warn('Log list fetch aborted: no token provided.');
-                    return;
-                }
+                if (!headers.Authorization) return;
 
                 const response = await fetch('/api/monitoring/logs/list', {
                     headers: headers
                 });
                 
                 if (response.status === 401) {
-                    sessionStorage.removeItem('apis_hub_admin_token');
-                    alert('Session Expired or Invalid Key. Please reload and try again.');
+                    localStorage.removeItem('apis_hub_admin_auth');
+                    alert('Session Expired or Invalid Key. Please reload and provide your key again.');
                     return;
                 }
 
@@ -386,18 +385,15 @@
 
             try {
                 const headers = getAdminHeaders();
-                if (!headers.Authorization) {
-                    console.warn('Logs fetch aborted: no token provided.');
-                    return;
-                }
+                if (!headers.Authorization) return;
 
                 const response = await fetch(`/api/monitoring/logs?file=${file}&lines=1000`, {
                     headers: headers
                 });
 
                 if (response.status === 401) {
-                    sessionStorage.removeItem('apis_hub_admin_token');
-                    alert('Session Expired or Invalid Key. Please reload and try again.');
+                    localStorage.removeItem('apis_hub_admin_auth');
+                    alert('Session Expired or Invalid Key. Please reload and provide your key again.');
                     return;
                 }
 

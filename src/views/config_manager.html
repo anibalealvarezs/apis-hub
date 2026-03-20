@@ -1040,9 +1040,22 @@
         let countriesList = {};
 
         function getAdminHeaders() {
-            const token = sessionStorage.getItem('apis_hub_admin_token');
+            const EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
+            const now = Date.now();
+            let auth = JSON.parse(localStorage.getItem('apis_hub_admin_auth') || '{}');
+            
+            if (!auth.token || (now - auth.timestamp > EXPIRATION_TIME)) {
+                const token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
+                if (token) {
+                    auth = { token, timestamp: now };
+                    localStorage.setItem('apis_hub_admin_auth', JSON.stringify(auth));
+                } else {
+                    return {};
+                }
+            }
+            
             return {
-                'Authorization': 'Bearer ' + token,
+                'Authorization': 'Bearer ' + auth.token,
                 'Content-Type': 'application/json'
             };
         }
@@ -1052,8 +1065,7 @@
             try {
                 const headers = getAdminHeaders();
                 if (!headers.Authorization) {
-                    console.warn('Config Manager assets fetch aborted: no token provided.');
-                    hideLoading(); // Ensure loading state is cleared if no token
+                    hideLoading();
                     return;
                 }
 
@@ -1068,8 +1080,8 @@
                 });
                 
                 if (response.status === 401) {
-                    sessionStorage.removeItem('apis_hub_admin_token');
-                    alert('Session Expired or Invalid Key. Please reload and try again.');
+                    localStorage.removeItem('apis_hub_admin_auth');
+                    alert('Session Expired or Invalid Key. Please reload and provide your key again.');
                     return;
                 }
                 
