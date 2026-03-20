@@ -49,7 +49,8 @@ class RoutingCore implements HttpKernelInterface
             $isHtml = $attributes['html'] ?? false;
 
             // Security Check
-            if (!$isPublic && !$this->isAuthorized($request, $isAdminOnly)) {
+            // API calls are always protected. HTML pages let the frontend Ghost Guard handle it.
+            if (!$isPublic && !$isHtml && !$this->isAuthorized($request, $isAdminOnly)) {
                 return new Response(json_encode([
                     'status' => 'error',
                     'error' => 'Unauthorized: Access denied'
