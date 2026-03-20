@@ -11,7 +11,7 @@ use Repositories\PageRepository;
 #[ORM\Entity(repositoryClass: PageRepository::class)]
 #[ORM\Table(name: 'pages')]
 #[ORM\Index(columns: ['url'], name: 'idx_pages_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_pages_platformId_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_pages_platform_id_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Page extends Entity
 {
@@ -24,7 +24,7 @@ class Page extends Entity
     #[ORM\Column(type: 'string', nullable: true)]
     protected ?string $hostname = null;
 
-    #[ORM\Column(type: 'string')]
+    #[ORM\Column(name: 'platform_id', type: 'string')]
     protected int|string $platformId;
 
     #[ORM\Column(type: 'json', nullable: true)]

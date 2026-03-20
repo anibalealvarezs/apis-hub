@@ -612,6 +612,7 @@
             <a href="/logs" class="nav-link"><i data-lucide="scroll"></i> Logs</a>
             <a href="/command-builder" class="nav-link"><i data-lucide="terminal"></i> Builder</a>
             <a href="/config-manager" class="nav-link"><i data-lucide="settings"></i> Config</a>
+            <a href="/fb-reports" class="nav-link"><i data-lucide="bar-chart-3"></i> Reports</a>
             <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
         </nav>
     </header>
@@ -718,13 +719,48 @@
         // Init Lucide
         lucide.createIcons();
 
+        function getAdminHeaders() {
+            const EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
+            const now = Date.now();
+            let auth = JSON.parse(localStorage.getItem('apis_hub_admin_auth') || '{}');
+            
+            // Check if token exists and hasn't expired
+            if (!auth.token || (now - auth.timestamp > EXPIRATION_TIME)) {
+                const token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
+                if (token) {
+                    auth = { token, timestamp: now };
+                    localStorage.setItem('apis_hub_admin_auth', JSON.stringify(auth));
+                } else {
+                    return {};
+                }
+            }
+            
+            return {
+                'Authorization': 'Bearer ' + auth.token,
+                'Content-Type': 'application/json'
+            };
+        }
+
         async function fetchData() {
             try {
-                const response = await fetch('/api/monitoring/data');
-                const data = await response.json();
+                const headers = getAdminHeaders();
+                if (!headers.Authorization) return;
+
+                const response = await fetch('/api/monitoring/data', {
+                    headers: headers
+                });
                 
+                if (response.status === 401) {
+                    localStorage.removeItem('apis_hub_admin_auth');
+                    alert('Session Expired or Invalid Key. Please reload and provide your key again.');
+                    return;
+                }
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
                 updateContainers(data.containers);
-                updatePendingJobsDetailed(data.groupedJobs, data.containers); // Passing containers for order
+                updatePendingJobsDetailed(data.groupedJobs, data.containers);
                 updateDbTotals(data.dbTotals);
                 
                 if (data.projectName) {
@@ -1103,7 +1139,6 @@
                               (options.bypass ? '&bypass_dependency=true' : '&bypass_dependency=false');
             }
 
-            // Simple visual feedback
             if (btnElement) {
                 btnElement.disabled = true;
                 const originalText = btnElement.innerHTML;
@@ -1114,13 +1149,22 @@
             try {
                 const response = await fetch('/api/monitoring/jobs/action', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: { 
+                        ...getAdminHeaders(),
+                        'Content-Type': 'application/x-www-form-urlencoded' 
+                    },
                     body: `id=${id}&action=${action}${resumeParam}`
                 });
                 
+                if (response.status === 401) {
+                    sessionStorage.removeItem('apis_hub_admin_token');
+                    setTimeout(() => location.reload(), 500);
+                    return;
+                }
+
                 const result = await response.json();
                 if (result.success) {
-                    fetchData(); // Refresh dashboard
+                    fetchData();
                 } else {
                     await showSimpleModal('x-circle', 'Error', result.error);
                     if (btnElement) btnElement.disabled = false;

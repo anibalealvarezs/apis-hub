@@ -205,12 +205,27 @@ function createMcpServer() {
             properties: {
               entity: { type: "string", description: "The entity name (use 'channeled_metric' for performance data)" },
               channel: { type: "string", description: "The channel identifier (e.g. 'google_search_console', 'facebook')" },
-              aggregations: { type: "string", description: "JSON string of aggregations. Use intelligent formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. '{\"total_clicks\":\"clicks\"}'" },
+              aggregations: { 
+                type: "object", 
+                description: "Object mapping alias to formula. Formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. {\"total_spend\":\"spend\"}" 
+              },
+              filters: {
+                type: "object",
+                description: "Optional: Object containing filters. e.g. {\"dimensions.gender\":\"male\"}"
+              },
               groupBy: { type: "string", description: "Comma separated fields to group by (e.g. 'daily', 'weekly', 'dimensions.gender')" },
               startDate: { type: "string", description: "Start date (Y-m-d)" },
               endDate: { type: "string", description: "End date (Y-m-d)" }
             },
             required: ["entity", "aggregations"],
+          },
+        },
+        {
+          name: "get_available_instances",
+          description: "List all configured worker instances from instances.yaml",
+          inputSchema: {
+            type: "object",
+            properties: {},
           },
         }
       ],
@@ -279,18 +294,42 @@ function createMcpServer() {
 
     if (name === "summarize_performance") {
       const { entity, channel, aggregations, groupBy, startDate, endDate, filters } = args;
-      let cmd = `php bin/cli.php app:aggregate --entity="${entity}" --aggregations='${aggregations}' --pretty`;
+      
+      // Ensure aggregations and filters are stringified for the CLI
+      const aggregationsStr = typeof aggregations === 'object' ? JSON.stringify(aggregations) : aggregations;
+      const filtersStr = filters && typeof filters === 'object' ? JSON.stringify(filters) : filters;
+      
+      let cmd = `php bin/cli.php app:aggregate --entity="${entity}" --aggregations='${aggregationsStr}' --pretty`;
       if (channel) cmd += ` --channel="${channel}"`;
       if (groupBy) cmd += ` --group-by="${groupBy}"`;
       if (startDate) cmd += ` --start-date="${startDate}"`;
       if (endDate) cmd += ` --end-date="${endDate}"`;
-      if (filters) cmd += ` --filters='${filters}'`;
+      if (filtersStr) cmd += ` --filters='${filtersStr}'`;
 
       try {
         const stdout = await runCliCommand(cmd);
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
         return { content: [{ type: "text", text: `Aggregation failed: ${error.message}` }], isError: true };
+      }
+    }
+
+    if (name === "get_available_instances") {
+      try {
+        const stdout = await runCliCommand("php bin/cli.php app:refresh-instances --list");
+        return { content: [{ type: "text", text: stdout }] };
+      } catch (error) {
+        // Fallback if --list is not available or fails
+        try {
+          const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
+          if (fs.existsSync(filePath)) {
+            const content = fs.readFileSync(filePath, "utf-8");
+            return { content: [{ type: "text", text: `Instances from file:\n${content.substring(0, 5000)}...` }] };
+          }
+          return { content: [{ type: "text", text: "No instances found." }], isError: true };
+        } catch (innerError) {
+          return { content: [{ type: "text", text: `Failed to get instances: ${innerError.message}` }], isError: true };
+        }
       }
     }
 
@@ -313,50 +352,105 @@ if (MODE === "sse") {
   // Track active sessions and their transports
   const sessions = new Map();
 
-  app.use(express.json());
-  app.use((req, res, next) => {
-    console.error(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    next();
-  });
-
   app.get("/", (req, res) => {
     res.send("APIs Hub MCP Server (SSE Mode) is running. Connect to /mcp/sse");
   });
 
-  app.get("/mcp/sse", async (req, res) => {
-    console.error(`New SSE connection request from ${req.ip}`);
+  // EXCLUDE express.json() from /mcp/messages to allow SDK to read raw stream
+  // (SDK needs to read the body directly from the request stream)
+  // Or alternatively, we can use express.json() and re-emit the data,
+  // but simpler to just use it selectively.
+
+  // Middleware de logging total para debuggear peticiones de Antigravity
+  app.use((req, res, next) => {
+    console.error(`[DEBUG-REQ] ${req.method} ${req.url} | Headers: ${JSON.stringify(req.headers).substring(0, 50)}...`);
+    next();
+  });
+
+  // Manejador para el endpoint SSE (GET inicia el stream, otros métodos devolvemos JSON-RPC válido para inicialización)
+  app.all("/mcp/sse", async (req, res) => {
+    if (req.method !== "GET") {
+        console.error(`[DEBUG-REQ] Antigravity probando método ${req.method} en SSE. Enviando Handshake completo.`);
+        return res.status(200).json({ 
+            jsonrpc: "2.0", 
+            id: req.body ? req.body.id : (req.query.id || 1),
+            result: { 
+                protocolVersion: "2024-11-05",
+                capabilities: {
+                    logging: {},
+                    prompts: { listChanged: true },
+                    resources: { subscribe: true, listChanged: true },
+                    tools: { listChanged: true }
+                },
+                serverInfo: {
+                    name: "apis-hub-mcp-server",
+                    version: "1.0.0"
+                }
+            }
+        });
+    }
+
+    console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
     
-    // Use absolute URL for the endpoint to be more robust
-    const protocol = req.get('x-forwarded-proto') || req.protocol;
-    const host = req.get('host');
-    const endpoint = `${protocol}://${host}/mcp/messages`;
-    console.error(`Endpoint: ${endpoint}`);
+    // Cabeceras CRÍTICAS para evitar que proxies (Nginx/Laragon/Túneles) guarden en buffer la respuesta
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Específico para Nginx
     
+    // Detección de Host y Protocolo
+    const host = 'localhost:3010'; 
+    const endpoint = `http://localhost:3010/mcp/messages`;
+    
+    console.error(`[SSE] Publicando endpoint ABSOLUTO: ${endpoint}`);
+
+    // Native transport handles the 'endpoint' event automatically using the first argument
     const transport = new SSEServerTransport(endpoint, res);
     
-    // Set session BEFORE connecting or sending anything to avoid race conditions
     sessions.set(transport.sessionId, transport);
-    console.error(`Created session: ${transport.sessionId}`);
+    console.error(`[SSE] Sesión creada: ${transport.sessionId}`);
 
     const server = createMcpServer();
     await server.connect(transport);
     
     res.on("close", () => {
-        console.error(`SSE connection closed for session: ${transport.sessionId}`);
+        console.error(`[SSE] Conexión cerrada para sesión: ${transport.sessionId}`);
         sessions.delete(transport.sessionId);
     });
   });
 
   app.post("/mcp/messages", async (req, res) => {
-    const sessionId = req.query.sessionId;
-    console.error(`POST request for session: ${sessionId}`);
+    // Intentar obtener sessionId de todas las fuentes posibles
+    let sessionId = req.query.sessionId || 
+                    req.headers['x-session-id'] || 
+                    req.headers['sse-session-id'] ||
+                    (req.body && req.body.sessionId);
+
+    if (Array.isArray(sessionId)) {
+        sessionId = sessionId[0];
+    }
+
+    console.error(`[POST] Request URL: ${req.url}`);
+    console.error(`[POST] Session ID: ${sessionId || 'MISSING'}`);
     
+    if (!sessionId) {
+        console.error("[POST] Error: No se pudo encontrar sessionId en Query, Headers o Body");
+        return res.status(400).send("Session ID is required and was not found in any source.");
+    }
+
     const transport = sessions.get(sessionId);
     
     if (transport) {
-      await transport.handlePostMessage(req, res);
+      const bodyPreview = req.body ? JSON.stringify(req.body).substring(0, 100) : "Raw Stream";
+      console.error(`[POST] Procesando mensaje para sesión ${sessionId}. Body: ${bodyPreview}...`);
+      try {
+        await transport.handlePostMessage(req, res);
+      } catch (err) {
+        console.error(`[POST] Error en handlePostMessage: ${err.message}`);
+        res.status(500).send(err.message);
+      }
     } else {
-      console.error(`Session not found: ${sessionId}. Available sessions: ${Array.from(sessions.keys()).join(", ")}`);
+      console.error(`[POST] Sesión no encontrada: ${sessionId}. Sesiones activas: ${Array.from(sessions.keys()).join(", ")}`);
       res.status(404).send(`Session not found: ${sessionId}`);
     }
   });

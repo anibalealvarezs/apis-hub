@@ -8,12 +8,12 @@ use Repositories\Channeled\ChanneledMetricRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledMetricRepository::class)]
 #[ORM\Table(name: 'channeled_metrics')]
-#[ORM\UniqueConstraint(name: 'idx_channeled_metrics_full_unique', columns: ['platformId', 'channel', 'metric_id', 'platformCreatedAt'])]
+#[ORM\UniqueConstraint(name: 'idx_channeled_metrics_full_unique', columns: ['platform_id', 'channel', 'metric_id', 'platform_created_at'])]
 #[ORM\Index(columns: ['metric_id'], name: 'idx_channeled_metrics_metric_id_idx')]
-#[ORM\Index(columns: ['metric_id', 'platformCreatedAt'], name: 'idx_channeled_metrics_metric_created_idx')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_metrics_platform_channel_idx')]
-#[ORM\Index(columns: ['platformId', 'channel', 'metric_id'], name: 'idx_channeled_metrics_full_idx')]
-#[ORM\Index(columns: ['platformId', 'channel', 'platformCreatedAt'], name: 'idx_channeled_metrics_platform_created_idx')]
+#[ORM\Index(columns: ['metric_id', 'platform_created_at'], name: 'idx_channeled_metrics_metric_created_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_metrics_platform_channel_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel', 'metric_id'], name: 'idx_channeled_metrics_full_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel', 'platform_created_at'], name: 'idx_channeled_metrics_platform_created_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledMetric extends ChanneledEntity
 {

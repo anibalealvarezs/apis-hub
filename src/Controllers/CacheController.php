@@ -157,7 +157,7 @@ class CacheController extends BaseController
                     ->setParameter('end_pattern2', '%end_date%' . $params['endDate'] . '%');
             }
             
-            // Be instance-specific if name is provided
+            // be instance-specific if name is provided
             if ($params && isset($params['instance_name'])) {
                 $qb->andWhere('j.payload LIKE :instance_pattern')
                    ->setParameter('instance_pattern', '%instance_name%' . $params['instance_name'] . '%');
@@ -184,14 +184,45 @@ class CacheController extends BaseController
                 $payload['params'] = $params;
             }
 
-            // Create job
-            $jobData = (object) [
-                'entity' => $entity,
-                'channel' => $channel->name,
-                'status' => \Enums\JobStatus::scheduled->value,
-                'payload' => $payload
-            ];
-            $jobRepo->create($jobData);
+            // --- ATOMIC LOCK START ---
+            $redis = Helpers::getRedisClient();
+            $lockKey = 'lock:schedule:' . sha1($channel->name . $entity . json_encode($payload));
+            
+            // Try to acquire lock for 30 seconds
+            if (!$redis->set($lockKey, 'locked', ['nx', 'ex' => 30])) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Another process is currently scheduling this job. Please try again in a moment.',
+                    httpStatus: Response::HTTP_CONFLICT
+                );
+            }
+
+            try {
+                // Secondary check inside lock to be 100% sure
+                $existingJobsInner = $qb->getQuery()->getResult();
+                if (count($existingJobsInner) > 0) {
+                    $redis->del($lockKey);
+                    return $this->createResponse(
+                        data: null,
+                        status: 'error',
+                        error: 'There is already an active caching process for this endpoint.',
+                        httpStatus: Response::HTTP_CONFLICT
+                    );
+                }
+
+                $jobData = (object) [
+                    'entity' => $entity,
+                    'channel' => $channel->name,
+                    'status' => \Enums\JobStatus::scheduled->value,
+                    'payload' => $payload
+                ];
+                $jobRepo->create($jobData);
+            } finally {
+                // We keep the lock for a few seconds to avoid immediate retries from other containers
+                // but we could delete it if we are sure of the uniqueness
+            }
+            // --- ATOMIC LOCK END ---
 
             return $this->createResponse(
                 data: ['message' => 'Caching job successfully scheduled in background.'],

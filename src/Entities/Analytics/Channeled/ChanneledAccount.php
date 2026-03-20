@@ -15,9 +15,9 @@ use Repositories\Channeled\ChanneledAccountRepository;
 #[ORM\Table(name: 'channeled_accounts')]
 #[ORM\Index(columns: ['name', 'channel', 'type'], name: 'idx_cha_name_channel_type_idx')]
 #[ORM\Index(columns: ['name', 'channel'], name: 'idx_cha_name_channel_idx')]
-#[ORM\Index(columns: ['platformId', 'type'], name: 'idx_cha_platformId_type_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_cha_platformId_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_cha_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platform_id', 'type'], name: 'idx_cha_platform_id_type_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_cha_platform_id_idx')]
+#[ORM\Index(columns: ['platform_created_at'], name: 'idx_cha_platform_created_at_idx')]
 #[ORM\Index(columns: ['name', 'type'], name: 'idx_cha_name_type_idx')]
 #[ORM\Index(columns: ['name'], name: 'idx_cha_name_idx')]
 #[ORM\Index(columns: ['account_id'], name: 'idx_cha_account_id_idx')]
@@ -33,7 +33,7 @@ class ChanneledAccount extends ChanneledEntity
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'channeledAccounts')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'account_id', onDelete: 'cascade')]
     protected Account $account;
 
     #[ORM\OneToMany(mappedBy: 'channeledAccount', targetEntity: ChanneledCampaign::class, orphanRemoval: true)]

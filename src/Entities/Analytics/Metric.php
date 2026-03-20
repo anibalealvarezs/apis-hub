@@ -11,26 +11,26 @@ use Repositories\MetricRepository;
 #[ORM\Entity(repositoryClass: MetricRepository::class)]
 #[ORM\Table(name: 'metrics')]
 #[ORM\Index(
-    columns: ['metricConfig_id', 'dimensionsHash'],
-    name: 'idx_metrics_metricConfig_dimensionsHash_lookup_idx'
+    columns: ['metric_config_id', 'dimensions_hash'],
+    name: 'idx_metrics_metric_config_dimensions_hash_lookup_idx'
 )]
 #[ORM\Index(
-    columns: ['dimensionsHash'],
-    name: 'idx_metrics_dimensionsHash_lookup_idx'
+    columns: ['dimensions_hash'],
+    name: 'idx_metrics_dimensions_hash_lookup_idx'
 )]
 #[ORM\Index(
-    columns: ['metricConfig_id'],
-    name: 'idx_metrics_metricConfig_lookup_idx'
+    columns: ['metric_config_id'],
+    name: 'idx_metrics_metric_config_lookup_idx'
 )]
-#[ORM\UniqueConstraint(name: 'metric_unique', columns: ['metricConfig_id', 'dimensionsHash'])]
+#[ORM\UniqueConstraint(name: 'metric_unique', columns: ['metric_config_id', 'dimensions_hash'])]
 #[ORM\HasLifecycleCallbacks]
 class Metric extends Entity
 {
     #[ORM\ManyToOne(targetEntity: MetricConfig::class, inversedBy: 'metrics')]
-    #[ORM\JoinColumn(name: 'metricConfig_id', onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'metric_config_id', onDelete: 'CASCADE')]
     protected MetricConfig $metricConfig;
 
-    #[ORM\Column(type: 'string')]
+    #[ORM\Column(name: 'dimensions_hash', type: 'string')]
     protected string $dimensionsHash;
 
     #[ORM\Column(type: 'float')]

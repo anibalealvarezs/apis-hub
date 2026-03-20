@@ -2358,11 +2358,11 @@ class MetricRequests
         EntityManager $manager,
         Page $pageEntity,
     ): array {
-        $sql = "SELECT id, postId FROM posts WHERE page_id = ? AND channeledAccount_id IS NULL";
+        $sql = "SELECT id, post_id FROM posts WHERE page_id = ? AND channeled_account_id IS NULL";
         $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId()])->fetchAllAssociative();
         $map = [];
         foreach ($fetched as $row) {
-            $map[$row['postId']] = (int)$row['id'];
+            $map[$row['post_id']] = (int)$row['id'];
         }
         return [
             'map' => $map,
@@ -2378,11 +2378,11 @@ class MetricRequests
         if (!$channeledAccountEntity) {
              return ['map' => [], 'mapReverse' => []];
         }
-        $sql = "SELECT id, postId FROM posts WHERE page_id = ? AND channeledAccount_id = ?";
+        $sql = "SELECT id, post_id FROM posts WHERE page_id = ? AND channeled_account_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId(), $channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
         foreach ($fetched as $row) {
-            $map[$row['postId']] = (int)$row['id'];
+            $map[$row['post_id']] = (int)$row['id'];
         }
         return [
             'map' => $map,
@@ -2396,19 +2396,19 @@ class MetricRequests
         $conn = $manager->getConnection();
 
         // 1. Campaign Map
-        $sqlCampaign = "SELECT id, campaignId FROM campaigns";
+        $sqlCampaign = "SELECT id, campaign_id FROM campaigns";
         $fetchedCampaigns = $conn->executeQuery($sqlCampaign)->fetchAllAssociative();
         $campaignMap = [];
         foreach ($fetchedCampaigns as $row) {
-            $campaignMap[$row['campaignId']] = (int)$row['id'];
+            $campaignMap[$row['campaign_id']] = (int)$row['id'];
         }
 
         // 2. Channeled Campaign Map
-        $sqlCC = "SELECT id, platformId FROM channeled_campaigns WHERE channeledAccount_id = ?";
+        $sqlCC = "SELECT id, platform_id FROM channeled_campaigns WHERE channeled_account_id = ?";
         $fetchedCC = $conn->executeQuery($sqlCC, [$channeledAccountEntity->getId()])->fetchAllAssociative();
         $channeledCampaignMap = [];
         foreach ($fetchedCC as $row) {
-            $channeledCampaignMap[$row['platformId']] = (int)$row['id'];
+            $channeledCampaignMap[$row['platform_id']] = (int)$row['id'];
         }
 
         return [
@@ -2427,16 +2427,16 @@ class MetricRequests
         EntityManager $manager,
         ChanneledAccount $channeledAccountEntity,
     ): array {
-        $sql = "SELECT cag.id, cag.platformId, cc.platformId as campaignPlatformId 
+        $sql = "SELECT cag.id, cag.platform_id, cc.platform_id as campaign_platform_id 
                 FROM channeled_ad_groups cag
-                LEFT JOIN channeled_campaigns cc ON cag.channeledCampaign_id = cc.id
-                WHERE cag.channeledAccount_id = ?";
+                LEFT JOIN channeled_campaigns cc ON cag.channeled_campaign_id = cc.id
+                WHERE cag.channeled_account_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
         $mapCampaign = [];
         foreach ($fetched as $row) {
-            $map[$row['platformId']] = (int)$row['id'];
-            $mapCampaign[$row['platformId']] = $row['campaignPlatformId'];
+            $map[$row['platform_id']] = (int)$row['id'];
+            $mapCampaign[$row['platform_id']] = $row['campaign_platform_id'];
         }
         return [
             'map' => $map,
@@ -2449,16 +2449,16 @@ class MetricRequests
         EntityManager $manager,
         ChanneledAccount $channeledAccountEntity,
     ): array {
-        $sql = "SELECT ca.id, ca.platformId, cag.platformId as adGroupPlatformId 
+        $sql = "SELECT ca.id, ca.platform_id, cag.platform_id as ad_group_platform_id 
                 FROM channeled_ads ca
-                LEFT JOIN channeled_ad_groups cag ON ca.channeledAdGroup_id = cag.id
-                WHERE ca.channeledAccount_id = ?";
+                LEFT JOIN channeled_ad_groups cag ON ca.channeled_ad_group_id = cag.id
+                WHERE ca.channeled_account_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
         $mapAdGroup = [];
         foreach ($fetched as $row) {
-            $map[$row['platformId']] = (int)$row['id'];
-            $mapAdGroup[$row['platformId']] = $row['adGroupPlatformId'];
+            $map[$row['platform_id']] = (int)$row['id'];
+            $mapAdGroup[$row['platform_id']] = $row['ad_group_platform_id'];
         }
         return [
             'map' => $map,
@@ -2789,33 +2789,66 @@ class MetricRequests
     {
         try {
             $connection = $manager->getConnection();
-            $connection->executeStatement("
-            UPDATE metrics m
-            JOIN metric_configs mc ON mc.id = m.metricConfig_id
-            JOIN (
-                SELECT 
-                    cm.metric_id,
-                    mc.name,
-                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.impressions')), 0) as total_impressions,
-                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.clicks')), 0) as total_clicks,
-                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.position_weighted')), 0) as total_position_weighted,
-                    COALESCE(SUM(JSON_EXTRACT(cm.data, '$.ctr')), 0) as total_ctr
-                FROM channeled_metrics cm
-                JOIN metrics m ON cm.metric_id = m.id
-                JOIN metric_configs mc ON mc.id = m.metricConfig_id
-                WHERE cm.channel = :channel
-                AND cm.platformCreatedAt LIKE :date
-                GROUP BY cm.metric_id, mc.name
-            ) cm_agg ON m.id = cm_agg.metric_id
-            SET m.value = CASE cm_agg.name
-                WHEN 'impressions' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_impressions, 0))
-                WHEN 'clicks' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_clicks, 0))
-                WHEN 'ctr' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_ctr, 0))
-                WHEN 'position' THEN IF(cm_agg.total_impressions > 0, cm_agg.total_position_weighted / cm_agg.total_impressions, 0)
-                ELSE COALESCE(m.value, 0)
-            END
-            WHERE mc.channel = :channel
-        ", [
+            $isPostgres = Helpers::isPostgres();
+            if ($isPostgres) {
+                $sql = "
+                    UPDATE metrics m
+                    SET value = CASE cm_agg.name
+                        WHEN 'impressions' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_impressions, 0))
+                        WHEN 'clicks' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_clicks, 0))
+                        WHEN 'ctr' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_ctr, 0))
+                        WHEN 'position' THEN CASE WHEN cm_agg.total_impressions > 0 THEN cm_agg.total_position_weighted / cm_agg.total_impressions ELSE 0 END
+                        ELSE COALESCE(m.value, 0)
+                    END
+                    FROM (
+                        SELECT 
+                            cm.metric_id,
+                            mc.name,
+                            COALESCE(SUM((cm.data->>'impressions')::numeric), 0) as total_impressions,
+                            COALESCE(SUM((cm.data->>'clicks')::numeric), 0) as total_clicks,
+                            COALESCE(SUM((cm.data->>'position_weighted')::numeric), 0) as total_position_weighted,
+                            COALESCE(SUM((cm.data->>'ctr')::numeric), 0) as total_ctr
+                        FROM channeled_metrics cm
+                        JOIN metrics m2 ON cm.metric_id = m2.id
+                        JOIN metric_configs mc ON mc.id = m2.metric_config_id
+                        WHERE cm.channel = :channel
+                        AND cm.platform_created_at::text LIKE :date
+                        GROUP BY cm.metric_id, mc.name
+                    ) AS cm_agg
+                    JOIN metric_configs mc2 ON mc2.id = m.metric_config_id
+                    WHERE m.id = cm_agg.metric_id
+                    AND mc2.channel = :channel
+                ";
+            } else {
+                $sql = "
+                    UPDATE metrics m
+                    JOIN metric_configs mc ON mc.id = m.metric_config_id
+                    JOIN (
+                        SELECT 
+                            cm.metric_id,
+                            mc.name,
+                            COALESCE(SUM(JSON_EXTRACT(cm.data, '$.impressions')), 0) as total_impressions,
+                            COALESCE(SUM(JSON_EXTRACT(cm.data, '$.clicks')), 0) as total_clicks,
+                            COALESCE(SUM(JSON_EXTRACT(cm.data, '$.position_weighted')), 0) as total_position_weighted,
+                            COALESCE(SUM(JSON_EXTRACT(cm.data, '$.ctr')), 0) as total_ctr
+                        FROM channeled_metrics cm
+                        JOIN metrics m ON cm.metric_id = m.id
+                        JOIN metric_configs mc ON mc.id = m.metric_config_id
+                        WHERE cm.channel = :channel
+                        AND cm.platform_created_at LIKE :date
+                        GROUP BY cm.metric_id, mc.name
+                    ) cm_agg ON m.id = cm_agg.metric_id
+                    SET m.value = CASE cm_agg.name
+                        WHEN 'impressions' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_impressions, 0))
+                        WHEN 'clicks' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_clicks, 0))
+                        WHEN 'ctr' THEN GREATEST(COALESCE(m.value, 0), COALESCE(cm_agg.total_ctr, 0))
+                        WHEN 'position' THEN IF(cm_agg.total_impressions > 0, cm_agg.total_position_weighted / cm_agg.total_impressions, 0)
+                        ELSE COALESCE(m.value, 0)
+                    END
+                    WHERE mc.channel = :channel
+                ";
+            }
+            $connection->executeStatement($sql, [
                 'channel' => Channel::google_search_console->value,
                 'date' => $dayStr . '%'
             ]);
@@ -3254,31 +3287,63 @@ class MetricRequests
 
             $logger->info("Updating metrics values");
             $connection = $manager->getConnection();
-            $connection->executeStatement("
-                UPDATE metrics m
-                JOIN (
-                    SELECT 
-                        cm.metric_id,
-                        mc.name,
-                        mc.channel,
-                        SUM(JSON_EXTRACT(cm.data, '$.impressions')) as total_impressions,
-                        SUM(JSON_EXTRACT(cm.data, '$.clicks')) as total_clicks,
-                        SUM(JSON_EXTRACT(cm.data, '$.position_weighted')) as total_position_weighted
-                    FROM channeled_metrics cm
-                    JOIN metrics m ON cm.metric_id = m.id
-                    JOIN metric_configs mc ON m.metricConfig_id = mc.id
-                    WHERE cm.channel = :channel
-                    GROUP BY cm.metric_id, mc.name
-                ) cm_agg ON m.id = cm_agg.metric_id
-                SET m.value = CASE cm_agg.name
-                    WHEN 'impressions' THEN cm_agg.total_impressions
-                    WHEN 'clicks' THEN cm_agg.total_clicks
-                    WHEN 'ctr' THEN IF(cm_agg.total_impressions > 0, cm_agg.total_clicks / cm_agg.total_impressions, 0)
-                    WHEN 'position' THEN IF(cm_agg.total_impressions > 0, cm_agg.total_position_weighted / cm_agg.total_impressions, 0)
-                    ELSE m.value
-                END
-                WHERE cm_agg.channel = :channel
-            ", ['channel' => Channel::google_search_console->value]);
+            $isPostgres = Helpers::isPostgres();
+            if ($isPostgres) {
+                $sql = "
+                    UPDATE metrics m
+                    SET value = CASE cm_agg.name
+                        WHEN 'impressions' THEN cm_agg.total_impressions
+                        WHEN 'clicks' THEN cm_agg.total_clicks
+                        WHEN 'ctr' THEN CASE WHEN cm_agg.total_impressions > 0 THEN cm_agg.total_clicks::numeric / cm_agg.total_impressions ELSE 0 END
+                        WHEN 'position' THEN CASE WHEN cm_agg.total_impressions > 0 THEN cm_agg.total_position_weighted::numeric / cm_agg.total_impressions ELSE 0 END
+                        ELSE m.value
+                    END
+                    FROM (
+                        SELECT 
+                            cm.metric_id,
+                            mc.name,
+                            mc.channel,
+                            SUM((cm.data->>'impressions')::numeric) as total_impressions,
+                            SUM((cm.data->>'clicks')::numeric) as total_clicks,
+                            SUM((cm.data->>'position_weighted')::numeric) as total_position_weighted
+                        FROM channeled_metrics cm
+                        JOIN metrics m2 ON cm.metric_id = m2.id
+                        JOIN metric_configs mc ON m2.metric_config_id = mc.id
+                        WHERE cm.channel = :channel
+                        GROUP BY cm.metric_id, mc.name, mc.channel
+                    ) AS cm_agg
+                    JOIN metric_configs mc2 ON m.metric_config_id = mc2.id
+                    WHERE m.id = cm_agg.metric_id
+                    AND mc2.channel = :channel
+                ";
+            } else {
+                $sql = "
+                    UPDATE metrics m
+                    JOIN (
+                        SELECT 
+                            cm.metric_id,
+                            mc.name,
+                            mc.channel,
+                            SUM(JSON_EXTRACT(cm.data, '$.impressions')) as total_impressions,
+                            SUM(JSON_EXTRACT(cm.data, '$.clicks')) as total_clicks,
+                            SUM(JSON_EXTRACT(cm.data, '$.position_weighted')) as total_position_weighted
+                        FROM channeled_metrics cm
+                        JOIN metrics m ON cm.metric_id = m.id
+                        JOIN metric_configs mc ON m.metric_config_id = mc.id
+                        WHERE cm.channel = :channel
+                        GROUP BY cm.metric_id, mc.name
+                    ) cm_agg ON m.id = cm_agg.metric_id
+                    SET m.value = CASE cm_agg.name
+                        WHEN 'impressions' THEN cm_agg.total_impressions
+                        WHEN 'clicks' THEN cm_agg.total_clicks
+                        WHEN 'ctr' THEN IF(cm_agg.total_impressions > 0, cm_agg.total_clicks / cm_agg.total_impressions, 0)
+                        WHEN 'position' THEN IF(cm_agg.total_impressions > 0, cm_agg.total_position_weighted / cm_agg.total_impressions, 0)
+                        ELSE m.value
+                    END
+                    WHERE cm_agg.channel = :channel
+                ";
+            }
+            $connection->executeStatement($sql, ['channel' => Channel::google_search_console->value]);
 
             $logger->info("Invalidating cache for " . count($entitiesToInvalidate['metric']) . " metrics, " . count($entitiesToInvalidate['channeledMetric']) . " channeled metrics, " . count($entitiesToInvalidate['query']) . " queries");
             foreach ($entitiesToInvalidate as $entity => $ids) {

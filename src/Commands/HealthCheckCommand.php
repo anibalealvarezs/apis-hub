@@ -113,6 +113,23 @@ class HealthCheckCommand extends Command
             $allPassed = false;
         }
 
+        // 5. MCP Node.js Server
+        $output->write("🧠 <comment>MCP Interface (Port 3000):</comment> ");
+        try {
+            $mcpPort = getenv('MCP_PORT') ?: 3000;
+            $connection = @fsockopen('127.0.0.1', $mcpPort, $errno, $errstr, 2);
+            if (is_resource($connection)) {
+                $output->writeln("<info>ONLINE (SSE Mode)</info>");
+                fclose($connection);
+            } else {
+                $output->writeln("<error>OFFLINE (Port $mcpPort inaccessible)</error>");
+                $allPassed = false;
+            }
+        } catch (Throwable $e) {
+            $output->writeln("<error>CHECK FAILED: " . $e->getMessage() . "</error>");
+            $allPassed = false;
+        }
+
         $output->writeln("\n" . str_repeat("─", 40));
         if ($allPassed) {
             $output->writeln("<info>✅ SYSTEM HEALTHY - Deployment ready.</info>");

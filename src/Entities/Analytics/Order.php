@@ -11,11 +11,11 @@ use Repositories\OrderRepository;
 
 #[ORM\Entity(repositoryClass: OrderRepository::class)]
 #[ORM\Table(name: 'orders')]
-#[ORM\Index(columns: ['orderId'], name: 'idx_orders_orderId_idx')]
+#[ORM\Index(columns: ['order_id'], name: 'idx_orders_order_id_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Order extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(name: 'order_id', type: 'string', unique: true)]
     protected int|string $orderId;
 
     #[ORM\OneToMany(mappedBy: 'order', targetEntity: ChanneledOrder::class, orphanRemoval: true)]

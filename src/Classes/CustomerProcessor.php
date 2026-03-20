@@ -51,8 +51,8 @@ class CustomerProcessor
                 $uniqueChanneledCustomers[$channeledKey] = [
                     'customer_email' => $channeledCustomer->email,
                     'channel' => $channeledCustomer->channel,
-                    'platformId' => $channeledCustomer->platformId,
-                    'platformCreatedAt' => $channeledCustomer->platformCreatedAt,
+                    'platform_id' => $channeledCustomer->platformId,
+                    'platform_created_at' => $channeledCustomer->platformCreatedAt,
                     'data' => $channeledCustomer->data,
                 ];
             } else {
@@ -124,7 +124,7 @@ class CustomerProcessor
         foreach ($uniqueChanneledCustomers as $key => $cc) {
             $channeledCustomersByPlatform[] = [
                 'channel' => $cc['channel'],
-                'platformId' => $cc['platformId'],
+                'platform_id' => $cc['platform_id'],
             ];
         }
 
@@ -135,11 +135,11 @@ class CustomerProcessor
             $conditions = [];
             $params = [];
             foreach ($chunk as $cc) {
-                $conditions[] = "(channel = ? AND platformId = ?)";
+                $conditions[] = "(channel = ? AND platform_id = ?)";
                 $params[] = $cc['channel'];
-                $params[] = $cc['platformId'];
+                $params[] = $cc['platform_id'];
             }
-            $sql = "SELECT id, channel, platformId, data FROM channeled_customers WHERE " . implode(' OR ', $conditions);
+            $sql = "SELECT id, channel, platform_id, data FROM channeled_customers WHERE " . implode(' OR ', $conditions);
 
             $map = MapGenerator::getChanneledCustomerMap($manager, $sql, $params);
             $channeledCustomerMap = array_merge($channeledCustomerMap, $map);
@@ -179,18 +179,18 @@ class CustomerProcessor
                     'id' => $channeledCustomerMap[$key]['id'],
                     'customer_id' => $customerId,
                     'email' => $cc['customer_email'],
-                    'platformId' => $cc['platformId'],
+                    'platform_id' => $cc['platform_id'],
                     'channel' => $cc['channel'],
-                    'platformCreatedAt' => $cc['platformCreatedAt'] instanceof DateTime ? $cc['platformCreatedAt']->format('Y-m-d H:i:s') : $cc['platformCreatedAt'],
+                    'platform_created_at' => $cc['platform_created_at'] instanceof DateTime ? $cc['platform_created_at']->format('Y-m-d H:i:s') : $cc['platform_created_at'],
                     'data' => json_encode($cc['data']),
                 ];
             } else {
                 $ccToInsert[] = [
                     'customer_id' => $customerId,
                     'email' => $cc['customer_email'],
-                    'platformId' => $cc['platformId'],
+                    'platform_id' => $cc['platform_id'],
                     'channel' => $cc['channel'],
-                    'platformCreatedAt' => $cc['platformCreatedAt'] instanceof DateTime ? $cc['platformCreatedAt']->format('Y-m-d H:i:s') : $cc['platformCreatedAt'],
+                    'platform_created_at' => $cc['platform_created_at'] instanceof DateTime ? $cc['platform_created_at']->format('Y-m-d H:i:s') : $cc['platform_created_at'],
                     'data' => json_encode($cc['data']),
                 ];
             }
@@ -204,15 +204,15 @@ class CustomerProcessor
                 foreach ($chunk as $row) {
                     $insertParams[] = $row['customer_id'];
                     $insertParams[] = $row['email'];
-                    $insertParams[] = $row['platformId'];
+                    $insertParams[] = $row['platform_id'];
                     $insertParams[] = $row['channel'];
-                    $insertParams[] = $row['platformCreatedAt'];
+                    $insertParams[] = $row['platform_created_at'];
                     $insertParams[] = $row['data'];
                 }
 
                 $placeholders = implode(', ', array_fill(0, count($chunk), '(?, ?, ?, ?, ?, ?)'));
                 $manager->getConnection()->executeStatement(
-                    "INSERT INTO channeled_customers (customer_id, email, platformId, channel, platformCreatedAt, data) VALUES $placeholders",
+                    "INSERT INTO channeled_customers (customer_id, email, platform_id, channel, platform_created_at, data) VALUES $placeholders",
                     $insertParams
                 );
             }
@@ -228,16 +228,16 @@ class CustomerProcessor
                     $updateParams[] = $row['id'];
                     $updateParams[] = $row['customer_id'];
                     $updateParams[] = $row['email'];
-                    $updateParams[] = $row['platformId'];
+                    $updateParams[] = $row['platform_id'];
                     $updateParams[] = $row['channel'];
-                    $updateParams[] = $row['platformCreatedAt'];
+                    $updateParams[] = $row['platform_created_at'];
                     $updateParams[] = $row['data'];
                 }
 
                 $sql = Helpers::buildUpsertSql(
                     'channeled_customers', 
-                    ['id', 'customer_id', 'email', 'platformId', 'channel', 'platformCreatedAt', 'data'], 
-                    ['customer_id', 'email', 'platformId', 'channel', 'platformCreatedAt', 'data', 'updatedAt'], 
+                    ['id', 'customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data'], 
+                    ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data', 'updated_at'], 
                     'id', 
                     count($chunk)
                 );
@@ -247,7 +247,7 @@ class CustomerProcessor
 
         return [
             'emails' => array_column($uniqueCustomers, 'email'),
-            'platformIds' => array_column($uniqueChanneledCustomers, 'platformId'),
+            'platform_ids' => array_column($uniqueChanneledCustomers, 'platform_id'),
             'channels' => array_unique(array_column($uniqueChanneledCustomers, 'channel')),
         ];
     }

@@ -11,60 +11,39 @@ use Repositories\PostRepository;
 
 #[ORM\Entity(repositoryClass: PostRepository::class)]
 #[ORM\Table(name: 'posts')]
-#[ORM\Index(columns: ['postId'], name: 'idx_posts_postId_idx')]
-#[ORM\Index(
-    columns: ['postId', 'page_id'],
-    name: 'idx_posts_postId_page_lookup_idx'
-)]
-#[ORM\Index(
-    columns: ['postId', 'page_id', 'account_id'],
-    name: 'idx_posts_postId_page_account_lookup_idx'
-)]
-#[ORM\Index(
-    columns: ['postId', 'page_id', 'channeledAccount_id'],
-    name: 'idx_posts_postId_page_channeledAccount_lookup_idx'
-)]
-#[ORM\Index(
-    columns: ['postId', 'page_id', 'account_id', 'channeledAccount_id'],
-    name: 'idx_posts_postId_page_account_channeledAccount_lookup_idx'
-)]
-#[ORM\Index(
-    columns: ['postId', 'account_id'],
-    name: 'idx_posts_postId_account_lookup_idx'
-)]
-#[ORM\Index(
-    columns: ['postId', 'account_id', 'channeledAccount_id'],
-    name: 'idx_posts_postId_account_channeledAccount_lookup_idx'
-)]
-#[ORM\Index(
-    columns: ['postId', 'channeledAccount_id'],
-    name: 'idx_posts_postId_channeledAccount_lookup_idx'
-)]
+#[ORM\Index(columns: ['post_id'], name: 'idx_posts_id_idx')]
+#[ORM\Index(columns: ['post_id', 'page_id'], name: 'idx_posts_id_page_idx')]
+#[ORM\Index(columns: ['post_id', 'page_id', 'account_id'], name: 'idx_posts_full_idx')]
+#[ORM\Index(columns: ['post_id', 'page_id', 'channeled_account_id'], name: 'idx_posts_id_page_caccount_idx')]
+#[ORM\Index(columns: ['post_id', 'page_id', 'account_id', 'channeled_account_id'], name: 'idx_posts_full_caccount_idx')]
+#[ORM\Index(columns: ['post_id', 'account_id'], name: 'idx_posts_id_account_idx')]
+#[ORM\Index(columns: ['post_id', 'account_id', 'channeled_account_id'], name: 'idx_posts_id_account_caccount_idx')]
+#[ORM\Index(columns: ['post_id', 'channeled_account_id'], name: 'idx_posts_id_caccount_idx')]
 #[ORM\UniqueConstraint(name: 'post_unique', columns: [
-    'postId',
+    'post_id',
     'page_id',
     'account_id',
-    'channeledAccount_id'
+    'channeled_account_id'
 ])]
 #[ORM\HasLifecycleCallbacks]
 class Post extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(name: 'post_id', type: 'string', unique: true)]
     protected string $postId;
 
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $data = [];
 
     #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'posts')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'account_id', onDelete: 'SET NULL')]
     protected ?Account $account = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'posts')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_account_id', onDelete: 'SET NULL')]
     protected ?ChanneledAccount $channeledAccount = null;
 
     #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'posts')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'page_id', onDelete: 'SET NULL')]
     protected ?Page $page = null;
 
     #[ORM\OneToMany(mappedBy: 'post', targetEntity: MetricConfig::class, orphanRemoval: true)]

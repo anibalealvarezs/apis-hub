@@ -57,17 +57,20 @@ class MetricsProcessor
 
         // INSERT IGNORE: atomic upsert to handle race conditions
         if (!empty($queriesToInsert)) {
-            $insertPlaceholders = implode(', ', array_fill(0, count($queriesToInsert), '(?)'));
-            try {
-                $sql = Helpers::buildInsertIgnoreSql(
-                    'queries', 
-                    ['query'], 
-                    ['query'], 
-                    count($queriesToInsert)
-                );
-                $manager->getConnection()->executeStatement($sql, array_values($queriesToInsert));
-            } catch (Exception $e) {
-                throw new RuntimeException("Failed to insert queries: " . $e->getMessage(), 0, $e);
+            $cols = ['query'];
+            $chunkSize = 1000;
+            foreach (array_chunk($queriesToInsert, $chunkSize) as $chunk) {
+                try {
+                    $sql = Helpers::buildInsertIgnoreSql(
+                        'queries', 
+                        $cols, 
+                        ['query'], 
+                        count($chunk)
+                    );
+                    $manager->getConnection()->executeStatement($sql, array_values($chunk));
+                } catch (Exception $e) {
+                    throw new RuntimeException("Failed to insert queries: " . $e->getMessage(), 0, $e);
+                }
             }
         }
 
@@ -361,11 +364,11 @@ class MetricsProcessor
                 'period' => $metric->period,
                 'metricDate' => $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
                 'account_id' => isset($metric->account) ? $metric->account->getId() : null,
-                'channeledAccount_id' => isset($metric->channeledAccount) ? $channeledAccountMap['map'][$metric->channeledAccount->getPlatformId()] ?? null : null,
+                'channeled_account_id' => isset($metric->channeledAccount) ? $channeledAccountMap['map'][$metric->channeledAccount->getPlatformId()] ?? null : null,
                 'campaign_id' => isset($metric->campaign) ? $campaignMap['map'][$metric->campaign->getCampaignId()] ?? null : null,
-                'channeledCampaign_id' => isset($metric->channeledCampaign) ? $channeledCampaignMap['map'][$metric->channeledCampaign->getPlatformId()] ?? null : null,
-                'channeledAdGroup_id' => isset($metric->channeledAdGroup) ? $channeledAdGroupMap['map'][$metric->channeledAdGroup->getPlatformId()] ?? null : null,
-                'channeledAd_id' => isset($metric->channeledAd) ? $channeledAdMap['map'][$metric->channeledAd->getPlatformId()] ?? null : null,
+                'channeled_campaign_id' => isset($metric->channeledCampaign) ? $channeledCampaignMap['map'][$metric->channeledCampaign->getPlatformId()] ?? null : null,
+                'channeled_ad_group_id' => isset($metric->channeledAdGroup) ? $channeledAdGroupMap['map'][$metric->channeledAdGroup->getPlatformId()] ?? null : null,
+                'channeled_ad_id' => isset($metric->channeledAd) ? $channeledAdMap['map'][$metric->channeledAd->getPlatformId()] ?? null : null,
                 'query_id' => isset($metric->query) ? $queryMap['map'][$metric->query] : null,
                 'page_id' => isset($metric->page) ? $metric->page->getId() : null,
                 'post_id' => isset($metric->post) ? $postMap['map'][$metric->post->getPostId()] ?? null : null,
@@ -388,7 +391,7 @@ class MetricsProcessor
         if (!empty($selectParams)) {
             foreach (array_chunk($selectParams, 1000) as $chunkParams) {
                 $placeholders = implode(', ', array_fill(0, count($chunkParams), '?'));
-                $sql = "SELECT id, configSignature FROM metric_configs WHERE configSignature IN ($placeholders)";
+                $sql = "SELECT id, config_signature FROM metric_configs WHERE config_signature IN ($placeholders)";
                 
                 $chunkMap = MapGenerator::getMetricConfigMap(
                     manager: $manager,
@@ -410,13 +413,13 @@ class MetricsProcessor
                     'channel' => $metricConfig['channel'],
                     'name' => $metricConfig['name'],
                     'period' => $metricConfig['period'],
-                    'metricDate' => $metricConfig['metricDate'],
+                    'metric_date' => $metricConfig['metricDate'],
                     'account_id' => $metricConfig['account_id'] ?? null,
-                    'channeledAccount_id' => $metricConfig['channeledAccount_id'] ?? null,
+                    'channeled_account_id' => $metricConfig['channeled_account_id'] ?? null,
                     'campaign_id' => $metricConfig['campaign_id'] ?? null,
-                    'channeledCampaign_id' => $metricConfig['channeledCampaign_id'] ?? null,
-                    'channeledAdGroup_id' => $metricConfig['channeledAdGroup_id'] ?? null,
-                    'channeledAd_id' => $metricConfig['channeledAd_id'] ?? null,
+                    'channeled_campaign_id' => $metricConfig['channeled_campaign_id'] ?? null,
+                    'channeled_ad_group_id' => $metricConfig['channeled_ad_group_id'] ?? null,
+                    'channeled_ad_id' => $metricConfig['channeled_ad_id'] ?? null,
                     'query_id' => $metricConfig['query_id'] ?? null,
                     'page_id' => $metricConfig['page_id'] ?? null,
                     'post_id' => $metricConfig['post_id'] ?? null,
@@ -432,36 +435,43 @@ class MetricsProcessor
 
         // INSERT IGNORE: atomic upsert.
         if (!empty($uniqueMetricConfigs)) {
-            $insertParams = [];
-            foreach ($uniqueMetricConfigs as $metricConfig) {
-                $insertParams[] = $metricConfig['channel'];
-                $insertParams[] = $metricConfig['name'];
-                $insertParams[] = $metricConfig['period'];
-                $insertParams[] = $metricConfig['metricDate'];
-                $insertParams[] = $metricConfig['account_id'] ?? null;
-                $insertParams[] = $metricConfig['channeledAccount_id'] ?? null;
-                $insertParams[] = $metricConfig['campaign_id'] ?? null;
-                $insertParams[] = $metricConfig['channeledCampaign_id'] ?? null;
-                $insertParams[] = $metricConfig['channeledAdGroup_id'] ?? null;
-                $insertParams[] = $metricConfig['channeledAd_id'] ?? null;
-                $insertParams[] = $metricConfig['creative_id'] ?? null;
-                $insertParams[] = $metricConfig['query_id'] ?? null;
-                $insertParams[] = $metricConfig['page_id'] ?? null;
-                $insertParams[] = $metricConfig['post_id'] ?? null;
-                $insertParams[] = $metricConfig['product_id'] ?? null;
-                $insertParams[] = $metricConfig['customer_id'] ?? null;
-                $insertParams[] = $metricConfig['order_id'] ?? null;
-                $insertParams[] = $metricConfig['country_id'] ?? null;
-                $insertParams[] = $metricConfig['device_id'] ?? null;
-                $insertParams[] = $metricConfig['key']; // configSignature
+            $cols = ['channel', 'name', 'period', 'metric_date', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id', 'creative_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id', 'config_signature'];
+            $numCols = count($cols);
+            $chunkSize = floor(30000 / $numCols); // Ultra safe margin for Postgres (30k params max per chunk)
+            
+            foreach (array_chunk($uniqueMetricConfigs, (int)$chunkSize) as $chunk) {
+                $insertParams = [];
+                foreach ($chunk as $metricConfig) {
+                    $insertParams[] = $metricConfig['channel'];
+                    $insertParams[] = $metricConfig['name'];
+                    $insertParams[] = $metricConfig['period'];
+                    $insertParams[] = $metricConfig['metricDate'];
+                    $insertParams[] = $metricConfig['account_id'] ?? null;
+                    $insertParams[] = $metricConfig['channeled_account_id'] ?? null;
+                    $insertParams[] = $metricConfig['campaign_id'] ?? null;
+                    $insertParams[] = $metricConfig['channeled_campaign_id'] ?? null;
+                    $insertParams[] = $metricConfig['channeled_ad_group_id'] ?? null;
+                    $insertParams[] = $metricConfig['channeled_ad_id'] ?? null;
+                    $insertParams[] = $metricConfig['creative_id'] ?? null;
+                    $insertParams[] = $metricConfig['query_id'] ?? null;
+                    $insertParams[] = $metricConfig['page_id'] ?? null;
+                    $insertParams[] = $metricConfig['post_id'] ?? null;
+                    $insertParams[] = $metricConfig['product_id'] ?? null;
+                    $insertParams[] = $metricConfig['customer_id'] ?? null;
+                    $insertParams[] = $metricConfig['order_id'] ?? null;
+                    $insertParams[] = $metricConfig['country_id'] ?? null;
+                    $insertParams[] = $metricConfig['device_id'] ?? null;
+                    $insertParams[] = $metricConfig['key']; // configSignature
+                }
+                $sql = Helpers::buildInsertIgnoreSql(
+                    'metric_configs', 
+                    $cols, 
+                    ['config_signature'], 
+                    count($chunk)
+                );
+                $affected = $manager->getConnection()->executeStatement($sql, $insertParams);
+                Helpers::setLogger('facebook-marketing.log')->info("Inserted metric_configs chunk: $affected rows affected.");
             }
-            $sql = Helpers::buildInsertIgnoreSql(
-                'metric_configs', 
-                ['channel', 'name', 'period', 'metricDate', 'account_id', 'channeledAccount_id', 'campaign_id', 'channeledCampaign_id', 'channeledAdGroup_id', 'channeledAd_id', 'creative_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id', 'configSignature'], 
-                ['configSignature'], 
-                count($uniqueMetricConfigs)
-            );
-            $manager->getConnection()->executeStatement($sql, $insertParams);
         }
 
         // Re-fetch all metric_configs
@@ -469,10 +479,10 @@ class MetricsProcessor
         if (!empty($reFetchParams)) {
             foreach (array_chunk($reFetchParams, 1000) as $chunkParams) {
                 $placeholders = implode(', ', array_fill(0, count($chunkParams), '?'));
-                $reFetchSql = "SELECT id, configSignature FROM metric_configs WHERE configSignature IN ($placeholders)";
+                $reFetchSql = "SELECT id, config_signature FROM metric_configs WHERE config_signature IN ($placeholders)";
                 $allMetricConfigs = $manager->getConnection()->executeQuery($reFetchSql, $chunkParams)->fetchAllAssociative();
-                foreach ($allMetricConfigs as $metricConfig) {
-                    $metricConfigMap[$metricConfig['configSignature']] = (int)$metricConfig['id'];
+                foreach ($allMetricConfigs as $metricConfigRow) {
+                    $metricConfigMap[$metricConfigRow['config_signature']] = (int)$metricConfigRow['id'];
                 }
             }
         }
@@ -512,8 +522,8 @@ class MetricsProcessor
             $uniqueMetrics[$metricKey] = [
                 'value' => $metric->value,
                 'metadata' => $metric->metadata,
-                'dimensionsHash' => $dimensionsHash,
-                'metricConfig_id' => $metricConfigMap['map'][$metric->metricConfigKey],
+                'dimensions_hash' => $dimensionsHash,
+                'metric_config_id' => $metricConfigMap['map'][$metric->metricConfigKey],
             ];
         }
 
@@ -523,17 +533,17 @@ class MetricsProcessor
             $selectParams = [];
             $tuples = [];
             foreach ($chunkMetrics as $m) {
-                if (isset($m['dimensionsHash']) && isset($m['metricConfig_id'])) {
-                    $selectParams[] = $m['dimensionsHash'];
-                    $selectParams[] = $m['metricConfig_id'];
+                if (isset($m['dimensions_hash']) && isset($m['metric_config_id'])) {
+                    $selectParams[] = $m['dimensions_hash'];
+                    $selectParams[] = $m['metric_config_id'];
                     $tuples[] = '(?, ?)';
                 }
             }
             if (!empty($tuples)) {
                 $placeholders = implode(', ', $tuples);
-                $sql = "SELECT id, dimensionsHash, metricConfig_id 
+                $sql = "SELECT id, dimensions_hash, metric_config_id 
                         FROM metrics 
-                        WHERE (dimensionsHash, metricConfig_id) IN ($placeholders)";
+                        WHERE (dimensions_hash, metric_config_id) IN ($placeholders)";
                 
                 $chunkMap = MapGenerator::getMetricMap($manager, $sql, $selectParams, $metricConfigMap);
                 foreach ($chunkMap as $k => $v) {
@@ -541,6 +551,7 @@ class MetricsProcessor
                 }
             }
         }
+        Helpers::setLogger('facebook-marketing.log')->info("Metrics mapping complete: " . count($metricMap) . " existing global metrics found in DB.");
 
         $metricsToInsert = [];
         $metricsToUpdate = [];
@@ -549,8 +560,8 @@ class MetricsProcessor
                 $metricsToInsert[] = [
                     'value' => $metric['value'],
                     'metadata' => $cacheRawMetrics ? json_encode($metric['metadata'] ?? []) : null,
-                    'dimensionsHash' => $metric['dimensionsHash'],
-                    'metricConfig_id' => $metric['metricConfig_id'],
+                    'dimensions_hash' => $metric['dimensions_hash'],
+                    'metric_config_id' => $metric['metric_config_id'],
                     'key' => $key,
                 ];
             } else {
@@ -561,39 +572,53 @@ class MetricsProcessor
             }
         }
 
+        Helpers::setLogger('facebook-marketing.log')->info("Metrics analysis: " . count($metricsToInsert) . " new metrics to insert, " . count($metricsToUpdate) . " existing metrics to update.");
+
         if (!empty($metricsToInsert)) {
-            $insertParams = [];
-            foreach ($metricsToInsert as $row) {
-                $insertParams[] = $row['value'];
-                $insertParams[] = $row['metadata'];
-                $insertParams[] = $row['dimensionsHash'];
-                $insertParams[] = $row['metricConfig_id'];
+            $cols = ['value', 'metadata', 'dimensions_hash', 'metric_config_id'];
+            $numCols = count($cols);
+            $chunkSize = floor(30000 / $numCols); // Safe buffer under 65535, aiming for ~30k params
+            
+            foreach (array_chunk($metricsToInsert, (int)$chunkSize) as $chunk) {
+                $insertParams = [];
+                foreach ($chunk as $row) {
+                    $insertParams[] = $row['value'];
+                    $insertParams[] = $row['metadata'];
+                    $insertParams[] = $row['dimensions_hash'];
+                    $insertParams[] = $row['metric_config_id'];
+                }
+                
+                $sql = Helpers::buildInsertIgnoreSql(
+                    'metrics', 
+                    $cols, 
+                    ['metric_config_id', 'dimensions_hash'], 
+                    count($chunk)
+                );
+                $affected = $manager->getConnection()->executeStatement($sql, $insertParams);
+                Helpers::setLogger('facebook-marketing.log')->info("Inserted metrics chunk: $affected rows affected.");
             }
-            $sql = Helpers::buildInsertIgnoreSql(
-                'metrics', 
-                ['value', 'metadata', 'dimensionsHash', 'metricConfig_id'], 
-                ['dimensionsHash', 'metricConfig_id'], 
-                count($metricsToInsert)
-            );
-            $manager->getConnection()->executeStatement($sql, $insertParams);
 
             foreach (array_chunk($metricsToInsert, 1000) as $chunk) {
                 $reFetchParams = [];
                 $tuples = [];
+                $isPostgres = Helpers::isPostgres();
                 foreach ($chunk as $row) {
-                    $reFetchParams[] = $row['dimensionsHash'];
-                    $reFetchParams[] = $row['metricConfig_id'];
-                    $tuples[] = '(?, ?)';
+                    $reFetchParams[] = $row['dimensions_hash'];
+                    $reFetchParams[] = (int)$row['metric_config_id'];
+                    $tuples[] = $isPostgres ? '(?::text, ?::integer)' : '(?, ?)';
                 }
                 $placeholders = implode(', ', $tuples);
-                $reFetchSql = "SELECT id, dimensionsHash, metricConfig_id FROM metrics WHERE (dimensionsHash, metricConfig_id) IN ($placeholders)";
-                $newMetrics = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
-                foreach ($newMetrics as $metric) {
+                $isPostgres = Helpers::isPostgres();
+                $reFetchSql = "SELECT id, dimensions_hash, metric_config_id FROM metrics WHERE " .
+                    ($isPostgres ? "(dimensions_hash::text, metric_config_id::integer) " : "(dimensions_hash, metric_config_id) ") .
+                    "IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
+                $fetched = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
+                foreach ($fetched as $metricRow) {
                     $metricKey = KeyGenerator::generateMetricKey(
-                        dimensionsHash: $metric['dimensionsHash'],
-                        metricConfigKey: $metricConfigMap['mapReverse'][$metric['metricConfig_id']],
+                        dimensionsHash: $metricRow['dimensions_hash'],
+                        metricConfigKey: $metricConfigMap['mapReverse'][$metricRow['metric_config_id']],
                     );
-                    $metricMap[$metricKey] = (int)$metric['id'];
+                    $metricMap[$metricKey] = (int)$metricRow['id'];
                 }
             }
         }
@@ -632,25 +657,25 @@ class MetricsProcessor
         $uniqueChanneledMetrics = [];
         foreach ($metrics->toArray() as $metric) {
             $metricKey = KeyGenerator::generateMetricKey(
-                dimensionsHash: $metric->dimensionsHash,
-                metricConfigKey: $metric->metricConfigKey,
+                dimensionsHash: $metric->dimensions_hash ?? $metric->dimensionsHash,
+                metricConfigKey: $metric->metric_config_key ?? $metric->metricConfigKey,
             );
 
             if (!isset($metricMap['map'][$metricKey])) continue;
-            if (empty($metric->platformId)) continue;
+            if (empty($metric->platform_id) && empty($metric->platformId)) continue;
 
             $channeledMetricKey = KeyGenerator::generateChanneledMetricKey(
                 channel: $metric->channel,
-                platformId: $metric->platformId,
+                platformId: $metric->platform_id ?? $metric->platformId,
                 metric: $metricMap['map'][$metricKey],
-                platformCreatedAt: Carbon::parse($metric->platformCreatedAt)->format('Y-m-d'),
+                platformCreatedAt: Carbon::parse($metric->platform_created_at ?? $metric->platformCreatedAt)->format('Y-m-d'),
             );
 
             $uniqueChanneledMetrics[$channeledMetricKey] = [
                 'channel' => $metric->channel,
-                'platformId' => $metric->platformId,
+                'platform_id' => $metric->platform_id ?? $metric->platformId,
                 'metric_id' => $metricMap['map'][$metricKey],
-                'platformCreatedAt' => Carbon::parse($metric->platformCreatedAt)->format('Y-m-d'),
+                'platform_created_at' => Carbon::parse($metric->platform_created_at ?? $metric->platformCreatedAt)->format('Y-m-d'),
                 'data' => $metric->data ?? [],
                 'metricKey' => $metricKey,
             ];
@@ -662,16 +687,16 @@ class MetricsProcessor
             $tuples = [];
             foreach ($chunk as $m) {
                 $selectParams[] = $m['channel'];
-                $selectParams[] = $m['platformId'];
+                $selectParams[] = $m['platform_id'];
                 $selectParams[] = $m['metric_id'];
-                $selectParams[] = $m['platformCreatedAt'];
+                $selectParams[] = $m['platform_created_at'];
                 $tuples[] = '(?, ?, ?, ?)';
             }
             if (!empty($tuples)) {
                 $placeholders = implode(', ', $tuples);
-                $sql = "SELECT id, channel, platformId, metric_id, platformCreatedAt, data
+                $sql = "SELECT id, channel, platform_id, metric_id, platform_created_at, data
                         FROM channeled_metrics
-                        WHERE (channel, platformId, metric_id, platformCreatedAt) IN ($placeholders)";
+                        WHERE (channel, platform_id, metric_id, platform_created_at) IN ($placeholders)";
                 
                 $chunkMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
                 foreach ($chunkMap as $k => $v) {
@@ -679,6 +704,7 @@ class MetricsProcessor
                 }
             }
         }
+        Helpers::setLogger('facebook-marketing.log')->info("Channeled mapping complete: " . count($channeledMetricMap) . " existing channeled metrics found in DB.");
 
         $dimManager = new \Classes\DimensionManager($manager);
         $channeledMetricsToInsert = [];
@@ -687,7 +713,7 @@ class MetricsProcessor
             if (!isset($channeledMetricMap[$key]) && !isset($channeledMetricsToInsert[$key])) {
                 $originalMetric = null;
                 foreach ($metrics as $m) {
-                    $mKey = KeyGenerator::generateMetricKey(dimensionsHash: $m->dimensionsHash, metricConfigKey: $m->metricConfigKey);
+                    $mKey = KeyGenerator::generateMetricKey(dimensionsHash: $m->dimensions_hash ?? $m->dimensionsHash, metricConfigKey: $m->metric_config_key ?? $m->metricConfigKey);
                     if ($mKey === $channeledMetric['metricKey']) {
                         $originalMetric = $m;
                         break;
@@ -701,9 +727,9 @@ class MetricsProcessor
 
                 $channeledMetricsToInsert[$key] = [
                     'channel' => $channeledMetric['channel'],
-                    'platformId' => $channeledMetric['platformId'],
+                    'platform_id' => $channeledMetric['platform_id'],
                     'metric_id' => $channeledMetric['metric_id'],
-                    'platformCreatedAt' => $channeledMetric['platformCreatedAt'],
+                    'platform_created_at' => $channeledMetric['platform_created_at'],
                     'data' => $cacheRawMetrics ? json_encode($channeledMetric['data']) : null,
                     'dimension_set_id' => $dimensionSetId
                 ];
@@ -725,20 +751,33 @@ class MetricsProcessor
             }
         }
 
+        Helpers::setLogger('facebook-marketing.log')->info("Channeled metrics analysis: " . count($channeledMetricsToInsert) . " new, " . count($channeledMetricsToUpdate) . " to update.");
+
         if (!empty($channeledMetricsToInsert)) {
-            $placeholders = implode(', ', array_fill(0, count($channeledMetricsToInsert), '(?, ?, ?, ?, ?, ?)'));
-            $params = [];
-            foreach ($channeledMetricsToInsert as $row) {
-                $params[] = $row['channel']; $params[] = $row['platformId']; $params[] = $row['metric_id'];
-                $params[] = $row['platformCreatedAt']; $params[] = $row['data']; $params[] = $row['dimension_set_id'];
+            $cols = ['channel', 'platform_id', 'metric_id', 'platform_created_at', 'data', 'dimension_set_id'];
+            $numCols = count($cols);
+            $chunkSize = floor(30000 / $numCols); // Safe buffer under 65535, aiming for ~30k params
+
+            foreach (array_chunk($channeledMetricsToInsert, (int)$chunkSize) as $chunk) {
+                $params = [];
+                foreach ($chunk as $row) {
+                    $params[] = $row['channel']; 
+                    $params[] = $row['platform_id']; 
+                    $params[] = $row['metric_id'];
+                    $params[] = $row['platform_created_at']; 
+                    $params[] = $row['data']; 
+                    $params[] = $row['dimension_set_id'];
+                }
+                
+                $sql = Helpers::buildInsertIgnoreSql(
+                    'channeled_metrics', 
+                    $cols, 
+                    ['platform_id', 'channel', 'metric_id', 'platform_created_at'], 
+                    count($chunk)
+                );
+                $affected = $manager->getConnection()->executeStatement($sql, $params);
+                Helpers::setLogger('facebook-marketing.log')->info("Inserted channeled metrics chunk: $affected rows affected.");
             }
-            $sql = Helpers::buildInsertIgnoreSql(
-                'channeled_metrics', 
-                ['channel', 'platformId', 'metric_id', 'platformCreatedAt', 'data', 'dimension_set_id'], 
-                ['channel', 'platformId', 'metric_id', 'platformCreatedAt'], 
-                count($channeledMetricsToInsert)
-            );
-            $manager->getConnection()->executeStatement($sql, $params);
         }
 
         if (!empty($channeledMetricsToUpdate)) {
@@ -755,17 +794,18 @@ class MetricsProcessor
             $selectParams = [];
             $tuples = [];
             foreach ($chunk as $m) {
-                $selectParams[] = $m['channel'];
-                $selectParams[] = $m['platformId'];
-                $selectParams[] = $m['metric_id'];
-                $selectParams[] = $m['platformCreatedAt'];
-                $tuples[] = '(?, ?, ?, ?)';
+                $selectParams[] = (string)$m['channel'];
+                $selectParams[] = (string)$m['platform_id'];
+                $selectParams[] = (int)$m['metric_id'];
+                $selectParams[] = (string)$m['platform_created_at'];
+                $tuples[] = Helpers::isPostgres() ? '(?::text, ?::text, ?::integer, ?::text)' : '(?, ?, ?, ?)';
             }
             if (!empty($tuples)) {
                 $placeholders = implode(', ', $tuples);
-                $sql = "SELECT id, channel, platformId, metric_id, platformCreatedAt, data
+                $isPostgres = Helpers::isPostgres();
+                $sql = "SELECT id, channel, platform_id, metric_id, platform_created_at, data
                         FROM channeled_metrics
-                        WHERE (channel, platformId, metric_id, platformCreatedAt) IN ($placeholders)";
+                        WHERE " . ($isPostgres ? "(channel::text, platform_id::text, metric_id::integer, platform_created_at::text)" : "(channel, platform_id, metric_id, platform_created_at)") . " IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
                 
                 $chunkMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
                 foreach ($chunkMap as $k => $v) {

@@ -44,58 +44,45 @@ class RoutingCore implements HttpKernelInterface
         try {
             $attributes = $matcher->match($request->getPathInfo());
             $isPublic = $attributes['public'] ?? false;
+            $isAdminOnly = $attributes['admin'] ?? false;
             $controller = $attributes['controller'];
-            $isHtml = $attributes['html'] ?? false; // Detect if HTML
+            $isHtml = $attributes['html'] ?? false;
 
             // Security Check
-            if (!$isPublic && !$this->isAuthorized($request)) {
+            // API calls are always protected. HTML pages let the frontend Ghost Guard handle it.
+            if (!$isPublic && !$isHtml && !$this->isAuthorized($request, $isAdminOnly)) {
                 return new Response(json_encode([
                     'status' => 'error',
                     'error' => 'Unauthorized: Access denied'
                 ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
             }
 
-            unset($attributes['controller'], $attributes['_route'], $attributes['html'], $attributes['public']);
+            unset($attributes['controller'], $attributes['_route'], $attributes['html'], $attributes['public'], $attributes['admin']);
             $attributes['body'] = $request->getContent() ?: null;
             $attributes['params'] = $request->query->all() ?: null;
 
             $response = call_user_func_array($controller, $attributes);
 
-            // If not HTML, force Content-Type JSON
             if (!$isHtml && !$response->headers->has('Content-Type')) {
                 $response->headers->set('Content-Type', 'application/json');
             }
         } catch (ResourceNotFoundException) {
             $html = file_get_contents(__DIR__ . '/../views/404.html');
             $response = new Response($html, Response::HTTP_NOT_FOUND, ['Content-Type' => 'text/html']);
-        } catch (\Exceptions\ConfigurationException $e) {
-            $response = new Response(json_encode([
-                'status' => 'error',
-                'error' => 'Configuration Error',
-                'message' => $e->getMessage()
-            ]), Response::HTTP_INTERNAL_SERVER_ERROR, [
-                'Content-Type' => 'application/json'
-            ]);
         } catch (Exception $e) {
             $response = new Response(json_encode([
                 'status' => 'error',
                 'error' => 'Internal Server Error',
                 'message' => $e->getMessage()
-            ]), Response::HTTP_INTERNAL_SERVER_ERROR, [
-                'Content-Type' => 'application/json'
-            ]);
+            ]), Response::HTTP_INTERNAL_SERVER_ERROR, ['Content-Type' => 'application/json']);
         }
 
         return $response;
     }
 
-    /**
-     * @param Request $request
-     * @return bool
-     */
-    private function isAuthorized(Request $request): bool
+    private function isAuthorized(Request $request, bool $isAdminOnly = false): bool
     {
-        // 1. IP Whitelisting Check (First layer)
+        // 1. IP Whitelisting
         $authorizedIps = \Helpers\Helpers::getAuthorizedIps();
         if (!empty($authorizedIps)) {
             $clientIp = $request->getClientIp();
@@ -104,43 +91,43 @@ class RoutingCore implements HttpKernelInterface
             }
         }
 
-        // 2. Token Check (Second layer)
-        $expectedKeysRaw = \Helpers\Helpers::getAppApiKey();
-        if ($expectedKeysRaw === null) {
-            return true; // If no keys are defined, API is public (within whitelisted IPs)
-        }
-
-        $expectedKeys = array_map('trim', explode(',', $expectedKeysRaw));
-        
-        // Try X-API-Key
+        // 2. Token Check
         $providedKey = $request->headers->get('X-API-Key');
-        
-        // Try Authorization: Bearer <token>
         if ($providedKey === null) {
             $authHeader = $request->headers->get('Authorization');
             if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
                 $providedKey = substr($authHeader, 7);
             }
         }
+        
+        // Check query parameters for manual browser access
+        if ($providedKey === null) {
+            $providedKey = $request->query->get('key') ?: $request->query->get('token');
+        }
 
-        return in_array($providedKey, $expectedKeys, true);
+        $providedKey = $providedKey ? trim($providedKey) : null;
+
+        $appKey = \Helpers\Helpers::getAppApiKey();
+        $adminKey = \Helpers\Helpers::getAdminApiKey();
+
+        if ($isAdminOnly) {
+            return $adminKey !== null && $providedKey === $adminKey;
+        }
+
+        // Public/Report routes accept both admin and regular keys
+        $validKeys = [];
+        if ($appKey) $validKeys = array_merge($validKeys, array_map('trim', explode(',', $appKey)));
+        if ($adminKey) $validKeys[] = trim($adminKey);
+
+        return !empty($validKeys) && in_array($providedKey, $validKeys, true);
     }
 
-    // Associates a URL with a callback function
-
-    /**
-     * @param string $path
-     * @param string $httpMethod
-     * @param callable $controller
-     * @param bool $public
-     * @param bool $html
-     */
-    public function map(string $path, string $httpMethod, callable $controller, bool $public = false, bool $html = false): void
+    public function map(string $path, string $httpMethod, callable $controller, bool $public = false, bool $html = false, bool $admin = false): void
     {
         $routes = new RouteCollection();
         $routes->add($path, new Route(
             $path,
-            array('controller' => $controller, 'public' => $public, 'html' => $html)
+            array('controller' => $controller, 'public' => $public, 'html' => $html, 'admin' => $admin)
         ));
         $routes->setMethods($httpMethod);
         $this->routes->addCollection($routes);
@@ -157,7 +144,8 @@ class RoutingCore implements HttpKernelInterface
                 $data['httpMethod'], 
                 $data['callable'], 
                 $data['public'] ?? false, 
-                $data['html'] ?? false
+                $data['html'] ?? false,
+                $data['admin'] ?? false
             );
         }
     }

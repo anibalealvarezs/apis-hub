@@ -17,7 +17,8 @@ return [
                 channel: $channel,
                 entity: $entity
             );
-        }
+        },
+        'admin' => true
     ],
     '/cache/reset/{entity}' => [
         'httpMethod' => 'POST',
@@ -44,7 +45,8 @@ return [
                 status: Response::HTTP_INTERNAL_SERVER_ERROR,
                 headers: ['Content-Type' => 'application/json']
             );
-        }
+        },
+        'admin' => true
     ],
     '/cache/{channel}/{entity}' => [
         'httpMethod' => 'POST',
@@ -55,6 +57,7 @@ return [
                 body: $body,
                 params: $params,
             );
-        }
+        },
+        'admin' => true
     ],
 ];

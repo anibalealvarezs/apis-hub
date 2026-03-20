@@ -10,13 +10,14 @@ use Repositories\Channeled\ChanneledProductVariantRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledProductVariantRepository::class)]
 #[ORM\Table(name: 'channeled_product_variants')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_product_variants_platformId_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_product_variants_platformId_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_product_variants_platformCreatedAt_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_product_variants_platform_id_channel_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_product_variants_platform_id_idx')]
+#[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_product_variants_platform_created_at_idx')]
+#[ORM\UniqueConstraint(name: 'channeled_product_variants_full_unique', columns: ['platform_id', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProductVariant extends ChanneledEntity
 {
-    #[ORM\Column(type: 'string')]
+    #[ORM\Column(name: 'platform_id', type: 'string')]
     protected int|string $platformId;
 
     #[ORM\Column(type: 'string', nullable: true)]
@@ -28,13 +29,13 @@ class ChanneledProductVariant extends ChanneledEntity
     protected Collection $channeledOrders;
 
     #[ORM\ManyToOne(targetEntity:ChanneledProduct::class, inversedBy: 'channeledProductVariants')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'channeled_product_id', onDelete: 'cascade')]
     protected ChanneledProduct $channeledProduct;
 
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: ProductVariant::class, inversedBy: 'channeledProductVariants')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'product_variant_id', onDelete: 'cascade')]
     protected ProductVariant $productVariant;
 
     /**

@@ -13,7 +13,8 @@ return [
                 body: $body,
                 params: $params,
             );
-        }
+        },
+        'admin' => true
     ],
     '/{channel}/{entity}/aggregate' => [
         'httpMethod' => 'POST',
@@ -36,7 +37,8 @@ return [
                 method: 'read',
                 id: $id
             );
-        }
+        },
+        'admin' => true
     ],
     '/{channel}/{entity}' => [
         'httpMethod' => 'GET',
@@ -48,6 +50,7 @@ return [
                 body: $body,
                 params: $params,
             );
-        }
+        },
+        'admin' => true
     ],
 ];

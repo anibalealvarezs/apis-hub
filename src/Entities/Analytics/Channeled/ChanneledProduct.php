@@ -6,22 +6,24 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Entities\Analytics\Product;
+use Entities\Analytics\Vendor;
 use Repositories\Channeled\ChanneledProductRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledProductRepository::class)]
 #[ORM\Table(name: 'channeled_products')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_products_platformId_channel_idx')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_products_platformId_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_products_platform_id_channel_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_products_platform_id_idx')]
 #[ORM\Index(columns: ['sku'], name: 'idx_channeled_products_sku_idx')]
-#[ORM\Index(columns: ['platformCreatedAt'], name: 'idx_channeled_products_created_idx')]
-#[ORM\Index(columns: ['platformId', 'sku'], name: 'idx_channeled_products_pid_sku_idx')]
-#[ORM\Index(columns: ['platformId', 'platformCreatedAt'], name: 'idx_channeled_products_pid_created_idx')]
-#[ORM\Index(columns: ['sku', 'platformCreatedAt'], name: 'idx_channeled_products_sku_created_idx')]
-#[ORM\Index(columns: ['platformId', 'sku', 'platformCreatedAt'], name: 'idx_channeled_products_full_idx')]
+#[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_products_platform_created_at_idx')]
+#[ORM\Index(columns: ['platform_id', 'sku'], name: 'idx_channeled_products_pid_sku_idx')]
+#[ORM\Index(columns: ['platform_id', 'platform_created_at'], name: 'idx_channeled_products_pid_created_idx')]
+#[ORM\Index(columns: ['sku', 'platform_created_at'], name: 'idx_channeled_products_sku_created_idx')]
+#[ORM\Index(columns: ['platform_id', 'sku', 'platform_created_at'], name: 'idx_channeled_products_full_idx')]
+#[ORM\UniqueConstraint(name: 'channeled_products_full_unique', columns: ['platform_id', 'channel'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledProduct extends ChanneledEntity
 {
-    #[ORM\Column(type: 'string')]
+    #[ORM\Column(name: 'platform_id', type: 'string')]
     protected int|string $platformId;
 
     #[ORM\Column(type: 'string', nullable: true)]
@@ -38,14 +40,14 @@ class ChanneledProduct extends ChanneledEntity
     #[ORM\ManyToMany(targetEntity: ChanneledOrder::class, mappedBy: 'channeledProducts')]
     protected Collection $channeledOrders;
 
-    #[ORM\ManyToOne(targetEntity:ChanneledVendor::class, inversedBy: 'channeledProducts')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\ManyToOne(targetEntity: ChanneledVendor::class, inversedBy: 'channeledProducts')]
+    #[ORM\JoinColumn(name: 'channeled_vendor_id', onDelete: 'CASCADE')]
     protected ChanneledVendor $channeledVendor;
 
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: Product::class, inversedBy: 'channeledProducts')]
-    #[ORM\JoinColumn(onDelete: 'cascade')]
+    #[ORM\JoinColumn(name: 'product_id', onDelete: 'CASCADE')]
     protected Product $product;
 
     /**

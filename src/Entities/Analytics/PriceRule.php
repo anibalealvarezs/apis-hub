@@ -10,12 +10,12 @@ use Entities\Entity;
 use Repositories\PriceRuleRepository;
 
 #[ORM\Entity(repositoryClass: PriceRuleRepository::class)]
-#[ORM\Table(name: 'priceRules')]
-#[ORM\Index(columns: ['priceRuleId'], name: 'idx_priceRules_priceRules_priceRuleId_idx')]
+#[ORM\Table(name: 'price_rules')]
+#[ORM\Index(columns: ['price_rule_id'], name: 'idx_price_rules_price_rule_id_idx')]
 #[ORM\HasLifecycleCallbacks]
 class PriceRule extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(name: 'price_rule_id', type: 'string', unique: true)]
     protected int|string $priceRuleId;
 
     #[ORM\OneToMany(mappedBy: 'priceRule', targetEntity: ChanneledPriceRule::class, orphanRemoval: true)]

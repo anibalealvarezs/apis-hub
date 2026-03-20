@@ -258,6 +258,7 @@
             <a href="/logs" class="nav-link active"><i data-lucide="scroll"></i> Logs</a>
             <a href="/command-builder" class="nav-link"><i data-lucide="terminal"></i> Builder</a>
             <a href="/config-manager" class="nav-link"><i data-lucide="settings"></i> Config</a>
+            <a href="/fb-reports" class="nav-link"><i data-lucide="bar-chart-3"></i> Reports</a>
             <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
         </nav>
     </header>
@@ -306,15 +307,45 @@
     </footer>
 
     <script>
-        lucide.createIcons();
-
-        let autoRefreshInterval = null;
-        let lastTimestamp = null;
+        function getAdminHeaders() {
+            const EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
+            const now = Date.now();
+            let auth = JSON.parse(localStorage.getItem('apis_hub_admin_auth') || '{}');
+            
+            if (!auth.token || (now - auth.timestamp > EXPIRATION_TIME)) {
+                const token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
+                if (token) {
+                    auth = { token, timestamp: now };
+                    localStorage.setItem('apis_hub_admin_auth', JSON.stringify(auth));
+                } else {
+                    return {};
+                }
+            }
+            
+            return {
+                'Authorization': 'Bearer ' + auth.token,
+                'Content-Type': 'application/json'
+            };
+        }
 
         async function fetchLogList() {
             try {
-                const response = await fetch('/api/monitoring/logs/list');
+                const headers = getAdminHeaders();
+                if (!headers.Authorization) return;
+
+                const response = await fetch('/api/monitoring/logs/list', {
+                    headers: headers
+                });
+                
+                if (response.status === 401) {
+                    localStorage.removeItem('apis_hub_admin_auth');
+                    alert('Session Expired or Invalid Key. Please reload and provide your key again.');
+                    return;
+                }
+
                 const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
                 const selector = document.getElementById('log-file-selector');
                 const currentVal = selector.value;
                 
@@ -353,8 +384,21 @@
             if (!file) return;
 
             try {
-                const response = await fetch(`/api/monitoring/logs?file=${file}&lines=1000`);
+                const headers = getAdminHeaders();
+                if (!headers.Authorization) return;
+
+                const response = await fetch(`/api/monitoring/logs?file=${file}&lines=1000`, {
+                    headers: headers
+                });
+
+                if (response.status === 401) {
+                    localStorage.removeItem('apis_hub_admin_auth');
+                    alert('Session Expired or Invalid Key. Please reload and provide your key again.');
+                    return;
+                }
+
                 const data = await response.json();
+                if (data.error) throw new Error(data.error);
                 
                 const content = data.content || 'No content found.';
                 const formattedContent = colorizeLogs(content);
@@ -362,7 +406,6 @@
                 if (isInitial) {
                     consoleBox.innerHTML = formattedContent;
                 } else {
-                    // Simple diff check to avoid flickering if nothing changed
                     if (consoleBox.innerHTML !== formattedContent) {
                         consoleBox.innerHTML = formattedContent;
                     }

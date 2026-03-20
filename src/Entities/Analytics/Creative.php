@@ -11,11 +11,11 @@ use Repositories\CreativeRepository;
 
 #[ORM\Entity(repositoryClass: CreativeRepository::class)]
 #[ORM\Table(name: 'creatives')]
-#[ORM\Index(columns: ['creativeId'], name: 'idx_creatives_creativeId_idx')]
+#[ORM\Index(columns: ['creative_id'], name: 'idx_creatives_creative_id_idx')]
 #[ORM\HasLifecycleCallbacks]
 class Creative extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(name: 'creative_id', type: 'string', unique: true)]
     protected string $creativeId;
 
     #[ORM\Column(type: 'string')]

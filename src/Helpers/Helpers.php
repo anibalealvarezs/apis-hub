@@ -19,6 +19,7 @@ use ReflectionProperty;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 use Monolog\Handler\StreamHandler;
+use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\NullHandler;
 use Monolog\Level;
 use Monolog\Logger;
@@ -75,8 +76,8 @@ class Helpers
                     list($name, $value) = explode('=', $line, 2);
                     $name = trim($name);
                     $value = trim($value, " \t\n\r\0\x0B\"'");
-                    if (!getenv($name)) putenv("$name=$value");
-                    if (!isset($_ENV[$name])) $_ENV[$name] = $value;
+                    putenv("$name=$value");
+                    $_ENV[$name] = $value;
                 }
             }
         }
@@ -258,8 +259,8 @@ class Helpers
             $uniqueClause = is_array($uniqueCols) ? implode(', ', $uniqueCols) : $uniqueCols;
             $updateClauses = [];
             foreach ($updateCols as $col) {
-                if ($col === 'updatedAt') {
-                    $updateClauses[] = "updatedAt = CURRENT_TIMESTAMP";
+                if ($col === 'updatedAt' || $col === 'updated_at') {
+                    $updateClauses[] = "{$col} = CURRENT_TIMESTAMP";
                     continue;
                 }
                 $updateClauses[] = "{$col} = EXCLUDED.{$col}";
@@ -271,8 +272,8 @@ class Helpers
             // MySQL syntax: ON DUPLICATE KEY UPDATE col = VALUES(col)
             $updateClauses = [];
             foreach ($updateCols as $col) {
-                if ($col === 'updatedAt') {
-                    $updateClauses[] = "updatedAt = CURRENT_TIMESTAMP";
+                if ($col === 'updatedAt' || $col === 'updated_at') {
+                    $updateClauses[] = "{$col} = CURRENT_TIMESTAMP";
                     continue;
                 }
                 $updateClauses[] = "{$col} = VALUES({$col})";
@@ -344,6 +345,15 @@ class Helpers
             }
         }
         return self::$dbConfig;
+    }
+
+    /**
+     * @return bool
+     */
+    public static function isPostgres(): bool
+    {
+        $config = self::getDbConfig();
+        return ($config['driver'] === 'pdo_pgsql');
     }
 
     /**
@@ -485,24 +495,17 @@ class Helpers
         return self::$cacheConfig;
     }
 
+    public static function getAdminApiKey(): ?string
+    {
+        return getenv('ADMIN_API_KEY') ?: null;
+    }
+
     /**
      * @return string|null
      */
     public static function getAppApiKey(): ?string
     {
-        $envKey = getenv('APP_API_KEY') ?: null;
-        if ($envKey) {
-            return $envKey;
-        }
-
-        $projectConfig = self::getProjectConfig();
-        $configKeys = $projectConfig['security']['api_keys'] ?? null;
-        
-        if (is_array($configKeys)) {
-            return implode(',', $configKeys);
-        }
-
-        return is_string($configKeys) ? $configKeys : null;
+        return getenv('APP_API_KEY') ?: null;
     }
 
     /**
@@ -510,10 +513,13 @@ class Helpers
      */
     public static function getAuthorizedIps(): array
     {
-        $projectConfig = self::getProjectConfig();
-        $ips = $projectConfig['security']['authorized_ips'] ?? [];
+        $envIps = getenv('AUTHORIZED_IPS');
+        if (!$envIps || $envIps === '[]') {
+            return [];
+        }
         
-        return is_array($ips) ? $ips : [$ips];
+        $ips = explode(',', $envIps);
+        return array_map('trim', $ips);
     }
 
     /**
@@ -842,7 +848,8 @@ class Helpers
             $finalLevel = $baseLevel;
         }
 
-        $logger->pushHandler(new StreamHandler(__DIR__ . '/../../logs/' . $filename, $finalLevel));
+        $maxFiles = $logConfig['max_days'] ?? 7;
+        $logger->pushHandler(new RotatingFileHandler(__DIR__ . '/../../logs/' . $filename, $maxFiles, $finalLevel));
         return $logger;
     }
 

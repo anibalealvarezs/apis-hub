@@ -600,6 +600,7 @@
             <a href="/logs" class="nav-link"><i data-lucide="scroll"></i> Logs</a>
             <a href="/command-builder" class="nav-link active"><i data-lucide="terminal"></i> Builder</a>
             <a href="/config-manager" class="nav-link"><i data-lucide="settings"></i> Config</a>
+            <a href="/fb-reports" class="nav-link"><i data-lucide="bar-chart-3"></i> Reports</a>
             <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
         </nav>
     </header>
@@ -987,13 +988,50 @@
             updatePreview();
         };
 
+        function getAdminHeaders() {
+            const EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
+            const now = Date.now();
+            let auth = JSON.parse(localStorage.getItem('apis_hub_admin_auth') || '{}');
+            
+            if (!auth.token || (now - auth.timestamp > EXPIRATION_TIME)) {
+                const token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
+                if (token) {
+                    auth = { token, timestamp: now };
+                    localStorage.setItem('apis_hub_admin_auth', JSON.stringify(auth));
+                } else {
+                    return {};
+                }
+            }
+            
+            return {
+                'Authorization': 'Bearer ' + auth.token,
+                'Content-Type': 'application/json'
+            };
+        }
+
         async function fetchActualContainers() {
             try {
                 // Show loading state
                 containerSelectorEl.innerHTML = '<div class="hint"><i data-lucide="loader" class="loader" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:5px"></i> Fetching active containers...</div>';
                 
-                const response = await fetch('/api/monitoring/data');
+                const headers = getAdminHeaders();
+                if (!headers.Authorization) {
+                    containerSelectorEl.innerHTML = '<div class="hint" style="color:var(--danger)">Authorization Required. Please refresh to provide your API Key.</div>';
+                    return;
+                }
+
+                const response = await fetch('/api/monitoring/data', {
+                    headers: headers
+                });
+
+                if (response.status === 401) {
+                    localStorage.removeItem('apis_hub_admin_auth');
+                    alert('Session Expired or Invalid Key. Please reload and provide your key again.');
+                    return;
+                }
+
                 const data = await response.json();
+                if (data.error) throw new Error(data.error);
                 
                 if (data.containers && data.containers.length > 0) {
                     DICTIONARY.containers = data.containers; // Store full objects

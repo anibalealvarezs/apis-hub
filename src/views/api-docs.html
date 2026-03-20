@@ -210,6 +210,27 @@
 <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" charset="UTF-8"></script>
 <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
 <script>
+    function getAdminHeaders() {
+        const EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
+        const now = Date.now();
+        let auth = JSON.parse(localStorage.getItem('apis_hub_admin_auth') || '{}');
+        
+        if (!auth.token || (now - auth.timestamp > EXPIRATION_TIME)) {
+            const token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
+            if (token) {
+                auth = { token, timestamp: now };
+                localStorage.setItem('apis_hub_admin_auth', JSON.stringify(auth));
+            } else {
+                return {};
+            }
+        }
+        
+        return {
+            'Authorization': 'Bearer ' + auth.token,
+            'Content-Type': 'application/json'
+        };
+    }
+
     window.onload = function() {
         const ui = SwaggerUIBundle({
             url: "/api/spec",
@@ -222,7 +243,12 @@
             plugins: [
                 SwaggerUIBundle.plugins.DownloadUrl
             ],
-            layout: "BaseLayout"
+            layout: "BaseLayout",
+            requestInterceptor: (req) => {
+                const headers = getAdminHeaders();
+                req.headers['Authorization'] = headers['Authorization'];
+                return req;
+            }
         });
         window.ui = ui;
         

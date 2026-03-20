@@ -14,13 +14,13 @@ use Repositories\Channeled\ChanneledCampaignRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledCampaignRepository::class)]
 #[ORM\Table(name: 'channeled_campaigns')]
-#[ORM\Index(columns: ['platformId'], name: 'idx_channeled_campaigns_platformId_idx')]
+#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_campaigns_platform_id_idx')]
 #[ORM\Index(columns: ['channel'], name: 'idx_channeled_campaigns_channel_idx')]
-#[ORM\Index(columns: ['platformId', 'channel'], name: 'idx_channeled_campaigns_platform_channel_idx')]
-#[ORM\Index(columns: ['channeledAccount_id'], name: 'idx_channeled_campaigns_channeledAccount_id_idx')]
+#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_campaigns_platform_channel_idx')]
+#[ORM\Index(columns: ['channeled_account_id'], name: 'idx_channeled_campaigns_channeled_account_id_idx')]
 #[ORM\Index(columns: ['campaign_id'], name: 'idx_channeled_campaigns_campaign_idx')]
-#[ORM\Index(columns: ['channeledAccount_id', 'campaign_id'], name: 'idx_channeled_campaigns_channeledAccount_id_campaign_id_idx')]
-#[ORM\UniqueConstraint(name: 'platformId_channeledAccount_id_uidx', columns: ['platformId', 'channeledAccount_id'])]
+#[ORM\Index(columns: ['channeled_account_id', 'campaign_id'], name: 'idx_channeled_campaigns_channeled_account_id_campaign_id_idx')]
+#[ORM\UniqueConstraint(name: 'channeled_campaigns_platform_id_account_id_uidx', columns: ['platform_id', 'channeled_account_id'])]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledCampaign extends ChanneledEntity
 {
@@ -33,15 +33,15 @@ class ChanneledCampaign extends ChanneledEntity
     #[ORM\Column(type: 'string', nullable: true, enumType: CampaignStatus::class)]
     protected ?CampaignStatus $status = null;
 
-    #[ORM\Column(type: 'string', nullable: true, enumType: CampaignBuyingType::class)]
+    #[ORM\Column(name: 'buying_type', type: 'string', nullable: true, enumType: CampaignBuyingType::class)]
     protected ?CampaignBuyingType $buyingType = null;
 
     #[ORM\ManyToOne(targetEntity: Campaign::class, inversedBy: 'channeledCampaigns')]
-    #[ORM\JoinColumn(onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'campaign_id', onDelete: 'CASCADE')]
     protected Campaign $campaign;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'channeledCampaigns')]
-    #[ORM\JoinColumn(onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'channeled_account_id', onDelete: 'CASCADE')]
     protected ChanneledAccount $channeledAccount;
 
     #[ORM\OneToMany(mappedBy: 'channeledCampaign', targetEntity: ChanneledAdGroup::class)]

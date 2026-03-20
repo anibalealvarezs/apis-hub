@@ -15,21 +15,21 @@ use Repositories\MetricConfigRepository;
 
 #[ORM\Entity(repositoryClass: MetricConfigRepository::class)]
 #[ORM\Table(name: 'metric_configs')]
-#[ORM\Index(columns: ['channel', 'name', 'period', 'metricDate'], name: 'idx_metric_configs_metricDate_period_idx')]
-#[ORM\Index(columns: ['channel', 'name', 'metricDate'], name: 'idx_metric_configs_metricDate_base_idx')]
+#[ORM\Index(columns: ['channel', 'name', 'period', 'metric_date'], name: 'idx_metric_configs_metricDate_period_idx')]
+#[ORM\Index(columns: ['channel', 'name', 'metric_date'], name: 'idx_metric_configs_metricDate_base_idx')]
 #[ORM\Index(
-    columns: ['channel', 'name', 'period', 'metricDate', 'query_id', 'page_id', 'country_id', 'device_id'],
+    columns: ['channel', 'name', 'period', 'metric_date', 'query_id', 'page_id', 'country_id', 'device_id'],
     name: 'idx_metric_configs_lookup_full_idx'
 )]
 #[ORM\Index(
-    columns: ['channel', 'name', 'period', 'metricDate', 'channeledAccount_id'],
+    columns: ['channel', 'name', 'period', 'metric_date', 'channeled_account_id'],
     name: 'idx_metric_configs_lookup_channeled_idx'
 )]
 #[ORM\Index(
-    columns: ['channel', 'name', 'period', 'metricDate', 'account_id'],
+    columns: ['channel', 'name', 'period', 'metric_date', 'account_id'],
     name: 'idx_metric_configs_lookup_account_idx'
 )]
-#[ORM\UniqueConstraint(name: 'metric_config_signature_unique', columns: ['configSignature'])]
+#[ORM\UniqueConstraint(name: 'metric_config_signature_unique', columns: ['config_signature'])]
 #[ORM\HasLifecycleCallbacks]
 class MetricConfig extends Entity
 {
@@ -42,34 +42,34 @@ class MetricConfig extends Entity
     #[ORM\Column(type: 'string')]
     protected string $period;
 
-    #[ORM\Column(type: 'date')]
+    #[ORM\Column(name: 'metric_date', type: 'date')]
     protected DateTimeInterface $metricDate;
 
     #[ORM\OneToMany(mappedBy: 'metricConfig', targetEntity: Metric::class, orphanRemoval: true)]
     protected Collection $metrics;
 
     #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'account_id', onDelete: 'SET NULL')]
     protected ?Account $account = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_account_id', onDelete: 'SET NULL')]
     protected ?ChanneledAccount $channeledAccount = null;
 
     #[ORM\ManyToOne(targetEntity: Campaign::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'campaign_id', onDelete: 'SET NULL')]
     protected ?Campaign $campaign = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledCampaign::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_campaign_id', onDelete: 'SET NULL')]
     protected ?ChanneledCampaign $channeledCampaign = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAdGroup::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_ad_group_id', onDelete: 'SET NULL')]
     protected ?ChanneledAdGroup $channeledAdGroup = null;
 
     #[ORM\ManyToOne(targetEntity: ChanneledAd::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'channeled_ad_id', onDelete: 'SET NULL')]
     protected ?ChanneledAd $channeledAd = null;
 
     #[ORM\ManyToOne(targetEntity: Creative::class, inversedBy: 'metricConfigs')]
@@ -77,38 +77,38 @@ class MetricConfig extends Entity
     protected ?Creative $creative = null;
 
     #[ORM\ManyToOne(targetEntity: Page::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'page_id', onDelete: 'SET NULL')]
     protected ?Page $page = null;
 
     #[ORM\ManyToOne(targetEntity: Query::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'query_id', onDelete: 'SET NULL')]
     protected ?Query $query = null;
 
     #[ORM\ManyToOne(targetEntity: Post::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'post_id', onDelete: 'SET NULL')]
     protected ?Post $post = null;
 
     #[ORM\ManyToOne(targetEntity: Product::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'product_id', onDelete: 'SET NULL')]
     protected ?Product $product = null;
 
     #[ORM\ManyToOne(targetEntity: Customer::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'customer_id', onDelete: 'SET NULL')]
     protected ?Customer $customer = null;
 
     #[ORM\ManyToOne(targetEntity: Order::class, inversedBy: 'metricConfigs')]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'order_id', onDelete: 'SET NULL')]
     protected ?Order $order = null;
 
     #[ORM\ManyToOne(targetEntity: Country::class)]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'country_id', onDelete: 'SET NULL')]
     protected ?Country $country = null;
 
     #[ORM\ManyToOne(targetEntity: Device::class)]
-    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'device_id', onDelete: 'SET NULL')]
     protected ?Device $device = null;
 
-    #[ORM\Column(type: 'string', length: 32, unique: true)]
+    #[ORM\Column(name: 'config_signature', type: 'string', length: 32, unique: true)]
     protected string $configSignature;
 
     /* #[ORM\Column(type: 'json', nullable: true)]

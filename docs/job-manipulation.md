@@ -97,16 +97,13 @@ The dashboard follows a **Forensic Preservation** policy:
 
 ---
 
-## 5. Automation & Safe Processing
+### ⚡ Distributed High-Availability (HA) Scheduling
 
-Jobs are automatically processed in the background by the `ProcessJobsCommand`.
+In v1.4.0, APIs Hub evolved to support redundant scheduling across multiple container instances.
 
-### Instance-Safe Workers
-
-The workers are designed to be **localized** and **thread-safe**:
-
-- **Localization**: Each worker only picks up jobs that match its assigned `Channel`, `Entity`, and `Date Range`.
-- **Atomic Claiming**: The system uses a "Claim-first" mechanism. Multiple workers can query the same database without ever starting the same job twice.
+- **Distributed Locking (Redis)**: When multiple containers fire the same cron schedule (e.g., 5 AM sync), the system uses an atomic **Redis Lock** (`lock:schedule:{hash}`) with a "Set-if-Not-Exists" (NX) policy.
+- **Race Condition Prevention**: Only the first container to win the Redis lock will successfully schedule the job. Other containers will receive a `409 Conflict` and skip the injection, maintaining a strict 1:1 job-to-schedule ratio.
+- **Atomic Claiming**: Once scheduled, workers use a database-level "Claim-first" mechanism to transition jobs from `scheduled` to `processing`, ensuring no two workers ever process the same job ID.
 
 - **Worker Command**: `php bin/cli.php jobs:process`
-- **Automation Logic**: See [entrypoint.sh](../entrypoint.sh) to see how the worker is bootstrapped in a container.
+- **Automation Logic**: See [entrypoint.sh](../entrypoint.sh) to see how the worker is bootstrapped in a container with a shared cron configuration.

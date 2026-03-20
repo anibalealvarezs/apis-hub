@@ -12,42 +12,48 @@ return [
     '/command-builder' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->commandBuilder(),
-        'public' => true,
-        'html' => true
+        'public' => false,
+        'html' => true,
+        'admin' => true
     ],
     '/docs' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->docs(),
-        'public' => true,
-        'html' => true
+        'public' => false,
+        'html' => true,
+        'admin' => true
     ],
     '/logs' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->logs(),
-        'public' => true,
-        'html' => true
+        'public' => false,
+        'html' => true,
+        'admin' => true
     ],
     '/api/spec' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->apiSpec(),
-        'public' => true,
-        'html' => false
+        'public' => false,
+        'html' => false,
+        'admin' => true
     ],
     '/monitoring' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
             return (new \Controllers\MonitoringController())->index();
         },
-        'public' => true,
-        'html' => true
+        'public' => false,
+        'html' => true,
+        'admin' => true
     ],
     '/api/monitoring/data' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
             return (new \Controllers\MonitoringController())->data();
         },
-        'public' => true, // Make it public for now, or add auth if needed
-        'html' => false
+        'public' => false,
+        'html' => false,
+        'admin' => true
     ],
     '/api/monitoring/jobs/action' => [
         'httpMethod' => 'POST',
@@ -55,8 +61,9 @@ return [
             $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
             return (new \Controllers\MonitoringController())->jobAction($request);
         },
-        'public' => true,
-        'html' => false
+        'public' => false,
+        'html' => false,
+        'admin' => true
     ],
     '/api/monitoring/logs' => [
         'httpMethod' => 'GET',
@@ -64,22 +71,25 @@ return [
             $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
             return (new \Controllers\MonitoringController())->logs($request);
         },
-        'public' => true,
-        'html' => false
+        'public' => false,
+        'html' => false,
+        'admin' => true
     ],
     '/api/monitoring/logs/list' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
             return (new \Controllers\MonitoringController())->logList();
         },
-        'public' => true,
-        'html' => false
+        'public' => false,
+        'html' => false,
+        'admin' => true
     ],
     '/config-manager' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new \Controllers\ConfigManagerController())->index(),
-        'public' => true,
-        'html' => true
+        'public' => false,
+        'html' => true,
+        'admin' => true
     ],
     '/api/config-manager/assets' => [
         'httpMethod' => 'GET',
@@ -87,8 +97,9 @@ return [
             $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
             return (new \Controllers\ConfigManagerController())->fetchAssets($request);
         },
-        'public' => true,
-        'html' => false
+        'public' => false,
+        'html' => false,
+        'admin' => true
     ],
     '/api/config-manager/update' => [
         'httpMethod' => 'POST',
@@ -96,8 +107,9 @@ return [
             $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
             return (new \Controllers\ConfigManagerController())->updateConfig($request);
         },
-        'public' => true,
-        'html' => false
+        'public' => false,
+        'html' => false,
+        'admin' => true
     ],
     '/api/config-manager/validate-tokens' => [
         'httpMethod' => 'POST',
@@ -105,8 +117,9 @@ return [
             $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
             return (new \Controllers\ConfigManagerController())->validateTokens($request);
         },
-        'public' => true,
-        'html' => false
+        'public' => false,
+        'html' => false,
+        'admin' => true
     ],
     '/api/config-manager/export' => [
         'httpMethod' => 'POST',
@@ -114,7 +127,15 @@ return [
             $request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
             return (new \Controllers\ConfigManagerController())->exportConfig($request);
         },
-        'public' => true,
-        'html' => false
+        'public' => false,
+        'html' => false,
+        'admin' => true
+    ],
+    '/fb-reports' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new PageController())->facebookReports(),
+        'public' => false,
+        'html' => true,
+        'admin' => false
     ]
 ];

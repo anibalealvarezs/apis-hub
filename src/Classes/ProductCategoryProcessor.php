@@ -39,8 +39,8 @@ class ProductCategoryProcessor
             $cKey = KeyGenerator::generateProductCategoryKey($catPId);
             if (!isset($uCat[$cKey])) {
                 $uCat[$cKey] = [
-                    'productCategoryId' => $catPId,
-                    'isSmartCollection' => $cpc->isSmartCollection ?? false,
+                    'product_category_id' => $catPId,
+                    'is_smart_collection' => $cpc->isSmartCollection ?? false,
                 ];
             }
 
@@ -49,9 +49,9 @@ class ProductCategoryProcessor
                 $uCCat[$ccKey] = [
                     'categoryPId' => $catPId,
                     'channel' => $chan,
-                    'platformId' => $catPId,
-                    'platformCreatedAt' => isset($cpc->platformCreatedAt) ? $cpc->platformCreatedAt : null,
-                    'isSmartCollection' => $cpc->isSmartCollection ?? false,
+                    'platform_id' => $catPId,
+                    'platform_created_at' => isset($cpc->platformCreatedAt) ? $cpc->platformCreatedAt : (isset($cpc->platform_created_at) ? $cpc->platform_created_at : null),
+                    'is_smart_collection' => $cpc->isSmartCollection ?? false,
                     'data' => is_object($cpc->data) ? clone $cpc->data : (object)($cpc->data ?? []),
                 ];
             }
@@ -62,7 +62,7 @@ class ProductCategoryProcessor
                     if (!isset($uCProd[$cpKey])) {
                         $uCProd[$cpKey] = [
                             'channel' => $chan,
-                            'platformId' => (string)$prodId,
+                            'platform_id' => (string)$prodId,
                         ];
                     }
                 }
@@ -74,15 +74,15 @@ class ProductCategoryProcessor
         // ============================================
         $categoryMap = ['map' => [], 'mapReverse' => []];
         if (!empty($uCat)) {
-            $catIds = array_column($uCat, 'productCategoryId');
+            $catIds = array_column($uCat, 'product_category_id');
             $categoryMap = self::fetchAndInsertEntities(
                 $conn,
                 'product_categories',
-                'productCategoryId',
+                'product_category_id',
                 $catIds,
-                ['productCategoryId', 'isSmartCollection'],
-                [$uCat, fn ($c) => [$c['productCategoryId'], $c['isSmartCollection'] ? 1 : 0]],
-                fn ($chunk) => "SELECT id, productCategoryId FROM product_categories WHERE productCategoryId IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
+                ['product_category_id', 'is_smart_collection'],
+                [$uCat, fn ($c) => [$c['product_category_id'], $c['is_smart_collection'] ? 1 : 0]],
+                fn ($chunk) => "SELECT id, product_category_id FROM product_categories WHERE product_category_id IN (" . implode(', ', array_fill(0, count($chunk), '?')) . ")",
                 fn ($conn, $sql, $params) => MapGenerator::getProductCategoryMap($manager, $sql, $params)
             );
         }
@@ -94,13 +94,13 @@ class ProductCategoryProcessor
         $ccKeys = [];
         if (!empty($uCCat)) {
             foreach ($uCCat as $cc) {
-                $ccKeys[] = ['channel' => $cc['channel'], 'platformId' => $cc['platformId']];
+                $ccKeys[] = ['channel' => $cc['channel'], 'platform_id' => $cc['platform_id']];
             }
             $channeledCategoryMap = self::fetchChanneledEntities(
                 $conn,
                 $ccKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_product_categories WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_product_categories WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductCategoryMap($manager, $sql, $params)
             );
 
@@ -116,9 +116,9 @@ class ProductCategoryProcessor
                 $row = [
                     'product_category_id' => $categoryId,
                     'channel' => $cc['channel'],
-                    'platformId' => $cc['platformId'],
-                    'isSmartCollection' => $cc['isSmartCollection'] ? 1 : 0,
-                    'platformCreatedAt' => $cc['platformCreatedAt'] instanceof \DateTime ? $cc['platformCreatedAt']->format('Y-m-d H:i:s') : $cc['platformCreatedAt'],
+                    'platform_id' => $cc['platform_id'],
+                    'is_smart_collection' => $cc['is_smart_collection'] ? 1 : 0,
+                    'platform_created_at' => $cc['platform_created_at'] instanceof \DateTime ? $cc['platform_created_at']->format('Y-m-d H:i:s') : $cc['platform_created_at'],
                     'data' => json_encode($cc['data'])
                 ];
 
@@ -130,14 +130,14 @@ class ProductCategoryProcessor
                 }
             }
 
-            self::bulkInsert($conn, 'channeled_product_categories', ['product_category_id', 'channel', 'platformId', 'isSmartCollection', 'platformCreatedAt', 'data'], $insertRows);
-            self::bulkUpsert($conn, 'channeled_product_categories', ['id', 'product_category_id', 'channel', 'platformId', 'isSmartCollection', 'platformCreatedAt', 'data'], ['product_category_id', 'channel', 'platformId', 'isSmartCollection', 'platformCreatedAt', 'data', 'updatedAt' => 'CURRENT_TIMESTAMP'], $updateRows);
+            self::bulkInsert($conn, 'channeled_product_categories', ['product_category_id', 'channel', 'platform_id', 'is_smart_collection', 'platform_created_at', 'data'], $insertRows);
+            self::bulkUpsert($conn, 'channeled_product_categories', ['id', 'product_category_id', 'channel', 'platform_id', 'is_smart_collection', 'platform_created_at', 'data'], ['product_category_id', 'channel', 'platform_id', 'is_smart_collection', 'platform_created_at', 'data', 'updated_at' => 'CURRENT_TIMESTAMP'], $updateRows);
 
             $channeledCategoryMap = self::fetchChanneledEntities(
                 $conn,
                 $ccKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_product_categories WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_product_categories WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductCategoryMap($manager, $sql, $params)
             );
         }
@@ -149,13 +149,13 @@ class ProductCategoryProcessor
         if (!empty($uCProd)) {
             $cpKeys = [];
             foreach ($uCProd as $cp) {
-                $cpKeys[] = ['channel' => $cp['channel'], 'platformId' => $cp['platformId']];
+                $cpKeys[] = ['channel' => $cp['channel'], 'platform_id' => $cp['platform_id']];
             }
             $channeledProductMap = self::fetchChanneledEntities(
                 $conn,
                 $cpKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductMap($manager, $sql, $params)
             );
 
@@ -164,18 +164,18 @@ class ProductCategoryProcessor
                 if (!isset($channeledProductMap[$k])) {
                     $insertRows[] = [
                         'channel' => $cp['channel'],
-                        'platformId' => $cp['platformId'],
+                        'platform_id' => $cp['platform_id'],
                         'data' => json_encode([])
                     ];
                 }
             }
-            self::bulkInsert($conn, 'channeled_products', ['channel', 'platformId', 'data'], $insertRows);
+            self::bulkInsert($conn, 'channeled_products', ['channel', 'platform_id', 'data'], $insertRows);
 
             $channeledProductMap = self::fetchChanneledEntities(
                 $conn,
                 $cpKeys,
-                'platformId',
-                fn ($chunk) => "SELECT id, channel, platformId, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platformId = ?)")),
+                'platform_id',
+                fn ($chunk) => "SELECT id, channel, platform_id, data FROM channeled_products WHERE " . implode(' OR ', array_fill(0, count($chunk), "(channel = ? AND platform_id = ?)")),
                 fn ($conn, $sql, $params) => MapGenerator::getChanneledProductMap($manager, $sql, $params)
             );
         }
@@ -194,23 +194,23 @@ class ProductCategoryProcessor
 
                     if (isset($channeledCategoryMap[$ccKey]) && isset($channeledProductMap[$cpKey])) {
                         $pivotInserts[] = [
-                            'channeledproductcategory_id' => $channeledCategoryMap[$ccKey]['id'],
-                            'channeledproduct_id' => $channeledProductMap[$cpKey]['id']
+                            'channeled_product_category_id' => $channeledCategoryMap[$ccKey]['id'],
+                            'channeled_product_id' => $channeledProductMap[$cpKey]['id']
                         ];
                     }
                 }
             }
 
             if (!empty($pivotInserts)) {
-                self::bulkInsert($conn, 'channeled_product_categories_channeled_products', ['channeledproductcategory_id', 'channeledproduct_id'], $pivotInserts);
+                self::bulkInsert($conn, 'channeled_product_categories_channeled_products', ['channeled_product_category_id', 'channeled_product_id'], $pivotInserts);
             }
         }
 
         return [
-            'productCategories' => array_column($uCat, 'productCategoryId'),
-            'channeledProductCategories' => array_column($uCCat, 'platformId'),
+            'productCategories' => array_column($uCat, 'product_category_id'),
+            'channeledProductCategories' => array_column($uCCat, 'platform_id'),
             'channels' => array_unique(array_column($uCCat, 'channel')),
-            'channeledProducts' => array_column($uCProd, 'platformId'),
+            'channeledProducts' => array_column($uCProd, 'platform_id'),
         ];
     }
 
@@ -243,7 +243,7 @@ class ProductCategoryProcessor
                 foreach ($chunk as $row) {
                     $params = array_merge($params, $row);
                 }
-                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, 'productCategoryId', count($chunk));
+                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, 'product_category_id', count($chunk));
                 $conn->executeStatement($sql, $params);
             }
 
@@ -281,9 +281,9 @@ class ProductCategoryProcessor
             return;
         }
         $chunks = array_chunk($rows, $chunkSize);
-        $uniqueCols = ['channel', 'platformId'];
+        $uniqueCols = ['channel', 'platform_id'];
         if ($table === 'channeled_product_categories_channeled_products') {
-            $uniqueCols = ['channeledproductcategory_id', 'channeledproduct_id'];
+            $uniqueCols = ['channeled_product_category_id', 'channeled_product_id'];
         }
 
         foreach ($chunks as $chunk) {
