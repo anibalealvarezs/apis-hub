@@ -329,14 +329,23 @@ if (MODE === "sse") {
     next();
   });
 
-  app.get("/mcp/sse", async (req, res) => {
+  // Manejador para el endpoint SSE (GET inicia el stream, POST damos soporte por si el cliente lo intenta)
+  app.all("/mcp/sse", async (req, res) => {
+    if (req.method === "POST") {
+        console.error(`[DEBUG-REQ] Posteando en SSE. Antigravity está probando compatibilidad.`);
+        return res.status(405).send("Please use GET for SSE stream");
+    }
+
     console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
     
-    // Detección ultra-robusta de Host y Protocolo para túneles SSH
-    const host = 'localhost:3010'; // FORZAMOS LOCALHOST PARA QUE COINCIDA CON TU TÚNEL
-    const protocol = 'http';
+    // Cabeceras CRÍTICAS para evitar que proxies (Nginx/Laragon/Túneles) guarden en buffer la respuesta
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Específico para Nginx
     
-    // Construir URL absoluta con validación
+    // Detección de Host y Protocolo
+    const host = 'localhost:3010'; 
     const endpoint = `http://localhost:3010/mcp/messages`;
     
     console.error(`[SSE] Publicando endpoint ABSOLUTO: ${endpoint}`);
@@ -347,13 +356,10 @@ if (MODE === "sse") {
         if (chunk) {
             let str = chunk.toString();
             if (str.includes('event: endpoint') && str.includes('data: /mcp/messages')) {
-                // Buscamos el sessionId que el SDK ya generó
                 const match = str.match(/sessionId=([a-zA-Z0-9-]+)/);
                 const sid = match ? match[1] : 'unknown';
-                
-                // Forzamos el reemplazo a localhost y nos aseguramos de que termine con \n\n
                 str = `event: endpoint\ndata: ${endpoint}?sessionId=${sid}\n\n`;
-                console.error(`[SSE] HACK-RAW: Endpoint corregido con sesión ${sid}: ${endpoint}`);
+                console.error(`[SSE] HACK-RAW: Enviado a tiempo real.`);
                 return originalWrite(Buffer.from(str), encoding, callback);
             }
         }
@@ -363,7 +369,6 @@ if (MODE === "sse") {
 
     const transport = new SSEServerTransport(endpoint, res);
     
-    // Guardar la sesión antes de conectar
     sessions.set(transport.sessionId, transport);
     console.error(`[SSE] Sesión creada: ${transport.sessionId}`);
 
