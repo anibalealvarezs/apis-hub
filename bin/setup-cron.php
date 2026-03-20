@@ -44,12 +44,7 @@ foreach ($instances as $instance) {
     $frequency = $instance['frequency'] ?? null;
     
     if (!$channel || !$entity || !$frequency) continue;
-
-    // Only schedule if it matches current container instance name
-    if (!$instanceFilter || $instanceName !== $instanceFilter) {
-        continue;
-    }
-
+    
     $params = [
         'instance_name' => $instanceName
     ];
