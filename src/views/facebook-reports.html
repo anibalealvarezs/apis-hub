@@ -332,17 +332,28 @@
             align-items: center;
             justify-content: center;
             transition: var(--transition);
-        }
         .btn-expand:hover { color: var(--meta-blue); }
         .btn-expand.active { transform: rotate(90deg); color: var(--meta-blue); }
 
+        .report-section {
+            background: var(--meta-card);
+            border-radius: 12px;
+            border: 1px solid var(--meta-border);
+            overflow-x: auto;
+            width: 100%;
+        }
         .breakdown-row {
             background: rgba(0, 0, 0, 0.2) !important;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: auto;
         }
         .data-table th {
             font-size: 0.65rem !important;
             font-weight: 700 !important;
-            padding: 8px 4px !important;
+            padding: 10px 6px !important;
             text-transform: uppercase;
             letter-spacing: 0.02em;
             background: var(--meta-card);
@@ -353,7 +364,7 @@
         }
         .data-table td {
             font-size: 0.72rem !important;
-            padding: 6px 4px !important;
+            padding: 8px 6px !important;
             border-bottom: 1px solid var(--meta-border);
             vertical-align: middle;
         }
