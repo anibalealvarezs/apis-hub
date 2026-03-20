@@ -349,23 +349,34 @@ if (MODE === "sse") {
   });
 
   app.post("/mcp/messages", async (req, res) => {
-    // Ser robustos con el sessionId (a veces llega como array si hay proxies/túneles)
-    let sessionId = req.query.sessionId;
+    // Intentar obtener sessionId de todas las fuentes posibles
+    let sessionId = req.query.sessionId || 
+                    req.headers['x-session-id'] || 
+                    req.headers['sse-session-id'] ||
+                    (req.body && req.body.sessionId);
+
     if (Array.isArray(sessionId)) {
         sessionId = sessionId[0];
     }
 
-    console.error(`[POST] Mensaje recibido para sesión: ${sessionId || 'MISSING'}`);
+    console.error(`[POST] Request URL: ${req.url}`);
+    console.error(`[POST] Session ID: ${sessionId || 'MISSING'}`);
     
     if (!sessionId) {
-        console.error("[POST] Error: sessionId faltante en la URL");
-        return res.status(400).send("Session ID is required");
+        console.error("[POST] Error: No se pudo encontrar sessionId en Query, Headers o Body");
+        return res.status(400).send("Session ID is required and was not found in any source.");
     }
 
     const transport = sessions.get(sessionId);
     
     if (transport) {
-      await transport.handlePostMessage(req, res);
+      console.error(`[POST] Procesando mensaje para sesión ${sessionId}. Body: ${JSON.stringify(req.body).substring(0, 100)}...`);
+      try {
+        await transport.handlePostMessage(req, res);
+      } catch (err) {
+        console.error(`[POST] Error en handlePostMessage: ${err.message}`);
+        res.status(500).send(err.message);
+      }
     } else {
       console.error(`[POST] Sesión no encontrada: ${sessionId}. Sesiones activas: ${Array.from(sessions.keys()).join(", ")}`);
       res.status(404).send(`Session not found: ${sessionId}`);
