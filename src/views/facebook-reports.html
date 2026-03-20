@@ -681,14 +681,14 @@
             btn.classList.add('active');
             const breakdownRow = document.createElement('tr');
             breakdownRow.className = 'breakdown-row';
+            const containerId = `breakdown-container-${rowId}`;
             breakdownRow.innerHTML = `
                 <td colspan="17">
-                    <div class="breakdown-container">
-                        <div class="breakdown-title">
-                            <i data-lucide="users" size="14"></i> Age & Gender Breakdown: <strong>${campaignName}</strong>
-                            <span id="loader-${rowId}" style="margin-left:10px;"><i data-lucide="loader" class="spinner" style="width:14px; height:14px; display:inline-block; border-width:2px;"></i></span>
+                    <div id="${containerId}" class="breakdown-container">
+                        <div class="breakdown-title" style="margin-top:0">
+                            <i data-lucide="loader" class="spinner" style="width:14px; height:14px; margin-right:10px;"></i> 
+                            Building Triple Intelligence Center for: <strong>${campaignName}</strong>
                         </div>
-                        <div id="content-${rowId}"></div>
                     </div>
                 </td>
             `;
@@ -702,7 +702,7 @@
                 const start = document.getElementById('startDate').value;
                 const end = document.getElementById('endDate').value;
 
-                const payload = {
+                const payloadBase = {
                     aggregations: {
                         total_spend: "spend",
                         total_clicks: "clicks",
@@ -717,40 +717,64 @@
                         average_result_rate: "result_rate",
                         total_actions: "actions"
                     },
-                    groupBy: ["dimensions.age", "dimensions.gender"],
-                    filters: {
-                        channeledCampaign: campaignId
-                    },
+                    filters: { channeledCampaign: campaignId },
                     startDate: start,
                     endDate: end
                 };
 
-                const response = await fetch('/facebook_marketing/metric/aggregate', {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(payload)
-                });
+                // Triple parallel aggregate fetch
+                const [resFull, resAge, resGender] = await Promise.all([
+                    fetch('/facebook_marketing/metric/aggregate', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.gender", "dimensions.age"] })
+                    }).then(r => r.json()),
+                    fetch('/facebook_marketing/metric/aggregate', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.age"] })
+                    }).then(r => r.json()),
+                    fetch('/facebook_marketing/metric/aggregate', {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.gender"] })
+                    }).then(r => r.json())
+                ]);
 
-                if (response.status === 401) {
-                    localStorage.removeItem('apis_hub_admin_auth');
-                    alert('Session Expired. Please reload.');
-                    return;
-                }
+                const container = document.getElementById(containerId);
+                container.innerHTML = `
+                    <div class="breakdown-title" style="margin-top:0">
+                        <i data-lucide="users"></i> 
+                        Age & Gender Combined: <strong>${campaignName}</strong>
+                    </div>
+                    <div id="tbl-full-${rowId}"></div>
+                    
+                    <div class="breakdown-title" style="margin-top:40px">
+                        <i data-lucide="hash"></i> 
+                        Total results by <strong>Age</strong>
+                    </div>
+                    <div id="tbl-age-${rowId}"></div>
 
-                const result = await response.json();
-                const content = document.getElementById(`content-${rowId}`);
-                
-                if (result.status === 'success' && result.data && result.data.length > 0) {
-                    renderBreakdownTable(content, result.data);
-                } else {
-                    content.innerHTML = '<div class="empty-state" style="padding:20px;">No detailed demographic data found for this range.</div>';
-                }
-            } catch (err) {
-                console.error(err);
-            } finally {
-                const loader = document.getElementById(`loader-${rowId}`);
-                if (loader) loader.remove();
+                    <div class="breakdown-title" style="margin-top:40px">
+                        <i data-lucide="user"></i> 
+                        Total results by <strong>Gender</strong>
+                    </div>
+                    <div id="tbl-gender-${rowId}"></div>
+                `;
+
+                renderBreakdownTable(document.getElementById(`tbl-full-${rowId}`), resFull.data, ['gender', 'age']);
+                renderBreakdownTable(document.getElementById(`tbl-age-${rowId}`), resAge.data, ['age']);
+                renderBreakdownTable(document.getElementById(`tbl-gender-${rowId}`), resGender.data, ['gender']);
+
                 lucide.createIcons();
+                console.log(`Triple breakdown rendered for campaign ${campaignId}`);
+
+            } catch (err) {
+                console.error("Error building intelligence center:", err);
+                const container = document.getElementById(containerId);
+                if (container) {
+                    container.innerHTML = `<div class="empty-state" style="color:var(--meta-negative)">Error building intelligence center: ${err.message}</div>`;
+                }
             }
         }
 
