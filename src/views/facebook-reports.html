@@ -435,11 +435,12 @@
         // Init Lucide Icons
         lucide.createIcons();
 
-        // Default dates: Last 7 days
-        if (document.getElementById('endDate')) {
-            document.getElementById('endDate').value = dayjs().format('YYYY-MM-DD');
-            document.getElementById('startDate').value = dayjs().subtract(7, 'day').format('YYYY-MM-DD');
-        }
+        // Init dates
+        const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+        document.getElementById('endDate').value = yesterday;
+        document.getElementById('endDate').max = yesterday;
+        document.getElementById('startDate').value = dayjs().subtract(8, 'day').format('YYYY-MM-DD');
+        document.getElementById('startDate').max = yesterday;
 
         if (sessionStorage.getItem('apis_hub_token')) {
             document.getElementById('apiKey').value = sessionStorage.getItem('apis_hub_token');
