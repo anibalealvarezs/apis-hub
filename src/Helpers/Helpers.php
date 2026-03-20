@@ -495,9 +495,6 @@ class Helpers
         return self::$cacheConfig;
     }
 
-    /**
-     * @return string|null
-     */
     public static function getAdminApiKey(): ?string
     {
         return $_ENV['ADMIN_API_KEY'] ?? null;
@@ -508,7 +505,7 @@ class Helpers
      */
     public static function getAppApiKey(): ?string
     {
-        return $_ENV['API_KEY'] ?? null;
+        return $_ENV['APP_API_KEY'] ?? null;
     }
 
     /**
