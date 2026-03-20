@@ -210,6 +210,14 @@
 <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" charset="UTF-8"></script>
 <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
 <script>
+    function getAdminHeaders() {
+        const token = sessionStorage.getItem('apis_hub_admin_token');
+        return {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json'
+        };
+    }
+
     window.onload = function() {
         const ui = SwaggerUIBundle({
             url: "/api/spec",
@@ -222,7 +230,12 @@
             plugins: [
                 SwaggerUIBundle.plugins.DownloadUrl
             ],
-            layout: "BaseLayout"
+            layout: "BaseLayout",
+            requestInterceptor: (req) => {
+                const headers = getAdminHeaders();
+                req.headers['Authorization'] = headers['Authorization'];
+                return req;
+            }
         });
         window.ui = ui;
         

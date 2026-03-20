@@ -988,13 +988,31 @@
             updatePreview();
         };
 
+        function getAdminHeaders() {
+            const token = sessionStorage.getItem('apis_hub_admin_token');
+            return {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            };
+        }
+
         async function fetchActualContainers() {
             try {
                 // Show loading state
                 containerSelectorEl.innerHTML = '<div class="hint"><i data-lucide="loader" class="loader" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:5px"></i> Fetching active containers...</div>';
                 
-                const response = await fetch('/api/monitoring/data');
+                const response = await fetch('/api/monitoring/data', {
+                    headers: getAdminHeaders()
+                });
+
+                if (response.status === 401) {
+                    sessionStorage.removeItem('apis_hub_admin_token');
+                    setTimeout(() => location.reload(), 500);
+                    return;
+                }
+
                 const data = await response.json();
+                if (data.error) throw new Error(data.error);
                 
                 if (data.containers && data.containers.length > 0) {
                     DICTIONARY.containers = data.containers; // Store full objects
