@@ -326,12 +326,21 @@ if (MODE === "sse") {
   app.get("/mcp/sse", async (req, res) => {
     console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
     
-    // Obtener el host dinámicamente para soportar túneles SSH (ej: localhost:3010)
-    const protocol = req.get('x-forwarded-proto') || req.protocol;
-    const host = req.get('host'); // Este debería ser localhost:3010 si el cliente lo usa
-    const endpoint = `${protocol}://${host}/mcp/messages`;
+    // Detección ultra-robusta de Host y Protocolo para túneles SSH
+    const xForwardedHost = req.get('x-forwarded-host');
+    const xForwardedProto = req.get('x-forwarded-proto');
+    const host = xForwardedHost || req.get('host') || '127.0.0.1:3010'; // Fallback al puerto del túnel si falla la detección
+    const protocol = xForwardedProto || req.protocol || 'http';
     
-    console.error(`[SSE] Publicando endpoint: ${endpoint}`);
+    // Construir URL absoluta con validación
+    let endpoint;
+    try {
+        endpoint = new URL("/mcp/messages", `${protocol}://${host}`).toString();
+    } catch (e) {
+        endpoint = `http://${host}/mcp/messages`; // Último recurso si falla URL parser
+    }
+    
+    console.error(`[SSE] Publicando endpoint ABSOLUTO: ${endpoint}`);
     
     const transport = new SSEServerTransport(endpoint, res);
     
