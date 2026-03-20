@@ -343,7 +343,27 @@
         .btn-expand.active { transform: rotate(90deg); color: var(--meta-blue); }
 
         .gender-female { color: #ec4899; font-weight: 600; opacity: 0.9; }
-        .gender-male { color: #3b82f6; font-weight: 600; opacity: 0.9; }
+        .gender-male { color: #3b82f6; }
+        .breakdown-title i { opacity: 0.7; }
+
+        /* Sparkline minimal style */
+        .sparkline-container {
+            display: inline-flex;
+            align-items: center;
+            width: 100px;
+            height: 24px;
+            margin-left: 10px;
+            vertical-align: middle;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        .sparkline-container:hover { opacity: 1; }
+        .sparkline-path {
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
 
         .report-section {
             background: var(--meta-card);
@@ -591,29 +611,43 @@
                     endDate: end
                 };
 
-                const response = await fetch('/facebook_marketing/metric/aggregate', {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(payload)
-                });
+                // Double fetch: Main and Daily (Trend)
+                const [resMain, resTrend] = await Promise.all([
+                    fetch('/facebook_marketing/metric/aggregate', {
+                        method: 'POST', headers, body: JSON.stringify(payload)
+                    }).then(r => r.json()),
+                    fetch('/facebook_marketing/metric/aggregate', {
+                        method: 'POST', headers, body: JSON.stringify({
+                            aggregations: { daily_cpr: "cost_per_result" },
+                            groupBy: ["daily", "channeledCampaign"],
+                            startDate: start, endDate: end
+                        })
+                    }).then(r => r.json())
+                ]);
 
-                if (response.status === 401) {
-                    localStorage.removeItem('apis_hub_admin_auth');
-                    alert('Session Expired or Invalid Key. Please reload and provide your key again.');
-                    loader.style.display = 'none';
-                    return;
-                }
+                if (resMain.status === 'success') {
+                    // Build daily trends map (CPR)
+                    const trendData = {};
+                    if (resTrend.data) {
+                        resTrend.data.forEach(d => {
+                            if (!trendData[d.channeledCampaign]) trendData[d.channeledCampaign] = [];
+                            trendData[d.channeledCampaign].push({ day: d.daily, val: parseFloat(d.daily_cpr || 0) });
+                        });
+                        Object.keys(trendData).forEach(cid => {
+                            trendData[cid].sort((a,b) => a.day.localeCompare(b.day));
+                            trendData[cid] = trendData[cid].map(x => x.val);
+                        });
+                    }
 
-                const result = await response.json();
-                if (result.status === 'success' && result.data) {
-                    currentData = result.data;
-                    render()
+                    currentData = resMain.data.map(d => ({ ...d, _trend: trendData[d.channeledCampaign] || [] }));
+                    render();
                 } else {
                     emptyMsg.style.display = 'block';
                     resetSummary();
                 }
             } catch (error) {
                 console.error(error);
+                alert("Error loading report data.");
                 emptyMsg.style.display = 'block';
             } finally {
                 loader.style.display = 'none';
@@ -630,33 +664,45 @@
                 const rowId = `row-${index}`;
                 tr.id = rowId;
                 const cpr = parseFloat(row.average_cost_per_result || 0);
+                const costClass = getCostClass(cpr);
                 const ctr = parseFloat(row.average_ctr || 0) * 100;
+                const ctrClass = getCtrClass(ctr);
                 const resRate = parseFloat(row.average_result_rate || 0) * 100;
                 const status = row.campaign_status ? row.campaign_status.toLowerCase() : 'unknown';
                 
                 tr.innerHTML = `
                     <td>
                         <button class="btn-expand" onclick="toggleBreakdown(${index})">
-                            <i data-lucide="chevron-right" size="16"></i>
+                            <i data-lucide="chevron-right" size="14"></i>
                         </button>
                     </td>
-                    <td class="account-name">${row.account || 'Unknown'}</td>
-                    <td class="campaign-name" onclick="toggleBreakdown(${index})">${row.campaign || 'Unknown'}</td>
                     <td style="text-align:center;">${getStatusIcon(status)}</td>
+                    <td>
+                        <div class="campaign-name" onclick="toggleBreakdown(${index})" title="${row.campaign || 'Unknown'}">${row.campaign || 'Unknown'}</div>
+                        <div class="account-name">${row.account || 'Unknown'}</div>
+                    </td>
                     <td class="text-right metric-cell">€${formatNum(row.total_spend)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_impressions)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_reach)}</td>
                     <td class="text-right metric-cell">${formatNum(row.average_frequency)}x</td>
                     <td class="text-right metric-cell">${formatInt(row.total_clicks)}</td>
-                    <td class="text-right metric-cell"><span class="${getCtrClass(ctr)}">${formatPct(ctr)}</span></td>
+                    <td class="text-right metric-cell"><span class="${ctrClass}">${formatPct(ctr)}</span></td>
                     <td class="text-right metric-cell">€${formatNum(row.average_cpc)}</td>
                     <td class="text-right metric-cell">€${formatNum(row.average_cpm)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_results)}</td>
-                    <td class="text-right metric-cell"><span class="${getCostClass(cpr)}">€${formatNum(cpr)}</span></td>
+                    <td class="text-right metric-cell" style="white-space:nowrap">
+                        <span class="${costClass}">€${formatNum(cpr)}</span>
+                        <div id="spark-cpr-${index}" class="sparkline-container"></div>
+                    </td>
                     <td class="text-right metric-cell">${formatPct(resRate)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_actions)}</td>
                 `;
                 tbody.appendChild(tr);
+
+                // Populate Sparkline
+                if (row._trend && row._trend.length > 1) {
+                    renderSparkline(document.getElementById(`spark-cpr-${index}`), row._trend);
+                }
             });
             renderSummary(currentData);
             updateSortHeaders();
@@ -975,6 +1021,30 @@
         function formatPct(num) {
             if (num === null || num === undefined || isNaN(num) || !isFinite(num)) return '0,00%';
             return new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num) + '%';
+        }
+
+        function renderSparkline(container, points, color = 'var(--meta-blue)') {
+            if (!container || !points || points.length < 2) return;
+            const width = 100;
+            const height = 24;
+            const max = Math.max(...points);
+            const min = Math.min(...points);
+            const range = (max - min) || 1;
+            
+            const svgPoints = points.map((p, i) => {
+                const x = (i / (points.length - 1)) * width;
+                const y = height - ((p - min) / range) * (height - 4) - 2;
+                return `${x},${y}`;
+            });
+
+            // Very simple smoothing (linear polyline but could be cubic with more logic)
+            container.innerHTML = `
+                <div class="sparkline-container">
+                    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+                        <polyline class="sparkline-path" stroke="${color}" points="${svgPoints.join(' ')}" />
+                    </svg>
+                </div>
+            `;
         }
  if (sessionStorage.getItem('apis_hub_token')) { loadReport(); }
     </script>
