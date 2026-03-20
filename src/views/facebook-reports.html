@@ -322,16 +322,23 @@
 
         /* Scrollbar Meta Style */
         /* Breakdown Styles */
+        .container {
+            width: 100%;
+            max-width: none !important;
+            padding: 20px 40px;
+        }
         .btn-expand {
-            background: transparent;
+            background: none;
             border: none;
             color: var(--meta-text-dim);
             cursor: pointer;
-            padding: 4px;
+            width: 24px;
+            height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: var(--transition);
+        }
         .btn-expand:hover { color: var(--meta-blue); }
         .btn-expand.active { transform: rotate(90deg); color: var(--meta-blue); }
 
