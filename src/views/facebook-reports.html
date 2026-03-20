@@ -1021,23 +1021,29 @@
             return new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num) + '%';
         }
 
-        function renderSparkline(container, points, color = 'var(--meta-blue)') {
+        function renderSparkline(container, points) {
             if (!container || !points || points.length < 2) return;
-            const width = 100;
+            const width = 80;
             const height = 24;
             const max = Math.max(...points);
             const min = Math.min(...points);
             const range = (max - min) || 1;
             
+            // Semantic Color based on CPR Trend
+            const first = points[0];
+            const last = points[points.length - 1];
+            let color = 'var(--meta-blue)';
+            if (last > first) color = '#f85149'; // CPR Increase (Bad)
+            if (last < first) color = '#3fb950'; // CPR Decrease (Good)
+
             const svgPoints = points.map((p, i) => {
                 const x = (i / (points.length - 1)) * width;
                 const y = height - ((p - min) / range) * (height - 4) - 2;
                 return `${x},${y}`;
             });
 
-            // Very simple smoothing (linear polyline but could be cubic with more logic)
             container.innerHTML = `
-                <div class="sparkline-container">
+                <div class="sparkline-container" style="width: ${width}px; margin-left: 10px;">
                     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
                         <polyline class="sparkline-path" stroke="${color}" points="${svgPoints.join(' ')}" />
                     </svg>
