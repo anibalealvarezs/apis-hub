@@ -76,8 +76,8 @@ class Helpers
                     list($name, $value) = explode('=', $line, 2);
                     $name = trim($name);
                     $value = trim($value, " \t\n\r\0\x0B\"'");
-                    if (!getenv($name)) putenv("$name=$value");
-                    if (!isset($_ENV[$name])) $_ENV[$name] = $value;
+                    putenv("$name=$value");
+                    $_ENV[$name] = $value;
                 }
             }
         }
@@ -497,7 +497,7 @@ class Helpers
 
     public static function getAdminApiKey(): ?string
     {
-        return $_ENV['ADMIN_API_KEY'] ?? null;
+        return getenv('ADMIN_API_KEY') ?: null;
     }
 
     /**
@@ -505,7 +505,7 @@ class Helpers
      */
     public static function getAppApiKey(): ?string
     {
-        return $_ENV['APP_API_KEY'] ?? null;
+        return getenv('APP_API_KEY') ?: null;
     }
 
     /**

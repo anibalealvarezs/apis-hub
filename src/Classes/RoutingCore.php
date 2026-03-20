@@ -104,6 +104,8 @@ class RoutingCore implements HttpKernelInterface
             $providedKey = $request->query->get('key') ?: $request->query->get('token');
         }
 
+        $providedKey = $providedKey ? trim($providedKey) : null;
+
         $appKey = \Helpers\Helpers::getAppApiKey();
         $adminKey = \Helpers\Helpers::getAdminApiKey();
 
