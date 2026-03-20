@@ -620,7 +620,6 @@
             const btn = mainRow.querySelector('.btn-expand');
             const nextRow = mainRow.nextElementSibling;
             
-            const accountId = rowData.channeledAccount;
             const campaignId = rowData.channeledCampaign;
             const campaignName = rowData.campaign;
 
@@ -668,7 +667,6 @@
                     },
                     groupBy: ["dimensions.age", "dimensions.gender"],
                     filters: {
-                        channeledAccount: accountId,
                         channeledCampaign: campaignId
                     },
                     startDate: start,
