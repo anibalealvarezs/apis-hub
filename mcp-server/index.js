@@ -327,10 +327,8 @@ if (MODE === "sse") {
     console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
     
     // Detección ultra-robusta de Host y Protocolo para túneles SSH
-    const xForwardedHost = req.get('x-forwarded-host');
-    const xForwardedProto = req.get('x-forwarded-proto');
-    const host = xForwardedHost || req.get('host') || '127.0.0.1:3010'; // Fallback al puerto del túnel si falla la detección
-    const protocol = xForwardedProto || req.protocol || 'http';
+    const host = '127.0.0.1:3010'; // FORZAMOS ESTE HOST PARA EVITAR QUE EL SDK LO TRONQUE A RELATIVO
+    const protocol = 'http';
     
     // Construir URL absoluta con validación
     let endpoint;
