@@ -989,7 +989,18 @@
         };
 
         function getAdminHeaders() {
-            const token = sessionStorage.getItem('apis_hub_admin_token');
+            let token = sessionStorage.getItem('apis_hub_admin_token');
+            if (!token) {
+                token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
+                if (token) {
+                    sessionStorage.setItem('apis_hub_admin_token', token);
+                    return {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    };
+                }
+                return {};
+            }
             return {
                 'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
@@ -1001,13 +1012,19 @@
                 // Show loading state
                 containerSelectorEl.innerHTML = '<div class="hint"><i data-lucide="loader" class="loader" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:5px"></i> Fetching active containers...</div>';
                 
+                const headers = getAdminHeaders();
+                if (!headers.Authorization) {
+                    containerSelectorEl.innerHTML = '<div class="hint" style="color:var(--danger)">Authorization Required. Please refresh to provide your API Key.</div>';
+                    return;
+                }
+
                 const response = await fetch('/api/monitoring/data', {
-                    headers: getAdminHeaders()
+                    headers: headers
                 });
 
                 if (response.status === 401) {
                     sessionStorage.removeItem('apis_hub_admin_token');
-                    setTimeout(() => location.reload(), 500);
+                    alert('Session Expired or Invalid Key. Please reload and try again.');
                     return;
                 }
 

@@ -211,7 +211,18 @@
 <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
 <script>
     function getAdminHeaders() {
-        const token = sessionStorage.getItem('apis_hub_admin_token');
+        let token = sessionStorage.getItem('apis_hub_admin_token');
+        if (!token) {
+            token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
+            if (token) {
+                sessionStorage.setItem('apis_hub_admin_token', token);
+                return {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                };
+            }
+            return {};
+        }
         return {
             'Authorization': 'Bearer ' + token,
             'Content-Type': 'application/json'

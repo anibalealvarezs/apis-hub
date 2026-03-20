@@ -720,7 +720,18 @@
         lucide.createIcons();
 
         function getAdminHeaders() {
-            const token = sessionStorage.getItem('apis_hub_admin_token');
+            let token = sessionStorage.getItem('apis_hub_admin_token');
+            if (!token) {
+                token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
+                if (token) {
+                    sessionStorage.setItem('apis_hub_admin_token', token);
+                    return {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    };
+                }
+                return {};
+            }
             return {
                 'Authorization': 'Bearer ' + token,
                 'Content-Type': 'application/json'
@@ -729,13 +740,19 @@
 
         async function fetchData() {
             try {
+                const headers = getAdminHeaders();
+                if (!headers.Authorization) {
+                    console.warn('Monitoring data fetch aborted: no token provided.');
+                    return;
+                }
+
                 const response = await fetch('/api/monitoring/data', {
-                    headers: getAdminHeaders()
+                    headers: headers
                 });
                 
                 if (response.status === 401) {
                     sessionStorage.removeItem('apis_hub_admin_token');
-                    setTimeout(() => location.reload(), 500);
+                    alert('Session Expired or Invalid Key. Please reload and try again.');
                     return;
                 }
                 

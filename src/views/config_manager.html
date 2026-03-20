@@ -1050,6 +1050,13 @@
         async function fetchAssets(type = null, force = false) {
             showLoading(`Loading ${type || 'assets'}...`);
             try {
+                const headers = getAdminHeaders();
+                if (!headers.Authorization) {
+                    console.warn('Config Manager assets fetch aborted: no token provided.');
+                    hideLoading(); // Ensure loading state is cleared if no token
+                    return;
+                }
+
                 let url = `/api/config-manager/assets`;
                 const params = [];
                 if (type) params.push(`type=${type}`);
@@ -1057,12 +1064,12 @@
                 if (params.length > 0) url += `?${params.join('&')}`;
 
                 const response = await fetch(url, {
-                    headers: getAdminHeaders()
+                    headers: headers
                 });
                 
                 if (response.status === 401) {
                     sessionStorage.removeItem('apis_hub_admin_token');
-                    setTimeout(() => location.reload(), 500);
+                    alert('Session Expired or Invalid Key. Please reload and try again.');
                     return;
                 }
                 
