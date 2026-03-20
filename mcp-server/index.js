@@ -403,24 +403,8 @@ if (MODE === "sse") {
     const endpoint = `http://localhost:3010/mcp/messages`;
     
     console.error(`[SSE] Publicando endpoint ABSOLUTO: ${endpoint}`);
-    
-    // --- EL HACK MAESTRO: Interceptamos la escritura para forzar URL absoluta ---
-    const originalWrite = res.write.bind(res);
-    res.write = function(chunk, encoding, callback) {
-        if (chunk) {
-            let str = chunk.toString();
-            if (str.includes('event: endpoint') && str.includes('data: /mcp/messages')) {
-                const match = str.match(/sessionId=([a-zA-Z0-9-]+)/);
-                const sid = match ? match[1] : 'unknown';
-                str = `event: endpoint\ndata: ${endpoint}?sessionId=${sid}\n\n`;
-                console.error(`[SSE] HACK-RAW: Enviado a tiempo real.`);
-                return originalWrite(Buffer.from(str), encoding, callback);
-            }
-        }
-        return originalWrite(chunk, encoding, callback);
-    };
-    // ---------------------------------------------------------------------------
 
+    // Native transport handles the 'endpoint' event automatically using the first argument
     const transport = new SSEServerTransport(endpoint, res);
     
     sessions.set(transport.sessionId, transport);
