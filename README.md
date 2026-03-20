@@ -74,20 +74,40 @@ APP_API_KEY=your-super-secure-random-key
 
 The `config/` directory is the single source of truth. It allows you to define:
 
-- **Database Contexts**: Separate credentials for local development vs. Docker containers.
-- **Worker Instances**: Define which channels and entities each worker should process.
-- **Channel Rules**: Define which channels are enabled and their history depth in `config/instances_rules.yaml`.
-- **Project Overrides**: Specific settings can be placed in `config/projects/{project-name}/`.
+- Database Contexts: Separate credentials for local development vs. Docker containers.
+- Worker Instances: Define which channels and entities each worker should process.
+- Channel Rules: Define which channels are enabled and their history depth in `config/instances_rules.yaml`.
+- Project Overrides: Specific settings can be placed in `config/projects/{project-name}/`.
 
 All values in the YAML can be dynamic. For example, `host: ${DB_HOST:-127.0.0.1}` will use the `DB_HOST` environment variable if present, otherwise it defaults to `127.0.0.1`.
 
 ---
 
-## 🔐 Security & Access
+## 🔐 Security & Access (v1.4.0 Evolution)
 
-To protect your endpoints, the application supports three layers of validation:
+APIs Hub implements a zero-exposure security model. To protect your endpoints, the application supports four layers of validation:
 
-### 1. IP Whitelisting
+### 1. Dual-Key Authentication
+
+We differentiate between **Administrative** and **Data** access:
+
+- **ADMIN_API_KEY:** Required for sensitive views like `/config/manager`, `/monitoring`, and internal logs.
+- **APP_API_KEY:** Required for standard data endpoints and API consumption.
+
+The system accepts these keys via:
+
+- **X-API-Key:** `X-API-Key: {key}`
+- **Bearer Token:** `Authorization: Bearer {key}`
+
+### 2. Session-Based Transient Credentials (Privacy-First)
+
+For high-sensitivity integrations like **Facebook Marketing**, APIs Hub has evolved away from server-side environment variable injection:
+
+- **No Permanent Storage:** Integration tokens are entered manually by the user in the UI.
+- **Session-Only Persistence:** Credentials are stored in the browser's `sessionStorage` and transmitted via HTTP headers for each request.
+- **Zero Leakage:** Even if the server is compromised, your third-party API tokens are not stored in files or databases.
+
+### 3. IP Whitelisting
 
 Restricts access to specific IP addresses or CIDR blocks. Configure it in `project.yaml`:
 
@@ -98,25 +118,10 @@ security:
     - "192.168.1.0/24"
 ```
 
-### 2. Token-Based Authentication
-
-Supports both standard and industry-standard headers. Define keys in `project.yaml` or via the `APP_API_KEY` environment variable:
-
-```yaml
-security:
-  api_keys:
-    - "your-secret-key-1"
-```
-
-The API accepts two types of headers for these keys:
-
-- **X-API-Key:** `X-API-Key: your-secret-key-1`
-- **Bearer Token:** `Authorization: Bearer your-secret-key-1`
-
 ### 🛡️ Validation Logic
 
 - **IP Check:** If `authorized_ips` is not empty, the client IP must match at least one entry.
-- **Token Check:** If `api_keys` (or `APP_API_KEY`) is defined, the request must include a valid key in either header.
+- **Token Check:** If `api_keys` (or environment keys) are defined, the request must pass authentication.
 - **Combined:** If both are configured, the request must pass both layers.
 - **Public:** If no security is configured, the API is public (use with caution).
 

@@ -139,6 +139,16 @@ php bin/cli.php app:aggregate -e channeled_metric -c facebook \
   -f '{"dimensions.age":"45-54"}' --pretty
 ```
 
+### 1.5. PostgreSQL Compatibility & Column Names (v1.4.0 Standard)
+
+Since v1.4.0, APIs Hub has adopted **PostgreSQL** as the primary database for production. This introduces key naming requirements to ensure query stability:
+
+- **Mandatory snake_case**: All column names in standard and channeled entities MUST be used in `snake_case` within your aggregation queries (e.g., use `campaign_id` instead of `campaignId`).
+- **JSONB Traversal**: To filter or group by data stored inside JSONB columns (like the `dimensions` field), use the following syntax:
+  - **Syntax**: `dimensions.your_key`
+  - **Example**: `groupBy: ["dimensions.gender"]`
+- **Case Sensitivity**: PostgreSQL is case-sensitive for unquoted identifiers. Our aggregation engine automatically handles standard quotes, but ensure your JSON keys in `aggregations` and `filters` strictly match the database schema.
+
 ---
 
 ## 📅 Time Series & Smoothing
