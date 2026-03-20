@@ -329,14 +329,26 @@ if (MODE === "sse") {
     next();
   });
 
-  // Manejador para el endpoint SSE (GET inicia el stream, otros métodos devolvemos JSON-RPC vacío para compatibilidad)
+  // Manejador para el endpoint SSE (GET inicia el stream, otros métodos devolvemos JSON-RPC válido para inicialización)
   app.all("/mcp/sse", async (req, res) => {
     if (req.method !== "GET") {
-        console.error(`[DEBUG-REQ] Antigravity probando método ${req.method} en SSE. Respondiendo JSON-RPC 2.0.`);
+        console.error(`[DEBUG-REQ] Antigravity probando método ${req.method} en SSE. Enviando Handshake completo.`);
         return res.status(200).json({ 
             jsonrpc: "2.0", 
-            id: req.body ? req.body.id : null,
-            result: { supported: true, notice: "Please use GET for SSE stream" }
+            id: req.body ? req.body.id : (req.query.id || 1),
+            result: { 
+                protocolVersion: "2024-11-05",
+                capabilities: {
+                    logging: {},
+                    prompts: { listChanged: true },
+                    resources: { subscribe: true, listChanged: true },
+                    tools: { listChanged: true }
+                },
+                serverInfo: {
+                    name: "apis-hub-mcp-server",
+                    version: "1.0.0"
+                }
+            }
         });
     }
 
