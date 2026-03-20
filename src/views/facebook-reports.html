@@ -321,11 +321,53 @@
         }
 
         /* Scrollbar Meta Style */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: var(--meta-bg-dark); }
-        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #484f58; }
+        /* Breakdown Styles */
+        .btn-expand {
+            background: transparent;
+            border: none;
+            color: var(--meta-text-dim);
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        .btn-expand:hover { color: var(--meta-blue); }
+        .btn-expand.active { transform: rotate(90deg); color: var(--meta-blue); }
 
+        .breakdown-row {
+            background: rgba(0, 0, 0, 0.2) !important;
+        }
+        .breakdown-container {
+            padding: 10px 20px 20px 60px;
+            border-left: 2px solid var(--meta-blue);
+            margin: 5px 0;
+        }
+        .breakdown-table {
+            width: 100%;
+            border: 1px solid var(--meta-border);
+            border-radius: 8px;
+            font-size: 0.8rem !important;
+        }
+        .breakdown-table th {
+            font-size: 0.7rem !important;
+            padding: 6px 12px !important;
+            background: var(--meta-hover) !important;
+        }
+        .breakdown-table td {
+            padding: 6px 12px !important;
+            background: transparent !important;
+        }
+        .breakdown-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--meta-blue);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -398,6 +440,7 @@
                 <table id="reports-table">
                     <thead>
                         <tr>
+                            <th style="width: 40px;"></th>
                             <th onclick="sortTable('account')" data-col="account">Ad Account <span class="sort-icon">↕</span></th>
                             <th onclick="sortTable('campaign')" data-col="campaign">Campaign Name <span class="sort-icon">↕</span></th>
                             <th style="width: 50px;">Status</th>
@@ -531,16 +574,23 @@
             tbody.innerHTML = '';
             document.getElementById('record-count').textContent = currentData.length;
 
-            currentData.forEach(row => {
+            currentData.forEach((row, index) => {
                 const tr = document.createElement('tr');
+                const rowId = `row-${index}`;
+                tr.id = rowId;
                 const cpr = parseFloat(row.average_cost_per_result || 0);
                 const ctr = parseFloat(row.average_ctr || 0) * 100;
                 const resRate = parseFloat(row.average_result_rate || 0) * 100;
                 const status = row.campaign_status ? row.campaign_status.toLowerCase() : 'unknown';
                 
                 tr.innerHTML = `
+                    <td>
+                        <button class="btn-expand" onclick="toggleBreakdown(${index})">
+                            <i data-lucide="chevron-right" size="16"></i>
+                        </button>
+                    </td>
                     <td class="account-name">${row.account || 'Unknown'}</td>
-                    <td class="campaign-name">${row.campaign || 'Unknown'}</td>
+                    <td class="campaign-name" onclick="toggleBreakdown(${index})">${row.campaign || 'Unknown'}</td>
                     <td style="text-align:center;">${getStatusIcon(status)}</td>
                     <td class="text-right metric-cell">€${formatNum(row.total_spend)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_impressions)}</td>
@@ -560,6 +610,139 @@
             renderSummary(currentData);
             updateSortHeaders();
             lucide.createIcons();
+        }
+
+        async function toggleBreakdown(index) {
+            const rowData = currentData[index];
+            const rowId = `row-${index}`;
+            const mainRow = document.getElementById(rowId);
+            const btn = mainRow.querySelector('.btn-expand');
+            const nextRow = mainRow.nextElementSibling;
+            
+            const account = rowData.account;
+            const campaign = rowData.campaign;
+
+            // If already open, close it
+            if (nextRow && nextRow.classList.contains('breakdown-row')) {
+                nextRow.remove();
+                btn.classList.remove('active');
+                return;
+            }
+
+            // Open breakdown
+            btn.classList.add('active');
+            const breakdownRow = document.createElement('tr');
+            breakdownRow.className = 'breakdown-row';
+            breakdownRow.innerHTML = `
+                <td colspan="16">
+                    <div class="breakdown-container">
+                        <div class="breakdown-title">
+                            <i data-lucide="users" size="14"></i> Age & Gender Breakdown: <strong>${campaign}</strong>
+                            <span id="loader-${rowId}" style="margin-left:10px;"><i data-lucide="loader" class="spinner" style="width:14px; height:14px; display:inline-block; border-width:2px;"></i></span>
+                        </div>
+                        <div id="content-${rowId}"></div>
+                    </div>
+                </td>
+            `;
+            mainRow.after(breakdownRow);
+            lucide.createIcons();
+
+            try {
+                const headers = getAdminHeaders();
+                if (!headers.Authorization) return;
+
+                const start = document.getElementById('startDate').value;
+                const end = document.getElementById('endDate').value;
+
+                const payload = {
+                    aggregations: {
+                        total_spend: "spend",
+                        total_clicks: "clicks",
+                        total_impressions: "impressions",
+                        total_results: "results",
+                        average_ctr: "ctr",
+                        average_cpc: "cpc",
+                        average_cost_per_result: "cost_per_result"
+                    },
+                    groupBy: ["dimensions.age", "dimensions.gender"],
+                    filters: {
+                        account: account,
+                        campaign: campaign
+                    },
+                    startDate: start,
+                    endDate: end
+                };
+
+                const response = await fetch('/facebook_marketing/metric/aggregate', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.status === 401) {
+                    localStorage.removeItem('apis_hub_admin_auth');
+                    alert('Session Expired. Please reload.');
+                    return;
+                }
+
+                const result = await response.json();
+                const content = document.getElementById(`content-${rowId}`);
+                
+                if (result.status === 'success' && result.data && result.data.length > 0) {
+                    renderBreakdownTable(content, result.data);
+                } else {
+                    content.innerHTML = '<div class="empty-state" style="padding:20px;">No detailed demographic data found for this range.</div>';
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                const loader = document.getElementById(`loader-${rowId}`);
+                if (loader) loader.remove();
+                lucide.createIcons();
+            }
+        }
+
+        function renderBreakdownTable(container, data) {
+            let html = `
+                <table class="breakdown-table">
+                    <thead>
+                        <tr>
+                            <th>Age</th>
+                            <th>Gender</th>
+                            <th class="text-right">Spend</th>
+                            <th class="text-right">Impr.</th>
+                            <th class="text-right">Clicks</th>
+                            <th class="text-right">CTR</th>
+                            <th class="text-right">CPC</th>
+                            <th class="text-right">Results</th>
+                            <th class="text-right">Cost/Res</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            data.sort((a, b) => b.total_spend - a.total_spend);
+
+            data.forEach(row => {
+                const age = row['dimensions.age'] || 'Unknown';
+                const gender = row['dimensions.gender'] || 'Unknown';
+                html += `
+                    <tr>
+                        <td style="font-weight:600;">${age}</td>
+                        <td style="color:var(--meta-text-dim);">${gender.charAt(0).toUpperCase() + gender.slice(1)}</td>
+                        <td class="text-right">€${formatNum(row.total_spend)}</td>
+                        <td class="text-right">${formatInt(row.total_impressions)}</td>
+                        <td class="text-right">${formatInt(row.total_clicks)}</td>
+                        <td class="text-right">${formatPct(row.average_ctr * 100)}</td>
+                        <td class="text-right">€${formatNum(row.average_cpc)}</td>
+                        <td class="text-right">${formatInt(row.total_results)}</td>
+                        <td class="text-right">€${formatNum(row.average_cost_per_result)}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
         }
 
         function getStatusIcon(status) {
