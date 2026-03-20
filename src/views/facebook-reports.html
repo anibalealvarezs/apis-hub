@@ -874,19 +874,17 @@
             });
         }
 
-        function getCostClass(v) {
-            if (v < 6) return 'badge-excellent';
-            if (v >= 6 && v <= 7) return 'badge-good';
-            if (v > 7 && v <= 8) return 'badge-normal';
-            if (v > 8 && v <= 10) return 'badge-warning';
-            if (v > 10 && v <= 15) return 'badge-bad';
-            return 'badge-grave';
+        function getCostClass(val) {
+            if (val === 0) return '';
+            if (val < 1.0) return 'meta-positive';
+            if (val <= 2.5) return 'meta-moderate';
+            return 'meta-negative';
         }
 
         function getCtrClass(v) {
-            if (v > 3) return 'pos';
-            if (v >= 2 && v <= 3) return 'badge-normal';
-            return 'neg';
+            if (v > 5) return 'meta-positive';
+            if (v >= 2 && v <= 5) return 'meta-moderate';
+            return 'meta-negative';
         }
 
         function renderSummary(data) {
