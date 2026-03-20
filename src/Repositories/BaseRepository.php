@@ -408,7 +408,7 @@ class BaseRepository extends EntityRepository
                 'clicks'      => "SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END)",
                 'impressions' => "SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END)",
                 'reach'       => "SUM(CASE WHEN mc.name = 'reach' THEN m.value ELSE 0 END)",
-                'frequency'   => "SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'reach' THEN m.value ELSE 0 END), 0)",
+                'frequency'   => "AVG(CASE WHEN mc.name = 'frequency' THEN m.value ELSE NULL END)",
                 'ctr'         => "SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0)",
                 'cpc'         => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END), 0)",
                 'cpm'         => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0) / 1000)",
