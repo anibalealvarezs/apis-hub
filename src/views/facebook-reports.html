@@ -125,7 +125,7 @@
 
         main {
             padding: calc(var(--header-h) + 30px) 30px 40px 30px;
-            max-width: 1600px;
+            /* max-width: 1600px; */
             margin: 0 auto;
         }
 
@@ -391,14 +391,20 @@
         }
         .breakdown-table th {
             font-size: 0.6rem !important;
-            padding: 6px 3px !important;
+            padding: 6px 10px !important;
             white-space: nowrap;
             background: var(--meta-hover) !important;
         }
         .breakdown-table td {
-            padding: 5px 3px !important;
+            padding: 5px 10px !important;
             background: transparent !important;
             white-space: normal;
+        }
+        .breakdown-table tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .breakdown-table tr:hover {
+            background: rgba(255, 255, 255, 0.04);
         }
         .breakdown-title {
             font-size: 0.8rem;
