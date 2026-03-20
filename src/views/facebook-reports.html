@@ -660,10 +660,15 @@
                         total_spend: "spend",
                         total_clicks: "clicks",
                         total_impressions: "impressions",
-                        total_results: "results",
+                        total_reach: "reach",
+                        average_frequency: "frequency",
                         average_ctr: "ctr",
                         average_cpc: "cpc",
-                        average_cost_per_result: "cost_per_result"
+                        average_cpm: "cpm",
+                        total_results: "results",
+                        average_cost_per_result: "cost_per_result",
+                        average_result_rate: "result_rate",
+                        total_actions: "actions"
                     },
                     groupBy: ["dimensions.age", "dimensions.gender"],
                     filters: {
@@ -707,36 +712,59 @@
                 <table class="breakdown-table">
                     <thead>
                         <tr>
-                            <th>Age</th>
                             <th>Gender</th>
+                            <th>Age</th>
                             <th class="text-right">Spend</th>
                             <th class="text-right">Impr.</th>
+                            <th class="text-right">Reach</th>
+                            <th class="text-right">Freq.</th>
                             <th class="text-right">Clicks</th>
                             <th class="text-right">CTR</th>
                             <th class="text-right">CPC</th>
+                            <th class="text-right">CPM</th>
                             <th class="text-right">Results</th>
                             <th class="text-right">Cost/Res</th>
+                            <th class="text-right">Res. Rate</th>
+                            <th class="text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
             `;
 
-            data.sort((a, b) => b.total_spend - a.total_spend);
+            // Sort Gender -> Age
+            data.sort((a, b) => {
+                const genA = (a['dimensions.gender'] || '').toLowerCase();
+                const genB = (b['dimensions.gender'] || '').toLowerCase();
+                if (genA !== genB) return genA.localeCompare(genB);
+                
+                const ageA = a['dimensions.age'] || '';
+                const ageB = b['dimensions.age'] || '';
+                return ageA.localeCompare(ageB);
+            });
 
             data.forEach(row => {
                 const age = row['dimensions.age'] || 'Unknown';
-                const gender = row['dimensions.gender'] || 'Unknown';
+                const gender = (row['dimensions.gender'] || 'Unknown').charAt(0).toUpperCase() + (row['dimensions.gender'] || 'Unknown').slice(1);
+                const cpr = parseFloat(row.average_cost_per_result || 0);
+                const ctr = parseFloat(row.average_ctr || 0) * 100;
+                const resRate = parseFloat(row.average_result_rate || 0) * 100;
+
                 html += `
                     <tr>
+                        <td style="font-weight:600; color:var(--meta-blue);">${gender}</td>
                         <td style="font-weight:600;">${age}</td>
-                        <td style="color:var(--meta-text-dim);">${gender.charAt(0).toUpperCase() + gender.slice(1)}</td>
                         <td class="text-right">€${formatNum(row.total_spend)}</td>
                         <td class="text-right">${formatInt(row.total_impressions)}</td>
+                        <td class="text-right">${formatInt(row.total_reach)}</td>
+                        <td class="text-right">${formatNum(row.average_frequency)}x</td>
                         <td class="text-right">${formatInt(row.total_clicks)}</td>
-                        <td class="text-right">${formatPct(row.average_ctr * 100)}</td>
+                        <td class="text-right"><span class="${getCtrClass(ctr)}">${formatPct(ctr)}</span></td>
                         <td class="text-right">€${formatNum(row.average_cpc)}</td>
+                        <td class="text-right">€${formatNum(row.average_cpm)}</td>
                         <td class="text-right">${formatInt(row.total_results)}</td>
-                        <td class="text-right">€${formatNum(row.average_cost_per_result)}</td>
+                        <td class="text-right"><span class="${getCostClass(cpr)}">€${formatNum(cpr)}</span></td>
+                        <td class="text-right">${formatPct(resRate)}</td>
+                        <td class="text-right">${formatInt(row.total_actions)}</td>
                     </tr>
                 `;
             });
