@@ -307,15 +307,29 @@
     </footer>
 
     <script>
-        lucide.createIcons();
-
-        let autoRefreshInterval = null;
-        let lastTimestamp = null;
+        function getAdminHeaders() {
+            const token = sessionStorage.getItem('apis_hub_admin_token');
+            return {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            };
+        }
 
         async function fetchLogList() {
             try {
-                const response = await fetch('/api/monitoring/logs/list');
+                const response = await fetch('/api/monitoring/logs/list', {
+                    headers: getAdminHeaders()
+                });
+                
+                if (response.status === 401) {
+                    sessionStorage.removeItem('apis_hub_admin_token');
+                    setTimeout(() => location.reload(), 500);
+                    return;
+                }
+
                 const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
                 const selector = document.getElementById('log-file-selector');
                 const currentVal = selector.value;
                 
@@ -354,8 +368,18 @@
             if (!file) return;
 
             try {
-                const response = await fetch(`/api/monitoring/logs?file=${file}&lines=1000`);
+                const response = await fetch(`/api/monitoring/logs?file=${file}&lines=1000`, {
+                    headers: getAdminHeaders()
+                });
+
+                if (response.status === 401) {
+                    sessionStorage.removeItem('apis_hub_admin_token');
+                    setTimeout(() => location.reload(), 500);
+                    return;
+                }
+
                 const data = await response.json();
+                if (data.error) throw new Error(data.error);
                 
                 const content = data.content || 'No content found.';
                 const formattedContent = colorizeLogs(content);
@@ -363,7 +387,6 @@
                 if (isInitial) {
                     consoleBox.innerHTML = formattedContent;
                 } else {
-                    // Simple diff check to avoid flickering if nothing changed
                     if (consoleBox.innerHTML !== formattedContent) {
                         consoleBox.innerHTML = formattedContent;
                     }

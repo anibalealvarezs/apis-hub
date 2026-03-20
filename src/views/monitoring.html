@@ -719,13 +719,31 @@
         // Init Lucide
         lucide.createIcons();
 
+        function getAdminHeaders() {
+            const token = sessionStorage.getItem('apis_hub_admin_token');
+            return {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            };
+        }
+
         async function fetchData() {
             try {
-                const response = await fetch('/api/monitoring/data');
-                const data = await response.json();
+                const response = await fetch('/api/monitoring/data', {
+                    headers: getAdminHeaders()
+                });
                 
+                if (response.status === 401) {
+                    sessionStorage.removeItem('apis_hub_admin_token');
+                    setTimeout(() => location.reload(), 500);
+                    return;
+                }
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
                 updateContainers(data.containers);
-                updatePendingJobsDetailed(data.groupedJobs, data.containers); // Passing containers for order
+                updatePendingJobsDetailed(data.groupedJobs, data.containers);
                 updateDbTotals(data.dbTotals);
                 
                 if (data.projectName) {
@@ -1104,7 +1122,6 @@
                               (options.bypass ? '&bypass_dependency=true' : '&bypass_dependency=false');
             }
 
-            // Simple visual feedback
             if (btnElement) {
                 btnElement.disabled = true;
                 const originalText = btnElement.innerHTML;
@@ -1115,13 +1132,22 @@
             try {
                 const response = await fetch('/api/monitoring/jobs/action', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: { 
+                        ...getAdminHeaders(),
+                        'Content-Type': 'application/x-www-form-urlencoded' 
+                    },
                     body: `id=${id}&action=${action}${resumeParam}`
                 });
                 
+                if (response.status === 401) {
+                    sessionStorage.removeItem('apis_hub_admin_token');
+                    setTimeout(() => location.reload(), 500);
+                    return;
+                }
+
                 const result = await response.json();
                 if (result.success) {
-                    fetchData(); // Refresh dashboard
+                    fetchData();
                 } else {
                     await showSimpleModal('x-circle', 'Error', result.error);
                     if (btnElement) btnElement.disabled = false;
