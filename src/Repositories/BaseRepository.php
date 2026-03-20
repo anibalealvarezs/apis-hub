@@ -166,14 +166,12 @@ class BaseRepository extends EntityRepository
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                 $qb->setParameter("key_$dimAlias", $dimKey);
                 
-                // Advanced join strategy to prevent row multiplication (Cartesian product)
-                // We filter the dsi branch at the root level so e only relates to ONE dsi per dimension
-                $dsiCondition = "e.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.id = (
-                    SELECT sub_dsi.id FROM dimension_set_items sub_dsi 
-                    JOIN dimension_values sub_dv ON sub_dsi.dimension_value_id = sub_dv.id 
+                // Optimized join strategy to prevent Cartesian product without using junction table ID
+                // Each branch ONLY captures its intended dimension value from the set
+                $dsiCondition = "e.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
+                    SELECT sub_dv.id FROM dimension_values sub_dv 
                     JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
-                    WHERE sub_dsi.dimension_set_id = e.dimension_set_id AND sub_dk.name = :key_$dimAlias
-                    LIMIT 1
+                    WHERE sub_dk.name = :key_$dimAlias
                 )";
                 
                 $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", $dsiCondition);
