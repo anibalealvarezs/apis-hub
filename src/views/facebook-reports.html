@@ -812,9 +812,9 @@
                             <th class="text-right">CPC</th>
                             <th class="text-right">CPM</th>
                             <th class="text-right">Results</th>
+                            <th class="text-right">Cost/Res</th>
                             <th class="text-right">Res. Rate</th>
                             <th class="text-right">Actions</th>
-                            <th class="text-right">Cost/Res</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -838,9 +838,9 @@
                         <td class="text-right">€${formatNum(row.average_cpc)}</td>
                         <td class="text-right">€${formatNum(row.average_cpm)}</td>
                         <td class="text-right">${formatInt(row.total_results)}</td>
+                        <td class="text-right"><span class="${getCostClass(cpr)}">€${formatNum(cpr)}</span></td>
                         <td class="text-right">${formatPct(resRate)}</td>
                         <td class="text-right">${formatInt(row.total_actions)}</td>
-                        <td class="text-right"><span class="${getCostClass(cpr)}">€${formatNum(cpr)}</span></td>
                     </tr>
                 `;
             });
