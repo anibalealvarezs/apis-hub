@@ -164,12 +164,22 @@ class BaseRepository extends EntityRepository
             // Automatic dimension detection: if it's a ChanneledMetric and not a standard relation/date/field
             if ($this->isChanneledMetric && ($isDimension || (!in_array($field, $standardRelations) && !in_array($field, $dateFields) && !$this->_class->hasField($field)))) {
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
-                $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id");
-                $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
-                $safeLeftJoin("dv_$dimAlias", 'dimension_keys', "dk_$dimAlias", "dv_$dimAlias.dimension_key_id = dk_$dimAlias.id AND dk_$dimAlias.name = :key_$dimAlias");
+                $qb->setParameter("key_$dimAlias", $dimKey);
                 
-                $qb->setParameter("key_$dimAlias", $dimKey)
-                   ->addSelect("dv_$dimAlias.value AS \"$quotedField\"")
+                // Advanced join strategy to prevent row multiplication (Cartesian product)
+                // We filter the dsi branch at the root level so e only relates to ONE dsi per dimension
+                $dsiCondition = "e.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.id = (
+                    SELECT sub_dsi.id FROM dimension_set_items sub_dsi 
+                    JOIN dimension_values sub_dv ON sub_dsi.dimension_value_id = sub_dv.id 
+                    JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
+                    WHERE sub_dsi.dimension_set_id = e.dimension_set_id AND sub_dk.name = :key_$dimAlias
+                    LIMIT 1
+                )";
+                
+                $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", $dsiCondition);
+                $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
+                
+                $qb->addSelect("dv_$dimAlias.value AS \"$quotedField\"")
                    ->addGroupBy("dv_$dimAlias.value");
             } elseif ($this->isChanneledMetric && in_array($field, ['account', 'campaign'])) {
                 $isAccount = $field === 'account';

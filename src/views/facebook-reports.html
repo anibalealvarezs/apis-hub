@@ -869,11 +869,21 @@
             document.getElementById('record-count').textContent = '0';
         }
 
-        function formatNum(n) { return parseFloat(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-        function formatInt(n) { return parseInt(n).toLocaleString('de-DE'); }
-        function formatPct(n) { return parseFloat(n).toFixed(3) + '%'; }
+        function formatNum(num) {
+            if (num === null || num === undefined || isNaN(num) || !isFinite(num)) return '0,00';
+            return new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+        }
 
-        if (sessionStorage.getItem('apis_hub_token')) { loadReport(); }
+        function formatInt(num) {
+            if (num === null || num === undefined || isNaN(num) || !isFinite(num)) return '0';
+            return new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(num);
+        }
+
+        function formatPct(num) {
+            if (num === null || num === undefined || isNaN(num) || !isFinite(num)) return '0,00%';
+            return new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num) + '%';
+        }
+ if (sessionStorage.getItem('apis_hub_token')) { loadReport(); }
     </script>
 </body>
 </html>
