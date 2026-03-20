@@ -323,6 +323,12 @@ if (MODE === "sse") {
     res.send("APIs Hub MCP Server (SSE Mode) is running. Connect to /mcp/sse");
   });
 
+  // Middleware de logging total para debuggear peticiones de Antigravity
+  app.use((req, res, next) => {
+    console.error(`[DEBUG-REQ] ${req.method} ${req.url} | Headers: ${JSON.stringify(req.headers).substring(0, 50)}...`);
+    next();
+  });
+
   app.get("/mcp/sse", async (req, res) => {
     console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
     
@@ -341,9 +347,13 @@ if (MODE === "sse") {
         if (chunk) {
             let str = chunk.toString();
             if (str.includes('event: endpoint') && str.includes('data: /mcp/messages')) {
-                // Forzamos el reemplazo a localhost
-                str = str.replace('data: /mcp/messages', `data: ${endpoint}`);
-                console.error(`[SSE] HACK: URL reconvertida a: ${endpoint}`);
+                // Buscamos el sessionId que el SDK ya generó
+                const match = str.match(/sessionId=([a-zA-Z0-9-]+)/);
+                const sid = match ? match[1] : 'unknown';
+                
+                // Forzamos el reemplazo a localhost y nos aseguramos de que termine con \n\n
+                str = `event: endpoint\ndata: ${endpoint}?sessionId=${sid}\n\n`;
+                console.error(`[SSE] HACK-RAW: Endpoint corregido con sesión ${sid}: ${endpoint}`);
                 return originalWrite(Buffer.from(str), encoding, callback);
             }
         }
