@@ -340,6 +340,22 @@ if (MODE === "sse") {
     
     console.error(`[SSE] Publicando endpoint ABSOLUTO: ${endpoint}`);
     
+    // --- EL HACK MAESTRO: Interceptamos la escritura para forzar URL absoluta ---
+    const originalWrite = res.write.bind(res);
+    res.write = function(chunk, encoding, callback) {
+        if (chunk) {
+            let str = chunk.toString();
+            if (str.includes('event: endpoint') && str.includes('data: /mcp/messages')) {
+                // Reemplazamos la ruta relativa que el SDK intenta forzar por la absoluta
+                str = str.replace('data: /mcp/messages', `data: ${endpoint}`);
+                console.error(`[SSE] HACK: URL relativa interceptada y convertida a: ${endpoint}`);
+                return originalWrite(Buffer.from(str), encoding, callback);
+            }
+        }
+        return originalWrite(chunk, encoding, callback);
+    };
+    // ---------------------------------------------------------------------------
+
     const transport = new SSEServerTransport(endpoint, res);
     
     // Guardar la sesión antes de conectar
