@@ -324,39 +324,50 @@ if (MODE === "sse") {
   });
 
   app.get("/mcp/sse", async (req, res) => {
-    console.error(`New SSE connection request from ${req.ip}`);
+    console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
     
-    // Use absolute URL for the endpoint to be more robust
+    // Obtener el host dinámicamente para soportar túneles SSH (ej: localhost:3010)
     const protocol = req.get('x-forwarded-proto') || req.protocol;
-    const host = req.get('host');
+    const host = req.get('host'); // Este debería ser localhost:3010 si el cliente lo usa
     const endpoint = `${protocol}://${host}/mcp/messages`;
-    console.error(`Endpoint: ${endpoint}`);
+    
+    console.error(`[SSE] Publicando endpoint: ${endpoint}`);
     
     const transport = new SSEServerTransport(endpoint, res);
     
-    // Set session BEFORE connecting or sending anything to avoid race conditions
+    // Guardar la sesión antes de conectar
     sessions.set(transport.sessionId, transport);
-    console.error(`Created session: ${transport.sessionId}`);
+    console.error(`[SSE] Sesión creada: ${transport.sessionId}`);
 
     const server = createMcpServer();
     await server.connect(transport);
     
     res.on("close", () => {
-        console.error(`SSE connection closed for session: ${transport.sessionId}`);
+        console.error(`[SSE] Conexión cerrada para sesión: ${transport.sessionId}`);
         sessions.delete(transport.sessionId);
     });
   });
 
   app.post("/mcp/messages", async (req, res) => {
-    const sessionId = req.query.sessionId;
-    console.error(`POST request for session: ${sessionId}`);
+    // Ser robustos con el sessionId (a veces llega como array si hay proxies/túneles)
+    let sessionId = req.query.sessionId;
+    if (Array.isArray(sessionId)) {
+        sessionId = sessionId[0];
+    }
+
+    console.error(`[POST] Mensaje recibido para sesión: ${sessionId || 'MISSING'}`);
     
+    if (!sessionId) {
+        console.error("[POST] Error: sessionId faltante en la URL");
+        return res.status(400).send("Session ID is required");
+    }
+
     const transport = sessions.get(sessionId);
     
     if (transport) {
       await transport.handlePostMessage(req, res);
     } else {
-      console.error(`Session not found: ${sessionId}. Available sessions: ${Array.from(sessions.keys()).join(", ")}`);
+      console.error(`[POST] Sesión no encontrada: ${sessionId}. Sesiones activas: ${Array.from(sessions.keys()).join(", ")}`);
       res.status(404).send(`Session not found: ${sessionId}`);
     }
   });
