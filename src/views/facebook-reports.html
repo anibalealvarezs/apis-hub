@@ -339,25 +339,48 @@
         .breakdown-row {
             background: rgba(0, 0, 0, 0.2) !important;
         }
+        .data-table th {
+            font-size: 0.65rem !important;
+            font-weight: 700 !important;
+            padding: 8px 4px !important;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            background: var(--meta-card);
+            border-bottom: 2px solid var(--meta-border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .data-table td {
+            font-size: 0.72rem !important;
+            padding: 6px 4px !important;
+            border-bottom: 1px solid var(--meta-border);
+            vertical-align: middle;
+        }
         .breakdown-container {
-            padding: 10px 20px 20px 60px;
+            padding: 10px 10px 15px 40px;
             border-left: 2px solid var(--meta-blue);
-            margin: 5px 0;
+            margin: 2px 0;
+            max-width: 100%;
+            overflow: visible;
         }
         .breakdown-table {
             width: 100%;
             border: 1px solid var(--meta-border);
             border-radius: 8px;
-            font-size: 0.8rem !important;
+            font-size: 0.7rem !important;
+            table-layout: auto;
         }
         .breakdown-table th {
-            font-size: 0.7rem !important;
-            padding: 6px 12px !important;
+            font-size: 0.6rem !important;
+            padding: 6px 3px !important;
+            white-space: nowrap;
             background: var(--meta-hover) !important;
         }
         .breakdown-table td {
-            padding: 6px 12px !important;
+            padding: 5px 3px !important;
             background: transparent !important;
+            white-space: normal;
         }
         .breakdown-title {
             font-size: 0.8rem;
