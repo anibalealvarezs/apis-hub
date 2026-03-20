@@ -98,6 +98,11 @@ class RoutingCore implements HttpKernelInterface
                 $providedKey = substr($authHeader, 7);
             }
         }
+        
+        // Check query parameters for manual browser access
+        if ($providedKey === null) {
+            $providedKey = $request->query->get('key') ?: $request->query->get('token');
+        }
 
         $appKey = \Helpers\Helpers::getAppApiKey();
         $adminKey = \Helpers\Helpers::getAdminApiKey();
