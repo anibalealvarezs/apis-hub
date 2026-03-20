@@ -513,11 +513,13 @@ class Helpers
      */
     public static function getAuthorizedIps(): array
     {
-        // $projectConfig = self::getProjectConfig(); // Removed
-        // $ips = $projectConfig['security']['authorized_ips'] ?? []; // Removed
-        $ips = getenv('AUTHORIZED_IPS') ? explode(',', getenv('AUTHORIZED_IPS')) : [];
+        $envIps = getenv('AUTHORIZED_IPS');
+        if (!$envIps || $envIps === '[]') {
+            return [];
+        }
         
-        return is_array($ips) ? $ips : [$ips];
+        $ips = explode(',', $envIps);
+        return array_map('trim', $ips);
     }
 
     /**
