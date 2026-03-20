@@ -205,12 +205,27 @@ function createMcpServer() {
             properties: {
               entity: { type: "string", description: "The entity name (use 'channeled_metric' for performance data)" },
               channel: { type: "string", description: "The channel identifier (e.g. 'google_search_console', 'facebook')" },
-              aggregations: { type: "string", description: "JSON string of aggregations. Use intelligent formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. '{\"total_clicks\":\"clicks\"}'" },
+              aggregations: { 
+                type: "object", 
+                description: "Object mapping alias to formula. Formulas: 'spend', 'clicks', 'impressions', 'reach', 'results', 'ctr', 'cpc', 'cpm', 'roas', 'cost_per_result', 'result_rate', 'position'. e.g. {\"total_spend\":\"spend\"}" 
+              },
+              filters: {
+                type: "object",
+                description: "Optional: Object containing filters. e.g. {\"dimensions.gender\":\"male\"}"
+              },
               groupBy: { type: "string", description: "Comma separated fields to group by (e.g. 'daily', 'weekly', 'dimensions.gender')" },
               startDate: { type: "string", description: "Start date (Y-m-d)" },
               endDate: { type: "string", description: "End date (Y-m-d)" }
             },
             required: ["entity", "aggregations"],
+          },
+        },
+        {
+          name: "get_available_instances",
+          description: "List all configured worker instances from instances.yaml",
+          inputSchema: {
+            type: "object",
+            properties: {},
           },
         }
       ],
@@ -279,18 +294,42 @@ function createMcpServer() {
 
     if (name === "summarize_performance") {
       const { entity, channel, aggregations, groupBy, startDate, endDate, filters } = args;
-      let cmd = `php bin/cli.php app:aggregate --entity="${entity}" --aggregations='${aggregations}' --pretty`;
+      
+      // Ensure aggregations and filters are stringified for the CLI
+      const aggregationsStr = typeof aggregations === 'object' ? JSON.stringify(aggregations) : aggregations;
+      const filtersStr = filters && typeof filters === 'object' ? JSON.stringify(filters) : filters;
+      
+      let cmd = `php bin/cli.php app:aggregate --entity="${entity}" --aggregations='${aggregationsStr}' --pretty`;
       if (channel) cmd += ` --channel="${channel}"`;
       if (groupBy) cmd += ` --group-by="${groupBy}"`;
       if (startDate) cmd += ` --start-date="${startDate}"`;
       if (endDate) cmd += ` --end-date="${endDate}"`;
-      if (filters) cmd += ` --filters='${filters}'`;
+      if (filtersStr) cmd += ` --filters='${filtersStr}'`;
 
       try {
         const stdout = await runCliCommand(cmd);
         return { content: [{ type: "text", text: stdout }] };
       } catch (error) {
         return { content: [{ type: "text", text: `Aggregation failed: ${error.message}` }], isError: true };
+      }
+    }
+
+    if (name === "get_available_instances") {
+      try {
+        const stdout = await runCliCommand("php bin/cli.php app:refresh-instances --list");
+        return { content: [{ type: "text", text: stdout }] };
+      } catch (error) {
+        // Fallback if --list is not available or fails
+        try {
+          const filePath = path.join(APIS_HUB_ROOT, "config", "instances.yaml");
+          if (fs.existsSync(filePath)) {
+            const content = fs.readFileSync(filePath, "utf-8");
+            return { content: [{ type: "text", text: `Instances from file:\n${content.substring(0, 5000)}...` }] };
+          }
+          return { content: [{ type: "text", text: "No instances found." }], isError: true };
+        } catch (innerError) {
+          return { content: [{ type: "text", text: `Failed to get instances: ${innerError.message}` }], isError: true };
+        }
       }
     }
 
@@ -313,15 +352,14 @@ if (MODE === "sse") {
   // Track active sessions and their transports
   const sessions = new Map();
 
-  app.use(express.json());
-  app.use((req, res, next) => {
-    console.error(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    next();
-  });
-
   app.get("/", (req, res) => {
     res.send("APIs Hub MCP Server (SSE Mode) is running. Connect to /mcp/sse");
   });
+
+  // EXCLUDE express.json() from /mcp/messages to allow SDK to read raw stream
+  // (SDK needs to read the body directly from the request stream)
+  // Or alternatively, we can use express.json() and re-emit the data,
+  // but simpler to just use it selectively.
 
   // Middleware de logging total para debuggear peticiones de Antigravity
   app.use((req, res, next) => {
