@@ -1033,26 +1033,19 @@
             facebook_ad_accounts: []
         };
         let currentConfig = {
-            gsc_urls: [],
+            gsc: {},
             fb_page_ids: [],
             fb_ad_account_ids: []
         };
-
-        // Tabs switching
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
-                
-                tab.classList.add('active');
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                const targetContent = document.getElementById('tab-' + tab.dataset.tab);
-                targetContent.style.display = 'block';
-                targetContent.classList.add('active');
-            });
-        });
-
         let countriesList = {};
+
+        function getAdminHeaders() {
+            const token = sessionStorage.getItem('apis_hub_admin_token');
+            return {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            };
+        }
 
         async function fetchAssets(type = null, force = false) {
             showLoading(`Loading ${type || 'assets'}...`);
@@ -1063,9 +1056,17 @@
                 if (force) params.push(`refresh=1`);
                 if (params.length > 0) url += `?${params.join('&')}`;
 
-                const response = await fetch(url);
-                const data = await response.json();
+                const response = await fetch(url, {
+                    headers: getAdminHeaders()
+                });
                 
+                if (response.status === 401) {
+                    sessionStorage.removeItem('apis_hub_admin_token');
+                    setTimeout(() => location.reload(), 500);
+                    return;
+                }
+                
+                const data = await response.json();
                 if (data.error) throw new Error(data.error);
 
                 allAssets = data.assets;
@@ -1077,29 +1078,7 @@
                 }
                 
                 renderAssets();
-                
-                // Set initial values from config
-                if (currentConfig.fb_cache_chunk_size) {
-                    document.querySelectorAll('.fb-periodicity-select').forEach(select => {
-                        select.value = currentConfig.fb_cache_chunk_size;
-                    });
-                }
-                if (currentConfig.fb_organic_history_range) {
-                    document.getElementById('fb-organic-history-range').value = currentConfig.fb_organic_history_range;
-                }
-                if (currentConfig.fb_marketing_history_range) {
-                    document.getElementById('fb-marketing-history-range').value = currentConfig.fb_marketing_history_range;
-                }
-                if (currentConfig.fb_entity_filters) {
-                    Object.entries(currentConfig.fb_entity_filters).forEach(([entity, val]) => {
-                        const input = document.getElementById(`filter-${entity}`);
-                        if (input) input.value = val || '';
-                    });
-                }
-                if (currentConfig.gsc_cache_history_range) {
-                    document.getElementById('gsc-history-range').value = currentConfig.gsc_cache_history_range;
-                }
-
+                populateGlobalFields();
                 if (force) showToast('Assets refreshed successfully!');
             } catch (err) {
                 showToast('Error: ' + err.message, true);
@@ -1108,219 +1087,17 @@
             }
         }
 
-        async function validateTokens() {
-            showLoading('Checking token validity...');
-            try {
-                const response = await fetch('/api/config-manager/validate-tokens', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await response.json();
-                
-                if (data.error) throw new Error(data.error);
-
-                const renderStatus = (id, result) => {
-                    const el = document.getElementById(id);
-                    if (!result) {
-                        el.style.display = 'none';
-                        return;
-                    }
-                    el.style.display = 'inline-flex';
-                    el.className = `token-status ${result.status}`;
-                    el.innerHTML = `<i data-lucide="${result.status === 'valid' ? 'check-circle' : 'alert-circle'}"></i> ${result.status === 'valid' ? result.message.split(' ')[0] + ' OK' : result.message}`;
-                    lucide.createIcons();
-                };
-
-                renderStatus('gsc-token-status', data.results.gsc);
-                renderStatus('fb-token-status', data.results.facebook);
-
-                if (data.results.gsc?.status === 'error' || data.results.facebook?.status === 'error') {
-                    showToast('Token validation failed for some channels.', true);
-                } else {
-                    showToast('All tokens are valid and active!');
-                }
-            } catch (err) {
-                showToast('Validation Error: ' + err.message, true);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        function toggleConfigArea(safeUrl) {
-            const cb = document.getElementById(`cb-${safeUrl}`);
-            const configArea = document.getElementById(`config-${safeUrl}`);
-            configArea.style.display = cb.checked ? 'block' : 'none';
-        }
-
-        function addCountryTag(safeUrl, code) {
-            if (!code) return;
-            const container = document.getElementById(`countries-tags-${safeUrl}`);
-            if (container.querySelector(`[data-value="${code}"]`)) return;
-            
-            const tag = document.createElement('div');
-            tag.className = 'tag';
-            tag.dataset.value = code;
-            tag.innerHTML = `${countriesList[code]} <i data-lucide="x"></i>`;
-            tag.querySelector('i').onclick = () => tag.remove();
-            container.appendChild(tag);
-            lucide.createIcons();
-        }
-
-        function addKeywordTag(safeUrl, text) {
-            text = text.trim();
-            if (!text) return;
-            const container = document.getElementById(`keywords-tags-${safeUrl}`);
-            if (container.querySelector(`[data-value="${text}"]`)) return;
-            
-            const tag = document.createElement('div');
-            tag.className = 'tag';
-            tag.dataset.value = text;
-            tag.innerHTML = `${text} <i data-lucide="x"></i>`;
-            tag.querySelector('i').onclick = () => tag.remove();
-            container.appendChild(tag);
-            lucide.createIcons();
-        }
-
-        function removeTag(el) {
-            el.parentElement.remove();
-        }
-
-        function renderAssets() {
-            // Sort assets alphabetically
-            allAssets.gsc.sort((a, b) => a.title.localeCompare(b.title));
-            allAssets.facebook_pages.sort((a, b) => a.title.localeCompare(b.title));
-            allAssets.facebook_ad_accounts.sort((a, b) => a.name.localeCompare(b.name));
-
-            // Render GSC
-            const gscList = document.getElementById('gsc-list');
-            if (allAssets.gsc.length > 0) {
-                gscList.innerHTML = allAssets.gsc.map(site => {
-                    const configData = currentConfig.gsc[site.url] || { target_countries: [], target_keywords: [] };
-                    const isChecked = !!currentConfig.gsc[site.url];
-                    const safeUrl = btoa(site.url).replace(/=/g, ''); // Unique ID for tags
-                    
-                    return `
-                        <div class="asset-item ${isChecked ? 'synced' : ''}" data-url="${site.url}">
-                            <div class="asset-main">
-                                <input type="checkbox" id="cb-${safeUrl}" data-url="${site.url}" data-title="${site.title}" data-hostname="${site.hostname}" ${isChecked ? 'checked' : ''} onchange="toggleConfigArea('${safeUrl}')">
-                                <div class="asset-info" onclick="document.getElementById('cb-${safeUrl}').click()">
-                                    <div class="asset-title">${site.title}</div>
-                                    <div class="asset-meta">
-                                        <span>${site.url}</span>
-                                        <span class="meta-tag">GSC</span>
-                                        ${isChecked ? '<span class="meta-tag" style="color:var(--info); border-color:var(--info);">Configured</span>' : ''}
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="asset-config" id="config-${safeUrl}" style="${isChecked ? 'display:block' : 'display:none'}">
-                                <div class="config-grid">
-                                    <div class="config-group">
-                                        <div class="config-label">
-                                            <span>Target Countries</span>
-                                            <div class="has-tooltip">
-                                                <i data-lucide="info" class="info-icon"></i>
-                                                <div class="tooltip-text">
-                                                    Track selected countries individually. Data from all other countries will be consolidated into an "Others" category.
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="config-field">
-                                            <select class="config-input" id="country-select-${safeUrl}" onchange="addCountryTag('${safeUrl}', this.value); this.value=''">
-                                                <option value="">Select country...</option>
-                                                ${Object.entries(countriesList).map(([code, name]) => `<option value="${code}">${name}</option>`).join('')}
-                                            </select>
-                                        </div>
-                                        <div class="tag-container" id="countries-tags-${safeUrl}">
-                                            ${configData.target_countries.map(c => `
-                                                <div class="tag" data-value="${c}">${countriesList[c] || c} <i data-lucide="x" onclick="removeTag(this)"></i></div>
-                                            `).join('')}
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="config-group">
-                                        <div class="config-label">
-                                            <span>Target Keywords</span>
-                                            <div class="has-tooltip">
-                                                <i data-lucide="info" class="info-icon"></i>
-                                                <div class="tooltip-text">
-                                                    Selected keywords will be tracked independently, while others are grouped. 
-                                                    <br><br>
-                                                    Matches are <strong>case-insensitive substrings</strong> (e.g., "Web" matches "web design").
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="config-field">
-                                            <input type="text" class="config-input" placeholder="Add keyword..." onkeydown="if(event.key==='Enter') { addKeywordTag('${safeUrl}', this.value); this.value=''; }">
-                                        </div>
-                                        <div class="tag-container" id="keywords-tags-${safeUrl}">
-                                            ${configData.target_keywords.map(k => `
-                                                <div class="tag" data-value="${k}">${k} <i data-lucide="x" onclick="removeTag(this)"></i></div>
-                                            `).join('')}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                document.getElementById('gsc-count').innerText = `${allAssets.gsc.length} sites found`;
-            }
-
-            // Render FB Pages
-            const fbPagesList = document.getElementById('fb-pages-list');
-            if (allAssets.facebook_pages.length > 0) {
-                fbPagesList.innerHTML = allAssets.facebook_pages.map(page => {
-                    const isChecked = currentConfig.fb_page_ids.includes(String(page.id)) ? 'checked' : '';
-                    return `
-                        <div class="asset-item ${isChecked ? 'synced' : ''}">
-                            <input type="checkbox" data-id="${page.id}" data-title="${page.title}" data-url="${page.url}" data-hostname="${page.hostname}" data-ig="${page.ig_account || ''}" ${isChecked}>
-                            <div class="asset-info">
-                                <div class="asset-title">${page.title}</div>
-                                <div class="asset-meta">
-                                    <span>ID: ${page.id}</span>
-                                    ${page.ig_account ? `<span class="meta-tag" style="background: rgba(210, 153, 34, 0.2); border-color: var(--warning);">IG Linked</span>` : ''}
-                                    <span class="meta-tag">Page</span>
-                                    ${isChecked ? '<span class="meta-tag" style="color:var(--info); border-color:var(--info);">Configured</span>' : ''}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-
-            // Render FB Ad Accounts
-            const fbAdsList = document.getElementById('fb-ad-accounts-list');
-            if (allAssets.facebook_ad_accounts.length > 0) {
-                fbAdsList.innerHTML = allAssets.facebook_ad_accounts.map(acc => {
-                    const isChecked = currentConfig.fb_ad_account_ids.includes(String(acc.id)) ? 'checked' : '';
-                    return `
-                        <div class="asset-item ${isChecked ? 'synced' : ''}">
-                            <input type="checkbox" data-id="${acc.id}" data-name="${acc.name}" ${isChecked}>
-                            <div class="asset-info">
-                                <div class="asset-title">${acc.name}</div>
-                                <div class="asset-meta">
-                                    <span>ID: ${acc.id}</span>
-                                    <span class="meta-tag">Ad Account</span>
-                                    ${isChecked ? '<span class="meta-tag" style="color:var(--info); border-color:var(--info);">Configured</span>' : ''}
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-            
-            document.getElementById('fb-organic-count').innerText = `${allAssets.facebook_pages.length} pages found`;
-            document.getElementById('fb-marketing-count').innerText = `${allAssets.facebook_ad_accounts.length} ad accounts found`;
-            
-            // Populate Global Configs
+        function populateGlobalFields() {
             if (currentConfig.jobs_timeout_hours !== undefined) {
                 document.getElementById('jobs-timeout-hours').value = currentConfig.jobs_timeout_hours;
             }
             const cacheRawMetricsCb = document.getElementById('cache-raw-metrics');
-            if (cacheRawMetricsCb) {
-                cacheRawMetricsCb.checked = !!currentConfig.cache_raw_metrics;
-            }
+            if (cacheRawMetricsCb) cacheRawMetricsCb.checked = !!currentConfig.cache_raw_metrics;
+
+            document.getElementById('gsc-channel-enabled').checked = !!currentConfig.gsc_enabled;
+            document.getElementById('fb-organic-enabled').checked = !!currentConfig.fb_organic_enabled;
+            document.getElementById('fb-marketing-enabled').checked = !!currentConfig.fb_marketing_enabled;
+            
             if (currentConfig.fb_organic_history_range) {
                 document.getElementById('fb-organic-history-range').value = currentConfig.fb_organic_history_range;
             }
@@ -1333,431 +1110,143 @@
                     if (el) el.value = val;
                 });
             }
-            if (currentConfig.fb_feature_toggles) {
-                Object.entries(currentConfig.fb_feature_toggles).forEach(([key, val]) => {
-                    const el = document.querySelector(`input[data-key="${key}"]`);
-                    if (el) el.checked = !!val;
-                });
-            }
-
-            // Populate Channel Enabled
-            document.getElementById('gsc-channel-enabled').checked = !!currentConfig.gsc_enabled;
-            document.getElementById('fb-organic-enabled').checked = !!currentConfig.fb_organic_enabled;
-            document.getElementById('fb-marketing-enabled').checked = !!currentConfig.fb_marketing_enabled;
-
-            lucide.createIcons();
-        }
-
-        // Initial fetch
-        document.addEventListener('DOMContentLoaded', () => fetchAssets());
-
-        let pendingType = null;
-
-        function confirmUpdate(type) {
-            pendingType = type;
-            document.getElementById('confirm-modal').style.display = 'flex';
-            document.getElementById('modal-confirm-btn').onclick = () => {
-                closeModal();
-                updateConfig(pendingType);
-            };
-        }
-
-        function closeModal() {
-            document.getElementById('confirm-modal').style.display = 'none';
-        }
-
-        function selectAll(containerId, state) {
-            document.querySelectorAll(`#${containerId} input[type="checkbox"]`).forEach(cb => {
-                cb.checked = state;
-                // If it's a GSC checkbox (starts with cb-), toggle its config area
-                if (cb.id && cb.id.startsWith('cb-')) {
-                    const safeUrl = cb.id.replace('cb-', '');
-                    toggleConfigArea(safeUrl);
-                }
-            });
-        }
-
-        async function updateConfig(type) {
-            const selected = {};
-            let selector = '';
-            let apiType = type; // Keep the original type (facebook-organic, facebook-marketing, or gsc)
-            let cacheHistoryRange = null;
-            let cacheChunkSize = null;
-            let organicHistoryRange = null;
-            let marketingHistoryRange = null;
-            let entityFilters = {};
-
-            if (type === 'gsc') {
-                selector = '#gsc-list input:checked';
-                cacheHistoryRange = document.getElementById('gsc-history-range').value;
-            } else if (type === 'facebook-organic') {
-                selector = '#fb-pages-list input:checked';
-                cacheChunkSize = document.querySelector('#tab-facebook-organic .fb-periodicity-select').value;
-                organicHistoryRange = document.getElementById('fb-organic-history-range').value;
-                ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA'].forEach(e => {
-                    const el = document.getElementById(`filter-${e}`);
-                    if (el) entityFilters[e] = el.value;
-                });
-            } else if (type === 'facebook-marketing') {
-                selector = '#fb-ad-accounts-list input:checked';
-                cacheChunkSize = document.querySelector('#tab-facebook-marketing .fb-periodicity-select').value;
-                marketingHistoryRange = document.getElementById('fb-marketing-history-range').value;
-                ['CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'].forEach(e => {
-                    const el = document.getElementById(`filter-${e}`);
-                    if (el) entityFilters[e] = el.value;
-                });
-            } else {
-                selector = ''; // no specific asset list check needed
-            }
-            
-            const selectedArray = [];
-            if (selector !== '') {
-                document.querySelectorAll(selector).forEach(input => {
-                    if (type === 'gsc') {
-                        const safeUrl = input.id.replace('cb-', '');
-                        const countries = Array.from(document.querySelectorAll(`#countries-tags-${safeUrl} .tag`)).map(t => t.dataset.value);
-                        const keywords = Array.from(document.querySelectorAll(`#keywords-tags-${safeUrl} .tag`)).map(t => t.dataset.value);
-
-                        selectedArray.push({
-                            url: input.dataset.url,
-                            title: input.dataset.title,
-                            hostname: input.dataset.hostname,
-                            target_countries: countries,
-                            target_keywords: keywords
-                        });
-                    } else if (type === 'facebook-organic') {
-                        if (!selected.pages) selected.pages = [];
-                        selected.pages.push({
-                            id: input.dataset.id,
-                            title: input.dataset.title,
-                            url: input.dataset.url,
-                            hostname: input.dataset.hostname,
-                            ig_account: input.dataset.ig || null
-                        });
-                    } else if (type === 'facebook-marketing') {
-                        if (!selected.ad_accounts) selected.ad_accounts = [];
-                        selected.ad_accounts.push({
-                            id: input.dataset.id,
-                            name: input.dataset.name
-                        });
-                    }
-                });
-            }
-
-            const payloadAssets = (type === 'gsc') ? selectedArray : selected;
-
-            if (type !== 'global' && ((type === 'gsc' && selectedArray.length === 0) || 
-                (type === 'facebook-organic' && !selected.pages) || 
-                (type === 'facebook-marketing' && !selected.ad_accounts))) {
-                showToast('Please select at least one asset to apply.', true);
-                return;
-            }
-
-            showLoading('Updating configuration files...');
-            try {
-                const featureToggles = {};
-                document.querySelectorAll('.fb-toggle, .fb-toggle-mark').forEach(toggle => {
-                    featureToggles[toggle.dataset.key] = toggle.checked;
-                });
-                
-                let requestBody = { 
-                    type: apiType, 
-                    assets: payloadAssets,
-                    cache_chunk_size: cacheChunkSize,
-                    cache_history_range: cacheHistoryRange,
-                    organic_history_range: organicHistoryRange,
-                    marketing_history_range: marketingHistoryRange,
-                    entity_filters: entityFilters,
-                    feature_toggles: featureToggles,
-                    enabled: (type === 'gsc') ? (document.getElementById('gsc-channel-enabled')?.checked ?? true) :
-                             (type === 'facebook-organic') ? (document.getElementById('fb-organic-enabled')?.checked ?? true) :
-                             (type === 'facebook-marketing') ? (document.getElementById('fb-marketing-enabled')?.checked ?? true) : true
-                };
-                
-                if (type === 'global') {
-                    requestBody.jobs_timeout_hours = parseInt(document.getElementById('jobs-timeout-hours').value, 10) || 6;
-                    requestBody.cache_raw_metrics = document.getElementById('cache-raw-metrics')?.checked || false;
-                }
-
-                const response = await fetch('/api/config-manager/update', {
-                    method: 'POST',
-                    headers: getAdminHeaders(),
-                    body: JSON.stringify(requestBody)
-                });
-                const result = await response.json();
-                if (result.status === 'success' || result.success) {
-                    showToast('Configuration updated successfully!');
-                    fetchAssets(); // Refresh state to show newly configured items
-                } else {
-                    throw new Error(result.error);
-                }
-            } catch (err) {
-                showToast('Error: ' + err.message, true);
-                if (err.message.includes('Unauthorized')) {
-                    sessionStorage.removeItem('apis_hub_admin_token');
-                    setTimeout(() => location.reload(), 2000);
-                }
-            } finally {
-                hideLoading();
-            }
         }
 
         function renderAssets() {
-            // GSC
+            // Sort
+            allAssets.gsc.sort((a, b) => a.title.localeCompare(b.title));
+            allAssets.facebook_pages.sort((a, b) => a.title.localeCompare(b.title));
+            allAssets.facebook_ad_accounts.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Render GSC
             const gscList = document.getElementById('gsc-list');
-            gscList.innerHTML = '';
-            document.getElementById('gsc-count').innerText = `${allAssets.gsc.length} items found`;
-            
-            if (allAssets.gsc.length === 0) {
-                gscList.innerHTML = '<div class="empty-state"><i data-lucide="search"></i><p>No GSC properties found.</p></div>';
-            } else {
-                allAssets.gsc.forEach(site => {
-                    const isSynced = currentConfig.gsc_urls.includes(site.url);
-                    const safeUrl = site.url.replace(/[^a-z0-9]/gi, '-');
-                    const countries = (currentConfig.gsc_countries && currentConfig.gsc_countries[site.url]) || [];
-                    const keywords = (currentConfig.gsc_keywords && currentConfig.gsc_keywords[site.url]) || [];
-                    
-                    const item = document.createElement('div');
-                    item.className = `asset-item ${isSynced ? 'synced' : ''}`;
-                    item.innerHTML = `
-                        <label class="asset-main" for="cb-${safeUrl}">
-                            <input type="checkbox" id="cb-${safeUrl}" data-url="${site.url}" data-title="${site.title}" data-hostname="${site.hostname}" ${isSynced ? 'checked' : ''}>
-                            <div class="asset-info">
-                                <div class="asset-title">${site.title}</div>
-                                <div class="asset-meta">
-                                    <span class="meta-tag">${site.hostname}</span>
-                                    ${isSynced ? '<span class="meta-tag" style="background:rgba(63,185,80,0.1); color:var(--info); border-color:rgba(63,185,80,0.2);">ACTIVE</span>' : ''}
+            gscList.innerHTML = allAssets.gsc.length === 0 ? '<div class="empty-state"><p>No properties found.</p></div>' :
+                allAssets.gsc.map(site => {
+                    const configData = currentConfig.gsc[site.url] || { target_countries: [], target_keywords: [] };
+                    const isChecked = !!currentConfig.gsc[site.url];
+                    const safeUrl = btoa(site.url).replace(/[^a-z0-9]/gi, '');
+                    return `
+                        <div class="asset-item ${isChecked ? 'synced' : ''}">
+                            <div class="asset-main">
+                                <input type="checkbox" id="cb-${safeUrl}" data-url="${site.url}" data-title="${site.title}" data-hostname="${site.hostname}" ${isChecked ? 'checked' : ''} onchange="toggleConfigArea('${safeUrl}')">
+                                <div class="asset-info" onclick="document.getElementById('cb-${safeUrl}').click()">
+                                    <div class="asset-title">${site.title}</div>
+                                    <div class="asset-meta"><span>${site.url}</span></div>
                                 </div>
                             </div>
-                            <i data-lucide="chevron-down" class="text-dim"></i>
-                        </label>
-                        <div class="asset-config">
-                            <div class="config-grid">
-                                <div class="config-group">
-                                    <div class="config-label">Target Countries</div>
-                                    <div class="config-field">
-                                        <select class="config-input" id="country-select-${safeUrl}">
-                                            <option value="">Select country...</option>
-                                            ${Object.entries(countriesList).map(([code, name]) => `<option value="${code}">${name}</option>`).join('')}
+                            <div class="asset-config" id="config-${safeUrl}" style="${isChecked ? 'display:block' : 'display:none'}">
+                                <div class="config-grid">
+                                    <div class="config-group">
+                                        <div class="config-label">Target Countries</div>
+                                        <select class="config-input" onchange="addTag('${safeUrl}', 'country', this.value); this.value=''">
+                                            <option value="">Add Country...</option>
+                                            ${Object.entries(countriesList).map(([c, n]) => `<option value="${c}">${n}</option>`).join('')}
                                         </select>
-                                        <button class="btn btn-secondary btn-sm" onclick="addTag('${safeUrl}', 'country')">Add</button>
+                                        <div class="tag-container" id="countries-tags-${safeUrl}">
+                                            ${configData.target_countries.map(c => `<div class="tag" data-value="${c}">${countriesList[c] || c} <i data-lucide="x" onclick="this.parentElement.remove()"></i></div>`).join('')}
+                                        </div>
                                     </div>
-                                    <div class="tag-container" id="countries-tags-${safeUrl}">
-                                        ${countries.map(c => `<div class="tag" data-value="${c}">${countriesList[c] || c} <i data-lucide="x" onclick="this.parentElement.remove()"></i></div>`).join('')}
-                                    </div>
-                                </div>
-                                <div class="config-group">
-                                    <div class="config-label">Target Keywords</div>
-                                    <div class="config-field">
-                                        <input type="text" class="config-input" id="keyword-input-${safeUrl}" placeholder="Type keyword...">
-                                        <button class="btn btn-secondary btn-sm" onclick="addTag('${safeUrl}', 'keyword')">Add</button>
-                                    </div>
-                                    <div class="tag-container" id="keywords-tags-${safeUrl}">
-                                        ${keywords.map(k => `<div class="tag" data-value="${k}">${k} <i data-lucide="x" onclick="this.parentElement.remove()"></i></div>`).join('')}
+                                    <div class="config-group">
+                                        <div class="config-label">Target Keywords</div>
+                                        <input type="text" class="config-input" placeholder="Type & Enter..." onkeydown="if(event.key==='Enter'){ addTag('${safeUrl}', 'keyword', this.value); this.value=''; }">
+                                        <div class="tag-container" id="keywords-tags-${safeUrl}">
+                                            ${configData.target_keywords.map(k => `<div class="tag" data-value="${k}">${k} <i data-lucide="x" onclick="this.parentElement.remove()"></i></div>`).join('')}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
-                    gscList.appendChild(item);
-                });
-            }
+                        </div>`;
+                }).join('');
 
             // FB Organic
-            const fbOrgList = document.getElementById('fb-pages-list');
-            fbOrgList.innerHTML = '';
-            document.getElementById('fb-organic-count').innerText = `${allAssets.facebook_pages.length} pages found`;
-            
-            if (allAssets.facebook_pages.length === 0) {
-                 fbOrgList.innerHTML = '<div class="empty-state"><i data-lucide="facebook"></i><p>No FB pages found.</p></div>';
-            } else {
-                allAssets.facebook_pages.forEach(page => {
-                    const isSynced = currentConfig.fb_page_ids.includes(page.id);
-                    const item = document.createElement('div');
-                    item.className = `asset-item ${isSynced ? 'synced' : ''}`;
-                    item.innerHTML = `
-                        <label class="asset-main" for="cb-fb-${page.id}">
-                            <input type="checkbox" id="cb-fb-${page.id}" data-id="${page.id}" data-title="${page.title}" data-url="${page.url}" data-hostname="${page.hostname}" data-ig="${page.ig_account || ''}" ${isSynced ? 'checked' : ''}>
+            document.getElementById('fb-pages-list').innerHTML = allAssets.facebook_pages.length === 0 ? '<div class="empty-state"><p>No pages found.</p></div>' :
+                allAssets.facebook_pages.map(page => {
+                    const isChecked = currentConfig.fb_page_ids.includes(String(page.id)) ? 'checked' : '';
+                    return `
+                        <div class="asset-item ${isChecked ? 'synced' : ''}">
+                            <input type="checkbox" data-id="${page.id}" data-title="${page.title}" data-url="${page.url}" data-hostname="${page.hostname}" data-ig="${page.ig_account || ''}" ${isChecked}>
                             <div class="asset-info">
                                 <div class="asset-title">${page.title}</div>
-                                <div class="asset-meta">
-                                    <span class="meta-tag">ID: ${page.id}</span>
-                                    ${page.ig_account ? `<span class="meta-tag" style="background:rgba(210,153,34,0.1); color:var(--warning); border-color:rgba(210,153,34,0.2);"><i data-lucide="instagram" style="width:12px; height:12px; vertical-align:middle;"></i> IG Account Synced</span>` : ''}
-                                    ${isSynced ? '<span class="meta-tag" style="background:rgba(63,185,80,0.1); color:var(--info); border-color:rgba(63,185,80,0.2);">ACTIVE</span>' : ''}
-                                </div>
+                                <div class="asset-meta"><span>ID: ${page.id}</span></div>
                             </div>
-                        </label>
-                    `;
-                    fbOrgList.appendChild(item);
-                });
-            }
+                        </div>`;
+                }).join('');
 
             // FB Marketing
-            const fbMarkList = document.getElementById('fb-ad-accounts-list');
-            fbMarkList.innerHTML = '';
-            document.getElementById('fb-marketing-count').innerText = `${allAssets.facebook_ad_accounts.length} ad accounts found`;
-            
-            if (allAssets.facebook_ad_accounts.length === 0) {
-                fbMarkList.innerHTML = '<div class="empty-state"><i data-lucide="badge-dollar-sign"></i><p>No Ad Accounts found.</p></div>';
-            } else {
-                allAssets.facebook_ad_accounts.forEach(acc => {
-                    const isSynced = currentConfig.fb_ad_account_ids.includes(acc.id);
-                    const item = document.createElement('div');
-                    item.className = `asset-item ${isSynced ? 'synced' : ''}`;
-                    item.innerHTML = `
-                        <label class="asset-main" for="cb-fbm-${acc.id}">
-                            <input type="checkbox" id="cb-fbm-${acc.id}" data-id="${acc.id}" data-name="${acc.name}" ${isSynced ? 'checked' : ''}>
+            document.getElementById('fb-ad-accounts-list').innerHTML = allAssets.facebook_ad_accounts.length === 0 ? '<div class="empty-state"><p>No ad accounts found.</p></div>' :
+                allAssets.facebook_ad_accounts.map(acc => {
+                    const isChecked = currentConfig.fb_ad_account_ids.includes(String(acc.id)) ? 'checked' : '';
+                    return `
+                        <div class="asset-item ${isChecked ? 'synced' : ''}">
+                            <input type="checkbox" data-id="${acc.id}" data-name="${acc.name}" ${isChecked}>
                             <div class="asset-info">
                                 <div class="asset-title">${acc.name}</div>
-                                <div class="asset-meta">
-                                    <span class="meta-tag">ID: ${acc.id}</span>
-                                    ${isSynced ? '<span class="meta-tag" style="background:rgba(63,185,80,0.1); color:var(--info); border-color:rgba(63,185,80,0.2);">ACTIVE</span>' : ''}
-                                </div>
+                                <div class="asset-meta"><span>ID: ${acc.id}</span></div>
                             </div>
-                        </label>
-                    `;
-                    fbMarkList.appendChild(item);
-                });
-            }
+                        </div>`;
+                }).join('');
 
+            document.getElementById('gsc-count').innerText = `${allAssets.gsc.length} found`;
+            document.getElementById('fb-organic-count').innerText = `${allAssets.facebook_pages.length} found`;
+            document.getElementById('fb-marketing-count').innerText = `${allAssets.facebook_ad_accounts.length} found`;
             lucide.createIcons();
         }
 
-        function addTag(safeUrl, type) {
+        function toggleConfigArea(safeUrl) {
+            document.getElementById(`config-${safeUrl}`).style.display = document.getElementById(`cb-${safeUrl}`).checked ? 'block' : 'none';
+        }
+
+        function addTag(safeUrl, type, val) {
+            val = val.trim();
+            if (!val) return;
             const container = document.getElementById(`${type === 'country' ? 'countries' : 'keywords'}-tags-${safeUrl}`);
-            const input = document.getElementById(`${type === 'country' ? 'country-select' : 'keyword-input'}-${safeUrl}`);
-            const val = input.value.trim();
-            const label = type === 'country' ? input.options[input.selectedIndex].text : val;
-
-            if (val === '') return;
-            
-            // Check duplicated
-            const existing = Array.from(container.querySelectorAll('.tag')).map(t => t.dataset.value);
-            if (existing.includes(val)) return;
-
+            if (Array.from(container.querySelectorAll('.tag')).find(t => t.dataset.value === val)) return;
             const tag = document.createElement('div');
             tag.className = 'tag';
             tag.dataset.value = val;
-            tag.innerHTML = `${label} <i data-lucide="x" onclick="this.parentElement.remove()"></i>`;
+            tag.innerHTML = `${type === 'country' ? countriesList[val] || val : val} <i data-lucide="x" onclick="this.parentElement.remove()"></i>`;
             container.appendChild(tag);
             lucide.createIcons();
-            input.value = '';
-        }
-
-        function selectAll(listId, check) {
-            document.querySelectorAll(`#${listId} input[type="checkbox"]`).forEach(cb => cb.checked = check);
-        }
-
-        let pendingUpdateType = '';
-        function confirmUpdate(type) {
-            pendingUpdateType = type;
-            document.getElementById('confirm-modal').style.display = 'flex';
-            document.getElementById('modal-confirm-btn').onclick = () => {
-                closeModal();
-                updateConfig(pendingUpdateType);
-            };
-        }
-
-        function closeModal() {
-            document.getElementById('confirm-modal').style.display = 'none';
         }
 
         async function updateConfig(type) {
-            let apiType = type;
-            let selector = '';
-            let selected = {};
-            let cacheHistoryRange = null;
-            let organicHistoryRange = null;
-            let marketingHistoryRange = null;
-            let cacheChunkSize = null;
-            let entityFilters = {};
-
-            if (type === 'gsc') {
-                selector = '#gsc-list input:checked';
-                cacheHistoryRange = document.getElementById('gsc-history-range').value;
-            } else if (type === 'facebook-organic') {
-                selector = '#fb-pages-list input:checked';
-                cacheChunkSize = document.querySelector('#tab-facebook-organic .fb-periodicity-select').value;
-                organicHistoryRange = document.getElementById('fb-organic-history-range').value;
-                ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA'].forEach(e => {
-                    const el = document.getElementById(`filter-${e}`);
-                    if (el) entityFilters[e] = el.value;
-                });
-            } else if (type === 'facebook-marketing') {
-                selector = '#fb-ad-accounts-list input:checked';
-                cacheChunkSize = document.querySelector('#tab-facebook-marketing .fb-periodicity-select').value;
-                marketingHistoryRange = document.getElementById('fb-marketing-history-range').value;
-                ['CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'].forEach(e => {
-                    const el = document.getElementById(`filter-${e}`);
-                    if (el) entityFilters[e] = el.value;
-                });
-            }
-            
-            const selectedArray = [];
-            if (selector !== '') {
-                document.querySelectorAll(selector).forEach(input => {
-                    if (type === 'gsc') {
-                        const safeUrl = input.id.replace('cb-', '');
-                        const countries = Array.from(document.querySelectorAll(`#countries-tags-${safeUrl} .tag`)).map(t => t.dataset.value);
-                        const keywords = Array.from(document.querySelectorAll(`#keywords-tags-${safeUrl} .tag`)).map(t => t.dataset.value);
-
-                        selectedArray.push({
-                            url: input.dataset.url,
-                            title: input.dataset.title,
-                            hostname: input.dataset.hostname,
-                            target_countries: countries,
-                            target_keywords: keywords
-                        });
-                    } else if (type === 'facebook-organic') {
-                        if (!selected.pages) selected.pages = [];
-                        selected.pages.push({
-                            id: input.dataset.id,
-                            title: input.dataset.title,
-                            url: input.dataset.url,
-                            hostname: input.dataset.hostname,
-                            ig_account: input.dataset.ig || null
-                        });
-                    } else if (type === 'facebook-marketing') {
-                        if (!selected.ad_accounts) selected.ad_accounts = [];
-                        selected.ad_accounts.push({
-                            id: input.dataset.id,
-                            name: input.dataset.name
-                        });
-                    }
-                });
-            }
-
-            const payloadAssets = (type === 'gsc') ? selectedArray : selected;
-
-            if (type !== 'global' && ((type === 'gsc' && selectedArray.length === 0) || 
-                (type === 'facebook-organic' && !selected.pages) || 
-                (type === 'facebook-marketing' && !selected.ad_accounts))) {
-                showToast('Please select at least one asset to apply.', true);
-                return;
-            }
-
-            showLoading('Updating configuration files...');
+            showLoading('Saving configuration...');
             try {
-                const featureToggles = {};
-                document.querySelectorAll('.fb-toggle, .fb-toggle-mark').forEach(toggle => {
-                    featureToggles[toggle.dataset.key] = toggle.checked;
-                });
-                
-                let requestBody = { 
-                    type: apiType, 
-                    assets: payloadAssets,
-                    cache_chunk_size: cacheChunkSize,
-                    cache_history_range: cacheHistoryRange,
-                    organic_history_range: organicHistoryRange,
-                    marketing_history_range: marketingHistoryRange,
-                    entity_filters: entityFilters,
-                    feature_toggles: featureToggles,
-                    enabled: (type === 'gsc') ? (document.getElementById('gsc-channel-enabled')?.checked ?? true) :
-                             (type === 'facebook-organic') ? (document.getElementById('fb-organic-enabled')?.checked ?? true) :
-                             (type === 'facebook-marketing') ? (document.getElementById('fb-marketing-enabled')?.checked ?? true) : true
+                const selected = type === 'global' ? {} : (type === 'gsc' ? {} : { pages: [], ad_accounts: [] });
+                const requestBody = { 
+                    type, 
+                    enabled: document.getElementById(`${type === 'gsc' ? 'gsc' : (type === 'facebook-organic' ? 'fb-organic' : 'fb-marketing')}-enabled`)?.checked ?? true 
                 };
-                
-                if (type === 'global') {
+
+                if (type === 'gsc') {
+                    document.querySelectorAll('#gsc-list input:checked').forEach(input => {
+                        const safeUrl = input.id.replace('cb-', '');
+                        requestBody.assets = requestBody.assets || {};
+                        requestBody.assets[input.dataset.url] = {
+                            url: input.dataset.url,
+                            title: input.dataset.title,
+                            hostname: input.dataset.hostname,
+                            target_countries: Array.from(document.querySelectorAll(`#countries-tags-${safeUrl} .tag`)).map(t => t.dataset.value),
+                            target_keywords: Array.from(document.querySelectorAll(`#keywords-tags-${safeUrl} .tag`)).map(t => t.dataset.value)
+                        };
+                    });
+                    requestBody.cache_history_range = document.getElementById('gsc-history-range').value;
+                } else if (type === 'facebook-organic' || type === 'facebook-marketing') {
+                    const selector = type === 'facebook-organic' ? '#fb-pages-list input:checked' : '#fb-ad-accounts-list input:checked';
+                    const assets = [];
+                    document.querySelectorAll(selector).forEach(input => {
+                        assets.push(type === 'facebook-organic' ? 
+                            { id: input.dataset.id, title: input.dataset.title, url: input.dataset.url, hostname: input.dataset.hostname, ig_account: input.dataset.ig || null } : 
+                            { id: input.dataset.id, name: input.dataset.name });
+                    });
+                    requestBody.assets = type === 'facebook-organic' ? { pages: assets } : { ad_accounts: assets };
+                    requestBody.cache_history_range = document.getElementById(`fb-${type === 'facebook-organic' ? 'organic' : 'marketing'}-history-range`).value;
+                    requestBody.entity_filters = {};
+                    ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA', 'CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'].forEach(e => {
+                        const el = document.getElementById(`filter-${e}`);
+                        if (el) requestBody.entity_filters[e] = el.value;
+                    });
+                } else if (type === 'global') {
                     requestBody.jobs_timeout_hours = parseInt(document.getElementById('jobs-timeout-hours').value, 10) || 6;
                     requestBody.cache_raw_metrics = document.getElementById('cache-raw-metrics')?.checked || false;
                 }
@@ -1768,103 +1257,86 @@
                     body: JSON.stringify(requestBody)
                 });
                 const result = await response.json();
-                if (result.status === 'success' || result.success) {
-                    showToast('Configuration updated successfully!');
-                    fetchAssets(); // Refresh state to show newly configured items
-                } else {
-                    throw new Error(result.error);
-                }
+                if (result.status === 'success') {
+                    showToast('Configuration updated!');
+                    fetchAssets();
+                } else throw new Error(result.error);
             } catch (err) {
-                showToast('Error: ' + err.message, true);
+                showToast(err.message, true);
             } finally {
                 hideLoading();
             }
         }
 
-        function showLoading(text) {
-            document.getElementById('loading-text').innerText = text;
-            const loadingEl = document.getElementById('loading');
-            if (loadingEl) loadingEl.style.display = 'flex';
+        function confirmUpdate(type) {
+            document.getElementById('confirm-modal').style.display = 'flex';
+            document.getElementById('modal-confirm-btn').onclick = () => {
+                document.getElementById('confirm-modal').style.display = 'none';
+                updateConfig(type);
+            };
         }
 
-        function hideLoading() {
-            const loadingEl = document.getElementById('loading');
-            if (loadingEl) loadingEl.style.display = 'none';
+        function closeModal() {
+            document.getElementById('confirm-modal').style.display = 'none';
         }
 
-        function showToast(message, isError = false) {
-            const toast = document.getElementById('toast');
-            if (!toast) return;
-            toast.innerText = message;
-            toast.style.display = 'block';
-            toast.style.borderColor = isError ? 'var(--danger)' : 'var(--secondary)';
-            toast.style.color = isError ? 'var(--danger)' : 'var(--info)';
-            
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 4000);
-        }
         async function validateTokens() {
-             showLoading('Checking tokens validity...');
-             try {
-                const response = await fetch('/api/config-manager/validate-tokens', {
-                    method: 'POST',
-                    headers: getAdminHeaders()
-                });
+            showLoading('Checking tokens...');
+            try {
+                const response = await fetch('/api/config-manager/validate-tokens', { method: 'POST', headers: getAdminHeaders() });
                 const result = await response.json();
-                
-                const gscEl = document.getElementById('gsc-token-status');
-                const fbEl = document.getElementById('fb-token-status');
-                
-                gscEl.style.display = 'inline-flex';
-                fbEl.style.display = 'inline-flex';
-                
-                if (result.channels.gsc) {
-                    gscEl.className = 'token-status valid';
-                    gscEl.innerHTML = '<i data-lucide="check-circle-2"></i> GSC API: OK';
-                } else {
-                    gscEl.className = 'token-status error';
-                    gscEl.innerHTML = '<i data-lucide="x-circle"></i> GSC API: EXPIRED/INVALID';
-                }
-                
-                if (result.channels.facebook) {
-                    fbEl.className = 'token-status valid';
-                    fbEl.innerHTML = '<i data-lucide="check-circle-2"></i> FB API: OK';
-                } else {
-                    fbEl.className = 'token-status error';
-                    fbEl.innerHTML = '<i data-lucide="x-circle"></i> FB API: EXPIRED/INVALID';
-                }
-                
+                const render = (id, valid) => {
+                    const el = document.getElementById(id);
+                    el.style.display = 'inline-flex';
+                    el.className = `token-status ${valid ? 'valid' : 'error'}`;
+                    el.innerHTML = `<i data-lucide="${valid ? 'check-circle' : 'x-circle'}"></i> ${valid ? 'API OK' : 'EXPIRED/INVALID'}`;
+                };
+                render('gsc-token-status', result.channels.gsc);
+                render('fb-token-status', result.channels.facebook);
                 lucide.createIcons();
                 showToast('Tokens checked.');
-             } catch (err) {
-                showToast('Error: ' + err.message, true);
-             } finally {
-                hideLoading();
-             }
+            } catch (err) { showToast(err.message, true); } finally { hideLoading(); }
         }
 
         async function exportConfig() {
             try {
-                const response = await fetch('/api/config-manager/export', {
-                    method: 'POST',
-                    headers: getAdminHeaders()
-                });
+                const response = await fetch('/api/config-manager/export', { method: 'POST', headers: getAdminHeaders() });
                 const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = `instances-${dayjs().format('YYYY-MM-DD')}.yaml`;
-                document.body.appendChild(a);
+                a.href = window.URL.createObjectURL(blob);
+                a.download = `config-export-${dayjs().format('YYYY-MM-DD')}.yaml`;
                 a.click();
-                a.remove();
-                showToast('Configuration exported.');
-            } catch (err) {
-                showToast('Export failed: ' + err.message, true);
-            }
+            } catch (err) { showToast('Export failed', true); }
         }
 
-        // Init
+        function showLoading(text) { document.getElementById('loading-text').innerText = text; document.getElementById('loading').style.display = 'flex'; }
+        function hideLoading() { document.getElementById('loading').style.display = 'none'; }
+        
+        function showToast(msg, err) { 
+            const t = document.getElementById('toast'); 
+            if(!t) return;
+            t.innerText = msg; t.className = `toast ${err ? 'error' : ''}`; t.style.display = 'block'; 
+            setTimeout(() => t.style.display = 'none', 4000); 
+        }
+
+        function selectAll(id, state) { 
+            document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(cb => { 
+                cb.checked = state; 
+                if (cb.id.startsWith('cb-')) toggleConfigArea(cb.id.replace('cb-','')); 
+            }); 
+        }
+
+        // Tabs logic
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
+                tab.classList.add('active');
+                const content = document.getElementById('tab-' + tab.dataset.tab);
+                content.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(c => c.style.display = (c === content ? 'block' : 'none'));
+            });
+        });
+
         fetchAssets();
     </script>
 </body>
