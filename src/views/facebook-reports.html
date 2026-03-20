@@ -342,6 +342,9 @@
         .btn-expand:hover { color: var(--meta-blue); }
         .btn-expand.active { transform: rotate(90deg); color: var(--meta-blue); }
 
+        .gender-female { color: #ec4899; font-weight: 600; opacity: 0.9; }
+        .gender-male { color: #3b82f6; font-weight: 600; opacity: 0.9; }
+
         .report-section {
             background: var(--meta-card);
             border-radius: 12px;
@@ -821,7 +824,17 @@
             `;
 
             data.forEach(row => {
-                const dimCells = dimKeys.map(d => `<td>${row[`dimensions.${d}`] || 'Unknown'}</td>`).join('');
+                const dimCells = dimKeys.map(d => {
+                    const rawVal = row[`dimensions.${d}`] || 'Unknown';
+                    const val = rawVal.charAt(0).toUpperCase() + rawVal.slice(1);
+                    let cls = '';
+                    if (d === 'gender') {
+                        if (rawVal.toLowerCase() === 'female') cls = 'gender-female';
+                        if (rawVal.toLowerCase() === 'male') cls = 'gender-male';
+                    }
+                    return `<td class="${cls}">${val}</td>`;
+                }).join('');
+                
                 const cpr = parseFloat(row.average_cost_per_result || 0);
                 const ctr = parseFloat(row.average_ctr || 0) * 100;
                 const resRate = parseFloat(row.average_result_rate || 0) * 100;
