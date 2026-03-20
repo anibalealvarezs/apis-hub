@@ -430,6 +430,7 @@ class BaseRepository extends EntityRepository
                 'roas'            => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN m.value ELSE NULL END)",
                 'website_roas'    => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN m.value ELSE NULL END)",
                 'actions'         => "SUM(CASE WHEN mc.name = 'actions' THEN m.value ELSE 0 END)",
+                'campaign_status' => "MIN(rcc.status)",
                 'purchase_roas'   => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN m.value ELSE NULL END)",
                 'website_purchase_roas' => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN m.value ELSE NULL END)",
             ];

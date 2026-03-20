@@ -400,6 +400,7 @@
                         <tr>
                             <th onclick="sortTable('account')" data-col="account">Ad Account <span class="sort-icon">↕</span></th>
                             <th onclick="sortTable('campaign')" data-col="campaign">Campaign Name <span class="sort-icon">↕</span></th>
+                            <th style="width: 50px;">Status</th>
                             <th class="text-right" onclick="sortTable('total_spend')" data-col="total_spend">Spend <span class="sort-icon">↕</span></th>
                             <th class="text-right" onclick="sortTable('total_impressions')" data-col="total_impressions">Impr. <span class="sort-icon">↕</span></th>
                             <th class="text-right" onclick="sortTable('total_reach')" data-col="total_reach">Reach <span class="sort-icon">↕</span></th>
@@ -471,7 +472,8 @@
                         average_cpm: "cpm",
                         average_frequency: "frequency",
                         average_cost_per_result: "cost_per_result",
-                        average_result_rate: "result_rate"
+                        average_result_rate: "result_rate",
+                        campaign_status: "campaign_status"
                     },
                     groupBy: ["account", "campaign"],
                     startDate: start,
@@ -500,7 +502,6 @@
                 emptyMsg.style.display = 'block';
             } finally {
                 loader.style.display = 'none';
-                lucide.createIcons();
             }
         }
 
@@ -514,10 +515,12 @@
                 const cpr = parseFloat(row.average_cost_per_result || 0);
                 const ctr = parseFloat(row.average_ctr || 0) * 100;
                 const resRate = parseFloat(row.average_result_rate || 0) * 100;
+                const status = row.campaign_status ? row.campaign_status.toLowerCase() : 'unknown';
                 
                 tr.innerHTML = `
                     <td class="account-name">${row.account || 'Unknown'}</td>
                     <td class="campaign-name">${row.campaign || 'Unknown'}</td>
+                    <td style="text-align:center;">${getStatusIcon(status)}</td>
                     <td class="text-right metric-cell">€${formatNum(row.total_spend)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_impressions)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_reach)}</td>
@@ -535,6 +538,20 @@
             });
             renderSummary(currentData);
             updateSortHeaders();
+            lucide.createIcons();
+        }
+
+        function getStatusIcon(status) {
+            if (status === 'active' || status === 'on') {
+                return '<i data-lucide="circle" style="fill:#3fb950; color:#3fb950; width:12px; height:12px;" title="Active"></i>';
+            }
+            if (status === 'paused' || status === 'off') {
+                return '<i data-lucide="pause-circle" style="color:#f0883e; width:14px; height:14px;" title="Paused"></i>';
+            }
+            if (status.includes('archived') || status.includes('deleted')) {
+                return '<i data-lucide="archive" style="color:var(--meta-text-dim); width:14px; height:14px;" title="Archived"></i>';
+            }
+            return '<i data-lucide="help-circle" style="color:var(--meta-text-dim); width:14px; height:14px;"></i>';
         }
 
         function sortTable(key) {
