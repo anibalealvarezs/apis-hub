@@ -169,7 +169,7 @@ class BaseRepository extends EntityRepository
                 $safeLeftJoin("dv_$dimAlias", 'dimension_keys', "dk_$dimAlias", "dv_$dimAlias.dimension_key_id = dk_$dimAlias.id AND dk_$dimAlias.name = :key_$dimAlias");
                 
                 $qb->setParameter("key_$dimAlias", $dimKey)
-                   ->addSelect("dv_$dimAlias.value AS $quotedField")
+                   ->addSelect("dv_$dimAlias.value AS \"$quotedField\"")
                    ->addGroupBy("dv_$dimAlias.value");
             } elseif ($this->isChanneledMetric && in_array($field, ['account', 'campaign'])) {
                 $isAccount = $field === 'account';
@@ -186,7 +186,7 @@ class BaseRepository extends EntityRepository
                     $safeLeftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
                     $safeLeftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
                     
-                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST({$channeledMap['alias']}.platform_id AS CHAR), CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
+                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST({$channeledMap['alias']}.platform_id AS CHAR), CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS \"$quotedField\"")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("rca_fallback.name")
                        ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
@@ -194,7 +194,7 @@ class BaseRepository extends EntityRepository
                        ->addGroupBy("mc.{$channeledMap['fk']}")
                        ->addGroupBy("mc.{$genericMap['fk']}");
                 } else {
-                    $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS $quotedField")
+                    $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS \"$quotedField\"")
                        ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("mc.{$channeledMap['fk']}")
@@ -204,12 +204,12 @@ class BaseRepository extends EntityRepository
                 $map = $relationMap[$field];
                 $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
                 
-                $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS CHAR), 'Unknown') AS $quotedField")
+                $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS CHAR), 'Unknown') AS \"$quotedField\"")
                    ->addGroupBy("{$map['alias']}.{$map['field']}")
                    ->addGroupBy("mc.{$map['fk']}");
             } else {
                 $sqlField = $this->mapFieldToSql($field);
-                $qb->addSelect("$sqlField AS $quotedField")->addGroupBy($sqlField);
+                $qb->addSelect("$sqlField AS \"$quotedField\"")->addGroupBy($sqlField);
             }
         }
 
