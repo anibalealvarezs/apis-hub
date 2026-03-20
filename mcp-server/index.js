@@ -329,11 +329,15 @@ if (MODE === "sse") {
     next();
   });
 
-  // Manejador para el endpoint SSE (GET inicia el stream, otros métodos devolvemos 200 para compatibilidad)
+  // Manejador para el endpoint SSE (GET inicia el stream, otros métodos devolvemos JSON-RPC vacío para compatibilidad)
   app.all("/mcp/sse", async (req, res) => {
     if (req.method !== "GET") {
-        console.error(`[DEBUG-REQ] Antigravity probando método ${req.method} en SSE. Respondiendo 200 OK.`);
-        return res.status(200).json({ status: "ok" });
+        console.error(`[DEBUG-REQ] Antigravity probando método ${req.method} en SSE. Respondiendo JSON-RPC 2.0.`);
+        return res.status(200).json({ 
+            jsonrpc: "2.0", 
+            id: req.body ? req.body.id : null,
+            result: { supported: true, notice: "Please use GET for SSE stream" }
+        });
     }
 
     console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
