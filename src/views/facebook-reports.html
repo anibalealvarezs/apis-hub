@@ -676,11 +676,9 @@
                             <i data-lucide="chevron-right" size="14"></i>
                         </button>
                     </td>
+                    <td class="account-name">${row.account || 'Unknown'}</td>
+                    <td class="campaign-name" onclick="toggleBreakdown(${index})" title="${row.campaign || 'Unknown'}">${row.campaign || 'Unknown'}</td>
                     <td style="text-align:center;">${getStatusIcon(status)}</td>
-                    <td>
-                        <div class="campaign-name" onclick="toggleBreakdown(${index})" title="${row.campaign || 'Unknown'}">${row.campaign || 'Unknown'}</div>
-                        <div class="account-name">${row.account || 'Unknown'}</div>
-                    </td>
                     <td class="text-right metric-cell">€${formatNum(row.total_spend)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_impressions)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_reach)}</td>
@@ -692,7 +690,7 @@
                     <td class="text-right metric-cell">${formatInt(row.total_results)}</td>
                     <td class="text-right metric-cell" style="white-space:nowrap">
                         <span class="${costClass}">€${formatNum(cpr)}</span>
-                        <div id="spark-cpr-${index}" class="sparkline-container"></div>
+                        <div id="spark-cpr-${index}" class="sparkline-container" style="width: 80px"></div>
                     </td>
                     <td class="text-right metric-cell">${formatPct(resRate)}</td>
                     <td class="text-right metric-cell">${formatInt(row.total_actions)}</td>
