@@ -303,8 +303,9 @@ class Helpers
         $valuesString = implode(', ', array_fill(0, $rowCount, $placeholders));
 
         if ($isPostgres) {
-            $uniqueClause = is_array($uniqueCols) ? implode(', ', $uniqueCols) : $uniqueCols;
-            return "INSERT INTO {$table} ({$colString}) VALUES {$valuesString} ON CONFLICT ({$uniqueClause}) DO NOTHING";
+            // In PostgreSQL, if DO NOTHING is specified, the conflict_target can be omitted
+            // to ignore any conflict with any existing unique index.
+            return "INSERT INTO {$table} ({$colString}) VALUES {$valuesString} ON CONFLICT DO NOTHING";
         } else {
             return "INSERT IGNORE INTO {$table} ({$colString}) VALUES {$valuesString}";
         }

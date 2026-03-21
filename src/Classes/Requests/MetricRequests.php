@@ -4551,7 +4551,7 @@ class MetricRequests
             }
 
             $additionalParams = [
-                'breakdowns' => 'ad_creative_id',
+                'breakdowns' => 'ad_creative_id,ad_id,adset_id,campaign_id',
                 'limit' => 100,
             ];
             if ($startDate) {
