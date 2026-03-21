@@ -499,7 +499,7 @@ class MetricsProcessor
                 'country_id' => isset($metric->countryCode) ? ($countryMap['map'][$metric->countryCode]->getId()) : null,
                 'device_id' => isset($metric->deviceType) ? ($deviceMap['map'][$metric->deviceType]->getId()) : null,
                 'creative_id' => isset($metric->creative) ? ($creativeMap['map'][$metric->creative->getCreativeId()] ?? ($creativeMap['map'][$metric->creative->getCreativeId()] ?? null)) : null,
-                'config_signature' => $metricConfigKey,
+                'key' => $metricConfigKey,
             ];
         }
 
