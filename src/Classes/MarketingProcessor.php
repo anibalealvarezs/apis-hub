@@ -244,7 +244,7 @@ class MarketingProcessor
                     'channeled_ads', 
                     $cols, 
                     ['channeled_account_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'creative_id', 'name', 'status', 'data'], 
-                    ['platform_id', 'channel'], 
+                    ['platform_id', 'channeled_campaign_id'], 
                     count($chunk)
                 );
                 $affected = $conn->executeStatement($sql, $params);
