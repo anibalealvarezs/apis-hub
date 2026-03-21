@@ -804,42 +804,50 @@
                     <div class="config-label" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
                         <i data-lucide="toggle-right" style="width: 16px; height: 16px; color: var(--primary);"></i> Organic Feature Toggles
                     </div>
+                <div style="margin-top: 25px;">
+                    <div class="config-label" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="toggle-right" style="width: 16px; height: 16px; color: var(--primary);"></i> Organic Sync Configuration
+                    </div>
                     <div class="toggle-grid">
+                        <!-- FB Content Path -->
                         <div class="toggle-group">
-                            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">Entity Sync</div>
-                            <div class="toggle-item">
+                            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.5px;">Facebook Path</div>
+                            <div class="toggle-item" style="border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; margin-bottom: 10px;">
+                                <span style="color: #fff; font-weight: 500;">FB PAGE Metrics</span>
+                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="page_metrics" id="fb-page-metrics-toggle" checked><span class="slider"></span></label>
+                            </div>
+                            <div class="toggle-item" style="padding-left: 20px;">
                                 <span>Cache POST Entities</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle" data-key="posts" checked><span class="slider"></span></label>
+                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="posts" id="fb-posts-entity-toggle" onchange="updateOrganicDependencies()"><span class="slider"></span></label>
                             </div>
-                            <div class="toggle-item">
-                                <span>Cache IG_ACCOUNT Entities</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle" data-key="ig_accounts" checked><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item">
-                                <span>Cache IG_MEDIA Entities</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle" data-key="ig_account_media" checked><span class="slider"></span></label>
+                            <div class="toggle-item" style="padding-left: 40px; opacity: 0.7;">
+                                <span style="font-size: 0.8rem;">POST Metrics</span>
+                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="post_metrics" id="fb-posts-metrics-toggle"><span class="slider"></span></label>
                             </div>
                         </div>
+
+                        <!-- IG Content Path -->
                         <div class="toggle-group">
-                            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">Metric Sync</div>
-                            <div class="toggle-item">
-                                <span>PAGE Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle" data-key="page_metrics" checked><span class="slider"></span></label>
+                            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.5px;">Instagram Path (via FB Page)</div>
+                            <div class="toggle-item" style="padding-left: 20px;">
+                                <span>Cache IG ACCOUNT (Business)</span>
+                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="ig_accounts" id="fb-igacc-entity-toggle" onchange="updateOrganicDependencies()"><span class="slider"></span></label>
                             </div>
-                            <div class="toggle-item">
-                                <span>POST Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle" data-key="post_metrics"><span class="slider"></span></label>
+                            <div class="toggle-item" style="padding-left: 40px; opacity: 0.7;">
+                                <span style="font-size: 0.8rem;">IG ACCOUNT Metrics</span>
+                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="ig_account_metrics" id="fb-igacc-metrics-toggle"><span class="slider"></span></label>
                             </div>
-                            <div class="toggle-item">
-                                <span>IG_ACCOUNT Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle" data-key="ig_account_metrics"><span class="slider"></span></label>
+                            <div class="toggle-item" style="padding-left: 40px;">
+                                <span>Cache IG MEDIA Entities</span>
+                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="ig_account_media" id="fb-igmedia-entity-toggle" onchange="updateOrganicDependencies()"><span class="slider"></span></label>
                             </div>
-                            <div class="toggle-item">
-                                <span>IG_MEDIA Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle" data-key="ig_account_media_metrics"><span class="slider"></span></label>
+                            <div class="toggle-item" style="padding-left: 60px; opacity: 0.7;">
+                                <span style="font-size: 0.8rem;">IG MEDIA Metrics</span>
+                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="ig_account_media_metrics" id="fb-igmedia-metrics-toggle"><span class="slider"></span></label>
                             </div>
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
             <div class="card">
@@ -929,49 +937,35 @@
                 </div>
                 <div style="margin-top: 25px;">
                     <div class="config-label" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="toggle-right" style="width: 16px; height: 16px; color: var(--primary);"></i> Marketing Feature Toggles
+                        <i data-lucide="toggle-right" style="width: 16px; height: 16px; color: var(--primary);"></i> Marketing Sync Configuration
                     </div>
-                    <div class="toggle-grid">
+                    <div class="toggle-grid" style="grid-template-columns: 1fr;">
                         <div class="toggle-group">
-                            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">Entity Sync</div>
-                            <div class="toggle-item">
-                                <span>Cache CAMPAIGN Entities</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle-mark" data-key="campaigns" checked><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item">
-                                <span>Cache ADSET Entities</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle-mark" data-key="adsets" checked><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item">
-                                <span>Cache AD Entities</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle-mark" data-key="ads" checked><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item">
-                                <span>Cache CREATIVE Entities</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle-mark" data-key="creatives"><span class="slider"></span></label>
-                            </div>
-                        </div>
-                        <div class="toggle-group">
-                            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">Metric Sync</div>
-                            <div class="toggle-item">
-                                <span>AD_ACCOUNT Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle-mark" data-key="ad_account_metrics" checked><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item">
-                                <span>CAMPAIGN Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle-mark" data-key="campaign_metrics" checked><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item">
-                                <span>ADSET Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle-mark" data-key="adset_metrics"><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item">
-                                <span>AD Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle-mark" data-key="ad_metrics"><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item">
-                                <span>CREATIVE Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle-mark" data-key="creative_metrics"><span class="slider"></span></label>
+                            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 20px; letter-spacing: 0.5px;">Hierarchy & Granularity</div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 40px; align-items: flex-start;">
+                                <!-- Left Column: Level -->
+                                <div class="config-group">
+                                    <div class="config-label">Maximum Granularity level</div>
+                                    <select class="config-input" id="fb-marketing-level" onchange="handleFbLevelChange()">
+                                        <option value="ad_account">Ad Account Level</option>
+                                        <option value="campaign">Campaign Level</option>
+                                        <option value="adset">AdSet Level</option>
+                                        <option value="ad">Ad Level</option>
+                                        <option value="creative">Creative Level</option>
+                                    </select>
+                                    <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 8px;" id="fb-level-hint">
+                                        <i data-lucide="info" style="width: 12px; height: 12px; vertical-align: middle;"></i> Higher-level entities (Campaigns, AdSets, etc.) will be cached automatically.
+                                    </p>
+                                </div>
+
+                                <!-- Right Column: Metrics -->
+                                <div id="fb-metrics-options">
+                                    <div class="config-label" style="margin-bottom: 10px;">Select Metrics to Sync</div>
+                                    <div id="fb-metrics-container" style="display: flex; flex-wrap: wrap; gap: 15px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
+                                        <!-- Dynamic content -->
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1118,6 +1112,74 @@
             }
         }
 
+        // Facebook Marketing Hierarchy
+        const fbMarketingHierarchy = [
+            { key: 'ad_account', label: 'Ad Account', entityKey: null, metricKey: 'ad_account_metrics' },
+            { key: 'campaign', label: 'Campaign', entityKey: 'campaigns', metricKey: 'campaign_metrics' },
+            { key: 'adset', label: 'AdSet', entityKey: 'adsets', metricKey: 'adset_metrics' },
+            { key: 'ad', label: 'Ad', entityKey: 'ads', metricKey: 'ad_metrics' },
+            { key: 'creative', label: 'Creative', entityKey: 'creatives', metricKey: 'creative_metrics' }
+        ];
+
+        function handleFbLevelChange() {
+            const level = document.getElementById('fb-marketing-level').value;
+            const container = document.getElementById('fb-metrics-container');
+            const levelIdx = fbMarketingHierarchy.findIndex(h => h.key === level);
+            
+            // Re-render metrics radio buttons based on selected level
+            container.innerHTML = fbMarketingHierarchy
+                .filter((h, idx) => idx <= levelIdx)
+                .map(h => `
+                    <div class="toggle-item" style="gap: 10px; margin-bottom: 0;">
+                        <span>${h.label}</span>
+                        <input type="radio" name="fb-metric-level" class="fb-metric-radio" 
+                               data-key="${h.metricKey}" ${h.key === level ? 'checked' : ''} 
+                               style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                    </div>
+                `).join('');
+            
+            lucide.createIcons();
+        }
+
+        function updateOrganicDependencies() {
+            const postsEntity = document.getElementById('fb-posts-entity-toggle');
+            const postsMetrics = document.getElementById('fb-posts-metrics-toggle');
+            
+            const igAccEntity = document.getElementById('fb-igacc-entity-toggle');
+            const igAccMetrics = document.getElementById('fb-igacc-metrics-toggle');
+            const igMediaEntity = document.getElementById('fb-igmedia-entity-toggle');
+            const igMediaMetrics = document.getElementById('fb-igmedia-metrics-toggle');
+
+            // FB Posts Logic
+            if (!postsEntity.checked) {
+                postsMetrics.checked = false;
+                postsMetrics.disabled = true;
+            } else {
+                postsMetrics.disabled = false;
+            }
+
+            // IG Account Logic
+            if (!igAccEntity.checked) {
+                igAccMetrics.checked = false;
+                igAccMetrics.disabled = true;
+                igMediaEntity.checked = false;
+                igMediaEntity.disabled = true;
+                igMediaMetrics.checked = false;
+                igMediaMetrics.disabled = true;
+            } else {
+                igAccMetrics.disabled = false;
+                igMediaEntity.disabled = false;
+                
+                // IG Media Logic (dependent on IG Account)
+                if (!igMediaEntity.checked) {
+                    igMediaMetrics.checked = false;
+                    igMediaMetrics.disabled = true;
+                } else {
+                    igMediaMetrics.disabled = false;
+                }
+            }
+        }
+
         function populateGlobalFields() {
             if (currentConfig.jobs_timeout_hours !== undefined) {
                 document.getElementById('jobs-timeout-hours').value = currentConfig.jobs_timeout_hours;
@@ -1143,13 +1205,43 @@
                     if (el) el.value = val;
                 });
             }
+
+            // Handle Marketing Granularity
             if (currentConfig.fb_feature_toggles) {
-                Object.entries(currentConfig.fb_feature_toggles).forEach(([key, val]) => {
-                    document.querySelectorAll(`.fb-toggle[data-key="${key}"], .fb-toggle-mark[data-key="${key}"]`).forEach(el => {
-                        el.checked = !!val;
-                    });
+                // Populate Organic Toggles
+                document.querySelectorAll('.fb-organic-toggle').forEach(el => {
+                    const val = currentConfig.fb_feature_toggles[el.dataset.key];
+                    if (val !== undefined) el.checked = !!val;
                 });
+                updateOrganicDependencies();
+
+                // Handle Marketing Granularity
+                let maxLevel = 'ad_account';
+                if (currentConfig.fb_feature_toggles.creatives) maxLevel = 'creative';
+                else if (currentConfig.fb_feature_toggles.ads) maxLevel = 'ad';
+                else if (currentConfig.fb_feature_toggles.adsets) maxLevel = 'adset';
+                else if (currentConfig.fb_feature_toggles.campaigns) maxLevel = 'campaign';
+                
+                document.getElementById('fb-marketing-level').value = maxLevel;
+                handleFbLevelChange();
+
+                // Re-apply specific metric radio from config
+                setTimeout(() => {
+                    const radios = document.querySelectorAll('.fb-metric-radio');
+                    radios.forEach(el => { el.checked = false; }); // Uncheck all first
+                    
+                    // Find which metric is enabled in config
+                    const activeMetricKey = fbMarketingHierarchy
+                        .map(h => h.metricKey)
+                        .find(key => !!currentConfig.fb_feature_toggles[key]);
+                    
+                    if (activeMetricKey) {
+                        const targetRadio = Array.from(radios).find(r => r.dataset.key === activeMetricKey);
+                        if (targetRadio) targetRadio.checked = true;
+                    }
+                }, 0);
             }
+
             if (currentConfig.fb_cache_chunk_size) {
                 document.querySelectorAll('.fb-periodicity-select').forEach(el => {
                     el.value = currentConfig.fb_cache_chunk_size;
@@ -1301,9 +1393,30 @@
                     });
 
                     requestBody.feature_toggles = {};
-                    document.querySelectorAll('.fb-toggle, .fb-toggle-mark').forEach(el => {
-                        requestBody.feature_toggles[el.dataset.key] = el.checked;
-                    });
+                    if (type === 'facebook-marketing') {
+                        const level = document.getElementById('fb-marketing-level').value;
+                        const levelIdx = fbMarketingHierarchy.findIndex(h => h.key === level);
+                        
+                        // Set entities based on level (all levels above the selected one are true)
+                        fbMarketingHierarchy.forEach((h, idx) => {
+                            if (h.entityKey) {
+                                requestBody.feature_toggles[h.entityKey] = (idx <= levelIdx);
+                            }
+                        });
+                        
+                        // Set metrics based on UI radio choice
+                        fbMarketingHierarchy.forEach(h => {
+                            if (h.metricKey) requestBody.feature_toggles[h.metricKey] = false;
+                        });
+                        const selectedRadio = document.querySelector('.fb-metric-radio:checked');
+                        if (selectedRadio) {
+                            requestBody.feature_toggles[selectedRadio.dataset.key] = true;
+                        }
+                    } else {
+                        document.querySelectorAll('.fb-toggle').forEach(el => {
+                            requestBody.feature_toggles[el.dataset.key] = el.checked;
+                        });
+                    }
                 } else if (type === 'global') {
                     requestBody.jobs_timeout_hours = parseInt(document.getElementById('jobs-timeout-hours').value, 10) || 6;
                     requestBody.cache_raw_metrics = document.getElementById('cache-raw-metrics')?.checked || false;
