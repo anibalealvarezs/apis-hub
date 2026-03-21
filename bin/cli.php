@@ -44,6 +44,10 @@ try {
     if ($helperSet->has('db')) {
         $cli->getHelperSet()->set($helperSet->get('db'), 'db');
     }
+    // Ensure default helpers are registered
+    if (!$cli->getHelperSet()->has('question')) {
+        $cli->getHelperSet()->set(new \Symfony\Component\Console\Helper\QuestionHelper(), 'question');
+    }
 
     // Register All Doctrine Commands
     ConsoleRunner::addCommands($cli);
