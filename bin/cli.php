@@ -21,6 +21,7 @@ use Commands\GenerateEntitiesConfigCommand;
 use Commands\InitializeEntitiesCommand;
 use Commands\RefreshInstancesCommand;
 use Commands\SetupDatabaseCommand;
+use Commands\SeedDemoDataCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use Helpers\Helpers;
 use Symfony\Component\Console\Application;
@@ -61,6 +62,7 @@ try {
         new AggregateEntityCommand(),
         new RefreshInstancesCommand(),
         new SetupDatabaseCommand(),
+        new SeedDemoDataCommand(Helpers::getManager()),
     ]);
 
     // Runs console application

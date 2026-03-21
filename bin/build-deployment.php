@@ -71,6 +71,7 @@ foreach ($instances as $instance) {
         "REDIS_PORT=" . $redis['port'],
         "PROJECT_CONFIG_FILE=/app/config/" . ($config['project'] ?? 'apis-hub') . ".yaml",
         "INSTANCE_NAME={$name}",
+        "ENV_FILE=" . (getenv('ENV_FILE') ?: '.env'),
     ];
 
     if ($startDate) {
