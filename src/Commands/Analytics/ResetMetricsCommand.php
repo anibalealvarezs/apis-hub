@@ -151,7 +151,7 @@ class ResetMetricsCommand extends Command
 
             // Always clear cache
             $output->writeln('<info>🧹 Clearing analytics cache...</info>');
-            $clearCacheCommand = $this->getApplication()->find('app:clear-cache');
+            $clearCacheCommand = $this->getApplication()->find('app:cache:clear');
             $clearCacheCommand->run($input, $output);
 
             $output->writeln('<info>✅ Success: Metrics have been cleared.</info>');
