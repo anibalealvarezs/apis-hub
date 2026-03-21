@@ -4131,10 +4131,19 @@ class MetricRequests
             $channeledCampaignRepository = $manager->getRepository(ChanneledCampaign::class);
             $globalAllMetrics = new ArrayCollection();
 
+            $campaignPlatformIdsToFetch = array_keys($groupedRows);
+            $campaigns = $campaignRepository->findBy(['campaignId' => $campaignPlatformIdsToFetch]);
+            $channeledCampaigns = $channeledCampaignRepository->findBy(['platformId' => $campaignPlatformIdsToFetch]);
+
+            $campaignEntityMap = [];
+            foreach ($campaigns as $e) $campaignEntityMap[$e->getCampaignId()] = $e;
+            $channeledCampaignEntityMap = [];
+            foreach ($channeledCampaigns as $e) $channeledCampaignEntityMap[$e->getPlatformId()] = $e;
+
             foreach ($groupedRows as $campaignPlatformId => $campaignRows) {
                 Helpers::checkJobStatus($jobId);
-                $campaignEntity = $campaignRepository->findOneBy(['campaignId' => $campaignPlatformId]);
-                $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignPlatformId]);
+                $campaignEntity = $campaignEntityMap[$campaignPlatformId] ?? null;
+                $channeledCampaignEntity = $channeledCampaignEntityMap[$campaignPlatformId] ?? null;
 
                 if (!$campaignEntity || !$channeledCampaignEntity) {
                     continue;
@@ -4279,12 +4288,33 @@ class MetricRequests
             $channeledAdGroupRepository = $manager->getRepository(ChanneledAdGroup::class);
             $globalAllMetrics = new ArrayCollection();
 
+            $adsetPlatformIdsToFetch = array_keys($groupedRows);
+            $campaignIdsToFetch = [];
+            foreach ($adsetPlatformIdsToFetch as $agid) {
+                if (isset($channeledAdGroupMap['mapCampaign'][$agid])) {
+                    $campaignIdsToFetch[] = $channeledAdGroupMap['mapCampaign'][$agid];
+                }
+            }
+            $campaignIdsToFetch = array_unique($campaignIdsToFetch);
+
+            $campaigns = $campaignRepository->findBy(['campaignId' => $campaignIdsToFetch]);
+            $channeledCampaigns = $channeledCampaignRepository->findBy(['platformId' => $campaignIdsToFetch]);
+            $channeledAdGroups = $channeledAdGroupRepository->findBy(['platformId' => $adsetPlatformIdsToFetch]);
+
+            $campaignEntityMap = [];
+            foreach ($campaigns as $e) $campaignEntityMap[$e->getCampaignId()] = $e;
+            $channeledCampaignEntityMap = [];
+            foreach ($channeledCampaigns as $e) $channeledCampaignEntityMap[$e->getPlatformId()] = $e;
+            $channeledAdGroupEntityMap = [];
+            foreach ($channeledAdGroups as $e) $channeledAdGroupEntityMap[$e->getPlatformId()] = $e;
+
             foreach ($groupedRows as $adsetPlatformId => $adsetRows) {
                 Helpers::checkJobStatus($jobId);
                 $campaignId = $channeledAdGroupMap['mapCampaign'][$adsetPlatformId];
-                $campaignEntity = $campaignRepository->findOneBy(['campaignId' => $campaignId]);
-                $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignId]);
-                $channeledAdGroupEntity = $channeledAdGroupRepository->findOneBy(['platformId' => $adsetPlatformId]);
+                
+                $campaignEntity = $campaignEntityMap[$campaignId] ?? null;
+                $channeledCampaignEntity = $channeledCampaignEntityMap[$campaignId] ?? null;
+                $channeledAdGroupEntity = $channeledAdGroupEntityMap[$adsetPlatformId] ?? null;
 
                 if (!$campaignEntity || !$channeledCampaignEntity || !$channeledAdGroupEntity) {
                     continue;
@@ -4441,6 +4471,37 @@ class MetricRequests
             $projectConfig = Helpers::getProjectConfig();
             $marketingDebug = filter_var($projectConfig['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
+            $adPlatformIdsToFetch = array_keys($groupedRows);
+            $adgroupIdsToFetch = [];
+            foreach ($adPlatformIdsToFetch as $apid) {
+                if (isset($channeledAdMap['mapAdGroup'][$apid])) {
+                    $adgroupIdsToFetch[] = $channeledAdMap['mapAdGroup'][$apid];
+                }
+            }
+            $adgroupIdsToFetch = array_unique($adgroupIdsToFetch);
+            
+            $campaignIdsToFetch = [];
+            foreach ($adgroupIdsToFetch as $agid) {
+                if (isset($channeledAdGroupMap['mapCampaign'][$agid])) {
+                    $campaignIdsToFetch[] = $channeledAdGroupMap['mapCampaign'][$agid];
+                }
+            }
+            $campaignIdsToFetch = array_unique($campaignIdsToFetch);
+
+            $campaigns = $campaignRepository->findBy(['campaignId' => $campaignIdsToFetch]);
+            $channeledCampaigns = $channeledCampaignRepository->findBy(['platformId' => $campaignIdsToFetch]);
+            $channeledAdGroups = $channeledAdGroupRepository->findBy(['platformId' => $adgroupIdsToFetch]);
+            $channeledAds = $channeledAdRepository->findBy(['platformId' => $adPlatformIdsToFetch]);
+
+            $campaignEntityMap = [];
+            foreach ($campaigns as $e) $campaignEntityMap[$e->getCampaignId()] = $e;
+            $channeledCampaignEntityMap = [];
+            foreach ($channeledCampaigns as $e) $channeledCampaignEntityMap[$e->getPlatformId()] = $e;
+            $channeledAdGroupEntityMap = [];
+            foreach ($channeledAdGroups as $e) $channeledAdGroupEntityMap[$e->getPlatformId()] = $e;
+            $channeledAdEntityMap = [];
+            foreach ($channeledAds as $e) $channeledAdEntityMap[$e->getPlatformId()] = $e;
+
             foreach ($groupedRows as $adPlatformId => $adRows) {
                 Helpers::checkJobStatus($jobId);
                 
@@ -4452,10 +4513,10 @@ class MetricRequests
                 $adgroupId = $channeledAdMap['mapAdGroup'][$adPlatformId];
                 $campaignId = $channeledAdGroupMap['mapCampaign'][$adgroupId];
 
-                $campaignEntity = $campaignRepository->findOneBy(['campaignId' => $campaignId]);
-                $channeledCampaignEntity = $channeledCampaignRepository->findOneBy(['platformId' => $campaignId]);
-                $channeledAdGroupEntity = $channeledAdGroupRepository->findOneBy(['platformId' => $adgroupId]);
-                $channeledAdEntity = $channeledAdRepository->findOneBy(['platformId' => $adPlatformId]);
+                $campaignEntity = $campaignEntityMap[$campaignId] ?? null;
+                $channeledCampaignEntity = $channeledCampaignEntityMap[$campaignId] ?? null;
+                $channeledAdGroupEntity = $channeledAdGroupEntityMap[$adgroupId] ?? null;
+                $channeledAdEntity = $channeledAdEntityMap[$adPlatformId] ?? null;
 
                 if (!$campaignEntity) {
                     if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: Campaign entity '" . ($campaignId ?: 'EMPTY') . "' not found in DB");
