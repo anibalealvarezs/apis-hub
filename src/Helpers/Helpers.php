@@ -67,7 +67,8 @@ class Helpers
         $rootConfigDir = __DIR__ . '/../../config';
 
         // 0. Load .env manually if it exists to ensure variables are available
-        $dotEnv = __DIR__ . '/../../.env';
+        $envFileName = getenv('ENV_FILE') ?: '.env';
+        $dotEnv = __DIR__ . '/../../' . $envFileName;
         if (file_exists($dotEnv)) {
             $lines = file($dotEnv, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             foreach ($lines as $line) {

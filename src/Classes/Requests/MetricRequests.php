@@ -2467,6 +2467,25 @@ class MetricRequests
         ];
     }
 
+    private static function getCreativeMap(
+        EntityManager $manager,
+        ChanneledAccount $channeledAccountEntity,
+    ): array {
+        $sql = "SELECT DISTINCT c.id, c.creative_id 
+                FROM creatives c
+                JOIN channeled_ads ca ON ca.creative_id = c.id
+                WHERE ca.channeled_account_id = ?";
+        $fetched = $manager->getConnection()->executeQuery($sql, [$channeledAccountEntity->getId()])->fetchAllAssociative();
+        $map = [];
+        foreach ($fetched as $row) {
+            $map[$row['creative_id']] = (int)$row['id'];
+        }
+        return [
+            'map' => $map,
+            'mapReverse' => array_flip($map),
+        ];
+    }
+
 
     /**
      * Processes a single site, including page lookup and data fetching.
@@ -4438,6 +4457,7 @@ class MetricRequests
             }
 
             if (count($globalAllMetrics) > 0) {
+                $creativeMap = self::getCreativeMap($manager, $channeledAccountEntity);
                 try {
                     $manager->getConnection()->beginTransaction();
                     $metricConfigMap = MetricsProcessor::processMetricConfigs(
@@ -4448,6 +4468,7 @@ class MetricRequests
                         channeledCampaignMap: $channeledCampaignMap,
                         channeledAdGroupMap: $channeledAdGroupMap,
                         channeledAdMap: $channeledAdMap,
+                        creativeMap: $creativeMap,
                     );
                     $metricMap = MetricsProcessor::processMetrics(
                         metrics: $globalAllMetrics,
