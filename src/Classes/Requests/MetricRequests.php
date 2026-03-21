@@ -4417,6 +4417,10 @@ class MetricRequests
 
         $logger->info("Fetched " . count($allRows) . " bulk rows for ads in Ad Account " . $channeledAccountEntity->getPlatformId());
 
+        if (count($allRows) > 0) {
+            $logger->info("First row keys: " . implode(', ', array_keys($allRows[0])));
+        }
+
         if (count($allRows) === 0) {
             $logger->info("No bulk rows found for ads in Ad Account " . $channeledAccountEntity->getPlatformId());
             return ['metrics' => 0, 'rows' => 0];
@@ -4433,9 +4437,18 @@ class MetricRequests
             $channeledAdGroupRepository = $manager->getRepository(ChanneledAdGroup::class);
             $channeledAdRepository = $manager->getRepository(ChanneledAd::class);
             $globalAllMetrics = new ArrayCollection();
+            
+            $projectConfig = Helpers::getProjectConfig();
+            $marketingDebug = filter_var($projectConfig['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
             foreach ($groupedRows as $adPlatformId => $adRows) {
                 Helpers::checkJobStatus($jobId);
+                
+                if (!isset($channeledAdMap['mapAdGroup'][$adPlatformId])) {
+                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: Ad mapping to AdGroup not found in memory");
+                    continue;
+                }
+                
                 $adgroupId = $channeledAdMap['mapAdGroup'][$adPlatformId];
                 $campaignId = $channeledAdGroupMap['mapCampaign'][$adgroupId];
 
@@ -4445,25 +4458,25 @@ class MetricRequests
                 $channeledAdEntity = $channeledAdRepository->findOneBy(['platformId' => $adPlatformId]);
 
                 if (!$campaignEntity) {
-                    $logger->debug("Skipping ad $adPlatformId: Campaign entity $campaignId not found in DB");
+                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: Campaign entity $campaignId not found in DB");
                     continue;
                 }
                 if (!$channeledCampaignEntity) {
-                    $logger->debug("Skipping ad $adPlatformId: ChanneledCampaign entity $campaignId not found in DB");
+                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: ChanneledCampaign entity $campaignId not found in DB");
                     continue;
                 }
                 if (!$channeledAdGroupEntity) {
-                    $logger->debug("Skipping ad $adPlatformId: ChanneledAdGroup entity $adgroupId not found in DB");
+                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: ChanneledAdGroup entity $adgroupId not found in DB");
                     continue;
                 }
                 if (!$channeledAdEntity) {
-                    $logger->debug("Skipping ad $adPlatformId: ChanneledAd entity not found in DB");
+                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: ChanneledAd entity not found in DB");
                     continue;
                 }
 
                 $adName = $channeledAdEntity->getName();
                 if (!Helpers::matchesFilter((string)$adName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter((string)$adPlatformId, $cacheInclude, $cacheExclude)) {
-                    $logger->debug("Skipping ad $adPlatformId ($adName) due to filters");
+                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId ($adName) due to filters");
                     continue;
                 }
 
