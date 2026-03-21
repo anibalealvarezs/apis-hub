@@ -773,6 +773,15 @@ class MetricsProcessor
         $config = \Helpers\Helpers::getProjectConfig();
         $cacheRawMetrics = filter_var($config['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
+        $metricsMapByMKey = [];
+        foreach ($metrics as $m) {
+            $mKey = KeyGenerator::generateMetricKey(
+                dimensionsHash: $m->dimensions_hash ?? $m->dimensionsHash,
+                metricConfigKey: $m->metric_config_key ?? $m->metricConfigKey
+            );
+            $metricsMapByMKey[$mKey] = $m;
+        }
+
         $uniqueChanneledMetrics = [];
         foreach ($metrics->toArray() as $metric) {
             $metricKey = KeyGenerator::generateMetricKey(
@@ -830,14 +839,7 @@ class MetricsProcessor
         $channeledMetricsToUpdate = [];
         foreach ($uniqueChanneledMetrics as $key => $channeledMetric) {
             if (!isset($channeledMetricMap[$key]) && !isset($channeledMetricsToInsert[$key])) {
-                $originalMetric = null;
-                foreach ($metrics as $m) {
-                    $mKey = KeyGenerator::generateMetricKey(dimensionsHash: $m->dimensions_hash ?? $m->dimensionsHash, metricConfigKey: $m->metric_config_key ?? $m->metricConfigKey);
-                    if ($mKey === $channeledMetric['metricKey']) {
-                        $originalMetric = $m;
-                        break;
-                    }
-                }
+                $originalMetric = $metricsMapByMKey[$channeledMetric['metricKey']] ?? null;
 
                 $dimensionSetId = null;
                 if ($originalMetric && isset($originalMetric->dimensions) && !empty($originalMetric->dimensions)) {
