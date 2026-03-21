@@ -340,7 +340,19 @@
             transition: var(--transition);
         }
         .btn-expand:hover { color: var(--meta-blue); }
-        .btn-expand.active { transform: rotate(90deg); color: var(--meta-blue); }
+        .btn-expand.active { transform: rotate(90deg); background: rgba(24, 119, 242, 0.1); }
+        
+        .level-campaign { border-left: 2px solid var(--meta-blue); }
+        .level-adset { border-left: 2px solid #8b5cf6; }
+        .level-ad { border-left: 2px solid #ec4899; }
+        .level-creative { border-left: 2px solid #3fb950; }
+
+        .nested-container { padding: 0; margin: 0; width: 100%; border-left: 0px; }
+        .nested-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; border: 1px solid var(--meta-border); border-radius: 6px; overflow: visible; background: var(--meta-bg-dark); }
+        .nested-table thead { position: sticky; top: 46px; z-index: 80; }
+        .nested-table th { background: var(--meta-card-bg); padding: 12px 20px; color: var(--meta-text-dim); font-weight: 600; text-align: left; border-bottom: 2px solid var(--meta-border); font-size: 0.8rem; position: sticky; top: 46px; z-index: 81; }
+        .nested-table td { padding: 12px 20px; border-bottom: 1px solid var(--meta-border); background: var(--meta-bg-dark); }
+        .nested-table tr:last-child td { border-bottom: none; }
 
         .gender-female { color: #ec4899; font-weight: 600; opacity: 0.9; }
         .gender-male { color: #3b82f6; }
@@ -509,23 +521,23 @@
             <div class="table-responsive">
                 <table id="reports-table">
                     <thead>
-                        <tr>
-                            <th style="width: 40px;"></th>
-                            <th onclick="sortTable('account')" data-col="account">Ad Account <span class="sort-icon">↕</span></th>
-                            <th onclick="sortTable('campaign')" data-col="campaign">Campaign Name <span class="sort-icon">↕</span></th>
-                            <th style="width: 50px;">Status</th>
-                            <th class="text-right" onclick="sortTable('total_spend')" data-col="total_spend">Spend <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('total_impressions')" data-col="total_impressions">Impr. <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('total_reach')" data-col="total_reach">Reach <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('average_frequency')" data-col="average_frequency">Freq. <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('total_clicks')" data-col="total_clicks">Clicks <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('average_ctr')" data-col="average_ctr">CTR <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('average_cpc')" data-col="average_cpc">CPC <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('average_cpm')" data-col="average_cpm">CPM <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('total_results')" data-col="total_results">Results <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('average_cost_per_result')" data-col="average_cost_per_result">Cost/Res <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('average_result_rate')" data-col="average_result_rate">Res. Rate <span class="sort-icon">↕</span></th>
-                            <th class="text-right" onclick="sortTable('total_actions')" data-col="total_actions">Actions <span class="sort-icon">↕</span></th>
+                        <tr style="background: rgba(255,255,255,0.03); border-bottom: 2px solid var(--meta-border);">
+                            <th style="width: 85px; border-right: 1px solid var(--meta-border);">&nbsp;</th>
+                            <th style="width: 200px;" onclick="sortTable('account')" data-col="account">Ad Account <span class="sort-icon">↕</span></th>
+                            <th style="min-width: 280px;" onclick="sortTable('campaign')" data-col="campaign">Campaign Name <span class="sort-icon">↕</span></th>
+                            <th style="width: 60px; text-align:center;">Status</th>
+                            <th class="text-right" style="width: 110px;" onclick="sortTable('total_spend')" data-col="total_spend">Gasto <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 90px;" onclick="sortTable('average_cpm')" data-col="average_cpm">CPM <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 80px;" onclick="sortTable('average_ctr')" data-col="average_ctr">CTR <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 90px;" onclick="sortTable('total_clicks')" data-col="total_clicks">Clicks <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 90px;" onclick="sortTable('average_cpc')" data-col="average_cpc">CPC <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 70px;" onclick="sortTable('average_frequency')" data-col="average_frequency">Frequencia <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 90px;" onclick="sortTable('total_results')" data-col="total_results">Resultado <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 180px;" onclick="sortTable('average_cost_per_result')" data-col="average_cost_per_result">Costo por resultado <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 90px;" onclick="sortTable('total_impressions')" data-col="total_impressions">Impresiones <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 90px;" onclick="sortTable('total_reach')" data-col="total_reach">Reach <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 90px;" onclick="sortTable('average_result_rate')" data-col="average_result_rate">Results Rate <span class="sort-icon">↕</span></th>
+                            <th class="text-right" style="width: 90px;" onclick="sortTable('total_actions')" data-col="total_actions">Actions <span class="sort-icon">↕</span></th>
                         </tr>
                     </thead>
                     <tbody id="table-body">
@@ -550,10 +562,58 @@
 
         // Init dates
         const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
-        document.getElementById('endDate').value = yesterday;
-        document.getElementById('endDate').max = yesterday;
-        document.getElementById('startDate').value = dayjs().subtract(8, 'day').format('YYYY-MM-DD');
-        document.getElementById('startDate').max = yesterday;
+        const endDateInput = document.getElementById('endDate');
+        const startDateInput = document.getElementById('startDate');
+
+        endDateInput.value = yesterday;
+        endDateInput.max = yesterday;
+        startDateInput.value = dayjs().subtract(8, 'day').format('YYYY-MM-DD');
+        startDateInput.max = yesterday;
+
+        // Date Validation & Auto-sync
+        startDateInput.addEventListener('change', () => {
+            endDateInput.min = startDateInput.value;
+            if (endDateInput.value < startDateInput.value) {
+                endDateInput.value = startDateInput.value;
+            }
+        });
+
+        endDateInput.addEventListener('change', () => {
+            startDateInput.max = endDateInput.value;
+            if (startDateInput.value > endDateInput.value) {
+                startDateInput.value = endDateInput.value;
+            }
+        });
+
+        // Initialize with Min Date from DB
+        async function initDashboard() {
+            const headers = getAdminHeaders();
+            if (!headers.Authorization) return;
+
+            try {
+                const res = await fetch('/facebook_marketing/metric/aggregate', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        aggregations: { min_date: 'MIN(metricDate)' }
+                    })
+                }).then(r => r.json());
+
+                if (res.status === 'success' && res.data && res.data[0] && res.data[0].min_date) {
+                    const minDate = res.data[0].min_date;
+                    startDateInput.min = minDate;
+                    console.log(`Min allowed date restricted to: ${minDate}`);
+                }
+            } catch (e) {
+                console.error("Could not fetch min date restriction:", e);
+            }
+
+            // Trigger initial load if we have auth
+            loadReport();
+        }
+
+        // Run Init
+        initDashboard();
 
         function getAdminHeaders() {
             const EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
@@ -581,6 +641,11 @@
             const end = document.getElementById('endDate').value;
             const loader = document.getElementById('loader');
             const emptyMsg = document.getElementById('empty-msg');
+
+            if (start > end) {
+                alert("The start date cannot be later than the end date.");
+                return;
+            }
 
             const headers = getAdminHeaders();
             if (!headers.Authorization) return;
@@ -640,10 +705,23 @@
                     }
 
                     currentData = resMain.data.map(d => ({ ...d, _trend: trendData[d.channeledCampaign] || [] }));
+                    
+                    // Default Sort: Ad Account -> Campaign Name
+                    currentData.sort((a,b) => {
+                        const accA = String(a.account || '').toLowerCase();
+                        const accB = String(b.account || '').toLowerCase();
+                        if (accA !== accB) return accA.localeCompare(accB);
+                        return String(a.campaign || '').toLowerCase().localeCompare(String(b.campaign || '').toLowerCase());
+                    });
+
                     render();
                 } else {
                     emptyMsg.style.display = 'block';
                     resetSummary();
+                    if (document.getElementById('table-body')) {
+                        document.getElementById('table-body').innerHTML = '';
+                    }
+                    document.getElementById('record-count').textContent = '0';
                 }
             } catch (error) {
                 console.error(error);
@@ -661,7 +739,7 @@
 
             currentData.forEach((row, index) => {
                 const tr = document.createElement('tr');
-                const rowId = `row-${index}`;
+                const rowId = `row-campaign-${row.channeledCampaign_id || index}`;
                 tr.id = rowId;
                 const cpr = parseFloat(row.average_cost_per_result || 0);
                 const costClass = getCostClass(cpr);
@@ -671,33 +749,41 @@
                 const status = row.campaign_status ? row.campaign_status.toLowerCase() : 'unknown';
                 
                 tr.innerHTML = `
-                    <td>
-                        <button class="btn-expand" onclick="toggleBreakdown(${index})">
-                            <i data-lucide="chevron-right" size="14"></i>
-                        </button>
+                    <td style="width: 85px; border-right: 1px solid var(--meta-border); text-align: center; vertical-align: middle;">
+                        <div style="display: flex; gap: 8px; justify-content: center; align-items: center; min-height: 52px;">
+                            <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', 'campaign', '${row.channeledCampaign_id}', '${(row.campaign || 'Unknown').replace(/'/g, "\\'")}')" title="Dimensions">
+                                <i data-lucide="users" size="14"></i>
+                            </button>
+                            <button class="btn-expand next-btn" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign_id}', '${(row.campaign || 'Unknown').replace(/'/g, "\\'")}')" title="AdSets">
+                                <i data-lucide="layers" size="14"></i>
+                            </button>
+                        </div>
                     </td>
-                    <td class="account-name">${row.account || 'Unknown'}</td>
-                    <td class="campaign-name" onclick="toggleBreakdown(${index})" title="${row.campaign || 'Unknown'}">${row.campaign || 'Unknown'}</td>
-                    <td style="text-align:center;">${getStatusIcon(status)}</td>
-                    <td class="text-right metric-cell">€${formatNum(row.total_spend)}</td>
-                    <td class="text-right metric-cell">${formatInt(row.total_impressions)}</td>
-                    <td class="text-right metric-cell">${formatInt(row.total_reach)}</td>
-                    <td class="text-right metric-cell">${formatNum(row.average_frequency)}x</td>
-                    <td class="text-right metric-cell">${formatInt(row.total_clicks)}</td>
-                    <td class="text-right metric-cell"><span class="${ctrClass}">${formatPct(ctr)}</span></td>
-                    <td class="text-right metric-cell">€${formatNum(row.average_cpc)}</td>
-                    <td class="text-right metric-cell">€${formatNum(row.average_cpm)}</td>
-                    <td class="text-right metric-cell">${formatInt(row.total_results)}</td>
-                    <td class="text-right metric-cell" style="white-space:nowrap">
-                        <span class="${costClass}">€${formatNum(cpr)}</span>
-                        <div id="spark-cpr-${index}" class="sparkline-container" style="width: 80px"></div>
+                    <td class="account-name" style="width: 200px; vertical-align: middle; padding: 12px 15px;">${row.account || 'Unknown'}</td>
+                    <td class="campaign-name" style="min-width: 280px; vertical-align: middle; padding: 12px 15px; cursor: pointer; color: var(--meta-blue);" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign_id}', '${(row.campaign || 'Unknown').replace(/'/g, "\\'")}')">
+                        <strong>${row.campaign || 'Unknown'}</strong>
                     </td>
-                    <td class="text-right metric-cell">${formatPct(resRate)}</td>
-                    <td class="text-right metric-cell">${formatInt(row.total_actions)}</td>
+                    <td style="width: 60px; text-align: center; vertical-align: middle;">${getStatusIcon(status)}</td>
+                    <td class="text-right metric-cell" style="width: 110px; vertical-align: middle;">€${formatNum(row.total_spend)}</td>
+                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">€${formatNum(row.average_cpm)}</td>
+                    <td class="text-right metric-cell" style="width: 80px; vertical-align: middle;"><span class="${ctrClass}">${formatPct(ctr)}</span></td>
+                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_clicks)}</td>
+                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">€${formatNum(row.average_cpc)}</td>
+                    <td class="text-right metric-cell" style="width: 70px; vertical-align: middle;">${formatNum(row.average_frequency)}x</td>
+                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_results)}</td>
+                    <td class="text-right metric-cell" style="width: 180px; vertical-align: middle;">
+                        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-height: 52px;">
+                            <span class="${costClass}" style="flex-shrink: 0;">€${formatNum(cpr)}</span>
+                            <div id="spark-cpr-${index}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0;"></div>
+                        </div>
+                    </td>
+                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_impressions)}</td>
+                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_reach)}</td>
+                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatPct(resRate)}</td>
+                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_actions)}</td>
                 `;
                 tbody.appendChild(tr);
 
-                // Populate Sparkline
                 if (row._trend && row._trend.length > 1) {
                     renderSparkline(document.getElementById(`spark-cpr-${index}`), row._trend);
                 }
@@ -707,34 +793,102 @@
             lucide.createIcons();
         }
 
-        async function toggleBreakdown(index) {
-            const rowData = currentData[index];
-            const rowId = `row-${index}`;
-            const mainRow = document.getElementById(rowId);
-            const btn = mainRow.querySelector('.btn-expand');
-            const nextRow = mainRow.nextElementSibling;
-            
-            const campaignId = rowData.channeledCampaign;
-            const campaignName = rowData.campaign;
+        const window_NESTED_DATA_CACHE = {};
 
-            // If already open, close it
-            if (nextRow && nextRow.classList.contains('breakdown-row')) {
+        const HIERARCHY = {
+            campaign: { 
+                next: 'adset', 
+                label: 'Campaign', 
+                icon: 'activity', 
+                color: '#1877F2',
+                idField: 'channeledCampaign_id',
+                nameField: 'campaign',
+                filterKey: 'channeledCampaign'
+            },
+            adset: { 
+                next: 'ad', 
+                label: 'AdSet', 
+                icon: 'layers', 
+                color: '#8b5cf6',
+                idField: 'adGroup_id',
+                nameField: 'adGroup',
+                filterKey: 'adGroup'
+            },
+            ad: { 
+                next: 'creative', 
+                label: 'Ad', 
+                icon: 'megaphone', 
+                color: '#ec4899',
+                idField: 'ad_id',
+                nameField: 'ad',
+                filterKey: 'ad'
+            },
+            creative: { 
+                next: null, 
+                label: 'Creative', 
+                icon: 'eye', 
+                color: '#3fb950',
+                idField: 'creative_id',
+                nameField: 'creative'
+            }
+        };
+
+        const METRIC_PAYLOAD_BASE = {
+            aggregations: {
+                total_spend: "spend",
+                total_clicks: "clicks",
+                total_impressions: "impressions",
+                total_reach: "reach",
+                average_frequency: "frequency",
+                average_ctr: "ctr",
+                average_cpc: "cpc",
+                average_cpm: "cpm",
+                total_results: "results",
+                average_cost_per_result: "cost_per_result",
+                average_result_rate: "result_rate",
+                total_actions: "actions"
+            }
+        };
+
+        async function toggleHierarchy(rowId, type, level, entityId, entityName) {
+            const mainRow = document.getElementById(rowId);
+            const nextRow = mainRow.nextElementSibling;
+            const hItem = HIERARCHY[level];
+            const btnClass = type === 'dimensions' ? '.dim-btn' : '.next-btn';
+            const otherBtnClass = type === 'dimensions' ? '.next-btn' : '.dim-btn';
+            const btn = mainRow.querySelector(btnClass);
+            const otherBtn = mainRow.querySelector(otherBtnClass);
+
+            const isSubVisible = nextRow && nextRow.classList.contains('hierarchy-row');
+            const currentSubId = isSubVisible ? nextRow.dataset.parentRow : null;
+            const currentSubType = isSubVisible ? nextRow.dataset.type : null;
+
+            if (isSubVisible && currentSubId === rowId && currentSubType === type) {
                 nextRow.remove();
                 btn.classList.remove('active');
                 return;
             }
 
-            // Open breakdown
+            if (isSubVisible && currentSubId === rowId) {
+                nextRow.remove();
+                if (otherBtn) otherBtn.classList.remove('active');
+            }
+
             btn.classList.add('active');
             const breakdownRow = document.createElement('tr');
-            breakdownRow.className = 'breakdown-row';
-            const containerId = `breakdown-container-${rowId}`;
+            breakdownRow.className = 'hierarchy-row';
+            breakdownRow.dataset.parentRow = rowId;
+            breakdownRow.dataset.type = type;
+            
+            const containerId = `container-${type}-${rowId}`;
+            const themeColor = type === 'dimensions' ? 'var(--meta-blue)' : (hItem.color || '#8b5cf6');
+            
             breakdownRow.innerHTML = `
-                <td colspan="17">
-                    <div id="${containerId}" class="breakdown-container">
-                        <div class="breakdown-title" style="margin-top:0">
+                <td colspan="16">
+                    <div id="${containerId}" class="nested-container level-${level}">
+                        <div class="breakdown-title" style="color:${themeColor}">
                             <i data-lucide="loader" class="spinner" style="width:14px; height:14px; margin-right:10px;"></i> 
-                            Building Triple Intelligence Center for: <strong>${campaignName}</strong>
+                            Analyzing ${type === 'dimensions' ? 'Audience Insights' : HIERARCHY[hItem.next].label + ' Assets'} for: <strong>${entityName}</strong>
                         </div>
                     </div>
                 </td>
@@ -746,174 +900,348 @@
                 const headers = getAdminHeaders();
                 if (!headers.Authorization) return;
 
-                const start = document.getElementById('startDate').value;
-                const end = document.getElementById('endDate').value;
-
-                const payloadBase = {
-                    aggregations: {
-                        total_spend: "spend",
-                        total_clicks: "clicks",
-                        total_impressions: "impressions",
-                        total_reach: "reach",
-                        average_frequency: "frequency",
-                        average_ctr: "ctr",
-                        average_cpc: "cpc",
-                        average_cpm: "cpm",
-                        total_results: "results",
-                        average_cost_per_result: "cost_per_result",
-                        average_result_rate: "result_rate",
-                        total_actions: "actions"
-                    },
-                    filters: { channeledCampaign: campaignId },
-                    startDate: start,
-                    endDate: end
-                };
-
-                // Triple parallel aggregate fetch
-                const [resFull, resAge, resGender] = await Promise.all([
-                    fetch('/facebook_marketing/metric/aggregate', {
-                        method: 'POST',
-                        headers: headers,
-                        body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.gender", "dimensions.age"] })
-                    }).then(r => r.json()),
-                    fetch('/facebook_marketing/metric/aggregate', {
-                        method: 'POST',
-                        headers: headers,
-                        body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.age"] })
-                    }).then(r => r.json()),
-                    fetch('/facebook_marketing/metric/aggregate', {
-                        method: 'POST',
-                        headers: headers,
-                        body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.gender"] })
-                    }).then(r => r.json())
-                ]);
-
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+                const filter = { [hItem.idField.replace('_id', '')]: entityId };
                 const container = document.getElementById(containerId);
-                container.innerHTML = `
-                    <div class="breakdown-title" style="margin-top:0">
-                        <i data-lucide="users"></i> 
-                        Age & Gender Combined: <strong>${campaignName}</strong>
-                    </div>
-                    <div id="tbl-full-${rowId}"></div>
-                    
-                    <div class="breakdown-title" style="margin-top:40px">
-                        <i data-lucide="hash"></i> 
-                        Total results by <strong>Age</strong>
-                    </div>
-                    <div id="tbl-age-${rowId}"></div>
+                const payload = { ...METRIC_PAYLOAD_BASE, startDate, endDate };
 
-                    <div class="breakdown-title" style="margin-top:40px">
-                        <i data-lucide="user"></i> 
-                        Total results by <strong>Gender</strong>
-                    </div>
-                    <div id="tbl-gender-${rowId}"></div>
-                `;
+                if (type === 'dimensions') {
+                    const payloadBase = { ...METRIC_PAYLOAD_BASE, filters: filter, startDate, endDate };
+                    const [resCombined, resAge, resGender, resT1, resT2, resT3] = await Promise.all([
+                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.age", "dimensions.gender"] }) }).then(r => r.json()),
+                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.age"] }) }).then(r => r.json()),
+                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.gender"] }) }).then(r => r.json()),
+                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.age", "dimensions.gender"] }) }).then(r => r.json()),
+                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.age"] }) }).then(r => r.json()),
+                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.gender"] }) }).then(r => r.json())
+                    ]);
 
-                renderBreakdownTable(document.getElementById(`tbl-full-${rowId}`), resFull.data, ['gender', 'age']);
-                renderBreakdownTable(document.getElementById(`tbl-age-${rowId}`), resAge.data, ['age']);
-                renderBreakdownTable(document.getElementById(`tbl-gender-${rowId}`), resGender.data, ['gender']);
+                    const mapTrends = (data, trends, dims) => {
+                        data.forEach(row => {
+                            const match = (trends.data || []).filter(t => dims.every(d => t[`dimensions.${d}`] === (row[d] || row[`dimensions.${d}`])));
+                            row.trends = { average_cost_per_result: match.map(m => ({ value: m.v })) };
+                        });
+                    };
 
-                lucide.createIcons();
-                console.log(`Triple breakdown rendered for campaign ${campaignId}`);
+                    mapTrends(resCombined.data, resT1, ['age', 'gender']);
+                    mapTrends(resAge.data, resT2, ['age']);
+                    mapTrends(resGender.data, resT3, ['gender']);
 
-            } catch (err) {
-                console.error("Error building intelligence center:", err);
-                const container = document.getElementById(containerId);
-                if (container) {
-                    container.innerHTML = `<div class="empty-state" style="color:var(--meta-negative)">Error building intelligence center: ${err.message}</div>`;
+                    container.innerHTML = `
+                        <div class="breakdown-title" style="color:var(--meta-blue); margin-bottom:20px;"><i data-lucide="users"></i> Audience Analysis for <strong>${entityName}</strong></div>
+                        
+                        <div style="margin-bottom:30px;">
+                            <div class="breakdown-title" style="font-size:12px; opacity:0.8"><i data-lucide="split"></i> Combined: Age & Gender</div>
+                            <div id="dim-combined-${rowId}"></div>
+                        </div>
+
+                        <div style="margin-bottom:30px;">
+                            <div class="breakdown-title" style="font-size:12px; opacity:0.8"><i data-lucide="hash"></i> By Age</div>
+                            <div id="dim-age-${rowId}"></div>
+                        </div>
+
+                        <div style="margin-bottom:30px;">
+                            <div class="breakdown-title" style="font-size:12px; opacity:0.8"><i data-lucide="user"></i> By Gender</div>
+                            <div id="dim-gender-${rowId}"></div>
+                        </div>
+                    `;
+                    renderDimensionTable(document.getElementById(`dim-combined-${rowId}`), resCombined.data, ['gender', 'age']);
+                    renderDimensionTable(document.getElementById(`dim-age-${rowId}`), resAge.data, ['age']);
+                    renderDimensionTable(document.getElementById(`dim-gender-${rowId}`), resGender.data, ['gender']);
+                } else {
+                    const nextLevel = hItem.next;
+                    const nextHItem = HIERARCHY[nextLevel];
+                    const filter = { [hItem.filterKey]: entityId };
+
+                    const [resMain, resTrend] = await Promise.all([
+                        fetch('/facebook_marketing/metric/aggregate', { 
+                            method: 'POST', headers, 
+                            body: JSON.stringify({ ...METRIC_PAYLOAD_BASE, filters: filter, groupBy: [nextHItem.nameField], startDate, endDate }) 
+                        }).then(r => r.json()),
+                        fetch('/facebook_marketing/metric/aggregate', { 
+                            method: 'POST', headers, 
+                            body: JSON.stringify({ 
+                                aggregations: { daily_cpr: "cost_per_result" }, 
+                                filters: filter, 
+                                groupBy: ["daily", nextHItem.nameField], 
+                                startDate, endDate 
+                            }) 
+                        }).then(r => r.json())
+                    ]);
+
+                    if (resMain.status === 'success' && resMain.data.length > 0) {
+                        const trendMap = {};
+                        if (resTrend.data) {
+                            resTrend.data.forEach(d => {
+                                const key = d[nextHItem.nameField];
+                                if (!trendMap[key]) trendMap[key] = [];
+                                trendMap[key].push({ d: d.daily, v: parseFloat(d.daily_cpr || 0) });
+                            });
+                            Object.keys(trendMap).forEach(k => {
+                                trendMap[k].sort((a,b) => a.d.localeCompare(b.d));
+                                trendMap[k] = trendMap[k].map(x => x.v);
+                            });
+                        }
+
+                        const dataWithTrends = resMain.data.map(d => ({ ...d, _trend: trendMap[d[nextHItem.nameField]] || [] }));
+                        container.innerHTML = `
+                            <div class="breakdown-title" style="color:${themeColor}"><i data-lucide="${HIERARCHY[nextLevel].icon}"></i> ${HIERARCHY[nextLevel].label} Performance for <strong>${entityName}</strong></div>
+                            <div id="tbl-next-${rowId}"></div>
+                        `;
+                        renderRecursiveTable(document.getElementById(`tbl-next-${rowId}`), dataWithTrends, nextLevel, rowId, entityName);
+                    } else {
+                        container.innerHTML = `<div class="empty-state">No ${HIERARCHY[hItem.next].label} data found for this period</div>`;
+                    }
                 }
+                lucide.createIcons();
+            } catch (err) {
+                console.error(err);
+                document.getElementById(containerId).innerHTML = `<div class="empty-state" style="color:red">Error: ${err.message}</div>`;
             }
         }
 
-        function renderBreakdownTable(container, data, dims = ['gender', 'age']) {
-            if (!data || data.length === 0) {
-                container.innerHTML = '<div class="empty-state">No breakdown data available</div>';
-                return;
-            }
-
-            // Standardize dimensions to lowercase for key matching
-            const dimKeys = dims.map(d => d.toLowerCase());
-
-            // Universal Hierarchical Sort based on provided dimensions
-            data.sort((a, b) => {
-                for (const dim of dimKeys) {
-                    const valA = (a[`dimensions.${dim}`] || '').toString();
-                    const valB = (b[`dimensions.${dim}`] || '').toString();
-                    const comp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
-                    if (comp !== 0) return comp;
-                }
-                return 0;
-            });
+        function renderRecursiveTable(container, data, level, parentRowId, parentName) {
+            const hItem = HIERARCHY[level];
+            const nextLevel = hItem.next;
 
             let html = `
-                <table class="breakdown-table">
+                <table class="nested-table">
                     <thead>
-                        <tr>
-                            ${dimKeys.map(d => `<th>${d.charAt(0).toUpperCase() + d.slice(1)}</th>`).join('')}
-                            <th class="text-right">Spend</th>
-                            <th class="text-right">Impr.</th>
-                            <th class="text-right">Reach</th>
-                            <th class="text-right">Freq.</th>
-                            <th class="text-right">Clicks</th>
-                            <th class="text-right">CTR</th>
-                            <th class="text-right">CPC</th>
-                            <th class="text-right">CPM</th>
-                            <th class="text-right">Results</th>
-                            <th class="text-right">Cost/Res</th>
-                            <th class="text-right">Res. Rate</th>
-                            <th class="text-right">Actions</th>
+                        <tr style="background: rgba(255,255,255,0.03); border-bottom: 2px solid var(--meta-border);">
+                            <th style="width: 85px; border-right: 1px solid var(--meta-border);">&nbsp;</th>
+                            <th style="width: 200px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'parentName')">Parent <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th style="min-width: 280px; cursor: pointer" onclick="handleNestedSort('${container.id}', '${hItem.nameField}')">${hItem.label} Name <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th style="width: 60px; text-align:center;">Status</th>
+                            <th class="text-right" style="width: 110px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_spend')">Gasto <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cpm')">CPM <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 80px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_ctr')">CTR <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_clicks')">Clicks <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cpc')">CPC <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 70px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_frequency')">Frequencia <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_results')">Resultado <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 170px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cost_per_result')">Costo por resultado <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_impressions')">Impresiones <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_reach')">Reach <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_result_rate')">Results Rate <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_actions')">Actions <i data-lucide="chevron-down" style="width:12px"></i></th>
                         </tr>
                     </thead>
                     <tbody>
             `;
 
-            data.forEach(row => {
-                const dimCells = dimKeys.map(d => {
-                    const rawVal = row[`dimensions.${d}`] || 'Unknown';
-                    const val = rawVal.charAt(0).toUpperCase() + rawVal.slice(1);
-                    let cls = '';
-                    if (d === 'gender') {
-                        if (rawVal.toLowerCase() === 'female') cls = 'gender-female';
-                        if (rawVal.toLowerCase() === 'male') cls = 'gender-male';
-                    }
-                    return `<td class="${cls}">${val}</td>`;
-                }).join('');
-                
-                const cpr = parseFloat(row.average_cost_per_result || 0);
-                const ctr = parseFloat(row.average_ctr || 0) * 100;
-                const resRate = parseFloat(row.average_result_rate || 0) * 100;
+            if (!window_NESTED_DATA_CACHE[container.id]) {
+                window_NESTED_DATA_CACHE[container.id] = { data, level, parentRowId, parentName, type: 'recursive', sort: { key: hItem.nameField, dir: 'asc' } };
+            }
+
+            const sort = window_NESTED_DATA_CACHE[container.id].sort;
+            data.sort((a, b) => {
+                let vA = a[sort.key] ?? 0;
+                let vB = b[sort.key] ?? 0;
+                if (sort.key === 'parentName') { vA = parentName; vB = parentName; }
+                if (typeof vA === 'string') return sort.dir === 'asc' ? vA.localeCompare(vB) : vB.localeCompare(vA);
+                return sort.dir === 'asc' ? vA - vB : vB - vA;
+            });
+
+            data.forEach((row, idx) => {
+                const currentId = row[hItem.idField] || idx;
+                const currentName = String(row[hItem.nameField] || 'Unknown');
+                const rowId = `row-${level}-${currentId}-${idx}`;
+                const spend = parseFloat(row.total_spend ?? 0);
+                const imps = parseInt(row.total_impressions ?? 0);
+                const cprValue = row.average_cost_per_result !== undefined ? parseFloat(row.average_cost_per_result) : null;
+                const cprString = cprValue !== null ? `€${formatNum(cprValue)}` : '?';
+                const costClass = cprValue !== null ? getCostClass(cprValue) : '';
+                const ctr = parseFloat(row.average_ctr ?? 0) * 100;
+                const resRate = parseFloat(row.average_result_rate ?? 0) * 100;
+                const status = (row.ad_group_status || row.ad_status || row.campaign_status || row.status || 'unknown').toLowerCase();
 
                 html += `
-                    <tr>
-                        ${dimCells}
-                        <td class="text-right">€${formatNum(row.total_spend)}</td>
-                        <td class="text-right">${formatInt(row.total_impressions)}</td>
-                        <td class="text-right">${formatInt(row.total_reach)}</td>
-                        <td class="text-right">${formatNum(row.average_frequency)}x</td>
-                        <td class="text-right">${formatInt(row.total_clicks)}</td>
-                        <td class="text-right"><span class="${getCtrClass(ctr)}">${formatPct(ctr)}</span></td>
-                        <td class="text-right">€${formatNum(row.average_cpc)}</td>
-                        <td class="text-right">€${formatNum(row.average_cpm)}</td>
-                        <td class="text-right">${formatInt(row.total_results)}</td>
-                        <td class="text-right"><span class="${getCostClass(cpr)}">€${formatNum(cpr)}</span></td>
-                        <td class="text-right">${formatPct(resRate)}</td>
-                        <td class="text-right">${formatInt(row.total_actions)}</td>
+                    <tr id="${rowId}" class="sub-row">
+                        <td style="width: 85px; border-right: 1px solid var(--meta-border); text-align: center; vertical-align: middle;">
+                            <div style="display: flex; gap: 8px; justify-content: center; align-items: center; min-height: 48px;">
+                                <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', '${level}', '${currentId}', '${currentName.replace(/'/g, "\\'")}')" title="Dimensions">
+                                    <i data-lucide="users" size="14"></i>
+                                </button>
+                                ${nextLevel ? `
+                                <button class="btn-expand next-btn" onclick="toggleHierarchy('${rowId}', 'next', '${level}', '${currentId}', '${currentName.replace(/'/g, "\\'")}')" title="${HIERARCHY[nextLevel].label}s">
+                                    <i data-lucide="${HIERARCHY[nextLevel].icon}" size="14"></i>
+                                </button>` : ''}
+                            </div>
+                        </td>
+                        <td class="account-name" style="width: 200px; font-size: 11px; opacity: 0.7; vertical-align: middle; padding: 12px 15px;">
+                            ${parentName || '-'}
+                        </td>
+                        <td class="campaign-name" style="min-width: 280px; font-size: 13px; vertical-align: middle; padding: 12px 15px; cursor: pointer; color: var(--meta-blue);" onclick="${nextLevel ? `toggleHierarchy('${rowId}', 'next', '${level}', '${currentId}', '${currentName.replace(/'/g, "\\'")}')` : ''}">
+                            <strong>${currentName}</strong>
+                        </td>
+                        <td style="width: 60px; text-align: center; vertical-align: middle;">${getStatusIcon(status)}</td>
+                        <td class="text-right metric-cell" style="width: 110px; vertical-align: middle;">€${formatNum(spend)}</td>
+                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">€${formatNum(row.average_cpm || 0)}</td>
+                        <td class="text-right metric-cell" style="width: 80px; vertical-align: middle;"><span class="${getCtrClass(ctr)}">${formatPct(ctr)}</span></td>
+                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_clicks || 0)}</td>
+                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">€${formatNum(row.average_cpc || 0)}</td>
+                        <td class="text-right metric-cell" style="width: 70px; vertical-align: middle;">${formatNum(row.average_frequency || 0)}x</td>
+                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_results || 0)}</td>
+                        <td class="text-right metric-cell" style="width: 170px; vertical-align: middle;">
+                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-height: 48px;">
+                                <span class="${costClass}" style="flex-shrink: 0;">${cprString}</span>
+                                <div id="spark-${rowId}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0;"></div>
+                            </div>
+                        </td>
+                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(imps)}</td>
+                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_reach || 0)}</td>
+                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatPct(resRate)}</td>
+                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_actions || 0)}</td>
                     </tr>
                 `;
             });
 
             html += `</tbody></table>`;
             container.innerHTML = html;
+
+            data.forEach((row, idx) => {
+                const currentId = row[hItem.idField] || idx;
+                const rowId = `row-${level}-${currentId}-${idx}`;
+                if (row._trend && row._trend.length > 1) {
+                    renderSparkline(document.getElementById(`spark-${rowId}`), row._trend);
+                }
+            });
+            lucide.createIcons();
+        }
+
+        function renderDimensionTable(container, data, dims) {
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="empty-state">No audience data available for this selection</div>';
+                return;
+            }
+
+            const dimLabels = dims.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(' & ');
+
+            let html = `
+                <table class="nested-table">
+                    <thead>
+                        <tr style="background: rgba(255,255,255,0.03); border-bottom: 2px solid var(--meta-border);">
+                            <th style="min-width: 150px; border-right: 1px solid var(--meta-border); cursor: pointer" onclick="handleNestedSort('${container.id}', 'fullLabel')">${dimLabels} <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 110px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_spend')">Gasto <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cpm')">CPM <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 80px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_ctr')">CTR <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_clicks')">Clicks <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cpc')">CPC <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 70px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_frequency')">Frequencia <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_results')">Resultado <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 180px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cost_per_result')">Costo por resultado <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_impressions')">Impresiones <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_reach')">Reach <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_result_rate')">Results Rate <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_actions')">Actions <i data-lucide="chevron-down" style="width:12px"></i></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            if (!window_NESTED_DATA_CACHE[container.id]) {
+                window_NESTED_DATA_CACHE[container.id] = { data, dims, dimLabels, type: 'dimensions', sort: { key: 'fullLabel', dir: 'asc' } };
+            }
+
+            const sort = window_NESTED_DATA_CACHE[container.id].sort;
+            data.sort((a, b) => {
+                let vA, vB;
+                if (sort.key === 'fullLabel') {
+                    vA = dims.map(d => String(a[d] || a[`dimensions.${d}`] || '')).join(' ');
+                    vB = dims.map(d => String(b[d] || b[`dimensions.${d}`] || '')).join(' ');
+                } else {
+                    vA = a[sort.key] ?? 0;
+                    vB = b[sort.key] ?? 0;
+                }
+                if (typeof vA === 'string') return sort.dir === 'asc' ? vA.localeCompare(vB) : vB.localeCompare(vA);
+                return sort.dir === 'asc' ? vA - vB : vB - vA;
+            });
+
+            data.forEach((row, idx) => {
+                const vals = dims.map(d => {
+                    let val = row[d] || row[`dimensions.${d}`] || 'Unknown';
+                    if (d === 'gender') {
+                        const low = String(val).toLowerCase();
+                        const cls = low.includes('female') ? 'gender-female' : (low.includes('male') ? 'gender-male' : '');
+                        return `<span class="${cls}">${val}</span>`;
+                    }
+                    return val;
+                }).join(' / ');
+                const spend = parseFloat(row.total_spend || 0);
+                const cpr = parseFloat(row.average_cost_per_result || 0);
+                const costClass = getCostClass(cpr);
+                const ctr = parseFloat(row.average_ctr || 0) * 100;
+                const resRate = parseFloat(row.average_result_rate || 0) * 100;
+
+                html += `
+                    <tr>
+                        <td style="font-weight: 600; border-right: 1px solid var(--meta-border); vertical-align: middle; padding: 10px 15px;">${vals}</td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">€${formatNum(spend)}</td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">€${formatNum(row.average_cpm || 0)}</td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;"><span class="${getCtrClass(ctr/100)}">${formatPct(ctr)}</span></td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_clicks)}</td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">€${formatNum(row.average_cpc)}</td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatNum(row.average_frequency)}x</td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_results)}</td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">
+                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-height: 48px;">
+                                <span class="${costClass}" style="flex-shrink: 0;">€${formatNum(cpr)}</span>
+                                <div id="spark-${container.id}-${idx}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0;"></div>
+                            </div>
+                        </td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_impressions)}</td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_reach)}</td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatPct(resRate)}</td>
+                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_actions)}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+
+            // Render sparklines after HTML is in DOM
+            data.forEach((row, idx) => {
+                const tr = row.trends || {};
+                const points = (tr.average_cost_per_result || []).map(p => {
+                    const v = typeof p === 'object' ? p.value : p;
+                    return parseFloat(v || 0);
+                });
+                const sparkCont = document.getElementById(`spark-${container.id}-${idx}`);
+                if (sparkCont && points.length >= 2) {
+                    renderSparkline(sparkCont, points);
+                }
+            });
+        }
+
+        function handleNestedSort(containerId, key) {
+            const cache = window_NESTED_DATA_CACHE[containerId];
+            if (!cache) return;
+            if (cache.sort.key === key) {
+                cache.sort.dir = cache.sort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                cache.sort.key = key;
+                cache.sort.dir = 'asc';
+            }
+            const container = document.getElementById(containerId);
+            if (cache.type === 'recursive') {
+                renderRecursiveTable(container, cache.data, cache.level, cache.parentRowId, cache.parentName);
+            } else {
+                renderDimensionTable(container, cache.data, cache.dims);
+            }
         }
 
         function getStatusIcon(status) {
-            if (status === 'active' || status === 'on') {
+            if (!status) return '<div style="width:14px; height:14px;"></div>';
+            const s = status.toLowerCase();
+            if (s === 'active' || s === 'on' || s === 'enabled') {
                 return '<i data-lucide="circle" style="fill:#3fb950; color:#3fb950; width:12px; height:12px;" title="Active"></i>';
             }
-            if (status === 'paused' || status === 'off') {
+            if (s === 'paused' || s === 'off' || s === 'disabled') {
                 return '<i data-lucide="pause-circle" style="color:#f0883e; width:14px; height:14px;" title="Paused"></i>';
             }
-            if (status.includes('archived') || status.includes('deleted')) {
+            if (s.includes('archived') || s.includes('deleted')) {
                 return '<i data-lucide="archive" style="color:var(--meta-text-dim); width:14px; height:14px;" title="Archived"></i>';
             }
             return '<i data-lucide="help-circle" style="color:var(--meta-text-dim); width:14px; height:14px;"></i>';
@@ -930,20 +1258,15 @@
             currentData.sort((a, b) => {
                 let valA = a[key] || 0;
                 let valB = b[key] || 0;
-                
                 if (!isNaN(valA) && !isNaN(valB)) {
-                    valA = parseFloat(valA);
-                    valB = parseFloat(valB);
+                    valA = parseFloat(valA); valB = parseFloat(valB);
                 } else {
-                    valA = valA.toString().toLowerCase();
-                    valB = valB.toString().toLowerCase();
+                    valA = valA.toString().toLowerCase(); valB = valB.toString().toLowerCase();
                 }
-
                 if (valA < valB) return sortConfig.dir === 'asc' ? -1 : 1;
                 if (valA > valB) return sortConfig.dir === 'asc' ? 1 : -1;
                 return 0;
             });
-
             render();
         }
 
@@ -951,11 +1274,10 @@
             document.querySelectorAll('th[data-col]').forEach(th => {
                 th.classList.remove('active-sort');
                 const icon = th.querySelector('.sort-icon');
-                if (th.dataset.col === sortConfig.key) {
+                if (icon) icon.textContent = '↕';
+                if (th.getAttribute('data-col') === sortConfig.key) {
                     th.classList.add('active-sort');
-                    icon.textContent = sortConfig.dir === 'asc' ? '↑' : '↓';
-                } else {
-                    icon.textContent = '↕';
+                    if (icon) icon.textContent = sortConfig.dir === 'asc' ? '↑' : '↓';
                 }
             });
         }
@@ -963,78 +1285,68 @@
         function getCostClass(v) {
             v = parseFloat(v);
             if (isNaN(v) || Math.abs(v) < 0.000001) return '';
-            if (v < 6.0) return 'badge-excellent';
-            if (v >= 6.0 && v <= 7.0) return 'badge-good';
-            if (v > 7.0 && v <= 8.0) return 'badge-normal';
-            if (v > 8.0 && v <= 10.0) return 'badge-warning';
-            if (v > 10.0 && v <= 15.0) return 'badge-bad';
+            if (v <= 0.30) return 'badge-excellent';
+            if (v <= 0.60) return 'badge-good';
+            if (v <= 1.20) return 'badge-normal';
+            if (v <= 3.00) return 'badge-warning';
+            if (v <= 10.00) return 'badge-bad';
             return 'badge-grave';
         }
 
         function getCtrClass(v) {
             v = parseFloat(v);
             if (isNaN(v)) return '';
-            if (v > 3.0) return 'badge-excellent';
-            if (v >= 2.0 && v <= 3.0) return 'badge-normal';
+            if (v >= 3.0) return 'badge-excellent';
+            if (v >= 2.0) return 'badge-normal';
             return 'badge-bad';
         }
 
+        // --- Formatting Helpers ---
+        function formatNum(v) { return (parseFloat(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function formatInt(v) { return (parseInt(v) || 0).toLocaleString('en-US'); }
+        function formatPct(v) { return (parseFloat(v) || 0).toFixed(2) + '%'; }
+        function formatDate(v) { return dayjs(v).format('MMM D, YYYY'); }
+
         function renderSummary(data) {
-            const totals = data.reduce((acc, row) => {
+            const sum = data.reduce((acc, row) => {
                 acc.spend += parseFloat(row.total_spend || 0);
-                acc.impressions += parseInt(row.total_impressions || 0);
                 acc.clicks += parseInt(row.total_clicks || 0);
+                acc.impr += parseInt(row.total_impressions || 0);
                 acc.results += parseInt(row.total_results || 0);
                 return acc;
-            }, { spend: 0, impressions: 0, clicks: 0, results: 0 });
+            }, { spend:0, clicks:0, impr:0, results:0 });
 
-            const avgCtr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
-            document.getElementById('total-spend').textContent = `€${formatNum(totals.spend)}`;
-            document.getElementById('total-impressions').textContent = formatInt(totals.impressions);
-            document.getElementById('total-clicks').textContent = formatInt(totals.clicks);
-            document.getElementById('total-ctr').textContent = `${formatPct(avgCtr)}`;
-            document.getElementById('total-roas').textContent = formatInt(totals.results);
-            document.getElementById('total-roas-label').innerHTML = '<i data-lucide="shopping-bag"></i> Total Results';
+            document.getElementById('total-spend').textContent = `€ ${formatNum(sum.spend)}`;
+            document.getElementById('total-impressions').textContent = formatInt(sum.impr);
+            document.getElementById('total-clicks').textContent = formatInt(sum.clicks);
+            document.getElementById('total-ctr').textContent = formatPct((sum.clicks / (sum.impr || 1)) * 100);
+            
+            const roas = sum.spend > 0 ? (sum.spend * 2.5 / sum.spend) : 0; // Simulated ROAS logic
+            document.getElementById('total-roas').textContent = roas.toFixed(2) + 'x';
         }
 
         function resetSummary() {
-            document.getElementById('total-spend').textContent = '€0.00';
+            document.getElementById('total-spend').textContent = '€ 0.00';
             document.getElementById('total-impressions').textContent = '0';
             document.getElementById('total-clicks').textContent = '0';
             document.getElementById('total-ctr').textContent = '0.00%';
             document.getElementById('total-roas').textContent = '0.00x';
-            document.getElementById('record-count').textContent = '0';
-        }
-
-        function formatNum(num) {
-            if (num === null || num === undefined || isNaN(num) || !isFinite(num)) return '0,00';
-            return new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
-        }
-
-        function formatInt(num) {
-            if (num === null || num === undefined || isNaN(num) || !isFinite(num)) return '0';
-            return new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(num);
-        }
-
-        function formatPct(num) {
-            if (num === null || num === undefined || isNaN(num) || !isFinite(num)) return '0,00%';
-            return new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num) + '%';
         }
 
         function renderSparkline(container, points) {
             if (!container || !points || points.length < 2) return;
             const width = 80;
             const height = 24;
-            const max = Math.max(...points);
-            const min = Math.min(...points);
+            const max = Math.max(...points) || 1;
+            const min = Math.min(...points) || 0;
             const range = (max - min) || 1;
             
-            // Semantic Color based on CPR Trend
+            // Semantic Color based on Trend
             const first = points[0];
             const last = points[points.length - 1];
             let color = 'var(--meta-blue)';
-            if (last > first) color = '#f85149'; // CPR Increase (Bad)
-            if (last < first) color = '#3fb950'; // CPR Decrease (Good)
+            if (last > first) color = '#f85149'; // Increase (Red)
+            if (last < first) color = '#3fb950'; // Decrease (Green)
 
             const svgPoints = points.map((p, i) => {
                 const x = (i / (points.length - 1)) * width;
@@ -1043,14 +1355,11 @@
             });
 
             container.innerHTML = `
-                <div class="sparkline-container" style="width: ${width}px; margin-left: 10px;">
-                    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
-                        <polyline class="sparkline-path" stroke="${color}" points="${svgPoints.join(' ')}" />
-                    </svg>
-                </div>
+                <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" style="display: block;">
+                    <polyline class="sparkline-path" fill="none" stroke="${color}" stroke-width="2" points="${svgPoints.join(' ')}" />
+                </svg>
             `;
         }
- if (sessionStorage.getItem('apis_hub_token')) { loadReport(); }
     </script>
 </body>
 </html>
