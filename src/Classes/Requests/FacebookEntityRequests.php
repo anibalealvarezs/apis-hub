@@ -49,13 +49,17 @@ class FacebookEntityRequests implements RequestInterface
                 $success = false;
                 $errors[] = "Campaigns sync failed: " . ($campResponse->getContent() ?: "Unknown error");
             }
+            $campData = json_decode($campResponse->getContent(), true);
+            $authorizedCampaignMap = $campData['authorized_ids_map'] ?? [];
 
             // 2. Sync AdGroups
-            $adGroupResponse = AdGroupRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+            $adGroupResponse = AdGroupRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId, null, null, $authorizedCampaignMap);
             if ($adGroupResponse->getStatusCode() >= 400) {
                 $success = false;
                 $errors[] = "AdGroups sync failed: " . ($adGroupResponse->getContent() ?: "Unknown error");
             }
+            $adGroupData = json_decode($adGroupResponse->getContent(), true);
+            $authorizedAdSetMap = $adGroupData['authorized_ids_map'] ?? [];
 
             // 3. Sync Creatives
             $creativeResponse = CreativeRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
@@ -65,7 +69,7 @@ class FacebookEntityRequests implements RequestInterface
             }
 
             // 4. Sync Ads
-            $adResponse = AdRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId);
+            $adResponse = AdRequests::getListFromFacebookMarketing($startDate, $endDate, $logger, $jobId, null, null, $authorizedAdSetMap);
             if ($adResponse->getStatusCode() >= 400) {
                 $success = false;
                 $errors[] = "Ads sync failed: " . ($adResponse->getContent() ?: "Unknown error");
@@ -77,7 +81,7 @@ class FacebookEntityRequests implements RequestInterface
                 return new Response(json_encode(['error' => implode('; ', $errors)]), 500);
             }
 
-            return new Response(json_encode(['Facebook Marketing entities synchronized']));
+            return new Response(json_encode(['message' => 'Facebook Marketing entities synchronized']), 200, ['Content-Type' => 'application/json']);
         } catch (\Exception $e) {
             $logger->error("Error in FacebookEntityRequests::getListFromFacebookMarketing: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);
