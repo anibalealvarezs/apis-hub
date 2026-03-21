@@ -4458,7 +4458,7 @@ class MetricRequests
                 $channeledAdEntity = $channeledAdRepository->findOneBy(['platformId' => $adPlatformId]);
 
                 if (!$campaignEntity) {
-                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: Campaign entity $campaignId not found in DB");
+                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: Campaign entity '" . ($campaignId ?: 'EMPTY') . "' not found in DB");
                     continue;
                 }
                 if (!$channeledCampaignEntity) {
@@ -4505,6 +4505,8 @@ class MetricRequests
                 $creativeMap = self::getCreativeMap($manager, $channeledAccountEntity);
                 try {
                     $manager->getConnection()->beginTransaction();
+                    
+                    $logger->info("Starting processMetricConfigs for " . count($globalAllMetrics) . " metrics...");
                     $metricConfigMap = MetricsProcessor::processMetricConfigs(
                         metrics: $globalAllMetrics,
                         manager: $manager,
@@ -4515,22 +4517,30 @@ class MetricRequests
                         channeledAdMap: $channeledAdMap,
                         creativeMap: $creativeMap,
                     );
+                    $logger->info("Completed processMetricConfigs. Starting processMetrics...");
+                    
                     $metricMap = MetricsProcessor::processMetrics(
                         metrics: $globalAllMetrics,
                         manager: $manager,
                         metricConfigMap: $metricConfigMap,
                     );
+                    $logger->info("Completed processMetrics. Starting processChanneledMetrics...");
                     $channeledMetricMap = MetricsProcessor::processChanneledMetrics(
                         metrics: $globalAllMetrics,
                         manager: $manager,
                         metricMap: $metricMap,
                         logger: $logger,
                     );
+                    
+                    $logger->info("Completed all processing steps. Committing transaction...");
                     $manager->getConnection()->commit();
-                } catch (Exception $e) {
+                    $logger->info("Transaction committed successfully for Account: " . $channeledAccountEntity->getPlatformId());
+
+                } catch (\Exception $e) {
                     if ($manager->getConnection()->isTransactionActive()) {
                         $manager->getConnection()->rollback();
                     }
+                    $logger->error("Error during metric processing for Account " . $channeledAccountEntity->getPlatformId() . ": " . $e->getMessage());
                     throw $e;
                 }
             }
