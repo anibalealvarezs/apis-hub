@@ -144,14 +144,15 @@ class ConfigManagerController
                 'cache_raw_metrics' => false,
             ];
 
-            if (file_exists($this->gscConfigPath)) {
-            $gscConf = Yaml::parseFile($this->gscConfigPath);
             $appConfigPath = __DIR__ . '/../../config/app.yaml';
             if (file_exists($appConfigPath)) {
                 $appConf = Yaml::parseFile($appConfigPath);
                 $currentConfig['jobs_timeout_hours'] = $appConf['jobs']['timeout_hours'] ?? 6;
                 $currentConfig['cache_raw_metrics'] = filter_var($appConf['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
             }
+
+            if (file_exists($this->gscConfigPath)) {
+                $gscConf = Yaml::parseFile($this->gscConfigPath);
                 $gsc = $gscConf['channels']['google_search_console'] ?? [];
                 $currentConfig['gsc_cache_history_range'] = $gsc['cache_history_range'] ?? '16 months';
                 $currentConfig['gsc_enabled'] = $gsc['enabled'] ?? true;
@@ -245,9 +246,13 @@ class ConfigManagerController
     public function updateConfig(Request $request): Response
     {
         try {
+            $logger = Helpers::setLogger('config-manager.log');
             $data = json_decode($request->getContent(), true);
             $type = $data['type'] ?? ''; // 'gsc' or 'facebook'
             $assets = $data['assets'] ?? [];
+
+            $logger->info("Update config request received for type: " . $type);
+            $logger->debug("Payload: " . json_encode($data));
 
             if ($type === 'gsc') {
                 $this->updateGscConfig($assets, $data['cache_history_range'] ?? null, $data['enabled'] ?? true);
@@ -255,8 +260,8 @@ class ConfigManagerController
                 $this->updateFacebookConfig(
                     assets: $assets, 
                     cacheChunkSize: $data['cache_chunk_size'] ?? null,
-                    organicHistoryRange: $data['organic_history_range'] ?? null,
-                    marketingHistoryRange: $data['marketing_history_range'] ?? null,
+                    organicHistoryRange: $data['organic_history_range'] ?? $data['cache_history_range'] ?? null,
+                    marketingHistoryRange: $data['marketing_history_range'] ?? $data['cache_history_range'] ?? null,
                     entityFilters: $data['entity_filters'] ?? [],
                     featureToggles: $data['feature_toggles'] ?? [],
                     enabled: $data['enabled'] ?? true,
@@ -276,12 +281,15 @@ class ConfigManagerController
                 $appConf['analytics']['cache_raw_metrics'] = filter_var($data['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
                 file_put_contents($appConfigPath, Yaml::dump($appConf, 10, 2));
+                $logger->info("Global config updated successfully");
             } else {
                 return new Response(json_encode(['error' => 'Invalid type: ' . $type]), 400, ['Content-Type' => 'application/json']);
             }
 
+            $logger->info("Config updated successfully for type: " . $type);
             return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
         } catch (Exception $e) {
+            $logger->error("Error updating config: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
         }
     }

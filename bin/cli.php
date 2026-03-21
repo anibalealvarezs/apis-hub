@@ -11,6 +11,7 @@ use Commands\Analytics\ClearCacheCommand;
 use Commands\Analytics\CheckCoverageCommand;
 use Commands\Analytics\InspectJobsCommand;
 use Commands\Analytics\AnalyzeLogsCommand;
+use Commands\Analytics\ResetMetricsCommand;
 use Commands\HealthCheckCommand;
 use Commands\Crud\AggregateEntityCommand;
 use Commands\Crud\CreateEntityCommand;
@@ -63,6 +64,7 @@ try {
         new RefreshInstancesCommand(),
         new SetupDatabaseCommand(),
         new SeedDemoDataCommand(Helpers::getManager()),
+        new ResetMetricsCommand(),
     ]);
 
     // Runs console application
