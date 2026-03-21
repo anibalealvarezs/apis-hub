@@ -102,6 +102,9 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
                 $channeledMetric->metadata = $metadata;
                 $channeledMetric->data = $row;
+                $channeledMetric->account = $channeledAccountEntity->getAccount();
+                $channeledMetric->channeledAccount = $channeledAccountEntity;
+                $channeledMetric->creative = $creativeEntity;
 
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
@@ -202,6 +205,8 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
                 $channeledMetric->metadata = $metadata;
                 $channeledMetric->data = $row;
+                $channeledMetric->account = $accountEntity;
+                $channeledMetric->channeledAccountPlatformId = $channeledAccountPlatformId;
 
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
@@ -305,6 +310,10 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
                 $channeledMetric->metadata = $metadata;
                 $channeledMetric->data = $row;
+                $channeledMetric->account = $channeledAccountEntity->getAccount();
+                $channeledMetric->channeledAccount = $channeledAccountEntity;
+                $channeledMetric->campaign = $campaignEntity;
+                $channeledMetric->channeledCampaign = $channeledCampaignEntity;
 
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
@@ -411,6 +420,11 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
                 $channeledMetric->metadata = $metadata;
                 $channeledMetric->data = $row;
+                $channeledMetric->account = $channeledAccountEntity->getAccount();
+                $channeledMetric->channeledAccount = $channeledAccountEntity;
+                $channeledMetric->campaign = $campaignEntity;
+                $channeledMetric->channeledCampaign = $channeledCampaignEntity;
+                $channeledMetric->channeledAdGroup = $channeledAdGroupEntity;
 
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
@@ -520,6 +534,12 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->metricConfigKey = $metricConfigsGroupKey;
                 $channeledMetric->metadata = $metadata;
                 $channeledMetric->data = $row;
+                $channeledMetric->account = $channeledAccountEntity->getAccount();
+                $channeledMetric->channeledAccount = $channeledAccountEntity;
+                $channeledMetric->campaign = $campaignEntity;
+                $channeledMetric->channeledCampaign = $channeledCampaignEntity;
+                $channeledMetric->channeledAdGroup = $channeledAdGroupEntity;
+                $channeledMetric->channeledAd = $channeledAdEntity;
 
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];

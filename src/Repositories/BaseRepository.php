@@ -137,8 +137,9 @@ class BaseRepository extends EntityRepository
             'campaign' => ['table' => 'campaigns', 'fk' => 'campaign_id', 'field' => 'name', 'alias' => 'rc'],
             'channeledAccount'  => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
             'channeledCampaign' => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'platform_id', 'alias' => 'rcc'],
-            'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeled_ad_group_id', 'field' => 'platform_id', 'alias' => 'rag'],
-            'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'platform_id', 'alias' => 'rad'],
+            'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeled_ad_group_id', 'field' => 'name', 'alias' => 'rag'],
+            'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'name', 'alias' => 'rad'],
+            'creative' => ['table' => 'creatives', 'fk' => 'creative_id', 'field' => 'name', 'alias' => 'rcre'],
             'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
             'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'name', 'alias' => 'rd'],
         ];
@@ -195,6 +196,7 @@ class BaseRepository extends EntityRepository
                     $safeLeftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
                     
                     $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST({$channeledMap['alias']}.platform_id AS CHAR), CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS \"$quotedField\"")
+                       ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("rca_fallback.name")
                        ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
@@ -202,9 +204,11 @@ class BaseRepository extends EntityRepository
                        ->addGroupBy("mc.{$channeledMap['fk']}")
                        ->addGroupBy("mc.{$genericMap['fk']}");
                 } else {
-                    $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS \"$quotedField\"")
+                    $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST({$channeledMap['alias']}.platform_id AS CHAR), CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS \"$quotedField\"")
+                       ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
                        ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
+                       ->addGroupBy("{$channeledMap['alias']}.platform_id")
                        ->addGroupBy("mc.{$channeledMap['fk']}")
                        ->addGroupBy("mc.{$genericMap['fk']}");
                 }
@@ -213,6 +217,7 @@ class BaseRepository extends EntityRepository
                 $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
                 
                 $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS CHAR), 'Unknown') AS \"$quotedField\"")
+                   ->addSelect("mc.{$map['fk']} AS \"{$quotedField}_id\"")
                    ->addGroupBy("{$map['alias']}.{$map['field']}")
                    ->addGroupBy("mc.{$map['fk']}");
             } else {
@@ -238,9 +243,9 @@ class BaseRepository extends EntityRepository
                        ->setParameter("val_$dimAlias", $value);
                 } elseif ($this->isChanneledMetric && isset($relationMap[$key])) {
                     $map = $relationMap[$key];
+                    // We join the relation to allow filtering by platform_id OR database ID
                     $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
-                    
-                    $qb->andWhere("{$map['alias']}.{$map['field']} = :f_$key")
+                    $qb->andWhere("(mc.{$map['fk']} = :f_$key OR {$map['alias']}.platform_id = :f_$key)")
                        ->setParameter("f_$key", $value);
                 } else {
                     $sqlKey = $this->mapFieldToSql($key);

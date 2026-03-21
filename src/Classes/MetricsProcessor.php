@@ -105,10 +105,27 @@ class MetricsProcessor
      */
     public static function processAccounts(ArrayCollection $metrics, EntityManager $manager): array
     {
-        return [
-            'map' => [],
-            'mapReverse' => [],
-        ];
+        $ids = [];
+        foreach ($metrics as $metric) {
+            if (isset($metric->account)) {
+                $ids[] = $metric->account->getAccountId();
+            }
+        }
+        $ids = array_unique($ids);
+        if (empty($ids)) return ['map' => [], 'mapReverse' => []];
+
+        $results = $manager->getConnection()->executeQuery(
+            "SELECT id, account_id FROM accounts WHERE account_id IN (?)",
+            [$ids],
+            [\Doctrine\DBAL\ArrayParameterType::STRING]
+        )->fetchAllAssociative();
+
+        $map = []; $mapReverse = [];
+        foreach ($results as $row) {
+            $map[$row['account_id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['account_id'];
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
     /**
@@ -118,10 +135,29 @@ class MetricsProcessor
      */
     public static function processChanneledAccounts(ArrayCollection $metrics, EntityManager $manager): array
     {
-        return [
-            'map' => [],
-            'mapReverse' => [],
-        ];
+        $ids = [];
+        foreach ($metrics as $metric) {
+            if (isset($metric->channeledAccount)) {
+                $ids[] = $metric->channeledAccount->getPlatformId();
+            } elseif (isset($metric->channeledAccountPlatformId)) {
+                $ids[] = $metric->channeledAccountPlatformId;
+            }
+        }
+        $ids = array_unique($ids);
+        if (empty($ids)) return ['map' => [], 'mapReverse' => []];
+
+        $results = $manager->getConnection()->executeQuery(
+            "SELECT id, platform_id FROM channeled_accounts WHERE platform_id IN (?)",
+            [$ids],
+            [\Doctrine\DBAL\ArrayParameterType::STRING]
+        )->fetchAllAssociative();
+
+        $map = []; $mapReverse = [];
+        foreach ($results as $row) {
+            $map[$row['platform_id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['platform_id'];
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
     /**
@@ -131,10 +167,27 @@ class MetricsProcessor
      */
     public static function processCampaigns(ArrayCollection $metrics, EntityManager $manager): array
     {
-        return [
-            'map' => [],
-            'mapReverse' => [],
-        ];
+        $ids = [];
+        foreach ($metrics as $metric) {
+            if (isset($metric->campaign)) {
+                $ids[] = $metric->campaign->getCampaignId();
+            }
+        }
+        $ids = array_unique($ids);
+        if (empty($ids)) return ['map' => [], 'mapReverse' => []];
+
+        $results = $manager->getConnection()->executeQuery(
+            "SELECT id, campaign_id FROM campaigns WHERE campaign_id IN (?)",
+            [$ids],
+            [\Doctrine\DBAL\ArrayParameterType::STRING]
+        )->fetchAllAssociative();
+
+        $map = []; $mapReverse = [];
+        foreach ($results as $row) {
+            $map[$row['campaign_id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['campaign_id'];
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
     /**
@@ -144,10 +197,27 @@ class MetricsProcessor
      */
     public static function processChanneledCampaigns(ArrayCollection $metrics, EntityManager $manager): array
     {
-        return [
-            'map' => [],
-            'mapReverse' => [],
-        ];
+        $ids = [];
+        foreach ($metrics as $metric) {
+            if (isset($metric->channeledCampaign)) {
+                $ids[] = $metric->channeledCampaign->getPlatformId();
+            }
+        }
+        $ids = array_unique($ids);
+        if (empty($ids)) return ['map' => [], 'mapReverse' => []];
+
+        $results = $manager->getConnection()->executeQuery(
+            "SELECT id, platform_id FROM channeled_campaigns WHERE platform_id IN (?)",
+            [$ids],
+            [\Doctrine\DBAL\ArrayParameterType::STRING]
+        )->fetchAllAssociative();
+
+        $map = []; $mapReverse = [];
+        foreach ($results as $row) {
+            $map[$row['platform_id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['platform_id'];
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
     /**
@@ -157,10 +227,27 @@ class MetricsProcessor
      */
     public static function processChanneledAdGroups(ArrayCollection $metrics, EntityManager $manager): array
     {
-        return [
-            'map' => [],
-            'mapReverse' => [],
-        ];
+        $ids = [];
+        foreach ($metrics as $metric) {
+            if (isset($metric->channeledAdGroup)) {
+                $ids[] = $metric->channeledAdGroup->getPlatformId();
+            }
+        }
+        $ids = array_unique($ids);
+        if (empty($ids)) return ['map' => [], 'mapReverse' => []];
+
+        $results = $manager->getConnection()->executeQuery(
+            "SELECT id, platform_id FROM channeled_ad_groups WHERE platform_id IN (?)",
+            [$ids],
+            [\Doctrine\DBAL\ArrayParameterType::STRING]
+        )->fetchAllAssociative();
+
+        $map = []; $mapReverse = [];
+        foreach ($results as $row) {
+            $map[$row['platform_id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['platform_id'];
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
     /**
@@ -170,10 +257,27 @@ class MetricsProcessor
      */
     public static function processChanneledAds(ArrayCollection $metrics, EntityManager $manager): array
     {
-        return [
-            'map' => [],
-            'mapReverse' => [],
-        ];
+        $ids = [];
+        foreach ($metrics as $metric) {
+            if (isset($metric->channeledAd)) {
+                $ids[] = $metric->channeledAd->getPlatformId();
+            }
+        }
+        $ids = array_unique($ids);
+        if (empty($ids)) return ['map' => [], 'mapReverse' => []];
+
+        $results = $manager->getConnection()->executeQuery(
+            "SELECT id, platform_id FROM channeled_ads WHERE platform_id IN (?)",
+            [$ids],
+            [\Doctrine\DBAL\ArrayParameterType::STRING]
+        )->fetchAllAssociative();
+
+        $map = []; $mapReverse = [];
+        foreach ($results as $row) {
+            $map[$row['platform_id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['platform_id'];
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
     /**
@@ -183,10 +287,27 @@ class MetricsProcessor
      */
     public static function processCreatives(ArrayCollection $metrics, EntityManager $manager): array
     {
-        return [
-            'map' => [],
-            'mapReverse' => [],
-        ];
+        $ids = [];
+        foreach ($metrics as $metric) {
+            if (isset($metric->creative)) {
+                $ids[] = $metric->creative->getCreativeId();
+            }
+        }
+        $ids = array_unique($ids);
+        if (empty($ids)) return ['map' => [], 'mapReverse' => []];
+
+        $results = $manager->getConnection()->executeQuery(
+            "SELECT id, creative_id FROM creatives WHERE creative_id IN (?)",
+            [$ids],
+            [\Doctrine\DBAL\ArrayParameterType::STRING]
+        )->fetchAllAssociative();
+
+        $map = []; $mapReverse = [];
+        foreach ($results as $row) {
+            $map[$row['creative_id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['creative_id'];
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
     /**
@@ -363,24 +484,22 @@ class MetricsProcessor
                 'name' => $metric->name,
                 'period' => $metric->period,
                 'metricDate' => $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
-                'account_id' => isset($metric->account) ? $metric->account->getId() : null,
-                'channeled_account_id' => isset($metric->channeledAccount) ? $channeledAccountMap['map'][$metric->channeledAccount->getPlatformId()] ?? null : null,
-                'campaign_id' => isset($metric->campaign) ? $campaignMap['map'][$metric->campaign->getCampaignId()] ?? null : null,
-                'channeled_campaign_id' => isset($metric->channeledCampaign) ? $channeledCampaignMap['map'][$metric->channeledCampaign->getPlatformId()] ?? null : null,
-                'channeled_ad_group_id' => isset($metric->channeledAdGroup) ? $channeledAdGroupMap['map'][$metric->channeledAdGroup->getPlatformId()] ?? null : null,
-                'channeled_ad_id' => isset($metric->channeledAd) ? $channeledAdMap['map'][$metric->channeledAd->getPlatformId()] ?? null : null,
-                'query_id' => isset($metric->query) ? $queryMap['map'][$metric->query] : null,
-                'page_id' => isset($metric->page) ? $metric->page->getId() : null,
-                'post_id' => isset($metric->post) ? $postMap['map'][$metric->post->getPostId()] ?? null : null,
-                'product_id' => isset($metric->product) ? $productMap['map'][$metric->product->getProductId()] ?? null : null,
-                'customer_id' => isset($metric->customer) ? $customerMap['map'][$metric->customer->getEmail()] ?? null : null,
-                'order_id' => isset($metric->order) ? $orderMap['map'][$metric->order->getOrderId()] ?? null : null,
-                'country_id' => isset($metric->countryCode) ? $countryMap['map'][$metric->countryCode]->getId() : null,
-                'device_id' => isset($metric->deviceType) ? $deviceMap['map'][$metric->deviceType]->getId() : null,
-                'creative_id' => isset($metric->creative) ? $creativeMap['map'][$metric->creative->getCreativeId()] ?? null : null,
-                'value' => $metric->value,
-                'metadata' => $metric->metadata,
-                'key' => $metricConfigKey,
+                'account_id' => isset($metric->account) ? ($accountMap['map'][$metric->account->getAccountId()] ?? null) : null,
+                'channeled_account_id' => isset($metric->channeledAccount) ? ($channeledAccountMap['map'][$metric->channeledAccount->getPlatformId()] ?? null) : (isset($metric->channeledAccountPlatformId) ? ($channeledAccountMap['map'][$metric->channeledAccountPlatformId] ?? null) : null),
+                'campaign_id' => isset($metric->campaign) ? ($campaignMap['map'][$metric->campaign->getCampaignId()] ?? null) : null,
+                'channeled_campaign_id' => isset($metric->channeledCampaign) ? ($channeledCampaignMap['map'][$metric->channeledCampaign->getPlatformId()] ?? null) : null,
+                'channeled_ad_group_id' => isset($metric->channeledAdGroup) ? ($channeledAdGroupMap['map'][$metric->channeledAdGroup->getPlatformId()] ?? null) : null,
+                'channeled_ad_id' => isset($metric->channeledAd) ? ($channeledAdMap['map'][$metric->channeledAd->getPlatformId()] ?? null) : null,
+                'query_id' => isset($metric->query) ? ($queryMap['map'][$metric->query] ?? null) : null,
+                'page_id' => isset($metric->page) ? ($pageMap['map'][$metric->page->getPlatformId()] ?? null) : null,
+                'post_id' => isset($metric->post) ? ($postMap['map'][$metric->post->getPostId()] ?? null) : null,
+                'product_id' => isset($metric->product) ? ($productMap['map'][$metric->product->getProductId()] ?? null) : null,
+                'customer_id' => isset($metric->customer) ? ($customerMap['map'][$metric->customer->getEmail()] ?? null) : null,
+                'order_id' => isset($metric->order) ? ($orderMap['map'][$metric->order->getOrderId()] ?? null) : null,
+                'country_id' => isset($metric->countryCode) ? ($countryMap['map'][$metric->countryCode]->getId()) : null,
+                'device_id' => isset($metric->deviceType) ? ($deviceMap['map'][$metric->deviceType]->getId()) : null,
+                'creative_id' => isset($metric->creative) ? ($creativeMap['map'][$metric->creative->getCreativeId()] ?? ($creativeMap['map'][$metric->creative->getCreativeId()] ?? null)) : null,
+                'config_signature' => $metricConfigKey,
             ];
         }
 
@@ -461,7 +580,7 @@ class MetricsProcessor
                     $insertParams[] = $metricConfig['order_id'] ?? null;
                     $insertParams[] = $metricConfig['country_id'] ?? null;
                     $insertParams[] = $metricConfig['device_id'] ?? null;
-                    $insertParams[] = $metricConfig['key']; // configSignature
+                    $insertParams[] = $metricConfig['key']; // config_signature
                 }
                 $sql = Helpers::buildInsertIgnoreSql(
                     'metric_configs', 

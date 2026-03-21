@@ -23,12 +23,14 @@ echo "------------------------------------------------"
 echo -e "${YELLOW}📂 [0/5] Validating environment & configuration...${NC}"
 
 # Check for .env file
-if [ ! -f ".env" ]; then
-    if [ -f ".env.example" ]; then
+ENV_FILE=${ENV_FILE:-.env}
+if [ ! -f "$ENV_FILE" ]; then
+    if [ "$ENV_FILE" == ".env" ] && [ -f ".env.example" ]; then
         echo "  ⚠️  .env not found. Creating from .env.example..."
         cp .env.example .env
     else
-        echo "  ⚠️  .env.example not found. Using default environment variables."
+        echo -e "  ${RED}❌ Error: Environment file '$ENV_FILE' not found.${NC}"
+        exit 1
     fi
 fi
 
@@ -45,7 +47,7 @@ for FILE in $CONFIG_FILES; do
         fi
     fi
 done
-echo -e "${GREEN}✔ Environment ready.${NC}"
+echo -e "${GREEN}✔ Environment ready ($ENV_FILE).${NC}"
 
 # ── Step 1: Install Composer dependencies ────────────────────────────────────
 echo ""
@@ -76,7 +78,8 @@ echo ""
 echo -e "${YELLOW}🔄 [2/5] Calculating instance nodes and splits...${NC}"
 MSYS_NO_PATHCONV=1 docker run --rm \
     -v "$(pwd):/app" \
-    --env-file .env \
+    -e "ENV_FILE=$ENV_FILE" \
+    --env-file "$ENV_FILE" \
     -w /app \
     php:8.3-cli \
     php bin/cli.php app:refresh-instances
@@ -87,7 +90,8 @@ echo ""
 echo -e "${YELLOW}📂 [3/5] Building Docker Compose manifest...${NC}"
 MSYS_NO_PATHCONV=1 docker run --rm \
     -v "$(pwd):/app" \
-    --env-file .env \
+    -e "ENV_FILE=$ENV_FILE" \
+    --env-file "$ENV_FILE" \
     -w /app \
     php:8.3-cli \
     php bin/build-deployment.php
@@ -101,17 +105,17 @@ echo -e "${YELLOW}🚀 [4/5] Orchestrating containers...${NC}"
 if [ -f "docker-compose.yml" ]; then
     echo "  🧹 Cleaning up existing deployment..."
     rm -rf storage/db_lock
-    docker compose --env-file .env down --remove-orphans || echo "  ⚠️ Cleanup had issues, continuing..."
+    docker compose --env-file "$ENV_FILE" down --remove-orphans || echo "  ⚠️ Cleanup had issues, continuing..."
 fi
 
 echo "  🏗️  Building and starting new containers..."
-docker compose --env-file .env up -d --remove-orphans --build
+docker compose --env-file "$ENV_FILE" up -d --remove-orphans --build
 
 # ── Step 5: Post-deployment Health Check ──────────────────────────────────────
 echo ""
 echo -e "${YELLOW}🩺 [5/5] Waiting for master instance to bootstrap...${NC}"
 # We wait a bit for the entities-sync instance to finish schema update
-sleep 10
+sleep 15
 echo -e "${GREEN}✔ Bootstrap initiated.${NC}"
 
 echo ""

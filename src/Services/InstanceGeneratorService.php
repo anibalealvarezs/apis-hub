@@ -23,6 +23,16 @@ class InstanceGeneratorService
         $today = new DateTimeImmutable('today');
         $yesterday = $today->modify('-1 day');
         
+        if (getenv('APP_ENV') === 'demo') {
+            return [[
+                'name' => 'demo-entities-sync',
+                'port' => $basePort,
+                'channel' => 'none',
+                'entity' => 'none',
+                'frequency' => '0 0 * * *'
+            ]];
+        }
+
         $projectConfig = \Helpers\Helpers::getProjectConfig();
         $channels = $projectConfig['rules'] ?? [];
 
