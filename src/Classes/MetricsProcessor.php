@@ -107,23 +107,23 @@ class MetricsProcessor
     {
         $ids = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->account)) {
-                $ids[] = $metric->account->getAccountId();
+            if (isset($metric->account) && method_exists($metric->account, 'getId')) {
+                $ids[] = $metric->account->getId();
             }
         }
         $ids = array_unique($ids);
         if (empty($ids)) return ['map' => [], 'mapReverse' => []];
 
         $results = $manager->getConnection()->executeQuery(
-            "SELECT id, account_id FROM accounts WHERE account_id IN (?)",
+            "SELECT id FROM accounts WHERE id IN (?)",
             [$ids],
-            [\Doctrine\DBAL\ArrayParameterType::STRING]
+            [\Doctrine\DBAL\ArrayParameterType::INTEGER]
         )->fetchAllAssociative();
 
         $map = []; $mapReverse = [];
         foreach ($results as $row) {
-            $map[$row['account_id']] = (int) $row['id'];
-            $mapReverse[$row['id']] = $row['account_id'];
+            $map[$row['id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['id'];
         }
         return ['map' => $map, 'mapReverse' => $mapReverse];
     }
@@ -484,7 +484,7 @@ class MetricsProcessor
                 'name' => $metric->name,
                 'period' => $metric->period,
                 'metricDate' => $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
-                'account_id' => isset($metric->account) ? ($accountMap['map'][$metric->account->getAccountId()] ?? null) : null,
+                'account_id' => isset($metric->account) ? ($accountMap['map'][$metric->account->getId() ?? 0] ?? null) : null,
                 'channeled_account_id' => isset($metric->channeledAccount) ? ($channeledAccountMap['map'][$metric->channeledAccount->getPlatformId()] ?? null) : (isset($metric->channeledAccountPlatformId) ? ($channeledAccountMap['map'][$metric->channeledAccountPlatformId] ?? null) : null),
                 'campaign_id' => isset($metric->campaign) ? ($campaignMap['map'][$metric->campaign->getCampaignId()] ?? null) : (isset($metric->campaignPlatformId) ? ($campaignMap['map'][$metric->campaignPlatformId] ?? null) : null),
                 'channeled_campaign_id' => isset($metric->channeledCampaign) ? ($channeledCampaignMap['map'][$metric->channeledCampaign->getPlatformId()] ?? null) : (isset($metric->channeledCampaignPlatformId) ? ($channeledCampaignMap['map'][$metric->channeledCampaignPlatformId] ?? null) : null),
