@@ -171,7 +171,7 @@ class FacebookMarketingMetricConvert
             $dimensions = [];
             foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
-                    $logger?->warning("Skipping breakdown $breakdown for row $index of Ad Account metrics due to missing value");
+                    $logger?->debug("Skipping breakdown $breakdown for row $index of Ad Account metrics due to missing value");
                     continue;
                 }
                 $dimensions[] = [
@@ -275,7 +275,7 @@ class FacebookMarketingMetricConvert
             $dimensions = [];
             foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
-                    $logger?->warning("Skipping breakdown $breakdown for row $index of Campaign metrics due to missing value");
+                    $logger?->debug("Skipping breakdown $breakdown for row $index of Campaign metrics due to missing value");
                     continue;
                 }
                 $dimensions[] = [
@@ -384,7 +384,7 @@ class FacebookMarketingMetricConvert
             $dimensions = [];
             foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
-                    $logger?->warning("Skipping breakdown $breakdown for row $index of Adset metrics due to missing value");
+                    $logger?->debug("Skipping breakdown $breakdown for row $index of Adset metrics due to missing value");
                     continue;
                 }
                 $dimensions[] = [
@@ -497,7 +497,7 @@ class FacebookMarketingMetricConvert
             $dimensions = [];
             foreach ($breakdowns as $breakdown) {
                 if (!isset($row[$breakdown])) {
-                    $logger?->warning("Skipping breakdown $breakdown for row $index of Adset metrics due to missing value");
+                    $logger?->debug("Skipping breakdown $breakdown for row $index of Ad metrics due to missing value");
                     continue;
                 }
                 $dimensions[] = [
