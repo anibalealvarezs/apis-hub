@@ -54,6 +54,7 @@ class CampaignRequests implements RequestInterface
                 $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
             }
             $manager = Helpers::getManager();
+            $authorizedIdsMap = [];
 
             $hasErrors = false;
             $adAccounts = $config['ad_accounts'] ?? [];
@@ -90,23 +91,7 @@ class CampaignRequests implements RequestInterface
                 while ($retryCount < $maxRetries && !$fetched) {
                     try {
                         $additionalParams = [];
-                        if ($startDate) {
-                            if (!isset($additionalParams['filtering'])) $additionalParams['filtering'] = [];
-                            $additionalParams['filtering'][] = [
-                                'field' => 'updated_time',
-                                'operator' => 'GREATER_THAN',
-                                'value' => strtotime($startDate)
-                            ];
-                        }
-                        if ($endDate) {
-                            if (!isset($additionalParams['filtering'])) $additionalParams['filtering'] = [];
-                            $additionalParams['filtering'][] = [
-                                'field' => 'updated_time',
-                                'operator' => 'LESS_THAN',
-                                'value' => strtotime($endDate)
-                            ];
-                        }
-
+                        
                         $cacheInclude = MetricRequests::getFacebookFilter($config, 'CAMPAIGN', 'cache_include');
                         $cacheExclude = MetricRequests::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude');
 
@@ -135,6 +120,9 @@ class CampaignRequests implements RequestInterface
                             $logger->info("Fetched " . count($campaigns['data']) . " campaigns, kept " . count($data) . " after filtering for ad account $adAccountId");
 
                             if (!empty($data)) {
+                                foreach ($data as $c) {
+                                    $authorizedIdsMap[$adAccountId][] = (string)$c['id'];
+                                }
                                 self::process(FacebookMarketingConvert::campaigns($data, $channeledAccount->getId()));
                             }
                         } else {
@@ -166,7 +154,10 @@ class CampaignRequests implements RequestInterface
                 throw new \Exception("Finished with partial errors. Check channeled_sync_errors table or logs for details.");
             }
 
-            return new Response(json_encode(['Campaigns synchronized']));
+            return new Response(json_encode([
+                'message' => 'Campaigns synchronized',
+                'authorized_ids_map' => $authorizedIdsMap
+            ]), 200, ['Content-Type' => 'application/json']);
         } catch (\Exception $e) {
             $logger->error("Error in CampaignRequests::getListFromFacebookMarketing initialization: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);

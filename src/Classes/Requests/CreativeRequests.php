@@ -38,7 +38,8 @@ class CreativeRequests implements RequestInterface
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?array $adAccountIds = null,
-        ?FacebookGraphApi $api = null
+        ?FacebookGraphApi $api = null,
+        ?array $parentIdsMap = null
     ): Response {
         if (!$logger) {
             $logger = Helpers::setLogger('facebook-entities.log');
@@ -50,6 +51,7 @@ class CreativeRequests implements RequestInterface
                 $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
             }
             $manager = Helpers::getManager();
+            $authorizedIdsMap = [];
 
             $hasErrors = false;
             $adAccounts = $config['ad_accounts'] ?? [];
@@ -115,6 +117,9 @@ class CreativeRequests implements RequestInterface
                             $logger->info("Fetched " . count($creatives['data']) . " creatives, kept " . count($data) . " after filtering for ad account $adAccountId");
 
                             if (!empty($data)) {
+                                foreach ($data as $c) {
+                                    $authorizedIdsMap[$adAccountId][] = (string)$c['id'];
+                                }
                                 self::process(FacebookMarketingConvert::creatives($data, $channeledAccount->getId()));
                             }
                         } else {
@@ -146,7 +151,10 @@ class CreativeRequests implements RequestInterface
                 throw new \Exception("Finished with partial errors. Check channeled_sync_errors table or logs for details.");
             }
 
-            return new Response(json_encode(['Creatives synchronized']));
+            return new Response(json_encode([
+                'message' => 'Creatives synchronized',
+                'authorized_ids_map' => $authorizedIdsMap
+            ]), 200, ['Content-Type' => 'application/json']);
         } catch (\Exception $e) {
             $logger->error("Error in CreativeRequests::getListFromFacebookMarketing initialization: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);

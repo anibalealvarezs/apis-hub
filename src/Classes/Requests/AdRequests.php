@@ -37,7 +37,8 @@ class AdRequests implements RequestInterface
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?array $adAccountIds = null,
-        ?FacebookGraphApi $api = null
+        ?FacebookGraphApi $api = null,
+        ?array $parentIdsMap = null
     ): Response {
         if (!$logger) {
             $logger = Helpers::setLogger('facebook-entities.log');
@@ -49,6 +50,7 @@ class AdRequests implements RequestInterface
                 $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
             }
             $manager = Helpers::getManager();
+            $authorizedIdsMap = [];
 
             $hasErrors = false;
             $adAccounts = $config['ad_accounts'] ?? [];
@@ -84,20 +86,13 @@ class AdRequests implements RequestInterface
                 while ($retryCount < $maxRetries && !$fetched) {
                     try {
                         $additionalParams = [];
-                        if ($startDate) {
+                        
+                        if ($parentIdsMap && isset($parentIdsMap[$adAccountId])) {
                             if (!isset($additionalParams['filtering'])) $additionalParams['filtering'] = [];
                             $additionalParams['filtering'][] = [
-                                'field' => 'updated_time',
-                                'operator' => 'GREATER_THAN',
-                                'value' => strtotime($startDate)
-                            ];
-                        }
-                        if ($endDate) {
-                            if (!isset($additionalParams['filtering'])) $additionalParams['filtering'] = [];
-                            $additionalParams['filtering'][] = [
-                                'field' => 'updated_time',
-                                'operator' => 'LESS_THAN',
-                                'value' => strtotime($endDate)
+                                'field' => 'adset.id',
+                                'operator' => 'IN',
+                                'value' => $parentIdsMap[$adAccountId]
                             ];
                         }
 
@@ -129,6 +124,9 @@ class AdRequests implements RequestInterface
                             $logger->info("Fetched " . count($ads['data']) . " ads, kept " . count($data) . " after filtering for ad account $adAccountId");
 
                             if (!empty($data)) {
+                                foreach ($data as $a) {
+                                    $authorizedIdsMap[$adAccountId][] = (string)$a['id'];
+                                }
                                 self::process(FacebookMarketingConvert::ads($data, $channeledAccount->getId()));
                             }
                         } else {
@@ -160,7 +158,10 @@ class AdRequests implements RequestInterface
                 throw new \Exception("Finished with partial errors. Check channeled_sync_errors table or logs for details.");
             }
 
-            return new Response(json_encode(['Ads synchronized']));
+            return new Response(json_encode([
+                'message' => 'Ads synchronized',
+                'authorized_ids_map' => $authorizedIdsMap
+            ]), 200, ['Content-Type' => 'application/json']);
         } catch (\Exception $e) {
             $logger->error("Error in AdRequests::getListFromFacebookMarketing initialization: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500);
