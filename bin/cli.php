@@ -39,7 +39,11 @@ try {
         version: '1.0.0'
     );
     $cli->setCatchExceptions(true);
-    $cli->setHelperSet($helperSet);
+    // Register All Doctrine Helpers to the existing HelperSet
+    $cli->getHelperSet()->set($helperSet->get('em'), 'em');
+    if ($helperSet->has('db')) {
+        $cli->getHelperSet()->set($helperSet->get('db'), 'db');
+    }
 
     // Register All Doctrine Commands
     ConsoleRunner::addCommands($cli);
