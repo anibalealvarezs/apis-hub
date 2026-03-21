@@ -267,21 +267,22 @@ class MetricRequests
 
             // Process Pages
             Helpers::reconnectIfNeeded($manager);
-            $pagesToProcess = $config['pages'] ?? [];
+            $pagesToProcessRaw = $config['pages'] ?? [];
             $globalExcludeIds = array_map('strval', $config['exclude_from_caching'] ?? []);
+            $globalPageConfig = $config['PAGE'] ?? [
+                'page_metrics' => false,
+                'posts' => true,
+                'post_metrics' => false,
+                'ig_accounts' => true,
+                'ig_account_metrics' => false,
+                'ig_account_media' => true,
+                'ig_account_media_metrics' => false,
+            ];
 
-            if (empty($pagesToProcess)) {
+            $pagesToProcess = [];
+            if (empty($pagesToProcessRaw)) {
                 $logger->info("No specific pages listed in config. Fetching all available pages from database.");
                 $allPages = $pageRepository->findByDataAttribute('source', 'fb_page');
-                $globalPageConfig = $config['PAGE'] ?? [
-                    'page_metrics' => false,
-                    'posts' => true,
-                    'post_metrics' => false,
-                    'ig_accounts' => true,
-                    'ig_account_metrics' => false,
-                    'ig_account_media' => true,
-                    'ig_account_media_metrics' => false,
-                ];
                 foreach ($allPages as $p) {
                     $pageId = (string) $p->getPlatformId();
                     if (in_array($pageId, $globalExcludeIds)) {
@@ -301,6 +302,10 @@ class MetricRequests
                         // If IG user ID is stored in data, we can try to extract it
                         'ig_account' => $p->getData()['instagram_business_account']['id'] ?? null
                     ]);
+                }
+            } else {
+                foreach ($pagesToProcessRaw as $p) {
+                    $pagesToProcess[] = array_merge($globalPageConfig, $p);
                 }
             }
 
@@ -564,29 +569,30 @@ class MetricRequests
 
             // Process Ad Accounts
             Helpers::reconnectIfNeeded($manager);
-            $adAccountsToProcess = $config['ad_accounts'] ?? [];
+            $adAccountsToProcessRaw = $config['ad_accounts'] ?? [];
             $globalExcludeIds = array_map('strval', $config['exclude_from_caching'] ?? []);
+            $globalAdAccountConfig = $config['AD_ACCOUNT'] ?? [
+                'ad_account_metrics' => true,
+                'campaigns' => true,
+                'campaign_metrics' => true,
+                'adsets' => false,
+                'adset_metrics' => false,
+                'ads' => false,
+                'ad_metrics' => false,
+                'creatives' => false,
+                'creative_metrics' => false,
+            ];
 
+            $adAccountsToProcess = [];
             /** @var \Repositories\Channeled\ChanneledSyncErrorRepository $syncErrorRepo */
             $syncErrorRepo = $manager->getRepository(ChanneledSyncError::class);
 
-            if (empty($adAccountsToProcess)) {
+            if (empty($adAccountsToProcessRaw)) {
                 $logger->info("No specific ad accounts listed in config. Fetching all available ad accounts for channel from database.");
                 $allChanneledAccounts = $channeledAccountRepository->findBy([
                     'channel' => Channel::facebook_marketing->value,
                     'type' => AccountEnum::META_AD_ACCOUNT->value
                 ]);
-                $globalAdAccountConfig = $config['AD_ACCOUNT'] ?? [
-                    'ad_account_metrics' => true,
-                    'campaigns' => true,
-                    'campaign_metrics' => true,
-                    'adsets' => false,
-                    'adset_metrics' => false,
-                    'ads' => false,
-                    'ad_metrics' => false,
-                    'creatives' => false,
-                    'creative_metrics' => false,
-                ];
                 foreach ($allChanneledAccounts as $ca) {
                     $accId = (string) $ca->getPlatformId();
                     if (in_array($accId, $globalExcludeIds)) {
@@ -603,6 +609,10 @@ class MetricRequests
                         'name' => $accName,
                         'enabled' => true
                     ]);
+                }
+            } else {
+                foreach ($adAccountsToProcessRaw as $a) {
+                    $adAccountsToProcess[] = array_merge($globalAdAccountConfig, $a);
                 }
             }
 

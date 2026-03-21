@@ -69,6 +69,7 @@ class Helpers
         // 0. Load .env manually if it exists to ensure variables are available
         $envFileName = getenv('ENV_FILE') ?: '.env';
         $dotEnv = __DIR__ . '/../../' . $envFileName;
+
         if (file_exists($dotEnv)) {
             $lines = file($dotEnv, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             foreach ($lines as $line) {
@@ -132,15 +133,12 @@ class Helpers
             $content = file_get_contents($file);
             // Interpolate environment variables: ${VAR:-default}
             $content = preg_replace_callback('/\$\{([^}:]+)(?::-([^}]*))?\}/', function($matches) {
-                $envValue = getenv($matches[1]);
-                if ($envValue === false && isset($_ENV[$matches[1]])) $envValue = $_ENV[$matches[1]];
-                if ($envValue === false && isset($_SERVER[$matches[1]])) $envValue = $_SERVER[$matches[1]];
+                $varName = trim($matches[1]);
+                $envValue = getenv($varName);
+                if ($envValue === false && isset($_ENV[$varName])) $envValue = $_ENV[$varName];
+                if ($envValue === false && isset($_SERVER[$varName])) $envValue = $_SERVER[$varName];
                 
-                $val = ($envValue !== false) ? (string)$envValue : ($matches[2] ?? $matches[0]);
-                if (str_contains($matches[0], 'PASSWORD')) {
-                    file_put_contents(__DIR__ . '/../../logs/resolve.log', "Resolved {$matches[0]} to " . substr($val, 0, 1) . "...\n", FILE_APPEND);
-                }
-                return $val;
+                return ($envValue !== false) ? (string)$envValue : ($matches[2] ?? $matches[0]);
             }, $content);
 
             $parsed = Yaml::parse($content);
@@ -396,8 +394,12 @@ class Helpers
                     'GOOGLE_SEARCH_CONSOLE_TOKEN' => ['google_search_console', 'token'],
                     'FACEBOOK_APP_ID' => ['facebook', 'app_id'],
                     'FACEBOOK_APP_SECRET' => ['facebook', 'app_secret'],
-                    'FACEBOOK_GRAPH_USER_ACCESS_TOKEN' => ['facebook', 'graph_user_access_token'],
-                    'FACEBOOK_GRAPH_PAGE_ACCESS_TOKEN' => ['facebook', 'graph_page_access_token'],
+                    'FACEBOOK_REDIRECT_URI' => ['facebook', 'app_redirect_uri'],
+                    'FACEBOOK_USER_TOKEN' => ['facebook', 'graph_user_access_token'],
+                    'FACEBOOK_PAGE_TOKEN' => ['facebook', 'graph_page_access_token'],
+                    'FACEBOOK_TOKEN_PATH' => ['facebook', 'graph_token_path'],
+                    'FACEBOOK_USER_ID' => ['facebook', 'user_id'],
+                    'FACEBOOK_ACCOUNTS_GROUP' => ['facebook', 'accounts_group_name'],
                 ];
 
                 foreach ($envOverrides as $envKey => $configPath) {

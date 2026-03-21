@@ -1129,6 +1129,18 @@
                     if (el) el.value = val;
                 });
             }
+            if (currentConfig.fb_feature_toggles) {
+                Object.entries(currentConfig.fb_feature_toggles).forEach(([key, val]) => {
+                    document.querySelectorAll(`.fb-toggle[data-key="${key}"], .fb-toggle-mark[data-key="${key}"]`).forEach(el => {
+                        el.checked = !!val;
+                    });
+                });
+            }
+            if (currentConfig.fb_cache_chunk_size) {
+                document.querySelectorAll('.fb-periodicity-select').forEach(el => {
+                    el.value = currentConfig.fb_cache_chunk_size;
+                });
+            }
         }
 
         function renderAssets() {
@@ -1259,11 +1271,24 @@
                             { id: input.dataset.id, name: input.dataset.name });
                     });
                     requestBody.assets = type === 'facebook-organic' ? { pages: assets } : { ad_accounts: assets };
-                    requestBody.cache_history_range = document.getElementById(`fb-${type === 'facebook-organic' ? 'organic' : 'marketing'}-history-range`).value;
+                    requestBody.organic_history_range = document.getElementById('fb-organic-history-range').value;
+                    requestBody.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
+
+                    // Collect periodicity from the active tab's select
+                    const activeSelect = document.querySelector(`#tab-${type} .fb-periodicity-select`);
+                    if (activeSelect) {
+                        requestBody.cache_chunk_size = activeSelect.value;
+                    }
+
                     requestBody.entity_filters = {};
                     ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA', 'CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'].forEach(e => {
                         const el = document.getElementById(`filter-${e}`);
                         if (el) requestBody.entity_filters[e] = el.value;
+                    });
+
+                    requestBody.feature_toggles = {};
+                    document.querySelectorAll('.fb-toggle, .fb-toggle-mark').forEach(el => {
+                        requestBody.feature_toggles[el.dataset.key] = el.checked;
                     });
                 } else if (type === 'global') {
                     requestBody.jobs_timeout_hours = parseInt(document.getElementById('jobs-timeout-hours').value, 10) || 6;
@@ -1276,10 +1301,10 @@
                     body: JSON.stringify(requestBody)
                 });
                 const result = await response.json();
-                if (result.status === 'success') {
+                if (result.success) {
                     showToast('Configuration updated!');
                     fetchAssets();
-                } else throw new Error(result.error);
+                } else throw new Error(result.error || 'Unknown error');
             } catch (err) {
                 showToast(err.message, true);
             } finally {
@@ -1304,14 +1329,19 @@
             try {
                 const response = await fetch('/api/config-manager/validate-tokens', { method: 'POST', headers: getAdminHeaders() });
                 const result = await response.json();
-                const render = (id, valid) => {
+                const render = (id, data) => {
                     const el = document.getElementById(id);
+                    if (!el || !data) return;
+                    const isValid = data.status === 'valid';
                     el.style.display = 'inline-flex';
-                    el.className = `token-status ${valid ? 'valid' : 'error'}`;
-                    el.innerHTML = `<i data-lucide="${valid ? 'check-circle' : 'x-circle'}"></i> ${valid ? 'API OK' : 'EXPIRED/INVALID'}`;
+                    el.className = `token-status ${isValid ? 'valid' : (data.status === 'info' ? 'info' : 'error')}`;
+                    el.innerHTML = `<i data-lucide="${isValid ? 'check-circle' : (data.status === 'info' ? 'help-circle' : 'x-circle')}"></i> ${isValid ? 'API OK' : (data.status === 'info' ? 'INFO' : 'EXPIRED/INVALID')}`;
+                    el.title = data.message;
                 };
-                render('gsc-token-status', result.channels.gsc);
-                render('fb-token-status', result.channels.facebook);
+                if (result.results) {
+                    render('gsc-token-status', result.results.gsc);
+                    render('fb-token-status', result.results.facebook);
+                }
                 lucide.createIcons();
                 showToast('Tokens checked.');
             } catch (err) { showToast(err.message, true); } finally { hideLoading(); }
