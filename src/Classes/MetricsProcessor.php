@@ -770,7 +770,7 @@ class MetricsProcessor
         array $metricMap,
         LoggerInterface $logger,
     ): array {
-        $config = \Helpers\Helpers::getProjectConfig();
+        $config = Helpers::getProjectConfig();
         $cacheRawMetrics = filter_var($config['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $metricsMapByMKey = [];
