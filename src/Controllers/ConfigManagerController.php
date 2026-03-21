@@ -149,6 +149,7 @@ class ConfigManagerController
                 $appConf = Yaml::parseFile($appConfigPath);
                 $currentConfig['jobs_timeout_hours'] = $appConf['jobs']['timeout_hours'] ?? 6;
                 $currentConfig['cache_raw_metrics'] = filter_var($appConf['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $currentConfig['marketing_debug_logs'] = filter_var($appConf['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN);
             }
 
             if (file_exists($this->gscConfigPath)) {
@@ -279,6 +280,7 @@ class ConfigManagerController
                     $appConf['analytics'] = [];
                 }
                 $appConf['analytics']['cache_raw_metrics'] = filter_var($data['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $appConf['analytics']['marketing_debug_logs'] = filter_var($data['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
                 file_put_contents($appConfigPath, Yaml::dump($appConf, 10, 2));
                 $logger->info("Global config updated successfully");

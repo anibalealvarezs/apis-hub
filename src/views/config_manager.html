@@ -689,6 +689,18 @@
                             <label class="switch"><input type="checkbox" id="cache-raw-metrics"><span class="slider"></span></label>
                         </div>
                     </div>
+                    <div class="config-group">
+                        <div class="config-label">
+                            <span>Marketing Debug Logs</span>
+                            <div class="has-tooltip">
+                                <i data-lucide="info" class="info-icon"></i>
+                                <div class="tooltip-text">Enables extra information logs during Facebook Marketing sync (INFO level for diagnostics).</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 5px;">
+                            <label class="switch"><input type="checkbox" id="marketing-debug-logs"><span class="slider"></span></label>
+                        </div>
+                    </div>
                 </div>
                 <div class="actions-bar" style="margin-top: 20px;">
                     <div></div>
@@ -1112,6 +1124,8 @@
             }
             const cacheRawMetricsCb = document.getElementById('cache-raw-metrics');
             if (cacheRawMetricsCb) cacheRawMetricsCb.checked = !!currentConfig.cache_raw_metrics;
+            const marketingDebugLogsCb = document.getElementById('marketing-debug-logs');
+            if (marketingDebugLogsCb) marketingDebugLogsCb.checked = !!currentConfig.marketing_debug_logs;
 
             document.getElementById('gsc-channel-enabled').checked = !!currentConfig.gsc_enabled;
             document.getElementById('fb-organic-enabled').checked = !!currentConfig.fb_organic_enabled;
@@ -1293,6 +1307,7 @@
                 } else if (type === 'global') {
                     requestBody.jobs_timeout_hours = parseInt(document.getElementById('jobs-timeout-hours').value, 10) || 6;
                     requestBody.cache_raw_metrics = document.getElementById('cache-raw-metrics')?.checked || false;
+                    requestBody.marketing_debug_logs = document.getElementById('marketing-debug-logs')?.checked || false;
                 }
 
                 const response = await fetch('/api/config-manager/update', {
