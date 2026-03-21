@@ -668,7 +668,7 @@ class MetricRequests
                         $logger->info("Processing ad account chunk: $cStart to $cEnd");
 
                         if ($adAccount['ad_account_metrics']) {
-                            self::processAdAccount(
+                            $res = self::processAdAccount(
                                 adAccount: $adAccount,
                                 api: $api,
                                 manager: $manager,
@@ -678,6 +678,8 @@ class MetricRequests
                                 startDate: $cStart,
                                 endDate: $cEnd,
                             );
+                            $totalMetrics += $res['metrics'] ?? 0;
+                            $totalRows += $res['rows'] ?? 0;
                         }
 
                         if ($adAccount['campaigns']) {
@@ -686,7 +688,7 @@ class MetricRequests
                             $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
 
                             if ($adAccount['campaign_metrics']) {
-                                self::processCampaignsBulk(
+                                $res = self::processCampaignsBulk(
                                     api: $api,
                                     manager: $manager,
                                     channeledAccountEntity: $channeledAccountEntity,
@@ -699,13 +701,15 @@ class MetricRequests
                                     cacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
                                     cacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
                                 );
+                                $totalMetrics += $res['metrics'] ?? 0;
+                                $totalRows += $res['rows'] ?? 0;
                             }
 
                             if ($adAccount['adsets']) {
                                 $channeledAdGroupMap = self::getAdGroupMap($manager, $channeledAccountEntity);
 
                                 if ($adAccount['adset_metrics']) {
-                                    self::processAdsetsBulk(
+                                    $res = self::processAdsetsBulk(
                                         api: $api,
                                         manager: $manager,
                                         channeledAccountEntity: $channeledAccountEntity,
@@ -719,13 +723,15 @@ class MetricRequests
                                         cacheInclude: self::getFacebookFilter($config, 'ADSET', 'cache_include'),
                                         cacheExclude: self::getFacebookFilter($config, 'ADSET', 'cache_exclude'),
                                     );
+                                    $totalMetrics += $res['metrics'] ?? 0;
+                                    $totalRows += $res['rows'] ?? 0;
                                 }
 
                                 if ($adAccount['ads']) {
                                     $channeledAdMap = self::getAdMap($manager, $channeledAccountEntity);
 
                                     if ($adAccount['ad_metrics']) {
-                                        self::processAdsBulk(
+                                        $res = self::processAdsBulk(
                                             api: $api,
                                             manager: $manager,
                                             channeledAccountEntity: $channeledAccountEntity,
@@ -740,12 +746,14 @@ class MetricRequests
                                             cacheInclude: self::getFacebookFilter($config, 'AD', 'cache_include'),
                                             cacheExclude: self::getFacebookFilter($config, 'AD', 'cache_exclude'),
                                         );
+                                        $totalMetrics += $res['metrics'] ?? 0;
+                                        $totalRows += $res['rows'] ?? 0;
                                     }
                                 }
                             }
 
                             if (!empty($adAccount['creatives']) && !empty($adAccount['creative_metrics'])) {
-                                self::processCreativesBulk(
+                                $res = self::processCreativesBulk(
                                     api: $api,
                                     manager: $manager,
                                     channeledAccountEntity: $channeledAccountEntity,
@@ -756,6 +764,8 @@ class MetricRequests
                                     cacheInclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_include'),
                                     cacheExclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_exclude'),
                                 );
+                                $totalMetrics += $res['metrics'] ?? 0;
+                                $totalRows += $res['rows'] ?? 0;
                             }
                         }
                     }
@@ -1500,7 +1510,7 @@ class MetricRequests
         LoggerInterface $logger,
         ?string $startDate,
         ?string $endDate,
-    ): void {
+    ): array {
 
         $allMetrics = new ArrayCollection();
         $accountMap = [
@@ -1552,7 +1562,7 @@ class MetricRequests
 
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for ad account " . $adAccount['id']);
-                return;
+                return ['metrics' => 0, 'rows' => 0];
             }
 
             $metrics = FacebookMarketingMetricConvert::adAccountMetrics(
@@ -1571,7 +1581,7 @@ class MetricRequests
 
             if (count($allMetrics) === 0) {
                 $logger->info("No metrics found for ad account " . $adAccount['id']);
-                return;
+                return ['metrics' => 0, 'rows' => count($rows['data'])];
             }
 
             try {
@@ -1609,9 +1619,7 @@ class MetricRequests
                 throw $e;
             }
 
-            $logger->info("Completed Meta ad account insights request");
-
-            return;
+            return ['metrics' => count($allMetrics), 'rows' => count($rows['data'])];
         } catch (Exception $e) {
             $logger->error("Error during Meta account insights request for ad account " . $adAccount['id'] . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
             throw $e;
@@ -4057,10 +4065,10 @@ class MetricRequests
         ?int $jobId = null,
         $cacheInclude = null,
         $cacheExclude = null
-    ): bool {
+    ): array {
         $campaignPlatformIds = array_values($channeledCampaignMap['mapReverse']);
         if (empty($campaignPlatformIds)) {
-            return true;
+            return ['metrics' => 0, 'rows' => 0];
         }
 
         $additionalParams = [];
@@ -4111,7 +4119,7 @@ class MetricRequests
 
             if (count($allRows) === 0) {
                 $logger->info("No bulk rows found for campaigns in Ad Account " . $channeledAccountEntity->getPlatformId());
-                return false;
+                return ['metrics' => 0, 'rows' => 0];
             }
 
             $groupedRows = [];
@@ -4184,7 +4192,7 @@ class MetricRequests
                 }
             }
             $logger->info("Completed bulk Meta ad account's campaign insights request");
-            return true;
+            return ['metrics' => count($globalAllMetrics), 'rows' => count($allRows)];
         } catch (Exception $e) {
             $logger->error("Error during bulk Meta account's campaign insights request: " . $e->getMessage());
             throw $e;
@@ -4204,10 +4212,10 @@ class MetricRequests
         ?int $jobId = null,
         $cacheInclude = null,
         $cacheExclude = null
-    ): bool {
+    ): array {
         $adsetPlatformIds = array_keys($channeledAdGroupMap['mapCampaign']);
         if (empty($adsetPlatformIds)) {
-            return true;
+            return ['metrics' => 0, 'rows' => 0];
         }
 
         $additionalParams = [];
@@ -4258,7 +4266,7 @@ class MetricRequests
 
             if (count($allRows) === 0) {
                 $logger->info("No bulk rows found for adsets in Ad Account " . $channeledAccountEntity->getPlatformId());
-                return false;
+                return ['metrics' => 0, 'rows' => 0];
             }
 
             $groupedRows = [];
@@ -4337,7 +4345,7 @@ class MetricRequests
                 }
             }
             $logger->info("Completed bulk Meta ad account's adset insights request");
-            return true;
+            return ['metrics' => count($globalAllMetrics), 'rows' => count($allRows)];
         } catch (Exception $e) {
             $logger->error("Error during bulk Meta account's adset insights request: " . $e->getMessage());
             throw $e;
@@ -4358,10 +4366,10 @@ class MetricRequests
         ?int $jobId = null,
         $cacheInclude = null,
         $cacheExclude = null
-    ): bool {
+    ): array {
         $adPlatformIds = array_keys($channeledAdMap['mapAdGroup']);
         if (empty($adPlatformIds)) {
-            return true;
+            return ['metrics' => 0, 'rows' => 0];
         }
 
         $additionalParams = [];
@@ -4384,7 +4392,7 @@ class MetricRequests
                         adAccountId: $channeledAccountEntity->getPlatformId(),
                         adIds: $chunk,
                         limit: 100,
-                        metricBreakdown: [],
+                        metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
                         additionalParams: $additionalParams,
                         metricSet: MetricSet::KEY,
                     );
@@ -4411,7 +4419,7 @@ class MetricRequests
 
         if (count($allRows) === 0) {
             $logger->info("No bulk rows found for ads in Ad Account " . $channeledAccountEntity->getPlatformId());
-            return false;
+            return ['metrics' => 0, 'rows' => 0];
         }
 
         $groupedRows = [];
@@ -4500,7 +4508,7 @@ class MetricRequests
                 }
             }
             $logger->info("Completed bulk Meta ad account's ad insights request");
-            return true;
+            return ['metrics' => count($globalAllMetrics), 'rows' => count($allRows)];
         } catch (Exception $e) {
             $logger->error("Error during bulk Meta account's ad insights request: " . $e->getMessage());
             throw $e;
@@ -4528,7 +4536,7 @@ class MetricRequests
         ?int $jobId = null,
         $cacheInclude = null,
         $cacheExclude = null
-    ): bool {
+    ): array {
         $logger->info("Starting processCreativesBulk for ad account: " . $channeledAccountEntity->getPlatformId());
         try {
             $adAccountId = $channeledAccountEntity->getPlatformId();
@@ -4648,7 +4656,7 @@ class MetricRequests
                 }
             }
             $logger->info("Completed bulk Meta account's creative insights request: $totalMetricsCount metrics");
-            return true;
+            return ['metrics' => $totalMetricsCount, 'rows' => count($insights['data'])];
         } catch (Exception $e) {
             $logger->error("Error during bulk Meta account's creative insights request: " . $e->getMessage());
             throw $e;
