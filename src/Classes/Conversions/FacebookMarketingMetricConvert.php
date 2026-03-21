@@ -83,6 +83,10 @@ class FacebookMarketingMetricConvert
                     period: $period->value,
                     metricDate: $metricDate,
                     channeledAccount:  $channeledAccountEntity->getPlatformId(),
+                    campaign: $row['campaign_id'] ?? null,
+                    channeledCampaign: $row['campaign_id'] ?? null,
+                    channeledAdGroup: $row['adset_id'] ?? null,
+                    channeledAd: $row['ad_id'] ?? null,
                     creative: $creativeEntity->getCreativeId(),
                 );
                 $channeledMetric = new stdClass();
@@ -105,6 +109,10 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->account = $channeledAccountEntity->getAccount();
                 $channeledMetric->channeledAccount = $channeledAccountEntity;
                 $channeledMetric->creative = $creativeEntity;
+                $channeledMetric->campaignPlatformId = $row['campaign_id'] ?? null;
+                $channeledMetric->channeledCampaignPlatformId = $row['campaign_id'] ?? null;
+                $channeledMetric->channeledAdGroupPlatformId = $row['adset_id'] ?? null;
+                $channeledMetric->channeledAdPlatformId = $row['ad_id'] ?? null;
 
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
