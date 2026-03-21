@@ -4444,12 +4444,26 @@ class MetricRequests
                 $channeledAdGroupEntity = $channeledAdGroupRepository->findOneBy(['platformId' => $adgroupId]);
                 $channeledAdEntity = $channeledAdRepository->findOneBy(['platformId' => $adPlatformId]);
 
-                if (!$campaignEntity || !$channeledCampaignEntity || !$channeledAdGroupEntity || !$channeledAdEntity) {
+                if (!$campaignEntity) {
+                    $logger->debug("Skipping ad $adPlatformId: Campaign entity $campaignId not found in DB");
+                    continue;
+                }
+                if (!$channeledCampaignEntity) {
+                    $logger->debug("Skipping ad $adPlatformId: ChanneledCampaign entity $campaignId not found in DB");
+                    continue;
+                }
+                if (!$channeledAdGroupEntity) {
+                    $logger->debug("Skipping ad $adPlatformId: ChanneledAdGroup entity $adgroupId not found in DB");
+                    continue;
+                }
+                if (!$channeledAdEntity) {
+                    $logger->debug("Skipping ad $adPlatformId: ChanneledAd entity not found in DB");
                     continue;
                 }
 
                 $adName = $channeledAdEntity->getName();
                 if (!Helpers::matchesFilter((string)$adName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter((string)$adPlatformId, $cacheInclude, $cacheExclude)) {
+                    $logger->debug("Skipping ad $adPlatformId ($adName) due to filters");
                     continue;
                 }
 
