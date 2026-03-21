@@ -589,7 +589,7 @@ class MetricsProcessor
                     count($chunk)
                 );
                 $affected = $manager->getConnection()->executeStatement($sql, $insertParams);
-                Helpers::setLogger('facebook-marketing.log')->info("Inserted metric_configs chunk: $affected rows affected.");
+                Helpers::setLogger('facebook-marketing.log')->info("[MetricsProcessor] Inserted " . count($chunk) . " metric_configs (Ignore on duplicate). Affected: $affected rows.");
             }
         }
 
