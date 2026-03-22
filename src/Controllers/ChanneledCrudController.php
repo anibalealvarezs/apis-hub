@@ -10,6 +10,7 @@ use ReflectionEnum;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
+use Services\CacheStrategyService;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -343,6 +344,8 @@ class ChanneledCrudController extends BaseController
 
             $aggregations = (array) ($params['aggregations'] ?? []);
             $groupBy = (array) ($params['groupBy'] ?? []);
+            $endDate = $params['endDate'] ?? null;
+            $channelKey = $channel->name;
 
             if (empty($aggregations)) {
                 return $this->createResponse(
@@ -353,6 +356,29 @@ class ChanneledCrudController extends BaseController
                 );
             }
 
+            // --- Redis Caching Logic ---
+            $isCacheable = $endDate && CacheStrategyService::isCacheable($channelKey);
+            $cacheType = $isCacheable ? CacheStrategyService::getTargetCacheType($endDate) : null;
+            $cacheKey = $cacheType ? CacheStrategyService::generateKey($channelKey, [
+                'entity' => $entity,
+                'aggregations' => $aggregations,
+                'groupBy' => $groupBy,
+                'filters' => $params['filters'] ?? null,
+                'startDate' => $params['startDate'] ?? null,
+                'endDate' => $endDate,
+                'orderBy' => $params['orderBy'] ?? null,
+                'orderDir' => $params['orderDir'] ?? 'ASC'
+            ], $cacheType) : null;
+
+            if ($cacheKey && ($cachedData = CacheStrategyService::get($cacheKey, $cacheType))) {
+                return $this->createResponse(
+                    data: $cachedData,
+                    status: 'success',
+                    meta: ['cached' => true, 'cache_type' => $cacheType]
+                );
+            }
+            // ---------------------------
+
             $data = $repository->aggregate(
                 aggregations: $aggregations,
                 groupBy: $groupBy,
@@ -362,6 +388,12 @@ class ChanneledCrudController extends BaseController
                 orderBy: $params['orderBy'] ?? null,
                 orderDir: $params['orderDir'] ?? 'ASC'
             );
+
+            // --- Cache the results ---
+            if ($cacheKey && !empty($data)) {
+                CacheStrategyService::set($cacheKey, $data, $cacheType);
+            }
+            // -------------------------
 
             return $this->createResponse(
                 data: $data,

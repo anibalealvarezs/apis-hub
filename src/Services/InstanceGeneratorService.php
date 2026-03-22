@@ -66,7 +66,7 @@ class InstanceGeneratorService
             if ($chanConfig && !empty($chanConfig['cache_history_range'])) {
                 try {
                     $limitDate = $today->modify('-' . $chanConfig['cache_history_range']);
-                } catch (\Exception $e) { /* ignore malformed ranges */ }
+                } catch (Exception $e) { /* ignore malformed ranges */ }
             }
 
             // 1. Entities Sync (if applicable)
