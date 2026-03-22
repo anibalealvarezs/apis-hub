@@ -91,3 +91,14 @@ If you want to perform a completely clean installation:
    - Sets up its local cron worker
 
 5. Monitor progress at: `http://<host>:<port>/monitoring`
+
+## 🏢 Multiple Parallel Deployments
+
+To run multiple `apis-hub` installations on the same server without interference, use the **Isolation Layer** via `.env` configuration:
+
+1. **Logical Isolation**: Set a unique `DEPLOYMENT_NAME` in each project. This dictates the name of the Docker project, volumes, and networks.
+2. **Network Isolation**: Assign a unique `STARTING_HOST_PORT` (e.g., `9000`, `10000`) for each installation.
+3. **Host Connectivity**: Ensure `DB_HOST_PORT` and `REDIS_HOST_PORT` are also unique for each project if you plan to connect from your host machine.
+
+> [!TIP]
+> Docker Compose handles the internal network (where containers talk to each other) automatically. Even if 10 projects use port `6379` internally, they will never conflict as long as their **Host Port** mapping is unique.
