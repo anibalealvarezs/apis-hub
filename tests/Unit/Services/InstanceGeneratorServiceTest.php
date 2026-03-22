@@ -12,6 +12,7 @@ class InstanceGeneratorServiceTest extends TestCase
 {
     private string $configPath;
     private string $rulesPath;
+    private string|bool $originalAppEnv;
 
     private function setMockChannelsConfig(array $config): void
     {
@@ -32,6 +33,9 @@ class InstanceGeneratorServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Ensure we're not in demo mode for tests
+        $this->originalAppEnv = getenv('APP_ENV');
+        putenv('APP_ENV=testing');
         \Helpers\Helpers::resetConfigs();
 
         $this->setMockProjectConfig([
@@ -77,6 +81,14 @@ class InstanceGeneratorServiceTest extends TestCase
                 'sites' => []
             ]
         ]);
+    }
+
+    protected function tearDown(): void
+    {
+        // Restore environment
+        putenv("APP_ENV=" . ($this->originalAppEnv ?: ''));
+        \Helpers\Helpers::resetConfigs();
+        parent::tearDown();
     }
 
     public function testGenerateReturnsCorrectInstances(): void

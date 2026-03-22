@@ -39,10 +39,12 @@ class ProcessJobsTest extends BaseIntegrationTestCase
         // Capture and clear env to ensure isolation doesn't filter out the test job
         $oldSource = getenv('API_SOURCE');
         $oldEntity = getenv('API_ENTITY');
+        $oldInstance = getenv('INSTANCE_NAME');
         $oldStart = getenv('START_DATE');
         $oldEnd = getenv('END_DATE');
         putenv('API_SOURCE');
         putenv('API_ENTITY');
+        putenv('INSTANCE_NAME');
         putenv('START_DATE');
         putenv('END_DATE');
 
@@ -53,6 +55,7 @@ class ProcessJobsTest extends BaseIntegrationTestCase
         // Restore env
         if ($oldSource) putenv("API_SOURCE=$oldSource");
         if ($oldEntity) putenv("API_ENTITY=$oldEntity");
+        if ($oldInstance) putenv("INSTANCE_NAME=$oldInstance");
         if ($oldStart) putenv("START_DATE=$oldStart");
         if ($oldEnd) putenv("END_DATE=$oldEnd");
         

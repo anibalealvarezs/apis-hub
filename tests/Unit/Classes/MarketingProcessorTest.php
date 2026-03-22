@@ -51,7 +51,7 @@ class MarketingProcessorTest extends BaseUnitTestCase
         // Mock executeQuery for campaign map
         $result = $this->createMock(Result::class);
         $result->method('fetchAllAssociative')->willReturn([
-            ['id' => $this->faker->randomNumber(), 'campaignId' => $platformId]
+            ['id' => $this->faker->randomNumber(), 'campaign_id' => $platformId]
         ]);
 
         $this->conn->method('executeQuery')->willReturn($result);
@@ -86,7 +86,7 @@ class MarketingProcessorTest extends BaseUnitTestCase
         // Mock executeQuery for campaign map
         $result = $this->createMock(Result::class);
         $result->method('fetchAllAssociative')->willReturn([
-            ['platformId' => $campaignPlatformId, 'id' => $this->faker->randomNumber(), 'campaign_id' => $this->faker->randomNumber()]
+            ['platform_id' => $campaignPlatformId, 'id' => $this->faker->randomNumber(), 'campaign_id' => $this->faker->randomNumber()]
         ]);
 
         $this->conn->method('executeQuery')->willReturn($result);

@@ -509,7 +509,17 @@ class Helpers
      */
     public static function getAppApiKey(): ?string
     {
-        return getenv('APP_API_KEY') ?: null;
+        $env = getenv('APP_API_KEY');
+        if ($env !== false && $env !== '') {
+            return $env;
+        }
+        
+        $config = self::getProjectConfig();
+        $keys = $config['security']['api_keys'] ?? null;
+        if (is_array($keys)) {
+            return implode(',', $keys);
+        }
+        return $keys;
     }
 
     /**
@@ -518,12 +528,16 @@ class Helpers
     public static function getAuthorizedIps(): array
     {
         $envIps = getenv('AUTHORIZED_IPS');
-        if (!$envIps || $envIps === '[]') {
-            return [];
+        if ($envIps !== false && $envIps !== '' && $envIps !== '[]') {
+            return array_map('trim', explode(',', $envIps));
         }
         
-        $ips = explode(',', $envIps);
-        return array_map('trim', $ips);
+        $config = self::getProjectConfig();
+        $ips = $config['security']['authorized_ips'] ?? [];
+        if (is_string($ips)) {
+            return [$ips];
+        }
+        return is_array($ips) ? $ips : [];
     }
 
     /**

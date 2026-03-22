@@ -286,10 +286,11 @@
         .badge-grave { background: #450a0a; color: #fecaca; padding: 2px 8px; border-radius: 4px; border: 1px solid #7f1d1d; font-weight: 800; }
 
         .sort-icon { font-size: 0.7rem; margin-left: 5px; opacity: 0.5; }
-        th.active-sort { color: var(--meta-blue); background: rgba(24, 119, 242, 0.05); }
+        th.active-sort, .nested-table th.active-sort { color: var(--meta-blue) !important; background: rgba(24, 119, 242, 0.2) !important; }
 
         /* Helpers */
         .text-right { text-align: right; }
+        .text-left { text-align: left; }
         .pos { color: var(--meta-positive); }
         .neg { color: var(--meta-negative); }
 
@@ -471,6 +472,7 @@
             100% { background-position: -200% 0; }
         }
     </style>
+    <!-- FB_CONFIG_PLACEHOLDER -->
 </head>
 <body>
 
@@ -547,23 +549,12 @@
             <div class="table-responsive">
                 <table id="reports-table">
                     <thead>
-                        <tr style="background: rgba(255,255,255,0.03); border-bottom: 2px solid var(--meta-border);">
+                        <tr id="table-head-row" style="background: rgba(255,255,255,0.03); border-bottom: 2px solid var(--meta-border);">
                             <th style="width: 85px; border-right: 1px solid var(--meta-border);">&nbsp;</th>
                             <th style="width: 200px;" onclick="sortTable('account')" data-col="account">Ad Account <span class="sort-icon">↕</span></th>
                             <th style="min-width: 280px;" onclick="sortTable('campaign')" data-col="campaign">Campaign Name <span class="sort-icon">↕</span></th>
                             <th style="width: 60px; text-align:center;">Status</th>
-                            <th class="text-right" style="width: 110px;" onclick="sortTable('total_spend')" data-col="total_spend">Gasto <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 90px;" onclick="sortTable('average_cpm')" data-col="average_cpm">CPM <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 80px;" onclick="sortTable('average_ctr')" data-col="average_ctr">CTR <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 90px;" onclick="sortTable('total_clicks')" data-col="total_clicks">Clicks <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 90px;" onclick="sortTable('average_cpc')" data-col="average_cpc">CPC <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 70px;" onclick="sortTable('average_frequency')" data-col="average_frequency">Frequencia <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 90px;" onclick="sortTable('total_results')" data-col="total_results">Resultado <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 180px;" onclick="sortTable('average_cost_per_result')" data-col="average_cost_per_result">Costo por resultado <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 90px;" onclick="sortTable('total_impressions')" data-col="total_impressions">Impresiones <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 90px;" onclick="sortTable('total_reach')" data-col="total_reach">Reach <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 90px;" onclick="sortTable('average_result_rate')" data-col="average_result_rate">Results Rate <span class="sort-icon">↕</span></th>
-                            <th class="text-right" style="width: 90px;" onclick="sortTable('total_actions')" data-col="total_actions">Actions <span class="sort-icon">↕</span></th>
+                            <!-- Dynamic headers -->
                         </tr>
                     </thead>
                     <tbody id="table-body">
@@ -700,8 +691,24 @@
             document.getElementById('cache-badge').style.display = 'none';
 
             try {
-                const payload = {
-                    aggregations: {
+                const config = window.FB_METRICS_CONFIG || { strategy: 'default', metrics_config: {} };
+                const isCustom = config.strategy === 'custom';
+                
+                const aggregations = {};
+                if (isCustom) {
+                    Object.entries(config.metrics_config).forEach(([m, cfg]) => {
+                        if (cfg.enabled) {
+                            const cleanM = m.replace(/:/g, '_');
+                            // Same logic as getActiveMetrics
+                            const prefix = (m.includes('spend') || m.includes('clicks') || m.includes('results') || m.includes('impressions') || m.includes('reach') || m.includes('actions')) ? 'total_' : 'average_';
+                            aggregations[`${prefix}${cleanM}`] = m;
+                        }
+                    });
+                    // Force some essentials if not there (standardized keys)
+                    if (!aggregations.total_spend) aggregations.total_spend = 'spend';
+                    aggregations.campaign_status = 'campaign_status';
+                } else {
+                    Object.assign(aggregations, {
                         total_spend: "spend",
                         total_clicks: "clicks",
                         total_impressions: "impressions",
@@ -716,7 +723,11 @@
                         average_result_rate: "result_rate",
                         purchase_roas: "purchase_roas",
                         campaign_status: "campaign_status"
-                    },
+                    });
+                }
+
+                const payload = {
+                    aggregations,
                     groupBy: ["channeledAccount", "channeledCampaign", "account", "campaign"],
                     startDate: start,
                     endDate: end
@@ -765,10 +776,13 @@
                                 if (!trendMap[d.channeledCampaign]) trendMap[d.channeledCampaign] = [];
                                 trendMap[d.channeledCampaign].push({ day: d.daily, val: parseFloat(d.daily_cpr || 0) });
                             });
-                            
                             // Process and hydrate existing rows
+                            const activeMetrics = getActiveMetrics();
+                            const cprMetric = activeMetrics.find(m => m.original === 'cost_per_result' || m.key === 'average_cost_per_result');
+                            
                             currentData.forEach((row, idx) => {
-                                const sparkId = `spark-cpr-${row.channeledCampaign || idx}`.replace(/[^a-z0-9\-]/gi, '-');
+                                if (!cprMetric) return;
+                                const sparkId = `spark-${cprMetric.key}-${row.channeledCampaign || idx}`.replace(/[^a-z0-9\-]/gi, '-');
                                 const container = document.getElementById(sparkId);
                                 if (!container) return;
 
@@ -776,7 +790,7 @@
                                 if (rawTrend && rawTrend.length > 1) {
                                     rawTrend.sort((a,b) => a.day.localeCompare(b.day));
                                     row._trend = rawTrend.map(x => x.val);
-                                    renderSparkline(container, row._trend);
+                                    renderSparkline(container, row._trend, true);
                                 } else {
                                     // Remove loader if no data
                                     container.innerHTML = '<span style="color:var(--meta-text-dim); font-size: 0.6rem; opacity: 0.5;">N/A</span>';
@@ -807,7 +821,78 @@
             }
         }
 
+        function getActiveMetrics() {
+            const config = window.FB_METRICS_CONFIG || { strategy: 'default', metrics_config: {} };
+            const isCustom = config.strategy === 'custom';
+            const activeMetrics = [];
+            
+            if (isCustom) {
+                Object.entries(config.metrics_config).forEach(([m, cfg]) => {
+                    if (cfg.enabled) {
+                        const cleanM = m.replace(/:/g, '_');
+                        // Determine prefix to match backend aggregation key naming
+                        const prefix = (m.includes('spend') || m.includes('clicks') || m.includes('results') || m.includes('impressions') || m.includes('reach') || m.includes('actions')) ? 'total_' : 'average_';
+                        activeMetrics.push({ 
+                            key: `${prefix}${cleanM}`, 
+                            original: m, 
+                            label: cfg.label || m.toUpperCase(),
+                            order: cfg.order || 99,
+                            config: cfg 
+                        });
+                    }
+                });
+                // Sort by the 'order' field
+                activeMetrics.sort((a, b) => a.order - b.order);
+            } else {
+                const defaults = [
+                    { key: 'total_spend', label: 'SPEND', original: 'spend' },
+                    { key: 'average_cpm', label: 'CPM', original: 'cpm' },
+                    { key: 'average_ctr', label: 'CTR', original: 'ctr' },
+                    { key: 'total_clicks', label: 'CLICKS', original: 'clicks' },
+                    { key: 'average_cpc', label: 'CPC', original: 'cpc' },
+                    { key: 'average_frequency', label: 'FREQ', original: 'frequency' },
+                    { key: 'total_results', label: 'RESULT', original: 'results' },
+                    { key: 'average_cost_per_result', label: 'CPR', original: 'cost_per_result', config: { sparkline: true } },
+                    { key: 'total_impressions', label: 'IMPR', original: 'impressions' },
+                    { key: 'total_reach', label: 'REACH', original: 'reach' },
+                    { key: 'average_result_rate', label: 'RATE', original: 'result_rate' },
+                    { key: 'total_actions', label: 'ACTIONS', original: 'actions' }
+                ];
+                defaults.forEach(d => {
+                    activeMetrics.push({ 
+                        key: d.key, 
+                        label: d.label, 
+                        original: d.original, 
+                        config: d.config || { sparkline: false } 
+                    });
+                });
+            }
+            return activeMetrics;
+        }
+
         function render() {
+            const activeMetrics = getActiveMetrics();
+            
+            // Update Headers
+            const headRow = document.getElementById('table-head-row');
+            const staticHeads = `
+                <th style="width: 85px; border-right: 1px solid var(--meta-border); text-align: center;">&nbsp;</th>
+                <th class="text-left" style="width: 200px;" onclick="sortTable('account')" data-col="account">AD ACCOUNT <span class="sort-icon">↕</span></th>
+                <th class="text-left" style="min-width: 280px;" onclick="sortTable('campaign')" data-col="campaign">CAMPAIGN NAME <span class="sort-icon">↕</span></th>
+                <th style="width: 60px; text-align:center;">STATUS</th>
+            `;
+            
+            let dynamicHeads = '';
+            activeMetrics.forEach(m => {
+                dynamicHeads += `
+                    <th class="text-right" style="min-width: 90px;" onclick="sortTable('${m.key}')" data-col="${m.key}">
+                        ${(m.label || m.original).replace(/_/g, ' ').toUpperCase()} <span class="sort-icon">↕</span>
+                    </th>
+                `;
+            });
+            
+            headRow.innerHTML = staticHeads + dynamicHeads;
+            
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
             document.getElementById('record-count').textContent = currentData.length;
@@ -816,15 +901,9 @@
                 const tr = document.createElement('tr');
                 const rowId = `row-campaign-${row.channeledCampaign || index}`;
                 tr.id = rowId;
-                const cpr = parseFloat(row.average_cost_per_result || 0);
-                const costClass = getCostClass(cpr);
-                const ctr = parseFloat(row.average_ctr || 0) * 100;
-                const ctrClass = getCtrClass(ctr);
-                const resRate = parseFloat(row.average_result_rate || 0) * 100;
                 const status = row.campaign_status ? row.campaign_status.toLowerCase() : 'unknown';
                 
-                const sparkId = `spark-cpr-${row.channeledCampaign || index}`.replace(/[^a-z0-9\-]/gi, '-');
-                tr.innerHTML = `
+                let cells = `
                     <td style="width: 85px; border-right: 1px solid var(--meta-border); text-align: center; vertical-align: middle;">
                         <div style="display: flex; gap: 8px; justify-content: center; align-items: center; min-height: 52px;">
                             <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', 'campaign', '${row.channeledCampaign}', '${(row.campaign || 'Unknown').replace(/'/g, "\\'")}')" title="Dimensions">
@@ -840,35 +919,124 @@
                         <strong>${row.campaign || 'Unknown'}</strong>
                     </td>
                     <td style="width: 60px; text-align: center; vertical-align: middle;">${getStatusIcon(status)}</td>
-                    <td class="text-right metric-cell" style="width: 110px; vertical-align: middle;">€${formatNum(row.total_spend)}</td>
-                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">€${formatNum(row.average_cpm)}</td>
-                    <td class="text-right metric-cell" style="width: 80px; vertical-align: middle;"><span class="${ctrClass}">${formatPct(ctr)}</span></td>
-                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_clicks)}</td>
-                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">€${formatNum(row.average_cpc)}</td>
-                    <td class="text-right metric-cell" style="width: 70px; vertical-align: middle;">${formatNum(row.average_frequency)}x</td>
-                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_results)}</td>
-                    <td class="text-right metric-cell" style="width: 180px; vertical-align: middle;">
-                        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-height: 52px;">
-                            <span class="${costClass}" style="flex-shrink: 0;">€${formatNum(cpr)}</span>
-                            <div id="${sparkId}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0; justify-content: center;">
-                                <div class="spark-loading"></div>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_impressions)}</td>
-                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_reach)}</td>
-                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatPct(resRate)}</td>
-                    <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_actions)}</td>
                 `;
+                
+                activeMetrics.forEach(m => {
+                    const val = row[m.key] || 0;
+                    const format = m.config.format || (m.key.includes('spend') || m.key.includes('cp') ? 'currency' : (m.key.includes('ctr') || m.key.includes('rate') ? 'percent' : 'number'));
+                    const formatted = applyFormatting(val, format, m.key);
+                    const condClass = applyConditional(val, m.config.conditional, m.key);
+                    const sparkId = `spark-${m.key}-${row.channeledCampaign || index}`.replace(/[^a-z0-9\-]/gi, '-');
+                    
+                    cells += `
+                        <td class="text-right metric-cell" style="vertical-align: middle;">
+                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
+                                <span class="${condClass}">${formatted}</span>
+                                ${m.config.sparkline ? `
+                                    <div id="${sparkId}" class="sparkline-container" style="width: 60px; margin: 0; flex-shrink: 0; justify-content: center;">
+                                        <div class="spark-loading"></div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </td>
+                    `;
+                });
+                
+                tr.innerHTML = cells;
                 tbody.appendChild(tr);
-
-                if (row._trend && row._trend.length > 1) {
-                    renderSparkline(document.getElementById(sparkId), row._trend);
-                }
             });
             renderSummary(currentData);
             updateSortHeaders();
             lucide.createIcons();
+            initSparklines();
+        }
+
+        function initSparklines() {
+            const activeMetrics = getActiveMetrics();
+            console.log(`[initSparklines] Initializing for ${currentData.length} rows...`);
+            currentData.forEach((row, index) => {
+                activeMetrics.forEach(m => {
+                    if (m.config.sparkline) {
+                        const sparkId = `spark-${m.key}-${row.channeledCampaign || index}`.replace(/[^a-z0-9\-]/gi, '-');
+                        const container = document.getElementById(sparkId);
+                        
+                        // Look for trend in row
+                        let trend = row._trend;
+                        if (!trend || trend.length < 2) {
+                            // Dimensions often store trend in a separate lookup
+                            if (row.trend && row.trend.length > 1) trend = row.trend;
+                        }
+
+                        if (container && trend && trend.length > 1) {
+                            console.log(`[initSparklines] Redrawing for ${sparkId}`);
+                            renderSparkline(container, trend, m.key.includes('cost_per'));
+                        }
+                    }
+                });
+            });
+        }
+
+        function applyFormatting(val, format, key) {
+            if (format === 'money' || format === 'currency' || (key && (key.includes('cost') || key.includes('cp')))) {
+                return '€' + formatNum(val);
+            }
+            if (format === 'percent' || (key && (key.includes('ctr') || key.includes('rate')))) {
+                return formatPct(parseFloat(val) * (val > 1 ? 1 : 100));
+            }
+            if (format === 'result' || format === 'number') {
+                if (key && (key.includes('frequency') || key.includes('cost') || key.includes('cp') || key.includes('rate') || key.includes('ctr'))) {
+                    return formatNum(val);
+                }
+                return formatInt(val);
+            }
+            return formatNum(val);
+        }
+
+        function applyConditional(val, rulesData, key) {
+            if (!rulesData) {
+                if (key && key.includes('ctr')) return getCtrClass(parseFloat(val) * (val > 1 ? 1 : 100));
+                if (key && key.includes('cost_per_result')) return getCostClass(val);
+                return '';
+            }
+            try {
+                const data = typeof rulesData === 'string' ? JSON.parse(rulesData) : rulesData;
+                let v = parseFloat(val);
+
+                // Auto-scale for comparison if it's a percentage/rate metric
+                if (key && (key.includes('ctr') || key.includes('rate'))) {
+                    if (v > 0 && v <= 1) v *= 100;
+                }
+
+                // Handle new 'levels' structure
+                if (data.type === 'levels' && Array.isArray(data.config)) {
+                    for (const rule of data.config) {
+                        const min = rule.min !== undefined ? parseFloat(rule.min) : -Infinity;
+                        const max = rule.max !== undefined ? parseFloat(rule.max) : Infinity;
+                        if (v >= min && v <= max) {
+                            return rule.class.startsWith('badge-') ? rule.class : `badge-${rule.class}`;
+                        }
+                    }
+                    return '';
+                }
+
+                // Handle legacy operator-based rules
+                const rules = data;
+                for (const [condition, cls] of Object.entries(rules)) {
+                    const match = condition.match(/([<>=!]+)([\d.]+)/);
+                    if (match) {
+                        const op = match[1];
+                        const target = parseFloat(match[2]);
+                        if (op === '<' && v < target) return cls.startsWith('badge-') ? cls : `badge-${cls}`;
+                        if (op === '>' && v > target) return cls.startsWith('badge-') ? cls : `badge-${cls}`;
+                        if (op === '<=' && v <= target) return cls.startsWith('badge-') ? cls : `badge-${cls}`;
+                        if (op === '>=' && v >= target) return cls.startsWith('badge-') ? cls : `badge-${cls}`;
+                        if (op === '==' && v == target) return cls.startsWith('badge-') ? cls : `badge-${cls}`;
+                    }
+                }
+            } catch(e) {
+                console.error("Condition error:", e, rulesData);
+            }
+            return '';
         }
 
         const window_NESTED_DATA_CACHE = {};
@@ -1025,19 +1193,22 @@
                         fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.age"] }) }).then(r => r.json()),
                         fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.gender"] }) }).then(r => r.json())
                     ]).then(([resT1, resT2, resT3]) => {
+                        const activeMetrics = getActiveMetrics();
+                        const cprMetric = activeMetrics.find(m => m.original === 'cost_per_result' || m.key === 'average_cost_per_result');
+                        
                         const hydrate = (targetEl, data, trends, dims) => {
                             if (!targetEl || !trends.data) return;
                             data.forEach((row, idx) => {
-                                const sparkContainer = document.getElementById(`spark-${targetEl.id}-${idx}`);
+                                if (!cprMetric) return;
+                                const sparkContainer = document.getElementById(`spark-${targetEl.id}-${cprMetric.key}-${idx}`);
                                 if (!sparkContainer) return;
 
                                 const match = trends.data.filter(t => dims.every(d => t[`dimensions.${d}`] === (row[d] || row[`dimensions.${d}`])));
                                 if (match.length > 1) {
                                     match.sort((a,b) => a.daily.localeCompare(b.daily));
                                     const points = match.map(m => parseFloat(m.v || 0));
-                                    renderSparkline(sparkContainer, points);
-                                } else {
-                                    sparkContainer.innerHTML = '<span style="color:var(--meta-text-dim); font-size: 0.6rem; opacity: 0.5;">N/A</span>';
+                                    row._trend = points; // PERSIST TREND IN OBJECT
+                                    renderSparkline(sparkContainer, points, true);
                                 }
                             });
                         };
@@ -1088,18 +1259,20 @@
                                 });
 
                                 // Hydrate existing rows in sub-table
+                                const activeMetrics = getActiveMetrics();
+                                const cprMetric = activeMetrics.find(m => m.original === 'cost_per_result' || m.key === 'average_cost_per_result');
+
                                 baseData.forEach((row, idx) => {
+                                    if (!cprMetric) return;
                                     const key = row[nextHItem.nameField];
                                     const raw = trendMap[key];
                                     const currentSubRowId = `row-${nextLevel}-${row[nextHItem.idField] || idx}-${idx}`;
-                                    const sparkContainer = document.getElementById(`spark-${currentSubRowId}`);
+                                    const sparkContainer = document.getElementById(`spark-${cprMetric.key}-${currentSubRowId}`);
                                     
                                     if (raw && raw.length > 1) {
                                         raw.sort((a,b) => a.d.localeCompare(b.d));
                                         row._trend = raw.map(x => x.v);
-                                        if (sparkContainer) renderSparkline(sparkContainer, row._trend);
-                                    } else if (sparkContainer) {
-                                        sparkContainer.innerHTML = '<span style="color:var(--meta-text-dim); font-size: 0.6rem; opacity: 0.5;">N/A</span>';
+                                        if (sparkContainer) renderSparkline(sparkContainer, row._trend, true);
                                     }
                                 });
                             }
@@ -1118,37 +1291,36 @@
         function renderRecursiveTable(container, data, level, parentRowId, parentName) {
             const hItem = HIERARCHY[level];
             const nextLevel = hItem.next;
+            const activeMetrics = getActiveMetrics();
+
+            if (!window_NESTED_DATA_CACHE[container.id]) {
+                window_NESTED_DATA_CACHE[container.id] = { data, level, parentRowId, parentName, type: 'recursive', sort: { key: hItem.nameField, dir: 'asc' } };
+            }
+            const sort = window_NESTED_DATA_CACHE[container.id].sort;
+
+            const getIcon = (key) => sort.key === key ? (sort.dir === 'asc' ? '↑' : '↓') : '↕';
+            const getClass = (key) => sort.key === key ? 'active-sort' : '';
+
+            let headerCols = activeMetrics.map(m => `
+                <th class="text-right ${getClass(m.key)}" style="min-width: 90px; cursor: pointer; text-align: right;" onclick="handleNestedSort('${container.id}', '${m.key}')" data-col="${m.key}">
+                    ${(m.label || m.original).replace(/_/g, ' ').toUpperCase()} <span class="sort-icon">${getIcon(m.key)}</span>
+                </th>
+            `).join('');
 
             let html = `
                 <table class="nested-table">
                     <thead>
                         <tr style="background: rgba(255,255,255,0.03); border-bottom: 2px solid var(--meta-border);">
-                            <th style="width: 85px; border-right: 1px solid var(--meta-border);">&nbsp;</th>
-                            <th style="width: 200px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'parentName')">Parent <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th style="min-width: 280px; cursor: pointer" onclick="handleNestedSort('${container.id}', '${hItem.nameField}')">${hItem.label} Name <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th style="width: 60px; text-align:center;">Status</th>
-                            <th class="text-right" style="width: 110px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_spend')">Gasto <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cpm')">CPM <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 80px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_ctr')">CTR <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_clicks')">Clicks <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cpc')">CPC <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 70px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_frequency')">Frequencia <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_results')">Resultado <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 170px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cost_per_result')">Costo por resultado <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_impressions')">Impresiones <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_reach')">Reach <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_result_rate')">Results Rate <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_actions')">Actions <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th style="width: 85px; border-right: 1px solid var(--meta-border); text-align: center;">&nbsp;</th>
+                            <th class="text-left ${getClass('parentName')}" style="width: 200px; cursor: pointer; text-align: left;" onclick="handleNestedSort('${container.id}', 'parentName')" data-col="parentName">PARENT <span class="sort-icon">${getIcon('parentName')}</span></th>
+                            <th class="text-left ${getClass(hItem.nameField)}" style="min-width: 280px; cursor: pointer; text-align: left;" onclick="handleNestedSort('${container.id}', '${hItem.nameField}')" data-col="${hItem.nameField}">${(hItem.label + ' Name').toUpperCase()} <span class="sort-icon">${getIcon(hItem.nameField)}</span></th>
+                            <th style="width: 60px; text-align:center;">STATUS</th>
+                            ${headerCols}
                         </tr>
                     </thead>
                     <tbody>
             `;
 
-            if (!window_NESTED_DATA_CACHE[container.id]) {
-                window_NESTED_DATA_CACHE[container.id] = { data, level, parentRowId, parentName, type: 'recursive', sort: { key: hItem.nameField, dir: 'asc' } };
-            }
-
-            const sort = window_NESTED_DATA_CACHE[container.id].sort;
             data.sort((a, b) => {
                 let vA = a[sort.key] ?? 0;
                 let vB = b[sort.key] ?? 0;
@@ -1161,16 +1333,9 @@
                 const currentId = row[hItem.idField] || idx;
                 const currentName = String(row[hItem.nameField] || 'Unknown');
                 const rowId = `row-${level}-${currentId}-${idx}`;
-                const spend = parseFloat(row.total_spend ?? 0);
-                const imps = parseInt(row.total_impressions ?? 0);
-                const cprValue = row.average_cost_per_result !== undefined ? parseFloat(row.average_cost_per_result) : null;
-                const cprString = cprValue !== null ? `€${formatNum(cprValue)}` : '?';
-                const costClass = cprValue !== null ? getCostClass(cprValue) : '';
-                const ctr = parseFloat(row.average_ctr ?? 0) * 100;
-                const resRate = parseFloat(row.average_result_rate ?? 0) * 100;
                 const status = (row.ad_group_status || row.ad_status || row.campaign_status || row.status || 'unknown').toLowerCase();
 
-                html += `
+                let cells = `
                     <tr id="${rowId}" class="sub-row">
                         <td style="width: 85px; border-right: 1px solid var(--meta-border); text-align: center; vertical-align: middle;">
                             <div style="display: flex; gap: 8px; justify-content: center; align-items: center; min-height: 48px;">
@@ -1190,27 +1355,30 @@
                             <strong>${currentName}</strong>
                         </td>
                         <td style="width: 60px; text-align: center; vertical-align: middle;">${getStatusIcon(status)}</td>
-                        <td class="text-right metric-cell" style="width: 110px; vertical-align: middle;">€${formatNum(spend)}</td>
-                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">€${formatNum(row.average_cpm || 0)}</td>
-                        <td class="text-right metric-cell" style="width: 80px; vertical-align: middle;"><span class="${getCtrClass(ctr)}">${formatPct(ctr)}</span></td>
-                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_clicks || 0)}</td>
-                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">€${formatNum(row.average_cpc || 0)}</td>
-                        <td class="text-right metric-cell" style="width: 70px; vertical-align: middle;">${formatNum(row.average_frequency || 0)}x</td>
-                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_results || 0)}</td>
-                        <td class="text-right metric-cell" style="width: 170px; vertical-align: middle;">
-                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-height: 48px;">
-                                <span class="${costClass}" style="flex-shrink: 0;">${cprString}</span>
-                                <div id="spark-${rowId}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0; justify-content: center;">
-                                    <div class="spark-loading"></div>
-                                </div>
+                `;
+
+                activeMetrics.forEach(m => {
+                    const val = row[m.key] || 0;
+                    const format = m.config.format || (m.key.includes('spend') || m.key.includes('cp') ? 'currency' : (m.key.includes('ctr') || m.key.includes('rate') ? 'percent' : 'number'));
+                    const formatted = applyFormatting(val, format, m.key);
+                    const condClass = applyConditional(val, m.config.conditional, m.key);
+                    const sparkId = `spark-${m.key}-${rowId}`;
+
+                    cells += `
+                        <td class="text-right metric-cell" style="vertical-align: middle;">
+                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
+                                <span class="${condClass}">${formatted}</span>
+                                ${m.config.sparkline ? `
+                                    <div id="${sparkId}" class="sparkline-container" style="width: 60px; margin: 0; flex-shrink: 0; justify-content: center;">
+                                        <div class="spark-loading"></div>
+                                    </div>
+                                ` : ''}
                             </div>
                         </td>
-                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(imps)}</td>
-                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_reach || 0)}</td>
-                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatPct(resRate)}</td>
-                        <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_actions || 0)}</td>
-                    </tr>
-                `;
+                    `;
+                });
+
+                html += cells + `</tr>`;
             });
 
             html += `</tbody></table>`;
@@ -1219,9 +1387,15 @@
             data.forEach((row, idx) => {
                 const currentId = row[hItem.idField] || idx;
                 const rowId = `row-${level}-${currentId}-${idx}`;
-                if (row._trend && row._trend.length > 1) {
-                    renderSparkline(document.getElementById(`spark-${rowId}`), row._trend);
-                }
+                
+                activeMetrics.forEach(m => {
+                    if (m.config.sparkline) {
+                        const sparkCont = document.getElementById(`spark-${m.key}-${rowId}`);
+                        if (row._trend && row._trend.length > 1) {
+                            renderSparkline(sparkCont, row._trend, m.key.includes('cost_per')); // Invert sparkline for cost metrics
+                        }
+                    }
+                });
             });
             lucide.createIcons();
         }
@@ -1232,35 +1406,38 @@
                 return;
             }
 
+            const activeMetrics = getActiveMetrics();
             const dimLabels = dims.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(' & ');
+
+            if (!window_NESTED_DATA_CACHE[container.id]) {
+                window_NESTED_DATA_CACHE[container.id] = { data, dims, dimLabels, type: 'dimensions', sort: { key: 'fullLabel', dir: 'asc' } };
+            }
+            const sort = window_NESTED_DATA_CACHE[container.id].sort;
+
+            const getIcon = (key) => sort.key === key ? (sort.dir === 'asc' ? '↑' : '↓') : '↕';
+            const getClass = (key) => sort.key === key ? 'active-sort' : '';
 
             let html = `
                 <table class="nested-table">
                     <thead>
                         <tr style="background: rgba(255,255,255,0.03); border-bottom: 2px solid var(--meta-border);">
-                            <th style="min-width: 150px; border-right: 1px solid var(--meta-border); cursor: pointer" onclick="handleNestedSort('${container.id}', 'fullLabel')">${dimLabels} <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 110px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_spend')">Gasto <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cpm')">CPM <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 80px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_ctr')">CTR <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_clicks')">Clicks <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cpc')">CPC <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 70px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_frequency')">Frequencia <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_results')">Resultado <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 180px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_cost_per_result')">Costo por resultado <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_impressions')">Impresiones <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_reach')">Reach <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'average_result_rate')">Results Rate <i data-lucide="chevron-down" style="width:12px"></i></th>
-                            <th class="text-right" style="width: 90px; cursor: pointer" onclick="handleNestedSort('${container.id}', 'total_actions')">Actions <i data-lucide="chevron-down" style="width:12px"></i></th>
+                            <th class="text-left ${getClass('fullLabel')}" style="min-width: 150px; border-right: 1px solid var(--meta-border); cursor: pointer; text-align: left;" onclick="handleNestedSort('${container.id}', 'fullLabel')" data-col="fullLabel">${dimLabels.toUpperCase()} <span class="sort-icon">${getIcon('fullLabel')}</span></th>
+            `;
+
+            activeMetrics.forEach(m => {
+                html += `
+                    <th class="text-right ${getClass(m.key)}" style="min-width: 90px; cursor: pointer; text-align: right;" onclick="handleNestedSort('${container.id}', '${m.key}')" data-col="${m.key}">
+                        ${(m.label || m.original).toUpperCase()} <span class="sort-icon">${getIcon(m.key)}</span>
+                    </th>
+                `;
+            });
+
+            html += `
                         </tr>
                     </thead>
                     <tbody>
             `;
 
-            if (!window_NESTED_DATA_CACHE[container.id]) {
-                window_NESTED_DATA_CACHE[container.id] = { data, dims, dimLabels, type: 'dimensions', sort: { key: 'fullLabel', dir: 'asc' } };
-            }
-
-            const sort = window_NESTED_DATA_CACHE[container.id].sort;
             data.sort((a, b) => {
                 let vA, vB;
                 if (sort.key === 'fullLabel') {
@@ -1275,7 +1452,7 @@
             });
 
             data.forEach((row, idx) => {
-                const vals = dims.map(d => {
+                const dimVals = dims.map(d => {
                     let val = row[d] || row[`dimensions.${d}`] || 'Unknown';
                     if (d === 'gender') {
                         const low = String(val).toLowerCase();
@@ -1284,52 +1461,57 @@
                     }
                     return val;
                 }).join(' / ');
-                const spend = parseFloat(row.total_spend || 0);
-                const cpr = parseFloat(row.average_cost_per_result || 0);
-                const costClass = getCostClass(cpr);
-                const ctr = parseFloat(row.average_ctr || 0) * 100;
-                const resRate = parseFloat(row.average_result_rate || 0) * 100;
 
-                html += `
-                    <tr>
-                        <td style="font-weight: 600; border-right: 1px solid var(--meta-border); vertical-align: middle; padding: 10px 15px;">${vals}</td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;">€${formatNum(spend)}</td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;">€${formatNum(row.average_cpm || 0)}</td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;"><span class="${getCtrClass(ctr/100)}">${formatPct(ctr)}</span></td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_clicks)}</td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;">€${formatNum(row.average_cpc)}</td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatNum(row.average_frequency)}x</td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_results)}</td>
+                html += `<tr><td style="font-weight: 600; border-right: 1px solid var(--meta-border); vertical-align: middle; padding: 10px 15px;">${dimVals}</td>`;
+
+                activeMetrics.forEach(m => {
+                    const val = row[m.key] || 0;
+                    const format = m.config.format || (m.key.includes('spend') || m.key.includes('cp') ? 'currency' : (m.key.includes('ctr') || m.key.includes('rate') ? 'percent' : 'number'));
+                    const formatted = applyFormatting(val, format, m.key);
+                    const condClass = applyConditional(val, m.config.conditional, m.key);
+                    const sparkId = `spark-${container.id}-${m.key}-${idx}`; // Unique ID for sparkline per metric per row
+
+                    html += `
                         <td class="text-right metric-cell" style="vertical-align: middle;">
-                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-height: 48px;">
-                                <span class="${costClass}" style="flex-shrink: 0;">€${formatNum(cpr)}</span>
-                                <div id="spark-${container.id}-${idx}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0; justify-content: center;">
-                                    <div class="spark-loading"></div>
-                                </div>
+                            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
+                                <span class="${condClass}">${formatted}</span>
+                                ${m.config.sparkline ? `
+                                    <div id="${sparkId}" class="sparkline-container" style="width: 60px; margin: 0; flex-shrink: 0; justify-content: center;">
+                                        <div class="spark-loading"></div>
+                                    </div>
+                                ` : ''}
                             </div>
                         </td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_impressions)}</td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_reach)}</td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatPct(resRate)}</td>
-                        <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_actions)}</td>
-                    </tr>
-                `;
+                    `;
+                });
+
+                html += `</tr>`;
             });
 
             html += `</tbody></table>`;
             container.innerHTML = html;
+            lucide.createIcons();
 
-            // Render sparklines after HTML is in DOM
+            // Re-initialize Sparklines for Dimension Table
             data.forEach((row, idx) => {
-                const tr = row.trends || {};
-                const points = (tr.average_cost_per_result || []).map(p => {
-                    const v = typeof p === 'object' ? p.value : p;
-                    return parseFloat(v || 0);
+                activeMetrics.forEach(m => {
+                    if (m.config.sparkline) {
+                        const sparkId = `spark-${container.id}-${m.key}-${idx}`;
+                        const sparkCont = document.getElementById(sparkId);
+                        
+                        // Look for trend in row or in shared cache if available
+                        let trend = row._trend;
+                        if (!trend || trend.length < 2) {
+                            // Dimensions often store trend in a separate lookup or row property 'v'
+                            // We attempt to retrieve it if it was cached during initial load
+                            if (row.trend && row.trend.length > 1) trend = row.trend;
+                        }
+
+                        if (sparkCont && trend && trend.length > 1) {
+                            renderSparkline(sparkCont, trend, m.key.includes('cost_per'));
+                        }
+                    }
                 });
-                const sparkCont = document.getElementById(`spark-${container.id}-${idx}`);
-                if (sparkCont && points.length >= 2) {
-                    renderSparkline(sparkCont, points);
-                }
             });
         }
 
@@ -1402,20 +1584,20 @@
 
         function getCostClass(v) {
             v = parseFloat(v);
-            if (isNaN(v) || Math.abs(v) < 0.000001) return '';
-            if (v <= 0.30) return 'badge-excellent';
-            if (v <= 0.60) return 'badge-good';
-            if (v <= 1.20) return 'badge-normal';
-            if (v <= 3.00) return 'badge-warning';
-            if (v <= 10.00) return 'badge-bad';
+            if (v === 0 || isNaN(v)) return '';
+            if (v < 6) return 'badge-excellent';
+            if (v >= 6 && v <= 7) return 'badge-good';
+            if (v > 7 && v <= 8) return 'badge-normal';
+            if (v > 8 && v <= 10) return 'badge-warning';
+            if (v > 10 && v <= 15) return 'badge-bad';
             return 'badge-grave';
         }
 
         function getCtrClass(v) {
             v = parseFloat(v);
             if (isNaN(v)) return '';
-            if (v >= 3.0) return 'badge-excellent';
-            if (v >= 2.0) return 'badge-normal';
+            if (v > 3) return 'badge-good';
+            if (v >= 2 && v <= 3) return 'badge-warning';
             return 'badge-bad';
         }
 
@@ -1427,20 +1609,21 @@
 
         function renderSummary(data) {
             const sum = data.reduce((acc, row) => {
-                acc.spend += parseFloat(row.total_spend || 0);
-                acc.clicks += parseInt(row.total_clicks || 0);
-                acc.impr += parseInt(row.total_impressions || 0);
-                acc.results += parseInt(row.total_results || 0);
+                acc.spend += parseFloat(row.total_spend || row.metric_spend || 0);
+                acc.clicks += parseInt(row.total_clicks || row.metric_clicks || 0);
+                acc.impr += parseInt(row.total_impressions || row.metric_impressions || 0);
+                acc.results += parseInt(row.total_results || row.metric_results || row.metric_actions_lead || 0);
+                acc.income += parseFloat(row.metric_action_values_omni_purchase || row.metric_action_values_purchase || 0);
                 return acc;
-            }, { spend:0, clicks:0, impr:0, results:0 });
+            }, { spend:0, clicks:0, impr:0, results:0, income:0 });
 
             document.getElementById('total-spend').textContent = `€ ${formatNum(sum.spend)}`;
             document.getElementById('total-impressions').textContent = formatInt(sum.impr);
             document.getElementById('total-clicks').textContent = formatInt(sum.clicks);
             document.getElementById('total-ctr').textContent = formatPct((sum.clicks / (sum.impr || 1)) * 100);
             
-            const roas = sum.spend > 0 ? (sum.spend * 2.5 / sum.spend) : 0; // Simulated ROAS logic
-            document.getElementById('total-roas').textContent = roas.toFixed(2) + 'x';
+            const roas = sum.spend > 0 ? (sum.income / sum.spend) : 0; 
+            document.getElementById('total-roas').textContent = (roas || 0).toFixed(2) + 'x';
         }
 
         function resetSummary() {
@@ -1451,20 +1634,25 @@
             document.getElementById('total-roas').textContent = '0.00x';
         }
 
-        function renderSparkline(container, points) {
+        function renderSparkline(container, points, isInverted = false) {
             if (!container || !points || points.length < 2) return;
+            const numericPoints = points.map(p => parseFloat(p) || 0);
             const width = 80;
             const height = 24;
-            const max = Math.max(...points) || 1;
-            const min = Math.min(...points) || 0;
+            const max = Math.max(...numericPoints) || 1;
+            const min = Math.min(...numericPoints) || 0;
             const range = (max - min) || 1;
             
             // Semantic Color based on Trend
-            const first = points[0];
-            const last = points[points.length - 1];
-            let color = 'var(--meta-blue)';
-            if (last > first) color = '#f85149'; // Increase (Red)
-            if (last < first) color = '#3fb950'; // Decrease (Green)
+            const first = numericPoints[0];
+            const last = numericPoints[numericPoints.length - 1];
+            let color = '#8b949e'; // Gray (Neutral)
+            
+            if (last > first) {
+                color = isInverted ? '#f85149' : '#3fb950'; // Increase: Red if inverted (cost), Green otherwise
+            } else if (last < first) {
+                color = isInverted ? '#3fb950' : '#f85149'; // Decrease: Green if inverted (cost), Red otherwise
+            }
 
             const svgPoints = points.map((p, i) => {
                 const x = (i / (points.length - 1)) * width;

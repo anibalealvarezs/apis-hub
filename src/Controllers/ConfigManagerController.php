@@ -141,6 +141,8 @@ class ConfigManagerController
                 'fb_entity_filters' => [], // entity => include_string
                 'fb_organic_enabled' => true,
                 'fb_marketing_enabled' => true,
+                'fb_metrics_strategy' => 'default',
+                'fb_metrics_config' => [],
                 'jobs_timeout_hours' => 6,
                 'cache_raw_metrics' => false,
             ];
@@ -188,6 +190,8 @@ class ConfigManagerController
                 $currentConfig['fb_marketing_history_range'] = $fbMarketingConfig['cache_history_range'] ?? '2 years';
                 $currentConfig['fb_organic_enabled'] = $fbOrganicConfig['enabled'] ?? true;
                 $currentConfig['fb_marketing_enabled'] = $fbMarketingConfig['enabled'] ?? true;
+                $currentConfig['fb_metrics_strategy'] = $fbMarketingConfig['metrics_strategy'] ?? 'default';
+                $currentConfig['fb_metrics_config'] = $fbMarketingConfig['metrics_config'] ?? [];
                 
                 $entities = ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA', 'CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'];
                 foreach ($entities as $e) {
@@ -274,7 +278,9 @@ class ConfigManagerController
                     entityFilters: $data['entity_filters'] ?? [],
                     featureToggles: $data['feature_toggles'] ?? [],
                     enabled: $data['enabled'] ?? true,
-                    type: $type
+                    type: $type,
+                    metricsStrategy: $data['metrics_strategy'] ?? null,
+                    metricsConfig: $data['metrics_config'] ?? null
                 );
             } elseif ($type === 'global') {
                 $appConfigPath = __DIR__ . '/../../config/app.yaml';
@@ -456,7 +462,9 @@ class ConfigManagerController
         array $entityFilters = [],
         array $featureToggles = [],
         bool $enabled = true,
-        string $type = 'facebook'
+        string $type = 'facebook',
+        ?string $metricsStrategy = null,
+        ?array $metricsConfig = null
     ): void {
         // Ensure directory exists
         $configDir = dirname($this->fbConfigPath);
@@ -525,7 +533,13 @@ class ConfigManagerController
                 CacheStrategyService::clearChannel('facebook_marketing');
             }
         }
-
+        
+        if ($metricsStrategy) {
+            $markConfig['channels']['facebook_marketing']['metrics_strategy'] = $metricsStrategy;
+        }
+        if ($metricsConfig !== null) {
+            $markConfig['channels']['facebook_marketing']['metrics_config'] = $metricsConfig;
+        }
 
         $marketingEntities = ['CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'];
         foreach ($marketingEntities as $e) {
