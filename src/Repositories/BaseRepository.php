@@ -195,7 +195,8 @@ class BaseRepository extends EntityRepository
                     $safeLeftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
                     $safeLeftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
                     
-                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST({$channeledMap['alias']}.platform_id AS CHAR), CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS \"$quotedField\"")
+                    $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
+                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
                        ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("rca_fallback.name")
@@ -204,7 +205,8 @@ class BaseRepository extends EntityRepository
                        ->addGroupBy("mc.{$channeledMap['fk']}")
                        ->addGroupBy("mc.{$genericMap['fk']}");
                 } else {
-                    $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST({$channeledMap['alias']}.platform_id AS CHAR), CAST(mc.{$channeledMap['fk']} AS CHAR), CAST(mc.{$genericMap['fk']} AS CHAR), 'Unknown') AS \"$quotedField\"")
+                    $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
+                    $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
                        ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
                        ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
@@ -216,7 +218,8 @@ class BaseRepository extends EntityRepository
                 $map = $relationMap[$field];
                 $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
                 
-                $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS CHAR), 'Unknown') AS \"$quotedField\"")
+                $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
+                $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
                    ->addSelect("mc.{$map['fk']} AS \"{$quotedField}_id\"")
                    ->addGroupBy("{$map['alias']}.{$map['field']}")
                    ->addGroupBy("mc.{$map['fk']}");
@@ -245,8 +248,16 @@ class BaseRepository extends EntityRepository
                     $map = $relationMap[$key];
                     // We join the relation to allow filtering by platform_id OR database ID
                     $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
-                    $qb->andWhere("(mc.{$map['fk']} = :f_$key OR {$map['alias']}.platform_id = :f_$key)")
-                       ->setParameter("f_$key", $value);
+                    
+                    // Safety check to prevent integer overflow in PostgreSQL
+                    $isPlatformId = is_numeric($value) && (float)$value > 2147483647;
+                    if ($isPlatformId) {
+                        $qb->andWhere("{$map['alias']}.platform_id = :f_$key")
+                           ->setParameter("f_$key", (string)$value);
+                    } else {
+                        $qb->andWhere("(mc.{$map['fk']} = :f_$key OR {$map['alias']}.platform_id = :f_$key)")
+                           ->setParameter("f_$key", $value);
+                    }
                 } else {
                     $sqlKey = $this->mapFieldToSql($key);
                     $paramName = 'f_' . preg_replace('/[^a-z0-9]/i', '_', $key);
