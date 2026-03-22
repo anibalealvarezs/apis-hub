@@ -450,6 +450,26 @@
             align-items: center;
             gap: 8px;
         }
+
+        /* Sparkline Placeholder Shimmer */
+        .spark-loading {
+            width: 60px;
+            height: 12px;
+            background: linear-gradient(90deg, 
+                rgba(48, 54, 61, 0.4) 0%, 
+                rgba(88, 166, 255, 0.1) 50%, 
+                rgba(48, 54, 61, 0.4) 100%
+            );
+            background-size: 200% 100%;
+            animation: spark-shimmer 1.5s infinite linear;
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        @keyframes spark-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     </style>
 </head>
 <body>
@@ -477,6 +497,9 @@
             </div>
             <button class="btn-refresh" onclick="loadReport()">
                 <i data-lucide="refresh-cw"></i> Update Records
+            </button>
+            <button class="btn-refresh" style="background: var(--meta-hover); border: 1px solid var(--meta-border); color: var(--meta-text-dim);" onclick="forceRefresh()" title="Clear cache and reload data">
+                <i data-lucide="zap" style="color: #ffb444; width: 14px; height: 14px;"></i> Force Refresh
             </button>
         </div>
     </header>
@@ -513,7 +536,10 @@
                     <i data-lucide="layers" style="color:var(--meta-blue)"></i>
                     Aggregated Metrics by Platform ID
                 </div>
-                <div style="font-size: 0.8rem; color: var(--meta-text-dim);">
+                <div style="font-size: 0.8rem; color: var(--meta-text-dim); display: flex; align-items: center;">
+                    <span id="cache-badge" style="display: none; background: rgba(88, 166, 255, 0.1); color: var(--meta-blue); padding: 4px 8px; border-radius: 4px; margin-right: 15px; border: 1px solid rgba(88, 166, 255, 0.2); font-weight: 600; font-size: 0.7rem; letter-spacing: 0.5px;">
+                        <i data-lucide="database" style="width: 12px; height: 12px;"></i> CACHED
+                    </span>
                     <span id="record-count">0</span> accounts found in current range
                 </div>
             </div>
@@ -590,26 +616,22 @@
             const headers = getAdminHeaders();
             if (!headers.Authorization) return;
 
-            try {
-                const res = await fetch('/facebook_marketing/metric/aggregate', {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({
-                        aggregations: { min_date: 'MIN(metricDate)' }
-                    })
-                }).then(r => r.json());
+            // Trigger initial load IMMEDIATELY
+            loadReport();
 
+            // Fetch min date in background to update UI restrictions
+            fetch('/facebook_marketing/metric/aggregate', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    aggregations: { min_date: 'MIN(metricDate)' }
+                })
+            }).then(r => r.json()).then(res => {
                 if (res.status === 'success' && res.data && res.data[0] && res.data[0].min_date) {
                     const minDate = res.data[0].min_date;
                     startDateInput.min = minDate;
-                    console.log(`Min allowed date restricted to: ${minDate}`);
                 }
-            } catch (e) {
-                console.error("Could not fetch min date restriction:", e);
-            }
-
-            // Trigger initial load if we have auth
-            loadReport();
+            }).catch(e => console.error("Could not fetch min date restriction:", e));
         }
 
         // Run Init
@@ -636,6 +658,29 @@
             };
         }
 
+        async function forceRefresh() {
+            if (!confirm("This will clear the aggregation cache for Facebook Marketing and reload. Continue?")) return;
+            const loader = document.getElementById('loader');
+            loader.style.display = 'flex';
+            try {
+                const response = await fetch('/api/config-manager/flush-cache', { 
+                    method: 'POST', 
+                    headers: { ...getAdminHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ channel: 'facebook_marketing' })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    loadReport();
+                } else {
+                    alert(result.error || 'Flush failed');
+                    loader.style.display = 'none';
+                }
+            } catch (err) {
+                alert(err.message);
+                loader.style.display = 'none';
+            }
+        }
+
         async function loadReport() {
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
@@ -652,6 +697,7 @@
 
             loader.style.display = 'flex';
             emptyMsg.style.display = 'none';
+            document.getElementById('cache-badge').style.display = 'none';
 
             try {
                 const payload = {
@@ -676,35 +722,22 @@
                     endDate: end
                 };
 
-                // Double fetch: Main and Daily (Trend)
-                const [resMain, resTrend] = await Promise.all([
-                    fetch('/facebook_marketing/metric/aggregate', {
-                        method: 'POST', headers, body: JSON.stringify(payload)
-                    }).then(r => r.json()),
-                    fetch('/facebook_marketing/metric/aggregate', {
-                        method: 'POST', headers, body: JSON.stringify({
-                            aggregations: { daily_cpr: "cost_per_result" },
-                            groupBy: ["daily", "channeledCampaign"],
-                            startDate: start, endDate: end
-                        })
-                    }).then(r => r.json())
-                ]);
+                // 1. Fetch MAIN DATA first for immediate visibility
+                const resMain = await fetch('/facebook_marketing/metric/aggregate', {
+                    method: 'POST', headers, body: JSON.stringify(payload)
+                }).then(r => r.json());
 
                 if (resMain.status === 'success') {
-                    // Build daily trends map (CPR)
-                    const trendData = {};
-                    if (resTrend.data) {
-                        resTrend.data.forEach(d => {
-                            if (!trendData[d.channeledCampaign]) trendData[d.channeledCampaign] = [];
-                            trendData[d.channeledCampaign].push({ day: d.daily, val: parseFloat(d.daily_cpr || 0) });
-                        });
-                        Object.keys(trendData).forEach(cid => {
-                            trendData[cid].sort((a,b) => a.day.localeCompare(b.day));
-                            trendData[cid] = trendData[cid].map(x => x.val);
-                        });
+                    // Show cache indicator if applicable
+                    if (resMain.meta && resMain.meta.cached) {
+                        const badge = document.getElementById('cache-badge');
+                        badge.style.display = 'inline-flex';
+                        badge.title = `Source: Redis (${resMain.meta.cache_type})`;
+                        lucide.createIcons();
                     }
 
-                    currentData = resMain.data.map(d => ({ ...d, _trend: trendData[d.channeledCampaign] || [] }));
+                    // Render table immediately with empty trends
+                    currentData = resMain.data.map(d => ({ ...d, _trend: [] }));
                     
                     // Default Sort: Ad Account -> Campaign Name
                     currentData.sort((a,b) => {
@@ -714,7 +747,48 @@
                         return String(a.campaign || '').toLowerCase().localeCompare(String(b.campaign || '').toLowerCase());
                     });
 
-                    render();
+                    render(); // TABLE IS NOW VISIBLE AND INTERACTIVE
+                    loader.style.display = 'none';
+
+                    // 2. Load TREND DATA in the background (Lazy)
+                    fetch('/facebook_marketing/metric/aggregate', {
+                        method: 'POST', headers, body: JSON.stringify({
+                            aggregations: { daily_cpr: "cost_per_result" },
+                            groupBy: ["daily", "channeledCampaign"],
+                            startDate: start, endDate: end
+                        })
+                    }).then(r => r.json()).then(resTrend => {
+                        if (resTrend.status === 'success' && resTrend.data) {
+                            // Build lookup map for efficiency
+                            const trendMap = {};
+                            resTrend.data.forEach(d => {
+                                if (!trendMap[d.channeledCampaign]) trendMap[d.channeledCampaign] = [];
+                                trendMap[d.channeledCampaign].push({ day: d.daily, val: parseFloat(d.daily_cpr || 0) });
+                            });
+                            
+                            // Process and hydrate existing rows
+                            currentData.forEach((row, idx) => {
+                                const sparkId = `spark-cpr-${row.channeledCampaign || idx}`.replace(/[^a-z0-9\-]/gi, '-');
+                                const container = document.getElementById(sparkId);
+                                if (!container) return;
+
+                                const rawTrend = trendMap[row.channeledCampaign];
+                                if (rawTrend && rawTrend.length > 1) {
+                                    rawTrend.sort((a,b) => a.day.localeCompare(b.day));
+                                    row._trend = rawTrend.map(x => x.val);
+                                    renderSparkline(container, row._trend);
+                                } else {
+                                    // Remove loader if no data
+                                    container.innerHTML = '<span style="color:var(--meta-text-dim); font-size: 0.6rem; opacity: 0.5;">N/A</span>';
+                                }
+                            });
+                        }
+                    }).catch(e => {
+                        console.error("Could not lazy-load trend data:", e);
+                        // Clear all placeholders on global error
+                        document.querySelectorAll('.spark-loading').forEach(el => el.remove());
+                    });
+
                 } else {
                     emptyMsg.style.display = 'block';
                     resetSummary();
@@ -722,6 +796,7 @@
                         document.getElementById('table-body').innerHTML = '';
                     }
                     document.getElementById('record-count').textContent = '0';
+                    loader.style.display = 'none';
                 }
             } catch (error) {
                 console.error(error);
@@ -739,7 +814,7 @@
 
             currentData.forEach((row, index) => {
                 const tr = document.createElement('tr');
-                const rowId = `row-campaign-${row.channeledCampaign_id || index}`;
+                const rowId = `row-campaign-${row.channeledCampaign || index}`;
                 tr.id = rowId;
                 const cpr = parseFloat(row.average_cost_per_result || 0);
                 const costClass = getCostClass(cpr);
@@ -748,19 +823,20 @@
                 const resRate = parseFloat(row.average_result_rate || 0) * 100;
                 const status = row.campaign_status ? row.campaign_status.toLowerCase() : 'unknown';
                 
+                const sparkId = `spark-cpr-${row.channeledCampaign || index}`.replace(/[^a-z0-9\-]/gi, '-');
                 tr.innerHTML = `
                     <td style="width: 85px; border-right: 1px solid var(--meta-border); text-align: center; vertical-align: middle;">
                         <div style="display: flex; gap: 8px; justify-content: center; align-items: center; min-height: 52px;">
-                            <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', 'campaign', '${row.channeledCampaign_id}', '${(row.campaign || 'Unknown').replace(/'/g, "\\'")}')" title="Dimensions">
+                            <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', 'campaign', '${row.channeledCampaign}', '${(row.campaign || 'Unknown').replace(/'/g, "\\'")}')" title="Dimensions">
                                 <i data-lucide="users" size="14"></i>
                             </button>
-                            <button class="btn-expand next-btn" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign_id}', '${(row.campaign || 'Unknown').replace(/'/g, "\\'")}')" title="AdSets">
+                            <button class="btn-expand next-btn" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign}', '${(row.campaign || 'Unknown').replace(/'/g, "\\'")}')" title="AdSets">
                                 <i data-lucide="layers" size="14"></i>
                             </button>
                         </div>
                     </td>
                     <td class="account-name" style="width: 200px; vertical-align: middle; padding: 12px 15px;">${row.account || 'Unknown'}</td>
-                    <td class="campaign-name" style="min-width: 280px; vertical-align: middle; padding: 12px 15px; cursor: pointer; color: var(--meta-blue);" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign_id}', '${(row.campaign || 'Unknown').replace(/'/g, "\\'")}')">
+                    <td class="campaign-name" style="min-width: 280px; vertical-align: middle; padding: 12px 15px; cursor: pointer; color: var(--meta-blue);" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign}', '${(row.campaign || 'Unknown').replace(/'/g, "\\'")}')">
                         <strong>${row.campaign || 'Unknown'}</strong>
                     </td>
                     <td style="width: 60px; text-align: center; vertical-align: middle;">${getStatusIcon(status)}</td>
@@ -774,7 +850,9 @@
                     <td class="text-right metric-cell" style="width: 180px; vertical-align: middle;">
                         <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-height: 52px;">
                             <span class="${costClass}" style="flex-shrink: 0;">€${formatNum(cpr)}</span>
-                            <div id="spark-cpr-${index}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0;"></div>
+                            <div id="${sparkId}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0; justify-content: center;">
+                                <div class="spark-loading"></div>
+                            </div>
                         </div>
                     </td>
                     <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(row.total_impressions)}</td>
@@ -785,7 +863,7 @@
                 tbody.appendChild(tr);
 
                 if (row._trend && row._trend.length > 1) {
-                    renderSparkline(document.getElementById(`spark-cpr-${index}`), row._trend);
+                    renderSparkline(document.getElementById(sparkId), row._trend);
                 }
             });
             renderSummary(currentData);
@@ -908,57 +986,90 @@
 
                 if (type === 'dimensions') {
                     const payloadBase = { ...METRIC_PAYLOAD_BASE, filters: filter, startDate, endDate };
-                    const [resCombined, resAge, resGender, resT1, resT2, resT3] = await Promise.all([
+                    
+                    // 1. Fetch Main Dimension Data
+                    const [resCombined, resAge, resGender] = await Promise.all([
                         fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.age", "dimensions.gender"] }) }).then(r => r.json()),
                         fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.age"] }) }).then(r => r.json()),
-                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.gender"] }) }).then(r => r.json()),
-                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.age", "dimensions.gender"] }) }).then(r => r.json()),
-                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.age"] }) }).then(r => r.json()),
-                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.gender"] }) }).then(r => r.json())
+                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, groupBy: ["dimensions.gender"] }) }).then(r => r.json())
                     ]);
 
-                    const mapTrends = (data, trends, dims) => {
-                        data.forEach(row => {
-                            const match = (trends.data || []).filter(t => dims.every(d => t[`dimensions.${d}`] === (row[d] || row[`dimensions.${d}`])));
-                            row.trends = { average_cost_per_result: match.map(m => ({ value: m.v })) };
-                        });
-                    };
-
-                    mapTrends(resCombined.data, resT1, ['age', 'gender']);
-                    mapTrends(resAge.data, resT2, ['age']);
-                    mapTrends(resGender.data, resT3, ['gender']);
-
+                    // Render Structure immediately with placeholders
                     container.innerHTML = `
                         <div class="breakdown-title" style="color:var(--meta-blue); margin-bottom:20px;"><i data-lucide="users"></i> Audience Analysis for <strong>${entityName}</strong></div>
-                        
                         <div style="margin-bottom:30px;">
                             <div class="breakdown-title" style="font-size:12px; opacity:0.8"><i data-lucide="split"></i> Combined: Age & Gender</div>
                             <div id="dim-combined-${rowId}"></div>
                         </div>
-
                         <div style="margin-bottom:30px;">
                             <div class="breakdown-title" style="font-size:12px; opacity:0.8"><i data-lucide="hash"></i> By Age</div>
                             <div id="dim-age-${rowId}"></div>
                         </div>
-
                         <div style="margin-bottom:30px;">
                             <div class="breakdown-title" style="font-size:12px; opacity:0.8"><i data-lucide="user"></i> By Gender</div>
                             <div id="dim-gender-${rowId}"></div>
                         </div>
                     `;
-                    renderDimensionTable(document.getElementById(`dim-combined-${rowId}`), resCombined.data, ['gender', 'age']);
-                    renderDimensionTable(document.getElementById(`dim-age-${rowId}`), resAge.data, ['age']);
-                    renderDimensionTable(document.getElementById(`dim-gender-${rowId}`), resGender.data, ['gender']);
+                    
+                    const elComb = document.getElementById(`dim-combined-${rowId}`);
+                    const elAge = document.getElementById(`dim-age-${rowId}`);
+                    const elGen = document.getElementById(`dim-gender-${rowId}`);
+
+                    renderDimensionTable(elComb, resCombined.status === 'success' ? resCombined.data : [], ['gender', 'age']);
+                    renderDimensionTable(elAge, resAge.status === 'success' ? resAge.data : [], ['age']);
+                    renderDimensionTable(elGen, resGender.status === 'success' ? resGender.data : [], ['gender']);
+
+                    // 2. Fetch Dimension Trends (Lazy)
+                    Promise.all([
+                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.age", "dimensions.gender"] }) }).then(r => r.json()),
+                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.age"] }) }).then(r => r.json()),
+                        fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: { v: "cost_per_result" }, groupBy: ["daily", "dimensions.gender"] }) }).then(r => r.json())
+                    ]).then(([resT1, resT2, resT3]) => {
+                        const hydrate = (targetEl, data, trends, dims) => {
+                            if (!targetEl || !trends.data) return;
+                            data.forEach((row, idx) => {
+                                const sparkContainer = document.getElementById(`spark-${targetEl.id}-${idx}`);
+                                if (!sparkContainer) return;
+
+                                const match = trends.data.filter(t => dims.every(d => t[`dimensions.${d}`] === (row[d] || row[`dimensions.${d}`])));
+                                if (match.length > 1) {
+                                    match.sort((a,b) => a.daily.localeCompare(b.daily));
+                                    const points = match.map(m => parseFloat(m.v || 0));
+                                    renderSparkline(sparkContainer, points);
+                                } else {
+                                    sparkContainer.innerHTML = '<span style="color:var(--meta-text-dim); font-size: 0.6rem; opacity: 0.5;">N/A</span>';
+                                }
+                            });
+                        };
+
+                        hydrate(elComb, resCombined.data, resT1, ['age', 'gender']);
+                        hydrate(elAge, resAge.data, resT2, ['age']);
+                        hydrate(elGen, resGender.data, resT3, ['gender']);
+                    }).catch(e => console.error(e));
+
                 } else {
                     const nextLevel = hItem.next;
                     const nextHItem = HIERARCHY[nextLevel];
                     const filter = { [hItem.filterKey]: entityId };
 
-                    const [resMain, resTrend] = await Promise.all([
-                        fetch('/facebook_marketing/metric/aggregate', { 
-                            method: 'POST', headers, 
-                            body: JSON.stringify({ ...METRIC_PAYLOAD_BASE, filters: filter, groupBy: [nextHItem.nameField], startDate, endDate }) 
-                        }).then(r => r.json()),
+                    // 1. Fetch Main Data for Recursive Table
+                    const resMain = await fetch('/facebook_marketing/metric/aggregate', { 
+                        method: 'POST', headers, 
+                        body: JSON.stringify({ ...METRIC_PAYLOAD_BASE, filters: filter, groupBy: [nextHItem.nameField], startDate, endDate }) 
+                    }).then(r => r.json());
+
+                    if (resMain.status === 'success' && resMain.data.length > 0) {
+                        const nextTargetId = `tbl-next-${rowId}`;
+                        container.innerHTML = `
+                            <div class="breakdown-title" style="color:${themeColor}"><i data-lucide="${HIERARCHY[nextLevel].icon}"></i> ${HIERARCHY[nextLevel].label} Performance for <strong>${entityName}</strong></div>
+                            <div id="${nextTargetId}"></div>
+                        `;
+                        
+                        // Render Immediately with placeholders
+                        const baseData = resMain.data.map(d => ({ ...d, _trend: [] }));
+                        renderRecursiveTable(document.getElementById(nextTargetId), baseData, nextLevel, rowId, entityName);
+
+                        // 2. Fetch Trend Data (Lazy)
                         fetch('/facebook_marketing/metric/aggregate', { 
                             method: 'POST', headers, 
                             body: JSON.stringify({ 
@@ -967,29 +1078,32 @@
                                 groupBy: ["daily", nextHItem.nameField], 
                                 startDate, endDate 
                             }) 
-                        }).then(r => r.json())
-                    ]);
+                        }).then(r => r.json()).then(resTrend => {
+                            if (resTrend.status === 'success' && resTrend.data) {
+                                const trendMap = {};
+                                resTrend.data.forEach(d => {
+                                    const key = d[nextHItem.nameField];
+                                    if (!trendMap[key]) trendMap[key] = [];
+                                    trendMap[key].push({ d: d.daily, v: parseFloat(d.daily_cpr || 0) });
+                                });
 
-                    if (resMain.status === 'success' && resMain.data.length > 0) {
-                        const trendMap = {};
-                        if (resTrend.data) {
-                            resTrend.data.forEach(d => {
-                                const key = d[nextHItem.nameField];
-                                if (!trendMap[key]) trendMap[key] = [];
-                                trendMap[key].push({ d: d.daily, v: parseFloat(d.daily_cpr || 0) });
-                            });
-                            Object.keys(trendMap).forEach(k => {
-                                trendMap[k].sort((a,b) => a.d.localeCompare(b.d));
-                                trendMap[k] = trendMap[k].map(x => x.v);
-                            });
-                        }
-
-                        const dataWithTrends = resMain.data.map(d => ({ ...d, _trend: trendMap[d[nextHItem.nameField]] || [] }));
-                        container.innerHTML = `
-                            <div class="breakdown-title" style="color:${themeColor}"><i data-lucide="${HIERARCHY[nextLevel].icon}"></i> ${HIERARCHY[nextLevel].label} Performance for <strong>${entityName}</strong></div>
-                            <div id="tbl-next-${rowId}"></div>
-                        `;
-                        renderRecursiveTable(document.getElementById(`tbl-next-${rowId}`), dataWithTrends, nextLevel, rowId, entityName);
+                                // Hydrate existing rows in sub-table
+                                baseData.forEach((row, idx) => {
+                                    const key = row[nextHItem.nameField];
+                                    const raw = trendMap[key];
+                                    const currentSubRowId = `row-${nextLevel}-${row[nextHItem.idField] || idx}-${idx}`;
+                                    const sparkContainer = document.getElementById(`spark-${currentSubRowId}`);
+                                    
+                                    if (raw && raw.length > 1) {
+                                        raw.sort((a,b) => a.d.localeCompare(b.d));
+                                        row._trend = raw.map(x => x.v);
+                                        if (sparkContainer) renderSparkline(sparkContainer, row._trend);
+                                    } else if (sparkContainer) {
+                                        sparkContainer.innerHTML = '<span style="color:var(--meta-text-dim); font-size: 0.6rem; opacity: 0.5;">N/A</span>';
+                                    }
+                                });
+                            }
+                        }).catch(e => console.error(e));
                     } else {
                         container.innerHTML = `<div class="empty-state">No ${HIERARCHY[hItem.next].label} data found for this period</div>`;
                     }
@@ -1086,7 +1200,9 @@
                         <td class="text-right metric-cell" style="width: 170px; vertical-align: middle;">
                             <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-height: 48px;">
                                 <span class="${costClass}" style="flex-shrink: 0;">${cprString}</span>
-                                <div id="spark-${rowId}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0;"></div>
+                                <div id="spark-${rowId}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0; justify-content: center;">
+                                    <div class="spark-loading"></div>
+                                </div>
                             </div>
                         </td>
                         <td class="text-right metric-cell" style="width: 90px; vertical-align: middle;">${formatInt(imps)}</td>
@@ -1187,7 +1303,9 @@
                         <td class="text-right metric-cell" style="vertical-align: middle;">
                             <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-height: 48px;">
                                 <span class="${costClass}" style="flex-shrink: 0;">€${formatNum(cpr)}</span>
-                                <div id="spark-${container.id}-${idx}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0;"></div>
+                                <div id="spark-${container.id}-${idx}" class="sparkline-container" style="width: 80px; margin: 0; flex-shrink: 0; justify-content: center;">
+                                    <div class="spark-loading"></div>
+                                </div>
                             </div>
                         </td>
                         <td class="text-right metric-cell" style="vertical-align: middle;">${formatInt(row.total_impressions)}</td>

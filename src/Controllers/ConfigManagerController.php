@@ -5,6 +5,7 @@ namespace Controllers;
 use Classes\Requests\MetricRequests;
 use Exception;
 use Helpers\Helpers;
+use Services\CacheStrategyService;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Yaml\Yaml;
@@ -157,6 +158,9 @@ class ConfigManagerController
                 $gsc = $gscConf['channels']['google_search_console'] ?? [];
                 $currentConfig['gsc_cache_history_range'] = $gsc['cache_history_range'] ?? '16 months';
                 $currentConfig['gsc_enabled'] = $gsc['enabled'] ?? true;
+                $currentConfig['gsc_feature_toggles'] = [
+                    'cache_aggregations' => $gsc['cache_aggregations'] ?? false
+                ];
                 $sites = $gsc['sites'] ?? [];
                 foreach ($sites as $site) {
                     $currentConfig['gsc'][$site['url']] = [
@@ -229,7 +233,11 @@ class ConfigManagerController
                 foreach ($fbMarketingFeatures as $f => $default) {
                     $currentConfig['fb_feature_toggles'][$f] = $fbMarketingConfig['AD_ACCOUNT'][$f] ?? $default;
                 }
+                
+                // Root cache aggregation toggles
+                $currentConfig['fb_feature_toggles']['cache_aggregations'] = ($fbOrganicConfig['cache_aggregations'] ?? false) || ($fbMarketingConfig['cache_aggregations'] ?? false);
             }
+
 
             return new Response(json_encode([
                 'assets' => $allAssets,
@@ -256,7 +264,7 @@ class ConfigManagerController
             $logger->debug("Payload: " . json_encode($data));
 
             if ($type === 'gsc') {
-                $this->updateGscConfig($assets, $data['cache_history_range'] ?? null, $data['enabled'] ?? true);
+                $this->updateGscConfig($assets, $data['cache_history_range'] ?? null, $data['enabled'] ?? true, $data['feature_toggles'] ?? []);
             } elseif ($type === 'facebook' || $type === 'facebook-organic' || $type === 'facebook-marketing') {
                 $this->updateFacebookConfig(
                     assets: $assets, 
@@ -365,7 +373,7 @@ class ConfigManagerController
         }
     }
 
-    private function updateGscConfig(array $selectedSites, ?string $historyRange = null, bool $enabled = true): void
+    private function updateGscConfig(array $selectedSites, ?string $historyRange = null, bool $enabled = true, array $featureToggles = []): void
     {
         $config = file_exists($this->gscConfigPath) ? (Yaml::parseFile($this->gscConfigPath) ?: []) : [];
         if (!isset($config['channels']['google_search_console'])) {
@@ -375,6 +383,19 @@ class ConfigManagerController
             $config['channels']['google_search_console']['cache_history_range'] = $historyRange;
         }
         $config['channels']['google_search_console']['enabled'] = $enabled;
+
+        // Handle Redis caching toggle
+        if (isset($featureToggles['cache_aggregations'])) {
+            $prevValue = (bool)($config['channels']['google_search_console']['cache_aggregations'] ?? false);
+            $newValue = (bool)$featureToggles['cache_aggregations'];
+            $config['channels']['google_search_console']['cache_aggregations'] = $newValue;
+            
+            if ($prevValue && !$newValue) {
+                // Clear Redis for GSC
+                CacheStrategyService::clearChannel('google_search_console');
+            }
+        }
+
         $currentSites = $config['channels']['google_search_console']['sites'] ?? [];
         $newSitesList = [];
         
@@ -464,6 +485,18 @@ class ConfigManagerController
         if ($type === 'facebook' || $type === 'facebook-organic') {
             $orgConfig['channels']['facebook_organic']['enabled'] = $enabled;
         }
+
+        // Handle Redis caching toggle (Organic)
+        if (isset($featureToggles['cache_aggregations']) && ($type === 'facebook' || $type === 'facebook-organic')) {
+            $prevValue = (bool)($orgConfig['channels']['facebook_organic']['cache_aggregations'] ?? false);
+            $newValue = (bool)$featureToggles['cache_aggregations'];
+            $orgConfig['channels']['facebook_organic']['cache_aggregations'] = $newValue;
+            
+            if ($prevValue && !$newValue) {
+                CacheStrategyService::clearChannel('facebook_organic');
+            }
+        }
+
         $organicEntities = ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA'];
         foreach ($organicEntities as $e) {
             if (isset($entityFilters[$e])) {
@@ -481,6 +514,18 @@ class ConfigManagerController
         if ($type === 'facebook' || $type === 'facebook-marketing') {
             $markConfig['channels']['facebook_marketing']['enabled'] = $enabled;
         }
+
+        // Handle Redis caching toggle (Marketing)
+        if (isset($featureToggles['cache_aggregations']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
+            $prevValue = (bool)($markConfig['channels']['facebook_marketing']['cache_aggregations'] ?? false);
+            $newValue = (bool)$featureToggles['cache_aggregations'];
+            $markConfig['channels']['facebook_marketing']['cache_aggregations'] = $newValue;
+            
+            if ($prevValue && !$newValue) {
+                CacheStrategyService::clearChannel('facebook_marketing');
+            }
+        }
+
 
         $marketingEntities = ['CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'];
         foreach ($marketingEntities as $e) {
@@ -584,6 +629,26 @@ class ConfigManagerController
         $parsed = parse_url($url);
         $host = $parsed['host'] ?? '';
         return str_replace('www.', '', $host);
+    }
+
+    public function flushCache(Request $request): Response
+    {
+        $channel = $request->request->get('channel');
+        if (!$channel) {
+            $content = json_decode($request->getContent(), true);
+            $channel = $content['channel'] ?? null;
+        }
+
+        if (!$channel) {
+            return new Response(json_encode(['error' => 'Missing channel']), 400);
+        }
+
+        CacheStrategyService::clearChannel($channel);
+
+        return new Response(json_encode([
+            'success' => true,
+            'message' => "All aggregation caches for '$channel' cleared."
+        ]));
     }
 
     public static function getCountryList(): array

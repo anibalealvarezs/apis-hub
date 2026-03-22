@@ -8,16 +8,18 @@ use Entities\Job;
 use Enums\Channel;
 use Enums\JobStatus;
 use Helpers\Helpers;
+use Services\CacheStrategyService;
+use Services\DateResolver;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Services\DateResolver;
 use Symfony\Component\HttpFoundation\Response;
 use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
 use Doctrine\DBAL\Exception\LockWaitTimeoutException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputOption;
 use Throwable;
+
 
 #[AsCommand(
     name: 'app:process-jobs',
@@ -270,6 +272,10 @@ class ProcessJobsCommand extends Command
                         'status' => JobStatus::completed->value,
                         'message' => 'Success'
                     ]);
+
+                    // Invalidate recent aggregation caches for this channel
+                    CacheStrategyService::clearRecent($job->getChannel());
+
                     if (Helpers::isDebug()) {
                         $output->writeln("<info>Successfully completed job {$job->getUuid()}</info>");
                     }
