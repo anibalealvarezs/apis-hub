@@ -52,6 +52,10 @@ php bin/cli.php app:schedule-initial-jobs --instance="$INSTANCE_NAME" || echo "I
 if [ -n "$PROJECT_CONFIG_FILE" ]; then
     # Extract project name from path (e.g. deploy/alimentos-bahia.yaml -> alimentos-bahia)
     PROJECT_NAME=$(basename "$PROJECT_CONFIG_FILE" .yaml)
+    
+    echo "Regenerating instance configuration..."
+    php bin/cli.php app:refresh-instances || echo "Instance refresh failed"
+
     echo "Configuring dynamic cron for project: $PROJECT_NAME..."
     php bin/setup-cron.php "$PROJECT_NAME" || echo "Cron setup failed, continuing..."
 
