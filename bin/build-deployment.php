@@ -118,6 +118,7 @@ $dbHost = $extractEnvVar($db['host'] ?? '');
 $dbDriver = $extractEnvVar($db['driver'] ?? 'pdo_mysql');
 if (str_contains($dbHost, 'db') && !isset($services['db'])) {
     if ($dbDriver === 'pdo_pgsql') {
+        $dbHostPort = getenv('DB_HOST_PORT') ?: 5432;
         $services['db'] = [
             'image' => 'postgres:16-alpine',
             'restart' => 'always',
@@ -126,10 +127,11 @@ if (str_contains($dbHost, 'db') && !isset($services['db'])) {
                 'POSTGRES_PASSWORD' => $extractEnvVar($db['password'] ?? 'postgres'),
                 'POSTGRES_DB' => $extractEnvVar($db['name'] ?? 'apis-hub'),
             ],
-            'ports' => ['127.0.0.1:5432:5432'],
+            'ports' => ["127.0.0.1:{$dbHostPort}:5432"],
             'volumes' => ['db_data:/var/lib/postgresql/data'],
         ];
     } else {
+        $dbHostPort = getenv('DB_HOST_PORT') ?: 3306;
         $services['db'] = [
             'image' => 'mysql:8.0',
             'restart' => 'always',
@@ -137,16 +139,17 @@ if (str_contains($dbHost, 'db') && !isset($services['db'])) {
                 'MYSQL_ROOT_PASSWORD' => $extractEnvVar($db['password'] ?? 'root'),
                 'MYSQL_DATABASE' => $extractEnvVar($db['name'] ?? 'apis-hub'),
             ],
-            'ports' => ['127.0.0.1:3306:3306'],
+            'ports' => ["127.0.0.1:{$dbHostPort}:3306"],
             'volumes' => ['db_data:/var/lib/mysql'],
         ];
     }
 }
 
+$redisHostPort = getenv('REDIS_HOST_PORT') ?: 6379;
 $services['redis'] = [
     'image'   => 'redis:alpine',
     'restart' => 'always',
-    'ports'   => ['6379:6379'],
+    'ports'   => ["{$redisHostPort}:6379"],
     'volumes' => ['redis_data:/data'],
 ];
 

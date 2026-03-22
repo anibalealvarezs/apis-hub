@@ -52,6 +52,24 @@ php bin/cli.php app:schedule-initial-jobs --instance="$INSTANCE_NAME" || echo "I
 if [ -n "$PROJECT_CONFIG_FILE" ]; then
     # Extract project name from path (e.g. deploy/alimentos-bahia.yaml -> alimentos-bahia)
     PROJECT_NAME=$(basename "$PROJECT_CONFIG_FILE" .yaml)
+    
+    # Ensure instances.yaml is fresh. Only one instance needs to do this to avoid race conditions.
+    # But all instances need the result for the cron setup.
+    if [[ "$INSTANCE_NAME" == *"entities-sync"* ]]; then
+        if mkdir "/app/storage/refresh_lock" 2>/dev/null; then
+             echo "Regenerating instance configuration..."
+             php bin/cli.php app:refresh-instances || echo "Instance refresh failed"
+             # We keep the lock for 10 seconds to allow others to see the file is ready
+             (sleep 10 && rm -rf "/app/storage/refresh_lock") &
+        fi
+    fi
+
+    # Give the master sync instance a head start if it's currently refreshing
+    if [ ! -f "config/instances.yaml" ] && [ -d "/app/storage/refresh_lock" ]; then
+        echo "Waiting for instance configuration to be ready..."
+        sleep 5
+    fi
+
     echo "Configuring dynamic cron for project: $PROJECT_NAME..."
     php bin/setup-cron.php "$PROJECT_NAME" || echo "Cron setup failed, continuing..."
 
