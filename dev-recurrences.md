@@ -17,6 +17,7 @@ This document lists common command chains needed during development to keep loca
   - [Running Static Analysis (PHPStan)](#running-static-analysis-phpstan)
 - [6. Remote Deployment (Hetzner)](#6-remote-deployment-hetzner)
 - [7. Database Maintenance & Reset (Nuclear Operations)](#7-database-maintenance--reset-nuclear-operations)
+- [8. Multiple Deployments & Port Isolation](#8-multiple-deployments--port-isolation)
 
 ---
 
@@ -222,3 +223,44 @@ docker compose exec facebook-marketing-entities-sync php bin/cli.php app:health-
 
 > [!NOTE]
 > Use the `facebook-marketing-entities-sync` container for these master commands.
+
+---
+
+## 8. Multiple Deployments & Port Isolation
+
+If you need to run multiple `apis-hub` projects on the same server (e.g. for different clients), follow these rules to ensure true isolation.
+
+### 1. Distinct `DEPLOYMENT_NAME`
+
+Each project must have a unique identifier in its `.env` file. This prevents containers and volumes from different projects from clashing.
+
+```env
+DEPLOYMENT_NAME=client-xyz
+```
+
+### 2. Port Block Reservation
+
+Assign a unique starting port for each deployment to avoid "Port already allocated" errors.
+
+```env
+STARTING_HOST_PORT=9000
+```
+
+This ensures Project A uses ports 9000-9099, and Project B (set to 10000) uses 10000-10099.
+
+### 3. Service Port Overrides
+
+Also override the host-exposed ports for shared services like Database and Redis:
+
+```env
+DB_HOST_PORT=9100
+REDIS_HOST_PORT=9099
+```
+
+### 4. Verification Check
+
+After a new deployment, you can verify which project a container belongs to by checking its labels or name:
+
+```bash
+docker ps --filter "label=com.docker.compose.project=client-xyz"
+```
