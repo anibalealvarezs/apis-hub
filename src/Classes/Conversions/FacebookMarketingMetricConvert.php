@@ -44,6 +44,7 @@ class FacebookMarketingMetricConvert
         ?Creative $creativeEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
@@ -51,7 +52,7 @@ class FacebookMarketingMetricConvert
         $skippedRows = 0;
 
         // Creatives usually use Ad insights fields but for the creative itself
-        $metricsList = explode(',', AdPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdPermission::DEFAULT->insightsFields($metricSet));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -154,13 +155,14 @@ class FacebookMarketingMetricConvert
         ?string $channeledAccountPlatformId = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = explode(',', AdAccountPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdAccountPermission::DEFAULT->insightsFields($metricSet));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -258,13 +260,14 @@ class FacebookMarketingMetricConvert
         ?ChanneledCampaign $channeledCampaignEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = explode(',', CampaignPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = $customFields ? explode(',', $customFields) : explode(',', CampaignPermission::DEFAULT->insightsFields($metricSet));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -367,13 +370,14 @@ class FacebookMarketingMetricConvert
         ?ChanneledAdGroup $channeledAdGroupEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = explode(',', AdsetPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdsetPermission::DEFAULT->insightsFields($metricSet));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -480,13 +484,14 @@ class FacebookMarketingMetricConvert
         ?ChanneledAd $channeledAdEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = explode(',', AdPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdPermission::DEFAULT->insightsFields($metricSet));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 

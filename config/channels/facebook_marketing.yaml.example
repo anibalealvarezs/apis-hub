@@ -1,0 +1,145 @@
+channels:
+  facebook_marketing:
+    metrics_strategy: custom
+    metrics_config:
+      spend:
+        label: SPEND
+        enabled: true
+        sparkline: false
+        format: currency
+        order: 1
+        conditional:
+          type: levels
+          config: {  }
+      cpm:
+        label: CPM
+        enabled: true
+        sparkline: false
+        format: currency
+        order: 2
+        conditional:
+          type: levels
+          config: {  }
+      ctr:
+        label: CTR
+        enabled: true
+        sparkline: false
+        format: percent
+        order: 3
+        conditional:
+          type: levels
+          config:
+            - { min: '5.000000', class: badge-excellent }
+            - { min: '3.000001', max: '4.999999', class: badge-good }
+            - { min: '3.000000', max: '3.000000', class: badge-normal }
+            - { min: '2.000000', max: '2.999999', class: badge-warning }
+            - { max: '1.999999', class: badge-bad }
+      clicks:
+        label: CLICKS
+        enabled: true
+        sparkline: false
+        format: number
+        order: 4
+        conditional:
+          type: levels
+          config: {  }
+      cpc:
+        label: CPC
+        enabled: true
+        sparkline: false
+        format: currency
+        order: 5
+        conditional:
+          type: levels
+          config: {  }
+      frequency:
+        label: FREQ
+        enabled: true
+        sparkline: false
+        format: number
+        order: 6
+        conditional:
+          type: levels
+          config: {  }
+      results:
+        label: RESULT
+        enabled: true
+        sparkline: false
+        format: number
+        order: 7
+        conditional:
+          type: levels
+          config: {  }
+      cost_per_result:
+        label: CPR
+        enabled: true
+        sparkline: true
+        format: currency
+        order: 8
+        conditional:
+          type: levels
+          config:
+            - { max: '5.999999', class: badge-excellent }
+            - { min: '6.000000', max: '6.999999', class: badge-good }
+            - { min: '7.000000', max: '7.999999', class: badge-normal }
+            - { min: '8.000000', max: '9.999999', class: badge-warning }
+            - { min: '10.000000', max: '14.999999', class: badge-bad }
+            - { min: '15.000000', class: badge-grave }
+      impressions:
+        label: IMPR
+        enabled: true
+        sparkline: false
+        format: number
+        order: 9
+        conditional:
+          type: levels
+          config: {  }
+      reach:
+        label: REACH
+        enabled: true
+        sparkline: false
+        format: number
+        order: 10
+        conditional:
+          type: levels
+          config: {  }
+      result_rate:
+        label: RATE
+        enabled: true
+        sparkline: false
+        format: percent
+        order: 11
+        conditional:
+          type: levels
+          config: {  }
+      actions:
+        label: ACTIONS
+        enabled: true
+        sparkline: false
+        format: number
+        order: 12
+        conditional:
+          type: levels
+          config: {  }
+    CAMPAIGN:
+      cache_include: null
+    ADSET:
+      cache_include: null
+    AD:
+      cache_include: null
+    CREATIVE:
+      cache_include: null
+    AD_ACCOUNT:
+      ad_account_metrics: false
+      campaigns: true
+      campaign_metrics: false
+      adsets: true
+      adset_metrics: false
+      ads: true
+      ad_metrics: true
+      creatives: false
+      creative_metrics: false
+    ad_accounts: []
+    cache_history_range: '6 months'
+    enabled: true
+    cache_aggregations: true

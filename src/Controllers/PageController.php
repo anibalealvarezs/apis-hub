@@ -45,6 +45,21 @@ class PageController extends BaseController
     public function facebookReports(): Response
     {
         $html = file_get_contents(__DIR__ . '/../views/facebook-reports.html');
+        
+        $channelsConfig = \Helpers\Helpers::getChannelsConfig();
+        $fbConfig = $channelsConfig['facebook_marketing'] ?? [];
+        
+        $configData = [
+            'strategy' => $fbConfig['metrics_strategy'] ?? 'default',
+            'metrics_config' => $fbConfig['metrics_config'] ?? []
+        ];
+
+        $html = str_replace(
+            '<!-- FB_CONFIG_PLACEHOLDER -->',
+            '<script>window.FB_METRICS_CONFIG = ' . json_encode($configData) . ';</script>',
+            $html
+        );
+
         return new Response($html, Response::HTTP_OK, ['Content-Type' => 'text/html']);
     }
 }

@@ -1,0 +1,29 @@
+channels:
+  facebook_organic:
+    enabled: true
+    PAGE:
+      page_metrics: true
+      posts: true
+      post_metrics: true
+      ig_account_metrics: true
+      ig_account_media: true
+      ig_account_media_metrics: true
+      ig_account_media_stop_id: null
+      cache_include: null
+      ig_accounts: true
+    pages:
+      - id: "PAGE_ID"
+        url: 'https://www.facebook.com/PAGE_URL'
+        title: 'PAGE_TITLE'
+        hostname: facebook.com
+        ig_account: "IG_ACCOUNT_ID"
+        enabled: true
+        exclude_from_caching: false
+    cache_history_range: '3 years'
+    POST:
+      cache_include: null
+    IG_ACCOUNT:
+      cache_include: null
+    IG_MEDIA:
+      cache_include: null
+    cache_aggregations: true

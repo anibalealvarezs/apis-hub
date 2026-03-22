@@ -9,6 +9,10 @@ use Anibalealvarezs\FacebookGraphApi\Enums\MetricBreakdown;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
 use Classes\Overrides\FacebookGraphApiOverride;
+use Anibalealvarezs\FacebookGraphApi\Enums\AdAccountPermission;
+use Anibalealvarezs\FacebookGraphApi\Enums\AdPermission;
+use Anibalealvarezs\FacebookGraphApi\Enums\AdsetPermission;
+use Anibalealvarezs\FacebookGraphApi\Enums\CampaignPermission;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Dimension;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\GroupType;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Operator;
@@ -677,6 +681,7 @@ class MetricRequests
                                 logger: $logger,
                                 startDate: $cStart,
                                 endDate: $cEnd,
+                                config: $config,
                             );
                             $totalMetrics += $res['metrics'] ?? 0;
                             $totalRows += $res['rows'] ?? 0;
@@ -700,6 +705,7 @@ class MetricRequests
                                     jobId: $jobId,
                                     cacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
                                     cacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
+                                    config: $config,
                                 );
                                 $totalMetrics += $res['metrics'] ?? 0;
                                 $totalRows += $res['rows'] ?? 0;
@@ -722,6 +728,7 @@ class MetricRequests
                                         jobId: $jobId,
                                         cacheInclude: self::getFacebookFilter($config, 'ADSET', 'cache_include'),
                                         cacheExclude: self::getFacebookFilter($config, 'ADSET', 'cache_exclude'),
+                                        config: $config,
                                     );
                                     $totalMetrics += $res['metrics'] ?? 0;
                                     $totalRows += $res['rows'] ?? 0;
@@ -745,6 +752,7 @@ class MetricRequests
                                             jobId: $jobId,
                                             cacheInclude: self::getFacebookFilter($config, 'AD', 'cache_include'),
                                             cacheExclude: self::getFacebookFilter($config, 'AD', 'cache_exclude'),
+                                            config: $config,
                                         );
                                         $totalMetrics += $res['metrics'] ?? 0;
                                         $totalRows += $res['rows'] ?? 0;
@@ -763,6 +771,7 @@ class MetricRequests
                                     jobId: $jobId,
                                     cacheInclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_include'),
                                     cacheExclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_exclude'),
+                                    config: $config,
                                 );
                                 $totalMetrics += $res['metrics'] ?? 0;
                                 $totalRows += $res['rows'] ?? 0;
@@ -1139,6 +1148,58 @@ class MetricRequests
     }
 
     /**
+     * Build the fields string for Facebook API insights calls based on configuration.
+     *
+     * @param array $config
+     * @param string $level
+     * @return array Result contains 'metricSet' (MetricSet) and optional 'fields' (string).
+     */
+    private static function getFacebookMarketingMetricsFields(array $config, string $level): array
+    {
+        $strategy = $config['metrics_strategy'] ?? 'default';
+        $defaultBreakdowns = [MetricBreakdown::AGE, MetricBreakdown::GENDER];
+
+        if ($strategy === 'default') {
+            return [
+                'metricSet' => MetricSet::KEY,
+                'breakdowns' => $defaultBreakdowns
+            ];
+        }
+
+        $metricsConfig = $config['metrics_config'] ?? [];
+        $enabledMetrics = [];
+        foreach ($metricsConfig as $mName => $mSetting) {
+            if (!isset($mSetting['enabled']) || $mSetting['enabled'] === true) {
+                $enabledMetrics[] = $mName;
+            }
+        }
+
+        if (empty($enabledMetrics)) {
+            return [
+                'metricSet' => MetricSet::KEY,
+                'breakdowns' => $defaultBreakdowns
+            ]; // Fallback if no custom enabled
+        }
+
+        $idFields = match($level) {
+            'AD_ACCOUNT' => ['account_id'],
+            'CAMPAIGN' => ['campaign_id'],
+            'ADSET' => ['adset_id', 'campaign_id'],
+            'AD', 'CREATIVE' => ['ad_id', 'adset_id', 'campaign_id'],
+            default => [],
+        };
+
+        $breakdowns = $config['metrics_breakdowns'] ?? $defaultBreakdowns;
+
+        return [
+            'metricSet' => MetricSet::CUSTOM,
+            'metrics' => array_unique(array_filter(array_merge($enabledMetrics, $idFields))),
+            'breakdowns' => $breakdowns,
+            'fields' => implode(',', array_unique(array_filter(array_merge($enabledMetrics, $idFields))))
+        ];
+    }
+    
+    /**
      * Initializes the SearchConsoleApi client with retry logic.
      *
      * @param array $config
@@ -1510,6 +1571,7 @@ class MetricRequests
         LoggerInterface $logger,
         ?string $startDate,
         ?string $endDate,
+        array $config = [],
     ): array {
 
         $allMetrics = new ArrayCollection();
@@ -1531,7 +1593,11 @@ class MetricRequests
         ];
 
         try {
+            $metricConfig = self::getFacebookMarketingMetricsFields($config, 'AD_ACCOUNT');
             $additionalParams = [];
+            if (isset($metricConfig['fields'])) {
+                $additionalParams['fields'] = $metricConfig['fields'];
+            }
             if ($startDate && $endDate) {
                 $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
             }
@@ -1545,9 +1611,10 @@ class MetricRequests
                 try {
                     $rows = $api->getAdAccountInsights(
                         adAccountId: (string) $adAccount['id'],
-                        metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
+                        metricBreakdown: $metricConfig['breakdowns'],
                         additionalParams: $additionalParams,
-                        metricSet: MetricSet::KEY,
+                        metricSet: $metricConfig['metricSet'],
+                        customMetrics: $metricConfig['metrics'] ?? []
                     );
                     $fetched = true;
                 } catch (Exception $e) {
@@ -1570,7 +1637,8 @@ class MetricRequests
                 logger: $logger,
                 accountEntity: $accountEntity,
                 channeledAccountPlatformId: $channeledAccountEntity->getPlatformId(),
-                metricSet: MetricSet::KEY,
+                metricSet: $metricConfig['metricSet'],
+                customFields: $metricConfig['fields'] ?? null,
             );
 
             foreach ($metrics as $metric) {
@@ -4064,7 +4132,8 @@ class MetricRequests
         array $campaignMap,
         ?int $jobId = null,
         $cacheInclude = null,
-        $cacheExclude = null
+        $cacheExclude = null,
+        array $config = []
     ): array {
         $campaignPlatformIds = array_values($channeledCampaignMap['mapReverse']);
         if (empty($campaignPlatformIds)) {
@@ -4080,6 +4149,9 @@ class MetricRequests
             $campaignPlatformIdChunks = array_chunk($campaignPlatformIds, 50);
             $allRows = [];
 
+            $metricConfig = self::getFacebookMarketingMetricsFields($config, 'CAMPAIGN');
+            // Removed: if (isset($metricConfig['fields'])) { $additionalParams['fields'] = $metricConfig['fields']; }
+
             foreach ($campaignPlatformIdChunks as $chunk) {
                 $maxRetries = 3;
                 $retryCount = 0;
@@ -4092,9 +4164,10 @@ class MetricRequests
                             adAccountId: $channeledAccountEntity->getPlatformId(),
                             campaignIds: $chunk,
                             limit: 100,
-                            metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
+                            metricBreakdown: $metricConfig['breakdowns'],
                             additionalParams: $additionalParams,
-                            metricSet: MetricSet::KEY,
+                            metricSet: $metricConfig['metricSet'],
+                            customMetrics: $metricConfig['metrics'] ?? [] // Added customMetrics
                         );
                         $fetched = true;
                     } catch (Exception $e) {
@@ -4160,7 +4233,8 @@ class MetricRequests
                     channeledAccountEntity: $channeledAccountEntity,
                     campaignEntity: $campaignEntity,
                     channeledCampaignEntity: $channeledCampaignEntity,
-                    metricSet: MetricSet::KEY,
+                    metricSet: $metricConfig['metricSet'],
+                    customFields: $metricConfig['fields'] ?? null,
                 );
 
                 foreach ($metrics as $metric) {
@@ -4220,7 +4294,8 @@ class MetricRequests
         array $channeledAdGroupMap,
         ?int $jobId = null,
         $cacheInclude = null,
-        $cacheExclude = null
+        $cacheExclude = null,
+        array $config = [],
     ): array {
         $adsetPlatformIds = array_keys($channeledAdGroupMap['mapCampaign']);
         if (empty($adsetPlatformIds)) {
@@ -4236,6 +4311,11 @@ class MetricRequests
             $adsetPlatformIdChunks = array_chunk($adsetPlatformIds, 50);
             $allRows = [];
 
+            $metricConfig = self::getFacebookMarketingMetricsFields($config, 'ADSET');
+            if (isset($metricConfig['fields'])) {
+                $additionalParams['fields'] = $metricConfig['fields'];
+            }
+
             foreach ($adsetPlatformIdChunks as $chunk) {
                 $maxRetries = 3;
                 $retryCount = 0;
@@ -4248,9 +4328,10 @@ class MetricRequests
                             adAccountId: $channeledAccountEntity->getPlatformId(),
                             adsetIds: $chunk,
                             limit: 100,
-                            metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
+                            metricBreakdown: $metricConfig['breakdowns'],
                             additionalParams: $additionalParams,
-                            metricSet: MetricSet::KEY,
+                            metricSet: $metricConfig['metricSet'],
+                            customMetrics: $metricConfig['metrics'] ?? []
                         );
                         $fetched = true;
                     } catch (Exception $e) {
@@ -4332,7 +4413,8 @@ class MetricRequests
                     campaignEntity: $campaignEntity,
                     channeledCampaignEntity: $channeledCampaignEntity,
                     channeledAdGroupEntity: $channeledAdGroupEntity,
-                    metricSet: MetricSet::KEY,
+                    metricSet: $metricConfig['metricSet'],
+                    customFields: $metricConfig['fields'] ?? null,
                 );
 
                 foreach ($metrics as $metric) {
@@ -4395,7 +4477,8 @@ class MetricRequests
         array $channeledAdMap,
         ?int $jobId = null,
         $cacheInclude = null,
-        $cacheExclude = null
+        $cacheExclude = null,
+        array $config = [],
     ): array {
         $adPlatformIds = array_keys($channeledAdMap['mapAdGroup']);
         if (empty($adPlatformIds)) {
@@ -4410,6 +4493,11 @@ class MetricRequests
         $adPlatformIdChunks = array_chunk($adPlatformIds, 50);
         $allRows = [];
 
+        $metricConfig = self::getFacebookMarketingMetricsFields($config, 'AD');
+        if (isset($metricConfig['fields'])) {
+            $additionalParams['fields'] = $metricConfig['fields'];
+        }
+
         foreach ($adPlatformIdChunks as $chunk) {
             $maxRetries = 3;
             $retryCount = 0;
@@ -4422,9 +4510,10 @@ class MetricRequests
                         adAccountId: $channeledAccountEntity->getPlatformId(),
                         adIds: $chunk,
                         limit: 100,
-                        metricBreakdown: [MetricBreakdown::AGE, MetricBreakdown::GENDER],
+                        metricBreakdown: $metricConfig['breakdowns'],
                         additionalParams: $additionalParams,
-                        metricSet: MetricSet::KEY,
+                        metricSet: $metricConfig['metricSet'],
+                        customMetrics: $metricConfig['metrics'] ?? []
                     );
                     $fetched = true;
                 } catch (Exception $e) {
@@ -4549,7 +4638,8 @@ class MetricRequests
                     channeledCampaignEntity: $channeledCampaignEntity,
                     channeledAdGroupEntity: $channeledAdGroupEntity,
                     channeledAdEntity: $channeledAdEntity,
-                    metricSet: MetricSet::KEY,
+                    metricSet: $metricConfig['metricSet'],
+                    customFields: $metricConfig['fields'] ?? null,
                 );
 
                 foreach ($metrics as $metric) {
@@ -4633,7 +4723,8 @@ class MetricRequests
         ?string $endDate = null,
         ?int $jobId = null,
         $cacheInclude = null,
-        $cacheExclude = null
+        $cacheExclude = null,
+        array $config = [],
     ): array {
         $logger->info("Starting processCreativesBulk for ad account: " . $channeledAccountEntity->getPlatformId());
         try {
@@ -4656,10 +4747,14 @@ class MetricRequests
                 $creativesMap[$creative->getCreativeId()] = $creative;
             }
 
+            $metricConfig = self::getFacebookMarketingMetricsFields($config, 'CREATIVE');
             $additionalParams = [
                 'breakdowns' => 'ad_creative_id,ad_id,adset_id,campaign_id',
                 'limit' => 100,
             ];
+            if (isset($metricConfig['fields'])) {
+                $additionalParams['fields'] = $metricConfig['fields'];
+            }
             if ($startDate) {
                 $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
             }
@@ -4674,7 +4769,8 @@ class MetricRequests
                     $insights = $api->getAdAccountInsights(
                         adAccountId: $adAccountId,
                         additionalParams: $additionalParams,
-                        metricSet: MetricSet::FULL
+                        metricSet: $metricConfig['metricSet'],
+                        customMetrics: $metricConfig['metrics'] ?? []
                     );
                     $fetched = true;
                 } catch (Exception $e) {
@@ -4714,7 +4810,8 @@ class MetricRequests
                     logger: $logger,
                     channeledAccountEntity: $channeledAccountEntity,
                     creativeEntity: $creative,
-                    metricSet: MetricSet::FULL
+                    metricSet: $metricConfig['metricSet'],
+                    customFields: $metricConfig['fields'] ?? null,
                 );
                 
                 if ($metrics->count() > 0) {

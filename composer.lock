@@ -131,13 +131,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "ab3cec34ff23374890ab19d4e81d35ac4688d0d3"
+                "reference": "e4d3324c1c8f989a7a4faf60f96d4b5a48fb0b32"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-ab3cec34ff23374890ab19d4e81d35ac4688d0d3-zip-14823e.zip",
-                "reference": "ab3cec34ff23374890ab19d4e81d35ac4688d0d3",
-                "shasum": "bbc992e6d69bbb8143aa276d56341beede0e48ae"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-e4d3324c1c8f989a7a4faf60f96d4b5a48fb0b32-zip-3af8e6.zip",
+                "reference": "e4d3324c1c8f989a7a4faf60f96d4b5a48fb0b32",
+                "shasum": "30dd31f3057e455249dfe7eda25a9523ce8af005"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -188,7 +188,7 @@
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-14T15:32:31+00:00"
+            "time": "2026-03-22T02:43:37+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -771,12 +771,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/collections.git",
-                "reference": "532f25e0eafe1c89b2f2f44770b80ddb1ef33f31"
+                "reference": "bfd7237d7f158110e2e1545c2dbdf1d89906eb5f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/collections/zipball/532f25e0eafe1c89b2f2f44770b80ddb1ef33f31",
-                "reference": "532f25e0eafe1c89b2f2f44770b80ddb1ef33f31",
+                "url": "https://api.github.com/repos/doctrine/collections/zipball/bfd7237d7f158110e2e1545c2dbdf1d89906eb5f",
+                "reference": "bfd7237d7f158110e2e1545c2dbdf1d89906eb5f",
                 "shasum": ""
             },
             "require": {
@@ -849,7 +849,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-15T22:39:14+00:00"
+            "time": "2026-03-20T14:39:55+00:00"
         },
         {
             "name": "doctrine/common",
@@ -948,12 +948,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/dbal.git",
-                "reference": "9a043cbe92de5cd55464d5c833b12b92da05cc97"
+                "reference": "822147e135432a9f10646a154d863d57f67a7426"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/dbal/zipball/9a043cbe92de5cd55464d5c833b12b92da05cc97",
-                "reference": "9a043cbe92de5cd55464d5c833b12b92da05cc97",
+                "url": "https://api.github.com/repos/doctrine/dbal/zipball/822147e135432a9f10646a154d863d57f67a7426",
+                "reference": "822147e135432a9f10646a154d863d57f67a7426",
                 "shasum": ""
             },
             "require": {
@@ -1054,7 +1054,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-03T07:05:18+00:00"
+            "time": "2026-03-19T16:58:35+00:00"
         },
         {
             "name": "doctrine/deprecations",
@@ -1110,12 +1110,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/event-manager.git",
-                "reference": "dda33921b198841ca8dbad2eaa5d4d34769d18cf"
+                "reference": "1907faecf2d61e456b01707d6477171fe2846aba"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/event-manager/zipball/dda33921b198841ca8dbad2eaa5d4d34769d18cf",
-                "reference": "dda33921b198841ca8dbad2eaa5d4d34769d18cf",
+                "url": "https://api.github.com/repos/doctrine/event-manager/zipball/1907faecf2d61e456b01707d6477171fe2846aba",
+                "reference": "1907faecf2d61e456b01707d6477171fe2846aba",
                 "shasum": ""
             },
             "require": {
@@ -1194,7 +1194,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-01-29T07:11:08+00:00"
+            "time": "2026-03-20T07:42:41+00:00"
         },
         {
             "name": "doctrine/inflector",
@@ -3786,12 +3786,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/messenger.git",
-                "reference": "4f377837498a37d6e6d12640fec624bbd44ebbbf"
+                "reference": "03e10c683a28b9580b0b025dc8f1094d9c3a11ec"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/messenger/zipball/4f377837498a37d6e6d12640fec624bbd44ebbbf",
-                "reference": "4f377837498a37d6e6d12640fec624bbd44ebbbf",
+                "url": "https://api.github.com/repos/symfony/messenger/zipball/03e10c683a28b9580b0b025dc8f1094d9c3a11ec",
+                "reference": "03e10c683a28b9580b0b025dc8f1094d9c3a11ec",
                 "shasum": ""
             },
             "require": {
@@ -3869,7 +3869,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-04T13:20:04+00:00"
+            "time": "2026-03-19T04:54:44+00:00"
         },
         {
             "name": "symfony/polyfill-ctype",
@@ -5369,12 +5369,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/data-fixtures.git",
-                "reference": "a5a95dcc0ad84f067b246068e303a573fe760204"
+                "reference": "9825932bff92be54574d3e0792354e5eb951a635"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/data-fixtures/zipball/a5a95dcc0ad84f067b246068e303a573fe760204",
-                "reference": "a5a95dcc0ad84f067b246068e303a573fe760204",
+                "url": "https://api.github.com/repos/doctrine/data-fixtures/zipball/9825932bff92be54574d3e0792354e5eb951a635",
+                "reference": "9825932bff92be54574d3e0792354e5eb951a635",
                 "shasum": ""
             },
             "require": {
@@ -5396,7 +5396,7 @@
                 "doctrine/orm": "^2.14 || ^3",
                 "ext-sqlite3": "*",
                 "fig/log-test": "^1",
-                "phpstan/phpstan": "2.1.40",
+                "phpstan/phpstan": "2.1.42",
                 "phpunit/phpunit": "^9.6.13 || ^12.4",
                 "psr/log": "^1.1 || ^2 || ^3",
                 "symfony/cache": "^5.4 || ^6.3 || ^7 || ^8",
@@ -5447,7 +5447,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-16T08:08:13+00:00"
+            "time": "2026-03-19T19:01:42+00:00"
         },
         {
             "name": "mikey179/vfsstream",
