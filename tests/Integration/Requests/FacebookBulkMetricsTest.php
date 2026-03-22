@@ -106,7 +106,9 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         );
 
         // 3. Assert
-        $this->assertTrue($result);
+        $this->assertIsArray($result);
+        $this->assertGreaterThanOrEqual(1, $result['metrics']);
+        $this->assertGreaterThanOrEqual(1, $result['rows']);
         
         $metrics = $this->entityManager->getRepository(ChanneledMetric::class)->findAll();
         $this->assertNotEmpty($metrics);
@@ -217,7 +219,9 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         );
 
         // 3. Assert
-        $this->assertTrue($result);
+        $this->assertIsArray($result);
+        $this->assertGreaterThanOrEqual(1, $result['metrics']);
+        $this->assertGreaterThanOrEqual(1, $result['rows']);
         
         $metrics = $this->entityManager->getRepository(ChanneledMetric::class)->findAll();
         $this->assertNotEmpty($metrics);
@@ -344,7 +348,9 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         );
 
         // 3. Assert
-        $this->assertTrue($result);
+        $this->assertIsArray($result);
+        $this->assertGreaterThanOrEqual(1, $result['metrics']);
+        $this->assertGreaterThanOrEqual(1, $result['rows']);
         
         $metrics = $this->entityManager->getRepository(ChanneledMetric::class)->findAll();
         $this->assertNotEmpty($metrics);
@@ -435,7 +441,8 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         );
 
         // 3. Assert
-        $this->assertTrue($result);
+        $this->assertIsArray($result);
+        $this->assertEquals(0, $result['metrics'], 'Metrics should have been skipped due to filter');
         $metrics = $this->entityManager->getRepository(ChanneledMetric::class)->findAll();
         // Since other tests might have run and left data, but BaseIntegrationTestCase usually wipes the DB or similar?
         // Actually, integration tests often don't wipe between methods unless told so.

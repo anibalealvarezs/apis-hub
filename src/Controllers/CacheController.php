@@ -189,7 +189,7 @@ class CacheController extends BaseController
             $lockKey = 'lock:schedule:' . sha1($channel->name . $entity . json_encode($payload));
             
             // Try to acquire lock for 30 seconds
-            if (!$redis->set($lockKey, 'locked', ['nx', 'ex' => 30])) {
+            if (!$redis->set($lockKey, 'locked', 'EX', 30, 'NX')) {
                 return $this->createResponse(
                     data: null,
                     status: 'error',

@@ -48,6 +48,11 @@ class JobRepositoryTest extends TestCase
                 return $this->queryBuilder;
             });
 
+        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $platform = $this->createMock(\Doctrine\DBAL\Platforms\AbstractPlatform::class);
+        $connection->method('getDatabasePlatform')->willReturn($platform);
+        $entityManager->method('getConnection')->willReturn($connection);
+
         $this->queryBuilder->method('select')->willReturnCallback(function ($alias) {
             return $this->queryBuilder;
         });

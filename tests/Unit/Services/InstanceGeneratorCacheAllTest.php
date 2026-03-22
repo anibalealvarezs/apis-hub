@@ -13,6 +13,7 @@ class InstanceGeneratorCacheAllTest extends TestCase
 {
     private array $originalChannelsConfig;
     private array $originalProjectConfig;
+    private string|bool $originalAppEnv;
 
     protected function setUp(): void
     {
@@ -28,10 +29,18 @@ class InstanceGeneratorCacheAllTest extends TestCase
         $projectProp = $reflection->getProperty('projectConfig');
         $projectProp->setAccessible(true);
         $this->originalProjectConfig = (array) $projectProp->getValue();
+
+        // Ensure we're not in demo mode for tests
+        $this->originalAppEnv = getenv('APP_ENV');
+        putenv('APP_ENV=testing');
+        Helpers::resetConfigs();
     }
 
     protected function tearDown(): void
     {
+        // Restore environment
+        putenv("APP_ENV=" . ($this->originalAppEnv ?: ''));
+        Helpers::resetConfigs();
         // Restore original configs
         $reflection = new ReflectionClass(Helpers::class);
         

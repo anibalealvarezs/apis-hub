@@ -442,7 +442,7 @@ class GenerateEntitiesConfigCommandTest extends TestCase
                     'return_type' => 'bool'
                 ],
                 'aggregate' => [
-                    'parameters' => ['aggregations', 'groupBy', 'filters', 'startDate', 'endDate'],
+                    'parameters' => ['aggregations', 'groupBy', 'filters', 'startDate', 'endDate', 'orderBy', 'orderDir'],
                     'return_type' => 'array'
                 ],
                 'createQueryBuilder' => [

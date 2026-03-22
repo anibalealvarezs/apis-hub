@@ -9,6 +9,42 @@ use Tests\Integration\BaseIntegrationTestCase;
 
 class HubInstantiationTest extends BaseIntegrationTestCase
 {
+    private array $originalEnv = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Clear environment variables that might interfere
+        $envToClear = [
+            'GOOGLE_CLIENT_ID',
+            'GOOGLE_CLIENT_SECRET',
+            'GOOGLE_REFRESH_TOKEN',
+            'GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN',
+            'GOOGLE_REDIRECT_URI',
+            'GOOGLE_USER_ID',
+            'GOOGLE_SEARCH_CONSOLE_CLIENT_ID',
+            'GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET',
+            'GOOGLE_SEARCH_CONSOLE_TOKEN'
+        ];
+        foreach ($envToClear as $envKey) {
+            $this->originalEnv[$envKey] = getenv($envKey);
+            putenv($envKey);
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        // Restore environment variables
+        foreach ($this->originalEnv as $envKey => $val) {
+            if ($val !== false) {
+                putenv($envKey . '=' . $val);
+            } else {
+                putenv($envKey);
+            }
+        }
+        parent::tearDown();
+    }
+
     public function testHubSuccessfullyInstantiatesKlaviyoClientUsingConfig(): void
     {
         // 1. Arrange: Override the KLAVIYO configuration via Environment variable

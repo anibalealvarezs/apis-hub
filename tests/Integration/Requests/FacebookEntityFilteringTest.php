@@ -173,6 +173,18 @@ class FacebookEntityFilteringTest extends BaseIntegrationTestCase
     {
         $logger = $this->createMock(LoggerInterface::class);
 
+        $this->setMockChannelsConfig([
+            'facebook_marketing' => [
+                'enabled' => true,
+                'ad_accounts' => [
+                    ['id' => $this->adAccountId, 'enabled' => true, 'ads' => true]
+                ],
+                'AD' => [
+                    'cache_include' => 'AD-'
+                ]
+            ]
+        ]);
+
         $this->api->expects($this->atLeastOnce())
             ->method('getAds')
             ->with(
@@ -180,7 +192,9 @@ class FacebookEntityFilteringTest extends BaseIntegrationTestCase
                 $this->anything(),
                 $this->anything(),
                 $this->callback(function ($params) {
-                    return isset($params['filtering']);
+                    return isset($params['filtering']) && 
+                           $params['filtering'][0]['field'] === 'name' &&
+                           $params['filtering'][0]['value'] === 'AD-';
                 })
             )
             ->willReturn(['data' => []]);
