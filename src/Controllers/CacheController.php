@@ -145,21 +145,28 @@ class CacheController extends BaseController
                ->setParameter('channel', $channel->name)
                ->setParameter('statuses', [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value]);
 
+            if ($this->isPostgreSQL()) {
+                // PostgreSQL needs explicit casting from JSONB to TEXT for LIKE operator
+                $payloadField = 'CAST(j.payload AS TEXT)';
+            } else {
+                $payloadField = 'j.payload';
+            }
+
             // Be timeframe-specific to allow parallel jobs for different periods (e.g. gsc-jan vs gsc-feb)
             if ($params && isset($params['startDate'])) {
-                $qb->andWhere('(j.payload LIKE :start_pattern1 OR j.payload LIKE :start_pattern2)')
+                $qb->andWhere("({$payloadField} LIKE :start_pattern1 OR {$payloadField} LIKE :start_pattern2)")
                     ->setParameter('start_pattern1', '%startDate%' . $params['startDate'] . '%')
                     ->setParameter('start_pattern2', '%start_date%' . $params['startDate'] . '%');
             }
             if ($params && isset($params['endDate'])) {
-                $qb->andWhere('(j.payload LIKE :end_pattern1 OR j.payload LIKE :end_pattern2)')
+                $qb->andWhere("({$payloadField} LIKE :end_pattern1 OR {$payloadField} LIKE :end_pattern2)")
                     ->setParameter('end_pattern1', '%endDate%' . $params['endDate'] . '%')
                     ->setParameter('end_pattern2', '%end_date%' . $params['endDate'] . '%');
             }
             
             // be instance-specific if name is provided
             if ($params && isset($params['instance_name'])) {
-                $qb->andWhere('j.payload LIKE :instance_pattern')
+                $qb->andWhere("{$payloadField} LIKE :instance_pattern")
                    ->setParameter('instance_pattern', '%instance_name%' . $params['instance_name'] . '%');
             }
 

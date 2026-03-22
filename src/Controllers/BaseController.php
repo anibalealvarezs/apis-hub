@@ -183,4 +183,9 @@ abstract class BaseController
 
         return $finalParams;
     }
+
+    protected function isPostgreSQL(): bool
+    {
+        return $this->em->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+    }
 }
