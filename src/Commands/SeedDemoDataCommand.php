@@ -189,8 +189,18 @@ class SeedDemoDataCommand extends Command
                     }
                 }
             }
-            $progressBar->advance(); $this->entityManager->clear();
+            $progressBar->advance(); 
+            $this->entityManager->clear();
+            // Re-fetch parent using the original name to be reference-safe across clears
             $fbParent = $this->entityManager->getRepository(Account::class)->findOneBy(['id' => $gId]);
+            if (!$fbParent) {
+                // Fallback in case ID tracking fails across TRUNCATES
+                $fbParent = new Account(); 
+                $fbParent->addName("Client Demo (FB)"); 
+                $this->entityManager->persist($fbParent); 
+                $this->entityManager->flush();
+                $gId = $fbParent->getId();
+            }
         }
         $progressBar->finish(); $output->writeln("");
     }
