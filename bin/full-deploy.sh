@@ -47,6 +47,19 @@ for FILE in $CONFIG_FILES; do
         fi
     fi
 done
+
+# Check mandatory channel files
+mkdir -p config/channels
+CHANNEL_FILES="facebook_marketing facebook_organic google_search_console"
+for FILE in $CHANNEL_FILES; do
+    if [ ! -f "config/channels/$FILE.yaml" ]; then
+        if [ -f "config/channels/$FILE.yaml.example" ]; then
+            echo "  ⚠️  config/channels/$FILE.yaml missing. Creating from example..."
+            cp "config/channels/$FILE.yaml.example" "config/channels/$FILE.yaml"
+        fi
+    fi
+done
+
 echo -e "${GREEN}✔ Environment ready ($ENV_FILE).${NC}"
 
 # ── Step 1: Install Composer dependencies ────────────────────────────────────
