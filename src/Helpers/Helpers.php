@@ -431,6 +431,27 @@ class Helpers
                     $config['facebook']['graph_token_path'] = $resolvePath($config['facebook']['graph_token_path']);
                 }
 
+                if (getenv('APP_ENV') === 'demo') {
+                    // Smart Clean: Only remove static example placeholders 
+                    // from the .example files, but keep real or seeded data.
+                    $placeholders = ['PAGE_ID', 'IG_ACCOUNT_ID', 'PAGE_URL', 'example.com'];
+                    
+                    $cleanEntityList = function($entities) use ($placeholders) {
+                        return array_filter($entities, function($item) use ($placeholders) {
+                            $asString = json_encode($item);
+                            foreach ($placeholders as $p) {
+                                if (str_contains($asString, $p)) return false;
+                            }
+                            return true;
+                        });
+                    };
+
+                    $config['facebook_marketing']['ad_accounts'] = $cleanEntityList($config['facebook_marketing']['ad_accounts'] ?? []);
+                    $config['facebook_organic']['pages'] = $cleanEntityList($config['facebook_organic']['pages'] ?? []);
+                    $config['google_search_console']['sites'] = $cleanEntityList($config['google_search_console']['sites'] ?? []);
+                    $config['shopify']['stores'] = $cleanEntityList($config['shopify']['stores'] ?? []);
+                }
+
                 self::$channelsConfig = $config;
             } catch (Exception $e) {
                 throw new RuntimeException("Failed to load channels configuration: " . $e->getMessage());
