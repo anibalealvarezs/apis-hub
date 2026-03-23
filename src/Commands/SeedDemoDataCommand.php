@@ -64,9 +64,20 @@ class SeedDemoDataCommand extends Command
         ini_set('memory_limit', '4G');
         set_time_limit(0);
 
-        $this->conn->executeStatement('SET FOREIGN_KEY_CHECKS = 0');
+        $isPostgres = $this->conn->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+        
+        if ($isPostgres) {
+            $this->conn->executeStatement("SET session_replication_role = 'replica'");
+        } else {
+            $this->conn->executeStatement('SET FOREIGN_KEY_CHECKS = 0');
+        }
+
         $tables = ['channeled_metrics', 'metrics', 'metric_configs', 'dimension_set_items', 'dimension_sets', 'dimension_values', 'dimension_keys', 'channeled_ads', 'channeled_ad_groups', 'channeled_campaigns', 'campaigns', 'channeled_accounts', 'accounts', 'pages', 'queries', 'posts', 'countries', 'devices'];
-        foreach ($tables as $table) { $this->conn->executeStatement("TRUNCATE TABLE $table"); }
+        foreach ($tables as $table) { 
+            // Postgres needs CASCADE to truncate tables with foreign keys
+            $truncateSql = $isPostgres ? "TRUNCATE TABLE $table RESTART IDENTITY CASCADE" : "TRUNCATE TABLE $table";
+            $this->conn->executeStatement($truncateSql); 
+        }
 
         $this->seedBasicEntities();
         $this->seedDimensionHierarchy($output);
@@ -76,7 +87,12 @@ class SeedDemoDataCommand extends Command
         if (in_array('facebook_organic', $channels)) { $this->seedFacebookOrganicData($output); }
 
         $this->flushAll();
-        $this->conn->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
+        
+        if ($isPostgres) {
+            $this->conn->executeStatement("SET session_replication_role = 'origin'");
+        } else {
+            $this->conn->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
+        }
 
         $output->writeln("\n<info>✅ Ultra Realistic Seeding Completed!</info>");
         return Command::SUCCESS;
@@ -247,6 +263,10 @@ class SeedDemoDataCommand extends Command
         $columns = array_keys($rows[0]);
         $vals = [];
         foreach ($rows as $row) { $vals[] = "(" . implode(',', array_map(fn($v) => is_null($v) ? 'NULL' : $this->conn->quote((string)$v), array_values($row))) . ")"; }
-        $this->conn->executeStatement("INSERT IGNORE INTO $table (" . implode(',', $columns) . ") VALUES " . implode(',', $vals));
+        
+        $isPostgres = $this->conn->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+        $insertSql = $isPostgres ? "INSERT INTO $table (" . implode(',', $columns) . ") VALUES " . implode(',', $vals) . " ON CONFLICT DO NOTHING" : "INSERT IGNORE INTO $table (" . implode(',', $columns) . ") VALUES " . implode(',', $vals);
+        
+        $this->conn->executeStatement($insertSql);
     }
 }
