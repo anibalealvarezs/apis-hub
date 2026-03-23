@@ -13,3 +13,10 @@ database:
     user: ${DB_USER}
     password: ${DB_PASSWORD}
     name: ${DB_NAME}
+  demo:
+    driver: ${DB_DRIVER:-pdo_pgsql}
+    host: '${DB_HOST:-db}'
+    port: ${DB_PORT:-5432}
+    user: ${DB_USER:-postgres}
+    password: ${DB_PASSWORD}
+    name: ${DB_NAME:-apis-hub-demo}

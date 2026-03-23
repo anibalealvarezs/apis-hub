@@ -86,6 +86,7 @@ foreach ($instances as $instance) {
             'context'    => '.',
             'dockerfile' => 'Dockerfile',
         ],
+        'restart'     => 'always',
         'environment' => $envBlock,
         'volumes'     => ['./:/app', '/app/vendor'],
         'depends_on'  => ['redis'],
@@ -153,12 +154,15 @@ $services['redis'] = [
     'volumes' => ['redis_data:/data'],
 ];
 
+$dbVolumeName = getenv('DB_VOLUME_NAME');
+$redisVolumeName = getenv('REDIS_VOLUME_NAME');
+
 $compose = [
     'name'     => getenv('DEPLOYMENT_NAME') ?: 'apis-hub',
     'services' => $services,
     'volumes'  => [
-        'redis_data' => null,
-        'db_data' => null
+        'redis_data' => $redisVolumeName ? ['name' => $redisVolumeName] : null,
+        'db_data' => $dbVolumeName ? ['name' => $dbVolumeName] : null
     ],
 ];
 

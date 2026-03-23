@@ -54,6 +54,13 @@ class SetupDatabaseCommand extends Command
             $initEntitiesCommand = $this->getApplication()->find('app:initialize-entities');
             $initEntitiesCommand->run(new ArrayInput([]), $output);
 
+            // 4. Auto-Seed for Demo (Smart Zero-Touch)
+            if (getenv('APP_ENV') === 'demo') {
+                $output->writeln("<info>🎁 Environment is 'demo'. Filling with sample data...</info>");
+                $seedDemoCommand = $this->getApplication()->find('app:seed-demo');
+                $seedDemoCommand->run(new ArrayInput([]), $output);
+            }
+
             $output->writeln("<info>✅ Database setup complete!</info>");
             return Command::SUCCESS;
 
