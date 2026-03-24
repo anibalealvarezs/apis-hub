@@ -19,6 +19,12 @@ return [
         'public' => true,
         'html' => true
     ],
+    '/data-deletion' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new PrivacyController())->dataDeletion(),
+        'public' => true,
+        'html' => true
+    ],
     '/command-builder' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->commandBuilder(),
