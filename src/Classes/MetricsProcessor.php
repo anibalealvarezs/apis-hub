@@ -813,18 +813,20 @@ class MetricsProcessor
         foreach (array_chunk($uniqueChanneledMetrics, 1000, true) as $chunk) {
             $selectParams = [];
             $tuples = [];
+            $isPostgres = Helpers::isPostgres();
             foreach ($chunk as $m) {
-                $selectParams[] = $m['channel'];
-                $selectParams[] = $m['platform_id'];
-                $selectParams[] = $m['metric_id'];
-                $selectParams[] = $m['platform_created_at'];
-                $tuples[] = '(?, ?, ?, ?)';
+                $selectParams[] = (int)$m['channel'];
+                $selectParams[] = (string)$m['platform_id'];
+                $selectParams[] = (int)$m['metric_id'];
+                $selectParams[] = (string)$m['platform_created_at'];
+                $tuples[] = $isPostgres ? '(?::integer, ?::text, ?::integer, ?::text)' : '(?, ?, ?, ?)';
             }
             if (!empty($tuples)) {
                 $placeholders = implode(', ', $tuples);
+                $isPostgres = Helpers::isPostgres();
                 $sql = "SELECT id, channel, platform_id, metric_id, platform_created_at, data
                         FROM channeled_metrics
-                        WHERE (channel, platform_id, metric_id, platform_created_at) IN ($placeholders)";
+                        WHERE " . ($isPostgres ? "(channel::integer, platform_id::text, metric_id::integer, platform_created_at::text)" : "(channel, platform_id, metric_id, platform_created_at)") . " IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
                 
                 $chunkMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
                 foreach ($chunkMap as $k => $v) {
@@ -915,18 +917,18 @@ class MetricsProcessor
             $selectParams = [];
             $tuples = [];
             foreach ($chunk as $m) {
-                $selectParams[] = (string)$m['channel'];
+                $selectParams[] = (int)$m['channel'];
                 $selectParams[] = (string)$m['platform_id'];
                 $selectParams[] = (int)$m['metric_id'];
                 $selectParams[] = (string)$m['platform_created_at'];
-                $tuples[] = Helpers::isPostgres() ? '(?::text, ?::text, ?::integer, ?::text)' : '(?, ?, ?, ?)';
+                $tuples[] = Helpers::isPostgres() ? '(?::integer, ?::text, ?::integer, ?::text)' : '(?, ?, ?, ?)';
             }
             if (!empty($tuples)) {
                 $placeholders = implode(', ', $tuples);
                 $isPostgres = Helpers::isPostgres();
                 $sql = "SELECT id, channel, platform_id, metric_id, platform_created_at, data
                         FROM channeled_metrics
-                        WHERE " . ($isPostgres ? "(channel::text, platform_id::text, metric_id::integer, platform_created_at::text)" : "(channel, platform_id, metric_id, platform_created_at)") . " IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
+                        WHERE " . ($isPostgres ? "(channel::integer, platform_id::text, metric_id::integer, platform_created_at::text)" : "(channel, platform_id, metric_id, platform_created_at)") . " IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
                 
                 $chunkMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
                 foreach ($chunkMap as $k => $v) {
