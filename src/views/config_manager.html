@@ -3,1998 +3,256 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>APIs Hub | Configuration Manager</title>
-    <link rel="icon" type="image/png" href="/assets/images/apishub-favicon.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <title>Configuration Manager | APIs Hub</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        :root {
-            --bg-dark: #0a0c10;
-            --bg-card: rgba(22, 27, 34, 0.7);
-            --bg-accent: #21262d;
-            --primary: #58a6ff;
-            --primary-glow: rgba(88, 166, 255, 0.3);
-            --secondary: #238636;
-            --danger: #f85149;
-            --warning: #d29922;
-            --info: #3fb950;
-            --text-main: #c9d1d9;
-            --text-dim: #8b949e;
-            --border: rgba(48, 54, 61, 0.8);
-            --header-h: 70px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        /* Modal Styles */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(8px);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal {
-            background: var(--bg-accent);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 30px;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-            text-align: center;
-        }
-
-        .modal h2 {
-            margin-bottom: 15px;
-            color: #fff;
-        }
-
-        .modal p {
-            color: var(--text-dim);
-            margin-bottom: 25px;
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-        }
-
-        .select-actions {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 0.8rem;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 20px;
-        }
-
-        .nav-link {
-            color: var(--text-dim);
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .nav-link.active {
-            color: var(--primary);
-            font-weight: 500;
-        }
-
-        .nav-link:hover {
-            color: var(--primary);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            line-height: 1.6;
-            overflow-x: hidden;
-            background-image: 
-                radial-gradient(circle at 10% 20%, rgba(88, 166, 255, 0.05) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(35, 134, 54, 0.05) 0%, transparent 40%);
-            min-height: 100vh;
-            padding-top: var(--header-h);
-        }
-
-        header {
-            height: var(--header-h);
-            background: rgba(13, 17, 23, 0.8);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 40px;
-            position: fixed;
-            top: 0;
-            width: 100%;
-            z-index: 100;
-        }
-
-        .logo {
-            font-weight: 700;
-            font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #fff;
-            text-decoration: none;
-        }
-
-        .logo i {
-            color: var(--primary);
-        }
-
-        .logo span {
-            color: var(--text-dim);
-            font-weight: 400;
-            margin-left: 5px;
-            font-size: 0.9rem;
-        }
-
-        .main-container {
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .page-header {
-            margin-bottom: 30px;
-        }
-
-        .page-header h1 {
-            font-size: 2rem;
-            margin-bottom: 10px;
-            color: #fff;
-        }
-
-        .page-header p {
-            color: var(--text-dim);
-        }
-
-        .token-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-top: 10px;
-            display: none;
-        }
-
-        .token-status.valid {
-            background: rgba(63, 185, 80, 0.1);
-            color: var(--info);
-            border: 1px solid rgba(63, 185, 80, 0.2);
-        }
-
-        .token-status.error {
-            background: rgba(248, 81, 73, 0.1);
-            color: var(--danger);
-            border: 1px solid rgba(248, 81, 73, 0.2);
-        }
-
-        .tabs-container {
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-
-        .btn-flush {
-            background: rgba(248, 81, 73, 0.1);
-            color: var(--danger);
-            border: 1px solid rgba(248, 81, 73, 0.2);
-            padding: 4px 10px;
-            font-size: 0.75rem;
-            margin-left: 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            transition: var(--transition);
-        }
-
-        .btn-flush:hover {
-            background: rgba(248, 81, 73, 0.2);
-            border-color: var(--danger);
-        }
-
-        .tab {
-            padding: 12px 0;
-            color: var(--text-dim);
-            cursor: pointer;
-            font-weight: 500;
-            position: relative;
-            transition: var(--transition);
-        }
-
-        .tab:hover {
-            color: #fff;
-        }
-
-        .tab.active {
-            color: var(--primary);
-        }
-
-        .tab.active::after {
-            content: '';
-            position: absolute;
-            bottom: -1px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: var(--primary);
-            box-shadow: 0 0 10px var(--primary-glow);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            transition: var(--transition);
-        }
-
-        /* Switch Toggles */
-        .toggle-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-top: 15px;
-        }
-        .toggle-group {
-            background: rgba(255, 255, 255, 0.03);
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .toggle-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        .toggle-item:last-child {
-            margin-bottom: 0;
-        }
-        .toggle-item span {
-            font-size: 0.85rem;
-            color: var(--text-dim);
-        }
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 32px;
-            height: 18px;
-        }
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #333;
-            transition: .4s;
-            border-radius: 18px;
-        }
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 12px;
-            width: 12px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        input:checked + .slider {
-            background-color: var(--primary);
-        }
-        input:checked + .slider:before {
-            transform: translateX(14px);
-        }
-
-        .actions-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid transparent;
-            font-family: inherit;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: var(--bg-dark);
-        }
-
-        .btn-primary:hover {
-            background: #79c0ff;
-            transform: translateY(-1px);
-        }
-
-        .btn-secondary {
-            background: var(--bg-accent);
-            color: var(--text-main);
-            border-color: var(--border);
-        }
-
-        .btn-secondary:hover {
-            background: #30363d;
-            border-color: #8b949e;
-        }
-
-        .asset-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .asset-item {
-            background: var(--bg-accent);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            transition: var(--transition);
-        }
-
-        .asset-item:hover {
-            border-color: var(--primary);
-            background: rgba(88, 166, 255, 0.05);
-        }
-
-        .asset-main {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            width: 100%;
-        }
-
-        .asset-config {
-            margin-top: 5px;
-            padding-top: 15px;
-            border-top: 1px solid var(--border);
-            display: none;
-            width: 100%;
-        }
-
-        .asset-item input[type="checkbox"]:checked ~ .asset-config {
-            display: block;
-        }
-
-        .config-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        .config-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .config-label {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .tag-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            min-height: 32px;
-        }
-
-        .tag {
-            background: rgba(88, 166, 255, 0.1);
-            color: var(--primary);
-            border: 1px solid rgba(88, 166, 255, 0.2);
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .tag i {
-            cursor: pointer;
-            width: 12px;
-            height: 12px;
-            transition: var(--transition);
-        }
-
-        .tag i:hover {
-            color: var(--danger);
-        }
-
-        .config-field {
-            display: flex;
-            gap: 8px;
-        }
-
-        .config-input {
-            flex-grow: 1;
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
-            color: #fff;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            outline: none;
-        }
-
-        .config-input:focus {
-            border-color: var(--primary);
-        }
-
-        .info-icon {
-            color: var(--text-dim);
-            width: 14px;
-            height: 14px;
-            cursor: help;
-            transition: var(--transition);
-        }
-
-        .info-icon:hover {
-            color: var(--primary);
-        }
-
-        .config-label {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        /* Tooltip style */
-        .has-tooltip {
-            position: relative;
-        }
-
-        .tooltip-text {
-            visibility: hidden;
-            width: 280px;
-            background-color: #161b22;
-            color: #c9d1d9;
-            text-align: left;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 12px;
-            position: absolute;
-            z-index: 100;
-            bottom: 125%;
-            left: 0;
-            opacity: 0;
-            transition: opacity 0.3s;
-            font-size: 0.75rem;
-            line-height: 1.4;
-            text-transform: none;
-            font-weight: 400;
-            letter-spacing: normal;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        }
-
-        .has-tooltip:hover .tooltip-text {
-            visibility: visible;
-            opacity: 1;
-        }
-
-        .asset-item.synced {
-            border-left: 3px solid var(--info);
-            background: rgba(63, 185, 80, 0.03);
-        }
-
-        .asset-item input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-            accent-color: var(--primary);
-        }
-
-        .asset-info {
-            flex: 1;
-        }
-
-        .asset-title {
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 4px;
-        }
-
-        .asset-meta {
-            font-size: 0.85rem;
-            color: var(--text-dim);
-            display: flex;
-            gap: 15px;
-        }
-
-        .meta-tag {
-            background: rgba(48, 54, 61, 0.5);
-            padding: 2px 8px;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-        }
-
-        .loading-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid rgba(88, 166, 255, 0.1);
-            border-top: 3px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            padding: 16px 24px;
-            border-radius: 8px;
-            background: var(--bg-accent);
-            border: 1px solid var(--border);
-            color: #fff;
-            display: none;
-            z-index: 1100;
-            animation: slideIn 0.3s ease-out;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-dim);
-        }
-
-        .empty-state i {
-            font-size: 3rem;
-            margin-bottom: 20px;
-            opacity: 0.5;
-        }
-
-        /* Rule Builder Styles */
-        .rules-container {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        /* Split Numeric Component */
-        .split-num-container {
-            display: flex;
-            align-items: center;
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            padding: 0 6px;
-            transition: var(--transition);
-        }
-        .split-num-container:focus-within {
-            border-color: var(--primary);
-            box-shadow: 0 0 5px var(--primary-glow);
-        }
-        .split-num-container input {
-            background: transparent;
-            border: none;
-            color: #fff;
-            padding: 4px 0;
-            font-size: 0.8rem;
-            outline: none;
-            font-family: 'Fira Code', monospace;
-        }
-        .rule-int {
-            width: 50px;
-            text-align: right;
-            font-weight: 500;
-        }
-        .rule-dec {
-            width: 80px;
-            text-align: left;
-            color: var(--primary) !important;
-            font-size: 0.8rem !important;
-        }
-        .split-comma {
-            color: var(--text-dim);
-            font-weight: 700;
-            padding: 0 4px;
-            font-size: 1rem;
-            user-select: none;
-        }
-        /* Hide arrows on number inputs */
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        input[type=number] {
-            -moz-appearance: textfield;
-        }
-
-        .rule-item {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            background: rgba(255, 255, 255, 0.04);
-            padding: 6px 12px;
-            border-radius: 6px;
-            width: fit-content;
-        }
-        .rule-item .rule-input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .rule-item .rule-label {
-            font-size: 0.65rem;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-        }
-        .rule-item select.rule-class {
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
-            color: #fff;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            outline: none;
-            width: 100px;
-            height: 30px;
-        }
-        .btn-rule-action {
-            padding: 4px;
-            border-radius: 4px;
-            cursor: pointer;
-            border: none;
-            background: transparent;
-            color: var(--text-dim);
-            display: flex;
-            align-items: center;
-        }
-        .btn-rule-action:hover {
-            color: #fff;
-            background: rgba(255,255,255,0.1);
-        }
-        .btn-rule-action.delete:hover {
-            color: var(--danger);
-            background: rgba(248, 81, 73, 0.1);
-        }
-        .btn-add-rule {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 0.7rem;
-            color: var(--primary);
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 4px;
-            background: rgba(88, 166, 255, 0.05);
-            margin-top: 4px;
-            width: fit-content;
-        }
-        .btn-add-rule:hover {
-            background: rgba(88, 166, 255, 0.15);
-        }
-    </style>
+    <link rel="stylesheet" href="/assets/css/main.css">
 </head>
-<body>
-    <header>
-        <a href="/" class="logo">
-            <img src="/assets/images/apishub-trans-light-600.png" alt="APIs Hub Logo" style="height: 28px; width: auto;">
-            <span>Config</span>
-        </a>
-        <nav class="nav-links">
-            <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
-            <a href="/monitoring" class="nav-link"><i data-lucide="activity"></i> Monitoring</a>
-            <a href="/logs" class="nav-link"><i data-lucide="scroll"></i> Logs</a>
-            <a href="/command-builder" class="nav-link"><i data-lucide="terminal"></i> Builder</a>
-            <a href="/config-manager" class="nav-link active"><i data-lucide="settings"></i> Config</a>
-            <a href="/fb-reports" class="nav-link"><i data-lucide="bar-chart-3"></i> Reports</a>
-            <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
-        </nav>
-    </header>
-
-    <div class="main-container">
-        <div class="page-header">
-            <h1>Configuration Manager</h1>
-            <p>Sync assets from your APIs and update your configuration files automatically.</p>
-            <div style="display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
-                <div id="last-updated-text" style="font-size: 0.8rem; color: var(--text-dim); margin-top: 5px;">Last sync: Never</div>
-                <div style="display: flex; gap: 10px;">
-                    <div id="gsc-token-status" class="token-status"></div>
-                    <div id="fb-token-status" class="token-status"></div>
-                    <button class="btn btn-secondary" onclick="validateTokens()"><i data-lucide="shield-check"></i> Check Tokens Validity</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="tabs-container">
-            <div class="tab active" data-tab="global">Global App Settings</div>
-            <div class="tab" data-tab="gsc">Google Search Console</div>
-            <div class="tab" data-tab="facebook-organic">Facebook Organic</div>
-            <div class="tab" data-tab="facebook-marketing">Facebook Marketing</div>
-        </div>
-
-        <div id="tab-global" class="tab-content active">
-            <div class="card" style="margin-bottom: 20px;">
-                <h3 style="margin-bottom: 15px; color: #fff; font-size: 1rem; display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="sliders" style="width: 18px; height: 18px; color: var(--primary);"></i> Global Settings
-                    </div>
-                </h3>
-                <div class="config-grid">
-                     <div class="config-group">
-                        <div class="config-label">
-                            <span>Job Timeout (Hours)</span>
-                            <div class="has-tooltip">
-                                <i data-lucide="info" class="info-icon"></i>
-                                <div class="tooltip-text">Limits how long a background task is allowed to run before being marked as failed. Default is 6.</div>
-                            </div>
-                        </div>
-                        <input type="number" step="1" min="1" class="config-input" id="jobs-timeout-hours" placeholder="e.g. 6" value="6">
-                    </div>
-                    <div class="config-group">
-                        <div class="config-label">
-                            <span>Cache Raw DB Metrics</span>
-                            <div class="has-tooltip">
-                                <i data-lucide="info" class="info-icon"></i>
-                                <div class="tooltip-text">Saves heavy API JSON to database. Highly recommended to keep OFF for production.</div>
-                            </div>
-                        </div>
-                        <div style="margin-top: 5px;">
-                            <label class="switch"><input type="checkbox" id="cache-raw-metrics"><span class="slider"></span></label>
-                        </div>
-                    </div>
-                    <div class="config-group">
-                        <div class="config-label">
-                            <span>Marketing Debug Logs</span>
-                            <div class="has-tooltip">
-                                <i data-lucide="info" class="info-icon"></i>
-                                <div class="tooltip-text">Enables extra information logs during Facebook Marketing sync (INFO level for diagnostics).</div>
-                            </div>
-                        </div>
-                        <div style="margin-top: 5px;">
-                            <label class="switch"><input type="checkbox" id="marketing-debug-logs"><span class="slider"></span></label>
-                        </div>
-                    </div>
-                </div>
-                <div class="actions-bar" style="margin-top: 20px;">
-                    <div></div>
-                    <button class="btn btn-primary" onclick="confirmUpdate('global')"><i data-lucide="save"></i> Save Global Settings</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-gsc" class="tab-content">
-            <div class="card" style="margin-bottom: 20px;">
-                <h3 style="margin-bottom: 15px; color: #fff; font-size: 1rem; display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="sliders" style="width: 18px; height: 18px; color: var(--primary);"></i> Global GSC Settings
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px; font-size: 0.85rem;">
-                        <span>Channel Enabled</span>
-                        <label class="switch"><input type="checkbox" id="gsc-channel-enabled" checked><span class="slider"></span></label>
-                    </div>
-                </h3>
-                <div class="config-grid">
-                     <div class="config-group">
-                        <div class="config-label">
-                            <span>Global Retention</span>
-                            <div class="has-tooltip">
-                                <i data-lucide="info" class="info-icon"></i>
-                                <div class="tooltip-text">Recommended period. High values may slow down initial sync.</div>
-                            </div>
-                        </div>
-                        <input type="text" class="config-input" id="gsc-history-range" placeholder="e.g. 16 months" value="16 months">
-                    </div>
-                    <div class="config-group" style="justify-content: center;">
-                        <div class="config-label">
-                            <span>Cache Aggregations (Redis)</span>
-                            <div class="has-tooltip">
-                                <i data-lucide="zap" class="info-icon" style="color: #ff9f43;"></i>
-                                <div class="tooltip-text">Cache historical aggregations (pre-recent) in Redis to improve dashboard speed.</div>
-                            </div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                            <label class="switch"><input type="checkbox" class="gsc-toggle" data-key="cache_aggregations"><span class="slider"></span></label>
-                            <button class="btn-flush" onclick="flushCache('google_search_console')" title="Clear all aggregation caches for GSC" style="margin: 0; padding: 4px 8px;"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Flush</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="card">
-                <div class="actions-bar">
-                    <div class="asset-count" id="gsc-count">0 items found</div>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn btn-secondary" onclick="fetchAssets('gsc', true)"><i data-lucide="refresh-cw"></i> Refresh</button>
-                        <button class="btn btn-primary" onclick="confirmUpdate('gsc')"><i data-lucide="save"></i> Apply</button>
-                    </div>
-                </div>
-                <div class="select-actions">
-                    <button class="btn btn-secondary btn-sm" onclick="selectAll('gsc-list', true)">Select All</button>
-                    <button class="btn btn-secondary btn-sm" onclick="selectAll('gsc-list', false)">Deselect All</button>
-                </div>
-                <div class="asset-list" id="gsc-list">
-                    <div class="empty-state">
-                        <i data-lucide="search"></i>
-                        <p>No assets loaded. Click "Refresh" to start.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-facebook-organic" class="tab-content" style="display: none;">
-            <div class="card" style="margin-bottom: 20px;">
-                <h3 style="margin-bottom: 15px; color: #fff; font-size: 1rem; display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="sliders" style="width: 18px; height: 18px; color: var(--primary);"></i> Organic Settings
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px; font-size: 0.85rem;">
-                        <span>Channel Enabled</span>
-                        <label class="switch"><input type="checkbox" id="fb-organic-enabled" checked><span class="slider"></span></label>
-                    </div>
-                </h3>
-                <div class="config-grid">
-                    <div class="config-group">
-                        <div class="config-label">
-                            <span>Total Organic Sync History</span>
-                            <div class="has-tooltip">
-                                <i data-lucide="info" class="info-icon"></i>
-                                <div class="tooltip-text">Affects metrics fetch only. Default: 2 years.</div>
-                            </div>
-                        </div>
-                        <input type="text" class="config-input" id="fb-organic-history-range" placeholder="e.g. 2 years" value="2 years">
-                    </div>
-                    <div class="config-group" style="justify-content: center;">
-                        <div class="config-label">
-                            <span>Cache Aggregations (Redis)</span>
-                            <div class="has-tooltip">
-                                <i data-lucide="zap" class="info-icon" style="color: #ff9f43;"></i>
-                                <div class="tooltip-text">Cache historical aggregations (pre-recent) in Redis to improve dashboard speed.</div>
-                            </div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                            <label class="switch"><input type="checkbox" class="fb-toggle" data-key="cache_aggregations"><span class="slider"></span></label>
-                            <button class="btn-flush" onclick="flushCache('facebook_organic')" title="Clear all aggregation caches for FB Organic" style="margin: 0; padding: 4px 8px;"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Flush</button>
-                        </div>
-                    </div>
-                </div>
-                <div style="margin-top: 15px;">
-                    <div class="config-label" style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="filter" style="width: 16px; height: 16px; color: var(--primary);"></i> Entity Filters
-                    </div>
-                    <div class="config-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
-                        <div class="config-group">
-                            <div class="config-label">PAGE</div>
-                            <input type="text" class="config-input entity-filter" id="filter-PAGE" placeholder="Include string...">
-                        </div>
-                        <div class="config-group">
-                            <div class="config-label">POST</div>
-                            <input type="text" class="config-input entity-filter" id="filter-POST" placeholder="Include string...">
-                        </div>
-                        <div class="config-group">
-                            <div class="config-label">IG_ACCOUNT</div>
-                            <input type="text" class="config-input entity-filter" id="filter-IG_ACCOUNT" placeholder="Include string...">
-                        </div>
-                        <div class="config-group">
-                            <div class="config-label">IG_MEDIA</div>
-                            <input type="text" class="config-input entity-filter" id="filter-IG_MEDIA" placeholder="Include string...">
-                        </div>
-                    </div>
-                </div>
-                <div style="margin-top: 25px;">
-                    <div class="config-label" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="toggle-right" style="width: 16px; height: 16px; color: var(--primary);"></i> Organic Feature Toggles
-                    </div>
-                <div style="margin-top: 25px;">
-                    <div class="config-label" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="toggle-right" style="width: 16px; height: 16px; color: var(--primary);"></i> Organic Sync Configuration
-                    </div>
-                    <div class="toggle-grid">
-                        <!-- FB Content Path -->
-                        <div class="toggle-group">
-                            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.5px;">Facebook Path</div>
-                            <div class="toggle-item" style="border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; margin-bottom: 10px;">
-                                <span style="color: #fff; font-weight: 500;">FB PAGE Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="page_metrics" id="fb-page-metrics-toggle" checked><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item" style="padding-left: 20px;">
-                                <span>Cache POST Entities</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="posts" id="fb-posts-entity-toggle" onchange="updateOrganicDependencies()"><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item" style="padding-left: 40px; opacity: 0.7;">
-                                <span style="font-size: 0.8rem;">POST Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="post_metrics" id="fb-posts-metrics-toggle"><span class="slider"></span></label>
-                            </div>
-                        </div>
-
-                        <!-- IG Content Path -->
-                        <div class="toggle-group">
-                            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 0.5px;">Instagram Path (via FB Page)</div>
-                            <div class="toggle-item" style="padding-left: 20px;">
-                                <span>Cache IG ACCOUNT (Business)</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="ig_accounts" id="fb-igacc-entity-toggle" onchange="updateOrganicDependencies()"><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item" style="padding-left: 40px; opacity: 0.7;">
-                                <span style="font-size: 0.8rem;">IG ACCOUNT Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="ig_account_metrics" id="fb-igacc-metrics-toggle"><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item" style="padding-left: 40px;">
-                                <span>Cache IG MEDIA Entities</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="ig_account_media" id="fb-igmedia-entity-toggle" onchange="updateOrganicDependencies()"><span class="slider"></span></label>
-                            </div>
-                            <div class="toggle-item" style="padding-left: 60px; opacity: 0.7;">
-                                <span style="font-size: 0.8rem;">IG MEDIA Metrics</span>
-                                <label class="switch"><input type="checkbox" class="fb-toggle fb-organic-toggle" data-key="ig_account_media_metrics" id="fb-igmedia-metrics-toggle"><span class="slider"></span></label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                </div>
-            </div>
-            <div class="card">
-                <div class="actions-bar">
-                    <div class="asset-count" id="fb-organic-count">0 pages found</div>
-                    <div style="display: flex; gap: 15px; align-items: center;">
-                        <div class="config-group" style="flex-direction: row; align-items: center; gap: 10px;">
-                            <span class="config-label" style="text-transform: none; font-size: 0.85rem; color: var(--text-main);">Update Periodicity:</span>
-                            <select class="config-input fb-periodicity-select" style="width: auto; padding: 5px 10px;">
-                                <option value="1 day">Daily</option>
-                                <option value="2 days">2 days</option>
-                                <option value="3 days">3 days</option>
-                                <option value="5 days">5 days</option>
-                                <option value="1 week">Weekly</option>
-                                <option value="10 days">10 days</option>
-                                <option value="2 weeks">Biweekly</option>
-                                <option value="3 weeks">3 weeks</option>
-                                <option value="1 month">Monthly</option>
-                                <option value="2 months">2 months</option>
-                                <option value="3 months">Quarterly</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-secondary" onclick="fetchAssets('facebook', true)"><i data-lucide="refresh-cw"></i> Refresh</button>
-                        <button class="btn btn-primary" onclick="confirmUpdate('facebook-organic')"><i data-lucide="save"></i> Apply</button>
-                    </div>
-                </div>
-                <div class="select-actions">
-                    <button class="btn btn-secondary btn-sm" onclick="selectAll('fb-pages-list', true)">Select All</button>
-                    <button class="btn btn-secondary btn-sm" onclick="selectAll('fb-pages-list', false)">Deselect All</button>
-                </div>
-                
-                <h3 style="margin-bottom: 20px; color: #fff;">Pages & Instagram Accounts</h3>
-                <div class="asset-list" id="fb-pages-list">
-                     <div class="empty-state">
-                        <i data-lucide="facebook"></i>
-                        <p>No assets loaded. Click "Refresh" to start.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="tab-facebook-marketing" class="tab-content" style="display: none;">
-            <div class="card" style="margin-bottom: 20px;">
-                <h3 style="margin-bottom: 15px; color: #fff; font-size: 1rem; display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="sliders" style="width: 18px; height: 18px; color: var(--primary);"></i> Marketing Settings
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px; font-size: 0.85rem;">
-                        <span>Channel Enabled</span>
-                        <label class="switch"><input type="checkbox" id="fb-marketing-enabled" checked><span class="slider"></span></label>
-                    </div>
-                </h3>
-                <div class="config-grid">
-                    <div class="config-group">
-                        <div class="config-label">
-                            <span>Total Marketing Sync History</span>
-                            <div class="has-tooltip">
-                                <i data-lucide="info" class="info-icon"></i>
-                                <div class="tooltip-text">Affects metrics fetch only. Default: 2 years.</div>
-                            </div>
-                        </div>
-                        <input type="text" class="config-input" id="fb-marketing-history-range" placeholder="e.g. 2 years" value="2 years">
-                    </div>
-                    <div class="config-group" style="justify-content: center;">
-                        <div class="config-label">
-                            <span>Cache Aggregations (Redis)</span>
-                            <div class="has-tooltip">
-                                <i data-lucide="zap" class="info-icon" style="color: #ff9f43;"></i>
-                                <div class="tooltip-text">Cache historical aggregations (pre-recent) in Redis to improve dashboard speed.</div>
-                            </div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                            <label class="switch"><input type="checkbox" class="fb-toggle-mark" data-key="cache_aggregations"><span class="slider"></span></label>
-                            <button class="btn-flush" onclick="flushCache('facebook_marketing')" title="Clear all aggregation caches for FB Marketing" style="margin: 0; padding: 4px 8px;"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Flush</button>
-                        </div>
-                    </div>
-                </div>
-                <div style="margin-top: 15px;">
-                    <div class="config-label" style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="filter" style="width: 16px; height: 16px; color: var(--primary);"></i> Entity Filters
-                    </div>
-                    <div class="config-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
-                        <div class="config-group">
-                            <div class="config-label">CAMPAIGN</div>
-                            <input type="text" class="config-input entity-filter" id="filter-CAMPAIGN" placeholder="Include string...">
-                        </div>
-                        <div class="config-group">
-                            <div class="config-label">ADSET</div>
-                            <input type="text" class="config-input entity-filter" id="filter-ADSET" placeholder="Include string...">
-                        </div>
-                        <div class="config-group">
-                            <div class="config-label">AD</div>
-                            <input type="text" class="config-input entity-filter" id="filter-AD" placeholder="Include string...">
-                        </div>
-                        <div class="config-group">
-                            <div class="config-label">CREATIVE</div>
-                            <input type="text" class="config-input entity-filter" id="filter-CREATIVE" placeholder="Include string...">
-                        </div>
-                    </div>
-                </div>
-                <div style="margin-top: 25px;">
-                    <div class="config-label" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="toggle-right" style="width: 16px; height: 16px; color: var(--primary);"></i> Marketing Sync Configuration
-                    </div>
-                    <div class="toggle-grid" style="grid-template-columns: 1fr;">
-                        <div class="toggle-group">
-                            <div style="font-size: 0.75rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-bottom: 20px; letter-spacing: 0.5px;">Hierarchy & Granularity</div>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 40px; align-items: flex-start; margin-bottom: 20px;">
-                                <!-- Column: Level -->
-                                <div class="config-group">
-                                    <div class="config-label">Maximum Granularity level</div>
-                                    <select class="config-input" id="fb-marketing-level" onchange="handleFbLevelChange()">
-                                        <option value="ad_account">Ad Account Level</option>
-                                        <option value="campaign">Campaign Level</option>
-                                        <option value="adset">AdSet Level</option>
-                                        <option value="ad">Ad Level</option>
-                                        <option value="creative">Creative Level</option>
-                                    </select>
-                                    <p style="font-size: 0.75rem; color: var(--text-dim); margin-top: 8px;" id="fb-level-hint">
-                                        <i data-lucide="info" style="width: 12px; height: 12px; vertical-align: middle;"></i> Higher-level entities (Campaigns, AdSets, etc.) will be cached automatically.
-                                    </p>
-                                </div>
-
-                                <!-- Column: Sync -->
-                                <div class="config-group">
-                                    <div class="config-label" style="margin-bottom: 12px;">Select metrics to sync</div>
-                                    <div id="fb-metrics-container" style="display: flex; gap: 20px; align-items: center; background: rgba(0,0,0,0.2); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); min-height: 48px;">
-                                        <!-- Radios will be rendered here by JS -->
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Full Width: Metrics Strategy -->
-                            <div id="fb-metrics-options">
-                                <div class="config-label" style="margin-bottom: 12px;">Metrics Strategy</div>
-                                <div style="display: flex; gap: 20px; margin-bottom: 20px; background: rgba(0,0,0,0.1); padding: 12px 15px; border-radius: 8px; border: 1px dashed var(--border);">
-                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #fff;">
-                                        <input type="radio" name="fb_metrics_strategy" value="default" id="fb-strategy-default" checked onchange="handleFbStrategyChange()">
-                                        <span style="font-size: 0.85rem; font-weight: 500;">Default</span>
-                                        <div class="has-tooltip">
-                                            <i data-lucide="info" class="info-icon" style="width: 12px; height: 12px;"></i>
-                                            <div class="tooltip-text">Use the built-in "KEY" metric set.</div>
-                                        </div>
-                                    </label>
-                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #fff;">
-                                        <input type="radio" name="fb_metrics_strategy" value="custom" id="fb-strategy-custom" onchange="handleFbStrategyChange()">
-                                        <span style="font-size: 0.85rem; font-weight: 500;">Custom Selection</span>
-                                        <div class="has-tooltip">
-                                            <i data-lucide="zap" class="info-icon" style="width: 12px; height: 12px; color: var(--primary);"></i>
-                                            <div class="tooltip-text">Manually select metrics below.</div>
-                                        </div>
-                                    </label>
-                                </div>
-                                <div id="fb-custom-metrics-wrapper" style="display: none; background: rgba(0,0,0,0.15); border-radius: 12px; border: 1px solid var(--border); padding: 1px; overflow: hidden;">
-                                    <div style="max-height: 400px; overflow-y: auto;">
-                                        <table id="fb-metrics-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
-                                            <thead style="position: sticky; top: 0; background: var(--bg-accent); z-index: 5; box-shadow: 0 1px 0 var(--border);">
-                                                <tr style="text-align: left;">
-                                                    <th style="padding: 12px 15px; width: 60px;">Metric</th>
-                                                    <th style="padding: 12px 15px; width: 60px;">Sync</th>
-                                                    <th style="padding: 12px 15px; width: 60px;">Spark</th>
-                                                    <th style="padding: 12px 15px;">Format</th>
-                                                    <th style="padding: 12px 15px;">Conditional Formatting (JSON)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="fb-metrics-body">
-                                                <!-- Dynamic content -->
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div style="padding: 15px; background: rgba(210, 153, 34, 0.05); border-top: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px;">
-                                        <i data-lucide="alert-triangle" style="width: 16px; height: 16px; color: var(--warning); flex-shrink: 0; margin-top: 2px;"></i>
-                                        <p style="font-size: 0.75rem; color: var(--warning);">
-                                            <strong>Caution:</strong> Reducing the list of synced metrics will skip them during future updates. To recover missing historical data for newly added metrics, a historical sync may be required.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="card">
-                <div class="actions-bar">
-                    <div class="asset-count" id="fb-marketing-count">0 ad accounts found</div>
-                    <div style="display: flex; gap: 15px; align-items: center;">
-                        <div class="config-group" style="flex-direction: row; align-items: center; gap: 10px;">
-                            <span class="config-label" style="text-transform: none; font-size: 0.85rem; color: var(--text-main);">Update Periodicity:</span>
-                            <select class="config-input fb-periodicity-select" style="width: auto; padding: 5px 10px;">
-                                <option value="1 day">Daily</option>
-                                <option value="2 days">2 days</option>
-                                <option value="3 days">3 days</option>
-                                <option value="5 days">5 days</option>
-                                <option value="1 week">Weekly</option>
-                                <option value="10 days">10 days</option>
-                                <option value="2 weeks">Biweekly</option>
-                                <option value="3 weeks">3 weeks</option>
-                                <option value="1 month">Monthly</option>
-                                <option value="2 months">2 months</option>
-                                <option value="3 months">Quarterly</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-secondary" onclick="fetchAssets('facebook', true)"><i data-lucide="refresh-cw"></i> Refresh</button>
-                        <button class="btn btn-primary" onclick="confirmUpdate('facebook-marketing')"><i data-lucide="save"></i> Apply</button>
-                    </div>
-                </div>
-                <div class="select-actions">
-                    <button class="btn btn-secondary btn-sm" onclick="selectAll('fb-ad-accounts-list', true)">Select All</button>
-                    <button class="btn btn-secondary btn-sm" onclick="selectAll('fb-ad-accounts-list', false)">Deselect All</button>
-                </div>
-                
-                <h3 style="margin-bottom: 20px; color: #fff;">Ad Accounts</h3>
-                <div class="asset-list" id="fb-ad-accounts-list">
-                     <div class="empty-state">
-                        <i data-lucide="badge-dollar-sign"></i>
-                        <p>No assets loaded. Click "Refresh" to start.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="loading-overlay" id="loading">
+<body class="full-screen">
+    <div id="loading" class="loading-overlay">
         <div class="spinner"></div>
-        <p id="loading-text">Fetching assets...</p>
+        <div style="margin-top:15px; font-weight:600; color:var(--primary);">Synchronizing Config...</div>
     </div>
 
-    <div class="modal-overlay" id="confirm-modal">
-        <div class="modal">
-            <i data-lucide="alert-triangle" style="color: var(--warning); width: 48px; height: 48px; margin-bottom: 15px;"></i>
-            <h2>Confirm Changes</h2>
-            <p>Are you sure you want to update the configuration file with the selected assets? This will append new entries to your YAML config.</p>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-primary" id="modal-confirm-btn">Confirm & Apply</button>
+    <!-- Navigation -->
+    <script src="/assets/navbar.js"></script>
+
+    <main>
+        <div class="section-title">
+            <i data-lucide="settings-2"></i> Configuration Manager
+            <div style="margin-left:auto; display:flex; gap:10px;">
+                <button class="btn btn-primary" onclick="updateConfig('global')"><i data-lucide="save"></i> Save All Settings</button>
             </div>
         </div>
-    </div>
 
-    <div class="toast" id="toast"></div>
+        <!-- Global Settings Tabs -->
+        <div class="tab-nav">
+            <div class="tab active" data-tab="infrastructure"><i data-lucide="server"></i> Infrastructure</div>
+            <div class="tab" data-tab="google"><i data-lucide="search"></i> Google Search Console</div>
+            <div class="tab" data-tab="facebook"><i data-lucide="facebook"></i> Meta Organic</div>
+            <div class="tab" data-tab="facebook-marketing"><i data-lucide="trending-up"></i> Meta Marketing</div>
+        </div>
 
-    <script>
-        lucide.createIcons();
-
-        let allAssets = {
-            gsc: [],
-            facebook_pages: [],
-            facebook_ad_accounts: []
-        };
-        let currentConfig = {
-            gsc: {},
-            fb_page_ids: [],
-            fb_ad_account_ids: []
-        };
-        let countriesList = {};
-
-        const availableMetrics = [
-            'spend', 'impressions', 'reach', 'frequency', 'clicks', 'ctr', 'results', 'cost_per_result', 'result_rate', 'cpc', 'cpm',
-            'actions',
-            'actions:link_click', 'actions:post_engagement', 'actions:page_engagement',
-            'actions:omni_purchase', 'actions:lead', 'actions:onsite_conversion.post_save',
-            'action_values:omni_purchase', 'purchase_roas'
-        ];
-
-        const formattingOptions = [
-            { value: 'none', label: 'None' },
-            { value: 'currency', label: 'Currency (€/$)' },
-            { value: 'percent', label: 'Percent (%)' },
-            { value: 'number', label: 'Number (Int)' }
-        ];
-
-        function getAdminHeaders() {
-            const EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
-            const now = Date.now();
-            let auth = JSON.parse(localStorage.getItem('apis_hub_admin_auth') || '{}');
-            
-            if (!auth.token || (now - auth.timestamp > EXPIRATION_TIME)) {
-                const token = prompt('ADMIN ACCESS REQUIRED: Please enter your administrative API key to continue.');
-                if (token) {
-                    auth = { token, timestamp: now };
-                    localStorage.setItem('apis_hub_admin_auth', JSON.stringify(auth));
-                } else {
-                    return {};
-                }
-            }
-            
-            return {
-                'Authorization': 'Bearer ' + auth.token,
-                'Content-Type': 'application/json'
-            };
-        }
-
-        async function fetchAssets(type = null, force = false) {
-            showLoading(`Loading ${type || 'assets'}...`);
-            try {
-                const headers = getAdminHeaders();
-                if (!headers.Authorization) {
-                    hideLoading();
-                    return;
-                }
-
-                let url = `/api/config-manager/assets`;
-                const params = [];
-                if (type) params.push(`type=${type}`);
-                if (force) params.push(`refresh=1`);
-                if (params.length > 0) url += `?${params.join('&')}`;
-
-                const response = await fetch(url, {
-                    headers: headers
-                });
-                
-                if (response.status === 401) {
-                    localStorage.removeItem('apis_hub_admin_auth');
-                    alert('Session Expired or Invalid Key. Please reload and provide your key again.');
-                    return;
-                }
-                
-                const data = await response.json();
-                if (data.error) throw new Error(data.error);
-
-                allAssets = data.assets;
-                currentConfig = data.config;
-                countriesList = data.countries || {};
-                
-                if (data.last_updated_human) {
-                    document.getElementById('last-updated-text').innerText = `Last sync: ${data.last_updated_human}`;
-                }
-                
-                renderAssets();
-                populateGlobalFields();
-                if (force) showToast('Assets refreshed successfully!');
-            } catch (err) {
-                showToast('Error: ' + err.message, true);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // Facebook Marketing Hierarchy
-        const fbMarketingHierarchy = [
-            { key: 'ad_account', label: 'Ad Account', entityKey: null, metricKey: 'ad_account_metrics' },
-            { key: 'campaign', label: 'Campaign', entityKey: 'campaigns', metricKey: 'campaign_metrics' },
-            { key: 'adset', label: 'AdSet', entityKey: 'adsets', metricKey: 'adset_metrics' },
-            { key: 'ad', label: 'Ad', entityKey: 'ads', metricKey: 'ad_metrics' },
-            { key: 'creative', label: 'Creative', entityKey: 'creatives', metricKey: 'creative_metrics' }
-        ];
-
-        function handleFbLevelChange() {
-            const level = document.getElementById('fb-marketing-level').value;
-            const container = document.getElementById('fb-metrics-container');
-            const levelIdx = fbMarketingHierarchy.findIndex(h => h.key === level);
-            
-            // Re-render metrics radio buttons based on selected level
-            container.innerHTML = fbMarketingHierarchy
-                .filter((h, idx) => idx <= levelIdx)
-                .map(h => `
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 0.85rem;">${h.label}</span>
-                        <input type="radio" name="fb-metric-level" class="fb-metric-radio" 
-                               data-key="${h.metricKey}" ${h.key === level ? 'checked' : ''} 
-                               style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--primary);">
+        <!-- Tab Content: Infrastructure -->
+        <div id="tab-infrastructure" class="tab-content active">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:40px;">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <button class="btn" onclick="validateTokens()"><i data-lucide="shield-check"></i> Validate Tokens</button>
+                    <div id="token-status-badges" style="display:flex; gap:10px;">
+                        <div id="gsc-token-status-main" class="status-badge-inline" style="font-size:0.65rem; padding:4px 10px; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid var(--border); display:none;"></div>
+                        <div id="fb-token-status-main" class="status-badge-inline" style="font-size:0.65rem; padding:4px 10px; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid var(--border); display:none;"></div>
                     </div>
-                `).join('');
+                </div>
+            </div>
 
-            // Updated level hint
-            const hint = document.getElementById('fb-level-hint');
-            if (hint) {
-                hint.innerHTML = `<i data-lucide="info" style="width: 12px; height: 12px; vertical-align: middle;"></i> Insights will be fetched and processed for <strong>${level.replace('_', ' ')}</strong> level. All parent entities will be cached.`;
-            }
-            lucide.createIcons();
-        }
-
-        function handleFbStrategyChange() {
-            const isCustom = document.getElementById('fb-strategy-custom').checked;
-            document.getElementById('fb-custom-metrics-wrapper').style.display = isCustom ? 'block' : 'none';
-            if (isCustom) renderFbMetricsTable();
-        }
-
-        function formatSplitNum(val) {
-            if (val === undefined || val === null || val === '') return { int: '', dec: '' };
-            const parts = String(val).split('.');
-            return {
-                int: parts[0] || '0',
-                dec: (parts[1] || '').padEnd(6, '0').substring(0, 6)
-            };
-        }
-
-        function renderFbMetricsTable() {
-            const body = document.getElementById('fb-metrics-body');
-            const metrics = currentConfig.fb_metrics_config || {};
+            <div class="settings-horizontal-grid">
+                <div class="card compact-card">
+                    <div class="section-title small" style="opacity:0.7;"><i data-lucide="lock" size="14"></i> Database Host</div>
+                    <input type="text" id="db-host" placeholder="localhost" style="margin-top:auto;" disabled>
+                </div>
+                <div class="card compact-card">
+                    <div class="section-title small" style="opacity:0.7;"><i data-lucide="lock" size="14"></i> Database Name</div>
+                    <input type="text" id="db-name" placeholder="apis_hub" style="margin-top:auto;" disabled>
+                </div>
+                <div class="card compact-card">
+                    <div class="section-title small" style="opacity:0.7;"><i data-lucide="lock" size="14"></i> App Mode</div>
+                    <select id="app-mode" style="margin-top:auto;" disabled>
+                        <option value="production">Production</option>
+                        <option value="development">Development</option>
+                        <option value="demo">Demo Mode</option>
+                    </select>
+                </div>
+            </div>
             
-            body.innerHTML = availableMetrics.map(m => {
-                const config = metrics[m] || { enabled: false, sparkline: false, format: 'none', conditional: { type: 'levels', config: [] } };
-                const label = config.label || m.replace(/_/g, ' ').replace(/:/g, ' > ').toUpperCase();
-                
-                let levels = [];
-                if (config.conditional && config.conditional.type === 'levels') {
-                    levels = config.conditional.config || [];
-                }
+            <div class="settings-horizontal-grid">
+                <div class="card compact-card">
+                    <div class="section-title small"><i data-lucide="clock"></i> Job Timeout</div>
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:auto;">
+                        <input type="number" id="jobs-timeout-hours" value="24" style="flex:1;">
+                        <span style="font-size:0.8rem; color:var(--text-dim);">Hours</span>
+                    </div>
+                </div>
+                <div class="card compact-card" style="flex-direction:row; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div class="section-title small" style="margin-bottom:5px; border:none; padding:0;"><i data-lucide="hard-drive"></i> Raw Metrics</div>
+                        <div style="font-size:0.75rem; color:var(--text-dim);">Cache all API raw responses</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="cache-raw-metrics">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
 
-                const levelsHtml = levels.map((rule, idx) => {
-                    const minParts = formatSplitNum(rule.min);
-                    const maxParts = formatSplitNum(rule.max);
-                    const hasMin = rule.min !== undefined;
-                    const hasMax = rule.max !== undefined;
-                    
-                    return `
-                        <div class="rule-item" data-metric="${m}">
-                            <div class="rule-input-group rule-min">
-                                <span class="rule-label">Min</span>
-                                <div class="split-num-container">
-                                    <input type="text" class="rule-int" value="${hasMin ? minParts.int : ''}" onkeypress="return /[0-9-]/.test(event.key)" placeholder="0">
-                                    <span class="split-comma">,</span>
-                                    <input type="text" class="rule-dec" value="${hasMin ? minParts.dec : ''}" onkeypress="return /[0-9]/.test(event.key)" onblur="if(this.value.trim() !== '') this.value = this.value.padEnd(6, '0').substring(0, 6)" placeholder="${'0'.padEnd(6, '0')}">
-                                </div>
-                            </div>
-                            <div class="rule-input-group rule-max">
-                                <span class="rule-label">Max</span>
-                                <div class="split-num-container">
-                                    <input type="text" class="rule-int" value="${hasMax ? maxParts.int : ''}" onkeypress="return /[0-9-]/.test(event.key)" placeholder="0">
-                                    <span class="split-comma">,</span>
-                                    <input type="text" class="rule-dec" value="${hasMax ? maxParts.dec : ''}" onkeypress="return /[0-9]/.test(event.key)" onblur="if(this.value.trim() !== '') this.value = this.value.padEnd(6, '0').substring(0, 6)" placeholder="${'0'.padEnd(6, '0')}">
-                                </div>
-                            </div>
-                            <select class="rule-class">
-                                <option value="badge-excellent" ${rule.class === 'badge-excellent' ? 'selected' : ''}>Excellent</option>
-                                <option value="badge-good" ${rule.class === 'badge-good' ? 'selected' : ''}>Good</option>
-                                <option value="badge-normal" ${rule.class === 'badge-normal' ? 'selected' : ''}>Normal</option>
-                                <option value="badge-warning" ${rule.class === 'badge-warning' ? 'selected' : ''}>Warning</option>
-                                <option value="badge-bad" ${rule.class === 'badge-bad' ? 'selected' : ''}>Bad</option>
-                                <option value="badge-grave" ${rule.class === 'badge-grave' ? 'selected' : ''}>Grave</option>
-                            </select>
-                            <button class="btn-rule-action delete" onclick="this.parentElement.remove()" title="Delete rule">
-                                <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
-                            </button>
+        <!-- Tab Content: Google Search Console -->
+        <div id="tab-google" class="tab-content" style="display:none">
+            <div class="settings-horizontal-grid">
+                <div class="card compact-card" style="flex-direction:row; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div class="section-title small" style="margin-bottom:5px; border:none; padding:0;"><i data-lucide="power"></i> Channel Status</div>
+                        <div style="font-size:0.75rem; color:var(--text-dim);">Enable GSC Data Extraction</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="gsc-channel-enabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="card compact-card">
+                    <div class="section-title small"><i data-lucide="calendar"></i> Cache Window</div>
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:auto;">
+                        <select id="gsc-history-range" style="width:100%">
+                            <option value="1 month">1 Month</option>
+                            <option value="3 months">3 Months</option>
+                            <option value="6 months">6 Months</option>
+                            <option value="12 months">12 Months</option>
+                            <option value="16 months">16 Months</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-title small" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span><i data-lucide="layers"></i> Search Console properties</span>
+                </div>
+                <div id="gsc-list" class="asset-grid"></div>
+            </div>
+            <button class="btn btn-save-fixed" onclick="updateConfig('gsc')"><i data-lucide="save"></i> Save GSC Settings</button>
+        </div>
+
+        <!-- Tab Content: Meta Organic -->
+        <div id="tab-facebook" class="tab-content" style="display:none">
+            <div class="settings-horizontal-grid">
+                <div class="card compact-card" style="flex-direction:row; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div class="section-title small" style="margin-bottom:5px; border:none; padding:0;"><i data-lucide="power"></i> Channel Status</div>
+                        <div style="font-size:0.75rem; color:var(--text-dim);">Enable FB Organic Data Extraction</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="fb-organic-enabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="card compact-card">
+                    <div class="section-title small"><i data-lucide="calendar"></i> Sync Window</div>
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:auto;">
+                        <select id="fb-organic-history-range" style="width:100%">
+                            <option value="1 year">1 Year</option>
+                            <option value="2 years">2 Years</option>
+                            <option value="3 years">3 Years</option>
+                            <option value="4 years">4 Years</option>
+                            <option value="5 years">5 Years</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-title small"><i data-lucide="layout"></i> Connected Pages</div>
+                <div id="fb-pages-list" class="asset-grid"></div>
+            </div>
+            <button class="btn btn-save-fixed" onclick="updateConfig('facebook-organic')"><i data-lucide="save"></i> Save Organic Settings</button>
+        </div>
+
+        <!-- Tab Content: Meta Marketing -->
+        <div id="tab-facebook-marketing" class="tab-content" style="display:none">
+            <div class="settings-horizontal-grid">
+                <div class="card compact-card" style="flex-direction:row; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div class="section-title small" style="margin-bottom:5px; border:none; padding:0;"><i data-lucide="power"></i> Channel Status</div>
+                        <div style="font-size:0.75rem; color:var(--text-dim);">Enable FB Ads Extraction</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="fb-marketing-enabled">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="card compact-card">
+                    <div class="section-title small"><i data-lucide="calendar"></i> Sync Window</div>
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:auto;">
+                        <select id="fb-marketing-history-range" style="width:100%">
+                            <option value="1 day">1 Day</option>
+                            <option value="7 days">7 Days</option>
+                            <option value="30 days">30 Days</option>
+                            <option value="90 days">90 Days</option>
+                            <option value="6 months">6 Months</option>
+                            <option value="1 year">1 Year</option>
+                            <option value="2 years">2 Years</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card compact-card" style="flex:2; grid-column: span 2;">
+                    <div class="section-title small" style="margin-bottom:10px;"><i data-lucide="layers"></i> Extraction Granularity</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px; align-items:flex-start;">
+                        <!-- Concept 1: Entity Sync Depth -->
+                        <div style="padding-right: 15px; border-right: 1px solid var(--border);">
+                           <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:10px; font-weight:700; display:flex; align-items:center; gap:5px;"><i data-lucide="database" size="10"></i> Entity Sync Depth (Infrastructure)</div>
+                           <select id="fb-marketing-level" onchange="handleFbLevelChange()" style="width:100%; margin-bottom:12px;">
+                               <option value="ad_account">Level 1: Account Only</option>
+                               <option value="campaign">Level 2: Campaigns</option>
+                               <option value="adset">Level 3: AdSets</option>
+                               <option value="ad">Level 4: Ads</option>
+                               <option value="creative">Level 5: Creatives</option>
+                           </select>
+                           <div class="granularity-compact-row" style="margin-top:0; justify-content: flex-start; gap:8px;">
+                                <div class="level-indicator-dot" id="ent-ind-1" title="Campaigns" onclick="setFbLevel('campaign')">C</div>
+                                <div class="level-indicator-dot" id="ent-ind-2" title="AdSets" onclick="setFbLevel('adset')">S</div>
+                                <div class="level-indicator-dot" id="ent-ind-3" title="Ads" onclick="setFbLevel('ad')">A</div>
+                                <div class="level-indicator-dot" id="ent-ind-4" title="Creatives" onclick="setFbLevel('creative')">R</div>
+                           </div>
                         </div>
-                    `;
-                }).join('');
 
-                return `
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                        <td style="padding: 10px 15px; font-weight: 500; color: #fff;">${label}</td>
-                        <td style="padding: 10px 15px;">
-                            <label class="switch"><input type="checkbox" class="fb-metric-sync" data-metric="${m}" ${config.enabled ? 'checked' : ''}><span class="slider"></span></label>
-                        </td>
-                        <td style="padding: 10px 15px;">
-                            <label class="switch"><input type="checkbox" class="fb-metric-spark" data-metric="${m}" ${config.sparkline ? 'checked' : ''}><span class="slider"></span></label>
-                        </td>
-                        <td style="padding: 10px 15px;">
-                            <select class="config-input fb-metric-format" data-metric="${m}" style="padding: 4px 8px; width: auto;">
-                                ${formattingOptions.map(o => `<option value="${o.value}" ${config.format === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
-                            </select>
-                        </td>
-                        <td style="padding: 10px 15px;">
-                            <div class="rules-container" id="rules-${m}" style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                ${levelsHtml}
-                            </div>
-                            <div class="btn-add-rule" onclick="addRuleRow('${m}')">
-                                <i data-lucide="plus" style="width: 12px; height: 12px;"></i> Add Level
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-            lucide.createIcons();
-        }
-
-        function addRuleRow(metric) {
-            const container = document.getElementById(`rules-${metric}`);
-            const div = document.createElement('div');
-            div.className = 'rule-item';
-            div.dataset.metric = metric;
-            const emptyDec = ''.padEnd(6, '0');
-            div.innerHTML = `
-                <div class="rule-input-group rule-min">
-                    <span class="rule-label">Min</span>
-                    <div class="split-num-container">
-                        <input type="text" class="rule-int" value="" onkeypress="return /[0-9-]/.test(event.key)" placeholder="0">
-                        <span class="split-comma">,</span>
-                        <input type="text" class="rule-dec" value="" onkeypress="return /[0-9]/.test(event.key)" onblur="if(this.value.trim() !== '') this.value = this.value.padEnd(6, '0').substring(0, 6)" placeholder="${'0'.padEnd(6, '0')}">
+                        <!-- Concept 2: Metrics Caching Depth -->
+                        <div>
+                           <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:10px; font-weight:700; display:flex; align-items:center; gap:5px;"><i data-lucide="bar-chart-3" size="10"></i> Metrics Level (Reporting)</div>
+                           <select id="fb-marketing-metrics-level" onchange="handleFbLevelChange()" style="width:100%; margin-bottom:12px;">
+                               <option value="ad_account">Level 1: Account Metrics</option>
+                               <option value="campaign">Level 2: Campaign Metrics</option>
+                               <option value="adset">Level 3: AdSet Metrics</option>
+                               <option value="ad">Level 4: Ad Metrics</option>
+                               <option value="creative">Level 5: Creative Metrics</option>
+                           </select>
+                           <div class="granularity-compact-row" style="margin-top:0; justify-content: flex-start; gap:8px;">
+                                <div class="level-indicator-dot" id="met-ind-1" title="Campaign Metrics" onclick="setMetricLevel('campaign')">C</div>
+                                <div class="level-indicator-dot" id="met-ind-2" title="AdSet Metrics" onclick="setMetricLevel('adset')">S</div>
+                                <div class="level-indicator-dot" id="met-ind-3" title="Ad Metrics" onclick="setMetricLevel('ad')">A</div>
+                                <div class="level-indicator-dot" id="met-ind-4" title="Creative Metrics" onclick="setMetricLevel('creative')">R</div>
+                           </div>
+                        </div>
                     </div>
                 </div>
-                <div class="rule-input-group rule-max">
-                    <span class="rule-label">Max</span>
-                    <div class="split-num-container">
-                        <input type="text" class="rule-int" value="" onkeypress="return /[0-9-]/.test(event.key)" placeholder="0">
-                        <span class="split-comma">,</span>
-                        <input type="text" class="rule-dec" value="" onkeypress="return /[0-9]/.test(event.key)" onblur="if(this.value.trim() !== '') this.value = this.value.padEnd(6, '0').substring(0, 6)" placeholder="${'0'.padEnd(6, '0')}">
+            </div>
+
+            <div class="marketing-split-layout">
+                <div class="card">
+                    <div class="section-title small"><i data-lucide="target"></i> Ad Accounts</div>
+                    <div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:15px;">
+                        <button class="btn btn-mini" onclick="toggleAllAds()" title="Select/Deselect All"><i data-lucide="check-square" size="14"></i> Select All</button>
+                    </div>
+                    <div id="fb-ad-accounts-list" class="asset-grid three-cols"></div>
+                </div>
+
+                <div class="card">
+                    <div class="section-title small"><i data-lucide="shield"></i> Rules Config</div>
+                    <div style="display:flex; gap:20px; margin-bottom:20px;">
+                        <label class="strategy-option"><input type="radio" name="fb_metrics_strategy" id="fb-strategy-default" value="default" checked onchange="handleFbStrategyChange()"> <span>Standard</span></label>
+                        <label class="strategy-option"><input type="radio" name="fb_metrics_strategy" id="fb-strategy-custom" value="custom" onchange="handleFbStrategyChange()"> <span>Custom</span></label>
+                    </div>
+                    <div id="fb-custom-metrics-area" style="display:none">
+                        <div class="metric-config-grid" id="fb-metrics-custom-grid"></div>
                     </div>
                 </div>
-                <select class="rule-class">
-                    <option value="badge-excellent">Excellent</option>
-                    <option value="badge-good">Good</option>
-                    <option value="badge-normal" selected>Normal</option>
-                    <option value="badge-warning">Warning</option>
-                    <option value="badge-bad">Bad</option>
-                    <option value="badge-grave">Grave</option>
-                </select>
-                <button class="btn-rule-action delete" onclick="this.parentElement.remove()" title="Delete rule">
-                    <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
-                </button>
-            `;
-            container.appendChild(div);
-            lucide.createIcons();
-        }
+            </div>
+            <button class="btn btn-save-fixed" onclick="updateConfig('facebook-marketing')"><i data-lucide="save"></i> Save Strategy</button>
+        </div>
 
-        function updateOrganicDependencies() {
-            const postsEntity = document.getElementById('fb-posts-entity-toggle');
-            const postsMetrics = document.getElementById('fb-posts-metrics-toggle');
-            
-            const igAccEntity = document.getElementById('fb-igacc-entity-toggle');
-            const igAccMetrics = document.getElementById('fb-igacc-metrics-toggle');
-            const igMediaEntity = document.getElementById('fb-igmedia-entity-toggle');
-            const igMediaMetrics = document.getElementById('fb-igmedia-metrics-toggle');
+        <!-- Footer JS -->
+        <script src="/assets/footer.js"></script>
+    </main>
 
-            // FB Posts Logic
-            if (!postsEntity.checked) {
-                postsMetrics.checked = false;
-                postsMetrics.disabled = true;
-            } else {
-                postsMetrics.disabled = false;
-            }
-
-            // IG Account Logic
-            if (!igAccEntity.checked) {
-                igAccMetrics.checked = false;
-                igAccMetrics.disabled = true;
-                igMediaEntity.checked = false;
-                igMediaEntity.disabled = true;
-                igMediaMetrics.checked = false;
-                igMediaMetrics.disabled = true;
-            } else {
-                igAccMetrics.disabled = false;
-                igMediaEntity.disabled = false;
-                
-                // IG Media Logic (dependent on IG Account)
-                if (!igMediaEntity.checked) {
-                    igMediaMetrics.checked = false;
-                    igMediaMetrics.disabled = true;
-                } else {
-                    igMediaMetrics.disabled = false;
-                }
-            }
-        }
-
-        function populateGlobalFields() {
-            if (currentConfig.jobs_timeout_hours !== undefined) {
-                document.getElementById('jobs-timeout-hours').value = currentConfig.jobs_timeout_hours;
-            }
-            const cacheRawMetricsCb = document.getElementById('cache-raw-metrics');
-            if (cacheRawMetricsCb) cacheRawMetricsCb.checked = !!currentConfig.cache_raw_metrics;
-            const marketingDebugLogsCb = document.getElementById('marketing-debug-logs');
-            if (marketingDebugLogsCb) marketingDebugLogsCb.checked = !!currentConfig.marketing_debug_logs;
-
-            document.getElementById('gsc-channel-enabled').checked = !!currentConfig.gsc_enabled;
-            document.getElementById('fb-organic-enabled').checked = !!currentConfig.fb_organic_enabled;
-            document.getElementById('fb-marketing-enabled').checked = !!currentConfig.fb_marketing_enabled;
-            
-            if (currentConfig.fb_organic_history_range) {
-                document.getElementById('fb-organic-history-range').value = currentConfig.fb_organic_history_range;
-            }
-            if (currentConfig.fb_marketing_history_range) {
-                document.getElementById('fb-marketing-history-range').value = currentConfig.fb_marketing_history_range;
-            }
-            if (currentConfig.fb_entity_filters) {
-                Object.entries(currentConfig.fb_entity_filters).forEach(([e, val]) => {
-                    const el = document.getElementById(`filter-${e}`);
-                    if (el) el.value = val;
-                });
-            }
-
-            // Handle Marketing Granularity
-            if (currentConfig.gsc_feature_toggles) {
-                document.querySelectorAll('.gsc-toggle').forEach(el => {
-                    const val = currentConfig.gsc_feature_toggles[el.dataset.key];
-                    if (val !== undefined) el.checked = !!val;
-                });
-            }
-
-            if (currentConfig.fb_feature_toggles) {
-                // Populate Facebook Toggles (Organic & Marketing extra toggles)
-                document.querySelectorAll('.fb-organic-toggle, .fb-toggle, .fb-toggle-mark').forEach(el => {
-                    const val = currentConfig.fb_feature_toggles[el.dataset.key];
-                    if (val !== undefined) el.checked = !!val;
-                });
-                updateOrganicDependencies();
-
-                // Handle Marketing Granularity
-                let maxLevel = 'ad_account';
-                if (currentConfig.fb_feature_toggles.creatives) maxLevel = 'creative';
-                else if (currentConfig.fb_feature_toggles.ads) maxLevel = 'ad';
-                else if (currentConfig.fb_feature_toggles.adsets) maxLevel = 'adset';
-                else if (currentConfig.fb_feature_toggles.campaigns) maxLevel = 'campaign';
-                
-                document.getElementById('fb-marketing-level').value = maxLevel;
-                handleFbLevelChange();
-
-                // Strategy and Metrics
-                const strategy = currentConfig.fb_metrics_strategy || 'default';
-                document.getElementById('fb-strategy-default').checked = (strategy === 'default');
-                document.getElementById('fb-strategy-custom').checked = (strategy === 'custom');
-                handleFbStrategyChange();
-
-                // Re-apply specific metric radio from config
-                setTimeout(() => {
-                    const radios = document.querySelectorAll('.fb-metric-radio');
-                    radios.forEach(el => { el.checked = false; }); // Uncheck all first
-                    
-                    // Find which metric is enabled in config
-                    const activeMetricKey = fbMarketingHierarchy
-                        .map(h => h.metricKey)
-                        .find(key => !!currentConfig.fb_feature_toggles[key]);
-                    
-                    if (activeMetricKey) {
-                        const targetRadio = Array.from(radios).find(r => r.dataset.key === activeMetricKey);
-                        if (targetRadio) targetRadio.checked = true;
-                    }
-                }, 0);
-            }
-
-            if (currentConfig.fb_cache_chunk_size) {
-                document.querySelectorAll('.fb-periodicity-select').forEach(el => {
-                    el.value = currentConfig.fb_cache_chunk_size;
-                });
-            }
-        }
-
-        function renderAssets() {
-            // Sort
-            allAssets.gsc.sort((a, b) => a.title.localeCompare(b.title));
-            allAssets.facebook_pages.sort((a, b) => a.title.localeCompare(b.title));
-            allAssets.facebook_ad_accounts.sort((a, b) => a.name.localeCompare(b.name));
-
-            // Render GSC
-            const gscList = document.getElementById('gsc-list');
-            gscList.innerHTML = allAssets.gsc.length === 0 ? '<div class="empty-state"><p>No properties found.</p></div>' :
-                allAssets.gsc.map(site => {
-                    const configData = currentConfig.gsc[site.url] || { target_countries: [], target_keywords: [] };
-                    const isChecked = !!currentConfig.gsc[site.url];
-                    const safeUrl = btoa(site.url).replace(/[^a-z0-9]/gi, '');
-                    return `
-                        <div class="asset-item ${isChecked ? 'synced' : ''}">
-                            <div class="asset-main">
-                                <input type="checkbox" id="cb-${safeUrl}" data-url="${site.url}" data-title="${site.title}" data-hostname="${site.hostname}" ${isChecked ? 'checked' : ''} onchange="toggleConfigArea('${safeUrl}')">
-                                <div class="asset-info" onclick="document.getElementById('cb-${safeUrl}').click()">
-                                    <div class="asset-title">${site.title}</div>
-                                    <div class="asset-meta"><span>${site.url}</span></div>
-                                </div>
-                            </div>
-                            <div class="asset-config" id="config-${safeUrl}" style="${isChecked ? 'display:block' : 'display:none'}">
-                                <div class="config-grid">
-                                    <div class="config-group">
-                                        <div class="config-label">Target Countries</div>
-                                        <select class="config-input" onchange="addTag('${safeUrl}', 'country', this.value); this.value=''">
-                                            <option value="">Add Country...</option>
-                                            ${Object.entries(countriesList).map(([c, n]) => `<option value="${c}">${n}</option>`).join('')}
-                                        </select>
-                                        <div class="tag-container" id="countries-tags-${safeUrl}">
-                                            ${configData.target_countries.map(c => `<div class="tag" data-value="${c}">${countriesList[c] || c} <i data-lucide="x" onclick="this.parentElement.remove()"></i></div>`).join('')}
-                                        </div>
-                                    </div>
-                                    <div class="config-group">
-                                        <div class="config-label">Target Keywords</div>
-                                        <input type="text" class="config-input" placeholder="Type & Enter..." onkeydown="if(event.key==='Enter'){ addTag('${safeUrl}', 'keyword', this.value); this.value=''; }">
-                                        <div class="tag-container" id="keywords-tags-${safeUrl}">
-                                            ${configData.target_keywords.map(k => `<div class="tag" data-value="${k}">${k} <i data-lucide="x" onclick="this.parentElement.remove()"></i></div>`).join('')}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>`;
-                }).join('');
-
-            // FB Organic
-            document.getElementById('fb-pages-list').innerHTML = allAssets.facebook_pages.length === 0 ? '<div class="empty-state"><p>No pages found.</p></div>' :
-                allAssets.facebook_pages.map(page => {
-                    const isChecked = currentConfig.fb_page_ids.includes(String(page.id)) ? 'checked' : '';
-                    return `
-                        <div class="asset-item ${isChecked ? 'synced' : ''}">
-                            <input type="checkbox" data-id="${page.id}" data-title="${page.title}" data-url="${page.url}" data-hostname="${page.hostname}" data-ig="${page.ig_account || ''}" ${isChecked}>
-                            <div class="asset-info">
-                                <div class="asset-title">${page.title}</div>
-                                <div class="asset-meta"><span>ID: ${page.id}</span></div>
-                            </div>
-                        </div>`;
-                }).join('');
-
-            // FB Marketing
-            document.getElementById('fb-ad-accounts-list').innerHTML = allAssets.facebook_ad_accounts.length === 0 ? '<div class="empty-state"><p>No ad accounts found.</p></div>' :
-                allAssets.facebook_ad_accounts.map(acc => {
-                    const isChecked = currentConfig.fb_ad_account_ids.includes(String(acc.id)) ? 'checked' : '';
-                    return `
-                        <div class="asset-item ${isChecked ? 'synced' : ''}">
-                            <input type="checkbox" data-id="${acc.id}" data-name="${acc.name}" ${isChecked}>
-                            <div class="asset-info">
-                                <div class="asset-title">${acc.name}</div>
-                                <div class="asset-meta"><span>ID: ${acc.id}</span></div>
-                            </div>
-                        </div>`;
-                }).join('');
-
-            document.getElementById('gsc-count').innerText = `${allAssets.gsc.length} found`;
-            document.getElementById('fb-organic-count').innerText = `${allAssets.facebook_pages.length} found`;
-            document.getElementById('fb-marketing-count').innerText = `${allAssets.facebook_ad_accounts.length} found`;
-            lucide.createIcons();
-        }
-
-        function toggleConfigArea(safeUrl) {
-            document.getElementById(`config-${safeUrl}`).style.display = document.getElementById(`cb-${safeUrl}`).checked ? 'block' : 'none';
-        }
-
-        function addTag(safeUrl, type, val) {
-            val = val.trim();
-            if (!val) return;
-            const container = document.getElementById(`${type === 'country' ? 'countries' : 'keywords'}-tags-${safeUrl}`);
-            if (Array.from(container.querySelectorAll('.tag')).find(t => t.dataset.value === val)) return;
-            const tag = document.createElement('div');
-            tag.className = 'tag';
-            tag.dataset.value = val;
-            tag.innerHTML = `${type === 'country' ? countriesList[val] || val : val} <i data-lucide="x" onclick="this.parentElement.remove()"></i>`;
-            container.appendChild(tag);
-            lucide.createIcons();
-        }
-
-        async function updateConfig(type) {
-            showLoading('Saving configuration...');
-            try {
-                const selected = type === 'global' ? {} : (type === 'gsc' ? {} : { pages: [], ad_accounts: [] });
-                const requestBody = { 
-                    type, 
-                    enabled: document.getElementById(`${type === 'gsc' ? 'gsc' : (type === 'facebook-organic' ? 'fb-organic' : 'fb-marketing')}-enabled`)?.checked ?? true 
-                };
-
-                if (type === 'gsc') {
-                    document.querySelectorAll('#gsc-list input:checked').forEach(input => {
-                        const safeUrl = input.id.replace('cb-', '');
-                        requestBody.assets = requestBody.assets || {};
-                        requestBody.assets[input.dataset.url] = {
-                            url: input.dataset.url,
-                            title: input.dataset.title,
-                            hostname: input.dataset.hostname,
-                            target_countries: Array.from(document.querySelectorAll(`#countries-tags-${safeUrl} .tag`)).map(t => t.dataset.value),
-                            target_keywords: Array.from(document.querySelectorAll(`#keywords-tags-${safeUrl} .tag`)).map(t => t.dataset.value)
-                        };
-                    });
-                    requestBody.cache_history_range = document.getElementById('gsc-history-range').value;
-                    requestBody.feature_toggles = {};
-                    document.querySelectorAll('.gsc-toggle').forEach(el => {
-                        requestBody.feature_toggles[el.dataset.key] = el.checked;
-                    });
-                } else if (type === 'facebook-organic' || type === 'facebook-marketing') {
-                    const selector = type === 'facebook-organic' ? '#fb-pages-list input:checked' : '#fb-ad-accounts-list input:checked';
-                    const assets = [];
-                    document.querySelectorAll(selector).forEach(input => {
-                        assets.push(type === 'facebook-organic' ? 
-                            { id: input.dataset.id, title: input.dataset.title, url: input.dataset.url, hostname: input.dataset.hostname, ig_account: input.dataset.ig || null } : 
-                            { id: input.dataset.id, name: input.dataset.name });
-                    });
-                    requestBody.assets = type === 'facebook-organic' ? { pages: assets } : { ad_accounts: assets };
-                    requestBody.organic_history_range = document.getElementById('fb-organic-history-range').value;
-                    requestBody.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
-
-                    // Collect periodicity from the active tab's select
-                    const activeSelect = document.querySelector(`#tab-${type} .fb-periodicity-select`);
-                    if (activeSelect) {
-                        requestBody.cache_chunk_size = activeSelect.value;
-                    }
-
-                    requestBody.entity_filters = {};
-                    ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA', 'CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'].forEach(e => {
-                        const el = document.getElementById(`filter-${e}`);
-                        if (el) requestBody.entity_filters[e] = el.value;
-                    });
-
-                    requestBody.feature_toggles = {};
-                    if (type === 'facebook-marketing') {
-                        // Metrics Configuration
-                        const strategy = document.querySelector('input[name="fb_metrics_strategy"]:checked').value;
-                        requestBody.metrics_strategy = strategy;
-                        
-                                // Always collect metrics config details if strategy is custom
-                                if (strategy === 'custom') {
-                                    requestBody.metrics_config = {};
-                                    document.querySelectorAll('.fb-metric-sync').forEach(el => {
-                                        const m = el.dataset.metric;
-                                        const spark = document.querySelector(`.fb-metric-spark[data-metric="${m}"]`).checked;
-                                        const format = document.querySelector(`.fb-metric-format[data-metric="${m}"]`).value;
-                                        
-                                        // Collect dynamic level rules
-                                        const levels = [];
-                                        const rulesContainer = document.getElementById(`rules-${m}`);
-                                        if (rulesContainer) {
-                                            rulesContainer.querySelectorAll('.rule-item').forEach(ruleEl => {
-                                                const minInt = ruleEl.querySelector('.rule-min .rule-int')?.value ?? '';
-                                                const minDec = ruleEl.querySelector('.rule-min .rule-dec')?.value ?? '';
-                                                const maxInt = ruleEl.querySelector('.rule-max .rule-int')?.value ?? '';
-                                                const maxDec = ruleEl.querySelector('.rule-max .rule-dec')?.value ?? '';
-                                                const cls = ruleEl.querySelector('.rule-class').value;
-                                                
-                                                const rule = { class: cls };
-                                                if (minInt.trim() !== '' || minDec.trim() !== '') {
-                                                    const val = (minInt.trim() || '0') + '.' + (minDec.trim() || '0').padEnd(6, '0');
-                                                    rule.min = val; // Store as string to preserve precision
-                                                }
-                                                if (maxInt.trim() !== '' || maxDec.trim() !== '') {
-                                                    const val = (maxInt.trim() || '0') + '.' + (maxDec.trim() || '0').padEnd(6, '0');
-                                                    rule.max = val;
-                                                }
-                                                levels.push(rule);
-                                            });
-                                        }
-
-                                        const existing = (currentConfig.fb_metrics_config || {})[m] || {};
-                                        requestBody.metrics_config[m] = {
-                                            label: existing.label || m.toUpperCase(),
-                                            enabled: el.checked,
-                                            sparkline: spark,
-                                            format: format,
-                                            order: existing.order || 99,
-                                            conditional: {
-                                                type: 'levels',
-                                                config: levels
-                                            }
-                                        };
-                                    });
-                                }
-                        
-                        const level = document.getElementById('fb-marketing-level').value;
-                        const levelIdx = fbMarketingHierarchy.findIndex(h => h.key === level);
-
-                        // Set entities based on level (all levels above the selected one are true)
-                        fbMarketingHierarchy.forEach((h, idx) => {
-                            if (h.entityKey) {
-                                requestBody.feature_toggles[h.entityKey] = (idx <= levelIdx);
-                            }
-                        });
-
-                        // Set metrics based on UI radio choice
-                        fbMarketingHierarchy.forEach(h => {
-                            if (h.metricKey) requestBody.feature_toggles[h.metricKey] = false;
-                        });
-                        const selectedRadio = document.querySelector('.fb-metric-radio:checked');
-                        if (selectedRadio) {
-                            requestBody.feature_toggles[selectedRadio.dataset.key] = true;
-                        }
-                        
-                        // Collect extra toggles (like Cache Aggregations)
-                        document.querySelectorAll('.fb-toggle-mark').forEach(el => {
-                            requestBody.feature_toggles[el.dataset.key] = el.checked;
-                        });
-                    } else {
-                        document.querySelectorAll('.fb-toggle').forEach(el => {
-                            requestBody.feature_toggles[el.dataset.key] = el.checked;
-                        });
-                    }
-                } else if (type === 'global') {
-                    requestBody.jobs_timeout_hours = parseInt(document.getElementById('jobs-timeout-hours').value, 10) || 6;
-                    requestBody.cache_raw_metrics = document.getElementById('cache-raw-metrics')?.checked || false;
-                    requestBody.marketing_debug_logs = document.getElementById('marketing-debug-logs')?.checked || false;
-                }
-
-                const response = await fetch('/api/config-manager/update', {
-                    method: 'POST',
-                    headers: getAdminHeaders(),
-                    body: JSON.stringify(requestBody)
-                });
-                const result = await response.json();
-                if (result.success) {
-                    showToast('Configuration updated!');
-                    fetchAssets();
-                } else throw new Error(result.error || 'Unknown error');
-            } catch (err) {
-                showToast(err.message, true);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        function confirmUpdate(type) {
-            document.getElementById('confirm-modal').style.display = 'flex';
-            document.getElementById('modal-confirm-btn').onclick = () => {
-                document.getElementById('confirm-modal').style.display = 'none';
-                updateConfig(type);
-            };
-        }
-
-        function closeModal() {
-            document.getElementById('confirm-modal').style.display = 'none';
-        }
-
-        async function validateTokens() {
-            showLoading('Checking tokens...');
-            try {
-                const response = await fetch('/api/config-manager/validate-tokens', { method: 'POST', headers: getAdminHeaders() });
-                const result = await response.json();
-                const render = (id, data) => {
-                    const el = document.getElementById(id);
-                    if (!el || !data) return;
-                    const isValid = data.status === 'valid';
-                    el.style.display = 'inline-flex';
-                    el.className = `token-status ${isValid ? 'valid' : (data.status === 'info' ? 'info' : 'error')}`;
-                    el.innerHTML = `<i data-lucide="${isValid ? 'check-circle' : (data.status === 'info' ? 'help-circle' : 'x-circle')}"></i> ${isValid ? 'API OK' : (data.status === 'info' ? 'INFO' : 'EXPIRED/INVALID')}`;
-                    el.title = data.message;
-                };
-                if (result.results) {
-                    render('gsc-token-status', result.results.gsc);
-                    render('fb-token-status', result.results.facebook);
-                }
-                lucide.createIcons();
-                showToast('Tokens checked.');
-            } catch (err) { showToast(err.message, true); } finally { hideLoading(); }
-        }
-
-        async function exportConfig() {
-            try {
-                const response = await fetch('/api/config-manager/export', { method: 'POST', headers: getAdminHeaders() });
-                const blob = await response.blob();
-                const a = document.createElement('a');
-                a.href = window.URL.createObjectURL(blob);
-                a.download = `config-export-${dayjs().format('YYYY-MM-DD')}.yaml`;
-                a.click();
-            } catch (err) { showToast('Export failed', true); }
-        }
-
-        function showLoading(text) { document.getElementById('loading-text').innerText = text; document.getElementById('loading').style.display = 'flex'; }
-        function hideLoading() { document.getElementById('loading').style.display = 'none'; }
-        
-        function showToast(msg, err) { 
-            const t = document.getElementById('toast'); 
-            if(!t) return;
-            t.innerText = msg; t.className = `toast ${err ? 'error' : ''}`; t.style.display = 'block'; 
-            setTimeout(() => t.style.display = 'none', 4000); 
-        }
-
-        function selectAll(id, state) { 
-            document.querySelectorAll(`#${id} input[type="checkbox"]`).forEach(cb => { 
-                cb.checked = state; 
-                if (cb.id.startsWith('cb-')) toggleConfigArea(cb.id.replace('cb-','')); 
-            }); 
-        }
-
-        async function flushCache(channel) {
-            if (!confirm(`Are you sure you want to clear ALL aggregation caches for ${channel}? This cannot be undone.`)) return;
-            showLoading(`Flushing ${channel} cache...`);
-            try {
-                const response = await fetch('/api/config-manager/flush-cache', { 
-                    method: 'POST', 
-                    headers: { ...getAdminHeaders(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ channel })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    showToast(result.message);
-                } else {
-                    showToast(result.error || 'Flush failed', true);
-                }
-            } catch (err) {
-                showToast(err.message, true);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        // Tabs logic
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
-                tab.classList.add('active');
-                const content = document.getElementById('tab-' + tab.dataset.tab);
-                content.classList.add('active');
-                document.querySelectorAll('.tab-content').forEach(c => c.style.display = (c === content ? 'block' : 'none'));
-            });
-        });
-
-        fetchAssets();
-    </script>
+    <script src="/assets/views/config-manager.js"></script>
 </body>
 </html>

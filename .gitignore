@@ -33,3 +33,4 @@ config/channels/facebook_marketing.yaml.llenatucentro
 docker-compose.yml.llenatucentro
 config/instances.yaml.demo.hetzner
 .env.demo.hetzner
+.privacy-policy

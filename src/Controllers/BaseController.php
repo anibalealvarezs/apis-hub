@@ -188,4 +188,18 @@ abstract class BaseController
     {
         return $this->em->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
     }
+
+    protected function renderWithEnv(string $html): Response
+    {
+        $appMode = Helpers::getAppMode();
+        $isDemo = Helpers::isDemo();
+        
+        $inject = '<meta name="app-env" content="' . $appMode . '">';
+        if ($isDemo) {
+            $inject .= '<script>window.AUTH_BYPASS = true;</script>';
+        }
+        
+        $html = str_replace('<head>', '<head>' . $inject, $html);
+        return new Response($html, 200, ['Content-Type' => 'text/html']);
+    }
 }

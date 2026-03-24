@@ -14,7 +14,7 @@ return [
                 params: $params,
             );
         },
-        'admin' => true
+        'admin' => false
     ],
     '/{channel}/{entity}/aggregate' => [
         'httpMethod' => 'POST',
@@ -26,7 +26,8 @@ return [
                 body: $body,
                 params: $params,
             );
-        }
+        },
+        'admin' => false
     ],
     '/{channel}/{entity}/{id}' => [
         'httpMethod' => 'GET',
@@ -38,7 +39,7 @@ return [
                 id: $id
             );
         },
-        'admin' => true
+        'admin' => false
     ],
     '/{channel}/{entity}' => [
         'httpMethod' => 'GET',
@@ -51,6 +52,6 @@ return [
                 params: $params,
             );
         },
-        'admin' => true
+        'admin' => false
     ],
 ];

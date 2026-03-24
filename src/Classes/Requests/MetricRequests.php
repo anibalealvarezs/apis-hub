@@ -1096,12 +1096,28 @@ class MetricRequests
         $organic = $channels['facebook_organic'] ?? [];
         $marketing = $channels['facebook_marketing'] ?? [];
 
+        // --- 🛡️ SMART DEMO AUTH OVERRIDE ---
+        if (getenv('APP_ENV') === 'demo') {
+            $tokenPath = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'tokens' . DIRECTORY_SEPARATOR . 'facebook_tokens.json';
+            
+            if (file_exists($tokenPath)) {
+                $tokens = json_decode(file_get_contents($tokenPath), true);
+                $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
+                if ($marketingToken) {
+                    $config['graph_user_access_token'] = $marketingToken;
+                    $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
+                    putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
+                }
+            }
+        }
+        // ------------------------------------
+
         // Merge specialized files into the main config array
         $config = array_replace_recursive($config, $organic, $marketing);
 
         if (empty($config)) {
             $logger?->error("Facebook configuration not found in channels config.");
-            throw new RuntimeException("Facebook configuration not found in channels config.");
+            throw new \RuntimeException("Facebook configuration not found in channels config.");
         }
 
         // Global exclusion list
@@ -1271,6 +1287,19 @@ class MetricRequests
         if (isset($config['facebook']) && is_array($config['facebook']) && !isset($config['app_id'])) {
             $config = $config['facebook'];
         }
+
+        // --- 🛡️ SMART DEMO AUTH OVERRIDE ---
+        if (getenv('APP_ENV') === 'demo') {
+            $tokenPath = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'tokens' . DIRECTORY_SEPARATOR . 'facebook_tokens.json';
+            if (file_exists($tokenPath)) {
+                $tokens = json_decode(file_get_contents($tokenPath), true);
+                $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
+                if ($marketingToken) {
+                    $config['graph_user_access_token'] = $marketingToken;
+                }
+            }
+        }
+        // ------------------------------------
 
         $maxApiRetries = 3;
         $apiRetryCount = 0;

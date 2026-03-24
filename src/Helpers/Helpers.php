@@ -34,6 +34,7 @@ class Helpers
     private static ?array $channelsConfig = null;
     private static ?array $entitiesConfig = null;
     private static ?array $projectConfig = null;
+    private static ?string $appMode = null;
 
     /**
      * Resets all cached configurations to force a reload from files.
@@ -179,6 +180,51 @@ class Helpers
     {
         $config = self::getProjectConfig();
         return (bool) ($config['debug'] ?? false);
+    }
+
+    /**
+     * @return string
+     */
+    public static function getAppMode(): string
+    {
+        if (self::$appMode === null) {
+            // Ensure config/env is loaded
+            try {
+                $config = self::getProjectConfig();
+            } catch (\Exception $e) {
+                $config = [];
+            }
+
+            $mode = getenv('APP_MODE') ?: ($_ENV['APP_MODE'] ?? null);
+            
+            // Heuristic for Demo: If APP_MODE is missing but PROJECT_NAME has 'demo'
+            if (!$mode) {
+                $projectName = getenv('PROJECT_NAME') ?: ($config['project'] ?? '');
+                if (str_contains(strtolower($projectName), 'demo')) {
+                    $mode = 'demo';
+                }
+            }
+
+            self::$appMode = strtolower($mode ?: 'production');
+        }
+        return self::$appMode;
+    }
+
+    public static function isDemo(): bool
+    {
+        if (self::getAppMode() === 'demo') {
+            return true;
+        }
+        
+        try {
+            $config = self::getProjectConfig();
+            $projectName = getenv('PROJECT_NAME') ?: ($config['project'] ?? '');
+            if (str_contains(strtolower($projectName), 'demo')) {
+                return true;
+            }
+        } catch (\Exception $e) {}
+
+        return false;
     }
     /**
      * @return array
@@ -412,6 +458,34 @@ class Helpers
                     }
                 }
 
+                // --- 🛡️ SMART DEMO AUTH MAPPING ---
+                // If we are in demo mode, we need to ensure that the "facebook_marketing" 
+                // token from the JSON is actually used.
+                if (getenv('APP_ENV') === 'demo') {
+                    // Resolve token path
+                    $tokenPath = $config['facebook']['graph_token_path'] ?? './storage/tokens/facebook_tokens.json';
+                    if (str_starts_with($tokenPath, './')) {
+                        $tokenPath = dirname(__DIR__, 2) . substr($tokenPath, 1);
+                    }
+                    
+                    if (file_exists($tokenPath)) {
+                        $tokens = json_decode(file_get_contents($tokenPath), true);
+                        $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
+                        
+                        if ($marketingToken) {
+                            // OVERRIDE ABSOLUTO: Inyectamos el token en todas las claves posibles
+                            $config['facebook']['graph_user_access_token'] = $marketingToken;
+                            $config['facebook_marketing']['graph_user_access_token'] = $marketingToken;
+                            $config['facebook_marketing']['access_token'] = $marketingToken;
+                            
+                            // Inyectamos también en variables de entorno para máxima compatibilidad
+                            $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
+                            putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
+                        }
+                    }
+                }
+                // ---------------------------------
+
                 // Normalize relative paths to project root to avoid CWD issues
                 $rootPath = dirname(__DIR__, 2);
                 $resolvePath = function($path) use ($rootPath) {
@@ -541,6 +615,29 @@ class Helpers
             return implode(',', $keys);
         }
         return $keys;
+    }
+
+    /**
+     * Returns the first available Facebook access token from storage.
+     * Used for system-level background jobs or demo-mode bypass.
+     * 
+     * @return string|null
+     */
+    public static function getSystemFacebookToken(): ?string
+    {
+        $config = self::getChannelsConfig();
+        $tokenPath = $config['facebook']['graph_token_path'] ?? null;
+
+        if ($tokenPath && file_exists($tokenPath)) {
+            $tokens = json_decode(file_get_contents($tokenPath), true);
+            if (!empty($tokens)) {
+                $firstToken = reset($tokens);
+                return $firstToken['access_token'] ?? null;
+            }
+        }
+        
+        // Fallback to legacy ENV if present
+        return getenv('FACEBOOK_USER_TOKEN') ?: null;
     }
 
     /**
