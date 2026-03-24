@@ -471,6 +471,25 @@
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
+        footer {
+            padding: 40px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        .subtle-link {
+            color: inherit;
+            text-decoration: none;
+            transition: color 0.3s;
+            opacity: 0.5;
+        }
+
+        .subtle-link:hover {
+            opacity: 1;
+            color: var(--primary);
+        }
     </style>
     <!-- FB_CONFIG_PLACEHOLDER -->
 </head>
@@ -1666,6 +1685,14 @@
                 </svg>
             `;
         }
+    </script>
+
+    <footer>
+        <p>&copy; 2026 APIs Hub Central. Developed by <a href="https://anibalalvarez.com" target="_blank" class="subtle-link">Aníbal Álvarez</a>. | <a href="/privacy" class="subtle-link"><i data-lucide="shield" style="width: 12px; height: 12px; vertical-align: middle;"></i> Privacy Policy</a></p>
+    </footer>
+
+    <script>
+        lucide.createIcons();
     </script>
 </body>
 </html>
