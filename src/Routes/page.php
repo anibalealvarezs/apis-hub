@@ -3,6 +3,7 @@
 use Controllers\ConfigManagerController;
 use Controllers\MonitoringController;
 use Controllers\PageController;
+use Controllers\FacebookAuthController;
 use Controllers\PrivacyController;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -28,6 +29,26 @@ return [
     '/tos' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PrivacyController())->tos(),
+        'public' => true,
+        'html' => true
+    ],
+    '/fb-login' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new FacebookAuthController())->login(),
+        'public' => true,
+        'html' => true
+    ],
+    '/fb-auth-start' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new FacebookAuthController())->start(),
+        'public' => true,
+        'html' => true
+    ],
+    '/fb-callback' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            return (new FacebookAuthController())->callback(\Symfony\Component\HttpFoundation\Request::createFromGlobals());
+        },
         'public' => true,
         'html' => true
     ],
@@ -166,7 +187,7 @@ return [
     '/fb-reports' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->facebookReports(),
-        'public' => false,
+        'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
         'html' => true,
         'admin' => false
     ]

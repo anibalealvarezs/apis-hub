@@ -14,7 +14,7 @@ class MonitoringController extends BaseController
     public function index(): Response
     {
         $html = file_get_contents(__DIR__ . '/../views/monitoring.html');
-        return new Response($html, 200, ['Content-Type' => 'text/html']);
+        return $this->renderWithEnv($html);
     }
 
     private function getTargetContainerId($job, array $instances): ?string
@@ -103,40 +103,86 @@ class MonitoringController extends BaseController
             return $c;
         }, $containersData);
 
-        // Fetch jobs for grouping - last 200 to ensure we find some for each container
+        /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
-        $allRecentJobs = $jobRepo->findBy([], ['id' => 'DESC'], 200);
 
-        $groupedJobs = [];
+        // Fetch ONLY pending, processing, or failed jobs for priority visibility
+        $priorityJobs = $jobRepo->findBy(
+            ['status' => [JobStatus::scheduled->value, JobStatus::processing->value, JobStatus::failed->value]],
+            ['id' => 'DESC'],
+            100
+        );
+
+        // Fetch the 50 most recent jobs overall for historical context
+        $recentJobs = $jobRepo->findBy([], ['id' => 'DESC'], 50);
+        $allRecentJobs = array_unique(array_merge($priorityJobs, $recentJobs), SORT_REGULAR);
+
+        $pipelines = [];
         foreach ($allRecentJobs as $job) {
-            $targetId = $this->getTargetContainerId($job, $instances);
-            if (!$targetId) continue;
-
-            if (!isset($groupedJobs[$targetId])) $groupedJobs[$targetId] = [];
-            if (count($groupedJobs[$targetId]) >= 10) continue; // Show more in detail
-
+            $targetId = $this->getTargetContainerId($job, $instances) ?: 'global-infrastructure';
             $payload = $job->getPayload() ?? [];
             $params = $payload['params'] ?? [];
-            $frequency = 'N/A';
-            foreach ($instances as $instance) {
-                if ($instance['name'] === $targetId) {
-                    $frequency = $instance['frequency'] ?? $frequency;
-                    break;
+            
+            // Create a unique key for this sync "pipeline"
+            $paramsHash = md5(json_encode($params));
+            $pipelineKey = "{$targetId}:{$job->getChannel()}:{$job->getEntity()}:{$paramsHash}";
+
+            if (!isset($pipelines[$pipelineKey])) {
+                $statusText = JobStatus::tryFrom($job->getStatus())?->name ?? 'unknown';
+                $frequency = 'N/A';
+                foreach ($instances as $instance) {
+                    if ($instance['name'] === $targetId) {
+                        $frequency = $instance['frequency'] ?? $frequency;
+                        break;
+                    }
+                }
+
+                $createdAt = $job->getCreatedAt();
+                $updatedAt = $job->getUpdatedAt();
+                $interval = $createdAt && $updatedAt ? $createdAt->diff($updatedAt) : null;
+                $executionTime = 'N/A';
+                if ($interval && ($job->getStatus() === JobStatus::completed->value || $job->getStatus() === JobStatus::failed->value)) {
+                    $parts = [];
+                    if ($interval->h > 0) $parts[] = $interval->h . 'h';
+                    if ($interval->i > 0) $parts[] = $interval->i . 'm';
+                    if ($interval->s > 0) $parts[] = $interval->s . 's';
+                    $executionTime = !empty($parts) ? implode(' ', $parts) : '0s';
+                }
+
+                $pipelines[$pipelineKey] = [
+                    'id' => $job->getId(),
+                    'uuid' => $job->getUuid(),
+                    'channel' => strtolower($job->getChannel()),
+                    'entity' => strtolower($job->getEntity()),
+                    'status' => $job->getStatus(),
+                    'status_text' => strtoupper($statusText),
+                    'params' => $params,
+                    'frequency' => $payload['cron'] ?? $frequency, // Use payload['cron'] if available, otherwise instance frequency
+                    'execution_time' => $executionTime,
+                    'created_at' => $createdAt ? $createdAt->format('Y-m-d H:i:s') : 'N/A',
+                    'updated_at' => $updatedAt ? $updatedAt->format('Y-m-d H:i:s') : 'N/A',
+                    'message' => $job->getMessage(),
+                    'group' => $targetId,
+                    'history' => []
+                ];
+            } else {
+                // Add to history of this pipeline if not already full (max 5)
+                if (count($pipelines[$pipelineKey]['history']) < 5) {
+                    $pipelines[$pipelineKey]['history'][] = [
+                        'status' => $job->getStatus(),
+                        'date' => $job->getUpdatedAt() ? $job->getUpdatedAt()->format('Y-m-d H:i:s') : 'N/A',
+                        'message' => $job->getMessage() ?: 'No details'
+                    ];
                 }
             }
+        }
 
-            $groupedJobs[$targetId][] = [
-                'id' => $job->getId(),
-                'uuid' => $job->getUuid(),
-                'channel' => $job->getChannel(),
-                'entity' => $job->getEntity(),
-                'status' => $job->getStatus(),
-                'params' => $params,
-                'frequency' => $frequency,
-                'created_at' => $job->getCreatedAt() ? $job->getCreatedAt()->format('Y-m-d H:i:s') : 'N/A',
-                'updated_at' => $job->getUpdatedAt() ? $job->getUpdatedAt()->format('Y-m-d H:i:s') : 'N/A',
-                'message' => $job->getMessage()
-            ];
+        // Re-group pipelines by channel to match the requested UI hierarchy
+        $groupedJobs = [];
+        foreach ($pipelines as $pipeline) {
+            $chan = $pipeline['channel'];
+            if (!isset($groupedJobs[$chan])) $groupedJobs[$chan] = [];
+            $groupedJobs[$chan][] = $pipeline;
         }
 
         $statsConfig = [
@@ -261,8 +307,8 @@ class MonitoringController extends BaseController
                     }
 
                     $newJobData = [
-                        'channel' => $job->getChannel(),
-                        'entity' => $job->getEntity(),
+                        'channel' => strtolower($job->getChannel()),
+                        'entity' => strtolower($job->getEntity()),
                         'payload' => $payload,
                         'status' => JobStatus::scheduled->value
                     ];
@@ -286,7 +332,9 @@ class MonitoringController extends BaseController
                     return new JsonResponse(['success' => true, 'message' => "Job #$id triggered in background. Refresh in a few moments."]);
 
                 case 'cancel':
-                    $jobRepo->update($id, (object)['status' => JobStatus::cancelled->value]);
+                    $job->addStatus(JobStatus::cancelled->value);
+                    $job->addMessage('Manually cancelled via Monitoring Dashboard');
+                    $this->em->flush();
                     return new JsonResponse(['success' => true, 'message' => "Job #$id manually cancelled/deactivated"]);
 
                 default: return new JsonResponse(['error' => "Action '$action' not supported"], 400);

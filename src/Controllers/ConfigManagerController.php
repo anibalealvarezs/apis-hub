@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Yaml\Yaml;
 
-class ConfigManagerController
+class ConfigManagerController extends BaseController
 {
     private string $gscConfigPath;
     private string $fbConfigPath;
@@ -20,6 +20,7 @@ class ConfigManagerController
 
     public function __construct()
     {
+        parent::__construct();
         $this->gscConfigPath = __DIR__ . '/../../config/channels/google_search_console.yaml';
         $this->fbConfigPath = __DIR__ . '/../../config/channels/facebook.yaml';
         $this->fbOrganicPath = __DIR__ . '/../../config/channels/facebook_organic.yaml';
@@ -30,7 +31,7 @@ class ConfigManagerController
     public function index(): Response
     {
         $html = file_get_contents(__DIR__ . '/../views/config_manager.html');
-        return new Response($html, 200, ['Content-Type' => 'text/html']);
+        return $this->renderWithEnv($html);
     }
 
     public function fetchAssets(Request $request): Response
@@ -268,7 +269,7 @@ class ConfigManagerController
             $logger->debug("Payload: " . json_encode($data));
 
             if ($type === 'gsc') {
-                $this->updateGscConfig($assets, $data['cache_history_range'] ?? null, $data['enabled'] ?? true, $data['feature_toggles'] ?? []);
+                $this->updateGscConfig($assets['gsc'] ?? [], $data['cache_history_range'] ?? null, $data['enabled'] ?? true, $data['feature_toggles'] ?? []);
             } elseif ($type === 'facebook' || $type === 'facebook-organic' || $type === 'facebook-marketing') {
                 $this->updateFacebookConfig(
                     assets: $assets, 
@@ -295,6 +296,9 @@ class ConfigManagerController
                 }
                 $appConf['analytics']['cache_raw_metrics'] = filter_var($data['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
                 $appConf['analytics']['marketing_debug_logs'] = filter_var($data['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+                // Explicit Guard: Strip any attempts to modify system-level infrastructure via UI
+                unset($appConf['db_host'], $appConf['db_name'], $appConf['app_mode']);
 
                 file_put_contents($appConfigPath, Yaml::dump($appConf, 10, 2));
                 $logger->info("Global config updated successfully");
@@ -449,8 +453,9 @@ class ConfigManagerController
         file_put_contents($this->gscConfigPath, Yaml::dump($config, 10, 2));
     }
 
-    private function normalizeGscUrl(string $url): string
+    private function normalizeGscUrl(?string $url): string
     {
+        if (!$url) return '';
         return rtrim(strtolower($url), '/');
     }
 

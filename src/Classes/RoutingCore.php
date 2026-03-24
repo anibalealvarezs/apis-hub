@@ -110,6 +110,20 @@ class RoutingCore implements HttpKernelInterface
         $appKey = \Helpers\Helpers::getAppApiKey();
         $adminKey = \Helpers\Helpers::getAdminApiKey();
 
+        // DEPLOYMENT DEMO BYPASS:
+        // Automatically authorize regular users IF AND ONLY IF the environment is explicitly set to 'demo'.
+        if (\Helpers\Helpers::isDemo()) {
+            // In demo mode, we inject the internal Admin Key so all APIs (CRUD, Updates) work.
+            $adminKey = \Helpers\Helpers::getAdminApiKey();
+            
+            if ($adminKey) {
+                $request->headers->set('X-API-Key', $adminKey);
+                $request->headers->set('Authorization', 'Bearer ' . $adminKey);
+                $request->attributes->set('BYPASS_INTERNAL_AUTH', true);
+            }
+            return true;
+        }
+
         if ($isAdminOnly) {
             return $adminKey !== null && $providedKey === $adminKey;
         }
