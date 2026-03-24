@@ -7,7 +7,7 @@ This privacy notice for **APIs Hub** ("Company," "we," "us," or "our"), describe
 * Visit our website at <https://apis-hub.anibalalvarez.com>, or any website of ours that links to this privacy notice.
 * Engage with us in other related ways, including any sales, marketing, or events.
 
-**Questions or concerns?** Reading this privacy notice will help you understand your privacy rights and choices. If you do not agree with our policies and practices, please do not use our Services. If you still have any questions or concerns, please contact us at <anibal@anibalalvarez.com>.
+**Questions or concerns?** Reading this privacy notice will help you understand your privacy rights and choices. If you do not agree with our policies and practices, please do not use our Services. If you still have any questions or concerns, please contact us at <contact@anibalalvarez.com>.
 
 ## TABLE OF CONTENTS
 
@@ -141,7 +141,7 @@ We may update this privacy notice from time to time. The updated version will be
 
 ## CONTACT
 
-If you have questions or comments about this notice, you may email us at <anibal@anibalalvarez.com> or by post to:
+If you have questions or comments about this notice, you may email us at <contact@anibalalvarez.com> or by post to:
 
 **Aníbal Álvarez**  
 [Your Physical Address if available]  
