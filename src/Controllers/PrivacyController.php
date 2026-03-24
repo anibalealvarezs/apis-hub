@@ -22,6 +22,14 @@ class PrivacyController
         return $this->renderDocument('DATA_DELETION.md', 'data-deletion.html');
     }
 
+    /**
+     * @Route("/tos", name="app_tos")
+     */
+    public function tos(): Response
+    {
+        return $this->renderDocument('TOS.md', 'tos.html');
+    }
+
     private function renderDocument(string $mdFile, string $htmlView): Response
     {
         $projectDir = dirname(__DIR__, 2);
