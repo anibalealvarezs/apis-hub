@@ -24,14 +24,12 @@ docker-compose.yml
 # Development recurrences
 dev-recurrences.md
 
-
 # Storage (Generated tokens, logs, etc.)
 /storage/
-
 .env.llenatucentro
-
 find_vars.py
-
 check_yaml.py
-
 config/channels/facebook_marketing.yaml.llenatucentro
+docker-compose.yml.llenatucentro
+config/instances.yaml.demo.hetzner
+.env.demo.hetzner

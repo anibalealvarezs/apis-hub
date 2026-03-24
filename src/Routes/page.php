@@ -3,12 +3,19 @@
 use Controllers\ConfigManagerController;
 use Controllers\MonitoringController;
 use Controllers\PageController;
+use Controllers\PrivacyController;
 use Symfony\Component\HttpFoundation\Request;
 
 return [
     '/' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->home(),
+        'public' => true,
+        'html' => true
+    ],
+    '/privacy' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new PrivacyController())->index(),
         'public' => true,
         'html' => true
     ],
