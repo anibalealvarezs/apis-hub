@@ -25,6 +25,12 @@ return [
         'public' => true,
         'html' => true
     ],
+    '/tos' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new PrivacyController())->tos(),
+        'public' => true,
+        'html' => true
+    ],
     '/command-builder' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->commandBuilder(),
