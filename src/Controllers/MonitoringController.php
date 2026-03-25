@@ -20,33 +20,46 @@ class MonitoringController extends BaseController
     private function getTargetContainerId($job, array $instances): ?string
     {
         $payload = $job instanceof Job ? $job->getPayload() : json_decode($job['payload'], true);
-        
+        if (!$payload) $payload = [];
+
         // 1. Direct match by instance_name (the most reliable)
-        if (isset($payload['instance_name'])) {
-            return $payload['instance_name'];
+        if (isset($payload['instance_name'])) return $payload['instance_name'];
+
+        $chanRaw = $job instanceof Job ? $job->getChannel() : $row['channel'] ?? $job['channel'];
+        
+        // Canonical Channel Name (always lowercase string)
+        $chan = null;
+        if (is_numeric($chanRaw)) {
+            $chan = strtolower(\Enums\Channel::tryFrom((int)$chanRaw)?->name ?? (string)$chanRaw);
+        } else {
+            $chan = strtolower(\Enums\Channel::tryFromName((string)$chanRaw)?->name ?? (string)$chanRaw);
         }
 
-        $chanRaw = $job instanceof Job ? $job->getChannel() : $job['channel'];
-        $chan = \Enums\Channel::tryFromName($chanRaw)?->name ?? strtolower($chanRaw);
-        $ent = strtolower($job instanceof Job ? $job->getEntity() : $job['entity']);
+        $ent = strtolower(trim($job instanceof Job ? $job->getEntity() : $job['entity']));
         
         $params = $payload['params'] ?? [];
         $jobStartDate = $params['startDate'] ?? $params['start_date'] ?? null;
         $jobEndDate = $params['endDate'] ?? $params['end_date'] ?? null;
 
-        if ($jobStartDate) $jobStartDate = str_replace('+', ' ', $jobStartDate);
-        if ($jobEndDate) $jobEndDate = str_replace('+', ' ', $jobEndDate);
+        if ($jobStartDate) $jobStartDate = str_replace('+', ' ', (string)$jobStartDate);
+        if ($jobEndDate) $jobEndDate = str_replace('+', ' ', (string)$jobEndDate);
 
         // 2. Fallback to channel/entity/date match
         foreach ($instances as $instance) {
             $instChanRaw = $instance['channel'] ?? '';
-            $instChan = \Enums\Channel::tryFromName($instChanRaw)?->name ?? strtolower($instChanRaw);
+            $instChan = strtolower(\Enums\Channel::tryFromName($instChanRaw)?->name ?? $instChanRaw);
             $instEnt = strtolower($instance['entity'] ?? '');
-            $instStart = $instance['start_date'] ?? null;
-            $instEnd = $instance['end_date'] ?? null;
-
+            
             if ($chan === $instChan && $ent === $instEnt) {
-                if ($instStart === $jobStartDate && $instEnd === $jobEndDate) {
+                // If the instance has dates defined, they must match exactly
+                if (!empty($instance['start_date']) || !empty($instance['end_date'])) {
+                     $instStart = $instance['start_date'] ?? null;
+                     $instEnd = $instance['end_date'] ?? null;
+                     if ($instStart === $jobStartDate && $instEnd === $jobEndDate) {
+                         return $instance['name'];
+                     }
+                } else {
+                    // If instance has NO dates (like Entities Sync), any job with same chan/ent matches
                     return $instance['name'];
                 }
             }
