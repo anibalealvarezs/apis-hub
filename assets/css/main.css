@@ -451,29 +451,18 @@ td { padding: 10px 15px; border-bottom: 1px solid var(--border); font-size: 0.8r
 .job-summary-left { display: flex; align-items: center; gap: 12px; }
 .job-summary-right { display: flex; align-items: center; gap: 15px; text-align: right; }
 .job-summary-title { font-weight: 800; font-size: 0.9rem; color: #fff; letter-spacing: 0.02em; }
-.pipeline-card.expanded { border-color: var(--primary); background: rgba(88, 166, 255, 0.05); }
-
-/* Workflow Group Headers */
-.workflow-group-section { margin-bottom: 40px; margin-top: 20px; }
-.workflow-group-header { 
-    display: flex; 
-    align-items: center; 
-    gap: 10px; 
-    margin-bottom: 25px; 
-    font-weight: 900; 
-    font-size: 1.1rem; 
-    color: #f59e0b; 
-    letter-spacing: 0.1em; 
-    text-transform: uppercase; 
-}
-.workflow-group-icon { opacity: 0.9; }
-.workflow-group-line { flex: 1; height: 1px; background: rgba(255,255,255,0.05); }
-
 .job-latest-activity { font-size: 0.7rem; color: var(--text-dim); display: block; }
 
 .job-details-pane { padding: 20px; border-top: 1px solid rgba(255,255,255,0.05); background: rgba(0, 0, 0, 0.1); display: none; }
 .pipeline-card.expanded .job-details-pane { display: block; }
 .pipeline-card.expanded .summary-chevron { transform: rotate(180deg); }
 .summary-chevron { transition: var(--transition); color: var(--text-dim); }
+
+.clickable:hover { background: rgba(255,255,255,0.03); }
+.sort-icon, .nested-sort-icon { font-size: 0.7rem; opacity: 0.3; transition: all 0.2s; margin-left: 4px; }
+.clickable:hover .sort-icon, .clickable:hover .nested-sort-icon { opacity: 0.7; }
+th.clickable { user-select: none; }
+th.clickable:active { background: rgba(255,255,255,0.1); }
+
 
 
