@@ -47,12 +47,7 @@ class InstanceGeneratorService
                 continue;
             }
 
-            if (!$this->hasActiveEntities($channelName)) {
-                continue;
-            }
-
             $channel = $channelName;
-            
             $channelInstances = [];
             
             // 0. Get Caching Limits for this channel
@@ -81,58 +76,61 @@ class InstanceGeneratorService
                 ];
             }
 
-            // 2. Historics (Quarters)
-            $historyStart = $today->modify("-{$rules['history_months']} months");
-            
-            // Limit history start by cache history range if stricter
-            if ($limitDate && $historyStart < $limitDate) {
-                $historyStart = $limitDate;
-            }
-
-            $tempStart = $historyStart;
-            
-            while ($tempStart < $yesterday) {
-                // Calculate end of quarter or just before yesterday
-                $quarterEnd = $this->getEndOfQuarter($tempStart);
-                if ($quarterEnd >= $yesterday) {
-                    $quarterEnd = $yesterday;
+            // 2. Historics and Recent (only if has active entities)
+            if ($this->hasActiveEntities($channelName)) {
+                // 2. Historics (Quarters)
+                $historyStart = $today->modify("-{$rules['history_months']} months");
+                
+                // Limit history start by cache history range if stricter
+                if ($limitDate && $historyStart < $limitDate) {
+                    $historyStart = $limitDate;
                 }
 
-                // If the entire quarter is before the limit date, skip it
-                if ($limitDate && $quarterEnd < $limitDate) {
+                $tempStart = $historyStart;
+                
+                while ($tempStart < $yesterday) {
+                    // Calculate end of quarter or just before yesterday
+                    $quarterEnd = $this->getEndOfQuarter($tempStart);
+                    if ($quarterEnd >= $yesterday) {
+                        $quarterEnd = $yesterday;
+                    }
+
+                    // If the entire quarter is before the limit date, skip it
+                    if ($limitDate && $quarterEnd < $limitDate) {
+                        $tempStart = $quarterEnd->modify('+1 day');
+                        if ($tempStart >= $yesterday) break;
+                        continue;
+                    }
+
+                    $year = $tempStart->format('Y');
+                    $quarterNumber = ceil($tempStart->format('n') / 3);
+                    $instanceName = sprintf('%s-%s-%s', str_replace('_', '-', $channel), $year, $quarterNumber);
+
+                    $channelInstances[] = [
+                        'name' => $instanceName,
+                        'port' => $currentPort++,
+                        'channel' => $channel,
+                        'entity' => 'metric',
+                        'start_date' => $tempStart->format('Y-m-d'),
+                        'end_date' => $quarterEnd->format('Y-m-d')
+                    ];
+
                     $tempStart = $quarterEnd->modify('+1 day');
                     if ($tempStart >= $yesterday) break;
-                    continue;
                 }
 
-                $year = $tempStart->format('Y');
-                $quarterNumber = ceil($tempStart->format('n') / 3);
-                $instanceName = sprintf('%s-%s-%s', str_replace('_', '-', $channel), $year, $quarterNumber);
-
+                // 3. Recent Instance
+                $recentName = str_replace('_', '-', $channel) . '-recent';
                 $channelInstances[] = [
-                    'name' => $instanceName,
+                    'name' => $recentName,
                     'port' => $currentPort++,
                     'channel' => $channel,
                     'entity' => 'metric',
-                    'start_date' => $tempStart->format('Y-m-d'),
-                    'end_date' => $quarterEnd->format('Y-m-d')
+                    'start_date' => '-3 days',
+                    'end_date' => 'yesterday',
+                    'frequency' => sprintf('%d %d * * *', $rules['recent_cron_minute'], $rules['recent_cron_hour'])
                 ];
-
-                $tempStart = $quarterEnd->modify('+1 day');
-                if ($tempStart >= $yesterday) break;
             }
-
-            // 3. Recent Instance
-            $recentName = str_replace('_', '-', $channel) . '-recent';
-            $channelInstances[] = [
-                'name' => $recentName,
-                'port' => $currentPort++,
-                'channel' => $channel,
-                'entity' => 'metric',
-                'start_date' => '-3 days',
-                'end_date' => 'yesterday',
-                'frequency' => sprintf('%d %d * * *', $rules['recent_cron_minute'], $rules['recent_cron_hour'])
-            ];
 
             // 4. Handle dependencies (Optional)
             if ($useDependencies) {
