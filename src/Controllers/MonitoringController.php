@@ -107,15 +107,23 @@ class MonitoringController extends BaseController
         $jobRepo = $this->em->getRepository(Job::class);
 
         // Fetch ONLY pending, processing, or failed jobs for priority visibility
+        // Fetch the 300 most recent jobs overall for historical context
+        $allRecentJobs = $jobRepo->findBy([], ['id' => 'DESC'], 300);
+        
+        // We also want to make sure priority jobs (failed, etc.) are included even if they are older
         $priorityJobs = $jobRepo->findBy(
             ['status' => [JobStatus::scheduled->value, JobStatus::processing->value, JobStatus::failed->value]],
             ['id' => 'DESC'],
-            200
+            100
         );
 
-        // Fetch the 300 most recent jobs overall for historical context
-        $recentJobs = $jobRepo->findBy([], ['id' => 'DESC'], 300);
-        $allRecentJobs = array_unique(array_merge($priorityJobs, $recentJobs), SORT_REGULAR);
+        // Merge and manually ensure uniqueness by ID to avoid SORT_REGULAR issues
+        $finalJobs = [];
+        foreach (array_merge($allRecentJobs, $priorityJobs) as $j) {
+            $finalJobs[$j->getId()] = $j;
+        }
+        krsort($finalJobs); // Keep highest IDs first
+        $allRecentJobs = array_values($finalJobs);
 
         $pipelines = [];
         foreach ($allRecentJobs as $job) {
@@ -123,9 +131,11 @@ class MonitoringController extends BaseController
             $payload = $job->getPayload() ?? [];
             $params = $payload['params'] ?? [];
             
-            // Create a unique key for this sync "pipeline" based on Instance + Entity
-            // We ignore paramsHash here to keep historical runs of the same instance grouped together
-            $pipelineKey = "{$targetId}:" . strtolower($job->getChannel()) . ":" . strtolower($job->getEntity());
+            $normChan = strtolower(trim($job->getChannel()));
+            $normEnt = strtolower(trim($job->getEntity()));
+
+            // Create a unique key based on Instance + Entity (normalized)
+            $pipelineKey = "{$targetId}:{$normChan}:{$normEnt}";
 
             if (!isset($pipelines[$pipelineKey])) {
                 $statusText = JobStatus::tryFrom($job->getStatus())?->name ?? 'unknown';
