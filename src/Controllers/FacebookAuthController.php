@@ -5,6 +5,7 @@ namespace Controllers;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Helpers\Helpers;
 use Symfony\Component\Yaml\Yaml;
 
 class FacebookAuthController
@@ -15,6 +16,9 @@ class FacebookAuthController
 
     public function __construct()
     {
+        // Forzamos la carga de la configuración para asegurar que $_ENV esté poblado
+        Helpers::getProjectConfig();
+        
         // Se cargan desde el .env (basado en la estructura del proyecto)
         $this->clientId = $_ENV['FACEBOOK_APP_ID'] ?? '';
         $this->clientSecret = $_ENV['FACEBOOK_APP_SECRET'] ?? '';
