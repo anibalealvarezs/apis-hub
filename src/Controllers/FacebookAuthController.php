@@ -35,7 +35,15 @@ class FacebookAuthController
         
         // Inyectamos valores de depuración para que el usuario pueda verificar la config
         $appId = $this->clientId ?: '<span style="color: #f85149;">Missing</span>';
-        $activeEnv = getenv('ENV_FILE') ?: '.env';
+        
+        $primaryEnv = getenv('ENV_FILE') ?: '.env';
+        $appEnv = getenv('APP_ENV') ?: ($_ENV['APP_ENV'] ?? '');
+        
+        // Reflejamos si hubo carga en cadena
+        $activeEnv = $primaryEnv;
+        if ($appEnv === 'demo' && $primaryEnv !== '.env.demo') {
+            $activeEnv .= ' + <span style="color: #58a6ff;">.env.demo</span>';
+        }
         
         $content = str_replace(
             ['{{FACEBOOK_APP_ID}}', '{{ACTIVE_ENV_FILE}}'],
