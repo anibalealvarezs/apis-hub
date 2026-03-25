@@ -527,8 +527,10 @@ function sortTable(key) {
     if (sortConfig.key === key) sortConfig.dir = sortConfig.dir === 'asc' ? 'desc' : 'asc';
     else { sortConfig.key = key; sortConfig.dir = 'asc'; }
     currentData.sort((a,b) => {
-        let vA = a[key] || 0; let vB = b[key] || 0;
-        if (typeof vA === 'string') return sortConfig.dir === 'asc' ? vA.localeCompare(vB) : vB.localeCompare(vA);
+        let vA = a[key] ?? ''; let vB = b[key] ?? '';
+        if (typeof vA === 'string' || typeof vB === 'string') {
+            return sortConfig.dir === 'asc' ? String(vA).localeCompare(String(vB)) : String(vB).localeCompare(String(vA));
+        }
         return sortConfig.dir === 'asc' ? vA - vB : vB - vA;
     });
     render();
