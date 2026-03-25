@@ -110,11 +110,11 @@ class MonitoringController extends BaseController
         $priorityJobs = $jobRepo->findBy(
             ['status' => [JobStatus::scheduled->value, JobStatus::processing->value, JobStatus::failed->value]],
             ['id' => 'DESC'],
-            100
+            200
         );
 
-        // Fetch the 50 most recent jobs overall for historical context
-        $recentJobs = $jobRepo->findBy([], ['id' => 'DESC'], 50);
+        // Fetch the 300 most recent jobs overall for historical context
+        $recentJobs = $jobRepo->findBy([], ['id' => 'DESC'], 300);
         $allRecentJobs = array_unique(array_merge($priorityJobs, $recentJobs), SORT_REGULAR);
 
         $pipelines = [];
@@ -186,6 +186,17 @@ class MonitoringController extends BaseController
             $chan = $pipeline['channel'];
             if (!isset($groupedJobs[$chan])) $groupedJobs[$chan] = [];
             $groupedJobs[$chan][] = $pipeline;
+        }
+
+        // Sort jobs within each channel group to match the instance order
+        $instanceOrder = array_flip(array_column($instances, 'name'));
+        foreach ($groupedJobs as $chan => &$jobs) {
+            usort($jobs, function($a, $b) use ($instanceOrder) {
+                $idxA = $instanceOrder[$a['group']] ?? 999;
+                $idxB = $instanceOrder[$b['group']] ?? 999;
+                if ($idxA !== $idxB) return $idxA - $idxB;
+                return $b['id'] - $a['id']; // Internal sort by ID desc if in same instance
+            });
         }
 
         $statsConfig = [
