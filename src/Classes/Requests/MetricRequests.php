@@ -1249,7 +1249,7 @@ class MetricRequests
                 }
 
                 $apiInstance = new SearchConsoleApi(
-                    redirectUrl: $redirectUri,
+                    redirectUrl: (string)$redirectUri,
                     clientId: $clientId,
                     clientSecret: $clientSecret,
                     refreshToken: $config['google_search_console']['refresh_token'] ?? ($config['google']['refresh_token'] ?? null),
