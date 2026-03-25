@@ -163,34 +163,36 @@ class ConfigManagerController extends BaseController
                     $fbConfig = MetricRequests::validateFacebookConfig($logger);
                     $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $logger);
                     
-                    // Get Pages
-                    $pagesResponse = $fbApi->performRequest(
-                        'GET',
-                        'v25.0/me/accounts',
-                        ['fields' => 'id,name,link,instagram_business_account']
+                    // Get Pages using SDK with explicit User ID and custom fields
+                    $userId = $fbApi->getUserId();
+                    $pagesData = $fbApi->getPages(
+                        userId: $userId,
+                        permissions: [], 
+                        limit: 100, 
+                        fields: 'id,name,instagram_business_account'
                     );
-                    $pagesData = json_decode($pagesResponse->getBody()->getContents(), true);
-                    if (isset($pagesData['data'])) {
+
+                    if (!empty($pagesData['data'])) {
                         $allAssets['facebook_pages'] = [];
                         foreach ($pagesData['data'] as $page) {
                             $allAssets['facebook_pages'][] = [
                                 'id' => $page['id'],
                                 'title' => $page['name'],
-                                'url' => $page['link'] ?? '',
-                                'hostname' => isset($page['link']) ? $this->deriveHostnameFromUrl($page['link']) : '',
+                                'url' => '', // 'link' was removed as it might require extra permissions
+                                'hostname' => '',
                                 'ig_account' => $page['instagram_business_account']['id'] ?? null,
                             ];
                         }
                     }
 
-                    // Get Ad Accounts (Manual request to avoid business_management requirement in DEFAULT fields)
-                    $adAccountsResponse = $fbApi->performRequest(
-                        'GET',
-                        'v25.0/me/adaccounts',
-                        ['fields' => 'id,name,account_id,account_status,currency']
+                    // Get Ad Accounts using SDK with explicit User ID and custom fields
+                    $adAccountsData = $fbApi->getAdAccounts(
+                        userId: $userId,
+                        limit: 100, 
+                        fields: 'id,name,account_id,account_status,currency'
                     );
-                    $adAccountsData = json_decode($adAccountsResponse->getBody()->getContents(), true);
-                    if (isset($adAccountsData['data'])) {
+
+                    if (!empty($adAccountsData['data'])) {
                         $allAssets['facebook_ad_accounts'] = [];
                         foreach ($adAccountsData['data'] as $acc) {
                             $allAssets['facebook_ad_accounts'][] = [
