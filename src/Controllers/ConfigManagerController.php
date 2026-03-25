@@ -202,14 +202,55 @@ class ConfigManagerController extends BaseController
                 $lastUpdated = time();
             }
 
-            // 3. Post-process Assets: Ensure known accounts from config are pre-populated even if API fetch failed
+            // 3. Post-process Assets: GSC (Search Console)
+            $configGscUrls = [];
+            foreach (($currentConfig['gsc'] ?? []) as $url => $siteCfg) {
+                $configGscUrls[] = $url;
+            }
+            
+            // Mark lost access (in config but not in API results)
+            foreach ($configGscUrls as $url) {
+                $found = false;
+                foreach ($allAssets['gsc'] as $fetched) {
+                    if ($this->normalizeGscUrl($fetched['url']) === $this->normalizeGscUrl($url)) {
+                        $found = true;
+                        break;
+                    }
+                }
+                if (!$found) {
+                    $allAssets['gsc'][] = [
+                        'url' => $url,
+                        'title' => $this->deriveTitleFromUrl($url),
+                        'hostname' => $this->deriveHostnameFromUrl($url),
+                        'lost_access' => true
+                    ];
+                }
+            }
+
+            // Mark NEW GSC sites
+            foreach ($allAssets['gsc'] as &$asset) {
+                if (!isset($asset['lost_access'])) {
+                    $normalizedUrl = $this->normalizeGscUrl($asset['url']);
+                    $isKnown = false;
+                    foreach ($configGscUrls as $cU) {
+                        if ($this->normalizeGscUrl($cU) === $normalizedUrl) {
+                            $isKnown = true;
+                            break;
+                        }
+                    }
+                    if (!$isKnown) $asset['is_new'] = true;
+                }
+            }
+            unset($asset);
+
+            // 4. Post-process Assets: Facebook (Pages & Ad Accounts)
             foreach (($currentConfig['fb_page_ids'] ?? []) as $pId) {
                 $found = false;
                 foreach ($allAssets['facebook_pages'] as $known) {
                     if ((string)$known['id'] === (string)$pId) { $found = true; break; }
                 }
                 if (!$found) {
-                    $allAssets['facebook_pages'][] = ['id' => $pId, 'title' => 'FB Page ' . $pId, 'hostname' => ''];
+                    $allAssets['facebook_pages'][] = ['id' => $pId, 'title' => 'FB Page ' . $pId, 'hostname' => '', 'lost_access' => true];
                 }
             }
             foreach (($currentConfig['fb_ad_account_ids'] ?? []) as $aId) {
@@ -218,9 +259,22 @@ class ConfigManagerController extends BaseController
                     if ((string)$known['id'] === (string)$aId) { $found = true; break; }
                 }
                 if (!$found) {
-                    $allAssets['facebook_ad_accounts'][] = ['id' => $aId, 'name' => 'Ad Account ' . $aId];
+                    $allAssets['facebook_ad_accounts'][] = ['id' => $aId, 'name' => 'Ad Account ' . $aId, 'lost_access' => true];
                 }
             }
+
+            // Mark new assets
+            foreach ($allAssets['facebook_pages'] as &$asset) {
+                if (!isset($asset['lost_access']) && !in_array((string)$asset['id'], $currentConfig['fb_page_ids'] ?? [])) {
+                    $asset['is_new'] = true;
+                }
+            }
+            foreach ($allAssets['facebook_ad_accounts'] as &$asset) {
+                if (!isset($asset['lost_access']) && !in_array((string)$asset['id'], $currentConfig['fb_ad_account_ids'] ?? [])) {
+                    $asset['is_new'] = true;
+                }
+            }
+            unset($asset); // safe unset by reference
 
             return new Response(json_encode([
                 'assets' => $allAssets,

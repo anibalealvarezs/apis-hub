@@ -7,6 +7,9 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Helpers\Helpers;
 use Symfony\Component\Yaml\Yaml;
+use Classes\Clients\FacebookClient;
+use Anibalealvarezs\FacebookGraphApi\Enums\UserPermission;
+use Anibalealvarezs\FacebookGraphApi\Enums\PagePermission;
 
 class FacebookAuthController
 {
@@ -57,17 +60,34 @@ class FacebookAuthController
             return new RedirectResponse('/fb-login?error=invalid_config');
         }
 
+        try {
+            $config = FacebookClient::getConfig();
+        } catch (\Exception $e) {
+            $config = [];
+        }
+
         $scopes = [
-            'public_profile',
-            'email',
-            'ads_read', // Requerido para ver insights
-            'ads_management' // Opcional, pero recomendado para gestión estándar
+            UserPermission::PUBLIC_PROFILE->value,
+            UserPermission::EMAIL->value,
         ];
+
+        // Marketing Scopes
+        if (!empty($config['ad_accounts'])) {
+            $scopes[] = UserPermission::ADS_READ->value;
+        }
+
+        // Organic Pages and Instagram Scopes
+        if (!empty($config['pages'])) {
+            $scopes[] = PagePermission::PAGES_SHOW_LIST->value;
+            $scopes[] = PagePermission::PAGES_READ_ENGAGEMENT->value;
+            $scopes[] = 'instagram_basic';
+            $scopes[] = 'instagram_manage_insights';
+        }
 
         $url = "https://www.facebook.com/v19.0/dialog/oauth?" . http_build_query([
             'client_id' => $this->clientId,
             'redirect_uri' => $this->redirectUri,
-            'scope' => implode(',', $scopes),
+            'scope' => implode(',', array_unique($scopes)),
             'response_type' => 'code',
             'state' => bin2hex(random_bytes(16)) // Seguridad anti-CSRF
         ]);
