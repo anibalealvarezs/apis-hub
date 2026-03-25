@@ -36,3 +36,5 @@ config/instances.yaml.demo.hetzner
 .privacy-policy
 config/channels/facebook_marketing.yml.demo.hetzner
 .env.hetzner
+
+.env.gbs

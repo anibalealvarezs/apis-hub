@@ -131,13 +131,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "e4d3324c1c8f989a7a4faf60f96d4b5a48fb0b32"
+                "reference": "8716f609536fd790846f16a9285646e2c11b57a7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-e4d3324c1c8f989a7a4faf60f96d4b5a48fb0b32-zip-3af8e6.zip",
-                "reference": "e4d3324c1c8f989a7a4faf60f96d4b5a48fb0b32",
-                "shasum": "30dd31f3057e455249dfe7eda25a9523ce8af005"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-8716f609536fd790846f16a9285646e2c11b57a7-zip-5aa9c7.zip",
+                "reference": "8716f609536fd790846f16a9285646e2c11b57a7",
+                "shasum": "f2fcbf00f45ac15581c7b8edb46fb92bcd026b0d"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -188,7 +188,7 @@
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-22T02:43:37+00:00"
+            "time": "2026-03-25T18:03:31+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -2236,12 +2236,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/predis/predis.git",
-                "reference": "1c4219cf88708cbe54c4302322160f2edd847a40"
+                "reference": "4c56d5d290fb879b31e43ee4f10817dacd5c2f7b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/predis/predis/zipball/1c4219cf88708cbe54c4302322160f2edd847a40",
-                "reference": "1c4219cf88708cbe54c4302322160f2edd847a40",
+                "url": "https://api.github.com/repos/predis/predis/zipball/4c56d5d290fb879b31e43ee4f10817dacd5c2f7b",
+                "reference": "4c56d5d290fb879b31e43ee4f10817dacd5c2f7b",
                 "shasum": ""
             },
             "require": {
@@ -2292,7 +2292,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-03-18T01:09:30+00:00"
+            "time": "2026-03-25T09:36:01+00:00"
         },
         {
             "name": "psr/cache",
@@ -2765,12 +2765,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/cache.git",
-                "reference": "b64349671566d62f70577ba455d0a575ae3db9ee"
+                "reference": "82d5b5cb95f1fbee9e6358cfe4ef9c1ced4e3793"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/cache/zipball/b64349671566d62f70577ba455d0a575ae3db9ee",
-                "reference": "b64349671566d62f70577ba455d0a575ae3db9ee",
+                "url": "https://api.github.com/repos/symfony/cache/zipball/82d5b5cb95f1fbee9e6358cfe4ef9c1ced4e3793",
+                "reference": "82d5b5cb95f1fbee9e6358cfe4ef9c1ced4e3793",
                 "shasum": ""
             },
             "require": {
@@ -2857,7 +2857,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-16T13:41:56+00:00"
+            "time": "2026-03-23T20:31:23+00:00"
         },
         {
             "name": "symfony/cache-contracts",
@@ -3668,12 +3668,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-kernel.git",
-                "reference": "97266035603152ba0fd726b583191154a85737a6"
+                "reference": "b22a712e646064a6b84153ececeb963948944146"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/97266035603152ba0fd726b583191154a85737a6",
-                "reference": "97266035603152ba0fd726b583191154a85737a6",
+                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/b22a712e646064a6b84153ececeb963948944146",
+                "reference": "b22a712e646064a6b84153ececeb963948944146",
                 "shasum": ""
             },
             "require": {
@@ -3778,7 +3778,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-17T11:32:31+00:00"
+            "time": "2026-03-22T13:52:11+00:00"
         },
         {
             "name": "symfony/messenger",
@@ -5369,12 +5369,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/data-fixtures.git",
-                "reference": "9825932bff92be54574d3e0792354e5eb951a635"
+                "reference": "9a05e1706b5edec1230ce5011c1d6979e7b00ac3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/data-fixtures/zipball/9825932bff92be54574d3e0792354e5eb951a635",
-                "reference": "9825932bff92be54574d3e0792354e5eb951a635",
+                "url": "https://api.github.com/repos/doctrine/data-fixtures/zipball/9a05e1706b5edec1230ce5011c1d6979e7b00ac3",
+                "reference": "9a05e1706b5edec1230ce5011c1d6979e7b00ac3",
                 "shasum": ""
             },
             "require": {
@@ -5396,7 +5396,7 @@
                 "doctrine/orm": "^2.14 || ^3",
                 "ext-sqlite3": "*",
                 "fig/log-test": "^1",
-                "phpstan/phpstan": "2.1.42",
+                "phpstan/phpstan": "2.1.43",
                 "phpunit/phpunit": "^9.6.13 || ^12.4",
                 "psr/log": "^1.1 || ^2 || ^3",
                 "symfony/cache": "^5.4 || ^6.3 || ^7 || ^8",
@@ -5447,7 +5447,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-19T19:01:42+00:00"
+            "time": "2026-03-25T11:15:58+00:00"
         },
         {
             "name": "mikey179/vfsstream",
