@@ -76,13 +76,12 @@ class FacebookAuthController
             $scopes[] = UserPermission::ADS_READ->value;
         }
 
-        // Organic Pages Scopes
+        // Organic Pages and Instagram Scopes
         if (!empty($config['pages'])) {
             $scopes[] = PagePermission::PAGES_SHOW_LIST->value;
             $scopes[] = PagePermission::PAGES_READ_ENGAGEMENT->value;
-            $scopes[] = PagePermission::PAGES_READ_USER_CONTENT->value;
-            $scopes[] = PagePermission::PAGES_MANAGE_METADATA->value;
-            $scopes[] = PagePermission::BUSINESS_MANAGEMENT->value;
+            $scopes[] = 'instagram_basic';
+            $scopes[] = 'instagram_manage_insights';
         }
 
         $url = "https://www.facebook.com/v19.0/dialog/oauth?" . http_build_query([
