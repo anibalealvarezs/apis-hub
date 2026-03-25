@@ -249,20 +249,42 @@ class BaseRepository extends EntityRepository
                     // We join the relation to allow filtering by platform_id OR database ID
                     $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
                     
-                    // Safety check to prevent integer overflow in PostgreSQL
-                    $isPlatformId = is_numeric($value) && (float)$value > 2147483647;
-                    if ($isPlatformId) {
+                    // Safety check to prevent integer overflow and type mismatch in PostgreSQL
+                    $isPlatformIdValue = is_numeric($value) && (float)$value > 2147483647;
+                    $isPostgres = Helpers::isPostgres();
+                    
+                    if ($isPlatformIdValue) {
                         $qb->andWhere("{$map['alias']}.platform_id = :f_$key")
                            ->setParameter("f_$key", (string)$value);
                     } else {
-                        $qb->andWhere("(mc.{$map['fk']} = :f_$key OR {$map['alias']}.platform_id = :f_$key)")
-                           ->setParameter("f_$key", $value);
+                        if ($isPostgres) {
+                            // On PostgreSQL, we MUST cast the integer FK to text to compare with a parameter 
+                            // that might be a non-numeric string, otherwise it fails with SQLSTATE[22P02]
+                            $qb->andWhere("(CAST(mc.{$map['fk']} AS text) = :f_$key OR {$map['alias']}.platform_id = :f_$key)")
+                               ->setParameter("f_$key", (string)$value);
+                        } else {
+                            $qb->andWhere("(mc.{$map['fk']} = :f_$key OR {$map['alias']}.platform_id = :f_$key)")
+                               ->setParameter("f_$key", $value);
+                        }
                     }
                 } else {
                     $sqlKey = $this->mapFieldToSql($key);
                     $paramName = 'f_' . preg_replace('/[^a-z0-9]/i', '_', $key);
-                    $qb->andWhere("$sqlKey = :$paramName")
-                       ->setParameter($paramName, $value);
+                    
+                    $isPostgres = Helpers::isPostgres();
+                    if ($isPostgres) {
+                        // Cast both sides to text if the input is not numeric to prevent type mismatch
+                        if (!is_numeric($value)) {
+                            $qb->andWhere("CAST($sqlKey AS text) = :$paramName")
+                               ->setParameter($paramName, (string)$value);
+                        } else {
+                            $qb->andWhere("$sqlKey = :$paramName")
+                               ->setParameter($paramName, $value);
+                        }
+                    } else {
+                        $qb->andWhere("$sqlKey = :$paramName")
+                           ->setParameter($paramName, $value);
+                    }
                 }
             }
         }
