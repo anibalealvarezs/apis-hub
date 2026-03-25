@@ -617,6 +617,40 @@ function handleFbStrategyChange() {
     if (area) area.style.display = isCustom ? 'block' : 'none';
 }
 
+async function forceRefresh(type) {
+    const loader = document.getElementById('loading');
+    if (loader) {
+        loader.style.display = 'flex';
+        const textEl = loader.querySelector('div:nth-child(2)');
+        if (textEl) textEl.textContent = 'Force Syncing from API...';
+    }
+
+    try {
+        const response = await fetch(`/api/config-manager/assets?refresh=1&type=${type}`, { headers: getAdminHeaders() });
+        if (response.status === 401) {
+            localStorage.removeItem('apis_hub_admin_auth');
+            alert('Session Expired. Please reload.');
+            return;
+        }
+        
+        const data = await response.json();
+        if (!data || !data.config) throw new Error("Invalid response.");
+        
+        currentConfig = data.config;
+        populateGlobalFields();
+        renderAssets(data.assets);
+        showToast('Assets synchronized successfully!', false);
+    } catch (error) {
+        showToast('Error syncing assets: ' + error.message, true);
+    } finally {
+        if (loader) {
+            loader.style.display = 'none';
+            const textEl = loader.querySelector('div:nth-child(2)');
+            if (textEl) textEl.textContent = 'Synchronizing Config...';
+        }
+    }
+}
+
 // Global Hooks
 window.setFbLevel = setFbLevel;
 window.setMetricLevel = setMetricLevel;
@@ -626,6 +660,7 @@ window.updateConfig = updateConfig;
 window.validateTokens = validateTokens;
 window.handleFbLevelChange = handleFbLevelChange;
 window.handleFbStrategyChange = handleFbStrategyChange;
+window.forceRefresh = forceRefresh;
 
 // Initialize
 if (document.readyState === 'loading') {
