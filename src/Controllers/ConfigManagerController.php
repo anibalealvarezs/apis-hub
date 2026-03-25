@@ -48,11 +48,84 @@ class ConfigManagerController extends BaseController
             ];
             $lastUpdated = null;
 
+            // 1. Load effective config from system source of truth (merging all Yaml + Env)
+            $systemConfig = Helpers::getProjectConfig();
+            $gsc = $systemConfig['channels']['google_search_console'] ?? [];
+            $fbGlobal = $systemConfig['channels']['facebook'] ?? [];
+            $fbOrganic = $systemConfig['channels']['facebook_organic'] ?? [];
+            $fbMarketing = $systemConfig['channels']['facebook_marketing'] ?? [];
+
+            $fbConf = array_replace_recursive($fbGlobal, $fbOrganic, $fbMarketing);
+
+            $currentConfig = [
+                'gsc' => [], 
+                'gsc_cache_history_range' => $gsc['cache_history_range'] ?? '16 months',
+                'gsc_enabled' => $gsc['enabled'] ?? true,
+                'gsc_feature_toggles' => [
+                    'cache_aggregations' => $gsc['cache_aggregations'] ?? false
+                ],
+                'fb_page_ids' => [],
+                'fb_ad_account_ids' => [],
+                'fb_cache_chunk_size' => $fbGlobal['cache_chunk_size'] ?? '1 week',
+                'fb_organic_history_range' => $fbOrganic['cache_history_range'] ?? '2 years',
+                'fb_marketing_history_range' => $fbMarketing['cache_history_range'] ?? '2 years',
+                'fb_entity_filters' => [],
+                'fb_organic_enabled' => $fbOrganic['enabled'] ?? true,
+                'fb_marketing_enabled' => $fbMarketing['enabled'] ?? true,
+                'fb_metrics_strategy' => $fbMarketing['metrics_strategy'] ?? 'default',
+                'fb_metrics_config' => $fbMarketing['metrics_config'] ?? [],
+                'jobs_timeout_hours' => $systemConfig['jobs']['timeout_hours'] ?? 6,
+                'cache_raw_metrics' => filter_var($systemConfig['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'marketing_debug_logs' => filter_var($systemConfig['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            ];
+
+            // Re-map GSC sites
+            foreach (($gsc['sites'] ?? []) as $site) {
+                $currentConfig['gsc'][$site['url']] = [
+                    'target_countries' => $site['target_countries'] ?? [],
+                    'target_keywords' => $site['target_keywords'] ?? [],
+                ];
+            }
+
+            // Re-map FB entities
+            if (!empty($fbConf)) {
+                $entities = ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA', 'CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'];
+                foreach ($entities as $e) {
+                    $currentConfig['fb_entity_filters'][$e] = $fbConf[$e]['cache_include'] ?? '';
+                }
+
+                foreach (($fbConf['pages'] ?? []) as $p) {
+                    $currentConfig['fb_page_ids'][] = (string)$p['id'];
+                }
+                foreach (($fbConf['ad_accounts'] ?? []) as $a) {
+                    $currentConfig['fb_ad_account_ids'][] = (string)$a['id'];
+                }
+
+                $fbOrganicFeatures = ['page_metrics', 'posts', 'post_metrics', 'ig_accounts', 'ig_account_metrics', 'ig_account_media', 'ig_account_media_metrics'];
+                $fbMarketingFeatures = ['ad_account_metrics', 'campaigns', 'campaign_metrics', 'adsets', 'adset_metrics', 'ads', 'ad_metrics', 'creatives', 'creative_metrics'];
+                
+                $currentConfig['fb_feature_toggles'] = [];
+                // From Organic (PAGE section)
+                foreach ($fbOrganicFeatures as $f) {
+                    $currentConfig['fb_feature_toggles'][$f] = $fbOrganic['PAGE'][$f] ?? false; 
+                }
+                // From Marketing (AD_ACCOUNT section)
+                foreach ($fbMarketingFeatures as $f) {
+                    $currentConfig['fb_feature_toggles'][$f] = $fbMarketing['AD_ACCOUNT'][$f] ?? false;
+                }
+                $currentConfig['fb_feature_toggles']['cache_aggregations'] = ($fbOrganic['cache_aggregations'] ?? false) || ($fbMarketing['cache_aggregations'] ?? false);
+            }
+
+            // 2. Fetch Assets from APIs (with isolated Try-Catch)
             // Try to load from backup first if not forcing refresh
             if (!$forceRefresh && file_exists($this->assetsBackupPath)) {
-                $backup = Yaml::parseFile($this->assetsBackupPath);
-                $allAssets = $backup['assets'] ?? $allAssets;
-                $lastUpdated = filemtime($this->assetsBackupPath);
+                try {
+                    $backup = Yaml::parseFile($this->assetsBackupPath);
+                    $allAssets = $backup['assets'] ?? $allAssets;
+                    $lastUpdated = filemtime($this->assetsBackupPath);
+                } catch (\Throwable $e) {
+                    $logger->warning("Failed to load assets backup: " . $e->getMessage());
+                }
             }
 
             // If we need to fetch from APIs (either force refresh or no backup found for requested type)
@@ -75,7 +148,7 @@ class ConfigManagerController extends BaseController
                             ];
                         }
                     }
-                } catch (Exception $e) {
+                } catch (\Throwable $e) {
                     $logger->error("Error fetching GSC sites: " . $e->getMessage());
                     if ($requestedType === 'gsc') throw $e;
                 }
@@ -117,7 +190,7 @@ class ConfigManagerController extends BaseController
                             ];
                         }
                     }
-                } catch (Exception $e) {
+                } catch (\Throwable $e) {
                     $logger->error("Error fetching Facebook assets: " . $e->getMessage());
                     if ($requestedType === 'facebook') throw $e;
                 }
@@ -129,120 +202,25 @@ class ConfigManagerController extends BaseController
                 $lastUpdated = time();
             }
 
-            // Load current config for sync state
-            $currentConfig = [
-                'gsc' => [], 
-                'gsc_cache_history_range' => '16 months',
-                'gsc_enabled' => true,
-                'fb_page_ids' => [],
-                'fb_ad_account_ids' => [],
-                'fb_cache_chunk_size' => '1 week',
-                'fb_organic_history_range' => '2 years',
-                'fb_marketing_history_range' => '2 years',
-                'fb_entity_filters' => [], // entity => include_string
-                'fb_organic_enabled' => true,
-                'fb_marketing_enabled' => true,
-                'fb_metrics_strategy' => 'default',
-                'fb_metrics_config' => [],
-                'jobs_timeout_hours' => 6,
-                'cache_raw_metrics' => false,
-            ];
-
-            $appConfigPath = __DIR__ . '/../../config/app.yaml';
-            if (file_exists($appConfigPath)) {
-                $appConf = Yaml::parseFile($appConfigPath);
-                $currentConfig['jobs_timeout_hours'] = $appConf['jobs']['timeout_hours'] ?? 6;
-                $currentConfig['cache_raw_metrics'] = filter_var($appConf['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
-                $currentConfig['marketing_debug_logs'] = filter_var($appConf['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN);
-            }
-
-            if (file_exists($this->gscConfigPath)) {
-                $gscConf = Yaml::parseFile($this->gscConfigPath);
-                $gsc = $gscConf['channels']['google_search_console'] ?? [];
-                $currentConfig['gsc_cache_history_range'] = $gsc['cache_history_range'] ?? '16 months';
-                $currentConfig['gsc_enabled'] = $gsc['enabled'] ?? true;
-                $currentConfig['gsc_feature_toggles'] = [
-                    'cache_aggregations' => $gsc['cache_aggregations'] ?? false
-                ];
-                $sites = $gsc['sites'] ?? [];
-                foreach ($sites as $site) {
-                    $currentConfig['gsc'][$site['url']] = [
-                        'target_countries' => $site['target_countries'] ?? [],
-                        'target_keywords' => $site['target_keywords'] ?? [],
-                    ];
+            // 3. Post-process Assets: Ensure known accounts from config are pre-populated even if API fetch failed
+            foreach (($currentConfig['fb_page_ids'] ?? []) as $pId) {
+                $found = false;
+                foreach ($allAssets['facebook_pages'] as $known) {
+                    if ((string)$known['id'] === (string)$pId) { $found = true; break; }
+                }
+                if (!$found) {
+                    $allAssets['facebook_pages'][] = ['id' => $pId, 'title' => 'FB Page ' . $pId, 'hostname' => ''];
                 }
             }
-
-            // Merge all Facebook config files to get complete state
-            $fbGlobal = file_exists($this->fbConfigPath) ? Yaml::parseFile($this->fbConfigPath) : [];
-            $fbOrganic = file_exists($this->fbOrganicPath) ? Yaml::parseFile($this->fbOrganicPath) : [];
-            $fbMarketing = file_exists($this->fbMarketingPath) ? Yaml::parseFile($this->fbMarketingPath) : [];
-            
-            // Extract from their respective keys
-            $fbGlobalConfig = $fbGlobal['channels']['facebook'] ?? [];
-            $fbOrganicConfig = $fbOrganic['channels']['facebook_organic'] ?? [];
-            $fbMarketingConfig = $fbMarketing['channels']['facebook_marketing'] ?? [];
-            
-            $fbConf = array_replace_recursive($fbGlobalConfig, $fbOrganicConfig, $fbMarketingConfig);
-            
-            if (!empty($fbConf)) {
-                $currentConfig['fb_cache_chunk_size'] = $fbGlobalConfig['cache_chunk_size'] ?? '1 week';
-                $currentConfig['fb_organic_history_range'] = $fbOrganicConfig['cache_history_range'] ?? '2 years';
-                $currentConfig['fb_marketing_history_range'] = $fbMarketingConfig['cache_history_range'] ?? '2 years';
-                $currentConfig['fb_organic_enabled'] = $fbOrganicConfig['enabled'] ?? true;
-                $currentConfig['fb_marketing_enabled'] = $fbMarketingConfig['enabled'] ?? true;
-                $currentConfig['fb_metrics_strategy'] = $fbMarketingConfig['metrics_strategy'] ?? 'default';
-                $currentConfig['fb_metrics_config'] = $fbMarketingConfig['metrics_config'] ?? [];
-                
-                $entities = ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA', 'CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'];
-                foreach ($entities as $e) {
-                    $currentConfig['fb_entity_filters'][$e] = $fbConf[$e]['cache_include'] ?? '';
+            foreach (($currentConfig['fb_ad_account_ids'] ?? []) as $aId) {
+                $found = false;
+                foreach ($allAssets['facebook_ad_accounts'] as $known) {
+                    if ((string)$known['id'] === (string)$aId) { $found = true; break; }
                 }
-
-                $pages = $fbConf['pages'] ?? [];
-                foreach ($pages as $p) {
-                    $currentConfig['fb_page_ids'][] = (string)$p['id'];
+                if (!$found) {
+                    $allAssets['facebook_ad_accounts'][] = ['id' => $aId, 'name' => 'Ad Account ' . $aId];
                 }
-                $ads = $fbConf['ad_accounts'] ?? [];
-                foreach ($ads as $a) {
-                    $currentConfig['fb_ad_account_ids'][] = (string)$a['id'];
-                }
-
-                $fbOrganicFeatures = [
-                    'page_metrics' => false,
-                    'posts' => true,
-                    'post_metrics' => false,
-                    'ig_accounts' => true,
-                    'ig_account_metrics' => false,
-                    'ig_account_media' => true,
-                    'ig_account_media_metrics' => false,
-                ];
-                $fbMarketingFeatures = [
-                    'ad_account_metrics' => true,
-                    'campaigns' => true,
-                    'campaign_metrics' => true,
-                    'adsets' => false,
-                    'adset_metrics' => false,
-                    'ads' => false,
-                    'ad_metrics' => false,
-                    'creatives' => false,
-                    'creative_metrics' => false,
-                ];
-                
-                $currentConfig['fb_feature_toggles'] = [];
-                // From Organic (PAGE defaults)
-                foreach ($fbOrganicFeatures as $f => $default) {
-                    $currentConfig['fb_feature_toggles'][$f] = $fbOrganicConfig['PAGE'][$f] ?? $default;
-                }
-                // From Marketing (AD_ACCOUNT defaults)
-                foreach ($fbMarketingFeatures as $f => $default) {
-                    $currentConfig['fb_feature_toggles'][$f] = $fbMarketingConfig['AD_ACCOUNT'][$f] ?? $default;
-                }
-                
-                // Root cache aggregation toggles
-                $currentConfig['fb_feature_toggles']['cache_aggregations'] = ($fbOrganicConfig['cache_aggregations'] ?? false) || ($fbMarketingConfig['cache_aggregations'] ?? false);
             }
-
 
             return new Response(json_encode([
                 'assets' => $allAssets,
@@ -252,10 +230,11 @@ class ConfigManagerController extends BaseController
                 'last_updated_human' => $lastUpdated ? date('Y-m-d H:i:s', $lastUpdated) : 'Never'
             ]), 200, ['Content-Type' => 'application/json']);
 
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
         }
     }
+
 
     public function updateConfig(Request $request): Response
     {
