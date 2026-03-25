@@ -540,32 +540,8 @@ class FacebookGraphHelpers
      */
     public static function validateFacebookConfig(LoggerInterface $logger): array
     {
-        $config = Helpers::getChannelsConfig()['facebook'] ?? null;
+        $config = \Classes\Clients\FacebookClient::getConfig($logger);
         
-        // --- 🛡️ SMART STORAGE AUTH OVERRIDE ---
-        $tokenPath = $_ENV['FACEBOOK_TOKEN_PATH'] ?? $config['graph_token_path'] ?? dirname(__DIR__, 2) . '/storage/tokens/facebook_tokens.json';
-        if (file_exists($tokenPath)) {
-            $tokens = json_decode(file_get_contents($tokenPath), true);
-            $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
-            $marketingUserId = $tokens['facebook_marketing']['user_id'] ?? null;
-            
-            if ($marketingToken) {
-                $config['graph_user_access_token'] = $marketingToken;
-                $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
-                putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
-            }
-            if ($marketingUserId) {
-                $config['user_id'] = $marketingUserId;
-                $_ENV['FACEBOOK_USER_ID'] = $marketingUserId;
-                putenv("FACEBOOK_USER_ID=" . $marketingUserId);
-            }
-        }
-        // ------------------------------------
-
-        if (!$config) {
-            $logger->error("Missing 'facebook' configuration in channels config");
-            throw new Exception("Missing 'facebook' configuration in channels config");
-        }
         $logger->info("Loaded FB config: pages=" . count($config['pages'] ?? []));
         return [
             'facebook' => $config,
