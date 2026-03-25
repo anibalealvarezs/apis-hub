@@ -32,25 +32,6 @@ class FacebookAuthController
     {
         $viewPath = dirname(__DIR__, 2) . '/src/views/fb-login.html';
         $content = file_exists($viewPath) ? file_get_contents($viewPath) : '<h1>Login with Meta</h1><a href="/fb-auth-start">Continue</a>';
-        
-        // Inyectamos valores de depuración para que el usuario pueda verificar la config
-        $appId = $this->clientId ?: '<span style="color: #f85149;">Missing</span>';
-        
-        $primaryEnv = getenv('ENV_FILE') ?: '.env';
-        $appEnv = getenv('APP_ENV') ?: ($_ENV['APP_ENV'] ?? '');
-        
-        // Reflejamos si hubo carga en cadena
-        $activeEnv = $primaryEnv;
-        if ($appEnv === 'demo' && $primaryEnv !== '.env.demo') {
-            $activeEnv .= ' + <span style="color: #58a6ff;">.env.demo</span>';
-        }
-        
-        $content = str_replace(
-            ['{{FACEBOOK_APP_ID}}', '{{ACTIVE_ENV_FILE}}'],
-            [$appId, $activeEnv],
-            $content
-        );
-
         return new Response($content);
     }
 
