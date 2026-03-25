@@ -123,13 +123,15 @@ class MonitoringController extends BaseController
             $payload = $job->getPayload() ?? [];
             $params = $payload['params'] ?? [];
             
-            // Create a unique key for this sync "pipeline"
-            $paramsHash = md5(json_encode($params));
-            $pipelineKey = "{$targetId}:{$job->getChannel()}:{$job->getEntity()}:{$paramsHash}";
+            // Create a unique key for this sync "pipeline" based on Instance + Entity
+            // We ignore paramsHash here to keep historical runs of the same instance grouped together
+            $pipelineKey = "{$targetId}:" . strtolower($job->getChannel()) . ":" . strtolower($job->getEntity());
 
             if (!isset($pipelines[$pipelineKey])) {
                 $statusText = JobStatus::tryFrom($job->getStatus())?->name ?? 'unknown';
                 $frequency = 'N/A';
+                $instanceLabel = ucwords(str_replace(['-', '_'], ' ', $targetId));
+
                 foreach ($instances as $instance) {
                     if ($instance['name'] === $targetId) {
                         $frequency = $instance['frequency'] ?? $frequency;
@@ -163,11 +165,12 @@ class MonitoringController extends BaseController
                     'updated_at' => $updatedAt ? $updatedAt->format('Y-m-d H:i:s') : 'N/A',
                     'message' => $job->getMessage(),
                     'group' => $targetId,
+                    'instance_label' => $instanceLabel,
                     'history' => []
                 ];
             } else {
-                // Add to history of this pipeline if not already full (max 5)
-                if (count($pipelines[$pipelineKey]['history']) < 5) {
+                // Add to history of this pipeline if not already full (max 10 for better coverage)
+                if (count($pipelines[$pipelineKey]['history']) < 10) {
                     $pipelines[$pipelineKey]['history'][] = [
                         'status' => $job->getStatus(),
                         'date' => $job->getUpdatedAt() ? $job->getUpdatedAt()->format('Y-m-d H:i:s') : 'N/A',

@@ -308,7 +308,7 @@ function updatePendingJobsDetailed(groupedJobs) {
                     <div class="job-summary-left">
                         <i data-lucide="chevron-down" size="14" class="summary-chevron"></i>
                         <i data-lucide="${headerIcon}" size="16" style="color:${iconColor};"></i>
-                        <span class="job-summary-title">${job.channel.toUpperCase()}-${job.entity.toUpperCase()}</span>
+                        <span class="job-summary-title">${job.instance_label || job.group} <span style="opacity:0.4; font-weight:400; font-size: 0.7rem; margin-left:5px;">» ${job.entity.toUpperCase()}</span></span>
                     </div>
                     <div class="job-summary-right">
                         <span class="job-id-tag">#${job.id}</span>
