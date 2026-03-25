@@ -115,8 +115,16 @@ class FacebookAuthController
             return new Response("Failed to exchange long-lived token.", 500);
         }
 
-        // 3. PERSISTENCIA: Guardamos las credenciales
-        $this->saveCredentials($longLivedToken);
+        // 3. Obtener el User ID
+        $meUrl = "https://graph.facebook.com/v19.0/me?" . http_build_query([
+            'access_token' => $longLivedToken,
+            'fields' => 'id'
+        ]);
+        $meResponse = json_decode(@file_get_contents($meUrl), true);
+        $userId = $meResponse['id'] ?? null;
+
+        // 4. PERSISTENCIA: Guardamos las credenciales
+        $this->saveCredentials($longLivedToken, $userId);
 
         return new Response("
             <div style='background: #0a0c10; color: #fff; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; text-align: center; padding: 20px;'>
@@ -132,7 +140,7 @@ class FacebookAuthController
     /**
      * Guarda el token en el archivo de tokens JSON (excluido de Git)
      */
-    private function saveCredentials(string $token): void
+    private function saveCredentials(string $token, ?string $userId = null): void
     {
         $projectDir = dirname(__DIR__, 2);
         // Usamos la ruta definida en .env o una por defecto
@@ -152,6 +160,7 @@ class FacebookAuthController
         // Almacenamos el token con metadatos de expiración (60 días aprox)
         $tokens['facebook_marketing'] = [
             'access_token' => $token,
+            'user_id' => $userId,
             'updated_at' => date('Y-m-d H:i:s'),
             'expires_at' => date('Y-m-d H:i:s', strtotime('+60 days'))
         ];

@@ -1096,18 +1096,23 @@ class MetricRequests
         $organic = $channels['facebook_organic'] ?? [];
         $marketing = $channels['facebook_marketing'] ?? [];
 
-        // --- 🛡️ SMART DEMO AUTH OVERRIDE ---
-        if (getenv('APP_ENV') === 'demo') {
-            $tokenPath = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'tokens' . DIRECTORY_SEPARATOR . 'facebook_tokens.json';
+        // --- 🛡️ SMART STORAGE AUTH OVERRIDE ---
+        // Always try to use the stored tokens regardless of APP_ENV
+        $tokenPath = $_ENV['FACEBOOK_TOKEN_PATH'] ?? dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'tokens' . DIRECTORY_SEPARATOR . 'facebook_tokens.json';
+        if (file_exists($tokenPath)) {
+            $tokens = json_decode(file_get_contents($tokenPath), true);
+            $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
+            $marketingUserId = $tokens['facebook_marketing']['user_id'] ?? null;
             
-            if (file_exists($tokenPath)) {
-                $tokens = json_decode(file_get_contents($tokenPath), true);
-                $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
-                if ($marketingToken) {
-                    $config['graph_user_access_token'] = $marketingToken;
-                    $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
-                    putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
-                }
+            if ($marketingToken) {
+                $config['graph_user_access_token'] = $marketingToken;
+                $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
+                putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
+            }
+            if ($marketingUserId) {
+                $config['user_id'] = $marketingUserId;
+                $_ENV['FACEBOOK_USER_ID'] = $marketingUserId;
+                putenv("FACEBOOK_USER_ID=" . $marketingUserId);
             }
         }
         // ------------------------------------
@@ -1288,15 +1293,18 @@ class MetricRequests
             $config = $config['facebook'];
         }
 
-        // --- 🛡️ SMART DEMO AUTH OVERRIDE ---
-        if (getenv('APP_ENV') === 'demo') {
-            $tokenPath = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'tokens' . DIRECTORY_SEPARATOR . 'facebook_tokens.json';
-            if (file_exists($tokenPath)) {
-                $tokens = json_decode(file_get_contents($tokenPath), true);
-                $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
-                if ($marketingToken) {
-                    $config['graph_user_access_token'] = $marketingToken;
-                }
+        // --- 🛡️ SMART STORAGE AUTH OVERRIDE ---
+        $tokenPath = $_ENV['FACEBOOK_TOKEN_PATH'] ?? dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'tokens' . DIRECTORY_SEPARATOR . 'facebook_tokens.json';
+        if (file_exists($tokenPath)) {
+            $tokens = json_decode(file_get_contents($tokenPath), true);
+            $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
+            $marketingUserId = $tokens['facebook_marketing']['user_id'] ?? null;
+            
+            if ($marketingToken) {
+                $config['graph_user_access_token'] = $marketingToken;
+            }
+            if ($marketingUserId) {
+                $config['user_id'] = $marketingUserId;
             }
         }
         // ------------------------------------
