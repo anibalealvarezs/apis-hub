@@ -147,8 +147,14 @@ input:checked + .slider-mini:before { transform: translateX(16px); background-co
 .asset-grid.three-cols { grid-template-columns: repeat(3, 1fr); }
 .asset-grid.compact { grid-template-columns: 1fr; max-height: 480px; overflow-y: auto; padding-right: 5px; }
 
-.asset-item { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px; padding: 12px; transition: var(--transition); }
+.asset-item { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px; padding: 12px; transition: var(--transition); position: relative; overflow: hidden; }
 .asset-item.synced { border-color: var(--secondary); background: rgba(35, 134, 54, 0.05); }
+
+.asset-item.is-new { border-color: var(--primary); background: rgba(88, 166, 255, 0.05); }
+.asset-item.is-new::after { content: 'NEW'; position: absolute; top: 0; right: 0; background: var(--primary); color: #fff; font-size: 0.5rem; font-weight: 800; padding: 2px 6px; border-bottom-left-radius: 6px; }
+
+.asset-item.lost-access { border-color: var(--danger); background: rgba(248, 81, 73, 0.05); opacity: 0.8; }
+.asset-item.lost-access::after { content: 'LOST ACCESS'; position: absolute; top: 0; right: 0; background: var(--danger); color: #fff; font-size: 0.5rem; font-weight: 800; padding: 2px 6px; border-bottom-left-radius: 6px; }
 
 .asset-text-truncate {
     white-space: nowrap;

@@ -362,10 +362,16 @@ function renderAssets(assets) {
         const props = assets.gsc || [];
         if (props.length === 0) gscList.innerHTML = '<div class="empty-state">No GSC properties found.</div>';
         props.forEach(p => {
-            const isSynced = currentConfig.gsc?.[p.url] !== undefined;
+            const isSynced = currentConfig.gsc?.[p.url] !== undefined && !p.lost_access;
             const displayUrl = p.url.replace('sc-domain:', '');
             const div = document.createElement('div');
-            div.className = 'asset-item ' + (isSynced ? 'synced' : '');
+            
+            let itemClass = 'asset-item';
+            if (isSynced) itemClass += ' synced';
+            if (p.is_new) itemClass += ' is-new';
+            if (p.lost_access) itemClass += ' lost-access';
+
+            div.className = itemClass;
             div.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                    <div class="asset-text-truncate" title="${displayUrl}" style="font-size:0.75rem; font-weight:600; color:#fff; flex:1; min-width:0;">${displayUrl}</div>
@@ -384,9 +390,15 @@ function renderAssets(assets) {
         const pages = assets.facebook_pages || [];
         if (pages.length === 0) fbOrganicList.innerHTML = '<div class="empty-state">No Facebook pages found.</div>';
         pages.forEach(p => {
-            const isSynced = currentConfig.fb_page_ids?.includes(String(p.id));
+            const isSynced = currentConfig.fb_page_ids?.includes(String(p.id)) && !p.lost_access;
             const div = document.createElement('div');
-            div.className = 'asset-item ' + (isSynced ? 'synced' : '');
+            
+            let itemClass = 'asset-item';
+            if (isSynced) itemClass += ' synced';
+            if (p.is_new) itemClass += ' is-new';
+            if (p.lost_access) itemClass += ' lost-access';
+            
+            div.className = itemClass;
             div.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                    <div style="font-size:0.75rem; font-weight:600; color:#fff;">${p.title}</div>
@@ -408,9 +420,15 @@ function renderAssets(assets) {
         
         if (accounts.length === 0) fbMarketingList.innerHTML = '<div class="empty-state">No Ad accounts found.</div>';
         accounts.forEach(a => {
-            const isSynced = currentConfig.fb_ad_account_ids?.includes(String(a.id));
+            const isSynced = currentConfig.fb_ad_account_ids?.includes(String(a.id)) && !a.lost_access;
             const div = document.createElement('div');
-            div.className = 'asset-item ' + (isSynced ? 'synced' : '');
+            
+            let itemClass = 'asset-item';
+            if (isSynced) itemClass += ' synced';
+            if (a.is_new) itemClass += ' is-new';
+            if (a.lost_access) itemClass += ' lost-access';
+
+            div.className = itemClass;
             div.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                    <div>
