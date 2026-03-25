@@ -69,20 +69,40 @@ class Helpers
 
         // 0. Load .env manually if it exists to ensure variables are available
         $envFileName = getenv('ENV_FILE') ?: '.env';
-        $dotEnv = __DIR__ . '/../../' . $envFileName;
-
-        if (file_exists($dotEnv)) {
-            $lines = file($dotEnv, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            foreach ($lines as $line) {
-                if (str_starts_with(trim($line), '#')) continue;
-                if (str_contains($line, '=')) {
-                    list($name, $value) = explode('=', $line, 2);
-                    $name = trim($name);
-                    $value = trim($value, " \t\n\r\0\x0B\"'");
-                    putenv("$name=$value");
-                    $_ENV[$name] = $value;
+        $envFilesToLoad = [$envFileName];
+        
+        // Smart Default: If we are not explicitly told a file, and we are NOT already loading .env.demo, 
+        // we check if we should supplement with .env.demo later.
+        
+        $loadedValues = [];
+        $loadEnvFile = function($filename) use (&$loadedValues) {
+            $filePath = __DIR__ . '/../../' . $filename;
+            if (file_exists($filePath)) {
+                $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                foreach ($lines as $line) {
+                    if (str_starts_with(trim($line), '#')) continue;
+                    if (str_contains($line, '=')) {
+                        list($name, $value) = explode('=', $line, 2);
+                        $name = trim($name);
+                        $value = trim($value, " \t\n\r\0\x0B\"'");
+                        putenv("$name=$value");
+                        $_ENV[$name] = $value;
+                        $loadedValues[$name] = $value;
+                    }
                 }
+                return true;
             }
+            return false;
+        };
+
+        // First pass: Load the primary env file
+        $loadEnvFile($envFileName);
+
+        // Second pass: Smart Chain Load for Demo
+        // If we just loaded .env and discovered it's a demo, load .env.demo over it if it exists.
+        $appEnv = getenv('APP_ENV') ?: ($_ENV['APP_ENV'] ?? null);
+        if ($appEnv === 'demo' && $envFileName !== '.env.demo') {
+            $loadEnvFile('.env.demo');
         }
 
         // 0. Safeguard: Check for mandatory configuration files
