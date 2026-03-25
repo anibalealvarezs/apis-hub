@@ -7,11 +7,16 @@ let currentConfig = null;
 
 // --- Initialization ---
 async function initConfig() {
-    console.log("Initializing Configuration Engine...");
-    lucide.createIcons();
-    setupTabSystem();
-    await fetchConfig();
-    setupEventListeners();
+    try {
+        console.log("Initializing Configuration Engine...");
+        lucide.createIcons();
+        setupTabSystem();
+        await fetchConfig();
+        setupEventListeners();
+    } catch (e) {
+        console.error("Initialization Error:", e);
+        showToast("Config Engine initialization failed. Global functions are still available.", true);
+    }
 }
 
 function setupTabSystem() {
@@ -362,7 +367,8 @@ function renderAssets(assets) {
         const props = assets.gsc || [];
         if (props.length === 0) gscList.innerHTML = '<div class="empty-state">No GSC properties found.</div>';
         props.forEach(p => {
-            const isSynced = currentConfig.gsc?.[p.url] !== undefined && !p.lost_access;
+            const configGsc = currentConfig?.gsc || {};
+            const isSynced = configGsc[p.url] !== undefined && !p.lost_access;
             const displayUrl = p.url.replace('sc-domain:', '');
             const div = document.createElement('div');
             
@@ -390,7 +396,8 @@ function renderAssets(assets) {
         const pages = assets.facebook_pages || [];
         if (pages.length === 0) fbOrganicList.innerHTML = '<div class="empty-state">No Facebook pages found.</div>';
         pages.forEach(p => {
-            const isSynced = currentConfig.fb_page_ids?.includes(String(p.id)) && !p.lost_access;
+            const syncedIds = currentConfig?.fb_page_ids || [];
+            const isSynced = syncedIds.includes(String(p.id)) && !p.lost_access;
             const div = document.createElement('div');
             
             let itemClass = 'asset-item';
@@ -420,7 +427,8 @@ function renderAssets(assets) {
         
         if (accounts.length === 0) fbMarketingList.innerHTML = '<div class="empty-state">No Ad accounts found.</div>';
         accounts.forEach(a => {
-            const isSynced = currentConfig.fb_ad_account_ids?.includes(String(a.id)) && !a.lost_access;
+            const syncedIds = currentConfig?.fb_ad_account_ids || [];
+            const isSynced = syncedIds.includes(String(a.id)) && !a.lost_access;
             const div = document.createElement('div');
             
             let itemClass = 'asset-item';
@@ -669,7 +677,7 @@ async function forceRefresh(type) {
     }
 }
 
-// Global Hooks
+// Global Hooks (Expose to window)
 window.setFbLevel = setFbLevel;
 window.setMetricLevel = setMetricLevel;
 window.toggleAllAds = toggleAllAds;
@@ -679,6 +687,8 @@ window.validateTokens = validateTokens;
 window.handleFbLevelChange = handleFbLevelChange;
 window.handleFbStrategyChange = handleFbStrategyChange;
 window.forceRefresh = forceRefresh;
+
+console.log("Config Manager script loaded.");
 
 // Initialize
 if (document.readyState === 'loading') {
