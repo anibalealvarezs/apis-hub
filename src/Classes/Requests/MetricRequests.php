@@ -1090,82 +1090,7 @@ class MetricRequests
      */
     public static function validateFacebookConfig(?LoggerInterface $logger = null): array
     {
-        $channels = Helpers::getChannelsConfig();
-        
-        $config = $channels['facebook'] ?? [];
-        $organic = $channels['facebook_organic'] ?? [];
-        $marketing = $channels['facebook_marketing'] ?? [];
-
-        // --- 🛡️ SMART STORAGE AUTH OVERRIDE ---
-        // Always try to use the stored tokens regardless of APP_ENV
-        $tokenPath = $_ENV['FACEBOOK_TOKEN_PATH'] ?? dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'tokens' . DIRECTORY_SEPARATOR . 'facebook_tokens.json';
-        if (file_exists($tokenPath)) {
-            $tokens = json_decode(file_get_contents($tokenPath), true);
-            $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
-            $marketingUserId = $tokens['facebook_marketing']['user_id'] ?? null;
-            
-            if ($marketingToken) {
-                $config['graph_user_access_token'] = $marketingToken;
-                $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
-                putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
-            }
-            if ($marketingUserId) {
-                $config['user_id'] = $marketingUserId;
-                $_ENV['FACEBOOK_USER_ID'] = $marketingUserId;
-                putenv("FACEBOOK_USER_ID=" . $marketingUserId);
-            }
-        }
-        // ------------------------------------
-
-        // Merge specialized files into the main config array
-        $config = array_replace_recursive($config, $organic, $marketing);
-
-        if (empty($config)) {
-            $logger?->error("Facebook configuration not found in channels config.");
-            throw new \RuntimeException("Facebook configuration not found in channels config.");
-        }
-
-        // Global exclusion list
-        $globalExclude = $config['exclude_from_caching'] ?? [];
-        if (!is_array($globalExclude)) {
-            $globalExclude = [$globalExclude];
-        }
-
-        // Apply global defaults for PAGES if they exist
-        if (isset($config['PAGE'])) {
-            $globalPageDefaults = $config['PAGE'];
-            $config['pages'] = array_map(function ($page) use ($globalPageDefaults, $globalExclude) {
-                $merged = array_merge($globalPageDefaults, $page);
-                if (in_array((string) $merged['id'], array_map('strval', $globalExclude))) {
-                    $merged['exclude_from_caching'] = true;
-                }
-                return $merged;
-            }, $config['pages'] ?? []);
-        }
-
-        // Apply global defaults for AD_ACCOUNTS if they exist
-        if (isset($config['AD_ACCOUNT'])) {
-            $globalAdAccountDefaults = $config['AD_ACCOUNT'];
-            $config['ad_accounts'] = array_map(function ($adAccount) use ($globalAdAccountDefaults, $globalExclude) {
-                $merged = array_merge($globalAdAccountDefaults, $adAccount);
-                if (in_array((string) $merged['id'], array_map('strval', $globalExclude))) {
-                    $merged['exclude_from_caching'] = true;
-                }
-                return $merged;
-            }, $config['ad_accounts'] ?? []);
-        }
-
-        // If 'pages' list is NOT provided or empty, we mark it as such so it's handled during request
-        if (!isset($config['pages']) || !is_array($config['pages'])) {
-             $config['pages'] = []; 
-        }
-
-        // If 'ad_accounts' list is NOT provided or empty
-        if (!isset($config['ad_accounts']) || !is_array($config['ad_accounts'])) {
-             $config['ad_accounts'] = [];
-        }
-
-        return $config;
+        return \Classes\Clients\FacebookClient::getConfig($logger);
     }
 
     /**
@@ -1288,66 +1213,7 @@ class MetricRequests
      */
     public static function initializeFacebookGraphApi(array $config, LoggerInterface $logger): FacebookGraphApi
     {
-        // Handle wrapped configuration
-        if (isset($config['facebook']) && is_array($config['facebook']) && !isset($config['app_id'])) {
-            $config = $config['facebook'];
-        }
-
-        // --- 🛡️ SMART STORAGE AUTH OVERRIDE ---
-        $tokenPath = $_ENV['FACEBOOK_TOKEN_PATH'] ?? dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'tokens' . DIRECTORY_SEPARATOR . 'facebook_tokens.json';
-        if (file_exists($tokenPath)) {
-            $tokens = json_decode(file_get_contents($tokenPath), true);
-            $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
-            $marketingUserId = $tokens['facebook_marketing']['user_id'] ?? null;
-            
-            if ($marketingToken) {
-                $config['graph_user_access_token'] = $marketingToken;
-            }
-            if ($marketingUserId) {
-                $config['user_id'] = $marketingUserId;
-            }
-        }
-        // ------------------------------------
-
-        $maxApiRetries = 3;
-        $apiRetryCount = 0;
-        while ($apiRetryCount < $maxApiRetries) {
-            try {
-                // Ensure required keys are present as strings
-                $appSecret = $config['app_secret'] ?? null;
-                if ($appSecret === null) {
-                    $keysFound = implode(', ', array_keys($config));
-                    $logger->error("Facebook app_secret is missing or null. Keys found: $keysFound");
-                    throw new Exception("Facebook app_secret is missing or null.");
-                }
-
-                $apiInstance = new FacebookGraphApiOverride(
-                    userId: (string) ($config['user_id'] ?? ''),
-                    appId: (string) ($config['app_id'] ?? ''),
-                    appSecret: (string) $appSecret,
-                    redirectUrl: (string) ($config['app_redirect_uri'] ?? ''),
-                    userAccessToken: (string) ($config['graph_user_access_token'] ?? ''),
-                    longLivedUserAccessToken: (string) ($config['graph_long_lived_user_access_token'] ?? ''),
-                    appAccessToken: (string) ($config['graph_app_access_token'] ?? ''),
-                    pageAccesstoken: (string) ($config['graph_page_access_token'] ?? ''),
-                    longLivedPageAccesstoken: (string) ($config['graph_long_lived_page_access_token'] ?? ''),
-                    clientAccesstoken: (string) ($config['graph_client_access_token'] ?? ''),
-                    longLivedClientAccesstoken: (string) ($config['graph_long_lived_client_access_token'] ?? ''),
-                    tokenPath: (string) ($config['graph_token_path'] ?? ''),
-                );
-                $logger->info("Initialized FacebookGraphApi");
-                return $apiInstance;
-            } catch (Exception $e) {
-                $apiRetryCount++;
-                if ($apiRetryCount >= $maxApiRetries) {
-                    $logger->error("Failed to initialize FacebookGraphApi after $maxApiRetries retries: " . $e->getMessage());
-                    throw new Exception("Failed to initialize FacebookGraphApi after $maxApiRetries retries: " . $e->getMessage());
-                }
-                $logger->warning("FacebookGraphApi initialization failed, retry $apiRetryCount/$maxApiRetries: " . $e->getMessage());
-                usleep(100000 * $apiRetryCount);
-            }
-        }
-        throw new Exception("Failed to initialize FacebookGraphApi");
+        return \Classes\Clients\FacebookClient::getInstance($logger, $config);
     }
 
     /**
