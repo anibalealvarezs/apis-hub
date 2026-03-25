@@ -37,8 +37,8 @@ function canDisaggregate(toLevel) {
     return toIdx <= maxIdx;
 }
 
-function getSparkId(level, key, entityId, idx) {
-    const sanitizedId = String(entityId || idx).replace(/[^a-z0-9\-]/gi, '-').toLowerCase();
+function getSparkId(level, key, entityId) {
+    const sanitizedId = String(entityId).replace(/[^a-z0-9\-]/gi, '-').toLowerCase();
     return `spark-${level}-${key}-${sanitizedId}`.toLowerCase();
 }
 
@@ -235,24 +235,24 @@ function render() {
             currentAccount = row.account;
         }
         const tr = document.createElement('tr');
-        const rowId = `row-campaign-${row.channeledCampaign || idx}`.replace(/[^a-z0-9\-]/gi, '-');
+        const rowId = `row-campaign-${row.channeledCampaign}`.replace(/[^a-z0-9\-]/gi, '-');
         tr.id = rowId;
-        const statusClass = row.campaign_status?.toLowerCase() === 'active' ? 'status-active' : 'status-paused';
+        const nameEscaped = row.campaign.replace(/'/g, "\\'");
         const isDisaggregatable = canDisaggregate('adset');
         tr.innerHTML = `
             <td class="col-actions cell-no-padding">
                 <div class="btn-group-center">
-                    <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', 'campaign', '${row.channeledCampaign}', '${row.campaign.replace(/'/g, "\\'")}')" title="Audience Analysis" ${!isDisaggregatable ? 'disabled class="disabled-btn"' : ''}><i data-lucide="users" size="14"></i></button>
-                    <button class="btn-expand next-btn" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign}', '${row.campaign.replace(/'/g, "\\'")}')" title="Explore AdSets" ${!isDisaggregatable ? 'disabled class="disabled-btn"' : ''}><i data-lucide="layers" size="14"></i></button>
+                    <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', 'campaign', '${row.channeledCampaign}', '${nameEscaped}')" title="Audience Analysis" ${!isDisaggregatable ? 'disabled class="disabled-btn"' : ''}><i data-lucide="users" size="14"></i></button>
+                    <button class="btn-expand next-btn" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign}', '${nameEscaped}')" title="Explore AdSets" ${!isDisaggregatable ? 'disabled class="disabled-btn"' : ''}><i data-lucide="layers" size="14"></i></button>
                 </div>
             </td>
             <td class="account-cell">${row.account}</td>
-            <td class="campaign-cell clickable-text" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign}', '${row.campaign.replace(/'/g, "\\'")}')">${row.campaign}</td>
+            <td class="campaign-cell clickable-text" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign}', '${nameEscaped}')">${row.campaign}</td>
             <td class="text-center">${getStatusIcon(row.campaign_status)}</td>
             ${activeMetrics.map(m => {
                 const val = row[m.key] || 0;
                 const formatted = applyFormatting(val, m.format, m.key, m.precision);
-                const sparkId = getSparkId('campaign', m.key, row.channeledCampaign, idx);
+                const sparkId = getSparkId('campaign', m.key, row.channeledCampaign);
                 const badgeClass = applyConditional(val, m.config.conditional, m.key);
                 return `<td class="text-right metric-cell"><div class="metric-flex-end"><span class="${badgeClass}">${formatted}</span>${m.config.sparkline ? `<div id="${sparkId}" class="sparkline-inline"><div class="spark-loading"></div></div>` : ''}</div></td>`;
             }).join('')}
@@ -300,14 +300,10 @@ function drawTableSparklines(level, data, cacheKey = null) {
         if (!entityId) return;
         
         sparkMetrics.forEach(m => {
-            const sparkId = getSparkId(level, m.key, entityId, idx);
+            const sparkId = getSparkId(level, m.key, entityId);
             const container = document.getElementById(sparkId);
             
-            if (!container) {
-                // Secondary attempt: maybe the ID is simplified
-                const fallbackId = getSparkId(level, m.key, entityId, idx);
-                if (!document.getElementById(fallbackId)) return;
-            }
+            if (!container) return;
             
             const rawTrend = TREND_DATA_CACHE[level][lookupKey]?.[m.key];
             if (rawTrend && rawTrend.length > 1) {
@@ -429,7 +425,7 @@ async function toggleHierarchy(rowId, type, level, entityId, entityName) {
                         } 
                     });
                 });
-                drawTableSparklines(hItem.next, nestedData);
+                drawTableSparklines(hItem.next, nestedData, cacheKey);
             }
         }
     } catch (err) { console.error("Hierarchy error:", err); document.getElementById(containerId).innerHTML = `<div class="empty-state">${err.message}</div>`; }
@@ -456,7 +452,7 @@ function renderRecursiveTable(container, data, level, parentRowId, parentName, c
     html += `</tr></thead><tbody>`;
     data.forEach((row, idx) => {
         const eId = row[hItem.idField];
-        const rowId = `row-${level}-${eId || idx}`.replace(/[^a-z0-9\-]/gi, '-');
+        const rowId = `row-${level}-${eId}`.replace(/[^a-z0-9\-]/gi, '-');
         html += `<tr id="${rowId}">
             <td class="text-center">
                 <div class="btn-group-center">
@@ -468,7 +464,7 @@ function renderRecursiveTable(container, data, level, parentRowId, parentName, c
             <td class="text-center">${getStatusIcon(row.status || row.campaign_status)}</td>`;
         activeMetrics.forEach(m => {
             const val = row[m.key] || 0;
-            const sparkId = getSparkId(level, m.key, eId, idx);
+            const sparkId = getSparkId(level, m.key, eId);
             html += `<td class="text-right">
                 <div class="metric-flex-end">
                     <span class="${applyConditional(val, m.config.conditional, m.key)}">${applyFormatting(val, m.format, m.key, m.precision)}</span>
@@ -505,7 +501,7 @@ function renderDimensionTable(container, data, dims, parentId = '', cacheKey) {
         html += `<tr><td>${dims.map(d => row[d]).join(' / ')}</td>`;
         activeMetrics.forEach(m => {
             const val = row[m.key] || 0;
-            const sparkId = getSparkId('dim-' + dims.join('-'), m.key, uniqueId, idx);
+            const sparkId = getSparkId('dim-' + dims.join('-'), m.key, uniqueId);
             html += `<td class="text-right">
                 <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px;">
                     <span class="${applyConditional(val, m.config.conditional, m.key)}">${applyFormatting(val, m.format, m.key, m.precision)}</span>
