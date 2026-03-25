@@ -6,44 +6,14 @@
 // Global state
 let currentData = [];
 let sortConfig = { key: 'campaign', dir: 'asc' };
-const window_NESTED_DATA_CACHE = {};
+const TREND_DATA_CACHE = {}; // Cache for sparklines: { [level]: { [entityId]: { [metric]: [points] } } }
+const NESTED_DATA_CACHE = {}; // Cache for sub-tables to allow sorting
 
 const HIERARCHY = {
-    campaign: { 
-        next: 'adset', 
-        label: 'Campaign', 
-        icon: 'activity', 
-        color: '#1877F2',
-        idField: 'channeledCampaign_id',
-        nameField: 'campaign',
-        filterKey: 'channeledCampaign'
-    },
-    adset: { 
-        next: 'ad', 
-        label: 'AdSet', 
-        icon: 'layers', 
-        color: '#8b5cf6',
-        idField: 'adGroup_id',
-        nameField: 'adGroup',
-        filterKey: 'adGroup'
-    },
-    ad: { 
-        next: 'creative', 
-        label: 'Ad', 
-        icon: 'megaphone', 
-        color: '#ec4899',
-        idField: 'ad_id',
-        nameField: 'ad',
-        filterKey: 'ad'
-    },
-    creative: { 
-        next: null, 
-        label: 'Creative', 
-        icon: 'eye', 
-        color: '#3fb950',
-        idField: 'creative_id',
-        nameField: 'creative'
-    }
+    campaign: { next: 'adset', label: 'Campaign', icon: 'activity', color: '#1877F2', idField: 'channeledCampaign', nameField: 'campaign', filterKey: 'channeledCampaign' },
+    adset: { next: 'ad', label: 'AdSet', icon: 'layers', color: '#8b5cf6', idField: 'adGroup_id', nameField: 'adGroup', filterKey: 'adGroup' },
+    ad: { next: 'creative', label: 'Ad', icon: 'megaphone', color: '#ec4899', idField: 'ad_id', nameField: 'ad', filterKey: 'ad' },
+    creative: { next: null, label: 'Creative', icon: 'eye', color: '#3fb950', idField: 'creative_id', nameField: 'creative' }
 };
 
 const DIM_CONFIGS = {
@@ -51,6 +21,13 @@ const DIM_CONFIGS = {
     placement: { dims: ['publisher_platform', 'platform_position'], label: 'Placement' }
 };
 
+// Expose early
+window.sortTable = sortTable;
+window.sortNestedTable = sortNestedTable;
+window.toggleHierarchy = toggleHierarchy;
+window.loadReport = loadReport;
+window.forceRefresh = forceRefresh;
+window.initDashboard = initDashboard;
 function canDisaggregate(toLevel) {
     const config = window.FB_METRICS_CONFIG || { metrics_level: 'creative' };
     const maxLevel = config.metrics_level || 'creative';
@@ -188,45 +165,39 @@ async function loadReport() {
         if (resMain.status === 'success' && resMain.data) {
             if (resMain.meta && resMain.meta.cached && cacheBadge) { cacheBadge.style.display = 'inline-flex'; cacheBadge.title = `Source: Redis (${resMain.meta.cache_type})`; }
             currentData = resMain.data.map(d => ({ ...d, _trend: [] }));
+            
+            // Initial sort
             currentData.sort((a,b) => {
                 const accA = String(a.account || '').toLowerCase();
                 const accB = String(b.account || '').toLowerCase();
                 if (accA !== accB) return accA.localeCompare(accB);
                 return String(a.campaign || '').toLowerCase().localeCompare(String(b.campaign || '').toLowerCase());
             });
-            render();
+
             const sparkMetrics = activeMetrics.filter(m => m.config && m.config.sparkline);
             if (sparkMetrics.length > 0) {
                 const trendAggregations = {};
                 sparkMetrics.forEach(m => trendAggregations[`trend_${m.key}`] = m.original);
-                fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ aggregations: trendAggregations, groupBy: ["daily", "channeledCampaign"], startDate: start, endDate: end }) })
-                .then(r => r.json()).then(resTrend => {
-                    if (resTrend.status === 'success' && resTrend.data) {
-                        const trendMaps = {}; sparkMetrics.forEach(m => trendMaps[m.key] = {});
-                        resTrend.data.forEach(d => {
-                            const cid = d.channeledCampaign;
-                            if (!cid) return;
-                            sparkMetrics.forEach(m => {
-                                if (!trendMaps[m.key][cid]) trendMaps[m.key][cid] = [];
-                                trendMaps[m.key][cid].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) });
-                            });
+                const resTrend = await fetch('/facebook_marketing/metric/aggregate', { 
+                    method: 'POST', 
+                    headers, 
+                    body: JSON.stringify({ aggregations: trendAggregations, groupBy: ["daily", "channeledCampaign"], startDate: start, endDate: end }) 
+                }).then(r => r.json());
+
+                if (resTrend.status === 'success' && resTrend.data) {
+                    TREND_DATA_CACHE['campaign'] = {};
+                    resTrend.data.forEach(d => {
+                        const cid = d.channeledCampaign;
+                        if (!cid) return;
+                        if (!TREND_DATA_CACHE['campaign'][cid]) TREND_DATA_CACHE['campaign'][cid] = {};
+                        sparkMetrics.forEach(m => {
+                            if (!TREND_DATA_CACHE['campaign'][cid][m.key]) TREND_DATA_CACHE['campaign'][cid][m.key] = [];
+                            TREND_DATA_CACHE['campaign'][cid][m.key].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) });
                         });
-                        currentData.forEach((row, idx) => {
-                            const cid = row.channeledCampaign;
-                            sparkMetrics.forEach(m => {
-                                const sparkId = getSparkId('campaign', m.key, cid, idx);
-                                const container = document.getElementById(sparkId);
-                                if (!container) return;
-                                const rawTrend = trendMaps[m.key][cid];
-                                if (rawTrend && rawTrend.length > 1) {
-                                    rawTrend.sort((a,b) => a.day.localeCompare(b.day));
-                                    renderSparkline(container, rawTrend.map(x => x.val), m.key.includes('cost_per') || m.key.includes('cpm') || m.key.includes('cpc'));
-                                } else container.innerHTML = '<span style="color:var(--text-dim); font-size: 0.6rem; opacity: 0.3;">--</span>';
-                            });
-                        });
-                    }
-                });
+                    });
+                }
             }
+            render();
         } else { if (emptyMsg) emptyMsg.style.display = 'block'; resetSummary(); }
     } catch (error) { console.error("Dashboard Load Error:", error); if (emptyMsg) emptyMsg.style.display = 'block'; }
     finally { if (loader) loader.style.display = 'none'; lucide.createIcons(); }
@@ -292,7 +263,61 @@ function render() {
     if (count) count.textContent = currentData.length;
     renderSummary(currentData);
     updateSortHeaders();
+    drawTableSparklines('campaign', currentData);
     lucide.createIcons();
+}
+
+function drawTableSparklines(level, data, cacheKey = null) {
+    if (!TREND_DATA_CACHE[level]) {
+        console.warn(`[Sparkline] No trend cache found for level: ${level}`);
+        return;
+    }
+    const activeMetrics = getActiveMetrics();
+    const sparkMetrics = activeMetrics.filter(m => m.config && m.config.sparkline);
+    
+    console.log(`[Sparkline] Drawing for ${level} (${data.length} rows) using cacheKey: ${cacheKey}`);
+
+    data.forEach((row, idx) => {
+        let lookupKey = null;
+        let entityId = null;
+
+        if (level.startsWith('dim-') && cacheKey) {
+            const entry = NESTED_DATA_CACHE[cacheKey];
+            const dimKey = entry.dims.map(d => row[d]).join('-');
+            lookupKey = dimKey;
+            entityId = `dim-${entry.parentId}-${dimKey}`;
+        } else {
+            const hItem = HIERARCHY[level];
+            if (!hItem) {
+                console.error(`[Sparkline] Hierarchy mapping not found for level: ${level}`);
+                return;
+            }
+            const eId = row[hItem.idField];
+            lookupKey = eId;
+            entityId = eId;
+        }
+
+        if (!entityId) return;
+        
+        sparkMetrics.forEach(m => {
+            const sparkId = getSparkId(level, m.key, entityId, idx);
+            const container = document.getElementById(sparkId);
+            
+            if (!container) {
+                // Secondary attempt: maybe the ID is simplified
+                const fallbackId = getSparkId(level, m.key, entityId, idx);
+                if (!document.getElementById(fallbackId)) return;
+            }
+            
+            const rawTrend = TREND_DATA_CACHE[level][lookupKey]?.[m.key];
+            if (rawTrend && rawTrend.length > 1) {
+                rawTrend.sort((a,b) => a.day.localeCompare(b.day));
+                renderSparkline(container, rawTrend.map(x => x.val), m.key.includes('cost_per') || m.key.includes('cpm') || m.key.includes('cpc'));
+            } else {
+                container.innerHTML = '<span style="color:var(--text-dim); font-size: 0.6rem; opacity: 0.3;">--</span>';
+            }
+        });
+    });
 }
 
 async function toggleHierarchy(rowId, type, level, entityId, entityName) {
@@ -341,35 +366,33 @@ async function toggleHierarchy(rowId, type, level, entityId, entityName) {
                 const resMain = await fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, groupBy: set.dims }) }).then(r => r.json());
                 const resTrend = await fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify({ ...payloadBase, aggregations: trendAggs, groupBy: ["daily", ...set.dims] }) }).then(r => r.json());
                 
-                renderDimensionTable(document.getElementById(subContainerId), resMain.data || [], set.dims, entityId);
+                const audienceData = resMain.data || [];
+                const cacheKey = `audience-${set.dims.join('-')}-${rowId}`;
+                NESTED_DATA_CACHE[cacheKey] = { 
+                    data: audienceData, 
+                    dims: set.dims, 
+                    parentId: entityId, 
+                    containerId: subContainerId, // Store the real DOM ID
+                    sort: { key: null, dir: 'asc' } 
+                };
+                
+                renderDimensionTable(document.getElementById(subContainerId), audienceData, set.dims, entityId, cacheKey);
 
                 if (resTrend.status === 'success' && resTrend.data) {
-                    const trendMaps = {}; 
+                    const levelKey = 'dim-' + set.dims.join('-');
+                    if (!TREND_DATA_CACHE[levelKey]) TREND_DATA_CACHE[levelKey] = {};
+                    
                     resTrend.data.forEach(d => {
                         const dimKey = set.dims.map(dim => d[dim]).join('-');
-                        if (!trendMaps[dimKey]) trendMaps[dimKey] = {};
+                        if (!TREND_DATA_CACHE[levelKey][dimKey]) TREND_DATA_CACHE[levelKey][dimKey] = {};
                         activeMetrics.forEach(m => { 
                             if (d[`trend_${m.key}`] !== undefined) { 
-                                if (!trendMaps[dimKey][m.key]) trendMaps[dimKey][m.key] = []; 
-                                trendMaps[dimKey][m.key].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) }); 
+                                if (!TREND_DATA_CACHE[levelKey][dimKey][m.key]) TREND_DATA_CACHE[levelKey][dimKey][m.key] = []; 
+                                TREND_DATA_CACHE[levelKey][dimKey][m.key].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) }); 
                             } 
                         });
                     });
-
-                    (resMain.data || []).forEach((row, idx) => {
-                        const dimValKey = set.dims.map(dim => row[dim]).join('-');
-                        const uniqueId = `dim-${entityId}-${dimValKey}`;
-                        activeMetrics.forEach(m => {
-                            if (!m.config.sparkline) return;
-                            const sparkId = getSparkId('dim-' + set.dims.join('-'), m.key, uniqueId, idx);
-                            const sparkContainer = document.getElementById(sparkId);
-                            const rawTrend = trendMaps[dimValKey]?.[m.key];
-                            if (sparkContainer && rawTrend && rawTrend.length > 1) {
-                                rawTrend.sort((a,b) => a.day.localeCompare(b.day));
-                                renderSparkline(sparkContainer, rawTrend.map(x => x.val), m.key.includes('cost_per') || m.key.includes('cpm') || m.key.includes('cpc'));
-                            } else if (sparkContainer) sparkContainer.innerHTML = '--';
-                        });
-                    });
+                    drawTableSparklines(levelKey, audienceData, cacheKey);
                 }
             }
         } else {
@@ -380,43 +403,54 @@ async function toggleHierarchy(rowId, type, level, entityId, entityName) {
             const container = document.getElementById(containerId);
             container.innerHTML = `<div class="breakdown-title" style="color:${hItem.color}"><i data-lucide="${nextHItem.icon}"></i> ${nextHItem.label} Analysis for <strong>${entityName}</strong></div><div id="inner-${containerId}"></div>`;
             const nestedData = resMain.data || [];
-            renderRecursiveTable(document.getElementById(`inner-${containerId}`), nestedData, hItem.next, rowId, entityName);
+            
+            const cacheKey = `hierarchy-${hItem.next}-${rowId}`;
+            const subContainerId = `inner-${containerId}`;
+            NESTED_DATA_CACHE[cacheKey] = { 
+                data: nestedData, 
+                level: hItem.next, 
+                parentRowId: rowId, 
+                parentName: entityName, 
+                containerId: subContainerId, // Store the real DOM ID
+                sort: { key: null, dir: 'asc' } 
+            };
+            
+            renderRecursiveTable(document.getElementById(subContainerId), nestedData, hItem.next, rowId, entityName, cacheKey);
+            
             if (resTrend.status === 'success' && resTrend.data) {
-                const trendMaps = {}; resTrend.data.forEach(d => {
+                if (!TREND_DATA_CACHE[hItem.next]) TREND_DATA_CACHE[hItem.next] = {};
+                resTrend.data.forEach(d => {
                     const nextId = d[nextHItem.idField]; if (!nextId) return;
-                    if (!trendMaps[nextId]) trendMaps[nextId] = {};
-                    activeMetrics.forEach(m => { if (d[`trend_${m.key}`] !== undefined) { if (!trendMaps[nextId][m.key]) trendMaps[nextId][m.key] = []; trendMaps[nextId][m.key].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) }); } });
-                });
-                nestedData.forEach((row, idx) => {
-                    const nextId = row[nextHItem.idField];
-                    activeMetrics.forEach(m => {
-                        if (!m.config.sparkline) return;
-                        const sparkId = getSparkId(hItem.next, m.key, nextId, idx);
-                        const sparkContainer = document.getElementById(sparkId);
-                        const rawTrend = trendMaps[nextId]?.[m.key];
-                        if (sparkContainer && rawTrend && rawTrend.length > 1) {
-                            rawTrend.sort((a,b) => a.day.localeCompare(b.day));
-                            renderSparkline(sparkContainer, rawTrend.map(x => x.val), m.key.includes('cost_per') || m.key.includes('cpm') || m.key.includes('cpc'));
-                        } else if (sparkContainer) sparkContainer.innerHTML = '--';
+                    if (!TREND_DATA_CACHE[hItem.next][nextId]) TREND_DATA_CACHE[hItem.next][nextId] = {};
+                    activeMetrics.forEach(m => { 
+                        if (d[`trend_${m.key}`] !== undefined) { 
+                            if (!TREND_DATA_CACHE[hItem.next][nextId][m.key]) TREND_DATA_CACHE[hItem.next][nextId][m.key] = []; 
+                            TREND_DATA_CACHE[hItem.next][nextId][m.key].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) }); 
+                        } 
                     });
                 });
+                drawTableSparklines(hItem.next, nestedData);
             }
         }
     } catch (err) { console.error("Hierarchy error:", err); document.getElementById(containerId).innerHTML = `<div class="empty-state">${err.message}</div>`; }
     finally { lucide.createIcons(); }
 }
 
-function renderRecursiveTable(container, data, level, parentRowId, parentName) {
+function renderRecursiveTable(container, data, level, parentRowId, parentName, cacheKey) {
     const hItem = HIERARCHY[level];
     const activeMetrics = getActiveMetrics();
+    const currentSort = NESTED_DATA_CACHE[cacheKey]?.sort || { key: null, dir: 'asc' };
+
     let html = `<table class="nested-table"><thead><tr>
         <th style="width: 85px; text-align: center;">EXPLORE</th>
-        <th style="text-align: left; min-width: 200px;">${hItem.label.toUpperCase()} NAME</th>
+        <th class="clickable" onclick="sortNestedTable('${cacheKey}', '${hItem.nameField}')" style="text-align: left; min-width: 200px;">
+            <div class="header-flex">${hItem.label.toUpperCase()} NAME <span class="nested-sort-icon">${currentSort.key === hItem.nameField ? (currentSort.dir === 'asc' ? '↑' : '↓') : '↕'}</span></div>
+        </th>
         <th style="width: 80px; text-align: center;">STATUS</th>`;
     
     activeMetrics.forEach(m => {
-        html += `<th style="text-align: right; min-width: 80px;">
-            <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px;">${m.label.toUpperCase()}</div>
+        html += `<th class="clickable" onclick="sortNestedTable('${cacheKey}', '${m.key}')" style="text-align: right; min-width: 80px;">
+            <div class="header-flex-end">${m.label.toUpperCase()} <span class="nested-sort-icon">${currentSort.key === m.key ? (currentSort.dir === 'asc' ? '↑' : '↓') : '↕'}</span></div>
         </th>`;
     });
     html += `</tr></thead><tbody>`;
@@ -449,14 +483,19 @@ function renderRecursiveTable(container, data, level, parentRowId, parentName) {
     lucide.createIcons();
 }
 
-function renderDimensionTable(container, data, dims, parentId = '') {
+function renderDimensionTable(container, data, dims, parentId = '', cacheKey) {
     const activeMetrics = getActiveMetrics();
+    const currentSort = NESTED_DATA_CACHE[cacheKey]?.sort || { key: null, dir: 'asc' };
+    const dimName = dims.join(' / ');
+
     let html = `<table class="nested-table"><thead><tr>
-        <th style="text-align: left; min-width: 150px;">${dims.join(' / ').toUpperCase()}</th>`;
+        <th class="clickable" onclick="sortNestedTable('${cacheKey}', '_dimName')" style="text-align: left; min-width: 150px;">
+            <div class="header-flex">${dimName.toUpperCase()} <span class="nested-sort-icon">${currentSort.key === '_dimName' ? (currentSort.dir === 'asc' ? '↑' : '↓') : '↕'}</span></div>
+        </th>`;
     
     activeMetrics.forEach(m => {
-        html += `<th style="text-align: right; min-width: 80px;">
-            <div style="display:flex; justify-content:flex-end; align-items:center; gap:8px;">${m.label.toUpperCase()}</div>
+        html += `<th class="clickable" onclick="sortNestedTable('${cacheKey}', '${m.key}')" style="text-align: right; min-width: 80px;">
+            <div class="header-flex-end">${m.label.toUpperCase()} <span class="nested-sort-icon">${currentSort.key === m.key ? (currentSort.dir === 'asc' ? '↑' : '↓') : '↕'}</span></div>
         </th>`;
     });
     html += `</tr></thead><tbody>`;
@@ -497,6 +536,48 @@ function sortTable(key) {
         return sortConfig.dir === 'asc' ? vA - vB : vB - vA;
     });
     render();
+}
+
+function sortNestedTable(cacheKey, key) {
+    console.log(`[Sort] Nested sort initiated for cacheKey: ${cacheKey}, key: ${key}`);
+    const entry = NESTED_DATA_CACHE[cacheKey];
+    if (!entry) {
+        console.error(`[Sort] Entry not found in cache for key: ${cacheKey}`);
+        return;
+    }
+    
+    if (entry.sort.key === key) entry.sort.dir = entry.sort.dir === 'asc' ? 'desc' : 'asc';
+    else { entry.sort.key = key; entry.sort.dir = 'asc'; }
+    
+    const hItem = entry.level ? HIERARCHY[entry.level] : null;
+
+    entry.data.sort((a, b) => {
+        let vA, vB;
+        if (key === '_dimName') {
+            vA = entry.dims.map(d => a[d]).join(' / ');
+            vB = entry.dims.map(d => b[d]).join(' / ');
+        } else {
+            vA = a[key] || 0; vB = b[key] || 0;
+        }
+
+        if (typeof vA === 'string') return entry.sort.dir === 'asc' ? vA.localeCompare(vB) : vB.localeCompare(vA);
+        return entry.sort.dir === 'asc' ? vA - vB : vB - vA;
+    });
+
+    const containerId = entry.containerId;
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error("Sort Error: Container not found", containerId);
+        return;
+    }
+
+    if (entry.level) {
+        renderRecursiveTable(container, entry.data, entry.level, entry.parentRowId, entry.parentName, cacheKey);
+        drawTableSparklines(entry.level, entry.data, cacheKey);
+    } else {
+        renderDimensionTable(container, entry.data, entry.dims, entry.parentId, cacheKey);
+        drawTableSparklines('dim-' + entry.dims.join('-'), entry.data, cacheKey);
+    }
 }
 
 function updateSortHeaders() {
@@ -589,4 +670,5 @@ window.forceRefresh = forceRefresh;
 window.initDashboard = initDashboard;
 window.toggleHierarchy = toggleHierarchy;
 window.sortTable = sortTable;
+window.sortNestedTable = sortNestedTable;
 document.addEventListener('DOMContentLoaded', initDashboard);
