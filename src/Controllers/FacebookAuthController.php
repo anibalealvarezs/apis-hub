@@ -74,6 +74,7 @@ class FacebookAuthController
         // Marketing Scopes
         if (!empty($config['ad_accounts'])) {
             $scopes[] = UserPermission::ADS_READ->value;
+            $scopes[] = PagePermission::BUSINESS_MANAGEMENT->value;
         }
 
         // Organic Pages and Instagram Scopes
@@ -82,6 +83,7 @@ class FacebookAuthController
             $scopes[] = PagePermission::PAGES_READ_ENGAGEMENT->value;
             $scopes[] = 'instagram_basic';
             $scopes[] = 'instagram_manage_insights';
+            $scopes[] = PagePermission::BUSINESS_MANAGEMENT->value;
         }
 
         $url = "https://www.facebook.com/v19.0/dialog/oauth?" . http_build_query([
