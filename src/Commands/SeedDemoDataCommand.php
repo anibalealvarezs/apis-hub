@@ -61,6 +61,14 @@ class SeedDemoDataCommand extends Command
     {
         $channels = explode(',', $input->getOption('channels'));
         $output->writeln("<info>🚀 Seeding Ultra Realistic Demo Data (Names & PlatformIDs)...</info>");
+        // --- 🧹 CLEAR REDIS CACHE ---
+        try {
+            $output->writeln("🧹 Flushing Redis cache...");
+            \Helpers\Helpers::getRedisClient()->flushdb();
+        } catch (\Exception $e) {
+            $output->writeln("<comment>⚠️ Redis Flush skipped: " . $e->getMessage() . "</comment>");
+        }
+
         ini_set('memory_limit', '4G');
         set_time_limit(0);
 
