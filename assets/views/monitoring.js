@@ -359,12 +359,15 @@ function updatePendingJobsDetailed(groupedJobs) {
                            <span class="job-metric-label" style="margin:0;">PIPELINE HISTORY</span>
                            <div class="job-history-dots" style="margin:0; border:none; padding:0;">
                               ${(job.history || []).map(h => {
-                                  let dotStatusClass = '';
-                                  if (h.status === 3) dotStatusClass = 'completed'; // COMPLETED
-                                  else if (h.status === 5) dotStatusClass = 'cancelled'; // CANCELLED
-                                  else dotStatusClass = h.status;
-                                  return `<div class="history-dot dot-${dotStatusClass}" title="${h.date}: ${h.message}"></div>`;
-                              }).join('')}
+                                   let dotStatusClass = 'unknown';
+                                   if (h.status === 1) dotStatusClass = 'scheduled';
+                                   else if (h.status === 2) dotStatusClass = 'processing';
+                                   else if (h.status === 3) dotStatusClass = 'completed';
+                                   else if (h.status === 4) dotStatusClass = 'failed';
+                                   else if (h.status === 5) dotStatusClass = 'delayed';
+                                   else if (h.status === 6) dotStatusClass = 'cancelled';
+                                   return `<div class="history-dot dot-${dotStatusClass}" title="${h.date}: ${h.message}"></div>`;
+                               }).join('')}
                            </div>
                        </div>
                        <div style="display:flex; gap:8px;">
