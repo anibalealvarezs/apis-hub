@@ -384,12 +384,17 @@ td { padding: 10px 15px; border-bottom: 1px solid var(--border); font-size: 0.8r
 .badge-cancelled { background: rgba(255, 255, 255, 0.05); color: #8b949e; border-color: rgba(255, 255, 255, 0.1); }
 
 .job-history-dots { display: flex; gap: 4px; margin-top: 10px; align-items: center; border-top: 1px dotted rgba(255,255,255,0.05); padding-top: 10px; }
-.history-dot { width: 8px; height: 8px; border-radius: 50%; opacity: 0.6; }
-.dot-1 { background: #f59e0b; }
-.dot-2 { background: var(--secondary); }
-.dot-3 { background: #3b82f6; }
-.dot-4 { background: var(--danger); }
-.dot-5 { background: #8b949e; }
+.history-dot { width: 8px; height: 8px; border-radius: 50%; opacity: 0.8; transition: transform 0.2s; }
+.history-dot:hover { transform: scale(1.4); opacity: 1; outline: 2px solid #fff; }
+
+/* Status Dot Colors */
+.dot-1, .dot-scheduled { background: #f59e0b; }
+.dot-2, .dot-processing { background: var(--primary); }
+.dot-3, .dot-completed { background: #4ade80; }
+.dot-4, .dot-failed { background: var(--danger); }
+.dot-5, .dot-delayed { background: #8b949e; }
+.dot-6, .dot-cancelled { background: #f0883e; }
+.dot-unknown { background: #333; }
 
 
 /* Dashboard Specific Utilities */
