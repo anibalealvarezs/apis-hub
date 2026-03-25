@@ -29,6 +29,32 @@ class FacebookClient
 
         $config = $overrideConfig ?? self::getConfig($logger);
 
+        // --- DYNAMIC DETECTION START ---
+        // Let's try to detect the active user/token from the JSON file to be dynamic
+        $tokenPath = (string) ($config['graph_token_path'] ?? '');
+        if ($tokenPath && file_exists($tokenPath)) {
+            try {
+                $storedTokens = json_decode(file_get_contents($tokenPath), true) ?? [];
+                // If we have a 'facebook_marketing' node (our master reference)
+                if (isset($storedTokens['facebook_marketing'])) {
+                    $ref = $storedTokens['facebook_marketing'];
+                    // Use the user_id from the token file if current is missing or we want to be 100% dynamic
+                    if (!empty($ref['user_id'])) {
+                        $logger?->info("Using dynamic Facebook User ID from storage: " . $ref['user_id']);
+                        $config['user_id'] = $ref['user_id'];
+                    }
+                    if (!empty($ref['access_token'])) {
+                        $logger?->info("Using dynamic Facebook Access Token from storage");
+                        // Inject into longLivedUserAccessToken to override old ENV-based ones
+                        $config['graph_long_lived_user_access_token'] = $ref['access_token'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                $logger?->warning("Failed to perform dynamic Facebook detection: " . $e->getMessage());
+            }
+        }
+        // --- DYNAMIC DETECTION END ---
+
         $maxApiRetries = 3;
         $apiRetryCount = 0;
 
