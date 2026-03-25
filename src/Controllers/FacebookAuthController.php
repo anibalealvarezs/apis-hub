@@ -22,7 +22,20 @@ class FacebookAuthController
         // Se cargan desde el .env (basado en la estructura del proyecto)
         $this->clientId = $_ENV['FACEBOOK_APP_ID'] ?? '';
         $this->clientSecret = $_ENV['FACEBOOK_APP_SECRET'] ?? '';
-        $this->redirectUri = $_ENV['FACEBOOK_REDIRECT_URI'] ?? (isset($_SERVER['HTTPS']) ? 'https' : 'http') . "://$_SERVER[HTTP_HOST]/fb-callback";
+        
+        // Detección mejorada de Protocolo (HTTPS detrás de Proxies como Nginx en Docker)
+        $isHttps = (
+            (isset($_SERVER['HTTPS']) && ($_SERVER['HTTPS'] === 'on' || $_SERVER['HTTPS'] === 1)) ||
+            (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+        );
+        $protocol = $isHttps ? 'https' : 'http';
+        
+        // Forzado automático: Si no estamos en localhost, casi con seguridad Facebook exige HTTPS
+        if (isset($_SERVER['HTTP_HOST']) && !str_contains($_SERVER['HTTP_HOST'], 'localhost') && !str_contains($_SERVER['HTTP_HOST'], '127.0.0.1')) {
+            $protocol = 'https';
+        }
+
+        $this->redirectUri = $_ENV['FACEBOOK_REDIRECT_URI'] ?? "$protocol://$_SERVER[HTTP_HOST]/fb-callback";
     }
 
     /**
