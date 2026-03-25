@@ -179,11 +179,16 @@ class ConfigManagerController extends BaseController
                         }
                     }
 
-                    // Get Ad Accounts
-                    $adAccountsResponse = $fbApi->getMyAdAccounts();
-                    if (isset($adAccountsResponse['data'])) {
+                    // Get Ad Accounts (Manual request to avoid business_management requirement in DEFAULT fields)
+                    $adAccountsResponse = $fbApi->performRequest(
+                        'GET',
+                        'v25.0/me/adaccounts',
+                        ['fields' => 'id,name,account_id,account_status,currency']
+                    );
+                    $adAccountsData = json_decode($adAccountsResponse->getBody()->getContents(), true);
+                    if (isset($adAccountsData['data'])) {
                         $allAssets['facebook_ad_accounts'] = [];
-                        foreach ($adAccountsResponse['data'] as $acc) {
+                        foreach ($adAccountsData['data'] as $acc) {
                             $allAssets['facebook_ad_accounts'][] = [
                                 'id' => $acc['id'],
                                 'name' => $acc['name'] ?? ('Ad Account ' . $acc['id']),
