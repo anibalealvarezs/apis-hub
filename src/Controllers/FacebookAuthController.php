@@ -74,7 +74,6 @@ class FacebookAuthController
         // Marketing Scopes
         if (!empty($config['ad_accounts'])) {
             $scopes[] = UserPermission::ADS_READ->value;
-            $scopes[] = UserPermission::ADS_MANAGEMENT->value;
         }
 
         // Organic Pages Scopes
