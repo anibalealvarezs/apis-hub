@@ -117,12 +117,16 @@ class ConfigManagerController extends BaseController
             }
 
             // 2. Fetch Assets from APIs (with isolated Try-Catch)
-            // Try to load from backup first if not forcing refresh
-            if (!$forceRefresh && file_exists($this->assetsBackupPath)) {
+            // Load previous backup for comparison (to know what's truly "NEW")
+            $previousAssets = ['gsc' => [], 'facebook_pages' => [], 'facebook_ad_accounts' => []];
+            if (file_exists($this->assetsBackupPath)) {
                 try {
                     $backup = Yaml::parseFile($this->assetsBackupPath);
-                    $allAssets = $backup['assets'] ?? $allAssets;
-                    $lastUpdated = filemtime($this->assetsBackupPath);
+                    $previousAssets = $backup['assets'] ?? $previousAssets;
+                    if (!$forceRefresh) {
+                        $allAssets = $previousAssets;
+                        $lastUpdated = filemtime($this->assetsBackupPath);
+                    }
                 } catch (\Throwable $e) {
                     $logger->warning("Failed to load assets backup: " . $e->getMessage());
                 }
@@ -179,11 +183,16 @@ class ConfigManagerController extends BaseController
                         }
                     }
 
-                    // Get Ad Accounts
-                    $adAccountsResponse = $fbApi->getMyAdAccounts();
-                    if (isset($adAccountsResponse['data'])) {
+                    // Get Ad Accounts (Manual request to avoid business_management requirement in DEFAULT fields)
+                    $adAccountsResponse = $fbApi->performRequest(
+                        'GET',
+                        'v25.0/me/adaccounts',
+                        ['fields' => 'id,name,account_id,account_status,currency']
+                    );
+                    $adAccountsData = json_decode($adAccountsResponse->getBody()->getContents(), true);
+                    if (isset($adAccountsData['data'])) {
                         $allAssets['facebook_ad_accounts'] = [];
-                        foreach ($adAccountsResponse['data'] as $acc) {
+                        foreach ($adAccountsData['data'] as $acc) {
                             $allAssets['facebook_ad_accounts'][] = [
                                 'id' => $acc['id'],
                                 'name' => $acc['name'] ?? ('Ad Account ' . $acc['id']),
@@ -263,18 +272,34 @@ class ConfigManagerController extends BaseController
                 }
             }
 
-            // Mark new assets
+            // Mark new assets (Neither in current config nor in previous backup)
+            $prevGscUrls = array_map(fn($a) => $this->normalizeGscUrl($a['url']), $previousAssets['gsc'] ?? []);
+            foreach ($allAssets['gsc'] as &$asset) {
+                if (!isset($asset['lost_access'])) {
+                    $normalizedUrl = $this->normalizeGscUrl($asset['url']);
+                    $isKnown = in_array($normalizedUrl, $prevGscUrls) || isset($currentConfig['gsc'][$asset['url']]);
+                    if (!$isKnown) $asset['is_new'] = true;
+                }
+            }
+            unset($asset);
+
+            $prevPageIds = array_map(fn($a) => (string)$a['id'], $previousAssets['facebook_pages'] ?? []);
             foreach ($allAssets['facebook_pages'] as &$asset) {
-                if (!isset($asset['lost_access']) && !in_array((string)$asset['id'], $currentConfig['fb_page_ids'] ?? [])) {
-                    $asset['is_new'] = true;
+                if (!isset($asset['lost_access'])) {
+                    $isKnown = in_array((string)$asset['id'], $prevPageIds) || in_array((string)$asset['id'], $currentConfig['fb_page_ids'] ?? []);
+                    if (!$isKnown) $asset['is_new'] = true;
                 }
             }
+            unset($asset);
+
+            $prevAdAccountIds = array_map(fn($a) => (string)$a['id'], $previousAssets['facebook_ad_accounts'] ?? []);
             foreach ($allAssets['facebook_ad_accounts'] as &$asset) {
-                if (!isset($asset['lost_access']) && !in_array((string)$asset['id'], $currentConfig['fb_ad_account_ids'] ?? [])) {
-                    $asset['is_new'] = true;
+                if (!isset($asset['lost_access'])) {
+                    $isKnown = in_array((string)$asset['id'], $prevAdAccountIds) || in_array((string)$asset['id'], $currentConfig['fb_ad_account_ids'] ?? []);
+                    if (!$isKnown) $asset['is_new'] = true;
                 }
             }
-            unset($asset); // safe unset by reference
+            unset($asset);
 
             return new Response(json_encode([
                 'assets' => $allAssets,
