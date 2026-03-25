@@ -518,7 +518,7 @@ function renderDimensionTable(container, data, dims, parentId = '', cacheKey) {
 
 function getStatusIcon(status) {
     const s = (status || 'unknown').toLowerCase();
-    if (s === 'active' || s === 'on') return '<i data-lucide="circle" style="fill:#3fb950; color:#3fb950; width:12px;"></i>';
+    if (s === 'active' || s === 'on') return '<i data-lucide="circle" style="fill:#4ade80; color:#4ade80; width:12px;"></i>';
     if (s === 'paused' || s === 'off') return '<i data-lucide="pause-circle" style="color:#f0883e; width:14px;"></i>';
     return '<i data-lucide="help-circle" style="width:14px; opacity:0.5"></i>';
 }
@@ -528,6 +528,16 @@ function sortTable(key) {
     else { sortConfig.key = key; sortConfig.dir = 'asc'; }
     currentData.sort((a,b) => {
         let vA = a[key] ?? ''; let vB = b[key] ?? '';
+        
+        let isNumA = !isNaN(vA) && vA !== '';
+        let isNumB = !isNaN(vB) && vB !== '';
+        
+        if (isNumA && isNumB) {
+            vA = Number(vA);
+            vB = Number(vB);
+            return sortConfig.dir === 'asc' ? vA - vB : vB - vA;
+        }
+
         if (typeof vA === 'string' || typeof vB === 'string') {
             return sortConfig.dir === 'asc' ? String(vA).localeCompare(String(vB)) : String(vB).localeCompare(String(vA));
         }
@@ -555,7 +565,16 @@ function sortNestedTable(cacheKey, key) {
             vA = entry.dims.map(d => a[d]).join(' / ');
             vB = entry.dims.map(d => b[d]).join(' / ');
         } else {
-            vA = a[key] || 0; vB = b[key] || 0;
+            vA = a[key] ?? ''; vB = b[key] ?? '';
+        }
+
+        let isNumA = !isNaN(vA) && vA !== '';
+        let isNumB = !isNaN(vB) && vB !== '';
+        
+        if (isNumA && isNumB) {
+            vA = Number(vA);
+            vB = Number(vB);
+            return entry.sort.dir === 'asc' ? vA - vB : vB - vA;
         }
 
         if (typeof vA === 'string' || typeof vB === 'string') {
