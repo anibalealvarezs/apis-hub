@@ -560,7 +560,10 @@ function sortNestedTable(cacheKey, key) {
             vA = a[key] || 0; vB = b[key] || 0;
         }
 
-        if (typeof vA === 'string') return entry.sort.dir === 'asc' ? vA.localeCompare(vB) : vB.localeCompare(vA);
+        if (typeof vA === 'string' || typeof vB === 'string') {
+            vA = String(vA || ''); vB = String(vB || '');
+            return entry.sort.dir === 'asc' ? vA.localeCompare(vB) : vB.localeCompare(vA);
+        }
         return entry.sort.dir === 'asc' ? vA - vB : vB - vA;
     });
 
