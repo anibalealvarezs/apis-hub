@@ -478,30 +478,34 @@ class Helpers
                     }
                 }
 
-                // --- 🛡️ SMART DEMO AUTH MAPPING ---
-                // If we are in demo mode, we need to ensure that the "facebook_marketing" 
-                // token from the JSON is actually used.
-                if (getenv('APP_ENV') === 'demo') {
-                    // Resolve token path
-                    $tokenPath = $config['facebook']['graph_token_path'] ?? './storage/tokens/facebook_tokens.json';
-                    if (str_starts_with($tokenPath, './')) {
-                        $tokenPath = dirname(__DIR__, 2) . substr($tokenPath, 1);
-                    }
+                // --- 🛡️ SMART STORAGE AUTH MAPPING ---
+                // If we have a local stored token, prioritize it
+                // Resolve token path
+                $tokenPath = $_ENV['FACEBOOK_TOKEN_PATH'] ?? $config['facebook']['graph_token_path'] ?? './storage/tokens/facebook_tokens.json';
+                if (is_string($tokenPath) && str_starts_with($tokenPath, './')) {
+                    $tokenPath = dirname(__DIR__, 2) . substr($tokenPath, 1);
+                }
+                
+                if (file_exists($tokenPath)) {
+                    $tokens = json_decode(file_get_contents($tokenPath), true);
+                    $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
+                    $marketingUserId = $tokens['facebook_marketing']['user_id'] ?? null;
                     
-                    if (file_exists($tokenPath)) {
-                        $tokens = json_decode(file_get_contents($tokenPath), true);
-                        $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
+                    if ($marketingToken) {
+                        // OVERRIDE ABSOLUTO: Inyectamos el token en todas las claves posibles
+                        $config['facebook']['graph_user_access_token'] = $marketingToken;
+                        $config['facebook_marketing']['graph_user_access_token'] = $marketingToken;
+                        $config['facebook_marketing']['access_token'] = $marketingToken;
                         
-                        if ($marketingToken) {
-                            // OVERRIDE ABSOLUTO: Inyectamos el token en todas las claves posibles
-                            $config['facebook']['graph_user_access_token'] = $marketingToken;
-                            $config['facebook_marketing']['graph_user_access_token'] = $marketingToken;
-                            $config['facebook_marketing']['access_token'] = $marketingToken;
-                            
-                            // Inyectamos también en variables de entorno para máxima compatibilidad
-                            $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
-                            putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
-                        }
+                        // Inyectamos también en variables de entorno para máxima compatibilidad
+                        $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
+                        putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
+                    }
+                    if ($marketingUserId) {
+                        $config['facebook']['user_id'] = $marketingUserId;
+                        $config['facebook_marketing']['user_id'] = $marketingUserId;
+                        $_ENV['FACEBOOK_USER_ID'] = $marketingUserId;
+                        putenv("FACEBOOK_USER_ID=" . $marketingUserId);
                     }
                 }
                 // ---------------------------------

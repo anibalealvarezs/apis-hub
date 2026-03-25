@@ -542,17 +542,22 @@ class FacebookGraphHelpers
     {
         $config = Helpers::getChannelsConfig()['facebook'] ?? null;
         
-        // --- 🛡️ SMART DEMO AUTH OVERRIDE ---
-        if (getenv('APP_ENV') === 'demo') {
-            $tokenPath = $config['graph_token_path'] ?? dirname(__DIR__, 2) . '/storage/tokens/facebook_tokens.json';
-            if (file_exists($tokenPath)) {
-                $tokens = json_decode(file_get_contents($tokenPath), true);
-                $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
-                if ($marketingToken) {
-                    $config['graph_user_access_token'] = $marketingToken;
-                    $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
-                    putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
-                }
+        // --- 🛡️ SMART STORAGE AUTH OVERRIDE ---
+        $tokenPath = $_ENV['FACEBOOK_TOKEN_PATH'] ?? $config['graph_token_path'] ?? dirname(__DIR__, 2) . '/storage/tokens/facebook_tokens.json';
+        if (file_exists($tokenPath)) {
+            $tokens = json_decode(file_get_contents($tokenPath), true);
+            $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
+            $marketingUserId = $tokens['facebook_marketing']['user_id'] ?? null;
+            
+            if ($marketingToken) {
+                $config['graph_user_access_token'] = $marketingToken;
+                $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
+                putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
+            }
+            if ($marketingUserId) {
+                $config['user_id'] = $marketingUserId;
+                $_ENV['FACEBOOK_USER_ID'] = $marketingUserId;
+                putenv("FACEBOOK_USER_ID=" . $marketingUserId);
             }
         }
         // ------------------------------------
