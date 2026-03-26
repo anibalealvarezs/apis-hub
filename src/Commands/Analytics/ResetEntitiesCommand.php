@@ -98,8 +98,6 @@ class ResetEntitiesCommand extends Command
 
                 // 4. Cleanup Orphaned Base Entities (Meta)
                 $output->writeln('<info>  Pruning orphaned base entities...</info>');
-                $connection->executeStatement("DELETE FROM ads WHERE id NOT IN (SELECT ad_id FROM channeled_ads)");
-                $connection->executeStatement("DELETE FROM ad_groups WHERE id NOT IN (SELECT ad_group_id FROM channeled_ad_groups)");
                 $connection->executeStatement("DELETE FROM campaigns WHERE id NOT IN (SELECT campaign_id FROM channeled_campaigns)");
                 $connection->executeStatement("DELETE FROM creatives WHERE id NOT IN (SELECT creative_id FROM channeled_ads WHERE creative_id IS NOT NULL)");
                 
