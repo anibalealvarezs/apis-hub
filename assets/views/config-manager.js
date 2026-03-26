@@ -756,7 +756,12 @@ async function updateConfig(typeArg) {
         });
 
         document.querySelectorAll('.fb-marketing-asset-sync:checked').forEach(el => {
-            payload.assets.ad_accounts.push({ id: el.value });
+            const item = el.closest('.asset-item');
+            const nameEl = item ? item.querySelector('[style*="font-weight:600"]') : null;
+            payload.assets.ad_accounts.push({ 
+                id: el.value,
+                name: nameEl ? nameEl.textContent.trim() : null
+            });
         });
 
         if (typeArg === 'gsc') {
