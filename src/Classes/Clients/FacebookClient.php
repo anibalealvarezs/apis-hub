@@ -131,6 +131,10 @@ class FacebookClient
         // Merge specialized files into the main config array
         $config = array_replace_recursive($config, $organic, $marketing);
 
+        // Explicitly preserve enablement flags to help with scope detection
+        $config['organic_enabled'] = (bool) ($organic['enabled'] ?? false);
+        $config['marketing_enabled'] = (bool) ($marketing['enabled'] ?? false);
+
         if (empty($config)) {
             $logger?->error("Facebook configuration not found in channels config.");
             throw new \RuntimeException("Facebook configuration not found in channels config.");

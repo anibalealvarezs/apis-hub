@@ -71,14 +71,14 @@ class FacebookAuthController
             UserPermission::EMAIL->value,
         ];
 
-        // Marketing Scopes
-        if (!empty($config['ad_accounts'])) {
+        // Marketing Scopes (Check both list existence and enablement flag)
+        if (!empty($config['ad_accounts']) || ($config['marketing_enabled'] ?? false)) {
             $scopes[] = UserPermission::ADS_READ->value;
             $scopes[] = PagePermission::BUSINESS_MANAGEMENT->value;
         }
 
-        // Organic Pages and Instagram Scopes
-        if (!empty($config['pages'])) {
+        // Organic Pages and Instagram Scopes (Check both list existence and enablement flag)
+        if (!empty($config['pages']) || ($config['organic_enabled'] ?? false)) {
             $scopes[] = PagePermission::PAGES_SHOW_LIST->value;
             $scopes[] = PagePermission::PAGES_READ_ENGAGEMENT->value;
             $scopes[] = 'instagram_basic';
