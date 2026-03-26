@@ -7,6 +7,11 @@ use Exception;
 use Helpers\Helpers;
 use Services\CacheStrategyService;
 use Services\ConfigSchemaRegistryService;
+use Entities\Analytics\Account;
+use Entities\Analytics\Channeled\ChanneledAccount;
+use Enums\Channel;
+use Enums\Account as AccountEnum;
+use DateTime;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Yaml\Yaml;
@@ -681,19 +686,99 @@ class ConfigManagerController extends BaseController
                 }
             }
 
+            // Sync with DB
+            $fbGroupName = $globalConfig['channels']['facebook']['accounts_group_name'] ?? $orgConfig['channels']['facebook_organic']['accounts_group_name'] ?? $markConfig['channels']['facebook_marketing']['accounts_group_name'] ?? "Default Group";
+            $accountEntity = $this->em->getRepository(Account::class)->getByName($fbGroupName);
+            if (!$accountEntity) {
+                $accountEntity = new Account();
+                $accountEntity->addName($fbGroupName);
+                $this->em->persist($accountEntity);
+                $this->em->flush();
+            }
+
             // Add newly selected accounts
             $existingAccIds = array_map('strval', array_column($currentAccs, 'id'));
             foreach ($assets['ad_accounts'] as $newAcc) {
-                if (!in_array((string)$newAcc['id'], $existingAccIds)) {
+                $accId = (string) $newAcc['id'];
+                $accName = $newAcc['name'] ?? ("Ad Account " . $accId);
+                
+                if (!in_array($accId, $existingAccIds)) {
                     $newAccsList[] = ConfigSchemaRegistryService::getEntitySchema('facebook_marketing', [
-                        'id' => (string)$newAcc['id'],
-                        'name' => $newAcc['name'] ?? '',
+                        'id' => $accId,
+                        'name' => $accName,
                     ]);
                 }
+                
+                // Sync to database physical entity
+                $dbChanneled = $this->em->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $accId, 'channel' => Channel::facebook_marketing->value]);
+                if (!$dbChanneled) {
+                    $dbChanneled = new ChanneledAccount();
+                    $dbChanneled->addPlatformId($accId)
+                        ->addAccount($accountEntity)
+                        ->addType(AccountEnum::META_AD_ACCOUNT)
+                        ->addChannel(Channel::facebook_marketing->value)
+                        ->addName($accName)
+                        ->addPlatformCreatedAt(new DateTime('2010-10-06'))
+                        ->addData([]);
+                    $this->em->persist($dbChanneled);
+                } else {
+                    if ($dbChanneled->getName() !== $accName || empty($dbChanneled->getName())) {
+                        $dbChanneled->addName($accName);
+                        $this->em->persist($dbChanneled);
+                    }
+                }
             }
+            $this->em->flush();
             $markConfig['channels']['facebook_marketing']['ad_accounts'] = $newAccsList;
         }
         file_put_contents($this->fbMarketingPath, Yaml::dump($markConfig, 10, 2));
+
+        // Sync Pages to DB too
+        if (isset($assets['pages'])) {
+            $fbGroupName = $fbGroupName ?? "Default Group";
+            $accountEntity = $accountEntity ?? $this->em->getRepository(Account::class)->getByName($fbGroupName);
+            foreach ($assets['pages'] as $pData) {
+                $pageId = (string)$pData['id'];
+                $pageName = $pData['title'] ?? ("Page " . $pageId);
+                $dbPage = $this->em->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $pageId, 'channel' => Channel::facebook_organic->value]);
+                if (!$dbPage) {
+                    $dbPage = new ChanneledAccount();
+                    $dbPage->addPlatformId($pageId)
+                        ->addAccount($accountEntity)
+                        ->addType(AccountEnum::FACEBOOK_PAGE)
+                        ->addChannel(Channel::facebook_organic->value)
+                        ->addName($pageName)
+                        ->addPlatformCreatedAt(new DateTime('2010-10-06'))
+                        ->addData([]);
+                    $this->em->persist($dbPage);
+                } elseif ($dbPage->getName() !== $pageName || empty($dbPage->getName())) {
+                    $dbPage->addName($pageName);
+                    $this->em->persist($dbPage);
+                }
+                
+                // IG sync if present
+                if (!empty($pData['ig_account'])) {
+                    $igId = (string)$pData['ig_account'];
+                    $igName = $pData['ig_account_name'] ?? $pageName;
+                    $dbIg = $this->em->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $igId, 'channel' => Channel::facebook_organic->value]);
+                    if (!$dbIg) {
+                        $dbIg = new ChanneledAccount();
+                        $dbIg->addPlatformId($igId)
+                            ->addAccount($accountEntity)
+                            ->addType(AccountEnum::INSTAGRAM)
+                            ->addChannel(Channel::facebook_organic->value)
+                            ->addName($igName)
+                            ->addPlatformCreatedAt(new DateTime('2010-10-06'))
+                            ->addData([]);
+                        $this->em->persist($dbIg);
+                    } elseif ($dbIg->getName() !== $igName || empty($dbIg->getName())) {
+                        $dbIg->addName($igName);
+                        $this->em->persist($dbIg);
+                    }
+                }
+            }
+            $this->em->flush();
+        }
     }
 
     private function deriveTitleFromUrl(string $url): string

@@ -349,9 +349,10 @@ class InitializeEntitiesCommand extends Command
             foreach ($adAccountsToProcess as $adAccount) {
                 /** @var ChanneledAccount|null $adAccountEntity */
                 $adAccountEntity = $channeledAccountRepository->getByPlatformId($adAccount['id'], Channel::facebook_marketing->value);
+                $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbGroupName ?? ("Ad Account " . $adAccount['id']);
+                
                 if (!$adAccountEntity) {
                     $channeledAccount = new ChanneledAccount();
-                    $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbGroupName;
                     $channeledAccount->addPlatformId($adAccount['id'])
                         ->addAccount($accountEntity)
                         ->addType(AccountEnum::META_AD_ACCOUNT)
@@ -362,8 +363,7 @@ class InitializeEntitiesCommand extends Command
                     $this->entityManager->persist($channeledAccount);
                     $this->logger->info("Initialized Ad Account: ID={$adAccount['id']}, Name={$channeledAccountName}");
                 } else {
-                    $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbGroupName;
-                    if ($adAccountEntity->getName() !== $channeledAccountName) {
+                    if ($adAccountEntity->getName() !== $channeledAccountName || empty($adAccountEntity->getName())) {
                         $adAccountEntity->addName($channeledAccountName);
                         $this->entityManager->persist($adAccountEntity);
                         $this->logger->info("Updated Ad Account name: ID={$adAccount['id']}, New Name={$channeledAccountName}");

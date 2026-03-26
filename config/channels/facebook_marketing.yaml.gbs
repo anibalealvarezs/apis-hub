@@ -175,13 +175,13 @@ channels:
     CREATIVE:
       cache_include: ''
     AD_ACCOUNT:
-      ad_account_metrics: true
+      ad_account_metrics: false
       campaigns: true
-      campaign_metrics: true
+      campaign_metrics: false
       adsets: true
       adset_metrics: true
       ads: true
-      ad_metrics: true
+      ad_metrics: false
       creatives: false
       creative_metrics: false
     ad_accounts:

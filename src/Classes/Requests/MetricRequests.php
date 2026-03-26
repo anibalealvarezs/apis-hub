@@ -1396,11 +1396,17 @@ class MetricRequests
                     );
                     $fetched = true;
                 } catch (Exception $e) {
+                    $msg = $e->getMessage();
+                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'valid insights metric') || str_contains($msg, 'permissions') || str_contains($msg, 'Unsupported get request'));
+                    
                     $retryCount++;
-                    if ($retryCount >= $maxRetries) {
-                        throw $e;
+                    if ($retryCount >= $maxRetries || $isFatal) {
+                        $logger->error(($isFatal ? "FATAL INSIGHTS ERROR" : "Failed") . " to retrieve insights for page " . $page['id'] . ": " . $msg);
+                        $fetched = true; // Break loop
+                        if (!$isFatal) throw $e;
+                        return; // Continue to next page
                     }
-                    $logger->warning("Retry $retryCount/$maxRetries for FB page insights " . $page['id'] . ": " . $e->getMessage());
+                    $logger->warning("Retry $retryCount/$maxRetries for FB page insights " . $page['id'] . ": " . $msg);
                     usleep(200000 * $retryCount);
                 }
             }
@@ -1540,11 +1546,17 @@ class MetricRequests
                     );
                     $fetched = true;
                 } catch (Exception $e) {
+                    $msg = $e->getMessage();
+                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'valid insights metric') || str_contains($msg, 'permissions'));
+                    
                     $retryCount++;
-                    if ($retryCount >= $maxRetries) {
-                        throw $e;
+                    if ($retryCount >= $maxRetries || $isFatal) {
+                        $logger->error(($isFatal ? "FATAL MARKETING ERROR" : "Failed") . " to retrieve ad account insights " . $adAccount['id'] . ": " . $msg);
+                        $fetched = true; // Break loop
+                        if (!$isFatal) throw $e;
+                        return ['metrics' => 0, 'rows' => 0];
                     }
-                    $logger->warning("Retry $retryCount/$maxRetries for Meta ad account insights " . $adAccount['id'] . ": " . $e->getMessage());
+                    $logger->warning("Retry $retryCount/$maxRetries for Meta ad account insights " . $adAccount['id'] . ": " . $msg);
                     usleep(200000 * $retryCount);
                 }
             }
@@ -1716,11 +1728,20 @@ class MetricRequests
                             );
                             $fetched = true;
                         } catch (Exception $e) {
+                            $msg = $e->getMessage();
+                            $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'valid insights metric') || str_contains($msg, 'permissions'));
+                            
                             $retryCount++;
-                            if ($retryCount >= $maxRetries) {
-                                throw $e;
+                            if ($retryCount >= $maxRetries || $isFatal) {
+                                $logger->error(($isFatal ? "FATAL IG INSIGHTS ERROR" : "Failed") . " to retrieve IG insights (option $option) for page " . $page['id'] . ": " . $msg);
+                                $fetched = true; // Break loop
+                                if (!$isFatal) {
+                                    $option = 6; // Stop options loop
+                                    throw $e;
+                                }
+                                continue;
                             }
-                            $logger->warning("Retry $retryCount/$maxRetries for IG account insights " . $page['ig_account'] . " (option $option): " . $e->getMessage());
+                            $logger->warning("Retry $retryCount/$maxRetries for IG account insights " . $page['ig_account'] . " (option $option): " . $msg);
                             usleep(200000 * $retryCount);
                         }
                     }
@@ -1862,11 +1883,17 @@ class MetricRequests
                     );
                     $fetched = true;
                 } catch (Exception $e) {
+                    $msg = $e->getMessage();
+                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'permissions') || str_contains($msg, 'Unsupported get request'));
+                    
                     $retryCount++;
-                    if ($retryCount >= $maxRetries) {
-                        throw $e;
+                    if ($retryCount >= $maxRetries || $isFatal) {
+                        $logger->error(($isFatal ? "FATAL IG MEDIA ERROR" : "Failed") . " to retrieve IG media insights " . $postEntity->getPostId() . ": " . $msg);
+                        $fetched = true; // Break loop
+                        if (!$isFatal) throw $e;
+                        return false;
                     }
-                    $logger->warning("Retry $retryCount/$maxRetries for IG media insights " . $postEntity->getPostId() . ": " . $e->getMessage());
+                    $logger->warning("Retry $retryCount/$maxRetries for IG media insights " . $postEntity->getPostId() . ": " . $msg);
                     usleep(200000 * $retryCount);
                 }
             }
@@ -1990,11 +2017,17 @@ class MetricRequests
                     );
                     $fetched = true;
                 } catch (Exception $e) {
+                    $msg = $e->getMessage();
+                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'permissions'));
+                    
                     $retryCount++;
-                    if ($retryCount >= $maxRetries) {
-                        throw $e;
+                    if ($retryCount >= $maxRetries || $isFatal) {
+                        $logger->error(($isFatal ? "FATAL CAMPAIGN ERROR" : "Failed") . " to retrieve campaign insights $campaignPlatformId: " . $msg);
+                        $fetched = true; // Break loop
+                        if (!$isFatal) throw $e;
+                        return false;
                     }
-                    $logger->warning("Retry $retryCount/$maxRetries for campaign insights $campaignPlatformId: " . $e->getMessage());
+                    $logger->warning("Retry $retryCount/$maxRetries for campaign insights $campaignPlatformId: " . $msg);
                     usleep(200000 * $retryCount);
                 }
             }
@@ -2123,11 +2156,17 @@ class MetricRequests
                     );
                     $fetched = true;
                 } catch (Exception $e) {
+                    $msg = $e->getMessage();
+                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'permissions'));
+                    
                     $retryCount++;
-                    if ($retryCount >= $maxRetries) {
-                        throw $e;
+                    if ($retryCount >= $maxRetries || $isFatal) {
+                        $logger->error(($isFatal ? "FATAL ADSET ERROR" : "Failed") . " to retrieve adset insights $adsetPlatformId: " . $msg);
+                        $fetched = true; // Break loop
+                        if (!$isFatal) throw $e;
+                        return false;
                     }
-                    $logger->warning("Retry $retryCount/$maxRetries for adset insights $adsetPlatformId: " . $e->getMessage());
+                    $logger->warning("Retry $retryCount/$maxRetries for adset insights $adsetPlatformId: " . $msg);
                     usleep(200000 * $retryCount);
                 }
             }
@@ -2263,11 +2302,17 @@ class MetricRequests
                     );
                     $fetched = true;
                 } catch (Exception $e) {
+                    $msg = $e->getMessage();
+                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'permissions'));
+                    
                     $retryCount++;
-                    if ($retryCount >= $maxRetries) {
-                        throw $e;
+                    if ($retryCount >= $maxRetries || $isFatal) {
+                        $logger->error(($isFatal ? "FATAL AD ERROR" : "Failed") . " to retrieve ad insights $adPlatformId: " . $msg);
+                        $fetched = true; // Break loop
+                        if (!$isFatal) throw $e;
+                        return false;
                     }
-                    $logger->warning("Retry $retryCount/$maxRetries for ad insights $adPlatformId: " . $e->getMessage());
+                    $logger->warning("Retry $retryCount/$maxRetries for ad insights $adPlatformId: " . $msg);
                     usleep(200000 * $retryCount);
                 }
             }

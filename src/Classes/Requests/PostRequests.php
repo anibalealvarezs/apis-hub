@@ -133,12 +133,17 @@ class PostRequests implements RequestInterface
                             }
                             $fetched = true;
                         } catch (\Exception $e) {
+                            $msg = $e->getMessage();
+                            $isFatal = (str_contains($msg, 'Unsupported get request') || str_contains($msg, 'missing permissions') || str_contains($msg, 'Object with ID'));
+                            
                             $retryCount++;
-                            if ($retryCount >= $maxRetries) {
-                                $logger->error("Failed to fetch Facebook posts after $maxRetries retries for page " . $pageCfg['id'] . ": " . $e->getMessage());
-                                throw $e;
+                            if ($retryCount >= $maxRetries || $isFatal) {
+                                $logger->error(($isFatal ? "FATAL PERMISSION ERROR" : "Failed") . " to fetch Facebook posts for page " . $pageCfg['id'] . ": " . $msg);
+                                $fetched = true; // Stop loop
+                                if (!$isFatal) throw $e;
+                                continue;
                             }
-                            $logger->warning("Retry $retryCount/$maxRetries for Facebook posts page " . $pageCfg['id'] . ": " . $e->getMessage());
+                            $logger->warning("Retry $retryCount/$maxRetries for Facebook posts page " . $pageCfg['id'] . ": " . $msg);
                             usleep(200000 * $retryCount);
                         }
                     }
@@ -189,12 +194,17 @@ class PostRequests implements RequestInterface
                                 }
                                 $fetched = true;
                             } catch (\Exception $e) {
+                                $msg = $e->getMessage();
+                                $isFatal = (str_contains($msg, 'Unsupported get request') || str_contains($msg, 'missing permissions') || str_contains($msg, 'Object with ID'));
+                                
                                 $retryCount++;
-                                if ($retryCount >= $maxRetries) {
-                                    $logger->error("Failed to fetch Instagram media after $maxRetries retries for page " . $pageCfg['id'] . ": " . $e->getMessage());
-                                    throw $e;
+                                if ($retryCount >= $maxRetries || $isFatal) {
+                                    $logger->error(($isFatal ? "FATAL PERMISSION ERROR" : "Failed") . " to fetch Instagram media for page " . $pageCfg['id'] . ": " . $msg);
+                                    $fetched = true; // Stop loop
+                                    if (!$isFatal) throw $e;
+                                    continue;
                                 }
-                                $logger->warning("Retry $retryCount/$maxRetries for Instagram media page " . $pageCfg['id'] . ": " . $e->getMessage());
+                                $logger->warning("Retry $retryCount/$maxRetries for Instagram media page " . $pageCfg['id'] . ": " . $msg);
                                 usleep(200000 * $retryCount);
                             }
                         }
