@@ -129,48 +129,71 @@ class CacheController extends BaseController
         try {
             /** @var \Repositories\JobRepository $jobRepo */
             $jobRepo = $this->em->getRepository(\Entities\Job::class);
-            $qb = $jobRepo->createQueryBuilder('j');
-            
+
             $equivalents = [$entity];
             if (str_contains($entity, 'channeled_')) {
                 $equivalents[] = str_replace('channeled_', '', $entity);
             } else {
                 $equivalents[] = 'channeled_' . $entity;
             }
+            $equivalents = array_unique($equivalents);
 
-            $qb->where('j.entity IN (:entities)')
-               ->andWhere('j.channel = :channel')
-               ->andWhere('j.status IN (:statuses)')
-               ->setParameter('entities', array_unique($equivalents))
-               ->setParameter('channel', $channel->name)
-               ->setParameter('statuses', [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value]);
+            $statuses = [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value];
 
             if ($this->isPostgreSQL()) {
-                // PostgreSQL needs explicit casting from JSONB to TEXT for LIKE operator
-                $payloadField = 'CAST(j.payload AS TEXT)';
+                // PostgreSQL needs Native SQL for JSON casting and operators
+                $sql = "SELECT id FROM jobs WHERE entity IN (:entities) AND channel = :channel AND status IN (:statuses)";
+                $sqlParams = [
+                    'entities' => $equivalents,
+                    'channel' => $channel->name,
+                    'statuses' => $statuses
+                ];
+                
+                $payloadField = 'CAST(payload AS TEXT)';
+                if ($params && isset($params['startDate'])) {
+                    $sql .= " AND ({$payloadField} LIKE :start_pattern1 OR {$payloadField} LIKE :start_pattern2)";
+                    $sqlParams['start_pattern1'] = '%startDate%' . $params['startDate'] . '%';
+                    $sqlParams['start_pattern2'] = '%start_date%' . $params['startDate'] . '%';
+                }
+                if ($params && isset($params['endDate'])) {
+                    $sql .= " AND ({$payloadField} LIKE :end_pattern1 OR {$payloadField} LIKE :end_pattern2)";
+                    $sqlParams['end_pattern1'] = '%endDate%' . $params['endDate'] . '%';
+                    $sqlParams['end_pattern2'] = '%end_date%' . $params['endDate'] . '%';
+                }
+                if ($params && isset($params['instance_name'])) {
+                    $sql .= " AND {$payloadField} LIKE :instance_pattern";
+                    $sqlParams['instance_pattern'] = '%instance_name%' . $params['instance_name'] . '%';
+                }
+
+                $stmt = $this->em->getConnection()->prepare($sql);
+                $existingJobs = $stmt->executeQuery($sqlParams)->fetchAllAssociative();
             } else {
+                // MySQL works fine with DQL and native JSON support
+                $qb = $jobRepo->createQueryBuilder('j');
+                $qb->where('j.entity IN (:entities)')
+                   ->andWhere('j.channel = :channel')
+                   ->andWhere('j.status IN (:statuses)')
+                   ->setParameter('entities', array_unique($equivalents))
+                   ->setParameter('channel', $channel->name)
+                   ->setParameter('statuses', $statuses);
+
                 $payloadField = 'j.payload';
+                if ($params && isset($params['startDate'])) {
+                    $qb->andWhere("({$payloadField} LIKE :start_pattern1 OR {$payloadField} LIKE :start_pattern2)")
+                        ->setParameter('start_pattern1', '%startDate%' . $params['startDate'] . '%')
+                        ->setParameter('start_pattern2', '%start_date%' . $params['startDate'] . '%');
+                }
+                if ($params && isset($params['endDate'])) {
+                    $qb->andWhere("({$payloadField} LIKE :end_pattern1 OR {$payloadField} LIKE :end_pattern2)")
+                        ->setParameter('end_pattern1', '%endDate%' . $params['endDate'] . '%')
+                        ->setParameter('end_pattern2', '%end_date%' . $params['endDate'] . '%');
+                }
+                if ($params && isset($params['instance_name'])) {
+                    $qb->andWhere("{$payloadField} LIKE :instance_pattern")
+                       ->setParameter('instance_pattern', '%instance_name%' . $params['instance_name'] . '%');
+                }
+                $existingJobs = $qb->getQuery()->getResult();
             }
-
-            // Be timeframe-specific to allow parallel jobs for different periods (e.g. gsc-jan vs gsc-feb)
-            if ($params && isset($params['startDate'])) {
-                $qb->andWhere("({$payloadField} LIKE :start_pattern1 OR {$payloadField} LIKE :start_pattern2)")
-                    ->setParameter('start_pattern1', '%startDate%' . $params['startDate'] . '%')
-                    ->setParameter('start_pattern2', '%start_date%' . $params['startDate'] . '%');
-            }
-            if ($params && isset($params['endDate'])) {
-                $qb->andWhere("({$payloadField} LIKE :end_pattern1 OR {$payloadField} LIKE :end_pattern2)")
-                    ->setParameter('end_pattern1', '%endDate%' . $params['endDate'] . '%')
-                    ->setParameter('end_pattern2', '%end_date%' . $params['endDate'] . '%');
-            }
-            
-            // be instance-specific if name is provided
-            if ($params && isset($params['instance_name'])) {
-                $qb->andWhere("{$payloadField} LIKE :instance_pattern")
-                   ->setParameter('instance_pattern', '%instance_name%' . $params['instance_name'] . '%');
-            }
-
-            $existingJobs = $qb->getQuery()->getResult();
             if (count($existingJobs) > 0) {
                 return $this->createResponse(
                     data: null,
