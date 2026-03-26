@@ -209,7 +209,7 @@ channels:
           type: levels
           config: {  }
     CAMPAIGN:
-      cache_include: CAMP-
+      cache_include: ''
     ADSET:
       cache_include: ''
     AD:

@@ -7,9 +7,9 @@ database:
     password: '${DB_PASSWORD:-YOUR_PASSWORD}'
     name: '${DB_NAME:-apis-hub-testing}'
   production:
-    driver: ${DB_DRIVER:-pdo_mysql}
+    driver: ${DB_DRIVER:-pdo_pgsql}
     host: '${DB_HOST:-db}'
-    port: ${DB_PORT:-3306}
+    port: ${DB_PORT:-5432}
     user: ${DB_USER}
     password: ${DB_PASSWORD}
     name: ${DB_NAME}
