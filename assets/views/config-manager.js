@@ -247,13 +247,13 @@ function handleFbLevelChange() {
     // Sync Entity Indicators (infrastructure)
     const entActiveIdx = visLevels.indexOf(entEl.value) + 1;
     document.querySelectorAll('[id^="ent-ind-"]').forEach((ind, i) => {
-        ind.className = 'level-indicator-dot ' + (i < entActiveIdx ? 'active' : 'inactive');
+        ind.className = 'level-indicator-dot ' + (i === entActiveIdx - 1 ? 'active' : 'inactive');
     });
 
     // Metrics Indicators (reporting)
     const metActiveIdx = visLevels.indexOf(metEl.value) + 1;
     document.querySelectorAll('[id^="met-ind-"]').forEach((ind, i) => {
-        ind.className = 'level-indicator-dot ' + (i < metActiveIdx ? 'active' : 'inactive');
+        ind.className = 'level-indicator-dot ' + (i === metActiveIdx - 1 ? 'active' : 'inactive');
     });
 }
 
@@ -779,17 +779,17 @@ async function updateConfig(typeArg) {
             const entLevel = document.getElementById('fb-marketing-level')?.value || 'ad_account';
             const metLevel = document.getElementById('fb-marketing-metrics-level')?.value || 'ad_account';
 
-            // Feature Toggles (Infrastructure)
-            payload.feature_toggles.campaigns = true;
-            payload.feature_toggles.adsets = (entLevel === 'adset' || entLevel === 'ad' || entLevel === 'creative');
-            payload.feature_toggles.ads = (entLevel === 'ad' || entLevel === 'creative');
+            // Feature Toggles (Infrastructure - Exclusive Radio Logic)
+            payload.feature_toggles.campaigns = (entLevel === 'campaign');
+            payload.feature_toggles.adsets = (entLevel === 'adset');
+            payload.feature_toggles.ads = (entLevel === 'ad');
             payload.feature_toggles.creatives = (entLevel === 'creative');
 
-            // Feature Toggles (Metrics)
-            payload.feature_toggles.ad_account_metrics = true;
-            payload.feature_toggles.campaign_metrics = (metLevel === 'campaign' || metLevel === 'adset' || metLevel === 'ad' || metLevel === 'creative');
-            payload.feature_toggles.adset_metrics = (metLevel === 'adset' || metLevel === 'ad' || metLevel === 'creative');
-            payload.feature_toggles.ad_metrics = (metLevel === 'ad' || metLevel === 'creative');
+            // Feature Toggles (Metrics - Exclusive Radio Logic)
+            payload.feature_toggles.ad_account_metrics = (metLevel === 'ad_account');
+            payload.feature_toggles.campaign_metrics = (metLevel === 'campaign');
+            payload.feature_toggles.adset_metrics = (metLevel === 'adset');
+            payload.feature_toggles.ad_metrics = (metLevel === 'ad');
             payload.feature_toggles.creative_metrics = (metLevel === 'creative');
 
             const stratCustom = document.getElementById('fb-strategy-custom');
