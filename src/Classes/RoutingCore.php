@@ -145,7 +145,14 @@ class RoutingCore implements HttpKernelInterface
         if ($appKey) $validKeys = array_merge($validKeys, array_map('trim', explode(',', $appKey)));
         if ($adminKey) $validKeys[] = trim($adminKey);
 
-        return !empty($validKeys) && in_array($providedKey, $validKeys, true);
+        $success = !empty($validKeys) && in_array($providedKey, $validKeys, true);
+        if (!$success && !$request->attributes->has('AUTH_DEBUG_ERROR')) {
+            $msg = "Global check failed. AdminOnly Route: " . ($isAdminOnly ? 'YES' : 'NO');
+            $msg .= ". Key provided: " . ($providedKey ? ('Yes (Len: ' . strlen($providedKey) . ')') : 'EMPTY');
+            $msg .= ". AdminKey configured: " . ($adminKey ? 'YES' : 'NO');
+            $request->attributes->set('AUTH_DEBUG_ERROR', $msg);
+        }
+        return $success;
     }
 
     public function map(string $path, string $httpMethod, callable $controller, bool $public = false, bool $html = false, bool $admin = false): void
