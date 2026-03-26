@@ -51,9 +51,10 @@ class RoutingCore implements HttpKernelInterface
             // Security Check
             // API calls are always protected. HTML pages let the frontend Ghost Guard handle it.
             if (!$isPublic && !$isHtml && !$this->isAuthorized($request, $isAdminOnly)) {
+                $debugMsg = $request->attributes->get('AUTH_DEBUG_ERROR') ?: 'Unauthorized: Access denied';
                 return new Response(json_encode([
                     'status' => 'error',
-                    'error' => 'Unauthorized: Access denied'
+                    'error' => $debugMsg
                 ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
             }
 
@@ -87,6 +88,7 @@ class RoutingCore implements HttpKernelInterface
         if (!empty($authorizedIps)) {
             $clientIp = $request->getClientIp();
             if (!\Symfony\Component\HttpFoundation\IpUtils::checkIp($clientIp, $authorizedIps)) {
+                $request->attributes->set('AUTH_DEBUG_ERROR', "IP Blocked: $clientIp. Authorized: " . implode(',', $authorizedIps));
                 return false;
             }
         }
@@ -125,7 +127,17 @@ class RoutingCore implements HttpKernelInterface
         }
 
         if ($isAdminOnly) {
-            return $adminKey !== null && $providedKey === $adminKey;
+            $isMatch = $adminKey !== null && $providedKey === $adminKey;
+            if (!$isMatch) {
+                $msg = $adminKey === null ? 'Admin key NOT found in server config' : ('Key mismatch. Provided len: ' . strlen($providedKey ?? '') . ', Server len: ' . strlen($adminKey));
+                if ($providedKey) {
+                    $msg .= '. Provided starts with: ' . substr($providedKey, 0, 3);
+                } else {
+                    $msg .= '. Provided key is EMPTY (Header stripped?)';
+                }
+                $request->attributes->set('AUTH_DEBUG_ERROR', $msg);
+            }
+            return $isMatch;
         }
 
         // Public/Report routes accept both admin and regular keys
