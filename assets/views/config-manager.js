@@ -184,13 +184,14 @@ function populateGlobalFields() {
         }
         
         // Strategy Selection
+        console.log("Setting up strategy selectors...");
         const strategy = currentConfig.fb_metrics_strategy || 'default';
         const strategyRadio = document.getElementById('fb-strategy-' + strategy);
         if (strategyRadio) strategyRadio.checked = true;
         
         // Entity Filters
         const filters = currentConfig.fb_entity_filters || {};
-        console.log("Loading Facebook Entity Filters:", filters);
+        console.log("DEBUG: FB Entity Filters Object from Controller:", JSON.stringify(filters));
         
         const map = {
             'fb-marketing-campaign-filter': filters.CAMPAIGN,
@@ -198,6 +199,8 @@ function populateGlobalFields() {
             'fb-marketing-ad-filter': filters.AD,
             'fb-marketing-creative-filter': filters.CREATIVE
         };
+        
+        console.log("DEBUG: Mapping Filters to UI Elements...", map);
         
         Object.entries(map).forEach(([id, val]) => {
             const el = document.getElementById(id);
