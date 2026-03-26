@@ -692,15 +692,28 @@ async function updateConfig(typeArg) {
             payload.assets.gsc.push({ url: el.value, target_countries: [], target_keywords: [] });
         });
 
-        document.querySelectorAll('.fb-page-main-toggle:checked').forEach(el => {
-            const pageId = el.dataset.id;
-            const pageData = { id: pageId, enabled: true };
+        // 1. Collect FB Organic Pages (All of them, enabled or not, for granularity preservation)
+        document.querySelectorAll('.page-config-card').forEach(card => {
+            const mainToggle = card.querySelector('.fb-page-main-toggle');
+            if (!mainToggle) return;
             
-            // Collect all sub-options for this specific page
-            document.querySelectorAll(`.fb-page-opt[data-page="${pageId}"]`).forEach(optEl => {
-                pageData[optEl.dataset.opt] = optEl.checked;
+            const pageId = String(mainToggle.dataset.id);
+            const pageData = {
+                id: pageId,
+                enabled: mainToggle.checked
+            };
+            
+            card.querySelectorAll('.fb-page-opt').forEach(opt => {
+                pageData[opt.dataset.opt] = opt.checked;
             });
             
+            // Meta-info
+            const titleEl = card.querySelector('[style*="font-weight:700"]');
+            if (titleEl) pageData.title = titleEl.textContent.trim();
+            
+            const igText = card.querySelector('[style*="color:#E1306C"]')?.textContent.trim();
+            if (igText) pageData.ig_account_name = igText;
+
             payload.assets.pages.push(pageData);
         });
 
@@ -776,8 +789,8 @@ async function updateConfig(typeArg) {
 
         // Feature Toggles (Organic Tiers - Derived from Selectors)
         if (typeArg === 'facebook-organic' || typeArg === 'global') {
-            const fbLvl = document.getElementById('fb-organic-level')?.value || 'none';
-            const igLvl = document.getElementById('fb-ig-level')?.value || 'none';
+            const fbLvl = document.getElementById('fb-organic-level')?.value || 'page';
+            const igLvl = document.getElementById('fb-ig-level')?.value || 'accounts';
 
             payload.feature_toggles.page_metrics = (fbLvl === 'page_metrics' || fbLvl === 'posts' || fbLvl === 'post_metrics');
             payload.feature_toggles.posts = (fbLvl === 'posts' || fbLvl === 'post_metrics');
