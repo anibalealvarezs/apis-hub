@@ -61,6 +61,10 @@ class ConfigManagerController extends BaseController
 
             $fbConf = array_replace_recursive($fbGlobal, $fbOrganic, $fbMarketing);
 
+            $logger->info("DEBUG: Project Name detected: " . (getenv('PROJECT_NAME') ?: "NOT SET"));
+            $logger->info("DEBUG: FB Marketing Campaign Filter: " . json_encode($fbMarketing['CAMPAIGN'] ?? 'NOT_FOUND'));
+            $logger->info("DEBUG: FB Conf Campaign Filter: " . json_encode($fbConf['CAMPAIGN'] ?? 'NOT_FOUND'));
+
             $currentConfig = [
                 'gsc' => [], 
                 'gsc_cache_history_range' => $gsc['cache_history_range'] ?? '16 months',
@@ -93,7 +97,7 @@ class ConfigManagerController extends BaseController
             if (!empty($fbConf)) {
                 $entities = ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA', 'CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'];
                 foreach ($entities as $e) {
-                    $currentConfig['fb_entity_filters'][$e] = $fbConf[$e]['cache_include'] ?? '';
+                    $currentConfig['fb_entity_filters'][$e] = $fbConf[$e]['cache_include'] ?? ($fbMarketing[$e]['cache_include'] ?? '');
                 }
 
                 foreach (($fbOrganic['pages'] ?? []) as $p) {
