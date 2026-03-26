@@ -23,9 +23,6 @@ class ConfigManagerController extends BaseController
     {
         parent::__construct();
         
-        $projectName = strtolower(getenv('PROJECT_NAME') ?: ($_ENV['PROJECT_NAME'] ?? ''));
-        $suffix = $projectName ? '.' . $projectName : '';
-
         $this->gscConfigPath = __DIR__ . '/../../config/channels/google_search_console.yaml';
         $this->fbConfigPath = __DIR__ . '/../../config/channels/facebook.yaml';
         $this->fbOrganicPath = __DIR__ . '/../../config/channels/facebook_organic.yaml';

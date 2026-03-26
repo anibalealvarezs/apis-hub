@@ -126,22 +126,13 @@ class Helpers
         if (is_dir($rootConfigDir)) {
             $files = self::globRecursive($rootConfigDir . '/*.yaml');
             
-            // Smart Suffix Discovery: Load project-specific overrides (e.g., *.yaml.gbs)
-            $projectName = strtolower(getenv('PROJECT_NAME') ?: ($_ENV['PROJECT_NAME'] ?? ''));
-            if ($projectName) {
-                $suffixPattern = $rootConfigDir . '/*.yaml.' . $projectName;
-                $suffixFiles = self::globRecursive($suffixPattern);
-                // We sort files to ensure .yaml comes before .yaml.suffix, 
-                // so the suffix overrides the base config.
-                $files = array_merge($files, $suffixFiles);
-            }
-
             foreach ($files as $file) {
                 $fileConfig = self::loadYamlFile($file);
-                $config = array_replace_recursive($config, $fileConfig);
+                if (!empty($fileConfig)) {
+                    $config = array_replace_recursive($config, $fileConfig);
+                }
             }
         }
-
         // 2. Load environment-specific override if PROJECT_CONFIG_FILE is set
         $envFile = getenv('PROJECT_CONFIG_FILE');
         if ($envFile && is_file($envFile)) {
