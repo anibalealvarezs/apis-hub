@@ -165,22 +165,20 @@ function populateGlobalFields() {
         // Organic Granularity (FB)
         const fbOrgLevelEl = document.getElementById('fb-organic-level');
         if (fbOrgLevelEl) {
-            let fbLvl = 'none';
+            let fbLvl = 'page'; // Default to Page Info if enabled
             if (t.post_metrics) fbLvl = 'post_metrics';
             else if (t.posts) fbLvl = 'posts';
             else if (t.page_metrics) fbLvl = 'page_metrics';
-            else if (t.enabled) fbLvl = 'page'; // If enabled but no sub-metrics
             fbOrgLevelEl.value = fbLvl;
         }
 
         // Organic Granularity (IG)
         const igLevelEl = document.getElementById('fb-ig-level');
         if (igLevelEl) {
-            let igLvl = 'none';
+            let igLvl = 'accounts'; // Default to Account Info if enabled
             if (t.ig_account_media_metrics) igLvl = 'media_metrics';
             else if (t.ig_account_media) igLvl = 'media';
             else if (t.ig_account_metrics) igLvl = 'metrics';
-            else if (t.ig_accounts) igLvl = 'accounts';
             igLevelEl.value = igLvl;
         }
         
