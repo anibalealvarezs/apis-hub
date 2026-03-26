@@ -394,6 +394,46 @@
                 </div>
             </div>
 
+            <!-- Extraction Filters Section -->
+            <div class="card" style="margin-bottom:20px;">
+                <div class="section-title small"><i data-lucide="filter"></i> Extraction Asset Filters</div>
+                <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:20px;">Only assets matching these inclusion patterns will be cached in the database. Leave empty for all.</div>
+                
+                <div class="asset-grid">
+                    <!-- Campaign Filter -->
+                    <div class="filter-group">
+                        <div class="rule-group-label" style="display:flex; align-items:center; gap:5px; margin-bottom:8px;"><i data-lucide="target" size="12"></i> Campaigns</div>
+                        <div class="input-with-icon" style="background: rgba(255,255,255,0.03); border-radius:10px; border:1px solid var(--border); padding: 0 12px; display:flex; align-items:center;">
+                            <input type="text" id="fb-marketing-campaign-filter" placeholder="e.g. CAMP-" style="border:none; background:transparent; padding:8px 0; width:100%; color:white; font-family:var(--font-mono); font-size:0.75rem;">
+                        </div>
+                    </div>
+                    
+                    <!-- AdSet Filter -->
+                    <div class="filter-group">
+                        <div class="rule-group-label" style="display:flex; align-items:center; gap:5px; margin-bottom:8px;"><i data-lucide="layers" size="12"></i> AdSets</div>
+                        <div class="input-with-icon" style="background: rgba(255,255,255,0.03); border-radius:10px; border:1px solid var(--border); padding: 0 12px; display:flex; align-items:center;">
+                            <input type="text" id="fb-marketing-adset-filter" placeholder="Pattern" style="border:none; background:transparent; padding:8px 0; width:100%; color:white; font-family:var(--font-mono); font-size:0.75rem;">
+                        </div>
+                    </div>
+                    
+                    <!-- Ad Filter -->
+                    <div class="filter-group">
+                        <div class="rule-group-label" style="display:flex; align-items:center; gap:5px; margin-bottom:8px;"><i data-lucide="megaphone" size="12"></i> Ads</div>
+                        <div class="input-with-icon" style="background: rgba(255,255,255,0.03); border-radius:10px; border:1px solid var(--border); padding: 0 12px; display:flex; align-items:center;">
+                            <input type="text" id="fb-marketing-ad-filter" placeholder="Pattern" style="border:none; background:transparent; padding:8px 0; width:100%; color:white; font-family:var(--font-mono); font-size:0.75rem;">
+                        </div>
+                    </div>
+                    
+                    <!-- Creative Filter -->
+                    <div class="filter-group">
+                        <div class="rule-group-label" style="display:flex; align-items:center; gap:5px; margin-bottom:8px;"><i data-lucide="image" size="12"></i> Creatives</div>
+                        <div class="input-with-icon" style="background: rgba(255,255,255,0.03); border-radius:10px; border:1px solid var(--border); padding: 0 12px; display:flex; align-items:center;">
+                            <input type="text" id="fb-marketing-creative-filter" placeholder="Pattern" style="border:none; background:transparent; padding:8px 0; width:100%; color:white; font-family:var(--font-mono); font-size:0.75rem;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="marketing-split-layout">
                 <div class="card">
                     <div class="section-title small"><i data-lucide="target"></i> Ad Accounts</div>
@@ -411,13 +451,8 @@
                         <label class="strategy-option"><input type="radio" name="fb_metrics_strategy" id="fb-strategy-custom" value="custom" onchange="handleFbStrategyChange()"> <span>Custom</span></label>
                     </div>
 
-                    <div style="margin-top:20px; border-top: 1px solid var(--border); padding-top:20px;">
-                        <div class="section-title small" style="margin-bottom:10px; border-bottom:none; padding:0; opacity:0.8;"><i data-lucide="filter" size="14"></i> Campaign Asset Filter</div>
-                        <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:12px;">Extraction will only cache assets from campaigns matching this text pattern (e.g. CAMP-)</div>
-                        <div class="input-with-icon" style="background: rgba(255,255,255,0.03); border-radius:12px; border:1px solid var(--border); padding: 5px 15px; display:flex; align-items:center;">
-                            <i data-lucide="type" size="16" style="opacity:0.5; margin-right:10px;"></i>
-                            <input type="text" id="fb-marketing-campaign-filter" placeholder="e.g. CAMP-" style="border:none; background:transparent; padding:10px 0; width:100%; color:white; font-family:var(--font-mono); font-size:0.85rem;">
-                        </div>
+                    <div id="fb-custom-metrics-area" style="display:none">
+                        <div class="metric-config-grid" id="fb-metrics-custom-grid"></div>
                     </div>
 
                     <div id="fb-custom-metrics-area" style="display:none">

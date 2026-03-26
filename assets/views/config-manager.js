@@ -188,11 +188,12 @@ function populateGlobalFields() {
         const strategyRadio = document.getElementById('fb-strategy-' + strategy);
         if (strategyRadio) strategyRadio.checked = true;
         
-        // Campaign Filter
-        const campFilterEl = document.getElementById('fb-marketing-campaign-filter');
-        if (campFilterEl) {
-            campFilterEl.value = currentConfig.fb_entity_filters?.CAMPAIGN || '';
-        }
+        // Entity Filters
+        const filters = currentConfig.fb_entity_filters || {};
+        if (document.getElementById('fb-marketing-campaign-filter')) document.getElementById('fb-marketing-campaign-filter').value = filters.CAMPAIGN || '';
+        if (document.getElementById('fb-marketing-adset-filter')) document.getElementById('fb-marketing-adset-filter').value = filters.ADSET || '';
+        if (document.getElementById('fb-marketing-ad-filter')) document.getElementById('fb-marketing-ad-filter').value = filters.AD || '';
+        if (document.getElementById('fb-marketing-creative-filter')) document.getElementById('fb-marketing-creative-filter').value = filters.CREATIVE || '';
         
         handleFbLevelChange();
         handleFbOrganicLevelChange();
@@ -757,7 +758,10 @@ async function updateConfig(typeArg) {
             payload.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
             
             payload.entity_filters = {
-                CAMPAIGN: document.getElementById('fb-marketing-campaign-filter')?.value || ''
+                CAMPAIGN: document.getElementById('fb-marketing-campaign-filter')?.value || '',
+                ADSET: document.getElementById('fb-marketing-adset-filter')?.value || '',
+                AD: document.getElementById('fb-marketing-ad-filter')?.value || '',
+                CREATIVE: document.getElementById('fb-marketing-creative-filter')?.value || ''
             };
 
             const entLevel = document.getElementById('fb-marketing-level')?.value || 'ad_account';
