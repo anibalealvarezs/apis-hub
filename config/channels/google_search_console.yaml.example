@@ -1,6 +1,6 @@
 channels:
   google_search_console:
-    enabled: true
+    enabled: false
     cache_all: false # If true, will fetch all accessible sites if none are listed below
     cache_include: null # Optional. Text or PCRE Regex to include sites by URL or Title
     cache_exclude: null # Optional. Text or PCRE Regex to exclude sites

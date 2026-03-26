@@ -48,23 +48,31 @@ function getActiveMetrics() {
     const metricConfigs = config.metrics_config || {};
     
     const standardMetrics = [
-        { key: 'total_spend', label: 'SPEND', format: 'currency', precision: 2, original: 'spend' },
-        { key: 'total_clicks', label: 'CLKS', format: 'number', precision: 0, original: 'clicks' },
-        { key: 'total_impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions' },
-        { key: 'total_reach', label: 'REACH', format: 'number', precision: 0, original: 'reach' },
-        { key: 'average_frequency', label: 'FREQ', format: 'number', precision: 2, original: 'frequency' },
-        { key: 'average_ctr', label: 'CTR', format: 'percent', precision: 2, original: 'ctr' },
-        { key: 'average_cpc', label: 'CPC', format: 'currency', precision: 2, original: 'cpc' },
-        { key: 'average_cpm', label: 'CPM', format: 'currency', precision: 2, original: 'cpm' },
-        { key: 'total_results', label: 'RES', format: 'number', precision: 0, original: 'results' },
-        { key: 'average_cost_per_result', label: 'CPR', format: 'currency', precision: 2, original: 'cost_per_result' },
-        { key: 'average_result_rate', label: 'R%', format: 'percent', precision: 2, original: 'result_rate' },
-        { key: 'average_purchase_roas', label: 'ROAS', format: 'number', precision: 2, original: 'purchase_roas' },
-        { key: 'total_actions', label: 'ACT', format: 'number', precision: 0, original: 'actions' }
+        { key: 'total_spend', label: 'SPEND', format: 'currency', precision: 2, original: 'spend', direction: 'standard' },
+        { key: 'total_clicks', label: 'CLKS', format: 'number', precision: 0, original: 'clicks', direction: 'standard' },
+        { key: 'total_impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions', direction: 'standard' },
+        { key: 'total_reach', label: 'REACH', format: 'number', precision: 0, original: 'reach', direction: 'standard' },
+        { key: 'average_frequency', label: 'FREQ', format: 'number', precision: 2, original: 'frequency', direction: 'standard' },
+        { key: 'average_ctr', label: 'CTR', format: 'percent', precision: 2, original: 'ctr', direction: 'standard' },
+        { key: 'average_cpc', label: 'CPC', format: 'currency', precision: 2, original: 'cpc', direction: 'inverted' },
+        { key: 'average_cpm', label: 'CPM', format: 'currency', precision: 2, original: 'cpm', direction: 'inverted' },
+        { key: 'total_results', label: 'RES', format: 'number', precision: 0, original: 'results', direction: 'standard' },
+        { key: 'average_cost_per_result', label: 'CPR', format: 'currency', precision: 2, original: 'cost_per_result', direction: 'inverted' },
+        { key: 'average_result_rate', label: 'R%', format: 'percent', precision: 2, original: 'result_rate', direction: 'standard' },
+        { key: 'average_purchase_roas', label: 'ROAS', format: 'number', precision: 2, original: 'purchase_roas', direction: 'standard' },
+        { key: 'total_actions', label: 'ACT', format: 'number', precision: 0, original: 'actions', direction: 'standard' }
     ];
 
     if (strategy === 'default') {
-        return standardMetrics.map(m => ({ ...m, config: { enabled: true, precision: m.precision, sparkline: ['total_spend', 'total_clicks', 'total_impressions'].includes(m.key) } }));
+        return standardMetrics.map(m => ({ 
+            ...m, 
+            config: { 
+                enabled: true, 
+                precision: m.precision, 
+                sparkline: ['total_spend', 'total_clicks', 'total_impressions'].includes(m.key),
+                sparkline_direction: m.direction || 'standard'
+            } 
+        }));
     }
 
     // Custom strategy
@@ -162,6 +170,10 @@ async function loadReport() {
         activeMetrics.forEach(m => aggregations[m.key] = m.original);
         const payload = { aggregations, groupBy: ["channeledAccount", "channeledCampaign", "account", "campaign"], startDate: start, endDate: end };
         const resMain = await fetch('/facebook_marketing/metric/aggregate', { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json());
+        
+        // Reset Trend Caches for new report
+        Object.keys(TREND_DATA_CACHE).forEach(k => delete TREND_DATA_CACHE[k]);
+
         if (resMain.status === 'success' && resMain.data) {
             if (resMain.meta && resMain.meta.cached && cacheBadge) { cacheBadge.style.display = 'inline-flex'; cacheBadge.title = `Source: Redis (${resMain.meta.cache_type})`; }
             currentData = resMain.data.map(d => ({ ...d, _trend: [] }));
@@ -268,15 +280,9 @@ function render() {
 }
 
 function drawTableSparklines(level, data, cacheKey = null) {
-    if (!TREND_DATA_CACHE[level]) {
-        console.warn(`[Sparkline] No trend cache found for level: ${level}`);
-        return;
-    }
     const activeMetrics = getActiveMetrics();
     const sparkMetrics = activeMetrics.filter(m => m.config && m.config.sparkline);
     
-    console.log(`[Sparkline] Drawing for ${level} (${data.length} rows) using cacheKey: ${cacheKey}`);
-
     data.forEach((row, idx) => {
         let lookupKey = null;
         let entityId = null;
@@ -288,10 +294,7 @@ function drawTableSparklines(level, data, cacheKey = null) {
             entityId = `dim-${entry.parentId}-${dimKey}`;
         } else {
             const hItem = HIERARCHY[level];
-            if (!hItem) {
-                console.error(`[Sparkline] Hierarchy mapping not found for level: ${level}`);
-                return;
-            }
+            if (!hItem) return;
             const eId = row[hItem.idField];
             lookupKey = eId;
             entityId = eId;
@@ -302,15 +305,17 @@ function drawTableSparklines(level, data, cacheKey = null) {
         sparkMetrics.forEach(m => {
             const sparkId = getSparkId(level, m.key, entityId);
             const container = document.getElementById(sparkId);
-            
             if (!container) return;
             
-            const rawTrend = TREND_DATA_CACHE[level][lookupKey]?.[m.key];
+            const cache = TREND_DATA_CACHE[level] || {};
+            const rawTrend = cache[lookupKey]?.[m.key];
+            
             if (rawTrend && rawTrend.length > 1) {
                 rawTrend.sort((a,b) => a.day.localeCompare(b.day));
-                renderSparkline(container, rawTrend.map(x => x.val), m.key.includes('cost_per') || m.key.includes('cpm') || m.key.includes('cpc'));
+                renderSparkline(container, rawTrend.map(x => x.val), m.config);
             } else {
-                container.innerHTML = '<span style="color:var(--text-dim); font-size: 0.6rem; opacity: 0.3;">--</span>';
+                // Period is 1-day or No Trend data
+                container.innerHTML = '<span style="color:var(--text-dim); font-size: 0.6rem; opacity: 0.2;">--</span>';
             }
         });
     });
@@ -674,14 +679,33 @@ function renderSummary(data) {
 
 function resetSummary() { ['total-spend', 'total-impressions', 'total-clicks', 'total-ctr'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; }); }
 
-function renderSparkline(container, points, isInverted = false) {
+function renderSparkline(container, points, config = {}) {
     if (!container || !points || points.length < 2) return;
     const width = 80; const height = 24;
     const numericPoints = points.map(p => parseFloat(p) || 0);
-    const max = Math.max(...numericPoints) || 1; const min = Math.min(...numericPoints) || 0; const range = (max - min) || 1;
-    const color = numericPoints[numericPoints.length-1] > numericPoints[0] ? (isInverted ? '#f85149' : '#3fb950') : (isInverted ? '#3fb950' : '#f85149');
+    const max = Math.max(...numericPoints) || 1; 
+    const min = Math.min(...numericPoints) || 0; 
+    const range = (max - min) || 1;
+
+    const startVal = numericPoints[0];
+    const endVal = numericPoints[numericPoints.length-1];
+    const direction = config.sparkline_direction || 'standard';
+    const isInverted = direction === 'inverted';
+    
+    let color = config.sparkline_color || '';
+    if (!color) {
+        // Momentum coloring logic
+        if (endVal === startVal) {
+            color = 'var(--text-dim)'; // Neutral Grey for flat lines
+        } else if (endVal > startVal) {
+            color = isInverted ? '#f85149' : '#3fb950'; // Green if Standard Up or Inverted Down
+        } else {
+            color = isInverted ? '#3fb950' : '#f85149';
+        }
+    }
+
     const svgPoints = numericPoints.map((p, i) => `${(i / (points.length - 1)) * width},${height - ((p - min) / range) * (height - 4) - 2}`);
-    container.innerHTML = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><polyline fill="none" stroke="${color}" stroke-width="1.5" points="${svgPoints.join(' ')}" /></svg>`;
+    container.innerHTML = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="opacity: ${endVal === startVal && !config.sparkline_color ? '0.2' : '1'}"><polyline fill="none" stroke="${color}" stroke-width="1.5" points="${svgPoints.join(' ')}" /></svg>`;
 }
 
 // Global hooks

@@ -250,7 +250,7 @@ function renderCustomMetricsGrid() {
     ];
 
     metrics.forEach(m => {
-        const cfg = currentConfig.fb_metrics_config?.[m] || { enabled: false, format: 'number', sparkline: false };
+        const cfg = currentConfig.fb_metrics_config?.[m] || { enabled: false, format: 'number', sparkline: false, sparkline_direction: 'standard' };
         const card = document.createElement('div');
         card.className = 'metric-config-card ' + (cfg.enabled ? 'active' : '');
         card.style.cursor = 'default';
@@ -261,7 +261,7 @@ function renderCustomMetricsGrid() {
                     <div style="display:flex; align-items:center; gap:6px;" title="Enable Sparkline (Trend Graph)">
                         <i data-lucide="trending-up" size="14" style="color:var(--text-dim);"></i>
                         <label class="switch-mini">
-                            <input type="checkbox" class="metric-sparkline" ${cfg.sparkline ? 'checked' : ''}>
+                            <input type="checkbox" class="metric-sparkline" ${cfg.sparkline ? 'checked' : ''} onchange="this.closest('.metric-config-card').querySelector('.sparkline-extra-settings').style.display = this.checked ? 'block' : 'none'">
                             <span class="slider-mini"></span>
                         </label>
                     </div>
@@ -270,6 +270,22 @@ function renderCustomMetricsGrid() {
                         <input type="checkbox" class="metric-enable" ${cfg.enabled ? 'checked' : ''} onchange="this.closest('.metric-config-card').classList.toggle('active', this.checked)">
                         <span class="slider-mini"></span>
                     </label>
+                </div>
+            </div>
+
+            <div class="sparkline-extra-settings" style="display:${cfg.sparkline ? 'block' : 'none'}; margin-bottom:15px; background:rgba(0,0,0,0.15); padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.03);">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div>
+                        <div class="rule-group-label" style="font-size:0.55rem;">Trend Logic</div>
+                        <select class="metric-sparkline-direction" style="width:100%; font-size:0.7rem; padding:2px 4px;">
+                            <option value="standard" ${cfg.sparkline_direction === 'standard' ? 'selected' : ''}>Standard (+ is Green)</option>
+                            <option value="inverted" ${cfg.sparkline_direction === 'inverted' ? 'selected' : ''}>Inverted (- is Green)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="rule-group-label" style="font-size:0.55rem;">Fixed Color (Optional)</div>
+                        <input type="text" class="metric-sparkline-color" placeholder="Hex (e.g. #fff)" value="${cfg.sparkline_color || ''}" style="width:100%; font-size:0.7rem; padding:3px 6px;">
+                    </div>
                 </div>
             </div>
             
@@ -289,7 +305,7 @@ function renderCustomMetricsGrid() {
             </div>
 
             <div class="rule-group-label" style="display:flex; justify-content:space-between; align-items:center;">
-                Rules
+                Conditional Rules (Badges)
                 <button class="btn-mini" onclick="addMetricRule('${m}')" title="Add Rule"><i data-lucide="plus" size="10"></i></button>
             </div>
             <div id="rules-${m}" class="rules-container" style="margin-top:10px;"></div>
@@ -327,13 +343,23 @@ function addMetricRule(metric, rule = null) {
     
     const uiLevel = getUILevelFromClass(rule?.class);
     
+    const colors = {
+        excellent: '#3fb950',
+        good: '#58a6ff',
+        average: '#d29922',
+        bad: '#f85149'
+    };
+    
     const selectHtml = `
-        <select class="rule-class" style="padding:2px 4px; font-size:0.7rem; width:100%;">
-            <option value="excellent" ${uiLevel === 'excellent' ? 'selected' : ''}>Excellent</option>
-            <option value="good" ${uiLevel === 'good' ? 'selected' : ''}>Good</option>
-            <option value="average" ${uiLevel === 'average' ? 'selected' : ''}>Average</option>
-            <option value="bad" ${uiLevel === 'bad' ? 'selected' : ''}>Bad</option>
-        </select>
+        <div style="display:flex; align-items:center; gap:5px;">
+            <div class="rule-color-indicator" style="width:8px; height:8px; border-radius:50%; background:${colors[uiLevel] || '#333'}; shrink:0;"></div>
+            <select class="rule-class" style="padding:2px 4px; font-size:0.7rem; width:100%;" onchange="this.previousElementSibling.style.background = {excellent:'#3fb950', good:'#58a6ff', average:'#d29922', bad:'#f85149'}[this.value]">
+                <option value="excellent" ${uiLevel === 'excellent' ? 'selected' : ''}>Excellent</option>
+                <option value="good" ${uiLevel === 'good' ? 'selected' : ''}>Good</option>
+                <option value="average" ${uiLevel === 'average' ? 'selected' : ''}>Average</option>
+                <option value="bad" ${uiLevel === 'bad' ? 'selected' : ''}>Bad</option>
+            </select>
+        </div>
     `;
 
     div.innerHTML = `
@@ -346,7 +372,7 @@ function addMetricRule(metric, rule = null) {
             <input type="number" step="0.0001" class="rule-max" value="${rule?.max !== undefined ? rule.max : 0}" style="width:100%; padding:2px 4px; font-size:0.7rem;">
         </div>
         <div>
-            <div class="rule-group-label" style="font-size:0.5rem;">Style</div>
+            <div class="rule-group-label" style="font-size:0.5rem;">Style Preview</div>
             ${selectHtml}
         </div>
         <button onclick="this.closest('.rule-item-grid').remove()" style="background:none; border:none; color:var(--danger); cursor:pointer; margin-top:10px;"><i data-lucide="trash-2" size="12"></i></button>
@@ -542,6 +568,8 @@ async function updateConfig(typeArg) {
                 payload.metrics_config[name] = {
                     enabled,
                     sparkline,
+                    sparkline_direction: card.querySelector('.metric-sparkline-direction').value,
+                    sparkline_color: card.querySelector('.metric-sparkline-color').value || null,
                     format,
                     precision,
                     conditional: {
