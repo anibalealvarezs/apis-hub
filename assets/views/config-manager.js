@@ -251,17 +251,19 @@ function handleFbOrganicLevelChange() {
     
     // FB Dots
     const fbLevels = ['page', 'page_metrics', 'posts', 'post_metrics'];
-    const fbActiveIdx = fbLevels.indexOf(fbEl?.value);
-    document.querySelectorAll('[id^="org-fb-ind-"]').forEach((ind, i) => {
-        ind.className = 'level-indicator-dot ' + (i <= fbActiveIdx ? 'active' : 'inactive');
-    });
+    const fbActiveIdx = fbLevels.indexOf(fbEl?.value) + 1; // 1 to 4
+    for (let i = 1; i <= 4; i++) {
+        const ind = document.getElementById('org-fb-ind-' + i);
+        if (ind) ind.className = 'level-indicator-dot ' + (i <= fbActiveIdx ? 'active' : 'inactive');
+    }
 
     // IG Dots
     const igLevels = ['accounts', 'metrics', 'media', 'media_metrics'];
-    const igActiveIdx = igLevels.indexOf(igEl?.value);
-    document.querySelectorAll('[id^="org-ig-ind-"]').forEach((ind, i) => {
-        ind.className = 'level-indicator-dot ' + (i <= igActiveIdx ? 'active' : 'inactive');
-    });
+    const igActiveIdx = igLevels.indexOf(igEl?.value) + 1; // 1 to 4
+    for (let i = 1; i <= 4; i++) {
+        const ind = document.getElementById('org-ig-ind-' + i);
+        if (ind) ind.className = 'level-indicator-dot ' + (i <= igActiveIdx ? 'active' : 'inactive');
+    }
 
     // Enforce global limits on local page toggles
     enforceGlobalOrganicLimits(fbEl?.value, igEl?.value);
