@@ -72,6 +72,11 @@ class ConfigManagerController extends BaseController
                 $fbOrganic = $rawOrg['channels']['facebook_organic'] ?? $fbOrganic;
             }
 
+            if (empty($fbMarketing['ad_accounts']) && file_exists($this->fbMarketingPath)) {
+                $rawMark = Yaml::parseFile($this->fbMarketingPath);
+                $fbMarketing = $rawMark['channels']['facebook_marketing'] ?? $fbMarketing;
+            }
+
             $fbConf = array_replace_recursive($fbGlobal, $fbOrganic, $fbMarketing);
 
             $currentConfig = [

@@ -190,10 +190,19 @@ function populateGlobalFields() {
         
         // Entity Filters
         const filters = currentConfig.fb_entity_filters || {};
-        if (document.getElementById('fb-marketing-campaign-filter')) document.getElementById('fb-marketing-campaign-filter').value = filters.CAMPAIGN || '';
-        if (document.getElementById('fb-marketing-adset-filter')) document.getElementById('fb-marketing-adset-filter').value = filters.ADSET || '';
-        if (document.getElementById('fb-marketing-ad-filter')) document.getElementById('fb-marketing-ad-filter').value = filters.AD || '';
-        if (document.getElementById('fb-marketing-creative-filter')) document.getElementById('fb-marketing-creative-filter').value = filters.CREATIVE || '';
+        console.log("Loading Facebook Entity Filters:", filters);
+        
+        const map = {
+            'fb-marketing-campaign-filter': filters.CAMPAIGN,
+            'fb-marketing-adset-filter': filters.ADSET,
+            'fb-marketing-ad-filter': filters.AD,
+            'fb-marketing-creative-filter': filters.CREATIVE
+        };
+        
+        Object.entries(map).forEach(([id, val]) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val || '';
+        });
         
         handleFbLevelChange();
         handleFbOrganicLevelChange();
