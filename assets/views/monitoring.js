@@ -300,8 +300,16 @@ function updatePendingJobsDetailed(groupedJobs) {
             const statusClass = `badge-${job.status_text.toLowerCase()}`;
             const canReschedule = job.status !== 1 && job.status !== 2;
             const canCancel = job.status === 1 || job.status === 2;
-            const headerIcon = job.status === 3 ? 'check-circle' : (job.status === 4 ? 'alert-circle' : (job.status === 1 ? 'clock' : 'activity'));
-            const iconColor = job.status === 3 ? '#4ade80' : (job.status === 4 ? '#f87171' : (job.status === 1 ? '#f59e0b' : 'var(--primary)'));
+            const headerIcon = job.status === 3 ? 'check-circle' : 
+                               (job.status === 4 ? 'alert-circle' : 
+                               (job.status === 5 ? 'activity' : 
+                               (job.status === 6 ? 'ban' : 
+                               (job.status === 1 ? 'clock' : 'activity'))));
+            const iconColor = job.status === 3 ? '#4ade80' : 
+                               (job.status === 4 ? '#f87171' : 
+                               (job.status === 5 ? '#f59e0b' : 
+                               (job.status === 6 ? '#8b949e' : 
+                               (job.status === 1 ? '#f59e0b' : 'var(--primary)'))));
 
             card.innerHTML = `
                 <div class="job-summary-header" onclick="this.parentElement.classList.toggle('expanded')">
