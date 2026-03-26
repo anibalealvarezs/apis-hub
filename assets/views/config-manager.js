@@ -153,6 +153,27 @@ function populateGlobalFields() {
             fbLevelEl.value = entLevel;
         }
 
+        // FB Organic Global Granularity
+        const fbOrgLvlEl = document.getElementById('fb-organic-level');
+        const fbIgLvlEl = document.getElementById('fb-ig-level');
+        
+        if (fbOrgLvlEl) {
+            let lvl = 'page';
+            if (t.post_metrics) lvl = 'post_metrics';
+            else if (t.posts) lvl = 'posts';
+            else if (t.page_metrics) lvl = 'page_metrics';
+            fbOrgLvlEl.value = lvl;
+        }
+
+        if (fbIgLvlEl) {
+            let lvl = 'none';
+            if (t.ig_account_media_metrics) lvl = 'media_metrics';
+            else if (t.ig_account_media) lvl = 'media';
+            else if (t.ig_account_metrics) lvl = 'metrics';
+            else if (t.ig_accounts) lvl = 'accounts';
+            fbIgLvlEl.value = lvl;
+        }
+
         if (fbMetricsLevelEl) {
             let metLevel = 'ad_account';
             if (t.creative_metrics) metLevel = 'creative';
@@ -160,26 +181,6 @@ function populateGlobalFields() {
             else if (t.adset_metrics) metLevel = 'adset';
             else if (t.campaign_metrics) metLevel = 'campaign';
             fbMetricsLevelEl.value = metLevel;
-        }
-
-        // Organic Granularity (FB)
-        const fbOrgLevelEl = document.getElementById('fb-organic-level');
-        if (fbOrgLevelEl) {
-            let fbLvl = 'page'; // Default to Page Info if enabled
-            if (t.post_metrics) fbLvl = 'post_metrics';
-            else if (t.posts) fbLvl = 'posts';
-            else if (t.page_metrics) fbLvl = 'page_metrics';
-            fbOrgLevelEl.value = fbLvl;
-        }
-
-        // Organic Granularity (IG)
-        const igLevelEl = document.getElementById('fb-ig-level');
-        if (igLevelEl) {
-            let igLvl = 'accounts'; // Default to Account Info if enabled
-            if (t.ig_account_media_metrics) igLvl = 'media_metrics';
-            else if (t.ig_account_media) igLvl = 'media';
-            else if (t.ig_account_metrics) igLvl = 'metrics';
-            igLevelEl.value = igLvl;
         }
         
         // Strategy Selection
@@ -515,10 +516,9 @@ function renderAssets(assets) {
         
         pages.forEach(p => {
             const getCfg = (key, def = true) => {
-                if (currentConfig.pages) {
-                    const saved = currentConfig.pages.find(pg => String(pg.id) === String(p.id));
-                    if (saved && saved[key] !== undefined) return saved[key];
-                }
+                const savedPages = currentConfig.fb_pages_full_config || [];
+                const saved = savedPages.find(pg => String(pg.id) === String(p.id));
+                if (saved && saved[key] !== undefined) return saved[key];
                 return def;
             };
 
