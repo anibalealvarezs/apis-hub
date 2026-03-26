@@ -514,58 +514,117 @@ function renderAssets(assets) {
         if (pages.length === 0) fbOrganicList.innerHTML = '<div class="empty-state">No Facebook pages found.</div>';
         
         pages.forEach(p => {
-            const configPages = currentConfig?.fb_pages_full_config || [];
-            const pageCfg = configPages.find(cp => String(cp.id) === String(p.id)) || { enabled: false };
-            const isSynced = pageCfg.enabled && !p.lost_access;
-            const div = document.createElement('div');
-            
-            div.className = 'asset-group-card' + (isSynced ? ' synced' : '') + (p.lost_access ? ' lost-access' : '');
-            
-            // Sub-toggles defaults or current values
-            const getCfg = (key, def = true) => pageCfg[key] !== undefined ? !!pageCfg[key] : def;
-            
-            const htmlId = `page-${p.id}`;
-            const igId = p.ig_account ? `ig-${p.ig_account}` : null;
+            const getCfg = (key, def = true) => {
+                if (currentConfig.pages) {
+                    const saved = currentConfig.pages.find(pg => String(pg.id) === String(p.id));
+                    if (saved && saved[key] !== undefined) return saved[key];
+                }
+                return def;
+            };
 
+            const div = document.createElement('div');
             div.innerHTML = `
-                <div class="asset-group-header">
-                   <div style="display:flex; align-items:center; gap:10px; flex:1;">
-                       <i data-lucide="layout" size="16"></i>
-                       <div style="font-weight:700; color:#fff;">${p.title}</div>
-                   </div>
-                   <label class="switch-mini">
-                       <input type="checkbox" class="fb-page-main-toggle" data-id="${p.id}" ${isSynced ? 'checked' : ''} onchange="toggleOrganicHierarchy('${p.id}', this.checked)">
-                       <span class="slider-mini"></span>
-                   </label>
+            <div class="glass-card page-config-card" style="margin-bottom:20px; padding:15px; border:1px solid var(--border); border-radius:12px; position:relative;">
+                <!-- Page Header -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="background:rgba(255,255,255,0.05); width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--primary);">
+                            <i data-lucide="layout" size="18"></i>
+                        </div>
+                        <div>
+                            <div style="font-weight:700; color:white; font-size:0.9rem;">${p.title || 'Untitled Page'}</div>
+                            <div style="font-size:0.65rem; color:var(--text-dim);">ID: ${p.id}</div>
+                        </div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" class="fb-page-main-toggle" data-id="${p.id}" ${getCfg('enabled') ? 'checked' : ''} onchange="toggleOrganicHierarchy('${p.id}', this.checked)">
+                        <span class="slider"></span>
+                    </label>
                 </div>
-                
-                <div class="asset-group-content" id="content-${p.id}" style="display: ${isSynced ? 'block' : 'none'}">
-                    <div class="hierarchy-grid">
-                        <!-- FB Tiers -->
-                        <div class="hierarchy-col">
-                            <label class="hierarchy-item"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="page_metrics" ${getCfg('page_metrics') ? 'checked' : ''}> Page Metrics</label>
-                            <label class="hierarchy-item"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="posts" ${getCfg('posts') ? 'checked' : ''} onchange="toggleSubOpt('${p.id}', 'posts', this.checked)"> Posts Content</label>
-                            <label class="hierarchy-sub-item" id="sub-${p.id}-posts" style="opacity:${getCfg('posts') ? 1 : 0.3}"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="post_metrics" ${getCfg('post_metrics') ? 'checked' : ''} ${!getCfg('posts') ? 'disabled' : ''}> Post Metrics</label>
+
+                <!-- Page Options Hierarchy -->
+                <div id="hierarchy-${p.id}" style="display:${getCfg('enabled') ? 'grid' : 'none'}; grid-template-columns: 1fr 1fr; gap:20px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+                    
+                    <!-- FB Section -->
+                    <div class="hierarchy-col">
+                        <div style="font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:12px; font-weight:700; opacity:0.6;">Facebook Extraction</div>
+                        
+                        <div class="hierarchy-item-premium">
+                            <label class="switch-inline">
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="page_metrics" ${getCfg('page_metrics') ? 'checked' : ''}>
+                                <span class="slider-sm"></span>
+                                <span class="lbl">Page Metrics</span>
+                            </label>
                         </div>
                         
-                        <!-- IG Tiers -->
-                        ${p.ig_account ? `
-                        <div class="hierarchy-col" style="border-left: 1px solid var(--border); padding-left: 20px;">
-                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px; color:var(--primary); font-size:0.7rem; font-weight:700; text-transform:uppercase;">
-                                <i data-lucide="instagram" size="12"></i> IG Account: ${p.ig_account_name || p.ig_account || 'Discovery Mode'}
+                        <div class="hierarchy-item-premium">
+                            <label class="switch-inline">
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="posts" ${getCfg('posts') ? 'checked' : ''}>
+                                <span class="slider-sm"></span>
+                                <span class="lbl">Posts Content</span>
+                            </label>
+                        </div>
+                        
+                        <div class="hierarchy-item-premium" style="margin-left: 20px; border-left: 1px solid rgba(255,255,255,0.1); padding-left:12px;">
+                            <label class="switch-inline">
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="post_metrics" ${getCfg('post_metrics') ? 'checked' : ''}>
+                                <span class="slider-sm"></span>
+                                <span class="lbl">Post Insights</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- IG Section -->
+                    ${p.ig_account ? `
+                    <div class="hierarchy-col" style="border-left: 1px solid rgba(255,255,255,0.05); padding-left: 20px;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
+                            <div style="background:rgba(225, 48, 108, 0.1); color:#E1306C; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:700; text-transform:uppercase; display:flex; align-items:center; gap:5px;">
+                                <i data-lucide="instagram" size="10"></i> ${p.ig_account_name || p.ig_account}
                             </div>
-                            <label class="hierarchy-item"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_accounts" ${getCfg('ig_accounts', false) ? 'checked' : ''} onchange="toggleSubOpt('${p.id}', 'ig_accounts', this.checked)"> IG Channel</label>
-                            <div id="sub-${p.id}-ig_accounts" style="opacity:${getCfg('ig_accounts') ? 1 : 0.3}">
-                                <label class="hierarchy-sub-item"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_metrics" ${getCfg('ig_account_metrics') ? 'checked' : ''} ${!getCfg('ig_accounts') ? 'disabled' : ''}> IG Metrics</label>
-                                <label class="hierarchy-sub-item"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_media" ${getCfg('ig_account_media') ? 'checked' : ''} ${!getCfg('ig_accounts') ? 'disabled' : ''} onchange="toggleSubOpt('${p.id}', 'ig_account_media', this.checked)"> IG Media</label>
-                                <label class="hierarchy-sub-item" id="sub-${p.id}-ig_account_media" style="margin-left: 20px; opacity:${getCfg('ig_account_media') ? 1 : 0.3}">
-                                    <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_media_metrics" ${getCfg('ig_account_media_metrics') ? 'checked' : ''} ${!getCfg('ig_account_media') ? 'disabled' : ''}> Media Metrics
+                        </div>
+                        
+                        <div class="hierarchy-item-premium">
+                            <label class="switch-inline">
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_accounts" ${getCfg('ig_accounts', false) ? 'checked' : ''} onchange="toggleSubOpt('${p.id}', 'ig_accounts', this.checked)">
+                                <span class="slider-sm"></span>
+                                <span class="lbl">Sync Instagram</span>
+                            </label>
+                        </div>
+
+                        <div id="sub-${p.id}-ig_accounts" style="opacity:${getCfg('ig_accounts', false) ? 1 : 0.3}; margin-left:20px; border-left: 1px solid rgba(255,255,255,0.1); padding-left:12px;">
+                            <div class="hierarchy-item-premium">
+                                <label class="switch-inline">
+                                    <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_metrics" ${getCfg('ig_account_metrics') ? 'checked' : ''} ${!getCfg('ig_accounts') ? 'disabled' : ''}>
+                                    <span class="slider-sm"></span>
+                                    <span class="lbl">Account Metrics</span>
+                                </label>
+                            </div>
+                            <div class="hierarchy-item-premium">
+                                <label class="switch-inline">
+                                    <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_media" ${getCfg('ig_account_media') ? 'checked' : ''} ${!getCfg('ig_accounts') ? 'disabled' : ''} onchange="toggleSubOpt('${p.id}', 'ig_account_media', this.checked)">
+                                    <span class="slider-sm"></span>
+                                    <span class="lbl">Media Content</span>
+                                </label>
+                            </div>
+                            <div id="sub-${p.id}-ig_account_media" class="hierarchy-item-premium" style="opacity:${getCfg('ig_account_media') ? 1 : 0.3}; margin-left:20px; border-left: 1px solid rgba(255,255,255,0.1); padding-left:12px;">
+                                <label class="switch-inline">
+                                    <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_media_metrics" ${getCfg('ig_account_media_metrics') ? 'checked' : ''} ${!getCfg('ig_account_media') ? 'disabled' : ''}>
+                                    <span class="slider-sm"></span>
+                                    <span class="lbl">Media Insights</span>
                                 </label>
                             </div>
                         </div>
-                        ` : ''}
                     </div>
+                    ` : `
+                    <div class="hierarchy-col" style="display:flex; align-items:center; justify-content:center; opacity:0.3; border-left: 1px solid rgba(255,255,255,0.05);">
+                        <div style="text-align:center;">
+                            <i data-lucide="instagram-off" size="24"></i>
+                            <div style="font-size:0.6rem; margin-top:5px;">No IG Link</div>
+                        </div>
+                    </div>
+                    `}
                 </div>
+            </div>
             `;
             fbOrganicList.appendChild(div);
         });
