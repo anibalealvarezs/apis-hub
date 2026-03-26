@@ -18,6 +18,7 @@ if (php_sapi_name() === 'cli-server') {
 }
 
 require_once __DIR__ . "/../vendor/autoload.php";
+\Helpers\Helpers::getProjectConfig(); // Inicialización temprana del entorno y archivo .env
 
 use Symfony\Component\HttpFoundation\Request;
 use Classes\RoutingCore;

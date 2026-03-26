@@ -38,3 +38,9 @@ config/channels/facebook_marketing.yml.demo.hetzner
 .env.hetzner
 
 .env.gbs
+
+config/channels/facebook_marketing.yaml.gbs
+
+config/channels/facebook_organic.yaml.gbs
+
+docker-compose.yml.gbs

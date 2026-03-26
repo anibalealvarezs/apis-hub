@@ -20,10 +20,11 @@ class InstanceGeneratorService
     public function generate(bool $useDependencies = true, int $basePort = 8080): array
     {
         $instances = [];
+        \Helpers\Helpers::getProjectConfig(); // Asegurar que el entorno está cargado
         $today = new DateTimeImmutable('today');
         $yesterday = $today->modify('-1 day');
         
-        if (getenv('APP_ENV') === 'demo') {
+        if (getenv('APP_ENV') === 'demo' || \Helpers\Helpers::isDemo()) {
             return [[
                 'name' => 'demo-entities-sync',
                 'port' => $basePort,

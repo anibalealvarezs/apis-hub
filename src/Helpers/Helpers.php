@@ -620,7 +620,16 @@ class Helpers
 
     public static function getAdminApiKey(): ?string
     {
-        return getenv('ADMIN_API_KEY') ?: null;
+        // Forzamos la carga de la configuración para procesar el archivo .env
+        self::getProjectConfig();
+
+        $env = getenv('ADMIN_API_KEY');
+        if ($env !== false && $env !== '') {
+            return $env;
+        }
+        
+        // Fallback a $_ENV (donde nuestro cargador manual inyecta los valores)
+        return $_ENV['ADMIN_API_KEY'] ?? null;
     }
 
     /**
