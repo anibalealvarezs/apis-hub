@@ -517,8 +517,12 @@ function renderAssets(assets) {
         pages.forEach(p => {
             const getCfg = (key, def = true) => {
                 const savedPages = currentConfig.fb_pages_full_config || [];
-                const saved = savedPages.find(pg => String(pg.id) === String(p.id));
-                if (saved && saved[key] !== undefined) return saved[key];
+                const pId = String(p.id).trim();
+                const saved = savedPages.find(pg => String(pg.id).trim() === pId);
+                
+                if (saved && saved[key] !== undefined) {
+                    return !!saved[key];
+                }
                 return def;
             };
 

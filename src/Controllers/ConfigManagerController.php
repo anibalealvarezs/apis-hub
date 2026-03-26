@@ -60,12 +60,17 @@ class ConfigManagerController extends BaseController
             ];
             $lastUpdated = null;
 
-            // 1. Load effective config from system source of truth (merging all Yaml + Env)
             $systemConfig = Helpers::getProjectConfig();
             $gsc = $systemConfig['channels']['google_search_console'] ?? [];
             $fbGlobal = $systemConfig['channels']['facebook'] ?? [];
             $fbOrganic = $systemConfig['channels']['facebook_organic'] ?? [];
             $fbMarketing = $systemConfig['channels']['facebook_marketing'] ?? [];
+
+            // Force load from specific path if suffix is present and helper missed it
+            if (empty($fbOrganic['pages']) && file_exists($this->fbOrganicPath)) {
+                $rawOrg = Yaml::parseFile($this->fbOrganicPath);
+                $fbOrganic = $rawOrg['channels']['facebook_organic'] ?? $fbOrganic;
+            }
 
             $fbConf = array_replace_recursive($fbGlobal, $fbOrganic, $fbMarketing);
 
