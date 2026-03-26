@@ -141,7 +141,6 @@ class CacheController extends BaseController
             $statuses = [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value];
 
             if ($this->isPostgreSQL()) {
-                // PostgreSQL needs Native SQL for JSON casting and operators
                 $sql = "SELECT id FROM jobs WHERE entity IN (:entities) AND channel = :channel AND status IN (:statuses)";
                 $sqlParams = [
                     'entities' => $equivalents,
@@ -165,8 +164,11 @@ class CacheController extends BaseController
                     $sqlParams['instance_pattern'] = '%instance_name%' . $params['instance_name'] . '%';
                 }
 
-                $stmt = $this->em->getConnection()->prepare($sql);
-                $existingJobs = $stmt->executeQuery($sqlParams)->fetchAllAssociative();
+                $sqlTypes = [
+                    'entities' => \Doctrine\DBAL\Connection::PARAM_STR_ARRAY,
+                    'statuses' => \Doctrine\DBAL\Connection::PARAM_INT_ARRAY
+                ];
+                $existingJobs = $this->em->getConnection()->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
             } else {
                 // MySQL works fine with DQL and native JSON support
                 $qb = $jobRepo->createQueryBuilder('j');
