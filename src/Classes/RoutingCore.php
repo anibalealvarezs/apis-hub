@@ -52,10 +52,12 @@ class RoutingCore implements HttpKernelInterface
             // API calls are always protected. HTML pages let the frontend Ghost Guard handle it.
             if (!$isPublic && !$isHtml && !$this->isAuthorized($request, $isAdminOnly)) {
                 $debugMsg = $request->attributes->get('AUTH_DEBUG_ERROR') ?: 'Unauthorized: Access denied';
+                $headers = ['Content-Type' => 'application/json', 'X-Debug-Version' => '123456789'];
                 return new Response(json_encode([
                     'status' => 'error',
-                    'error' => $debugMsg
-                ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
+                    'error' => $debugMsg,
+                    'v' => '1.2'
+                ]), Response::HTTP_UNAUTHORIZED, $headers);
             }
 
             unset($attributes['controller'], $attributes['_route'], $attributes['html'], $attributes['public'], $attributes['admin']);
