@@ -88,7 +88,6 @@ class ResetEntitiesCommand extends Command
                     $connection->executeStatement("DELETE FROM channeled_ads WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
                     $connection->executeStatement("DELETE FROM channeled_ad_groups WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
                     $connection->executeStatement("DELETE FROM channeled_campaigns WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
-                    $connection->executeStatement("DELETE FROM channeled_creatives WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
                 }
 
                 if (in_array(Channel::google_search_console->value, $targetChannelIds)) {
@@ -102,7 +101,7 @@ class ResetEntitiesCommand extends Command
                 $connection->executeStatement("DELETE FROM ads WHERE id NOT IN (SELECT ad_id FROM channeled_ads)");
                 $connection->executeStatement("DELETE FROM ad_groups WHERE id NOT IN (SELECT ad_group_id FROM channeled_ad_groups)");
                 $connection->executeStatement("DELETE FROM campaigns WHERE id NOT IN (SELECT campaign_id FROM channeled_campaigns)");
-                $connection->executeStatement("DELETE FROM creatives WHERE id NOT IN (SELECT creative_id FROM channeled_creatives)");
+                $connection->executeStatement("DELETE FROM creatives WHERE id NOT IN (SELECT creative_id FROM channeled_ads WHERE creative_id IS NOT NULL)");
                 
             } else {
                 // MySQL implementation (Foreign Key Checks)
