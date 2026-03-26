@@ -274,7 +274,7 @@ class MetricRequests
             $pagesToProcessRaw = $config['pages'] ?? [];
             $globalExcludeIds = array_map('strval', $config['exclude_from_caching'] ?? []);
             $globalPageConfig = $config['PAGE'] ?? [
-                'page_metrics' => false,
+                'page_metrics' => true,
                 'posts' => true,
                 'post_metrics' => false,
                 'ig_accounts' => true,
@@ -298,18 +298,31 @@ class MetricRequests
                     if (!Helpers::matchesFilter((string)$pageName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter((string)$pageId, $includeFilter, $excludeFilter)) {
                         continue;
                     }
+
+                    // Auto-discover IG if enabled globally
+                    $igId = $p->getData()['instagram_business_account']['id'] ?? null;
+
                     $pagesToProcess[] = array_merge($globalPageConfig, [
                         'id' => $pageId,
                         'url' => $p->getUrl(),
                         'title' => $pageName,
                         'enabled' => true,
-                        // If IG user ID is stored in data, we can try to extract it
-                        'ig_account' => $p->getData()['instagram_business_account']['id'] ?? null
+                        'ig_account' => $igId
                     ]);
                 }
             } else {
                 foreach ($pagesToProcessRaw as $p) {
-                    $pagesToProcess[] = array_merge($globalPageConfig, $p);
+                    $resolvedPage = array_merge($globalPageConfig, $p);
+                    
+                    // If IG is enabled but ID is missing, try to resolve from database
+                    if (empty($resolvedPage['ig_account']) && !empty($resolvedPage['ig_accounts'])) {
+                        $pEntity = $pageRepository->findOneBy(['platformId' => $resolvedPage['id']]);
+                        if ($pEntity && isset($pEntity->getData()['instagram_business_account']['id'])) {
+                            $resolvedPage['ig_account'] = $pEntity->getData()['instagram_business_account']['id'];
+                        }
+                    }
+                    
+                    $pagesToProcess[] = $resolvedPage;
                 }
             }
 

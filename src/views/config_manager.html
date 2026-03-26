@@ -149,6 +149,44 @@
                         </select>
                     </div>
                 </div>
+                <div class="card compact-card" style="flex:2; grid-column: span 2;">
+                    <div class="section-title small" style="margin-bottom:10px;"><i data-lucide="layers"></i> Extraction Granularity</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px; align-items:flex-start;">
+                        <!-- Concept 1: FB Organic Depth -->
+                        <div style="padding-right: 15px; border-right: 1px solid var(--border);">
+                           <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:10px; font-weight:700; display:flex; align-items:center; gap:5px;"><i data-lucide="layout" size="10"></i> FB Page Depth (Organic)</div>
+                           <select id="fb-organic-level" onchange="handleFbOrganicLevelChange()" style="width:100%; margin-bottom:12px;">
+                               <option value="page">Level 1: Page Info Only</option>
+                               <option value="page_metrics">Level 2: Page Metrics</option>
+                               <option value="posts">Level 3: Posts Content</option>
+                               <option value="post_metrics">Level 4: Full Posts & Metrics</option>
+                           </select>
+                           <div class="granularity-compact-row" style="margin-top:0; justify-content: flex-start; gap:8px;">
+                                <div class="level-indicator-dot" id="org-fb-ind-1" title="Page Info" onclick="setFbOrganicLevel('page')">I</div>
+                                <div class="level-indicator-dot" id="org-fb-ind-2" title="Page Metrics" onclick="setFbOrganicLevel('page_metrics')">M</div>
+                                <div class="level-indicator-dot" id="org-fb-ind-3" title="Posts" onclick="setFbOrganicLevel('posts')">P</div>
+                                <div class="level-indicator-dot" id="org-fb-ind-4" title="Post Metrics" onclick="setFbOrganicLevel('post_metrics')">S</div>
+                           </div>
+                        </div>
+
+                        <!-- Concept 2: IG Organic Depth -->
+                        <div>
+                           <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:10px; font-weight:700; display:flex; align-items:center; gap:5px;"><i data-lucide="instagram" size="10"></i> Instagram Depth (Business)</div>
+                           <select id="fb-ig-level" onchange="handleFbOrganicLevelChange()" style="width:100%; margin-bottom:12px;">
+                               <option value="accounts">Level 1: Account Info</option>
+                               <option value="metrics">Level 2: Account Metrics</option>
+                               <option value="media">Level 3: Media Content</option>
+                               <option value="media_metrics">Level 4: Full Media & Metrics</option>
+                           </select>
+                           <div class="granularity-compact-row" style="margin-top:0; justify-content: flex-start; gap:8px;">
+                                <div class="level-indicator-dot" id="org-ig-ind-1" title="Account" onclick="setIgLevel('accounts')">A</div>
+                                <div class="level-indicator-dot" id="org-ig-ind-2" title="Metrics" onclick="setIgLevel('metrics')">M</div>
+                                <div class="level-indicator-dot" id="org-ig-ind-3" title="Media" onclick="setIgLevel('media')">C</div>
+                                <div class="level-indicator-dot" id="org-ig-ind-4" title="Media Metrics" onclick="setIgLevel('media_metrics')">S</div>
+                           </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="card">

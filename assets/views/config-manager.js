@@ -161,6 +161,28 @@ function populateGlobalFields() {
             else if (t.campaign_metrics) metLevel = 'campaign';
             fbMetricsLevelEl.value = metLevel;
         }
+
+        // Organic Granularity (FB)
+        const fbOrgLevelEl = document.getElementById('fb-organic-level');
+        if (fbOrgLevelEl) {
+            let fbLvl = 'none';
+            if (t.post_metrics) fbLvl = 'post_metrics';
+            else if (t.posts) fbLvl = 'posts';
+            else if (t.page_metrics) fbLvl = 'page_metrics';
+            else if (t.enabled) fbLvl = 'page'; // If enabled but no sub-metrics
+            fbOrgLevelEl.value = fbLvl;
+        }
+
+        // Organic Granularity (IG)
+        const igLevelEl = document.getElementById('fb-ig-level');
+        if (igLevelEl) {
+            let igLvl = 'none';
+            if (t.ig_account_media_metrics) igLvl = 'media_metrics';
+            else if (t.ig_account_media) igLvl = 'media';
+            else if (t.ig_account_metrics) igLvl = 'metrics';
+            else if (t.ig_accounts) igLvl = 'accounts';
+            igLevelEl.value = igLvl;
+        }
         
         // Strategy Selection
         const strategy = currentConfig.fb_metrics_strategy || 'default';
@@ -168,6 +190,7 @@ function populateGlobalFields() {
         if (strategyRadio) strategyRadio.checked = true;
         
         handleFbLevelChange();
+        handleFbOrganicLevelChange();
         handleFbStrategyChange();
         renderCustomMetricsGrid();
         
@@ -222,6 +245,74 @@ function setFbLevel(lvl) {
         el.value = lvl;
         handleFbLevelChange();
     }
+}
+
+function handleFbOrganicLevelChange() {
+    const fbEl = document.getElementById('fb-organic-level');
+    const igEl = document.getElementById('fb-ig-level');
+    
+    // FB Dots
+    const fbLevels = ['page', 'page_metrics', 'posts', 'post_metrics'];
+    const fbActiveIdx = fbLevels.indexOf(fbEl?.value);
+    document.querySelectorAll('[id^="org-fb-ind-"]').forEach((ind, i) => {
+        ind.className = 'level-indicator-dot ' + (i <= fbActiveIdx ? 'active' : 'inactive');
+    });
+
+    // IG Dots
+    const igLevels = ['accounts', 'metrics', 'media', 'media_metrics'];
+    const igActiveIdx = igLevels.indexOf(igEl?.value);
+    document.querySelectorAll('[id^="org-ig-ind-"]').forEach((ind, i) => {
+        ind.className = 'level-indicator-dot ' + (i <= igActiveIdx ? 'active' : 'inactive');
+    });
+
+    // Enforce global limits on local page toggles
+    enforceGlobalOrganicLimits(fbEl?.value, igEl?.value);
+}
+
+function enforceGlobalOrganicLimits(globalFbLvl, globalIgLvl) {
+    const fbLevels = ['page', 'page_metrics', 'posts', 'post_metrics'];
+    const igLevels = ['accounts', 'metrics', 'media', 'media_metrics'];
+    
+    const maxFbIdx = fbLevels.indexOf(globalFbLvl);
+    const maxIgIdx = igLevels.indexOf(globalIgLvl);
+
+    document.querySelectorAll('.fb-page-main-toggle').forEach(mainToggle => {
+        const pageId = mainToggle.dataset.id;
+        const opts = document.querySelectorAll(`.fb-page-opt[data-page="${pageId}"]`);
+        
+        opts.forEach(opt => {
+            const key = opt.dataset.opt;
+            let allowed = true;
+            
+            // FB Logic
+            if (key === 'page_metrics' && maxFbIdx < 1) allowed = false;
+            if (key === 'posts' && maxFbIdx < 2) allowed = false;
+            if (key === 'post_metrics' && maxFbIdx < 3) allowed = false;
+            
+            // IG Logic
+            if (key === 'ig_accounts' && maxIgIdx < 0) allowed = false;
+            if (key === 'ig_account_metrics' && maxIgIdx < 1) allowed = false;
+            if (key === 'ig_account_media' && maxIgIdx < 2) allowed = false;
+            if (key === 'ig_account_media_metrics' && maxIgIdx < 3) allowed = false;
+
+            opt.disabled = !allowed;
+            if (!allowed) opt.checked = false;
+            
+            // Special sub-item opacity
+            const subItem = opt.closest('.hierarchy-sub-item');
+            if (subItem) subItem.style.opacity = allowed ? '1' : '0.2';
+        });
+    });
+}
+
+function setFbOrganicLevel(lvl) {
+    const el = document.getElementById('fb-organic-level');
+    if (el) { el.value = lvl; handleFbOrganicLevelChange(); }
+}
+
+function setIgLevel(lvl) {
+    const el = document.getElementById('fb-ig-level');
+    if (el) { el.value = lvl; handleFbOrganicLevelChange(); }
 }
 
 function setMetricLevel(lvl) {
@@ -421,28 +512,64 @@ function renderAssets(assets) {
         fbOrganicList.innerHTML = '';
         const pages = assets.facebook_pages || [];
         if (pages.length === 0) fbOrganicList.innerHTML = '<div class="empty-state">No Facebook pages found.</div>';
+        
         pages.forEach(p => {
-            const syncedIds = currentConfig?.fb_page_ids || [];
-            const isSynced = syncedIds.includes(String(p.id)) && !p.lost_access;
+            const configPages = currentConfig?.fb_pages_full_config || [];
+            const pageCfg = configPages.find(cp => String(cp.id) === String(p.id)) || { enabled: false };
+            const isSynced = pageCfg.enabled && !p.lost_access;
             const div = document.createElement('div');
             
-            let itemClass = 'asset-item';
-            if (isSynced) itemClass += ' synced';
-            if (p.is_new) itemClass += ' is-new';
-            if (p.lost_access) itemClass += ' lost-access';
+            div.className = 'asset-group-card' + (isSynced ? ' synced' : '') + (p.lost_access ? ' lost-access' : '');
             
-            div.className = itemClass;
+            // Sub-toggles defaults or current values
+            const getCfg = (key, def = true) => pageCfg[key] !== undefined ? !!pageCfg[key] : def;
+            
+            const htmlId = `page-${p.id}`;
+            const igId = p.ig_account ? `ig-${p.ig_account}` : null;
+
             div.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                   <div style="font-size:0.75rem; font-weight:600; color:#fff;">${p.title}</div>
+                <div class="asset-group-header">
+                   <div style="display:flex; align-items:center; gap:10px; flex:1;">
+                       <i data-lucide="layout" size="16"></i>
+                       <div style="font-weight:700; color:#fff;">${p.title}</div>
+                   </div>
                    <label class="switch-mini">
-                       <input type="checkbox" class="fb-organic-asset-sync" value="${p.id}" ${isSynced ? 'checked' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
+                       <input type="checkbox" class="fb-page-main-toggle" data-id="${p.id}" ${isSynced ? 'checked' : ''} onchange="toggleOrganicHierarchy('${p.id}', this.checked)">
                        <span class="slider-mini"></span>
                    </label>
+                </div>
+                
+                <div class="asset-group-content" id="content-${p.id}" style="display: ${isSynced ? 'block' : 'none'}">
+                    <div class="hierarchy-grid">
+                        <!-- FB Tiers -->
+                        <div class="hierarchy-col">
+                            <label class="hierarchy-item"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="page_metrics" ${getCfg('page_metrics') ? 'checked' : ''}> Page Metrics</label>
+                            <label class="hierarchy-item"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="posts" ${getCfg('posts') ? 'checked' : ''} onchange="toggleSubOpt('${p.id}', 'posts', this.checked)"> Posts Content</label>
+                            <label class="hierarchy-sub-item" id="sub-${p.id}-posts" style="opacity:${getCfg('posts') ? 1 : 0.3}"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="post_metrics" ${getCfg('post_metrics') ? 'checked' : ''} ${!getCfg('posts') ? 'disabled' : ''}> Post Metrics</label>
+                        </div>
+                        
+                        <!-- IG Tiers -->
+                        ${p.ig_account ? `
+                        <div class="hierarchy-col" style="border-left: 1px solid var(--border); padding-left: 20px;">
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:10px; color:var(--primary); font-size:0.7rem; font-weight:700; text-transform:uppercase;">
+                                <i data-lucide="instagram" size="12"></i> IG Account: ${p.ig_account_name || p.ig_account || 'Discovery Mode'}
+                            </div>
+                            <label class="hierarchy-item"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_accounts" ${getCfg('ig_accounts', false) ? 'checked' : ''} onchange="toggleSubOpt('${p.id}', 'ig_accounts', this.checked)"> IG Channel</label>
+                            <div id="sub-${p.id}-ig_accounts" style="opacity:${getCfg('ig_accounts') ? 1 : 0.3}">
+                                <label class="hierarchy-sub-item"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_metrics" ${getCfg('ig_account_metrics') ? 'checked' : ''} ${!getCfg('ig_accounts') ? 'disabled' : ''}> IG Metrics</label>
+                                <label class="hierarchy-sub-item"><input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_media" ${getCfg('ig_account_media') ? 'checked' : ''} ${!getCfg('ig_accounts') ? 'disabled' : ''} onchange="toggleSubOpt('${p.id}', 'ig_account_media', this.checked)"> IG Media</label>
+                                <label class="hierarchy-sub-item" id="sub-${p.id}-ig_account_media" style="margin-left: 20px; opacity:${getCfg('ig_account_media') ? 1 : 0.3}">
+                                    <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_media_metrics" ${getCfg('ig_account_media_metrics') ? 'checked' : ''} ${!getCfg('ig_account_media') ? 'disabled' : ''}> Media Metrics
+                                </label>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
                 </div>
             `;
             fbOrganicList.appendChild(div);
         });
+        lucide.createIcons();
     }
 
     if (fbMarketingList) {
@@ -506,8 +633,16 @@ async function updateConfig(typeArg) {
             payload.assets.gsc.push({ url: el.value, target_countries: [], target_keywords: [] });
         });
 
-        document.querySelectorAll('.fb-organic-asset-sync:checked').forEach(el => {
-            payload.assets.pages.push({ id: el.value });
+        document.querySelectorAll('.fb-page-main-toggle:checked').forEach(el => {
+            const pageId = el.dataset.id;
+            const pageData = { id: pageId, enabled: true };
+            
+            // Collect all sub-options for this specific page
+            document.querySelectorAll(`.fb-page-opt[data-page="${pageId}"]`).forEach(optEl => {
+                pageData[optEl.dataset.opt] = optEl.checked;
+            });
+            
+            payload.assets.pages.push(pageData);
         });
 
         document.querySelectorAll('.fb-marketing-asset-sync:checked').forEach(el => {
@@ -578,6 +713,21 @@ async function updateConfig(typeArg) {
                     }
                 };
             });
+        }
+
+        // Feature Toggles (Organic Tiers - Derived from Selectors)
+        if (typeArg === 'facebook-organic' || typeArg === 'global') {
+            const fbLvl = document.getElementById('fb-organic-level')?.value || 'none';
+            const igLvl = document.getElementById('fb-ig-level')?.value || 'none';
+
+            payload.feature_toggles.page_metrics = (fbLvl === 'page_metrics' || fbLvl === 'posts' || fbLvl === 'post_metrics');
+            payload.feature_toggles.posts = (fbLvl === 'posts' || fbLvl === 'post_metrics');
+            payload.feature_toggles.post_metrics = (fbLvl === 'post_metrics');
+
+            payload.feature_toggles.ig_accounts = (igLvl !== 'none');
+            payload.feature_toggles.ig_account_metrics = (igLvl === 'metrics' || igLvl === 'media' || igLvl === 'media_metrics');
+            payload.feature_toggles.ig_account_media = (igLvl === 'media' || igLvl === 'media_metrics');
+            payload.feature_toggles.ig_account_media_metrics = (igLvl === 'media_metrics');
         }
 
         // Global Infrastructure (Read-only fields are NOT included in payload)
@@ -661,6 +811,25 @@ function showToast(msg, isError) {
     }, 4000);
 }
 
+function toggleOrganicHierarchy(id, enabled) {
+    const content = document.getElementById('content-' + id);
+    if (content) content.style.display = enabled ? 'block' : 'none';
+    
+    const card = content?.closest('.asset-group-card');
+    if (card) card.classList.toggle('synced', enabled);
+}
+
+function toggleSubOpt(pageId, opt, enabled) {
+    const subContainer = document.getElementById(`sub-${pageId}-${opt}`);
+    if (subContainer) {
+        subContainer.style.opacity = enabled ? '1' : '0.3';
+        subContainer.querySelectorAll('input').forEach(input => {
+            input.disabled = !enabled;
+            if (!enabled) input.checked = false;
+        });
+    }
+}
+
 function setupEventListeners() {
 }
 
@@ -713,8 +882,13 @@ window.addMetricRule = addMetricRule;
 window.updateConfig = updateConfig;
 window.validateTokens = validateTokens;
 window.handleFbLevelChange = handleFbLevelChange;
+window.handleFbOrganicLevelChange = handleFbOrganicLevelChange;
 window.handleFbStrategyChange = handleFbStrategyChange;
 window.forceRefresh = forceRefresh;
+window.toggleOrganicHierarchy = toggleOrganicHierarchy;
+window.toggleSubOpt = toggleSubOpt;
+window.setFbOrganicLevel = setFbOrganicLevel;
+window.setIgLevel = setIgLevel;
 
 console.log("Config Manager script loaded.");
 

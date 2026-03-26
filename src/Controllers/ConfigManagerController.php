@@ -104,10 +104,12 @@ class ConfigManagerController extends BaseController
                     $currentConfig['fb_entity_filters'][$e] = $fbConf[$e]['cache_include'] ?? '';
                 }
 
-                foreach (($fbConf['pages'] ?? []) as $p) {
+                foreach (($fbOrganic['pages'] ?? []) as $p) {
                     $currentConfig['fb_page_ids'][] = (string)$p['id'];
                 }
-                foreach (($fbConf['ad_accounts'] ?? []) as $a) {
+                $currentConfig['fb_pages_full_config'] = $fbOrganic['pages'] ?? [];
+
+                foreach (($fbMarketing['ad_accounts'] ?? []) as $a) {
                     $currentConfig['fb_ad_account_ids'][] = (string)$a['id'];
                 }
 
@@ -179,7 +181,7 @@ class ConfigManagerController extends BaseController
                         userId: $userId,
                         permissions: [], 
                         limit: 100, 
-                        fields: 'id,name,instagram_business_account'
+                        fields: 'id,name,instagram_business_account{id,name,username}'
                     );
 
                     if (!empty($pagesData['data'])) {
@@ -191,6 +193,7 @@ class ConfigManagerController extends BaseController
                                 'url' => '', // 'link' was removed as it might require extra permissions
                                 'hostname' => '',
                                 'ig_account' => $page['instagram_business_account']['id'] ?? null,
+                                'ig_account_name' => $page['instagram_business_account']['username'] ?? $page['instagram_business_account']['name'] ?? null,
                             ];
                         }
                     }
@@ -616,7 +619,7 @@ class ConfigManagerController extends BaseController
             }
         }
 
-        // 4. Update Feature Toggles (Global Defaults)
+        // 4. Update Feature Toggles (Global Defaults for reference)
         $fbOrganicFeatures = ['page_metrics', 'posts', 'post_metrics', 'ig_accounts', 'ig_account_metrics', 'ig_account_media', 'ig_account_media_metrics'];
         foreach ($fbOrganicFeatures as $f) {
             if (isset($featureToggles[$f])) {
@@ -633,29 +636,29 @@ class ConfigManagerController extends BaseController
         
         // 2. Handle Pages Sync (Organic)
         if (isset($assets['pages'])) {
-            $selectedPageIds = array_column($assets['pages'], 'id');
-            $currentPages = $orgConfig['channels']['facebook_organic']['pages'] ?? [];
             $newPagesList = [];
-
-            // Keep existing pages still selected
-            foreach ($currentPages as $page) {
-                if (in_array((string)$page['id'], $selectedPageIds)) {
-                    $newPagesList[] = $page;
-                }
-            }
-
-            // Add newly selected pages
-            $existingPageIds = array_map('strval', array_column($currentPages, 'id'));
-            foreach ($assets['pages'] as $newPage) {
-                if (!in_array((string)$newPage['id'], $existingPageIds)) {
-                    $newPagesList[] = ConfigSchemaRegistryService::getEntitySchema('facebook_organic', [
-                        'id' => $newPage['id'],
-                        'url' => $newPage['url'],
-                        'title' => $newPage['title'],
-                        'hostname' => $newPage['hostname'],
-                        'ig_account' => $newPage['ig_account'],
-                    ]);
-                }
+            foreach ($assets['pages'] as $pData) {
+                // Ensure ID is string and boolean flags are casted
+                $pageId = (string)$pData['id'];
+                $item = [
+                    'id' => $pageId,
+                    'title' => $pData['title'] ?? null,
+                    'url' => $pData['url'] ?? null,
+                    'hostname' => $pData['hostname'] ?? null,
+                    'enabled' => filter_var($pData['enabled'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                    'exclude_from_caching' => filter_var($pData['exclude_from_caching'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    'ig_account' => $pData['ig_account'] ?? null,
+                    'ig_account_name' => $pData['ig_account_name'] ?? null,
+                    // Granularity Flags (Stored per page)
+                    'page_metrics' => filter_var($pData['page_metrics'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                    'posts' => filter_var($pData['posts'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                    'post_metrics' => filter_var($pData['post_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    'ig_accounts' => filter_var($pData['ig_accounts'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    'ig_account_metrics' => filter_var($pData['ig_account_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    'ig_account_media' => filter_var($pData['ig_account_media'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    'ig_account_media_metrics' => filter_var($pData['ig_account_media_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                ];
+                $newPagesList[] = ConfigSchemaRegistryService::getEntitySchema('facebook_organic', $item);
             }
             $orgConfig['channels']['facebook_organic']['pages'] = $newPagesList;
         }
