@@ -244,13 +244,13 @@ function handleFbLevelChange() {
 
     const visLevels = ['campaign', 'adset', 'ad', 'creative'];
     
-    // Sync Entity Indicators (infrastructure)
+    // Sync Entity Indicators (infrastructure - Cumulative hierarchy as needed for tree)
     const entActiveIdx = visLevels.indexOf(entEl.value) + 1;
     document.querySelectorAll('[id^="ent-ind-"]').forEach((ind, i) => {
-        ind.className = 'level-indicator-dot ' + (i === entActiveIdx - 1 ? 'active' : 'inactive');
+        ind.className = 'level-indicator-dot ' + (i < entActiveIdx ? 'active' : 'inactive');
     });
 
-    // Metrics Indicators (reporting)
+    // Metrics Indicators (reporting - Atomic Radio model)
     const metActiveIdx = visLevels.indexOf(metEl.value) + 1;
     document.querySelectorAll('[id^="met-ind-"]').forEach((ind, i) => {
         ind.className = 'level-indicator-dot ' + (i === metActiveIdx - 1 ? 'active' : 'inactive');
@@ -779,10 +779,10 @@ async function updateConfig(typeArg) {
             const entLevel = document.getElementById('fb-marketing-level')?.value || 'ad_account';
             const metLevel = document.getElementById('fb-marketing-metrics-level')?.value || 'ad_account';
 
-            // Feature Toggles (Infrastructure - Exclusive Radio Logic)
-            payload.feature_toggles.campaigns = (entLevel === 'campaign');
-            payload.feature_toggles.adsets = (entLevel === 'adset');
-            payload.feature_toggles.ads = (entLevel === 'ad');
+            // Feature Toggles (Infrastructure - Cumulative hierarchy tree)
+            payload.feature_toggles.campaigns = true;
+            payload.feature_toggles.adsets = (entLevel === 'adset' || entLevel === 'ad' || entLevel === 'creative');
+            payload.feature_toggles.ads = (entLevel === 'ad' || entLevel === 'creative');
             payload.feature_toggles.creatives = (entLevel === 'creative');
 
             // Feature Toggles (Metrics - Exclusive Radio Logic)
