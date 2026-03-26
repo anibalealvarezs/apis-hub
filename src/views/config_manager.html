@@ -102,6 +102,38 @@
         @media (max-width: 768px) {
             .asset-grid { grid-template-columns: 1fr; }
         }
+
+        /* Asset Badges for Organic */
+        .asset-badge-new {
+            position: absolute;
+            top: -10px;
+            right: 15px;
+            background: #238636;
+            color: white;
+            font-size: 0.6rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 4px;
+            z-index: 2;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .asset-badge-lost {
+            position: absolute;
+            top: -10px;
+            right: 15px;
+            background: #f85149;
+            color: white;
+            font-size: 0.6rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 4px;
+            z-index: 2;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .page-config-card.is-new { border-color: rgba(35, 134, 54, 0.4) !important; background: rgba(35, 134, 54, 0.05) !important; }
+        .page-config-card.lost-access { border-color: rgba(248, 81, 73, 0.3) !important; background: rgba(248, 81, 73, 0.05) !important; }
+        .page-config-card.synced { border-color: var(--primary) !important; }
     </style>
 </head>
 <body class="full-screen">

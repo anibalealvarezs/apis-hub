@@ -522,9 +522,21 @@ function renderAssets(assets) {
                 return def;
             };
 
+            const isSynced = getCfg('enabled') && !p.lost_access;
+            const isNew = p.is_new === true;
+            const lostAccess = p.lost_access === true;
+            
+            let cardClasses = 'glass-card page-config-card';
+            if (isSynced) cardClasses += ' synced';
+            if (isNew) cardClasses += ' is-new';
+            if (lostAccess) cardClasses += ' lost-access';
+
             const div = document.createElement('div');
             div.innerHTML = `
-            <div class="glass-card page-config-card" style="margin-bottom:20px; padding:15px; border:1px solid var(--border); border-radius:12px; position:relative;">
+            <div class="${cardClasses}" data-id="${p.id}" data-ig="${p.ig_account || ''}" style="margin-bottom:20px; padding:15px; border:1px solid var(--border); border-radius:12px; position:relative;">
+                ${isNew ? '<div class="asset-badge-new">NEW</div>' : ''}
+                ${lostAccess ? '<div class="asset-badge-lost">LOST ACCESS</div>' : ''}
+                
                 <!-- Page Header -->
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                     <div style="display:flex; align-items:center; gap:10px;">
@@ -698,9 +710,12 @@ async function updateConfig(typeArg) {
             if (!mainToggle) return;
             
             const pageId = String(mainToggle.dataset.id);
+            const igId = card.dataset.ig || null;
+            
             const pageData = {
                 id: pageId,
-                enabled: mainToggle.checked
+                enabled: mainToggle.checked,
+                ig_account: igId
             };
             
             card.querySelectorAll('.fb-page-opt').forEach(opt => {
