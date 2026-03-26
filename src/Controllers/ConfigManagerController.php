@@ -53,17 +53,21 @@ class ConfigManagerController extends BaseController
             ];
             $lastUpdated = null;
 
+            // STEP 0: Post-Singleton Load
             $systemConfig = Helpers::getProjectConfig();
+            $logger->info("STEP 0: Global Config CAMPAIGN Filter: " . json_encode($systemConfig['channels']['facebook_marketing']['CAMPAIGN']['cache_include'] ?? 'NOT_FOUND'));
+
             $gsc = $systemConfig['channels']['google_search_console'] ?? [];
             $fbGlobal = $systemConfig['channels']['facebook'] ?? [];
             $fbOrganic = $systemConfig['channels']['facebook_organic'] ?? [];
+            
+            // STEP 1: Channel Extraction
             $fbMarketing = $systemConfig['channels']['facebook_marketing'] ?? [];
+            $logger->info("STEP 1: fbMarketing CAMPAIGN Filter: " . json_encode($fbMarketing['CAMPAIGN']['cache_include'] ?? 'NOT_FOUND'));
 
+            // STEP 2: Mixed Config
             $fbConf = array_replace_recursive($fbGlobal, $fbOrganic, $fbMarketing);
-
-            $logger->info("DEBUG: Project Name detected: " . (getenv('PROJECT_NAME') ?: "NOT SET"));
-            $logger->info("DEBUG: FB Marketing Campaign Filter: " . json_encode($fbMarketing['CAMPAIGN'] ?? 'NOT_FOUND'));
-            $logger->info("DEBUG: FB Conf Campaign Filter: " . json_encode($fbConf['CAMPAIGN'] ?? 'NOT_FOUND'));
+            $logger->info("STEP 2: fbConf CAMPAIGN Filter: " . json_encode($fbConf['CAMPAIGN']['cache_include'] ?? 'NOT_FOUND'));
 
             $currentConfig = [
                 'gsc' => [], 
@@ -87,6 +91,10 @@ class ConfigManagerController extends BaseController
                 'marketing_debug_logs' => filter_var($systemConfig['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ];
 
+            $logger->info("DEBUG: Project Name detected: " . (getenv('PROJECT_NAME') ?: "NOT SET"));
+            $logger->info("DEBUG: FB Marketing Campaign Filter: " . json_encode($fbMarketing['CAMPAIGN'] ?? 'NOT_FOUND'));
+            $logger->info("DEBUG: FB Conf Campaign Filter: " . json_encode($fbConf['CAMPAIGN'] ?? 'NOT_FOUND'));
+
             // Re-map GSC sites with Hydration
             foreach (($gsc['sites'] ?? []) as $site) {
                 $url = $site['url'];
@@ -99,6 +107,9 @@ class ConfigManagerController extends BaseController
                 foreach ($entities as $e) {
                     $currentConfig['fb_entity_filters'][$e] = $fbConf[$e]['cache_include'] ?? ($fbMarketing[$e]['cache_include'] ?? '');
                 }
+                
+                // STEP 3: Post-Mapping
+                $logger->info("STEP 3: currentConfig CAMPAIGN Filter Output: " . ($currentConfig['fb_entity_filters']['CAMPAIGN'] ?: 'EMPTY_STRING'));
 
                 foreach (($fbOrganic['pages'] ?? []) as $p) {
                     $currentConfig['fb_page_ids'][] = (string)$p['id'];
