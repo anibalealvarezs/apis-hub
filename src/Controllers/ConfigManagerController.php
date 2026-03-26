@@ -6,6 +6,7 @@ use Classes\Requests\MetricRequests;
 use Exception;
 use Helpers\Helpers;
 use Services\CacheStrategyService;
+use Services\ConfigSchemaRegistryService;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Yaml\Yaml;
@@ -73,18 +74,16 @@ class ConfigManagerController extends BaseController
                 'fb_organic_enabled' => $fbOrganic['enabled'] ?? true,
                 'fb_marketing_enabled' => $fbMarketing['enabled'] ?? true,
                 'fb_metrics_strategy' => $fbMarketing['metrics_strategy'] ?? 'default',
-                'fb_metrics_config' => $fbMarketing['metrics_config'] ?? [],
+                'fb_metrics_config' => ConfigSchemaRegistryService::hydrate('facebook_marketing', 'metrics', $fbMarketing['metrics_config'] ?? []),
                 'jobs_timeout_hours' => $systemConfig['jobs']['timeout_hours'] ?? 6,
                 'cache_raw_metrics' => filter_var($systemConfig['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'marketing_debug_logs' => filter_var($systemConfig['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ];
 
-            // Re-map GSC sites
+            // Re-map GSC sites with Hydration
             foreach (($gsc['sites'] ?? []) as $site) {
-                $currentConfig['gsc'][$site['url']] = [
-                    'target_countries' => $site['target_countries'] ?? [],
-                    'target_keywords' => $site['target_keywords'] ?? [],
-                ];
+                $url = $site['url'];
+                $currentConfig['gsc'][$url] = ConfigSchemaRegistryService::hydrate('google_search_console', 'entity', $site);
             }
 
             // Re-map FB entities
@@ -492,20 +491,13 @@ class ConfigManagerController extends BaseController
         // Add new selected sites that weren't in the config
         foreach ($selectedMap as $normUrl => $newSite) {
             if (!in_array($normUrl, $processedNormUrls)) {
-                $newSitesList[] = [
+                $newSitesList[] = ConfigSchemaRegistryService::getEntitySchema('google_search_console', [
                     'url' => $newSite['url'],
                     'title' => $newSite['title'],
                     'hostname' => $newSite['hostname'],
-                    'include_keywords' => [],
-                    'exclude_keywords' => [],
-                    'include_countries' => [],
-                    'exclude_countries' => [],
-                    'include_pages' => [],
-                    'exclude_pages' => [],
                     'target_countries' => $newSite['target_countries'] ?? [],
                     'target_keywords' => $newSite['target_keywords'] ?? [],
-                    'enabled' => true,
-                ];
+                ]);
             }
         }
 
@@ -645,15 +637,13 @@ class ConfigManagerController extends BaseController
             $existingPageIds = array_map('strval', array_column($currentPages, 'id'));
             foreach ($assets['pages'] as $newPage) {
                 if (!in_array((string)$newPage['id'], $existingPageIds)) {
-                    $newPagesList[] = [
+                    $newPagesList[] = ConfigSchemaRegistryService::getEntitySchema('facebook_organic', [
                         'id' => $newPage['id'],
                         'url' => $newPage['url'],
                         'title' => $newPage['title'],
                         'hostname' => $newPage['hostname'],
                         'ig_account' => $newPage['ig_account'],
-                        'enabled' => true,
-                        'exclude_from_caching' => false,
-                    ];
+                    ]);
                 }
             }
             $orgConfig['channels']['facebook_organic']['pages'] = $newPagesList;
@@ -677,12 +667,10 @@ class ConfigManagerController extends BaseController
             $existingAccIds = array_map('strval', array_column($currentAccs, 'id'));
             foreach ($assets['ad_accounts'] as $newAcc) {
                 if (!in_array((string)$newAcc['id'], $existingAccIds)) {
-                    $newAccsList[] = [
+                    $newAccsList[] = ConfigSchemaRegistryService::getEntitySchema('facebook_marketing', [
                         'id' => (string)$newAcc['id'],
                         'name' => $newAcc['name'] ?? '',
-                        'enabled' => true,
-                        'exclude_from_caching' => false,
-                    ];
+                    ]);
                 }
             }
             $markConfig['channels']['facebook_marketing']['ad_accounts'] = $newAccsList;
@@ -754,4 +742,5 @@ class ConfigManagerController extends BaseController
             'bra' => 'Brazil',
         ];
     }
+
 }
