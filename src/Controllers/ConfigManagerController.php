@@ -22,11 +22,22 @@ class ConfigManagerController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->gscConfigPath = __DIR__ . '/../../config/channels/google_search_console.yaml';
-        $this->fbConfigPath = __DIR__ . '/../../config/channels/facebook.yaml';
-        $this->fbOrganicPath = __DIR__ . '/../../config/channels/facebook_organic.yaml';
-        $this->fbMarketingPath = __DIR__ . '/../../config/channels/facebook_marketing.yaml';
-        $this->assetsBackupPath = __DIR__ . '/../../config/assets_backup.yaml';
+        
+        $projectName = strtolower(getenv('PROJECT_NAME') ?: ($_ENV['PROJECT_NAME'] ?? ''));
+        $suffix = $projectName ? '.' . $projectName : '';
+
+        $this->gscConfigPath = __DIR__ . '/../../config/channels/google_search_console.yaml' . $suffix;
+        $this->fbConfigPath = __DIR__ . '/../../config/channels/facebook.yaml'; // Global config usually doesn't have suffix
+        $this->fbOrganicPath = __DIR__ . '/../../config/channels/facebook_organic.yaml' . $suffix;
+        $this->fbMarketingPath = __DIR__ . '/../../config/channels/facebook_marketing.yaml' . $suffix;
+        $this->assetsBackupPath = __DIR__ . '/../../config/assets_backup.yaml' . $suffix;
+
+        // Fallback for paths if suffix files do not exist (optional but recommended for robustness)
+        if ($suffix) {
+            if (!file_exists($this->gscConfigPath)) { $this->gscConfigPath = str_replace($suffix, '', $this->gscConfigPath); }
+            if (!file_exists($this->fbOrganicPath)) { $this->fbOrganicPath = str_replace($suffix, '', $this->fbOrganicPath); }
+            if (!file_exists($this->fbMarketingPath)) { $this->fbMarketingPath = str_replace($suffix, '', $this->fbMarketingPath); }
+        }
     }
 
     public function index(): Response
