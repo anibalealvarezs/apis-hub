@@ -410,6 +410,16 @@
                         <label class="strategy-option"><input type="radio" name="fb_metrics_strategy" id="fb-strategy-default" value="default" checked onchange="handleFbStrategyChange()"> <span>Standard</span></label>
                         <label class="strategy-option"><input type="radio" name="fb_metrics_strategy" id="fb-strategy-custom" value="custom" onchange="handleFbStrategyChange()"> <span>Custom</span></label>
                     </div>
+
+                    <div style="margin-top:20px; border-top: 1px solid var(--border); padding-top:20px;">
+                        <div class="section-title small" style="margin-bottom:10px; border-bottom:none; padding:0; opacity:0.8;"><i data-lucide="filter" size="14"></i> Campaign Asset Filter</div>
+                        <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:12px;">Extraction will only cache assets from campaigns matching this text pattern (e.g. CAMP-)</div>
+                        <div class="input-with-icon" style="background: rgba(255,255,255,0.03); border-radius:12px; border:1px solid var(--border); padding: 5px 15px; display:flex; align-items:center;">
+                            <i data-lucide="type" size="16" style="opacity:0.5; margin-right:10px;"></i>
+                            <input type="text" id="fb-marketing-campaign-filter" placeholder="e.g. CAMP-" style="border:none; background:transparent; padding:10px 0; width:100%; color:white; font-family:var(--font-mono); font-size:0.85rem;">
+                        </div>
+                    </div>
+
                     <div id="fb-custom-metrics-area" style="display:none">
                         <div class="metric-config-grid" id="fb-metrics-custom-grid"></div>
                     </div>

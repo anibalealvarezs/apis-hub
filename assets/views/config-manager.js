@@ -188,6 +188,12 @@ function populateGlobalFields() {
         const strategyRadio = document.getElementById('fb-strategy-' + strategy);
         if (strategyRadio) strategyRadio.checked = true;
         
+        // Campaign Filter
+        const campFilterEl = document.getElementById('fb-marketing-campaign-filter');
+        if (campFilterEl) {
+            campFilterEl.value = currentConfig.fb_entity_filters?.CAMPAIGN || '';
+        }
+        
         handleFbLevelChange();
         handleFbOrganicLevelChange();
         handleFbStrategyChange();
@@ -750,6 +756,10 @@ async function updateConfig(typeArg) {
             payload.enabled = document.getElementById('fb-marketing-enabled').checked;
             payload.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
             
+            payload.entity_filters = {
+                CAMPAIGN: document.getElementById('fb-marketing-campaign-filter')?.value || ''
+            };
+
             const entLevel = document.getElementById('fb-marketing-level')?.value || 'ad_account';
             const metLevel = document.getElementById('fb-marketing-metrics-level')?.value || 'ad_account';
 
