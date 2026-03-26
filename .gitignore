@@ -44,3 +44,5 @@ config/channels/facebook_marketing.yaml.gbs
 config/channels/facebook_organic.yaml.gbs
 
 docker-compose.yml.gbs
+
+config/assets_backup.yaml.apis-hub-demo
