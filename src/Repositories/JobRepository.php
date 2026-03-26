@@ -13,6 +13,7 @@ use Enums\JobStatus;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use InvalidArgumentException;
+use Helpers\Helpers;
 
 class JobRepository extends BaseRepository
 {
@@ -179,7 +180,7 @@ class JobRepository extends BaseRepository
             // Differentiate by Date Range in payload (e.g. gsc-jan vs gsc-feb)
             // We use a loose LIKE pattern to be compatible with MySQL JSON columns.
             // In PostgreSQL, this is handled via Native SQL in the calling methods to avoid DQL parsing issues.
-            if (!$this->isPostgreSQL()) {
+            if (!Helpers::isPostgres()) {
                 $payloadField = 'e.payload';
                 if ($envStart && (!is_object($filters) || !isset($filters->startDate))) {
                     $query->andWhere("({$payloadField} LIKE :ctx_start_pattern1 OR {$payloadField} LIKE :ctx_start_pattern2)")
@@ -284,7 +285,7 @@ class JobRepository extends BaseRepository
      */
     public function getJobsByStatus(int $status, ?string $channel = null, ?string $instanceName = null): array
     {
-        if ($this->isPostgreSQL()) {
+        if (Helpers::isPostgres()) {
             $sql = "SELECT * FROM jobs WHERE status = :status";
             $params = ['status' => $status];
             
@@ -473,7 +474,7 @@ class JobRepository extends BaseRepository
      */
     public function hasSuccessfulRecentJob(string $instanceName, int $withinHours = 24): bool
     {
-        if ($this->isPostgreSQL()) {
+        if (Helpers::isPostgres()) {
             $since = new \DateTime();
             $since->modify("-$withinHours hours");
 
@@ -515,7 +516,7 @@ class JobRepository extends BaseRepository
      */
     public function getLastSuccessfulJobTime(string $instanceName): ?\DateTime
     {
-        if ($this->isPostgreSQL()) {
+        if (Helpers::isPostgres()) {
             $sql = "SELECT j.updated_at FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :completed ORDER BY j.updated_at DESC LIMIT 1";
             
             $stmt = $this->_em->getConnection()->prepare($sql);
@@ -552,7 +553,7 @@ class JobRepository extends BaseRepository
      */
     public function isAnotherJobProcessing(string $instanceName, ?int $excludeJobId = null): bool
     {
-        if ($this->isPostgreSQL()) {
+        if (Helpers::isPostgres()) {
             $sql = "SELECT count(j.id) FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :processing";
             $params = [
                 'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
@@ -611,12 +612,5 @@ class JobRepository extends BaseRepository
             ->setParameter('since', $since)
             ->getQuery()
             ->execute();
-    }
-    /**
-     * @return bool
-     */
-    private function isPostgreSQL(): bool
-    {
-        return $this->_em->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
     }
 }

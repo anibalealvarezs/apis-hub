@@ -123,7 +123,7 @@ class ScheduleInitialJobsCommand extends Command
                     $shouldSchedule = false;
                 } else {
                     // Look specifically for a job with this instance name in its payload
-                    if ($this->isPostgreSQL()) {
+                    if (Helpers::isPostgres()) {
                         $sql = "SELECT count(j.id) FROM jobs j WHERE j.channel = :channel AND j.entity = :entity AND CAST(j.payload AS text) LIKE :instance_pattern";
                         $stmt = $this->entityManager->getConnection()->prepare($sql);
                         $count = $stmt->executeQuery([
@@ -155,20 +155,32 @@ class ScheduleInitialJobsCommand extends Command
                 $job = new Job();
                 $job->addChannel($channel);
                 $job->addEntity($entity);
-                $job->addStatus(JobStatus::scheduled->value);
+                
+                // For '-recent' instances, we schedule them as CANCELLED initially 
+                // to prevent redundancy with historical jobs during deployment,
+                // while still keeping them available in the UI for re-scheduling.
+                $isRecent = str_ends_with($name, '-recent');
+                $job->addStatus($isRecent ? JobStatus::cancelled->value : JobStatus::scheduled->value);
+                
                 $job->addUuid(bin2hex(random_bytes(16)));
                 $job->addPayload([
                     'params' => $params,
                     'instance_name' => $name
                 ]);
-                $job->addMessage("Initial scheduling from deployment command");
+                
+                $msg = $isRecent 
+                    ? "Initial job cancelled during deployment to prevent redundancy. Will run via cron at next scheduled time."
+                    : "Initial scheduling from deployment command";
+                $job->addMessage($msg);
+                
                 $job->addCreatedAt(new \DateTime());
                 $job->addUpdatedAt(new \DateTime());
 
                 $this->entityManager->persist($job);
                 $scheduledCount++;
                 if (Helpers::isDebug()) {
-                    $output->writeln("<info>Scheduled job for $name ($channel -> $entity)</info>");
+                    $statusName = $isRecent ? 'cancelled' : 'scheduled';
+                    $output->writeln("<info>Created initial $statusName job for $name ($channel -> $entity)</info>");
                 }
             } else {
                 $skippedCount++;
@@ -187,11 +199,4 @@ class ScheduleInitialJobsCommand extends Command
         return Command::SUCCESS;
     }
 
-    /**
-     * @return bool
-     */
-    private function isPostgreSQL(): bool
-    {
-        return $this->entityManager->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
-    }
 }

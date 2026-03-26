@@ -73,7 +73,7 @@ class InstanceGeneratorService
                     'port' => $currentPort++,
                     'channel' => $channel,
                     'entity' => $rules['entities_sync'],
-                    'frequency' => sprintf('0 %d * * *', $rules['recent_cron_hour'])
+                    'frequency' => '0 2 * * *'
                 ];
             }
 
@@ -136,6 +136,10 @@ class InstanceGeneratorService
             // 4. Handle dependencies (Optional)
             if ($useDependencies) {
                 for ($i = 1; $i < count($channelInstances); $i++) {
+                    // Recent jobs should run independently to avoid blocking daily updates
+                    if (str_ends_with($channelInstances[$i]['name'], '-recent')) {
+                        continue;
+                    }
                     $channelInstances[$i]['requires'] = $channelInstances[$i - 1]['name'];
                 }
             }
