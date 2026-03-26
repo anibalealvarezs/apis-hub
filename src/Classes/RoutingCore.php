@@ -51,13 +51,10 @@ class RoutingCore implements HttpKernelInterface
             // Security Check
             // API calls are always protected. HTML pages let the frontend Ghost Guard handle it.
             if (!$isPublic && !$isHtml && !$this->isAuthorized($request, $isAdminOnly)) {
-                $debugMsg = $request->attributes->get('AUTH_DEBUG_ERROR') ?: 'Unauthorized: Access denied';
-                $headers = ['Content-Type' => 'application/json', 'X-Debug-Version' => '123456789'];
                 return new Response(json_encode([
                     'status' => 'error',
-                    'error' => $debugMsg,
-                    'v' => '1.2'
-                ]), Response::HTTP_UNAUTHORIZED, $headers);
+                    'error' => 'Unauthorized: Access denied'
+                ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
             }
 
             unset($attributes['controller'], $attributes['_route'], $attributes['html'], $attributes['public'], $attributes['admin']);
@@ -90,7 +87,6 @@ class RoutingCore implements HttpKernelInterface
         if (!empty($authorizedIps)) {
             $clientIp = $request->getClientIp();
             if (!\Symfony\Component\HttpFoundation\IpUtils::checkIp($clientIp, $authorizedIps)) {
-                $request->attributes->set('AUTH_DEBUG_ERROR', "IP Blocked: $clientIp. Authorized: " . implode(',', $authorizedIps));
                 return false;
             }
         }
@@ -129,17 +125,7 @@ class RoutingCore implements HttpKernelInterface
         }
 
         if ($isAdminOnly) {
-            $isMatch = $adminKey !== null && $providedKey === $adminKey;
-            if (!$isMatch) {
-                $msg = $adminKey === null ? 'Admin key NOT found in server config' : ('Key mismatch. Provided len: ' . strlen($providedKey ?? '') . ', Server len: ' . strlen($adminKey));
-                if ($providedKey) {
-                    $msg .= '. Provided starts with: ' . substr($providedKey, 0, 3);
-                } else {
-                    $msg .= '. Provided key is EMPTY (Header stripped?)';
-                }
-                $request->attributes->set('AUTH_DEBUG_ERROR', $msg);
-            }
-            return $isMatch;
+            return $adminKey !== null && $providedKey === $adminKey;
         }
 
         // Public/Report routes accept both admin and regular keys
@@ -147,14 +133,7 @@ class RoutingCore implements HttpKernelInterface
         if ($appKey) $validKeys = array_merge($validKeys, array_map('trim', explode(',', $appKey)));
         if ($adminKey) $validKeys[] = trim($adminKey);
 
-        $success = !empty($validKeys) && in_array($providedKey, $validKeys, true);
-        if (!$success && !$request->attributes->has('AUTH_DEBUG_ERROR')) {
-            $msg = "Global check failed. AdminOnly Route: " . ($isAdminOnly ? 'YES' : 'NO');
-            $msg .= ". Key provided: " . ($providedKey ? ('Yes (Len: ' . strlen($providedKey) . ')') : 'EMPTY');
-            $msg .= ". AdminKey configured: " . ($adminKey ? 'YES' : 'NO');
-            $request->attributes->set('AUTH_DEBUG_ERROR', $msg);
-        }
-        return $success;
+        return !empty($validKeys) && in_array($providedKey, $validKeys, true);
     }
 
     public function map(string $path, string $httpMethod, callable $controller, bool $public = false, bool $html = false, bool $admin = false): void
