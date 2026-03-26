@@ -309,6 +309,54 @@ class MetricRepository extends BaseRepository
         }
     }
 
+    public function getMinDate(?object $filters = null): ?string
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('MIN(mc.metricDate)')
+            ->from(\Entities\Analytics\MetricConfig::class, 'mc');
+
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $query->andWhere('mc.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        try {
+            $res = $query->getQuery()->getSingleScalarResult();
+            if ($res instanceof \DateTimeInterface) {
+                return $res->format('Y-m-d');
+            }
+            return is_string($res) ? $res : null;
+        } catch (NoResultException $e) {
+            return null;
+        }
+    }
+
+    public function getMaxDate(?object $filters = null): ?string
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('MAX(mc.metricDate)')
+            ->from(\Entities\Analytics\MetricConfig::class, 'mc');
+
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $query->andWhere('mc.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        try {
+            $res = $query->getQuery()->getSingleScalarResult();
+            if ($res instanceof \DateTimeInterface) {
+                return $res->format('Y-m-d');
+            }
+            return is_string($res) ? $res : null;
+        } catch (NoResultException $e) {
+            return null;
+        }
+    }
+
     public function getByChannelAndName(
         int $channel,
         string $name,

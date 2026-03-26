@@ -92,33 +92,55 @@ function getActiveMetrics() {
 }
 
 // --- Initialization ---
-function initDashboard() {
+async function initDashboard() {
     lucide.createIcons();
     
+    const headers = getAdminHeaders();
+    if (!headers || !headers.Authorization) return;
+
+    let minStoredDate = dayjs().subtract(1, 'year').format('YYYY-MM-DD'); 
+    try {
+        const rangeRes = await fetch('/facebook_marketing/metric/range', { headers }).then(r => r.json());
+        if (rangeRes.status === 'success' && rangeRes.data.minDate) {
+            minStoredDate = rangeRes.data.minDate;
+            console.log("Historical data horizon detected:", minStoredDate);
+        }
+    } catch(e) { console.error("Range fetch error:", e); }
+
     const flatpickrConfig = {
         dateFormat: "Y-m-d",
         altInput: true,
         altFormat: "F j, Y",
         animate: true,
-        disableMobile: "true"
+        disableMobile: "true",
+        minDate: minStoredDate
     };
 
     const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
     const lastWeek = dayjs().subtract(8, 'day').format('YYYY-MM-DD');
 
-    flatpickr("#startDate", {
+    const startPicker = flatpickr("#startDate", {
         ...flatpickrConfig,
-        defaultDate: lastWeek
+        defaultDate: lastWeek > minStoredDate ? lastWeek : minStoredDate,
+        onChange: function(selectedDates, dateStr) {
+            endPicker.set('minDate', dateStr);
+        }
     });
 
-    flatpickr("#endDate", {
+    const endPicker = flatpickr("#endDate", {
         ...flatpickrConfig,
         defaultDate: yesterday,
-        maxDate: yesterday
+        maxDate: yesterday,
+        onChange: function(selectedDates, dateStr) {
+            startPicker.set('maxDate', dateStr);
+        }
     });
 
-    const headers = getAdminHeaders();
-    if (headers.Authorization) loadReport();
+    // Initial sync of limits
+    const initialStart = document.getElementById('startDate').value;
+    if (initialStart) endPicker.set('minDate', initialStart);
+    
+    loadReport();
 }
 
 function getAdminHeaders() {

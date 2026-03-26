@@ -93,10 +93,11 @@ class ChanneledCrudController extends BaseController
         $hideFields = array_filter(array_map('trim', explode(',', $params['hideFields'] ?? '')));
 
         return match ($method) {
-            'read'  => $this->read(entity: $entity, channel: $channelConstant, id: $id, rawData: $rawData, hideFields: $hideFields),
-            'count' => $this->count(entity: $entity, channel: $channelConstant, body: $body, params: $params),
+            'read'      => $this->read(entity: $entity, channel: $channelConstant, id: $id, rawData: $rawData, hideFields: $hideFields),
+            'count'     => $this->count(entity: $entity, channel: $channelConstant, body: $body, params: $params),
             'list'      => $this->list(entity: $entity, channel: $channelConstant, body: $body, params: $params, rawData: $rawData, hideFields: $hideFields),
             'aggregate' => $this->aggregate(entity: $entity, channel: $channelConstant, body: $body, params: $params),
+            'range'     => $this->range(entity: $entity, channel: $channelConstant, body: $body, params: $params),
             default     => $this->createResponse(
                 data: null,
                 status: 'error',
@@ -104,6 +105,54 @@ class ChanneledCrudController extends BaseController
                 httpStatus: Response::HTTP_NOT_FOUND
             ),
         };
+    }
+
+    /**
+     * @param string $entity
+     * @param Channel $channel
+     * @param string|null $body
+     * @param array|null $params
+     * @return Response
+     */
+    protected function range(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
+    {
+        try {
+            $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
+
+            if (!method_exists($repository, 'getMinDate') || !method_exists($repository, 'getMaxDate')) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: "Entity '$entity' does not support range queries",
+                    httpStatus: Response::HTTP_NOT_IMPLEMENTED
+                );
+            }
+
+            $params = $this->prepareChanneledReadMultipleParams(
+                params: $params,
+                repositoryClass: $repository::class,
+                body: $body,
+                channel: $channel
+            );
+
+            $minDate = $repository->getMinDate(filters: $params['filters']);
+            $maxDate = $repository->getMaxDate(filters: $params['filters']);
+
+            return $this->createResponse(
+                data: [
+                    'minDate' => $minDate,
+                    'maxDate' => $maxDate
+                ],
+                status: 'success'
+            );
+        } catch (Exception $e) {
+            return $this->createResponse(
+                data: null,
+                status: 'error',
+                error: $e->getMessage(),
+                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
     /**
