@@ -1,0 +1,205 @@
+channels:
+  facebook_marketing:
+    metrics_strategy: custom
+    metrics_config:
+      spend:
+        enabled: true
+        sparkline: false
+        sparkline_direction: standard
+        sparkline_color: null
+        format: currency
+        precision: 2
+        conditional:
+          enabled: false
+          config: {  }
+      clicks:
+        enabled: true
+        sparkline: false
+        sparkline_direction: standard
+        sparkline_color: null
+        format: number
+        precision: 0
+        conditional:
+          enabled: false
+          config: {  }
+      impressions:
+        enabled: true
+        sparkline: false
+        sparkline_direction: standard
+        sparkline_color: null
+        format: number
+        precision: 0
+        conditional:
+          enabled: false
+          config: {  }
+      reach:
+        enabled: true
+        sparkline: false
+        sparkline_direction: standard
+        sparkline_color: null
+        format: number
+        precision: 0
+        conditional:
+          enabled: false
+          config: {  }
+      frequency:
+        enabled: true
+        sparkline: false
+        sparkline_direction: standard
+        sparkline_color: null
+        format: number
+        precision: 2
+        conditional:
+          enabled: false
+          config: {  }
+      ctr:
+        enabled: true
+        sparkline: false
+        sparkline_direction: standard
+        sparkline_color: null
+        format: percent
+        precision: 2
+        conditional:
+          enabled: true
+          config:
+            -
+              min: 5
+              max: 0
+              class: badge-excellent
+            -
+              min: 3.000001
+              max: 4.999999
+              class: badge-good
+            -
+              min: 3
+              max: 3
+              class: badge-average
+            -
+              min: 2
+              max: 2.999999
+              class: badge-average
+            -
+              min: 0
+              max: 1.999999
+              class: badge-bad
+      cpc:
+        enabled: true
+        sparkline: false
+        sparkline_direction: inverted
+        sparkline_color: null
+        format: currency
+        precision: 2
+        conditional:
+          enabled: false
+          config: {  }
+      cpm:
+        enabled: true
+        sparkline: false
+        sparkline_direction: inverted
+        sparkline_color: null
+        format: currency
+        precision: 2
+        conditional:
+          enabled: false
+          config: {  }
+      results:
+        enabled: true
+        sparkline: false
+        sparkline_direction: standard
+        sparkline_color: null
+        format: number
+        precision: 0
+        conditional:
+          enabled: false
+          config: {  }
+      cost_per_result:
+        enabled: true
+        sparkline: true
+        sparkline_direction: inverted
+        sparkline_color: null
+        format: currency
+        precision: 2
+        conditional:
+          enabled: true
+          config:
+            -
+              min: 0
+              max: 5.999999
+              class: badge-excellent
+            -
+              min: 6
+              max: 6.999999
+              class: badge-good
+            -
+              min: 7
+              max: 7.999999
+              class: badge-average
+            -
+              min: 8
+              max: 9.999999
+              class: badge-average
+            -
+              min: 10
+              max: 14.999999
+              class: badge-bad
+            -
+              min: 15
+              max: 0
+              class: badge-bad
+      result_rate:
+        enabled: true
+        sparkline: false
+        sparkline_direction: standard
+        sparkline_color: null
+        format: percent
+        precision: 2
+        conditional:
+          enabled: false
+          config: {  }
+      purchase_roas:
+        enabled: false
+        sparkline: false
+        sparkline_direction: standard
+        sparkline_color: null
+        format: number
+        precision: 2
+        conditional:
+          enabled: false
+          config: {  }
+    CAMPAIGN:
+      cache_include: ''
+    ADSET:
+      cache_include: ''
+    AD:
+      cache_include: ''
+    CREATIVE:
+      cache_include: ''
+    AD_ACCOUNT:
+      ad_account_metrics: true
+      campaigns: true
+      campaign_metrics: true
+      adsets: true
+      adset_metrics: true
+      ads: true
+      ad_metrics: true
+      creatives: false
+      creative_metrics: false
+    ad_accounts:
+      -
+        id: act_338111992380162
+        name: ''
+        enabled: true
+        exclude_from_caching: false
+      -
+        id: act_1513300532639559
+        name: ''
+        enabled: true
+        exclude_from_caching: false
+      -
+        id: act_5446997812016439
+        name: ''
+        enabled: true
+        exclude_from_caching: false
+    cache_history_range: '1 year'
+    enabled: true
+    cache_aggregations: true

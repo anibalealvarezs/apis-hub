@@ -742,6 +742,8 @@ class MetricRequests
                                         cacheInclude: self::getFacebookFilter($config, 'ADSET', 'cache_include'),
                                         cacheExclude: self::getFacebookFilter($config, 'ADSET', 'cache_exclude'),
                                         config: $config,
+                                        campaignCacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
+                                        campaignCacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
                                     );
                                     $totalMetrics += $res['metrics'] ?? 0;
                                     $totalRows += $res['rows'] ?? 0;
@@ -766,6 +768,8 @@ class MetricRequests
                                             cacheInclude: self::getFacebookFilter($config, 'AD', 'cache_include'),
                                             cacheExclude: self::getFacebookFilter($config, 'AD', 'cache_exclude'),
                                             config: $config,
+                                            campaignCacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
+                                            campaignCacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
                                         );
                                         $totalMetrics += $res['metrics'] ?? 0;
                                         $totalRows += $res['rows'] ?? 0;
@@ -785,6 +789,8 @@ class MetricRequests
                                     cacheInclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_include'),
                                     cacheExclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_exclude'),
                                     config: $config,
+                                    campaignCacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
+                                    campaignCacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
                                 );
                                 $totalMetrics += $res['metrics'] ?? 0;
                                 $totalRows += $res['rows'] ?? 0;
@@ -4212,6 +4218,8 @@ class MetricRequests
         $cacheInclude = null,
         $cacheExclude = null,
         array $config = [],
+        $campaignCacheInclude = null,
+        $campaignCacheExclude = null,
     ): array {
         $adsetPlatformIds = array_keys($channeledAdGroupMap['mapCampaign']);
         if (empty($adsetPlatformIds)) {
@@ -4317,6 +4325,13 @@ class MetricRequests
                     continue;
                 }
 
+                // Parent Filter check
+                $campaignName = $campaignEntity->getName();
+                if (!Helpers::matchesFilter((string)$campaignName, $campaignCacheInclude, $campaignCacheExclude) && !Helpers::matchesFilter((string)$campaignId, $campaignCacheInclude, $campaignCacheExclude)) {
+                    continue;
+                }
+
+                // Own Filter check
                 $adsetName = $channeledAdGroupEntity->getName();
                 if (!Helpers::matchesFilter((string)$adsetName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter((string)$adsetPlatformId, $cacheInclude, $cacheExclude)) {
                     continue;
@@ -4395,6 +4410,8 @@ class MetricRequests
         $cacheInclude = null,
         $cacheExclude = null,
         array $config = [],
+        $campaignCacheInclude = null,
+        $campaignCacheExclude = null,
     ): array {
         $adPlatformIds = array_keys($channeledAdMap['mapAdGroup']);
         if (empty($adPlatformIds)) {
@@ -4516,8 +4533,12 @@ class MetricRequests
                 }
                 
                 $adgroupId = $channeledAdMap['mapAdGroup'][$adPlatformId];
+                
+                if (!isset($channeledAdGroupMap['mapCampaign'][$adgroupId])) {
+                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: AdGroup mapping to Campaign not found in memory for AdGroup $adgroupId");
+                    continue;
+                }
                 $campaignId = $channeledAdGroupMap['mapCampaign'][$adgroupId];
-
                 $campaignEntity = $campaignEntityMap[$campaignId] ?? null;
                 $channeledCampaignEntity = $channeledCampaignEntityMap[$campaignId] ?? null;
                 $channeledAdGroupEntity = $channeledAdGroupEntityMap[$adgroupId] ?? null;
@@ -4540,9 +4561,17 @@ class MetricRequests
                     continue;
                 }
 
+                // Parent Filter check (Campaign level)
+                $campaignName = $campaignEntity->getName();
+                if (!Helpers::matchesFilter((string)$campaignName, $campaignCacheInclude, $campaignCacheExclude) && !Helpers::matchesFilter((string)$campaignId, $campaignCacheInclude, $campaignCacheExclude)) {
+                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: Parent Campaign $campaignId ($campaignName) filtered out");
+                    continue;
+                }
+
+                // Own Filter check
                 $adName = $channeledAdEntity->getName();
                 if (!Helpers::matchesFilter((string)$adName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter((string)$adPlatformId, $cacheInclude, $cacheExclude)) {
-                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId ($adName) due to filters");
+                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId ($adName) due to ads filters");
                     continue;
                 }
 
@@ -4641,6 +4670,8 @@ class MetricRequests
         $cacheInclude = null,
         $cacheExclude = null,
         array $config = [],
+        $campaignCacheInclude = null,
+        $campaignCacheExclude = null,
     ): array {
         $logger->info("Starting processCreativesBulk for ad account: " . $channeledAccountEntity->getPlatformId());
         try {
@@ -4700,12 +4731,21 @@ class MetricRequests
             }
 
             $groupedRows = [];
+            $filteredInsightsCount = 0;
             foreach ($insights['data'] as $row) {
+                // Hierarchical Filter check (Campaign)
+                if (isset($row['campaign_id'])) {
+                    if (!Helpers::matchesFilter((string)$row['campaign_name'] ?? '', $campaignCacheInclude, $campaignCacheExclude) && !Helpers::matchesFilter((string)$row['campaign_id'], $campaignCacheInclude, $campaignCacheExclude)) {
+                        continue;
+                    }
+                }
+                
                 if (isset($row['ad_creative_id'])) {
                     $groupedRows[$row['ad_creative_id']][] = $row;
+                    $filteredInsightsCount++;
                 }
             }
-            $logger->info("Fetched insights for " . count($groupedRows) . " unique creatives");
+            $logger->info("Fetched insights for " . count($groupedRows) . " unique creatives (after filtering: $filteredInsightsCount rows)");
 
             $totalMetricsCount = 0;
             foreach ($groupedRows as $creativePlatformId => $rows) {
