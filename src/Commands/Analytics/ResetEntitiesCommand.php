@@ -71,7 +71,16 @@ class ResetEntitiesCommand extends Command
                     )", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
 
                 // 2. Clear Jobs
-                $connection->executeStatement("DELETE FROM jobs WHERE channel IN (SELECT name FROM channels WHERE id IN (?))", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
+                $jobChannels = [];
+                foreach ($targetChannelIds as $id) {
+                    $enum = Channel::tryFrom($id);
+                    if ($enum) {
+                        $jobChannels[] = $enum->name;
+                    }
+                }
+                if (!empty($jobChannels)) {
+                    $connection->executeStatement("DELETE FROM jobs WHERE channel IN (?)", [$jobChannels], [\Doctrine\DBAL\ArrayParameterType::STRING]);
+                }
 
                 // 3. Conditional Asset Cleanup
                 if (in_array(Channel::facebook_marketing->value, $targetChannelIds) || in_array(Channel::facebook_organic->value, $targetChannelIds)) {
