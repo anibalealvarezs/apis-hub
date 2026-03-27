@@ -258,7 +258,7 @@ class MonitoringController extends BaseController
                         if ($tableName === 'channeled_accounts') {
                             $sql = "SELECT channel, type, COUNT(*) as count FROM channeled_accounts GROUP BY channel, type";
                         } elseif ($tableName === 'channeled_metrics') {
-                            $sql = "SELECT cm.channel, COALESCE(ca1.type, ca2.type, ca3.type, ca4.type) as type, COUNT(*) as count 
+                            $sql = "SELECT cm.channel, COALESCE(ca1.type, ca2.type, ca3.type, ca4.type, ca5.type, ca6.type, ca7.type) as type, COUNT(*) as count 
                                   FROM channeled_metrics cm 
                                   LEFT JOIN channeled_accounts ca1 ON cm.platform_id = ca1.platform_id AND cm.channel = ca1.channel
                                   LEFT JOIN channeled_ads cad ON cm.platform_id = cad.platform_id AND cm.channel = cad.channel
@@ -267,6 +267,11 @@ class MonitoringController extends BaseController
                                   LEFT JOIN channeled_accounts ca3 ON cg.channeled_account_id = ca3.id
                                   LEFT JOIN channeled_campaigns cc ON cm.platform_id = cc.platform_id AND cm.channel = cc.channel
                                   LEFT JOIN channeled_accounts ca4 ON cc.channeled_account_id = ca4.id
+                                  LEFT JOIN posts p ON cm.platform_id = p.platform_id
+                                  LEFT JOIN channeled_accounts ca5 ON p.channeled_account_id = ca5.id
+                                  LEFT JOIN pages pg ON (cm.platform_id = pg.platform_id OR p.page_id = pg.id)
+                                  LEFT JOIN channeled_accounts ca6 ON pg.platform_id = ca6.platform_id AND cm.channel = ca6.channel
+                                  LEFT JOIN channeled_accounts ca7 ON pg.platform_id = ca7.platform_id
                                   GROUP BY cm.channel, type";
                         } elseif ($tableName === 'posts') {
                             $sql = "SELECT sub.channel, sub.type, COUNT(*) as count FROM (
