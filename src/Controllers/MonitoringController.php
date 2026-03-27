@@ -311,6 +311,9 @@ class MonitoringController extends BaseController
                             $resItems = [];
                             try {
                                 $results = $conn->fetchAllAssociative($sql);
+                                if ($tableName === 'channeled_metrics' && isset($_GET['debug_metrics'])) {
+                                    Helpers::dumpDebugJson($results);
+                                }
                                 foreach ($results as $res) {
                                     $channelId = (int)($res['channel'] ?? 0);
                                     $channelLabel = $channelId ? (\Enums\Channel::tryFrom($channelId)?->getCommonName() ?? "Ch $channelId") : "Unidentified Channel";
@@ -331,6 +334,7 @@ class MonitoringController extends BaseController
                                     ];
                                 }
                             } catch (\Exception $e) {
+                                file_put_contents(realpath(__DIR__ . '/../../') . '/logs/monitoring_error.log', "Error executing SQL ($tableName): " . $e->getMessage() . "\nSQL: $sql\n", FILE_APPEND);
                                 try {
                                     $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
                                     foreach ($results as $res) {
