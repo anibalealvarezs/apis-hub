@@ -141,14 +141,28 @@ function updateDbTotals(totals) {
             `;
         } else {
             channels.forEach(chan => {
-                const chanColor = chan.name.toLowerCase() === 'facebook' ? '#1877F2' : 'var(--primary)';
+                const chanName = chan.channel || chan.name;
+                const chanColor = (chanName.toLowerCase().includes('facebook') || chanName.toLowerCase().includes('meta')) ? '#1877F2' : 'var(--primary)';
+                
+                let labelHtml = `<span style="font-size:0.75rem; color: #fff; font-weight:700;">${chanName}</span>`;
+                if (chan.type) {
+                    labelHtml += ` <span style="font-size:0.6rem; color:var(--text-dim); opacity:0.6;">• ${chan.type}</span>`;
+                }
+                if (chan.account_name) {
+                    labelHtml += `<div style="font-size:0.65rem; color:var(--text-dim); margin-left:14px; margin-top:2px;">${chan.account_name}</div>`;
+                }
+
                 breakdownHtml += `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <div style="width:6px; height:6px; border-radius:50%; background:${chanColor};"></div>
-                            <span style="font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; font-weight:700;">${chan.name}</span>
+                    <div style="margin-bottom:15px; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="width:6px; height:6px; border-radius:50%; background:${chanColor}; flex-shrink:0;"></div>
+                                <div style="display:flex; flex-direction:column;">
+                                    ${labelHtml}
+                                </div>
+                            </div>
+                            <span style="font-size:1.1rem; font-weight:800; color:#fff; font-family:var(--font-mono);">${chan.count.toLocaleString()}</span>
                         </div>
-                        <span style="font-size:1.3rem; font-weight:800; color:#fff; font-family:var(--font-mono);">${chan.count.toLocaleString()}</span>
                     </div>
                 `;
             });

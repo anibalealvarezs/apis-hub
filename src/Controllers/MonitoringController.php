@@ -263,28 +263,82 @@ class MonitoringController extends BaseController
             }
 
             // 2. Channeled Breakdown (Raw SQL for speed)
-            $channeledData = [];
+            $channeledDataItems = [];
             if ($config['channeled']) {
                 try {
                     $tableName = self::getTableNameForEntity($config['channeled']);
                     if ($tableName) {
-                        $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
-                        
-                        foreach ($results as $res) {
-                            $channelId = (int)$res['channel'];
-                            $channelCount = (int)$res['count'];
-                            $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? \Enums\Channel::tryFromName($res['channel'])?->getCommonName() ?? "Ch $channelId";
+                        $sql = "";
+                        if ($tableName === 'channeled_accounts') {
+                            $sql = "SELECT channel, type, name, COUNT(*) as count FROM channeled_accounts GROUP BY channel, type, name";
+                        } elseif ($tableName === 'channeled_metrics') {
+                            // Join with accounts to get type and name.
+                            $sql = "SELECT cm.channel, ca.type, ca.name, COUNT(*) as count 
+                                  FROM channeled_metrics cm 
+                                  LEFT JOIN channeled_accounts ca ON cm.platform_id = ca.platform_id AND cm.channel = ca.channel 
+                                  GROUP BY cm.channel, ca.type, ca.name";
+                        } elseif (in_array($tableName, ['channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
+                            // These have a direct channeled_account_id
+                            $sql = "SELECT e.channel, ca.type, ca.name, COUNT(*) as count 
+                                  FROM $tableName e 
+                                  LEFT JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
+                                  GROUP BY e.channel, ca.type, ca.name";
+                        } elseif ($tableName === 'jobs') {
+                            // Jobs can be grouped by channel and instance_name from payload
+                            // Note: This JSON extract is for MySQL. 
+                            $payloadField = Helpers::isPostgres() ? "CAST(payload AS text)" : "payload";
+                            $instanceExtract = Helpers::isPostgres() 
+                                ? "substring($payloadField from '\"instance_name\":\"([^\"]+)\"')"
+                                : "JSON_UNQUOTE(JSON_EXTRACT(payload, '$.instance_name'))";
                             
-                            if (!isset($channeledData[$channelName])) {
-                                $channeledData[$channelName] = ['name' => $channelName, 'count' => 0];
+                            $sql = "SELECT channel, 'PIPELINE' as type, $instanceExtract as name, COUNT(*) as count 
+                                  FROM jobs 
+                                  GROUP BY channel, name";
+                        } else {
+                            $sql = "SELECT channel, NULL as type, NULL as name, COUNT(*) as count FROM $tableName GROUP BY channel";
+                        }
+
+                        if ($sql) {
+                            try {
+                                $results = $conn->fetchAllAssociative($sql);
+                                foreach ($results as $res) {
+                                    $channelId = (int)$res['channel'];
+                                    $channelCount = (int)$res['count'];
+                                    $type = $res['type'] ?? '';
+                                    $name = $res['name'] ?? '';
+                                    
+                                    $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? \Enums\Channel::tryFromName($res['channel'])?->getCommonName() ?? "Ch $channelId";
+                                    
+                                    $labelParts = [$channelName];
+                                    if ($type) $labelParts[] = $type;
+                                    if ($name) $labelParts[] = $name;
+                                    
+                                    $fullLabel = implode(' • ', $labelParts);
+                                    
+                                    $channeledDataItems[] = [
+                                        'name' => $fullLabel,
+                                        'count' => $channelCount,
+                                        'channel' => $channelName,
+                                        'type' => $type,
+                                        'account_name' => $name
+                                    ];
+                                }
+                            } catch (\Exception $e) {
+                                // Fallback to basic channel count if complex SQL fails
+                                $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
+                                foreach ($results as $res) {
+                                   $channeledDataItems[] = [
+                                       'name' => \Enums\Channel::tryFrom((int)$res['channel'])?->getCommonName() ?? "Channel " . $res['channel'],
+                                       'count' => (int)$res['count']
+                                   ];
+                                }
                             }
-                            $channeledData[$channelName]['count'] += $channelCount;
                         }
                         
-                        $entry['channels'] = array_values($channeledData);
+                        $entry['channels'] = $channeledDataItems;
                         
                         if (!$config['class']) {
-                            $entry['count'] = array_sum(array_column($channeledData, 'count'));
+                            $entry['count'] = array_sum(array_column($channeledDataItems, 'count'));
                         }
                     }
                 } catch (\Exception $e) {}
@@ -296,7 +350,7 @@ class MonitoringController extends BaseController
             'containers' => $containers,
             'groupedJobs' => $groupedJobs,
             'dbTotals' => $dbTotals,
-            'projectName' => $config['project'] ?? 'APIs Hub',
+            'projectName' => $this->config['project'] ?? 'APIs Hub',
             'timestamp' => date('Y-m-d H:i:s')
         ]);
     }
@@ -353,7 +407,7 @@ class MonitoringController extends BaseController
                     return new JsonResponse(['success' => true, 'message' => "New job scheduled. Original #$id history preserved."]);
                 
                 case 'process':
-                    if ($job->getStatus() !== \Enums\JobStatus::scheduled->value && $job->getStatus() !== \Enums\JobStatus::delayed->value) {
+                    if ($job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== \Enums\JobStatus::delayed->value) {
                          return new JsonResponse(['error' => 'Only scheduled or delayed jobs can be processed manually'], 400);
                     }
                     
