@@ -76,7 +76,7 @@ class FacebookGraphApiOverride extends FacebookGraphApi
 
             $response = $this->performRequest(
                 method: 'GET',
-                endpoint: 'v25.0/'.$pageId.'/posts',
+                endpoint: $pageId.'/posts',
                 query: $query,
                 sleep: 200000, // Reduced from 1,000,000 to 200,000 (0.2s)
                 tokenSample: TokenSample::PAGE,
@@ -136,7 +136,7 @@ class FacebookGraphApiOverride extends FacebookGraphApi
 
                 $response = $this->performRequest(
                     method: 'GET',
-                    endpoint: "v25.0/".$igUserId."/media",
+                    endpoint: $igUserId."/media",
                     query: $query,
                     sleep: 200000, // Reduced from 1,000,000 to 200,000 (0.2s)
                 );
