@@ -282,17 +282,17 @@ class MonitoringController extends BaseController
                                   LEFT JOIN channeled_accounts ca3 ON cg.channeled_account_id = ca3.id
                                   GROUP BY cm.channel, type";
                         } elseif ($tableName === 'posts') {
-                            // Posts have a direct channeled_account_id
+                            // Posts have channeled_account_id to match directly with the right account
                             $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
                                   FROM posts p 
                                   JOIN channeled_accounts ca ON p.channeled_account_id = ca.id 
                                   GROUP BY ca.channel, ca.type";
                         } elseif ($tableName === 'pages') {
-                            // Pages link to global account, which link to channeled accounts
+                            // Pages should match on platform_id + channel (usually organic channel)
+                            // A page in Facebook Organic has its platform_id matching the channeled_account.platform_id
                             $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
                                   FROM pages p 
-                                  JOIN accounts a ON p.account_id = a.id
-                                  JOIN channeled_accounts ca ON ca.account_id = a.id
+                                  JOIN channeled_accounts ca ON p.platform_id = ca.platform_id 
                                   GROUP BY ca.channel, ca.type";
                         } elseif (in_array($tableName, ['channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
                             $sql = "SELECT e.channel, ca.type, COUNT(*) as count 
