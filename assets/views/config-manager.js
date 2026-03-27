@@ -996,6 +996,70 @@ async function forceRefresh(type) {
     }
 }
 
+/**
+ * Force manual execution of a global sync for a channel.
+ * @param {string} channel 
+ * @param {string} entity 
+ */
+async function triggerFullSync(channel, entity) {
+    if (!confirm(`Are you sure you want to FORCE GLOBAL SYNC for ${channel}?\nThis will create a new background job immediately.`)) {
+        return;
+    }
+
+    const loader = document.getElementById('loading');
+    if (loader) {
+        loader.style.display = 'flex';
+        const textEl = loader.querySelector('div:nth-child(2)');
+        if (textEl) textEl.textContent = 'Triggering Global Pipeline...';
+    }
+
+    try {
+        const response = await fetch(`/cache/${channel}/${entity}`, {
+            method: 'POST',
+            headers: getAdminHeaders(),
+            body: JSON.stringify({})
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast('Success: Global sync scheduled. Check Monitoring Dashboard.', false);
+        } else {
+            throw new Error(data.error || 'Server error occurred');
+        }
+    } catch (e) {
+        console.error("Force Sync Error:", e);
+        showToast(`Failed to trigger sync: ${e.message}`, true);
+    } finally {
+        if (loader) loader.style.display = 'none';
+        
+        // Reset loader text if it exists
+        const loaderText = document.querySelector('#loading div:nth-child(2)');
+        if (loaderText) loaderText.textContent = 'Synchronizing Config...';
+    }
+}
+
+/**
+ * Display a premium notification toast.
+ * @param {string} msg 
+ * @param {boolean} isError 
+ */
+function showToast(msg, isError) {
+    const toast = document.createElement('div');
+    toast.className = 'toast animate-slide-in';
+    if (isError) toast.classList.add('error');
+    toast.innerHTML = `
+        <i data-lucide="${isError ? 'alert-circle' : 'check-circle'}" size="16"></i>
+        <span>${msg}</span>
+    `;
+    document.body.appendChild(toast);
+    lucide.createIcons();
+    setTimeout(() => {
+        toast.classList.add('animate-slide-out');
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
+}
+
 // Global Hooks (Expose to window)
 window.setFbLevel = setFbLevel;
 window.setMetricLevel = setMetricLevel;
@@ -1011,6 +1075,8 @@ window.toggleOrganicHierarchy = toggleOrganicHierarchy;
 window.toggleSubOpt = toggleSubOpt;
 window.setFbOrganicLevel = setFbOrganicLevel;
 window.setIgLevel = setIgLevel;
+window.triggerFullSync = triggerFullSync;
+window.showToast = showToast;
 
 console.log("Config Manager script loaded.");
 

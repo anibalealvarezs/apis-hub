@@ -230,20 +230,29 @@ function updateContainers(containers) {
                     </div>
                 </div>
 
-                <div style="border-top: 1px solid rgba(255,255,255,0.03); padding-top:12px; margin-top:10px;">
-                    <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; font-weight:800; letter-spacing:0.05em; margin-bottom:8px;">INSTANCE JOB STATS</div>
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        <div style="display:flex; align-items:center; gap:6px; color:#4ade80; font-weight:700; font-size:0.9rem;">
-                            <i data-lucide="check" size="15"></i>
-                            <span>${completedCount}</span>
+                <div style="border-top: 1px solid rgba(255,255,255,0.03); padding-top:12px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; font-weight:800; letter-spacing:0.05em; margin-bottom:8px;">INSTANCE JOB STATS</div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <div style="display:flex; align-items:center; gap:6px; color:#4ade80; font-weight:700; font-size:0.9rem;">
+                                <i data-lucide="check" size="15"></i>
+                                <span>${completedCount}</span>
+                            </div>
+                            ${failedCount > 0 ? `
+                                 <div style="display:flex; align-items:center; gap:6px; color:var(--danger); font-weight:700; font-size:0.9rem;">
+                                    <i data-lucide="x-circle" size="15"></i>
+                                    <span>${failedCount}</span>
+                                 </div>
+                            ` : ''}
                         </div>
-                        ${failedCount > 0 ? `
-                             <div style="display:flex; align-items:center; gap:6px; color:var(--danger); font-weight:700; font-size:0.9rem;">
-                                <i data-lucide="x-circle" size="15"></i>
-                                <span>${failedCount}</span>
-                             </div>
-                        ` : ''}
                     </div>
+                    <button class="btn btn-mini" onclick="triggerSyncInstance('${container.source.toLowerCase()}', '${container.entity.toLowerCase()}', '${container.id}')" 
+                            style="background:rgba(88, 166, 255, 0.1); color:var(--primary); padding:8px; border-radius:8px; border:1px solid rgba(88, 166, 255, 0.2); transition: all 0.2s;"
+                            onmouseover="this.style.background='var(--primary)'; this.style.color='#fff';"
+                            onmouseout="this.style.background='rgba(88, 166, 255, 0.1)'; this.style.color='var(--primary)';"
+                            title="Force Execution (Full Sync for this instance)">
+                        <i data-lucide="play-circle" size="18"></i>
+                    </button>
                 </div>
             `;
             cardGrid.appendChild(card);
@@ -524,9 +533,73 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+/**
+ * Force manual execution of a specific sync pipeline instance.
+ * @param {string} channel 
+ * @param {string} entity 
+ * @param {string} instanceId 
+ */
+async function triggerSyncInstance(channel, entity, instanceId) {
+    if (!confirm(`Are you sure you want to FORCE EXECUTION for ${instanceId}?\nThis will bypass the scheduler and run a full sync now.`)) {
+        return;
+    }
+
+    showToast(`Triggering ${instanceId} sync...`, false);
+
+    try {
+        const response = await fetch(`/cache/${channel}/${entity}`, {
+            method: 'POST',
+            headers: getAdminHeaders(),
+            body: JSON.stringify({
+                instance_name: instanceId
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast('Success: Pipeline triggered in background.', false);
+            // Auto-refresh data to see the new job appearing
+            if (typeof fetchMonitoringData === 'function') {
+                setTimeout(fetchMonitoringData, 1500);
+            } else if (typeof fetchData === 'function') {
+                setTimeout(fetchData, 1500);
+            }
+        } else {
+            throw new Error(data.error || 'Server error occurred');
+        }
+    } catch (e) {
+        console.error("Force Sync Error:", e);
+        showToast(`Failed to trigger sync: ${e.message}`, true);
+    }
+}
+
+/**
+ * Display a premium notification toast.
+ * @param {string} msg 
+ * @param {boolean} isError 
+ */
+function showToast(msg, isError) {
+    const toast = document.createElement('div');
+    toast.className = 'toast animate-slide-in';
+    if (isError) toast.classList.add('error');
+    toast.innerHTML = `
+        <i data-lucide="${isError ? 'alert-circle' : 'check-circle'}" size="16"></i>
+        <span>${msg}</span>
+    `;
+    document.body.appendChild(toast);
+    lucide.createIcons();
+    setTimeout(() => {
+        toast.classList.add('animate-slide-out');
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
+}
+
 // Global Exports
 window.processJob = processJob;
 window.cancelJob = cancelJob;
+window.triggerSyncInstance = triggerSyncInstance;
+window.showToast = showToast;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', initMonitoring);

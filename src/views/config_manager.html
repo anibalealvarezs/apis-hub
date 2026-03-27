@@ -134,6 +134,16 @@
         .page-config-card.is-new { border-color: rgba(35, 134, 54, 0.4) !important; background: rgba(35, 134, 54, 0.05) !important; }
         .page-config-card.lost-access { border-color: rgba(248, 81, 73, 0.3) !important; background: rgba(248, 81, 73, 0.05) !important; }
         .page-config-card.synced { border-color: var(--primary) !important; }
+
+        /* Toast Notifications */
+        .toast { position: fixed; bottom: 30px; right: 30px; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(10px); color: #fff; padding: 12px 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 0.9rem; pointer-events: none; }
+        .toast.error { border-color: var(--danger); background: rgba(248, 81, 73, 0.1); color: var(--danger); }
+        .toast i { color: var(--primary); }
+        .toast.error i { color: var(--danger); }
+        .animate-slide-in { animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .animate-slide-out { animation: slideOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        @keyframes slideIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(110%); opacity: 0; } }
     </style>
 </head>
 <body class="full-screen">
@@ -244,6 +254,7 @@
                 <div class="section-title small" style="display:flex; justify-content:space-between; align-items:center;">
                     <span><i data-lucide="layers"></i> Search Console properties</span>
                     <button class="btn btn-mini" onclick="forceRefresh('gsc')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Google</button>
+                    <button class="btn btn-mini" onclick="triggerFullSync('gsc', 'query')" style="background:var(--secondary);"><i data-lucide="zap" size="14"></i> Force Data Sync</button>
                 </div>
                 <div id="gsc-list" class="asset-grid"></div>
             </div>
@@ -319,6 +330,7 @@
                 <div class="section-title small"><i data-lucide="layout"></i> Connected Pages</div>
                 <div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:15px;">
                     <button class="btn btn-mini" onclick="forceRefresh('facebook')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Meta</button>
+                    <button class="btn btn-mini" onclick="triggerFullSync('facebook', 'metrics')" style="background:var(--secondary);"><i data-lucide="zap" size="14"></i> Force Data Sync</button>
                 </div>
                 <div id="fb-pages-list" class="asset-grid"></div>
             </div>
@@ -438,7 +450,8 @@
                 <div class="card">
                     <div class="section-title small"><i data-lucide="target"></i> Ad Accounts</div>
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                        <button class="btn btn-mini" onclick="forceRefresh('facebook')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Meta</button>
+                        <button class="btn btn-mini" onclick="forceRefresh('facebook_marketing')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Meta</button>
+                        <button class="btn btn-mini" onclick="triggerFullSync('facebook_marketing', 'metrics')" style="background:var(--secondary);"><i data-lucide="zap" size="14"></i> Force Data Sync</button>
                         <button class="btn btn-mini" onclick="toggleAllAds()" title="Select/Deselect All"><i data-lucide="check-square" size="14"></i> Select All</button>
                     </div>
                     <div id="fb-ad-accounts-list" class="asset-grid three-cols"></div>
