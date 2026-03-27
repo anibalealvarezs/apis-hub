@@ -39,7 +39,7 @@ class FacebookGraphApiOverride extends FacebookGraphApi
         array $additionalParams = [],
     ): array {
         $query = [
-            'fields' => 'id,message,created_time,full_picture,permalink_url,shares,is_hidden,is_published,status_type,attachments',
+            'fields' => 'id,message,created_time,full_picture,permalink_url,shares,is_hidden,is_published,status_type,attachments,from',
             'limit' => min($limit, 100),
         ];
 
@@ -51,18 +51,6 @@ class FacebookGraphApiOverride extends FacebookGraphApi
         $after = null;
 
         $this->setPageId($pageId);
-
-        // Diagnostic Probe: Check if we can even see the page basic metadata
-        try {
-            $this->performRequest(
-                method: 'GET',
-                endpoint: 'v25.0/'.$pageId,
-                query: ['fields' => 'id,name'],
-                tokenSample: TokenSample::PAGE,
-            );
-        } catch (Exception $e) {
-            error_log("DIAGNOSTIC PROBE FAILED for page $pageId: " . $e->getMessage());
-        }
 
         do {
             if ($after) {
