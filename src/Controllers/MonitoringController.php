@@ -283,17 +283,18 @@ class MonitoringController extends BaseController
                                   LEFT JOIN channeled_accounts ca3 ON cg.channeled_account_id = ca3.id
                                   GROUP BY cm.channel, type";
                         } elseif ($tableName === 'posts') {
-                            // Posts can be linked via channeled_account_id OR page_id
-                            $sql = "SELECT COALESCE(ca1.channel, ca2.channel, ca3.channel) as channel, 
-                                           COALESCE(ca1.type, ca2.type, ca3.type) as type, 
-                                           COUNT(*) as count 
-                                  FROM posts p 
-                                  LEFT JOIN channeled_accounts ca1 ON p.channeled_account_id = ca1.id 
-                                  LEFT JOIN pages pg ON p.page_id = pg.id
-                                  LEFT JOIN channeled_accounts ca2 ON pg.platform_id = ca2.platform_id
-                                  LEFT JOIN accounts a ON p.account_id = a.id
-                                  LEFT JOIN channeled_accounts ca3 ON ca3.account_id = a.id
-                                  GROUP BY channel, type";
+                            // Subquery approach to find channel/type for every post via page_id or account_id
+                            $sql = "SELECT sub.channel, sub.type, COUNT(*) as count FROM (
+                                      SELECT COALESCE(ca1.channel, ca2.channel, ca3.channel) as channel, 
+                                             COALESCE(ca1.type, ca2.type, ca3.type) as type
+                                      FROM posts p
+                                      LEFT JOIN channeled_accounts ca1 ON p.channeled_account_id = ca1.id
+                                      LEFT JOIN pages pg ON p.page_id = pg.id
+                                      LEFT JOIN channeled_accounts ca2 ON pg.platform_id = ca2.platform_id
+                                      LEFT JOIN accounts a ON p.account_id = a.id
+                                      LEFT JOIN channeled_accounts ca3 ON ca3.account_id = a.id
+                                    ) sub
+                                    GROUP BY sub.channel, sub.type";
                         } elseif ($tableName === 'pages') {
                             // Pages link to global account, match on platform_id + channeled_accounts to find the type/channel
                             $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
