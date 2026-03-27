@@ -274,10 +274,16 @@ class MetricRequests
             }
 
             // Apply retention range limit to startDate
-            $retentionLimit = self::getRetentionRange($config, 'facebook_organic', '2 years');
+            $retentionLimit = self::getRetentionRange($config, 'facebook_organic', '2 years - 1 day');
+            $hardLimit = Carbon::now()->subYears(2)->addDay()->startOfDay();
+            if ($retentionLimit->lt($hardLimit)) {
+                $logger->info("Overriding retentionLimit from " . $retentionLimit->format('Y-m-d') . " to " . $hardLimit->format('Y-m-d') . " due to Facebook API hard limit (2 years).");
+                $retentionLimit = $hardLimit;
+            }
+
             $requestedStart = Carbon::parse($startDate);
             if ($requestedStart->lt($retentionLimit)) {
-                $logger->info("Truncating startDate from $startDate to " . $retentionLimit->format('Y-m-d') . " due to cache_history_range");
+                $logger->info("Truncating startDate from $startDate to " . $retentionLimit->format('Y-m-d') . " due to retention policy.");
                 $startDate = $retentionLimit->format('Y-m-d');
             }
 
@@ -1698,7 +1704,13 @@ class MetricRequests
     ): void {
 
         if (!$startDate) {
-            $startDate = self::getRetentionRange($config, $channel, '2 years - 1 day')->endOfDay(); // Default to configured years ago at the end of the day
+            $startDate = self::getRetentionRange($config, $channel, '2 years - 1 day');
+            // Hard limit protection for Instagram (2 years)
+            $hardLimit = Carbon::now()->subYears(2)->addDay()->startOfDay();
+            if ($startDate->lt($hardLimit)) {
+                $startDate = $hardLimit;
+            }
+            $startDate = $startDate->endOfDay();
         } else {
             $startDate = Carbon::parse($startDate)->startOfDay(); // Ensure start date is at the beginning of the day
         }
