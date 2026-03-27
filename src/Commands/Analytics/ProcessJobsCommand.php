@@ -116,14 +116,14 @@ class ProcessJobsCommand extends Command
                 }
 
                 // 2. Date Range Filters (Fallback/Secondary)
-                if ($envStartDate !== false && $envStartDate !== '') {
+                if (!$jobId && $envStartDate !== false && $envStartDate !== '') {
                     $jobStart = $params['startDate'] ?? $params['start_date'] ?? null;
                     if ($jobStart !== $envStartDate) {
                         $stats['skipped']++;
                         continue;
                     }
                 }
-                if ($envEndDate !== false && $envEndDate !== '') {
+                if (!$jobId && $envEndDate !== false && $envEndDate !== '') {
                     $jobEnd = $params['endDate'] ?? $params['end_date'] ?? null;
                     if ($jobEnd !== $envEndDate) {
                         $stats['skipped']++;
@@ -149,7 +149,7 @@ class ProcessJobsCommand extends Command
                         continue;
                     }
                 }
-                if ($envEntity = getenv('API_ENTITY')) {
+                if (!$jobId && $envEntity = getenv('API_ENTITY')) {
                     if ($job->getEntity() !== $envEntity) {
                         $stats['skipped']++;
                         continue;
@@ -157,7 +157,7 @@ class ProcessJobsCommand extends Command
                 }
 
                 // Cooldown check for delayed jobs
-                if ($job->getStatus() === JobStatus::delayed->value) {
+                if (!$jobId && $job->getStatus() === JobStatus::delayed->value) {
                     $channelEnum = Channel::tryFromName($job->getChannel());
                     $cooldown = $channelEnum ? $channelEnum->getCooldown() : 600;
                     $updatedAt = $job->getUpdatedAt();
@@ -172,7 +172,7 @@ class ProcessJobsCommand extends Command
 
                 // Dependency check
                 $requires = $params['requires'] ?? null;
-                if ($requires) {
+                if (!$jobId && $requires) {
                     $requiredInstances = array_map('trim', explode(',', $requires));
                     foreach ($requiredInstances as $requiredInstance) {
                         if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
