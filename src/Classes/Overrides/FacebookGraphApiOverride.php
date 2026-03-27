@@ -42,4 +42,54 @@ class FacebookGraphApiOverride extends FacebookGraphApi
             customMetrics: $customMetrics
         );
     }
+
+    /**
+     * @param string $pageId
+     * @param string|array|null $postFields
+     * @param bool $includeAttachments
+     * @param bool $includeComments
+     * @param bool $includeReactions
+     * @param bool $includeDynamicPosts
+     * @param bool $includeSharedPosts
+     * @param bool $includeSponsorTags
+     * @param bool $includeTo
+     * @param int $limit
+     * @param array $additionalParams
+     * @return array
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     */
+    public function getFacebookPosts(
+        string $pageId,
+        string|array|null $postFields = null,
+        bool $includeAttachments = false,
+        bool $includeComments = false,
+        bool $includeReactions = false,
+        bool $includeDynamicPosts = false,
+        bool $includeSharedPosts = false,
+        bool $includeSponsorTags = false,
+        bool $includeTo = false,
+        int $limit = 10,
+        array $additionalParams = [],
+    ): array {
+        // Strict White List for v25.0 Stabilization
+        $safeFields = 'id,message,created_time,status_type,story,story_tags,shares,full_picture,permalink_url,from,updated_time,is_published,is_hidden,is_expired,is_popular,is_spherical';
+        
+        if ($includeTo) {
+            $safeFields .= ',to';
+        }
+
+        return parent::getFacebookPosts(
+            pageId: $pageId,
+            postFields: $safeFields,
+            includeAttachments: $includeAttachments,
+            includeComments: $includeComments,
+            includeReactions: $includeReactions,
+            includeDynamicPosts: $includeDynamicPosts,
+            includeSharedPosts: $includeSharedPosts,
+            includeSponsorTags: $includeSponsorTags,
+            includeTo: $includeTo,
+            limit: $limit,
+            additionalParams: $additionalParams
+        );
+    }
 }
