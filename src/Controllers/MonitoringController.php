@@ -353,20 +353,17 @@ class MonitoringController extends BaseController
                     return new JsonResponse(['success' => true, 'message' => "New job scheduled. Original #$id history preserved."]);
                 
                 case 'process':
-                    if ($job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
+                    if ($job->getStatus() !== \Enums\JobStatus::scheduled->value && $job->getStatus() !== \Enums\JobStatus::delayed->value) {
                          return new JsonResponse(['error' => 'Only scheduled or delayed jobs can be processed manually'], 400);
                     }
-                    if (!$jobRepo->claimJob($id)) return new JsonResponse(['error' => 'Job already processing'], 409);
                     
-                    $channel = \Enums\Channel::tryFromName($job->getChannel());
-                    $payload = $job->getPayload() ?? [];
-                    
-                    // Execute in background to avoid blocking the single-threaded web server
+                    // Execute in background WITHOUT claiming here. 
+                    // ProcessJobsCommand will claim it when it actually starts.
                     $rootPath = realpath(__DIR__ . '/../../');
                     $cmd = "php {$rootPath}/bin/cli.php app:process-jobs --job-id={$id} >> {$rootPath}/logs/jobs.log 2>&1 &";
                     exec($cmd);
 
-                    return new JsonResponse(['success' => true, 'message' => "Job #$id triggered in background. Refresh in a few moments."]);
+                    return new JsonResponse(['success' => true, 'message' => "Job #$id triggered in background. Once it starts, status will change to 'Processing'."]);
 
                 case 'cancel':
                     $job->addStatus(JobStatus::cancelled->value);
