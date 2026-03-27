@@ -1397,7 +1397,7 @@ class MetricRequests
                     $fetched = true;
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
-                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'valid insights metric') || str_contains($msg, 'permissions') || str_contains($msg, 'Unsupported get request'));
+                    $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'valid insights metric') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
                     
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {
@@ -1547,7 +1547,7 @@ class MetricRequests
                     $fetched = true;
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
-                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'valid insights metric') || str_contains($msg, 'permissions'));
+                    $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'valid insights metric') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
                     
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {
@@ -1729,7 +1729,7 @@ class MetricRequests
                             $fetched = true;
                         } catch (Exception $e) {
                             $msg = $e->getMessage();
-                            $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'valid insights metric') || str_contains($msg, 'permissions'));
+                            $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'valid insights metric') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
                             
                             $retryCount++;
                             if ($retryCount >= $maxRetries || $isFatal) {
@@ -1884,7 +1884,7 @@ class MetricRequests
                     $fetched = true;
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
-                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'permissions') || str_contains($msg, 'Unsupported get request'));
+                    $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
                     
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {
@@ -2018,7 +2018,7 @@ class MetricRequests
                     $fetched = true;
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
-                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'permissions'));
+                    $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
                     
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {
@@ -2157,7 +2157,7 @@ class MetricRequests
                     $fetched = true;
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
-                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'permissions'));
+                    $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
                     
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {
@@ -2303,7 +2303,7 @@ class MetricRequests
                     $fetched = true;
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
-                    $isFatal = (str_contains($msg, '(#100)') || str_contains($msg, 'permissions'));
+                    $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
                     
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {

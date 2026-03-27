@@ -134,7 +134,7 @@ class PostRequests implements RequestInterface
                             $fetched = true;
                         } catch (\Exception $e) {
                             $msg = $e->getMessage();
-                            $isFatal = (str_contains($msg, 'Unsupported get request') || str_contains($msg, 'missing permissions') || str_contains($msg, 'Object with ID'));
+                            $isFatal = (stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'missing permissions') !== false || stripos($msg, 'Object with ID') !== false);
                             
                             $retryCount++;
                             if ($retryCount >= $maxRetries || $isFatal) {
@@ -195,7 +195,7 @@ class PostRequests implements RequestInterface
                                 $fetched = true;
                             } catch (\Exception $e) {
                                 $msg = $e->getMessage();
-                                $isFatal = (str_contains($msg, 'Unsupported get request') || str_contains($msg, 'missing permissions') || str_contains($msg, 'Object with ID'));
+                                $isFatal = (stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'missing permissions') !== false || stripos($msg, 'Object with ID') !== false);
                                 
                                 $retryCount++;
                                 if ($retryCount >= $maxRetries || $isFatal) {
