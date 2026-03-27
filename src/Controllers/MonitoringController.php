@@ -362,7 +362,8 @@ class MonitoringController extends BaseController
                     $payload = $job->getPayload() ?? [];
                     
                     // Execute in background to avoid blocking the single-threaded web server
-                    $cmd = "php bin/cli.php app:process-jobs --job-id={$id} > /dev/null 2>&1 &";
+                    $rootPath = realpath(__DIR__ . '/../../');
+                    $cmd = "php {$rootPath}/bin/cli.php app:process-jobs --job-id={$id} >> {$rootPath}/logs/jobs.log 2>&1 &";
                     exec($cmd);
 
                     return new JsonResponse(['success' => true, 'message' => "Job #$id triggered in background. Refresh in a few moments."]);
