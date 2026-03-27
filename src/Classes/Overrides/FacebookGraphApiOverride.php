@@ -39,24 +39,7 @@ class FacebookGraphApiOverride extends FacebookGraphApi
         array $additionalParams = [],
     ): array {
         $query = [
-            'fields' => $postFields ?
-                (
-                    is_array($postFields) ?
-                    implode(',', array_map(fn ($field) => (
-                        $field instanceof FacebookPostField ?
-                        $field->value :
-                        $field
-                    ), $postFields)) :
-                    $postFields
-                ) :
-                FacebookPostField::toCommaSeparatedList()
-                . ($includeAttachments ? ',attachments' : '')
-                . ($includeComments ? ',comments' : '')
-                . ($includeReactions ? ',reactions' : '')
-                . ($includeDynamicPosts ? ',dynamic_posts' : '')
-                . ($includeSharedPosts ? ',sharedposts' : '')
-                . ($includeSponsorTags ? ',sponsor_tags' : '')
-                . ($includeTo ? ',to' : ''),
+            'fields' => 'id,message,created_time',
             'limit' => min($limit, 100),
         ];
 
