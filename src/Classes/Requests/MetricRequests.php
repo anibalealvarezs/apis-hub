@@ -1389,6 +1389,8 @@ class MetricRequests
 
             while ($retryCount < $maxRetries && !$fetched) {
                 try {
+                    $logger->info("Using Page Access Token for FB insights page " . $page['id'] . ": " . ($api->getLongLivedPageAccesstoken() ? substr($api->getLongLivedPageAccesstoken(), 0, 10) . "..." : "NONE FOUND"));
+
                     $rows = $api->getFacebookPageInsights(
                         pageId: (string) $page['id'],
                         since: $startDate ?: Carbon::today()->subMonths(3)->format('Y-m-d'),

@@ -104,6 +104,7 @@ class PostRequests implements RequestInterface
 
                     // Set pageId in API instance to allow correct token resolution
                     $api->setPageId((string)$pageCfg['id']);
+                    $logger->info("Using Page Access Token for FB posts page " . $pageCfg['id'] . ": " . ($api->getLongLivedPageAccesstoken() ? substr($api->getLongLivedPageAccesstoken(), 0, 10) . "..." : "NONE FOUND"));
 
                     $maxRetries = 3;
                     $retryCount = 0;
