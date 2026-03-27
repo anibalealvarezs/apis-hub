@@ -39,7 +39,7 @@ class FacebookGraphApiOverride extends FacebookGraphApi
         array $additionalParams = [],
     ): array {
         $query = [
-            'fields' => 'id,message,created_time,full_picture,permalink_url,shares,is_hidden,is_published,status_type,attachments,from',
+            'fields' => 'id,message,created_time,full_picture,permalink_url,shares,is_hidden,is_published,status_type,attachments,from,message_tags,story,story_tags',
             'limit' => min($limit, 100),
         ];
 
