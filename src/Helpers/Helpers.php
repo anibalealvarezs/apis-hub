@@ -1155,4 +1155,30 @@ class Helpers
 
         return $chunks;
     }
+
+    /**
+     * @param string $url
+     * @param string|int|null $platformId
+     * @param string|null $type
+     * @return string
+     */
+    public static function getCanonicalPageId(string $url, string|int|null $platformId = null, string|null $type = null): string
+    {
+        if ($platformId) {
+            if ($type === 'facebook_page') return "fb:page:$platformId";
+            if ($type === 'instagram') return "ig:account:$platformId";
+        }
+
+        // Normalize URL for websites or fallback
+        $normalizedUrl = preg_replace('~^https?://(?:www\.)?~i', '', $url);
+        $normalizedUrl = rtrim($normalizedUrl, '/');
+        $normalizedUrl = strtolower($normalizedUrl);
+        
+        // If it's a FB page URL but no platformId was given, try to extract it from URL
+        if (str_contains($normalizedUrl, 'facebook.com/') && preg_match('~(\d+)/?$~', $normalizedUrl, $matches)) {
+            return "fb:page:" . $matches[1];
+        }
+
+        return "site:domain:$normalizedUrl";
+    }
 }

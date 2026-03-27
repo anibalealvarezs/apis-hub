@@ -152,17 +152,19 @@ class InitializeEntitiesCommand extends Command
                 $title = $site['title'] ?? $siteUrl;
                 $hostname = $site['hostname'] ?? parse_url($siteUrl, PHP_URL_HOST) ?? str_replace('sc-domain:', '', $siteUrl);
 
-                $pageEntity = $pageRepository->getByUrl($normalizedSiteUrl);
+                $canonicalId = Helpers::getCanonicalPageId($normalizedSiteUrl);
+                $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
                 if (!$pageEntity) {
                     $pageEntity = new Page();
                     $pageEntity->addUrl($normalizedSiteUrl)
+                        ->addCanonicalId($canonicalId)
                         ->addTitle($title)
                         ->addHostname($hostname)
                         ->addPlatformId(md5($normalizedSiteUrl))
                         ->addData(['source' => 'gsc_site']);
                     $this->entityManager->persist($pageEntity);
                     $pagesInitialized++;
-                    $this->logger->info("Initialized Page: URL=$normalizedSiteUrl, Title=$title");
+                    $this->logger->info("Initialized Page: URL=$normalizedSiteUrl, CanonicalID=$canonicalId, Title=$title");
                 } else {
                     // Update if title or hostname changed
                     if ($pageEntity->getTitle() !== $title || $pageEntity->getHostname() !== $hostname) {
@@ -255,10 +257,12 @@ class InitializeEntitiesCommand extends Command
                 $pageUrl = $page['url'] ?? "https://www.facebook.com/" . $platformId;
                 $hostname = $page['hostname'] ?? 'www.facebook.com';
 
-                $pageEntity = $pageRepository->getByPlatformId($platformId);
+                $canonicalId = Helpers::getCanonicalPageId($pageUrl, $platformId, 'facebook_page');
+                $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
                 if (!$pageEntity) {
                     $pageEntity = new Page();
                     $pageEntity->addUrl($pageUrl)
+                        ->addCanonicalId($canonicalId)
                         ->addTitle($title)
                         ->addHostname($hostname)
                         ->addPlatformId($platformId)
@@ -266,7 +270,7 @@ class InitializeEntitiesCommand extends Command
                         ->addData(['source' => 'fb_page']);
                     $this->entityManager->persist($pageEntity);
                     $pagesInitialized++;
-                    $this->logger->info("Initialized Page: ID=$platformId, Title=$title");
+                    $this->logger->info("Initialized Page: ID=$platformId, CanonicalID=$canonicalId, Title=$title");
                 } else {
                     // Update if title or hostname changed
                     if ($pageEntity->getTitle() !== $title || $pageEntity->getHostname() !== $hostname) {

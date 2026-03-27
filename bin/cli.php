@@ -24,6 +24,7 @@ use Commands\InitializeEntitiesCommand;
 use Commands\RefreshInstancesCommand;
 use Commands\SetupDatabaseCommand;
 use Commands\SeedDemoDataCommand;
+use Commands\MigratePagesCanonicalCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use Helpers\Helpers;
 use Symfony\Component\Console\Application;
@@ -75,6 +76,7 @@ try {
         new SeedDemoDataCommand(Helpers::getManager()),
         new ResetMetricsCommand(),
         new ResetEntitiesCommand(),
+        new MigratePagesCanonicalCommand(Helpers::getManager()),
     ]);
 
     // Runs console application
