@@ -19,7 +19,7 @@ class ResetEntitiesCommand extends Command
     protected function configure()
     {
         $this
-            ->setDescription('Clears FB Entities (Campaigns, Adsets, Ads, Creatives) and associated metrics from the database.')
+            ->setDescription('Clears FB Entities (Campaigns, Adsets, Ads, Creatives, Posts) and associated metrics from the database.')
             ->addOption('channel', 'c', InputOption::VALUE_REQUIRED, 'Target channel to clear (facebook_marketing, facebook_organic, or all_facebook)');
     }
 
@@ -30,7 +30,7 @@ class ResetEntitiesCommand extends Command
         $questionHelper = $this->getHelper('question');
         
         $confirmMsg = $channelName 
-            ? "This will PERMANENTLY delete all Meta Entities (Ads, Campaigns, etc.) for channel '$channelName'. Are you sure? [y/N] "
+            ? "This will PERMANENTLY delete all Meta Entities (Ads, Campaigns, Posts, etc.) for channel '$channelName'. Are you sure? [y/N] "
             : 'This will PERMANENTLY delete ALL Meta Entities across all Facebook channels. Are you sure? [y/N] ';
         
         $question = new ConfirmationQuestion($confirmMsg, false);
@@ -48,9 +48,18 @@ class ResetEntitiesCommand extends Command
             // Determine target channel IDs
             $targetChannelIds = [];
             if (!$channelName || strtolower($channelName) === 'all') {
-                $targetChannelIds = [Channel::facebook_marketing->value, Channel::facebook_organic->value, Channel::google_search_console->value];
+                $targetChannelIds = [
+                    Channel::facebook_marketing->value,
+                    Channel::facebook_organic->value,
+                    Channel::instagram->value,
+                    Channel::google_search_console->value
+                ];
             } elseif (strtolower($channelName) === 'all_facebook') {
-                $targetChannelIds = [Channel::facebook_marketing->value, Channel::facebook_organic->value];
+                $targetChannelIds = [
+                    Channel::facebook_marketing->value,
+                    Channel::facebook_organic->value,
+                    Channel::instagram->value
+                ];
             } else {
                 $enum = Channel::tryFromName($channelName);
                 if (!$enum) {
@@ -62,13 +71,25 @@ class ResetEntitiesCommand extends Command
             $output->writeln('<info>🗑  Resetting Entities for selected channels...</info>');
 
             if ($isPostgres) {
-                // 1. Clear Metrics for targeted channels
+                // 1. Clear Metrics and Metric Configs for targeted channels
+                $output->writeln('<info>  Cleaning Metrics Data...</info>');
+                
+                // Clear Channeled Metrics first
                 $connection->executeStatement("
                     DELETE FROM channeled_metrics WHERE metric_id IN (
                         SELECT m.id FROM metrics m 
                         JOIN metric_configs mc ON m.metric_config_id = mc.id 
                         WHERE mc.channel IN (?)
                     )", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
+
+                // Clear Metrics
+                $connection->executeStatement("
+                    DELETE FROM metrics WHERE metric_config_id IN (
+                        SELECT id FROM metric_configs WHERE channel IN (?)
+                    )", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
+
+                // Clear Metric Configs
+                $connection->executeStatement("DELETE FROM metric_configs WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
 
                 // 2. Clear Jobs
                 $jobChannels = [];
@@ -83,11 +104,20 @@ class ResetEntitiesCommand extends Command
                 }
 
                 // 3. Conditional Asset Cleanup
-                if (in_array(Channel::facebook_marketing->value, $targetChannelIds) || in_array(Channel::facebook_organic->value, $targetChannelIds)) {
+                if (array_intersect([Channel::facebook_marketing->value, Channel::facebook_organic->value, Channel::instagram->value], $targetChannelIds)) {
                     $output->writeln('<info>  Cleaning Meta Assets...</info>');
                     $connection->executeStatement("DELETE FROM channeled_ads WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
                     $connection->executeStatement("DELETE FROM channeled_ad_groups WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
                     $connection->executeStatement("DELETE FROM channeled_campaigns WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
+                    
+                    if (array_intersect([Channel::facebook_organic->value, Channel::instagram->value], $targetChannelIds)) {
+                        $output->writeln('<info>  Cleaning Meta Posts...</info>');
+                        // Delete posts associated with targeted channeled accounts
+                        $connection->executeStatement("
+                            DELETE FROM posts 
+                            WHERE channeled_account_id IN (SELECT id FROM channeled_accounts WHERE channel IN (?))
+                        ", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
+                    }
                 }
 
                 if (in_array(Channel::google_search_console->value, $targetChannelIds)) {
@@ -96,10 +126,11 @@ class ResetEntitiesCommand extends Command
                     $connection->executeStatement("DELETE FROM pages WHERE data->>'source' = 'gsc_site'");
                 }
 
-                // 4. Cleanup Orphaned Base Entities (Meta)
+                // 4. Cleanup Orphaned Base Entities
                 $output->writeln('<info>  Pruning orphaned base entities...</info>');
                 $connection->executeStatement("DELETE FROM campaigns WHERE id NOT IN (SELECT campaign_id FROM channeled_campaigns)");
                 $connection->executeStatement("DELETE FROM creatives WHERE id NOT IN (SELECT creative_id FROM channeled_ads WHERE creative_id IS NOT NULL)");
+                $connection->executeStatement("DELETE FROM posts WHERE channeled_account_id IS NULL AND id NOT IN (SELECT post_id FROM metric_configs WHERE post_id IS NOT NULL)");
                 
             } else {
                 // MySQL implementation (Foreign Key Checks)
