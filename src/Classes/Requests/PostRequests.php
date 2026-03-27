@@ -91,7 +91,16 @@ class PostRequests implements RequestInterface
 
                     $additionalParams = [];
                     if ($startDate) $additionalParams['since'] = $startDate;
-                    if ($endDate) $additionalParams['until'] = $endDate;
+                    if ($endDate) {
+                        // Meta API: 'since' must be strictly less than 'until'.
+                        // If 'endDate' is a date string (Y-m-d), Meta treats it as 00:00:00.
+                        // If 'startDate' has a time component of today, it will be > 'endDate', causing Error #100.
+                        $finalEndDate = $endDate;
+                        if (strlen($endDate) === 10 && $startDate && strpos($startDate, $endDate) === 0) {
+                            $finalEndDate = $endDate . ' 23:59:59';
+                        }
+                        $additionalParams['until'] = $finalEndDate;
+                    }
 
                     // Set pageId in API instance to allow correct token resolution
                     $api->setPageId((string)$pageCfg['id']);
@@ -134,7 +143,7 @@ class PostRequests implements RequestInterface
                             $fetched = true;
                         } catch (\Exception $e) {
                             $msg = $e->getMessage();
-                            $isFatal = (stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'missing permissions') !== false || stripos($msg, 'Object with ID') !== false);
+                            $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'missing permissions') !== false || stripos($msg, 'Object with ID') !== false);
                             
                             $retryCount++;
                             if ($retryCount >= $maxRetries || $isFatal) {
