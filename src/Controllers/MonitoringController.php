@@ -270,32 +270,19 @@ class MonitoringController extends BaseController
                     if ($tableName) {
                         $sql = "";
                         if ($tableName === 'channeled_accounts') {
-                            $sql = "SELECT channel, type, name, COUNT(*) as count FROM channeled_accounts GROUP BY channel, type, name";
+                            $sql = "SELECT channel, type, COUNT(*) as count FROM channeled_accounts GROUP BY channel, type";
                         } elseif ($tableName === 'channeled_metrics') {
-                            // Join with accounts to get type and name.
-                            $sql = "SELECT cm.channel, ca.type, ca.name, COUNT(*) as count 
+                            $sql = "SELECT cm.channel, ca.type, COUNT(*) as count 
                                   FROM channeled_metrics cm 
                                   LEFT JOIN channeled_accounts ca ON cm.platform_id = ca.platform_id AND cm.channel = ca.channel 
-                                  GROUP BY cm.channel, ca.type, ca.name";
+                                  GROUP BY cm.channel, ca.type";
                         } elseif (in_array($tableName, ['channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
-                            // These have a direct channeled_account_id
-                            $sql = "SELECT e.channel, ca.type, ca.name, COUNT(*) as count 
+                            $sql = "SELECT e.channel, ca.type, COUNT(*) as count 
                                   FROM $tableName e 
                                   LEFT JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
-                                  GROUP BY e.channel, ca.type, ca.name";
-                        } elseif ($tableName === 'jobs') {
-                            // Jobs can be grouped by channel and instance_name from payload
-                            // Note: This JSON extract is for MySQL. 
-                            $payloadField = Helpers::isPostgres() ? "CAST(payload AS text)" : "payload";
-                            $instanceExtract = Helpers::isPostgres() 
-                                ? "substring($payloadField from '\"instance_name\":\"([^\"]+)\"')"
-                                : "JSON_UNQUOTE(JSON_EXTRACT(payload, '$.instance_name'))";
-                            
-                            $sql = "SELECT channel, 'PIPELINE' as type, $instanceExtract as name, COUNT(*) as count 
-                                  FROM jobs 
-                                  GROUP BY channel, name";
+                                  GROUP BY e.channel, ca.type";
                         } else {
-                            $sql = "SELECT channel, NULL as type, NULL as name, COUNT(*) as count FROM $tableName GROUP BY channel";
+                            $sql = "SELECT channel, NULL as type, COUNT(*) as count FROM $tableName GROUP BY channel";
                         }
 
                         if ($sql) {
@@ -304,14 +291,19 @@ class MonitoringController extends BaseController
                                 foreach ($results as $res) {
                                     $channelId = (int)$res['channel'];
                                     $channelCount = (int)$res['count'];
-                                    $type = $res['type'] ?? '';
-                                    $name = $res['name'] ?? '';
+                                    $typeValue = $res['type'] ?? '';
                                     
                                     $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? \Enums\Channel::tryFromName($res['channel'])?->getCommonName() ?? "Ch $channelId";
                                     
+                                    // Try to get a friendly name for the type enum
+                                    $typeName = $typeValue;
+                                    if ($typeValue && class_exists('\Enums\Account')) {
+                                        $enum = \Enums\Account::tryFrom($typeValue);
+                                        $typeName = $enum ? str_replace('_', ' ', $enum->name) : $typeValue;
+                                    }
+                                    
                                     $labelParts = [$channelName];
-                                    if ($type) $labelParts[] = $type;
-                                    if ($name) $labelParts[] = $name;
+                                    if ($typeName) $labelParts[] = $typeName;
                                     
                                     $fullLabel = implode(' • ', $labelParts);
                                     
@@ -319,8 +311,8 @@ class MonitoringController extends BaseController
                                         'name' => $fullLabel,
                                         'count' => $channelCount,
                                         'channel' => $channelName,
-                                        'type' => $type,
-                                        'account_name' => $name
+                                        'type' => $typeName,
+                                        'type_raw' => $typeValue
                                     ];
                                 }
                             } catch (\Exception $e) {

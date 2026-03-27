@@ -148,18 +148,13 @@ function updateDbTotals(totals) {
                 if (chan.type) {
                     labelHtml += ` <span style="font-size:0.6rem; color:var(--text-dim); opacity:0.6;">• ${chan.type}</span>`;
                 }
-                if (chan.account_name) {
-                    labelHtml += `<div style="font-size:0.65rem; color:var(--text-dim); margin-left:14px; margin-top:2px;">${chan.account_name}</div>`;
-                }
 
                 breakdownHtml += `
-                    <div style="margin-bottom:15px; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom:8px;">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="margin-bottom:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <div style="width:6px; height:6px; border-radius:50%; background:${chanColor}; flex-shrink:0;"></div>
-                                <div style="display:flex; flex-direction:column;">
-                                    ${labelHtml}
-                                </div>
+                                ${labelHtml}
                             </div>
                             <span style="font-size:1.1rem; font-weight:800; color:#fff; font-family:var(--font-mono);">${chan.count.toLocaleString()}</span>
                         </div>
