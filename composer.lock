@@ -131,13 +131,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "8716f609536fd790846f16a9285646e2c11b57a7"
+                "reference": "71655fefaf49170ee46613671feda1026355e132"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-8716f609536fd790846f16a9285646e2c11b57a7-zip-5aa9c7.zip",
-                "reference": "8716f609536fd790846f16a9285646e2c11b57a7",
-                "shasum": "f2fcbf00f45ac15581c7b8edb46fb92bcd026b0d"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-71655fefaf49170ee46613671feda1026355e132-zip-b4e00e.zip",
+                "reference": "71655fefaf49170ee46613671feda1026355e132",
+                "shasum": "f18d074f8bb20a8871b667e5c4a5b0bc15547b84"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -188,7 +188,7 @@
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-25T18:03:31+00:00"
+            "time": "2026-03-27T00:26:00+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -771,12 +771,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/collections.git",
-                "reference": "bfd7237d7f158110e2e1545c2dbdf1d89906eb5f"
+                "reference": "8ed945ca4fd52a15ca3bd877cc8625f637509142"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/collections/zipball/bfd7237d7f158110e2e1545c2dbdf1d89906eb5f",
-                "reference": "bfd7237d7f158110e2e1545c2dbdf1d89906eb5f",
+                "url": "https://api.github.com/repos/doctrine/collections/zipball/8ed945ca4fd52a15ca3bd877cc8625f637509142",
+                "reference": "8ed945ca4fd52a15ca3bd877cc8625f637509142",
                 "shasum": ""
             },
             "require": {
@@ -849,7 +849,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-20T14:39:55+00:00"
+            "time": "2026-03-26T19:58:09+00:00"
         },
         {
             "name": "doctrine/common",
