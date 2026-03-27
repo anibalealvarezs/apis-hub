@@ -1698,7 +1698,7 @@ class MetricRequests
     ): void {
 
         if (!$startDate) {
-            $startDate = self::getRetentionRange($config, $channel, '2 years')->endOfDay(); // Default to configured years ago at the end of the day
+            $startDate = self::getRetentionRange($config, $channel, '2 years - 1 day')->endOfDay(); // Default to configured years ago at the end of the day
         } else {
             $startDate = Carbon::parse($startDate)->startOfDay(); // Ensure start date is at the beginning of the day
         }
