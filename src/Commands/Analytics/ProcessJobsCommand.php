@@ -234,7 +234,8 @@ class ProcessJobsCommand extends Command
                     // Intelligent incremental sync for entities
                     $instanceName = $payload['instance_name'] ?? null;
                     if ($instanceName && str_ends_with($instanceName, '-entities-sync')) {
-                        if (empty($resolvedParams['startDate'])) {
+                        $smartResume = $params['smart_resume'] ?? true;
+                        if (filter_var($smartResume, FILTER_VALIDATE_BOOLEAN) && empty($resolvedParams['startDate'])) {
                             $lastRun = $jobRepo->getLastSuccessfulJobTime($instanceName);
                             if ($lastRun) {
                                 // Fetch only what changed since the last successful sync
