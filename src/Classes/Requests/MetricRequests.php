@@ -274,17 +274,19 @@ class MetricRequests
             }
 
             // Apply retention range limit to startDate
+            $timezone = $config['timezone'] ?? 'America/Caracas';
             $retentionLimit = self::getRetentionRange($config, 'facebook_organic', '2 years - 1 day');
-            $hardLimit = Carbon::now()->subYears(2)->addDay()->startOfDay();
+            // Hard limit protection (2 years)
+            $hardLimit = Carbon::now($timezone)->subYears(2)->addDays(2)->startOfDay();
             if ($retentionLimit->lt($hardLimit)) {
                 $logger->info("Overriding retentionLimit from " . $retentionLimit->format('Y-m-d') . " to " . $hardLimit->format('Y-m-d') . " due to Facebook API hard limit (2 years).");
                 $retentionLimit = $hardLimit;
             }
 
-            $requestedStart = Carbon::parse($startDate);
-            if ($requestedStart->lt($retentionLimit)) {
-                $logger->info("Truncating startDate from $startDate to " . $retentionLimit->format('Y-m-d') . " due to retention policy.");
-                $startDate = $retentionLimit->format('Y-m-d');
+            $requestedStart = Carbon::parse($startDate, $timezone)->startOfDay();
+            if ($requestedStart->lt($hardLimit)) {
+                $logger->warning("Truncating startDate from $startDate to " . $hardLimit->format('Y-m-d') . " due to Facebook API 2-year limit.");
+                $startDate = $hardLimit->format('Y-m-d');
             }
 
             if (Carbon::parse($startDate)->gt(Carbon::parse($endDate))) {
@@ -1706,7 +1708,8 @@ class MetricRequests
         if (!$startDate) {
             $startDate = self::getRetentionRange($config, $channel, '2 years - 1 day');
             // Hard limit protection for Instagram (2 years)
-            $hardLimit = Carbon::now()->subYears(2)->addDay()->startOfDay();
+            $timezone = $config['timezone'] ?? 'America/Caracas';
+            $hardLimit = Carbon::now($timezone)->subYears(2)->addDays(2)->startOfDay();
             if ($startDate->lt($hardLimit)) {
                 $startDate = $hardLimit;
             }
