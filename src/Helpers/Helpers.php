@@ -1159,21 +1159,39 @@ class Helpers
     /**
      * @param string $url
      * @param string|int|null $platformId
-     * @param string|null $type
+     * @param \Enums\PageType|string|null $type
+     * @param string|null $hostname
      * @return string
      */
-    public static function getCanonicalPageId(string $url, string|int|null $platformId = null, string|null $type = null, string|null $hostname = null): string
+    public static function getCanonicalPageId(string $url, string|int|null $platformId = null, \Enums\PageType|string|null $type = null, string|null $hostname = null): string
     {
-        // 1. Explicit social detection
-        $isFacebook = ($type === 'fb_page' || $type === 'facebook_page' || (isset($hostname) && str_contains($hostname, 'facebook.com')));
-        $isInstagram = ($type === 'instagram' || (isset($hostname) && str_contains($hostname, 'instagram.com')));
-
-        if ($platformId) {
-            if ($isFacebook) return "fb:page:$platformId";
-            if ($isInstagram) return "ig:account:$platformId";
+        // 1. Enum based detection or fallback logic
+        $prefix = null;
+        if ($type instanceof \Enums\PageType) {
+            $prefix = $type->getPrefix();
+        } else {
+            // Mapping strings for backward compatibility
+            $prefixMap = [
+                'fb_page' => 'fb:page',
+                'facebook_page' => 'fb:page',
+                'website' => 'web:site'
+            ];
+            $prefix = $prefixMap[$type] ?? null;
         }
 
-        // Normalize URL for websites or fallback
+        // 2. Intelligent social detection if no prefix was forced
+        if (!$prefix) {
+            // IG accounts for now are identified as FB assets in this vision
+            $isFacebook = (isset($hostname) && (str_contains($hostname, 'facebook.com') || str_contains($hostname, 'instagram.com')));
+            if ($isFacebook) $prefix = 'fb:page';
+        }
+
+        // 3. Return canonical with platform ID if we have a prefix and an ID
+        if ($platformId && $prefix) {
+            return "$prefix:$platformId";
+        }
+
+        // 4. Normalize URL for websites or fallback
         $normalizedUrl = preg_replace('~^https?://(?:www\.)?~i', '', $url);
         $normalizedUrl = rtrim($normalizedUrl, '/');
         $normalizedUrl = strtolower($normalizedUrl);

@@ -9,10 +9,11 @@ use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Country;
 use Entities\Analytics\Device;
 use Entities\Analytics\Page; // Add Page entity
+use Enums\Account as AccountEnum;
+use Enums\PageType;
 use Enums\Channel;
 use Enums\Country as CountryEnum;
 use Enums\Device as DeviceEnum;
-use Enums\Account as AccountEnum;
 use Exception;
 use Helpers\Helpers;
 use Monolog\Handler\StreamHandler;
@@ -152,7 +153,7 @@ class InitializeEntitiesCommand extends Command
                 $title = $site['title'] ?? $siteUrl;
                 $hostname = $site['hostname'] ?? parse_url($siteUrl, PHP_URL_HOST) ?? str_replace('sc-domain:', '', $siteUrl);
 
-                $canonicalId = Helpers::getCanonicalPageId($normalizedSiteUrl);
+                $canonicalId = Helpers::getCanonicalPageId($normalizedSiteUrl, null, PageType::WEBSITE);
                 $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
                 if (!$pageEntity) {
                     $pageEntity = new Page();
@@ -257,7 +258,7 @@ class InitializeEntitiesCommand extends Command
                 $pageUrl = $page['url'] ?? "https://www.facebook.com/" . $platformId;
                 $hostname = $page['hostname'] ?? 'www.facebook.com';
 
-                $canonicalId = Helpers::getCanonicalPageId($pageUrl, $platformId, 'facebook_page');
+                $canonicalId = Helpers::getCanonicalPageId($pageUrl, $platformId, PageType::FACEBOOK_PAGE);
                 $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
                 if (!$pageEntity) {
                     $pageEntity = new Page();
