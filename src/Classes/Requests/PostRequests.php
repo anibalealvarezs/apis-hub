@@ -115,6 +115,11 @@ class PostRequests implements RequestInterface
                         if (!empty($pageCfg['posts'])) {
                             $logger->info("Fetching Facebook posts for page: " . ($pageCfg['title'] ?? $pageCfg['id']) . " since $cStart until $cEnd");
 
+                            $fbChanneledAccount = $channeledAccountRepo->findOneBy([
+                                'platformId' => (string)$pageCfg['id'],
+                                'channel' => Channel::facebook_organic->value,
+                            ]);
+
                             $additionalParams = [
                                 'since' => $cStart,
                                 'until' => $cEnd . (strlen($cEnd) === 10 ? ' 23:59:59' : '')
@@ -152,7 +157,8 @@ class PostRequests implements RequestInterface
                                             $converted = FacebookOrganicConvert::posts(
                                                 posts: $data,
                                                 pageId: $pageEntity->getId(),
-                                                accountId: $accountEntity->getId()
+                                                accountId: $accountEntity->getId(),
+                                                channeledAccountId: $fbChanneledAccount ? $fbChanneledAccount->getId() : null
                                             );
                                             self::process($converted);
                                         }
@@ -181,9 +187,9 @@ class PostRequests implements RequestInterface
                         if (!empty($pageCfg['ig_account']) && !empty($pageCfg['ig_accounts']) && !empty($pageCfg['ig_account_media'])) {
                             $logger->info("Fetching Instagram media for page: " . ($pageCfg['title'] ?? $pageCfg['id']) . " since $cStart until $cEnd");
 
-                            $channeledAccount = $channeledAccountRepo->findOneBy([
+                            $igChanneledAccount = $channeledAccountRepo->findOneBy([
+                                'platformId' => (string)$pageCfg['ig_account'],
                                 'channel' => Channel::facebook_organic->value,
-                                'account' => $accountEntity->getId(),
                             ]);
 
                             $additionalParams = [
@@ -220,7 +226,7 @@ class PostRequests implements RequestInterface
                                                 posts: $data,
                                                 pageId: $pageEntity->getId(),
                                                 accountId: $accountEntity->getId(),
-                                                channeledAccountId: $channeledAccount ? $channeledAccount->getId() : null
+                                                channeledAccountId: $igChanneledAccount ? $igChanneledAccount->getId() : null
                                             );
                                             self::process($converted);
                                         }
