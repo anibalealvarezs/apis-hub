@@ -269,6 +269,7 @@ class MonitoringController extends BaseController
                     $tableName = self::getTableNameForEntity($config['channeled']);
                     if ($tableName) {
                         $sql = "";
+                        $sql = "";
                         if ($tableName === 'channeled_accounts') {
                             $sql = "SELECT channel, type, COUNT(*) as count FROM channeled_accounts GROUP BY channel, type";
                         } elseif ($tableName === 'channeled_metrics') {
@@ -282,17 +283,18 @@ class MonitoringController extends BaseController
                                   LEFT JOIN channeled_accounts ca3 ON cg.channeled_account_id = ca3.id
                                   GROUP BY cm.channel, type";
                         } elseif ($tableName === 'posts') {
-                            // Posts have channeled_account_id to match directly with the right account
-                            $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
+                            // Posts might not have channeled_account_id yet; fallback to account -> channeled_accounts
+                            $sql = "SELECT COALESCE(ca1.channel, ca2.channel) as channel, COALESCE(ca1.type, ca2.type) as type, COUNT(*) as count 
                                   FROM posts p 
-                                  JOIN channeled_accounts ca ON p.channeled_account_id = ca.id 
-                                  GROUP BY ca.channel, ca.type";
+                                  LEFT JOIN channeled_accounts ca1 ON p.channeled_account_id = ca1.id 
+                                  LEFT JOIN accounts a ON p.account_id = a.id
+                                  LEFT JOIN channeled_accounts ca2 ON ca2.account_id = a.id
+                                  GROUP BY channel, type";
                         } elseif ($tableName === 'pages') {
-                            // Pages should match on platform_id + channel (usually organic channel)
-                            // A page in Facebook Organic has its platform_id matching the channeled_account.platform_id
+                            // Pages link to global account, match on platform_id + channeled_accounts to find the type/channel
                             $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
                                   FROM pages p 
-                                  JOIN channeled_accounts ca ON p.platform_id = ca.platform_id 
+                                  LEFT JOIN channeled_accounts ca ON p.platform_id = ca.platform_id 
                                   GROUP BY ca.channel, ca.type";
                         } elseif (in_array($tableName, ['channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
                             $sql = "SELECT e.channel, ca.type, COUNT(*) as count 
@@ -300,7 +302,11 @@ class MonitoringController extends BaseController
                                   LEFT JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
                                   GROUP BY e.channel, ca.type";
                         } else {
-                            $sql = "SELECT channel, NULL as type, COUNT(*) as count FROM $tableName GROUP BY channel";
+                            // Search for channel column first
+                            $columns = $conn->fetchFirstColumn("DESCRIBE $tableName");
+                            if (in_array('channel', $columns)) {
+                                $sql = "SELECT channel, NULL as type, COUNT(*) as count FROM $tableName GROUP BY channel";
+                            }
                         }
 
                         if ($sql) {
@@ -308,12 +314,15 @@ class MonitoringController extends BaseController
                                 $results = $conn->fetchAllAssociative($sql);
                                 foreach ($results as $res) {
                                     $channelId = (int)($res['channel'] ?? 0);
-                                    if (!$channelId) continue;
-                                    
                                     $channelCount = (int)$res['count'];
-                                    $typeValue = $res['type'] ?? '';
                                     
-                                    $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? \Enums\Channel::tryFromName($res['channel'])?->getCommonName() ?? "Ch $channelId";
+                                    if (!$channelId) {
+                                        $channelName = "Unidentified Channel";
+                                    } else {
+                                        $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? \Enums\Channel::tryFromName($res['channel'])?->getCommonName() ?? "Ch $channelId";
+                                    }
+                                    
+                                    $typeValue = $res['type'] ?? '';
                                     
                                     // Try to get a friendly name for the type enum
                                     $typeName = $typeValue;
@@ -336,14 +345,16 @@ class MonitoringController extends BaseController
                                     ];
                                 }
                             } catch (\Exception $e) {
-                                // Fallback to basic channel count if complex SQL fails
-                                $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
-                                foreach ($results as $res) {
-                                   $channeledDataItems[] = [
-                                       'name' => \Enums\Channel::tryFrom((int)$res['channel'])?->getCommonName() ?? "Channel " . $res['channel'],
-                                       'count' => (int)$res['count']
-                                   ];
-                                }
+                                // Last resort fallback for tables with channel
+                                try {
+                                    $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
+                                    foreach ($results as $res) {
+                                       $channeledDataItems[] = [
+                                           'name' => \Enums\Channel::tryFrom((int)$res['channel'])?->getCommonName() ?? "Channel " . $res['channel'],
+                                           'count' => (int)$res['count']
+                                       ];
+                                    }
+                                } catch (\Exception $ex) {}
                             }
                         }
                         
