@@ -15,7 +15,7 @@ use Repositories\PageRepository;
 #[ORM\HasLifecycleCallbacks]
 class Page extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true, nullable: true)]
+    #[ORM\Column(name: "canonical_id", type: 'string', unique: true, nullable: true)]
     protected ?string $canonicalId = null;
 
     #[ORM\Column(type: 'string')]

@@ -1162,11 +1162,15 @@ class Helpers
      * @param string|null $type
      * @return string
      */
-    public static function getCanonicalPageId(string $url, string|int|null $platformId = null, string|null $type = null): string
+    public static function getCanonicalPageId(string $url, string|int|null $platformId = null, string|null $type = null, string|null $hostname = null): string
     {
+        // 1. Explicit social detection
+        $isFacebook = ($type === 'fb_page' || $type === 'facebook_page' || (isset($hostname) && str_contains($hostname, 'facebook.com')));
+        $isInstagram = ($type === 'instagram' || (isset($hostname) && str_contains($hostname, 'instagram.com')));
+
         if ($platformId) {
-            if ($type === 'facebook_page') return "fb:page:$platformId";
-            if ($type === 'instagram') return "ig:account:$platformId";
+            if ($isFacebook) return "fb:page:$platformId";
+            if ($isInstagram) return "ig:account:$platformId";
         }
 
         // Normalize URL for websites or fallback
@@ -1177,6 +1181,11 @@ class Helpers
         // If it's a FB page URL but no platformId was given, try to extract it from URL
         if (str_contains($normalizedUrl, 'facebook.com/') && preg_match('~(\d+)/?$~', $normalizedUrl, $matches)) {
             return "fb:page:" . $matches[1];
+        }
+
+        // Fallback for cases where URL is JUST the platform ID but hostname is facebook
+        if ($platformId && (string)$normalizedUrl === (string)$platformId && (isset($hostname) && str_contains($hostname, 'facebook.com'))) {
+            return "fb:page:$platformId";
         }
 
         return "site:domain:$normalizedUrl";
