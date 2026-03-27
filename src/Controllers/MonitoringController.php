@@ -258,22 +258,25 @@ class MonitoringController extends BaseController
                         if ($tableName === 'channeled_accounts') {
                             $sql = "SELECT channel, type, COUNT(*) as count FROM channeled_accounts GROUP BY channel, type";
                         } elseif ($tableName === 'channeled_metrics') {
-                            $sql = "SELECT cm.channel, COALESCE(ca1.type, ca2.type, ca3.type, ca4.type, ca5.type, ca6.type, ca7.type) as type, COUNT(*) as count 
+                            $sql = "SELECT cm.channel, COALESCE(ca1.type, ca2.type, ca3.type, ca4.type, ca5.type, ca6.type, ca7.type, ca8.type, ca9.type) as type, COUNT(*) as count 
                                   FROM channeled_metrics cm 
-                                  JOIN metrics m ON cm.metric_id = m.id
-                                  JOIN metric_configs mc ON m.metric_config_id = mc.id
-                                  LEFT JOIN channeled_accounts ca1 ON mc.channeled_account_id = ca1.id
-                                  LEFT JOIN channeled_campaigns cc ON mc.channeled_campaign_id = cc.id
-                                  LEFT JOIN channeled_accounts ca2 ON cc.channeled_account_id = ca2.id
+                                  LEFT JOIN channeled_accounts ca1 ON cm.platform_id = ca1.platform_id AND cm.channel = ca1.channel
+                                  LEFT JOIN metrics m ON cm.metric_id = m.id
+                                  LEFT JOIN metric_configs mc ON m.metric_config_id = mc.id
+                                  LEFT JOIN channeled_accounts ca2 ON mc.channeled_account_id = ca2.id
+                                  LEFT JOIN channeled_campaigns cc ON (mc.channeled_campaign_id = cc.id OR mc.campaign_id = cc.id)
+                                  LEFT JOIN channeled_accounts ca3 ON cc.channeled_account_id = ca3.id
                                   LEFT JOIN channeled_ad_groups cg ON mc.channeled_ad_group_id = cg.id
-                                  LEFT JOIN channeled_accounts ca3 ON cg.channeled_account_id = ca3.id
+                                  LEFT JOIN channeled_accounts ca4 ON cg.channeled_account_id = ca4.id
                                   LEFT JOIN channeled_ads cad ON mc.channeled_ad_id = cad.id
-                                  LEFT JOIN channeled_accounts ca4 ON cad.channeled_account_id = ca4.id
-                                  LEFT JOIN pages pg ON mc.page_id = pg.id
-                                  LEFT JOIN channeled_accounts ca5 ON pg.platform_id = ca5.platform_id
-                                  LEFT JOIN posts p ON mc.post_id = p.id
-                                  LEFT JOIN channeled_accounts ca6 ON p.channeled_account_id = ca6.id
-                                  LEFT JOIN channeled_accounts ca7 ON cm.platform_id = ca7.platform_id AND cm.channel = ca7.channel
+                                  LEFT JOIN channeled_accounts ca5 ON cad.channeled_account_id = ca5.id
+                                  LEFT JOIN pages pg ON (mc.page_id = pg.id OR (cm.channel = 15 AND cm.platform_id = pg.platform_id))
+                                  LEFT JOIN channeled_accounts ca6 ON pg.platform_id = ca6.platform_id
+                                  LEFT JOIN posts p ON (mc.post_id = p.id OR (cm.channel = 15 AND cm.platform_id = p.platform_id))
+                                  LEFT JOIN channeled_accounts ca7 ON p.channeled_account_id = ca7.id
+                                  LEFT JOIN channeled_accounts ca8 ON (p.page_id = pg.id AND pg.platform_id = ca8.platform_id)
+                                  LEFT JOIN accounts a ON (p.account_id = a.id OR pg.account_id = a.id)
+                                  LEFT JOIN channeled_accounts ca9 ON a.id = ca9.account_id
                                   GROUP BY cm.channel, type";
                         } elseif ($tableName === 'posts') {
                             $sql = "SELECT sub.channel, sub.type, COUNT(*) as count FROM (
