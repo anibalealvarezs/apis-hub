@@ -48,23 +48,26 @@ class PostRequests implements RequestInterface
         }
 
         try {
-            $config = MetricRequests::validateFacebookConfig($logger);
+            $config = MetricRequests::validateFacebookConfig($logger, 'facebook_organic');
             
-            // Apply default dates if missing - Respecting sync_window from config
+            // Apply default dates if missing - Respecting cache_history_range from config
             if (empty($startDate)) {
                 $days = 30; // Absolute fallback
-                if (!empty($config['sync_window'])) {
+                $window = $config['cache_history_range'] ?? null;
+                if (!empty($window)) {
                     try {
-                        $interval = new \DateInterval($config['sync_window']);
+                        // Handle both ISO intervals (P3Y) and human readable (3 years)
+                        $intervalStr = (str_starts_with((string)$window, 'P')) ? $window : Helpers::humanToIsoInterval($window);
+                        $interval = new \DateInterval($intervalStr);
                         $startDate = Carbon::today()->sub($interval)->format('Y-m-d');
-                        $logger->info("Using sync_window from config: " . $config['sync_window'] . " -> $startDate");
+                        $logger->info("Using cache_history_range from config: " . $window . " -> $startDate");
                     } catch (\Exception $e) {
-                        $logger->warning("Invalid sync_window in config: " . $config['sync_window'] . ". Using default 30 days.");
+                        $logger->warning("Invalid cache_history_range in config: " . $window . ". Using default 30 days. Error: " . $e->getMessage());
                         $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
                     }
                 } else {
                     $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
-                    $logger->info("No startDate or sync_window provided, defaulting to $startDate");
+                    $logger->info("No startDate or cache_history_range provided, defaulting to $startDate");
                 }
             }
 

@@ -801,6 +801,40 @@ class Helpers
     }
 
     /**
+     * Converts a human-readable interval like '3 years' or '1 month' to ISO8601 interval 'P3Y'.
+     *
+     * @param string $human
+     * @return string
+     */
+    public static function humanToIsoInterval(string $human): array|string|null
+    {
+        $human = strtolower(trim($human));
+        
+        $conversions = [
+            'year'   => 'Y',
+            'month'  => 'M',
+            'week'   => 'W',
+            'day'    => 'D',
+            'hour'   => 'H',
+            'minute' => 'M', // Suffix for time part
+            'second' => 'S',
+        ];
+
+        if (preg_match('/^(\d+)\s*(year|month|week|day|hour|minute|second)s?$/', $human, $matches)) {
+            $value = $matches[1];
+            $unit = $matches[2];
+            $suffix = $conversions[$unit];
+            
+            if (in_array($unit, ['hour', 'minute', 'second'])) {
+                return "PT{$value}{$suffix}";
+            }
+            return "P{$value}{$suffix}";
+        }
+
+        return $human; // Return as is if already ISO or unrecognized
+    }
+
+    /**
      * @param Entity $entity
      * @param array|null $fields
      * @return array

@@ -226,23 +226,26 @@ class MetricRequests
         $manager = Helpers::getManager();
         try {
             // Validate configuration
-            $config = self::validateFacebookConfig($logger);
+            $config = self::validateFacebookConfig($logger, 'facebook_organic');
 
-            // Apply default dates if missing - Respecting sync_window from config
+            // Apply default dates if missing - Respecting cache_history_range from config
             if (empty($startDate)) {
                 $days = 3; // Absolute fallback for metrics
-                if (!empty($config['sync_window'])) {
+                $window = $config['cache_history_range'] ?? null;
+                if (!empty($window)) {
                     try {
-                        $interval = new \DateInterval($config['sync_window']);
+                        // Handle both ISO intervals (P3Y) and human readable (3 years)
+                        $intervalStr = (str_starts_with((string)$window, 'P')) ? $window : Helpers::humanToIsoInterval($window);
+                        $interval = new \DateInterval((string)$intervalStr);
                         $startDate = Carbon::today()->sub($interval)->format('Y-m-d');
-                        $logger->info("Using sync_window from config: " . $config['sync_window'] . " -> $startDate");
+                        $logger->info("Using cache_history_range from config: " . $window . " -> $startDate");
                     } catch (\Exception $e) {
-                        $logger->warning("Invalid sync_window in config: " . $config['sync_window'] . ". Using default 3 days.");
+                        $logger->warning("Invalid cache_history_range in config: " . $window . ". Using default 3 days. Error: " . $e->getMessage());
                         $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
                     }
                 } else {
                     $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
-                    $logger->info("No startDate or sync_window provided, defaulting to $startDate");
+                    $logger->info("No startDate or cache_history_range provided, defaulting to $startDate");
                 }
             }
 
@@ -551,23 +554,26 @@ class MetricRequests
         $manager = Helpers::getManager();
         try {
             // Validate configuration
-            $config = self::validateFacebookConfig($logger);
+            $config = self::validateFacebookConfig($logger, 'facebook_marketing');
 
-            // Apply default dates if missing - Respecting sync_window from config
+            // Apply default dates if missing - Respecting cache_history_range from config
             if (empty($startDate)) {
                 $days = 3; // Absolute fallback for metrics
-                if (!empty($config['sync_window'])) {
+                $window = $config['cache_history_range'] ?? null;
+                if (!empty($window)) {
                     try {
-                        $interval = new \DateInterval($config['sync_window']);
+                        // Handle both ISO intervals (P3Y) and human readable (3 years)
+                        $intervalStr = (str_starts_with((string)$window, 'P')) ? $window : Helpers::humanToIsoInterval($window);
+                        $interval = new \DateInterval((string)$intervalStr);
                         $startDate = Carbon::today()->sub($interval)->format('Y-m-d');
-                        $logger->info("Using sync_window from config: " . $config['sync_window'] . " -> $startDate");
+                        $logger->info("Using cache_history_range from config: " . $window . " -> $startDate");
                     } catch (\Exception $e) {
-                        $logger->warning("Invalid sync_window in config: " . $config['sync_window'] . ". Using default 3 days.");
+                        $logger->warning("Invalid cache_history_range in config: " . $window . ". Using default 3 days. Error: " . $e->getMessage());
                         $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
                     }
                 } else {
                     $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
-                    $logger->info("No startDate or sync_window provided, defaulting to $startDate");
+                    $logger->info("No startDate or cache_history_range provided, defaulting to $startDate");
                 }
             }
 
@@ -1133,11 +1139,12 @@ class MetricRequests
      * Validates and returns the Facebook configuration with global defaults.
      *
      * @param LoggerInterface|null $logger
+     * @param string|null $channel Optional channel name (facebook_organic or facebook_marketing)
      * @return array
      */
-    public static function validateFacebookConfig(?LoggerInterface $logger = null): array
+    public static function validateFacebookConfig(?LoggerInterface $logger = null, ?string $channel = null): array
     {
-        return \Classes\Clients\FacebookClient::getConfig($logger);
+        return \Classes\Clients\FacebookClient::getConfig($logger, $channel);
     }
 
     /**
