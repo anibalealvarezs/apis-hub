@@ -40,7 +40,8 @@ class ProcessJobsCommand extends Command
     protected function configure(): void
     {
         $this->setHelp('This command looks for scheduled jobs in the database and executes them via the CacheController.')
-             ->addOption('force-all', 'f', InputOption::VALUE_NONE, 'Ignore instance/date filters and process all scheduled jobs.');
+             ->addOption('force-all', 'f', InputOption::VALUE_NONE, 'Ignore instance/date filters and process all scheduled jobs.')
+             ->addOption('job-id', 'j', InputOption::VALUE_REQUIRED, 'Process a specific job ID immediately regardless of status.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -80,17 +81,23 @@ class ProcessJobsCommand extends Command
             $progressMade = false;
             Helpers::reconnectIfNeeded($this->em);
 
-            $jobs = $jobRepo->getJobsByStatus(
-                status: JobStatus::scheduled->value,
-                channel: ($forceAll ? null : $envChannel),
-                instanceName: ($forceAll ? null : $envInstance)
-            );
-            $delayedJobs = $jobRepo->getJobsByStatus(
-                status: JobStatus::delayed->value,
-                channel: ($forceAll ? null : $envChannel),
-                instanceName: ($forceAll ? null : $envInstance)
-            );
-            $jobsList = array_merge($jobs, $delayedJobs);
+            $jobId = $input->getOption('job-id');
+            if ($jobId) {
+                $specificJob = $jobRepo->find($jobId);
+                $jobsList = $specificJob ? [$specificJob] : [];
+            } else {
+                $jobs = $jobRepo->getJobsByStatus(
+                    status: JobStatus::scheduled->value,
+                    channel: ($forceAll ? null : $envChannel),
+                    instanceName: ($forceAll ? null : $envInstance)
+                );
+                $delayedJobs = $jobRepo->getJobsByStatus(
+                    status: JobStatus::delayed->value,
+                    channel: ($forceAll ? null : $envChannel),
+                    instanceName: ($forceAll ? null : $envInstance)
+                );
+                $jobsList = array_merge($jobs, $delayedJobs);
+            }
 
             if (empty($jobsList)) {
                 break;
@@ -124,13 +131,13 @@ class ProcessJobsCommand extends Command
                     }
                 }
 
-                if ($job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
+                if (!$jobId && $job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
                     $stats['skipped']++;
                     continue;
                 }
 
                 // Global filters from env
-                if ($envChannel = getenv('API_SOURCE')) {
+                if (!$jobId && $envChannel = getenv('API_SOURCE')) {
                     $envChannelEnum = Channel::tryFromName($envChannel);
                     $jobChannelEnum = Channel::tryFromName($job->getChannel());
                     
@@ -195,13 +202,18 @@ class ProcessJobsCommand extends Command
 
                 try {
                     // Atomic claim by repository
-                    if (!$jobRepo->claimJob($job->getId())) {
+                    if (!$jobId && !$jobRepo->claimJob($job->getId())) {
                         if (Helpers::isDebug()) {
                             $output->writeln("Job {$job->getUuid()} already claimed by another worker. Skipping.");
                         }
                         $stats['skipped']++;
                         $stats['total']--;
                         continue;
+                    }
+                    
+                    // If specifically requested by ID, we might need to force the claim if it's not already ours
+                    if ($jobId && $job->getStatus() !== JobStatus::processing->value) {
+                        $jobRepo->claimJob($job->getId());
                     }
 
                     $channelEnum = Channel::tryFromName($job->getChannel());

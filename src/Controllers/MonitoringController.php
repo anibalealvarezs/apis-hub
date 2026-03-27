@@ -362,8 +362,7 @@ class MonitoringController extends BaseController
                     $payload = $job->getPayload() ?? [];
                     
                     // Execute in background to avoid blocking the single-threaded web server
-                    $params = json_encode($payload['params'] ?? []);
-                    $cmd = "php bin/cli.php apis-hub:cache \"{$channel->name}\" \"{$job->getEntity()}\" --params='{$params}' > /dev/null 2>&1 &";
+                    $cmd = "php bin/cli.php app:process-jobs --job-id={$id} > /dev/null 2>&1 &";
                     exec($cmd);
 
                     return new JsonResponse(['success' => true, 'message' => "Job #$id triggered in background. Refresh in a few moments."]);
