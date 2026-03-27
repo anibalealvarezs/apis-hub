@@ -272,7 +272,7 @@ class MonitoringController extends BaseController
                                   LEFT JOIN channeled_accounts ca5 ON cad.channeled_account_id = ca5.id
                                   LEFT JOIN pages pg ON (mc.page_id = pg.id OR (cm.channel = 15 AND cm.platform_id = pg.platform_id))
                                   LEFT JOIN channeled_accounts ca6 ON pg.platform_id = ca6.platform_id
-                                  LEFT JOIN posts p ON (mc.post_id = p.id OR (cm.channel = 15 AND cm.platform_id = p.platform_id))
+                                  LEFT JOIN posts p ON (mc.post_id = p.id OR (cm.channel = 15 AND cm.platform_id = p.post_id))
                                   LEFT JOIN channeled_accounts ca7 ON p.channeled_account_id = ca7.id
                                   LEFT JOIN channeled_accounts ca8 ON (p.page_id = pg.id AND pg.platform_id = ca8.platform_id)
                                   LEFT JOIN accounts a ON (p.account_id = a.id OR pg.account_id = a.id)
@@ -311,9 +311,6 @@ class MonitoringController extends BaseController
                             $resItems = [];
                             try {
                                 $results = $conn->fetchAllAssociative($sql);
-                                if ($tableName === 'channeled_metrics' && isset($_GET['debug_metrics'])) {
-                                    Helpers::dumpDebugJson($results);
-                                }
                                 foreach ($results as $res) {
                                     $channelId = (int)($res['channel'] ?? 0);
                                     $channelLabel = $channelId ? (\Enums\Channel::tryFrom($channelId)?->getCommonName() ?? "Ch $channelId") : "Unidentified Channel";
@@ -334,7 +331,6 @@ class MonitoringController extends BaseController
                                     ];
                                 }
                             } catch (\Exception $e) {
-                                file_put_contents(realpath(__DIR__ . '/../../') . '/logs/monitoring_error.log', "Error executing SQL ($tableName): " . $e->getMessage() . "\nSQL: $sql\n", FILE_APPEND);
                                 try {
                                     $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
                                     foreach ($results as $res) {
