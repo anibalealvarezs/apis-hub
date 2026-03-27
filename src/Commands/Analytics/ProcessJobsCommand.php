@@ -110,7 +110,7 @@ class ProcessJobsCommand extends Command
 
                 // 1. Instance Name Match (Primary Filter)
                 $jobInstance = $payload['instance_name'] ?? null;
-                if (!$forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance) {
+                if (!$jobId && !$forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance) {
                     $stats['skipped']++;
                     continue;
                 }
@@ -187,7 +187,7 @@ class ProcessJobsCommand extends Command
 
                 // Guard: Prevent another job for the same instance from running if one is already processing
                 $instanceName = $payload['instance_name'] ?? null;
-                if ($instanceName && $jobRepo->isAnotherJobProcessing($instanceName)) {
+                if (!$jobId && $instanceName && $jobRepo->isAnotherJobProcessing($instanceName)) {
                     if (Helpers::isDebug()) {
                         $output->writeln("<comment>Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.</comment>");
                     }
