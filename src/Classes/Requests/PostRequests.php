@@ -47,18 +47,31 @@ class PostRequests implements RequestInterface
             $logger = Helpers::setLogger('facebook-entities.log');
         }
 
-        // Apply default dates if missing for "recent" safety
-        if (empty($startDate)) {
-            $startDate = Carbon::today()->subDays(30)->format('Y-m-d');
-            $logger->info("No startDate provided, defaulting to $startDate");
-        }
-        if (empty($endDate)) {
-            $endDate = Carbon::today()->format('Y-m-d');
-            $logger->info("No endDate provided, defaulting to $endDate");
-        }
-
         try {
             $config = MetricRequests::validateFacebookConfig($logger);
+            
+            // Apply default dates if missing - Respecting sync_window from config
+            if (empty($startDate)) {
+                $days = 30; // Absolute fallback
+                if (!empty($config['sync_window'])) {
+                    try {
+                        $interval = new \DateInterval($config['sync_window']);
+                        $startDate = Carbon::today()->sub($interval)->format('Y-m-d');
+                        $logger->info("Using sync_window from config: " . $config['sync_window'] . " -> $startDate");
+                    } catch (\Exception $e) {
+                        $logger->warning("Invalid sync_window in config: " . $config['sync_window'] . ". Using default 30 days.");
+                        $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
+                    }
+                } else {
+                    $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
+                    $logger->info("No startDate or sync_window provided, defaulting to $startDate");
+                }
+            }
+
+            if (empty($endDate)) {
+                $endDate = Carbon::today()->format('Y-m-d');
+            }
+
             $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
             $manager = Helpers::getManager();
             $pageRepo = $manager->getRepository(Page::class);
