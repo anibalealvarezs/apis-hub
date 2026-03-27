@@ -202,18 +202,14 @@ class ProcessJobsCommand extends Command
 
                 try {
                     // Atomic claim by repository
-                    if (!$jobId && !$jobRepo->claimJob($job->getId())) {
-                        if (Helpers::isDebug()) {
-                            $output->writeln("Job {$job->getUuid()} already claimed by another worker. Skipping.");
+                    // Even if we provide job-id, we must ensure it's not already being processed by another worker
+                    if (!$jobRepo->claimJob($job->getId())) {
+                        if (Helpers::isDebug() || $jobId) {
+                            $output->writeln("<comment>Job {$job->getUuid()} already claimed or in progress. Skipping.</comment>");
                         }
                         $stats['skipped']++;
                         $stats['total']--;
                         continue;
-                    }
-                    
-                    // If specifically requested by ID, we might need to force the claim if it's not already ours
-                    if ($jobId && $job->getStatus() !== JobStatus::processing->value) {
-                        $jobRepo->claimJob($job->getId());
                     }
 
                     $channelEnum = Channel::tryFromName($job->getChannel());
