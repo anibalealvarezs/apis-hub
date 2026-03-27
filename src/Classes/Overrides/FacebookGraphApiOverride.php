@@ -69,6 +69,18 @@ class FacebookGraphApiOverride extends FacebookGraphApi
 
         $this->setPageId($pageId);
 
+        // Diagnostic Probe: Check if we can even see the page basic metadata
+        try {
+            $this->performRequest(
+                method: 'GET',
+                endpoint: 'v25.0/'.$pageId,
+                query: ['fields' => 'id,name'],
+                tokenSample: TokenSample::PAGE,
+            );
+        } catch (Exception $e) {
+            error_log("DIAGNOSTIC PROBE FAILED for page $pageId: " . $e->getMessage());
+        }
+
         do {
             if ($after) {
                 $query['after'] = $after;
