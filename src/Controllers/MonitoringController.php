@@ -273,20 +273,26 @@ class MonitoringController extends BaseController
                         if ($tableName === 'channeled_accounts') {
                             $sql = "SELECT channel, type, COUNT(*) as count FROM channeled_accounts GROUP BY channel, type";
                         } elseif ($tableName === 'channeled_metrics') {
-                            // Join with accounts (direct), campaigns, or ad_groups to climb back to channeled_account.type
-                            $sql = "SELECT cm.channel, COALESCE(ca1.type, ca2.type, ca3.type) as type, COUNT(*) as count 
+                            // Join with ads (missing before), accounts (direct), campaigns, or ad_groups to climb back to channeled_account
+                            $sql = "SELECT cm.channel, 
+                                           COALESCE(ca1.type, ca2.type, ca3.type, ca4.type) as type, 
+                                           COALESCE(ca1.name, ca2.name, ca3.name, ca4.name) as name,
+                                           COUNT(*) as count 
                                   FROM channeled_metrics cm 
                                   LEFT JOIN channeled_accounts ca1 ON cm.platform_id = ca1.platform_id AND cm.channel = ca1.channel
-                                  LEFT JOIN channeled_campaigns cc ON cm.platform_id = cc.platform_id AND cm.channel = cc.channel
-                                  LEFT JOIN channeled_accounts ca2 ON cc.channeled_account_id = ca2.id
+                                  LEFT JOIN channeled_ads cad ON cm.platform_id = cad.platform_id AND cm.channel = cad.channel
+                                  LEFT JOIN channeled_accounts ca2 ON cad.channeled_account_id = ca2.id
                                   LEFT JOIN channeled_ad_groups cg ON cm.platform_id = cg.platform_id AND cm.channel = cg.channel
                                   LEFT JOIN channeled_accounts ca3 ON cg.channeled_account_id = ca3.id
-                                  GROUP BY cm.channel, type";
+                                  LEFT JOIN channeled_campaigns cc ON cm.platform_id = cc.platform_id AND cm.channel = cc.channel
+                                  LEFT JOIN channeled_accounts ca4 ON cc.channeled_account_id = ca4.id
+                                  GROUP BY cm.channel, type, name";
                         } elseif ($tableName === 'posts') {
-                            // Subquery approach to find channel/type for every post via page_id or account_id
-                            $sql = "SELECT sub.channel, sub.type, COUNT(*) as count FROM (
+                            // Subquery approach to find channel/type/name for every post via various links
+                            $sql = "SELECT sub.channel, sub.type, sub.name, COUNT(*) as count FROM (
                                       SELECT COALESCE(ca1.channel, ca2.channel, ca3.channel) as channel, 
-                                             COALESCE(ca1.type, ca2.type, ca3.type) as type
+                                             COALESCE(ca1.type, ca2.type, ca3.type) as type,
+                                             COALESCE(ca1.name, ca2.name, ca3.name) as name
                                       FROM posts p
                                       LEFT JOIN channeled_accounts ca1 ON p.channeled_account_id = ca1.id
                                       LEFT JOIN pages pg ON p.page_id = pg.id
@@ -294,23 +300,23 @@ class MonitoringController extends BaseController
                                       LEFT JOIN accounts a ON p.account_id = a.id
                                       LEFT JOIN channeled_accounts ca3 ON ca3.account_id = a.id
                                     ) sub
-                                    GROUP BY sub.channel, sub.type";
+                                    GROUP BY sub.channel, sub.type, sub.name";
                         } elseif ($tableName === 'pages') {
-                            // Pages link to global account, match on platform_id + channeled_accounts to find the type/channel
-                            $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
+                            // Pages link to global account, match on platform_id + channeled_accounts to find the type/channel/name
+                            $sql = "SELECT ca.channel, ca.type, ca.name, COUNT(*) as count 
                                   FROM pages p 
                                   LEFT JOIN channeled_accounts ca ON p.platform_id = ca.platform_id 
-                                  GROUP BY ca.channel, ca.type";
+                                  GROUP BY ca.channel, ca.type, ca.name";
                         } elseif (in_array($tableName, ['channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
-                            $sql = "SELECT e.channel, ca.type, COUNT(*) as count 
+                            $sql = "SELECT e.channel, ca.type, ca.name, COUNT(*) as count 
                                   FROM $tableName e 
                                   LEFT JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
-                                  GROUP BY e.channel, ca.type";
+                                  GROUP BY e.channel, ca.type, ca.name";
                         } else {
                             // Search for channel column first
                             $columns = $conn->fetchFirstColumn("DESCRIBE $tableName");
                             if (in_array('channel', $columns)) {
-                                $sql = "SELECT channel, NULL as type, COUNT(*) as count FROM $tableName GROUP BY channel";
+                                $sql = "SELECT channel, NULL as type, NULL as name, COUNT(*) as count FROM $tableName GROUP BY channel";
                             }
                         }
 
@@ -322,31 +328,37 @@ class MonitoringController extends BaseController
                                     $channelCount = (int)$res['count'];
                                     
                                     if (!$channelId) {
-                                        $channelName = "Unidentified Channel";
+                                        $channelLabel = "Unidentified Channel";
                                     } else {
-                                        $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? \Enums\Channel::tryFromName($res['channel'])?->getCommonName() ?? "Ch $channelId";
+                                        $channelLabel = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? \Enums\Channel::tryFromName($res['channel'])?->getCommonName() ?? "Ch $channelId";
                                     }
                                     
                                     $typeValue = $res['type'] ?? '';
+                                    $accountName = $res['name'] ?? '';
                                     
                                     // Try to get a friendly name for the type enum
                                     $typeName = $typeValue;
                                     if ($typeValue && class_exists('\Enums\Account')) {
                                         $enum = \Enums\Account::tryFrom($typeValue);
-                                        $typeName = $enum ? str_replace('_', ' ', $enum->name) : $typeValue;
+                                        $typeName = $enum ? ucwords(str_replace('_', ' ', $enum->value)) : $typeValue;
                                     }
                                     
-                                    $labelParts = [$channelName];
-                                    if ($typeName) $labelParts[] = $typeName;
-                                    
+                                    $labelParts = [];
+                                    if ($accountName) {
+                                        $labelParts[] = $accountName;
+                                    } else {
+                                        $labelParts[] = $channelLabel;
+                                    }
+
                                     $fullLabel = implode(' • ', $labelParts);
                                     
                                     $channeledDataItems[] = [
                                         'name' => $fullLabel,
                                         'count' => $channelCount,
-                                        'channel' => $channelName,
+                                        'channel' => $channelLabel,
                                         'type' => $typeName,
-                                        'type_raw' => $typeValue
+                                        'type_raw' => $typeValue,
+                                        'account_name' => $accountName
                                     ];
                                 }
                             } catch (\Exception $e) {
