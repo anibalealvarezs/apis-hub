@@ -237,8 +237,8 @@ class MonitoringController extends BaseController
             'Discounts' => ['class' => 'Analytics\Discount', 'channeled' => 'Analytics\Channeled\ChanneledDiscount'],
             'Price Rules' => ['class' => 'Analytics\PriceRule', 'channeled' => 'Analytics\Channeled\ChanneledPriceRule'],
             'Vendors' => ['class' => 'Analytics\Vendor', 'channeled' => 'Analytics\Channeled\ChanneledVendor'],
-            'Pages' => ['class' => 'Analytics\Page', 'channeled' => null],
-            'Posts' => ['class' => 'Analytics\Post', 'channeled' => null],
+            'Pages' => ['class' => 'Analytics\Page', 'channeled' => 'Analytics\Page'],
+            'Posts' => ['class' => 'Analytics\Post', 'channeled' => 'Analytics\Post'],
             'Queries' => ['class' => 'Analytics\Query', 'channeled' => null],
             'Countries' => ['class' => 'Analytics\Country', 'channeled' => null],
             'Devices' => ['class' => 'Analytics\Device', 'channeled' => null],
@@ -272,10 +272,28 @@ class MonitoringController extends BaseController
                         if ($tableName === 'channeled_accounts') {
                             $sql = "SELECT channel, type, COUNT(*) as count FROM channeled_accounts GROUP BY channel, type";
                         } elseif ($tableName === 'channeled_metrics') {
-                            $sql = "SELECT cm.channel, ca.type, COUNT(*) as count 
+                            // Join with accounts (direct), campaigns, or ad_groups to climb back to channeled_account.type
+                            $sql = "SELECT cm.channel, COALESCE(ca1.type, ca2.type, ca3.type) as type, COUNT(*) as count 
                                   FROM channeled_metrics cm 
-                                  LEFT JOIN channeled_accounts ca ON cm.platform_id = ca.platform_id AND cm.channel = ca.channel 
-                                  GROUP BY cm.channel, ca.type";
+                                  LEFT JOIN channeled_accounts ca1 ON cm.platform_id = ca1.platform_id AND cm.channel = ca1.channel
+                                  LEFT JOIN channeled_campaigns cc ON cm.platform_id = cc.platform_id AND cm.channel = cc.channel
+                                  LEFT JOIN channeled_accounts ca2 ON cc.channeled_account_id = ca2.id
+                                  LEFT JOIN channeled_ad_groups cg ON cm.platform_id = cg.platform_id AND cm.channel = cg.channel
+                                  LEFT JOIN channeled_accounts ca3 ON cg.channeled_account_id = ca3.id
+                                  GROUP BY cm.channel, type";
+                        } elseif ($tableName === 'posts') {
+                            // Posts have a direct channeled_account_id
+                            $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
+                                  FROM posts p 
+                                  JOIN channeled_accounts ca ON p.channeled_account_id = ca.id 
+                                  GROUP BY ca.channel, ca.type";
+                        } elseif ($tableName === 'pages') {
+                            // Pages link to global account, which link to channeled accounts
+                            $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
+                                  FROM pages p 
+                                  JOIN accounts a ON p.account_id = a.id
+                                  JOIN channeled_accounts ca ON ca.account_id = a.id
+                                  GROUP BY ca.channel, ca.type";
                         } elseif (in_array($tableName, ['channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
                             $sql = "SELECT e.channel, ca.type, COUNT(*) as count 
                                   FROM $tableName e 
@@ -289,7 +307,9 @@ class MonitoringController extends BaseController
                             try {
                                 $results = $conn->fetchAllAssociative($sql);
                                 foreach ($results as $res) {
-                                    $channelId = (int)$res['channel'];
+                                    $channelId = (int)($res['channel'] ?? 0);
+                                    if (!$channelId) continue;
+                                    
                                     $channelCount = (int)$res['count'];
                                     $typeValue = $res['type'] ?? '';
                                     
