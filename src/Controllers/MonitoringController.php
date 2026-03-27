@@ -353,8 +353,8 @@ class MonitoringController extends BaseController
                     return new JsonResponse(['success' => true, 'message' => "New job scheduled. Original #$id history preserved."]);
                 
                 case 'process':
-                    if ($job->getStatus() !== JobStatus::scheduled->value) {
-                         return new JsonResponse(['error' => 'Only scheduled jobs can be processed manually'], 400);
+                    if ($job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
+                         return new JsonResponse(['error' => 'Only scheduled or delayed jobs can be processed manually'], 400);
                     }
                     if (!$jobRepo->claimJob($id)) return new JsonResponse(['error' => 'Job already processing'], 409);
                     

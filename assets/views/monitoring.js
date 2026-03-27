@@ -246,12 +246,10 @@ function updateContainers(containers) {
                             ` : ''}
                         </div>
                     </div>
-                    <button class="btn btn-mini" onclick="triggerSyncInstance('${container.source.toLowerCase()}', '${container.entity.toLowerCase()}', '${container.id}')" 
-                            style="background:rgba(88, 166, 255, 0.1); color:var(--primary); padding:8px; border-radius:8px; border:1px solid rgba(88, 166, 255, 0.2); transition: all 0.2s;"
-                            onmouseover="this.style.background='var(--primary)'; this.style.color='#fff';"
-                            onmouseout="this.style.background='rgba(88, 166, 255, 0.1)'; this.style.color='var(--primary)';"
-                            title="Force Execution (Full Sync for this instance)">
-                        <i data-lucide="play-circle" size="18"></i>
+                    <button class="btn btn-mini disabled-btn" disabled 
+                            style="background:rgba(255, 255, 255, 0.05); color:var(--text-dim); padding:8px; border-radius:8px; border:1px solid rgba(255, 255, 255, 0.1); cursor:not-allowed;"
+                            title="Force Sync (Feature disabled for now. This will allow manual, out-of-schedule execution for specific instances in future updates.)">
+                        <i data-lucide="play-circle" style="opacity:0.3" size="18"></i>
                     </button>
                 </div>
             `;
@@ -387,22 +385,30 @@ function updatePendingJobsDetailed(groupedJobs) {
                                }).join('')}
                            </div>
                        </div>
-                       <div style="display:flex; gap:8px;">
-                          <button onclick="event.stopPropagation(); processJob(${job.id})" 
-                                  class="btn btn-mini ${!canReschedule ? 'disabled-btn' : ''}" 
-                                  ${!canReschedule ? 'disabled' : ''}
-                                  style="background: rgba(88, 166, 255, 0.1); border-color: rgba(88, 166, 255, 0.2); padding: 8px 15px; color: var(--primary); display:flex; align-items:center; gap:6px;">
-                              <i data-lucide="calendar-plus" size="14"></i>
-                              <span style="font-size:0.75rem; font-weight:700;">Re-schedule</span>
-                          </button>
-                          <button onclick="event.stopPropagation(); cancelJob(${job.id})" 
-                                  class="btn btn-mini ${!canCancel ? 'disabled-btn' : ''}" 
-                                  ${!canCancel ? 'disabled' : ''}
-                                  style="background: rgba(248, 81, 73, 0.1); border-color: rgba(248, 81, 73, 0.2); color:var(--danger); padding: 8px 12px;" 
-                                  title="Abort synchronization">
-                              <i data-lucide="trash-2" size="14"></i>
-                          </button>
-                       </div>
+                        <div style="display:flex; gap:8px;">
+                           ${(job.status === 1 || job.status === 5) ? `
+                               <button onclick="event.stopPropagation(); runJobNow(${job.id})" 
+                                       class="btn btn-mini" 
+                                       style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 12px;" 
+                                       title="Run now (bypass cron cycle)">
+                                   <i data-lucide="play" size="14"></i>
+                               </button>
+                           ` : ''}
+                           <button onclick="event.stopPropagation(); processJob(${job.id})" 
+                                   class="btn btn-mini ${!canReschedule ? 'disabled-btn' : ''}" 
+                                   ${!canReschedule ? 'disabled' : ''}
+                                   style="background: rgba(88, 166, 255, 0.1); border-color: rgba(88, 166, 255, 0.2); padding: 8px 15px; color: var(--primary); display:flex; align-items:center; gap:6px;">
+                               <i data-lucide="calendar-plus" size="14"></i>
+                               <span style="font-size:0.75rem; font-weight:700;">Re-schedule</span>
+                           </button>
+                           <button onclick="event.stopPropagation(); cancelJob(${job.id})" 
+                                   class="btn btn-mini ${!canCancel ? 'disabled-btn' : ''}" 
+                                   ${!canCancel ? 'disabled' : ''}
+                                   style="background: rgba(248, 81, 73, 0.1); border-color: rgba(248, 81, 73, 0.2); color:var(--danger); padding: 8px 12px;" 
+                                   title="Abort synchronization">
+                               <i data-lucide="trash-2" size="14"></i>
+                           </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -595,9 +601,50 @@ function showToast(msg, isError) {
     }, 4000);
 }
 
+/**
+ * Process a specific job immediately in the background.
+ * @param {number} id 
+ */
+async function runJobNow(id) {
+    if (!confirm(`Are you sure you want to trigger Job #${id} immediately?`)) {
+        return;
+    }
+
+    showToast(`Triggering Job #${id}...`, false);
+
+    try {
+        const response = await fetch('/api/monitoring/jobs/action', {
+            method: 'POST',
+            headers: getAdminHeaders(),
+            body: JSON.stringify({
+                action: 'process',
+                id: id
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast(`Success: Job #${id} triggered.`, false);
+            // Refresh
+            if (typeof fetchMonitoringData === 'function') {
+                setTimeout(fetchMonitoringData, 1000);
+            } else if (typeof fetchData === 'function') {
+                setTimeout(fetchData, 1000);
+            }
+        } else {
+            throw new Error(data.error || 'Server error occurred');
+        }
+    } catch (e) {
+        console.error("Run Job Error:", e);
+        showToast(`Failed to trigger job: ${e.message}`, true);
+    }
+}
+
 // Global Exports
 window.processJob = processJob;
 window.cancelJob = cancelJob;
+window.runJobNow = runJobNow;
 window.triggerSyncInstance = triggerSyncInstance;
 window.showToast = showToast;
 

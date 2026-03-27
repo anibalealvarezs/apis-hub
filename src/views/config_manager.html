@@ -254,7 +254,7 @@
                 <div class="section-title small" style="display:flex; justify-content:space-between; align-items:center;">
                     <span><i data-lucide="layers"></i> Search Console properties</span>
                     <button class="btn btn-mini" onclick="forceRefresh('gsc')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Google</button>
-                    <button class="btn btn-mini" onclick="triggerFullSync('gsc', 'query')" style="background:var(--secondary);"><i data-lucide="zap" size="14"></i> Force Data Sync</button>
+                    <button class="btn btn-mini disabled-btn" disabled style="background:rgba(255,255,255,0.05); color:var(--text-dim); cursor:not-allowed;" title="Force Sync (Feature disabled for now. This will allow triggering a full historical sync for all Google Search Console assets in future updates.)"><i data-lucide="zap" size="14" style="opacity:0.3"></i> Force Data Sync</button>
                 </div>
                 <div id="gsc-list" class="asset-grid"></div>
             </div>
@@ -328,9 +328,9 @@
 
             <div class="card">
                 <div class="section-title small"><i data-lucide="layout"></i> Connected Pages</div>
-                <div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:15px;">
+                <div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:15px; gap:8px;">
                     <button class="btn btn-mini" onclick="forceRefresh('facebook')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Meta</button>
-                    <button class="btn btn-mini" onclick="triggerFullSync('facebook', 'metrics')" style="background:var(--secondary);"><i data-lucide="zap" size="14"></i> Force Data Sync</button>
+                    <button class="btn btn-mini disabled-btn" disabled style="background:rgba(255,255,255,0.05); color:var(--text-dim); cursor:not-allowed;" title="Force Sync (Feature disabled for now. This will allow triggering a full historical sync for all Meta Organic pages in future updates.)"><i data-lucide="zap" size="14" style="opacity:0.3"></i> Force Data Sync</button>
                 </div>
                 <div id="fb-pages-list" class="asset-grid"></div>
             </div>
@@ -450,8 +450,10 @@
                 <div class="card">
                     <div class="section-title small"><i data-lucide="target"></i> Ad Accounts</div>
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                        <button class="btn btn-mini" onclick="forceRefresh('facebook_marketing')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Meta</button>
-                        <button class="btn btn-mini" onclick="triggerFullSync('facebook_marketing', 'metrics')" style="background:var(--secondary);"><i data-lucide="zap" size="14"></i> Force Data Sync</button>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-mini" onclick="forceRefresh('facebook_marketing')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Meta</button>
+                            <button class="btn btn-mini disabled-btn" disabled style="background:rgba(255,255,255,0.05); color:var(--text-dim); cursor:not-allowed;" title="Force Sync (Feature disabled for now. This will allow triggering a full historical sync for all Meta Marketing accounts in future updates.)"><i data-lucide="zap" size="14" style="opacity:0.3"></i> Force Data Sync</button>
+                        </div>
                         <button class="btn btn-mini" onclick="toggleAllAds()" title="Select/Deselect All"><i data-lucide="check-square" size="14"></i> Select All</button>
                     </div>
                     <div id="fb-ad-accounts-list" class="asset-grid three-cols"></div>
