@@ -67,6 +67,8 @@ class FacebookGraphApiOverride extends FacebookGraphApi
         $posts = [];
         $after = null;
 
+        $this->setPageId($pageId);
+
         do {
             if ($after) {
                 $query['after'] = $after;
