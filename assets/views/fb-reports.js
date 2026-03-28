@@ -158,8 +158,18 @@ function getAdminHeaders() {
     return { 'Authorization': 'Bearer ' + auth.token, 'Content-Type': 'application/json' };
 }
 
-async function forceRefresh() {
-    if (!confirm("This will clear the aggregation cache for Facebook Marketing and reload. Continue?")) return;
+function forceRefresh() {
+    const modal = document.getElementById('flush-modal');
+    if (modal) modal.classList.add('active');
+}
+
+function closeFlushModal() {
+    const modal = document.getElementById('flush-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+async function confirmFlush() {
+    closeFlushModal();
     const loader = document.getElementById('loader');
     if (loader) loader.style.display = 'flex';
     try {
@@ -168,9 +178,37 @@ async function forceRefresh() {
         });
         const result = await response.json();
         if (result.success) loadReport();
-        else alert(result.error || 'Flush failed');
-    } catch (err) { alert(err.message); }
+        else {
+            showToast(result.error || 'Flush failed', true);
+        }
+    } catch (err) { 
+        showToast(err.message, true);
+    }
     finally { if (loader) loader.style.display = 'none'; }
+}
+
+function showToast(msg, isError) {
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (isError ? 'error' : 'success');
+    toast.style.position = 'fixed';
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '20000';
+    toast.style.padding = '12px 24px';
+    toast.style.borderRadius = '12px';
+    toast.style.background = isError ? 'rgba(248, 81, 73, 0.9)' : 'rgba(35, 134, 54, 0.9)';
+    toast.style.color = 'white';
+    toast.style.boxShadow = '0 10px 25px rgba(0,0,0,0.3)';
+    toast.style.backdropFilter = 'blur(10px)';
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.gap = '10px';
+    toast.style.fontSize = '0.9rem';
+    toast.style.fontWeight = '600';
+    toast.innerHTML = `<i data-lucide="${isError ? 'alert-circle' : 'check-circle'}" size="18"></i> ${msg}`;
+    document.body.appendChild(toast);
+    lucide.createIcons();
+    setTimeout(() => { toast.remove(); }, 4000);
 }
 
 async function loadReport() {
@@ -733,6 +771,8 @@ function renderSparkline(container, points, config = {}) {
 // Global hooks
 window.loadReport = loadReport;
 window.forceRefresh = forceRefresh;
+window.confirmFlush = confirmFlush;
+window.closeFlushModal = closeFlushModal;
 window.initDashboard = initDashboard;
 window.toggleHierarchy = toggleHierarchy;
 window.sortTable = sortTable;
