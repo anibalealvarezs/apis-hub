@@ -531,6 +531,7 @@ class MetricRequests
                                 $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
                                 if ($page['ig_account_media_metrics']) {
                                     foreach ($mediaMap['map'] as $mediaIdInDb) {
+                                        Helpers::checkJobStatus($jobId);
                                         if ($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$mediaIdInDb] == $page['ig_account_media_stop_id'])) {
                                             break;
                                         }
@@ -568,6 +569,7 @@ class MetricRequests
 
                         if ($page['post_metrics']) {
                             foreach ($postMap['map'] as $postIdInDb) {
+                                Helpers::checkJobStatus($jobId);
                                 try {
                                     $postEntity = $postRepository->find($postIdInDb);
                                     if ($postEntity) {
