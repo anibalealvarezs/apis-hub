@@ -417,7 +417,7 @@ class MetricRequests
                         $logger->info("Processing page chunk: $cStart to $cEnd");
 
                         if ($page['page_metrics']) {
-                            self::processFacebookPage(
+                            $res = self::processFacebookPage(
                                 page: $page,
                                 startDate: $cStart,
                                 endDate: $cEnd,
@@ -427,6 +427,9 @@ class MetricRequests
                                 logger: $logger,
                                 pageMap: $pageMap,
                             );
+                            $totalMetrics += $res['metrics'] ?? 0;
+                            $totalRows += $res['rows'] ?? 0;
+                            $totalDuplicates += $res['duplicates'] ?? 0;
                         }
 
                         if ($page['posts']) {
@@ -442,7 +445,7 @@ class MetricRequests
                                             if (!Helpers::matchesFilter($postMsg, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($postEntity->getPostId(), $includeFilter, $excludeFilter)) {
                                                 continue;
                                             }
-                                            self::processFacebookPagePost(
+                                            $res = self::processFacebookPagePost(
                                                 postEntity: $postEntity,
                                                 pageEntity: $pageEntity,
                                                 api: $api,
@@ -451,6 +454,9 @@ class MetricRequests
                                                 postMap: $postMap,
                                                 pageMap: $pageMap,
                                             );
+                                            $totalMetrics += $res['metrics'] ?? 0;
+                                            $totalRows += $res['rows'] ?? 0;
+                                            $totalDuplicates += $res['duplicates'] ?? 0;
                                         }
                                     } catch (Exception $e) {
                                         $logger->error("Error processing Facebook post " . $postIdInDb . ": " . $e->getMessage());
@@ -465,7 +471,7 @@ class MetricRequests
                             if (!Helpers::matchesFilter((string) $page['ig_account'], $includeFilter, $excludeFilter)) {
                                 $logger->info("Skipping Instagram account: " . $page['ig_account'] . " (filtered out)");
                             } elseif ($accountEntity) {
-                                self::processInstagramAccount(
+                                $res = self::processInstagramAccount(
                                     page: $page,
                                     api: $api,
                                     manager: $manager,
@@ -478,6 +484,9 @@ class MetricRequests
                                     config: $config,
                                     channel: 'facebook_organic'
                                 );
+                                $totalMetrics += $res['metrics'] ?? 0;
+                                $totalRows += $res['rows'] ?? 0;
+                                $totalDuplicates += $res['duplicates'] ?? 0;
                             } else {
                                 $logger->error("Cannot process Instagram account " . $page['ig_account'] . " because accountEntity is null.");
                             }
@@ -505,7 +514,7 @@ class MetricRequests
                                                 if (!Helpers::matchesFilter($mediaCaption, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($mediaEntity->getPostId(), $includeFilter, $excludeFilter)) {
                                                     continue;
                                                 }
-                                                self::processInstagramMedia(
+                                                $res = self::processInstagramMedia(
                                                     pageEntity: $pageEntity,
                                                     postEntity: $mediaEntity,
                                                     accountEntity: $accountEntity,
@@ -516,6 +525,9 @@ class MetricRequests
                                                     mediaMap: $mediaMap,
                                                     pageMap: $pageMap,
                                                 );
+                                                $totalMetrics += $res['metrics'] ?? 0;
+                                                $totalRows += $res['rows'] ?? 0;
+                                                $totalDuplicates += $res['duplicates'] ?? 0;
                                             }
                                         } catch (Exception $e) {
                                             $logger->error("Error processing Instagram media " . $mediaIdInDb . ": " . $e->getMessage());
@@ -1412,7 +1424,7 @@ class MetricRequests
         EntityRepository $pageRepository,
         LoggerInterface $logger,
         array $pageMap,
-    ): void {
+    ): array {
 
         // Get page entity
         $pageEntity = $pageRepository->findOneBy(['platformId' => $page['id']]);
@@ -1425,6 +1437,7 @@ class MetricRequests
         $api->setPageId((string) $page['id']);
 
         $allMetrics = new ArrayCollection();
+        $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
 
         try {
             $maxRetries = 3;
@@ -1451,7 +1464,7 @@ class MetricRequests
                         $logger->error(($isFatal ? "FATAL INSIGHTS ERROR" : "Failed") . " to retrieve insights for page " . $page['id'] . ": " . $msg);
                         $fetched = true; // Break loop
                         if (!$isFatal) throw $e;
-                        return; // Continue to next page
+                        return $stats; // Continue to next page
                     }
                     $logger->warning("Retry $retryCount/$maxRetries for FB page insights " . $page['id'] . ": " . $msg);
                     usleep(200000 * $retryCount);
@@ -1460,8 +1473,9 @@ class MetricRequests
 
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for page " . $page['id']);
-                return;
+                return $stats;
             }
+            $stats['rows'] = count($rows['data']);
 
             $metrics = FacebookOrganicMetricConvert::pageMetrics(
                 rows: $rows['data'],
@@ -1477,8 +1491,9 @@ class MetricRequests
 
             if (count($allMetrics) === 0) {
                 $logger->info("No metrics found for page " . $page['id']);
-                return;
+                return $stats;
             }
+            $stats['metrics'] = count($allMetrics);
 
             try {
                 $manager->getConnection()->beginTransaction();
@@ -1517,7 +1532,7 @@ class MetricRequests
 
             $logger->info("Completed FB page insights request");
 
-            return;
+            return $stats;
         } catch (Exception $e) {
             $logger->error("Error during FB page insights request for page " . $page['id'] . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
             throw $e;
@@ -1705,7 +1720,7 @@ class MetricRequests
         ?string $endDate = null,
         array $config = [],
         string $channel = 'facebook_organic'
-    ): void {
+    ): array {
 
         if (!$startDate) {
             $startDate = self::getRetentionRange($config, $channel, '2 years - 1 day');
@@ -1744,6 +1759,8 @@ class MetricRequests
             'mapReverse' => [],
         ];
 
+        $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
+
         $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
         $channeledAccountEntity = $channeledAccountRepository->findOneBy([
             'platformId' => (string) $page['ig_account'],
@@ -1754,6 +1771,8 @@ class MetricRequests
         $channeledAccountMap['mapReverse'][$channeledAccountEntity->getId()] = (string) $page['ig_account'];
 
         $api->setPageId((string) $page['ig_account']);
+
+        $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
 
         try {
             do {
@@ -1830,8 +1849,10 @@ class MetricRequests
 
             if (count($allMetrics) === 0) {
                 $logger->info("No metrics found for page " . $page['id']);
-                return;
+                return $stats;
             }
+            $stats['metrics'] = count($allMetrics);
+            $stats['rows'] = count($rows['data'] ?? []);
 
             try {
                 $manager->getConnection()->beginTransaction();
@@ -1871,7 +1892,7 @@ class MetricRequests
 
             $logger->info("Completed FB page insights request");
 
-            return;
+            return $stats;
         } catch (Exception $e) {
             $logger->error("Error during FB page insights request for page " . $page['id'] . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
             throw $e;
@@ -1890,7 +1911,7 @@ class MetricRequests
      * @param LoggerInterface $logger
      * @param array $mediaMap
      * @param array $pageMap
-     * @return bool
+     * @return array
      * @throws GuzzleException
      * @throws \Doctrine\DBAL\Exception
      */
@@ -1904,7 +1925,7 @@ class MetricRequests
         LoggerInterface $logger,
         array $mediaMap,
         array $pageMap,
-    ): bool {
+    ): array {
 
         $accountMap = [
             'map' => [
@@ -1926,6 +1947,7 @@ class MetricRequests
         $api->setPageId((string) $pageEntity->getPlatformId());
 
         $allMetrics = new ArrayCollection();
+        $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
 
         try {
             $maxRetries = 3;
@@ -1949,7 +1971,7 @@ class MetricRequests
                         $logger->error(($isFatal ? "FATAL IG MEDIA ERROR" : "Failed") . " to retrieve IG media insights " . $postEntity->getPostId() . ": " . $msg);
                         $fetched = true; // Break loop
                         if (!$isFatal) throw $e;
-                        return false;
+                        return $stats;
                     }
                     $logger->warning("Retry $retryCount/$maxRetries for IG media insights " . $postEntity->getPostId() . ": " . $msg);
                     usleep(200000 * $retryCount);
@@ -1958,8 +1980,9 @@ class MetricRequests
 
             if (count($insights['data']) === 0) {
                 $logger->info("No insights found for post " . $postEntity->getPostId());
-                return false;
+                return $stats;
             }
+            $stats['rows'] = count($insights['data']);
 
             $metrics = FacebookOrganicMetricConvert::igMediaMetrics(
                 rows: $insights['data'],
@@ -2016,8 +2039,9 @@ class MetricRequests
             }
 
             $logger->info("Completed FB page insights request");
+            $stats['metrics'] = count($allMetrics);
 
-            return true;
+            return $stats;
         } catch (Exception $e) {
             $logger->error("Error during IG Media insights request for post " . $postEntity->getPostId() . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
             throw $e;
@@ -2608,7 +2632,7 @@ class MetricRequests
      * @param LoggerInterface $logger
      * @param array $postMap
      * @param array $pageMap
-     * @return bool
+     * @return array
      * @throws GuzzleException
      * @throws \Doctrine\DBAL\Exception
      */
@@ -2620,9 +2644,10 @@ class MetricRequests
         LoggerInterface $logger,
         array $postMap,
         array $pageMap,
-    ): bool {
+    ): array {
         $api->setPageId((string) $pageEntity->getPlatformId());
         $allMetrics = new ArrayCollection();
+        $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
 
         try {
             $maxRetries = 3;
@@ -2648,8 +2673,9 @@ class MetricRequests
 
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for post " . $postEntity->getPostId());
-                return false;
+                return $stats;
             }
+            $stats['rows'] = count($rows['data']);
 
             $metrics = FacebookOrganicMetricConvert::pageMetrics(
                 rows: $rows['data'],
@@ -2702,8 +2728,9 @@ class MetricRequests
             }
 
             $logger->info("Completed FB page insights request");
+            $stats['metrics'] = count($allMetrics);
 
-            return true;
+            return $stats;
         } catch (Exception $e) {
             $logger->error("Error during FB page post insights request for post " . $postEntity->getPostId() . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
             throw $e;
