@@ -522,8 +522,9 @@ class MetricRequests
 
                         if (!empty($page['ig_account']) && !empty($page['ig_accounts']) && !empty($page['ig_account_media'])) {
                             $channeledAccountEntity = $channeledAccountRepository->findOneBy([
-                                'platformId' => $page['ig_account'],
-                                'account' => $accountEntity,
+                                'platformId' => (string) $page['ig_account'],
+                                'channel' => Channel::facebook_organic->value,
+                                'type' => AccountEnum::INSTAGRAM->value,
                             ]);
 
                             if ($channeledAccountEntity) {
@@ -2571,15 +2572,20 @@ class MetricRequests
         if (!$channeledAccountEntity) {
              return ['map' => [], 'mapReverse' => []];
         }
-        $sql = "SELECT id, post_id FROM posts WHERE page_id = ? AND channeled_account_id = ?";
+        $sql = "SELECT id, post_id, data FROM posts WHERE page_id = ? AND channeled_account_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId(), $channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
+        $mapData = [];
         foreach ($fetched as $row) {
-            $map[$row['post_id']] = (int)$row['id'];
+            $postId = $row['post_id'];
+            $map[$postId] = (int)$row['id'];
+            $data = json_decode($row['data'], true) ?? [];
+            $mapData[$postId] = $data['media_type'] ?? 'IMAGE'; // Default to IMAGE if unknown
         }
         return [
             'map' => $map,
             'mapReverse' => array_flip($map),
+            'mapData' => $mapData,
         ];
     }
     private static function getCampaignMaps(
