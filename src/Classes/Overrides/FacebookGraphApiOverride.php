@@ -36,12 +36,12 @@ class FacebookGraphApiOverride extends FacebookGraphApi
         \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet $metricSet = \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet::BASIC,
         array $customMetrics = [],
     ): array {
-        // Set of metrics compatible with v25.0
+        // Definitive set for v25.0 (Meta switched Impressions to Media View)
         $metricProgression = [
-            'page_views_total',           // SUCCESS - (returned empty but no error #100)
-            'page_post_engagements',      // SUCCESS - (returned empty but no error #100)
-            'page_daily_active_users',    // Very stable reach/activity metric
-            'page_impressions',           // Verification - check if v25.0 still accepts it
+            'page_post_engagements',      // Verified VALID
+            'page_views_total',           // Verified VALID
+            'page_media_view',            // Modern replacement for Page Impressions
+            'page_media_view_unique',     // Modern replacement for Page Reach
         ];
 
         // If customMetrics are provided, we use those instead
