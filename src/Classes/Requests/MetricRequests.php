@@ -434,7 +434,12 @@ class MetricRequests
                             // Sync Posts from Facebook before getting metrics
                             try {
                                 $logger->info("Syncing posts for Facebook Page {$pageId}");
-                                $rawPosts = $api->getFacebookPosts((string) $pageId);
+                                // Only sync posts from the start of the current year to avoid heavy historical loads
+                                $syncSince = Carbon::now()->startOfYear()->timestamp;
+                                $rawPosts = $api->getFacebookPosts(
+                                    pageId: (string) $pageId,
+                                    additionalParams: ['since' => $syncSince]
+                                );
                                 if (!empty($rawPosts['data'])) {
                                     $postsCollection = FacebookOrganicMetricConvert::toPostsCollection(
                                         posts: $rawPosts['data'],
@@ -454,7 +459,12 @@ class MetricRequests
                             // Sync Media from Instagram before getting metrics
                             try {
                                 $logger->info("Syncing media for Instagram Account {$page['ig_account']}");
-                                $rawMedia = $api->getInstagramMedia((string) $page['ig_account']);
+                                // Only sync media items from the start of the current year
+                                $syncSince = Carbon::now()->startOfYear()->timestamp;
+                                $rawMedia = $api->getInstagramMedia(
+                                    igUserId: (string) $page['ig_account'],
+                                    additionalParams: ['since' => $syncSince]
+                                );
                                 if (!empty($rawMedia['data'])) {
                                     $mediaCollection = FacebookOrganicMetricConvert::toInstagramMediaCollection(
                                         mediaItems: $rawMedia['data'],
