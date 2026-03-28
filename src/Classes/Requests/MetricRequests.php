@@ -609,7 +609,11 @@ class MetricRequests
                                 $logger->info("Processing Facebook post batch " . ($chunkIndex + 1) . "/" . count($postChunks));
                                 $urls = [];
                                 foreach ($chunk as $postPlatformId => $postEntity) {
-                                    $pMetrics = FacebookPostPermission::DEFAULT->insightsFields();
+                                    $postType = $postMap['mapData'][$postPlatformId] ?? 'status';
+                                    $pMetrics = 'post_reactions_by_type_total';
+                                    if ($postType === 'video') {
+                                        $pMetrics .= ',post_media_view';
+                                    }
                                     $urls[] = "/{$postPlatformId}/insights?metric={$pMetrics}&period=lifetime";
                                 }
 
@@ -2603,15 +2607,20 @@ class MetricRequests
         EntityManager $manager,
         Page $pageEntity,
     ): array {
-        $sql = "SELECT id, post_id FROM posts WHERE page_id = ? AND channeled_account_id IS NULL";
+        $sql = "SELECT id, post_id, data FROM posts WHERE page_id = ? AND channeled_account_id IS NULL";
         $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId()])->fetchAllAssociative();
         $map = [];
+        $mapData = [];
         foreach ($fetched as $row) {
-            $map[$row['post_id']] = (int)$row['id'];
+            $postId = $row['post_id'];
+            $map[$postId] = (int)$row['id'];
+            $data = json_decode($row['data'] ?? '{}', true) ?? [];
+            $mapData[$postId] = $data['type'] ?? ($data['status_type'] ?? 'status');
         }
         return [
             'map' => $map,
             'mapReverse' => array_flip($map),
+            'mapData' => $mapData,
         ];
     }
 
