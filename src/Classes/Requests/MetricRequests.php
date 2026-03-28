@@ -614,7 +614,7 @@ class MetricRequests
                                     if ($postType === 'video') {
                                         $pMetrics .= ',post_media_view';
                                     }
-                                    $urls[] = "/{$postPlatformId}/insights?metric={$pMetrics}&period=lifetime";
+                                    $urls[] = "/{$postPlatformId}/insights?metric={$pMetrics}&period=lifetime&fields=name,period,values";
                                 }
 
                                 $batchResults = $api->getBatch($urls);
