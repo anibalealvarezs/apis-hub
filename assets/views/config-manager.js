@@ -209,40 +209,40 @@ function populateGlobalFields() {
         
         // Cron Scheduling Hours (Global)
         const globalEntHourEl = document.getElementById('cron-entities-hour');
-        if (globalEntHourEl) globalEntHourEl.value = currentConfig.cron_entities_hour !== undefined ? currentConfig.cron_entities_hour : 2;
+        if (globalEntHourEl) globalEntHourEl.value = (currentConfig.cron_entities_hour !== undefined && currentConfig.cron_entities_hour !== null) ? currentConfig.cron_entities_hour : 2;
         const globalEntMinEl = document.getElementById('cron-entities-minute');
-        if (globalEntMinEl) globalEntMinEl.value = currentConfig.cron_entities_minute !== undefined ? currentConfig.cron_entities_minute : 0;
+        if (globalEntMinEl) globalEntMinEl.value = (currentConfig.cron_entities_minute !== undefined && currentConfig.cron_entities_minute !== null) ? currentConfig.cron_entities_minute : 0;
 
         const globalRecHourEl = document.getElementById('cron-recent-hour');
-        if (globalRecHourEl) globalRecHourEl.value = currentConfig.cron_recent_hour !== undefined ? currentConfig.cron_recent_hour : 5;
+        if (globalRecHourEl) globalRecHourEl.value = (currentConfig.cron_recent_hour !== undefined && currentConfig.cron_recent_hour !== null) ? currentConfig.cron_recent_hour : 5;
         const globalRecMinEl = document.getElementById('cron-recent-minute');
-        if (globalRecMinEl) globalRecMinEl.value = currentConfig.cron_recent_minute !== undefined ? currentConfig.cron_recent_minute : 0;
+        if (globalRecMinEl) globalRecMinEl.value = (currentConfig.cron_recent_minute !== undefined && currentConfig.cron_recent_minute !== null) ? currentConfig.cron_recent_minute : 0;
 
         // Cron Scheduling Hours (Channels)
         const gscCronHourEl = document.getElementById('gsc-cron-hour');
-        if (gscCronHourEl) gscCronHourEl.value = currentConfig.gsc_cron_recent_hour !== undefined ? currentConfig.gsc_cron_recent_hour : 5;
+        if (gscCronHourEl) gscCronHourEl.value = (currentConfig.gsc_cron_recent_hour !== undefined && currentConfig.gsc_cron_recent_hour !== null) ? currentConfig.gsc_cron_recent_hour : 5;
         const gscCronMinEl = document.getElementById('gsc-cron-minute');
-        if (gscCronMinEl) gscCronMinEl.value = currentConfig.gsc_cron_recent_minute !== undefined ? currentConfig.gsc_cron_recent_minute : 0;
+        if (gscCronMinEl) gscCronMinEl.value = (currentConfig.gsc_cron_recent_minute !== undefined && currentConfig.gsc_cron_recent_minute !== null) ? currentConfig.gsc_cron_recent_minute : 0;
 
         const fbOrgEntHourEl = document.getElementById('fb-organic-entities-cron-hour');
-        if (fbOrgEntHourEl) fbOrgEntHourEl.value = currentConfig.fb_organic_cron_entities_hour !== undefined ? currentConfig.fb_organic_cron_entities_hour : 2;
+        if (fbOrgEntHourEl) fbOrgEntHourEl.value = (currentConfig.fb_organic_cron_entities_hour !== undefined && currentConfig.fb_organic_cron_entities_hour !== null) ? currentConfig.fb_organic_cron_entities_hour : 2;
         const fbOrgEntMinEl = document.getElementById('fb-organic-entities-cron-minute');
-        if (fbOrgEntMinEl) fbOrgEntMinEl.value = currentConfig.fb_organic_cron_entities_minute !== undefined ? currentConfig.fb_organic_cron_entities_minute : 0;
+        if (fbOrgEntMinEl) fbOrgEntMinEl.value = (currentConfig.fb_organic_cron_entities_minute !== undefined && currentConfig.fb_organic_cron_entities_minute !== null) ? currentConfig.fb_organic_cron_entities_minute : 0;
 
         const fbOrgRecHourEl = document.getElementById('fb-organic-recent-cron-hour');
-        if (fbOrgRecHourEl) fbOrgRecHourEl.value = currentConfig.fb_organic_cron_recent_hour !== undefined ? currentConfig.fb_organic_cron_recent_hour : 6;
+        if (fbOrgRecHourEl) fbOrgRecHourEl.value = (currentConfig.fb_organic_cron_recent_hour !== undefined && currentConfig.fb_organic_cron_recent_hour !== null) ? currentConfig.fb_organic_cron_recent_hour : 6;
         const fbOrgRecMinEl = document.getElementById('fb-organic-recent-cron-minute');
-        if (fbOrgRecMinEl) fbOrgRecMinEl.value = currentConfig.fb_organic_cron_recent_minute !== undefined ? currentConfig.fb_organic_cron_recent_minute : 0;
+        if (fbOrgRecMinEl) fbOrgRecMinEl.value = (currentConfig.fb_organic_cron_recent_minute !== undefined && currentConfig.fb_organic_cron_recent_minute !== null) ? currentConfig.fb_organic_cron_recent_minute : 0;
 
         const fbMarkEntHourEl = document.getElementById('fb-marketing-entities-cron-hour');
-        if (fbMarkEntHourEl) fbMarkEntHourEl.value = currentConfig.fb_marketing_cron_entities_hour !== undefined ? currentConfig.fb_marketing_cron_entities_hour : 2;
+        if (fbMarkEntHourEl) fbMarkEntHourEl.value = (currentConfig.fb_marketing_cron_entities_hour !== undefined && currentConfig.fb_marketing_cron_entities_hour !== null) ? currentConfig.fb_marketing_cron_entities_hour : 2;
         const fbMarkEntMinEl = document.getElementById('fb-marketing-entities-cron-minute');
-        if (fbMarkEntMinEl) fbMarkEntMinEl.value = currentConfig.fb_marketing_cron_entities_minute !== undefined ? currentConfig.fb_marketing_cron_entities_minute : 0;
+        if (fbMarkEntMinEl) fbMarkEntMinEl.value = (currentConfig.fb_marketing_cron_entities_minute !== undefined && currentConfig.fb_marketing_cron_entities_minute !== null) ? currentConfig.fb_marketing_cron_entities_minute : 0;
 
         const fbMarkRecHourEl = document.getElementById('fb-marketing-recent-cron-hour');
-        if (fbMarkRecHourEl) fbMarkRecHourEl.value = currentConfig.fb_marketing_cron_recent_hour !== undefined ? currentConfig.fb_marketing_cron_recent_hour : 5;
+        if (fbMarkRecHourEl) fbMarkRecHourEl.value = (currentConfig.fb_marketing_cron_recent_hour !== undefined && currentConfig.fb_marketing_cron_recent_hour !== null) ? currentConfig.fb_marketing_cron_recent_hour : 5;
         const fbMarkRecMinEl = document.getElementById('fb-marketing-recent-cron-minute');
-        if (fbMarkRecMinEl) fbMarkRecMinEl.value = currentConfig.fb_marketing_cron_recent_minute !== undefined ? currentConfig.fb_marketing_cron_recent_minute : 0;
+        if (fbMarkRecMinEl) fbMarkRecMinEl.value = (currentConfig.fb_marketing_cron_recent_minute !== undefined && currentConfig.fb_marketing_cron_recent_minute !== null) ? currentConfig.fb_marketing_cron_recent_minute : 0;
 
         updateCronStatusIndicators();
         
@@ -854,22 +854,22 @@ async function updateConfig(typeArg) {
         if (typeArg === 'gsc') {
             payload.enabled = document.getElementById('gsc-channel-enabled').checked;
             payload.cache_history_range = document.getElementById('gsc-history-range').value;
-            payload.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
-            payload.cron_recent_minute = document.getElementById('gsc-cron-minute')?.value;
+            payload.feature_toggles.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
+            payload.feature_toggles.cron_recent_minute = document.getElementById('gsc-cron-minute')?.value;
         } else if (typeArg === 'facebook-organic') {
             payload.enabled = document.getElementById('fb-organic-enabled').checked;
             payload.organic_history_range = document.getElementById('fb-organic-history-range').value;
-            payload.cron_entities_hour = document.getElementById('fb-organic-entities-cron-hour')?.value;
-            payload.cron_entities_minute = document.getElementById('fb-organic-entities-cron-minute')?.value;
-            payload.cron_recent_hour = document.getElementById('fb-organic-recent-cron-hour')?.value;
-            payload.cron_recent_minute = document.getElementById('fb-organic-recent-cron-minute')?.value;
+            payload.feature_toggles.cron_entities_hour = document.getElementById('fb-organic-entities-cron-hour')?.value;
+            payload.feature_toggles.cron_entities_minute = document.getElementById('fb-organic-entities-cron-minute')?.value;
+            payload.feature_toggles.cron_recent_hour = document.getElementById('fb-organic-recent-cron-hour')?.value;
+            payload.feature_toggles.cron_recent_minute = document.getElementById('fb-organic-recent-cron-minute')?.value;
         } else if (typeArg === 'facebook-marketing') {
             payload.enabled = document.getElementById('fb-marketing-enabled').checked;
             payload.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
-            payload.cron_entities_hour = document.getElementById('fb-marketing-entities-cron-hour')?.value;
-            payload.cron_entities_minute = document.getElementById('fb-marketing-entities-cron-minute')?.value;
-            payload.cron_recent_hour = document.getElementById('fb-marketing-recent-cron-hour')?.value;
-            payload.cron_recent_minute = document.getElementById('fb-marketing-recent-cron-minute')?.value;
+            payload.feature_toggles.cron_entities_hour = document.getElementById('fb-marketing-entities-cron-hour')?.value;
+            payload.feature_toggles.cron_entities_minute = document.getElementById('fb-marketing-entities-cron-minute')?.value;
+            payload.feature_toggles.cron_recent_hour = document.getElementById('fb-marketing-recent-cron-hour')?.value;
+            payload.feature_toggles.cron_recent_minute = document.getElementById('fb-marketing-recent-cron-minute')?.value;
             
             payload.entity_filters = {
                 CAMPAIGN: document.getElementById('fb-marketing-campaign-filter')?.value || '',
