@@ -91,6 +91,15 @@ class ConfigManagerController extends BaseController
                 'jobs_timeout_hours' => $systemConfig['jobs']['timeout_hours'] ?? 6,
                 'cache_raw_metrics' => filter_var($systemConfig['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'marketing_debug_logs' => filter_var($systemConfig['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'cron_entities_hour' => $systemConfig['cron']['entities_hour'] ?? 2,
+                'cron_recent_hour' => $systemConfig['cron']['recent_hour'] ?? 5,
+                'gsc_cron_entities_hour' => $gsc['cron_entities_hour'] ?? null,
+                'gsc_cron_recent_hour' => $gsc['cron_recent_hour'] ?? null,
+                'fb_organic_cron_entities_hour' => $fbOrganic['cron_entities_hour'] ?? null,
+                'fb_organic_cron_recent_hour' => $fbOrganic['cron_recent_hour'] ?? null,
+                'fb_marketing_cron_entities_hour' => $fbMarketing['cron_entities_hour'] ?? null,
+                'fb_marketing_cron_recent_hour' => $fbMarketing['cron_recent_hour'] ?? null,
+                'effective_schedules' => $this->getEffectiveCronSchedules(),
             ];
 
             $logger->info("DEBUG: Project Name detected: " . (getenv('PROJECT_NAME') ?: "NOT SET"));
@@ -373,11 +382,14 @@ class ConfigManagerController extends BaseController
                 }
                 $appConf['jobs']['timeout_hours'] = (int) ($data['jobs_timeout_hours'] ?? 6);
 
-                if (!isset($appConf['analytics'])) {
-                    $appConf['analytics'] = [];
-                }
                 $appConf['analytics']['cache_raw_metrics'] = filter_var($data['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
                 $appConf['analytics']['marketing_debug_logs'] = filter_var($data['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+                if (!isset($appConf['cron'])) {
+                    $appConf['cron'] = [];
+                }
+                if (isset($data['cron_entities_hour'])) $appConf['cron']['entities_hour'] = (int) $data['cron_entities_hour'];
+                if (isset($data['cron_recent_hour'])) $appConf['cron']['recent_hour'] = (int) $data['cron_recent_hour'];
 
                 // Explicit Guard: Strip any attempts to modify system-level infrastructure via UI
                 unset($appConf['db_host'], $appConf['db_name'], $appConf['app_mode']);
@@ -473,6 +485,12 @@ class ConfigManagerController extends BaseController
         }
         if ($historyRange) {
             $config['channels']['google_search_console']['cache_history_range'] = $historyRange;
+        }
+        if (isset($featureToggles['cron_entities_hour'])) {
+            $config['channels']['google_search_console']['cron_entities_hour'] = (int)$featureToggles['cron_entities_hour'];
+        }
+        if (isset($featureToggles['cron_recent_hour'])) {
+            $config['channels']['google_search_console']['cron_recent_hour'] = (int)$featureToggles['cron_recent_hour'];
         }
         $config['channels']['google_search_console']['enabled'] = $enabled;
 
@@ -570,6 +588,12 @@ class ConfigManagerController extends BaseController
         if ($organicHistoryRange) {
             $orgConfig['channels']['facebook_organic']['cache_history_range'] = $organicHistoryRange;
         }
+        if (isset($featureToggles['cron_entities_hour']) && ($type === 'facebook' || $type === 'facebook-organic')) {
+            $orgConfig['channels']['facebook_organic']['cron_entities_hour'] = (int)$featureToggles['cron_entities_hour'];
+        }
+        if (isset($featureToggles['cron_recent_hour']) && ($type === 'facebook' || $type === 'facebook-organic')) {
+            $orgConfig['channels']['facebook_organic']['cron_recent_hour'] = (int)$featureToggles['cron_recent_hour'];
+        }
         if ($type === 'facebook' || $type === 'facebook-organic') {
             $orgConfig['channels']['facebook_organic']['enabled'] = $enabled;
         }
@@ -598,6 +622,12 @@ class ConfigManagerController extends BaseController
         }
         if ($marketingHistoryRange) {
             $markConfig['channels']['facebook_marketing']['cache_history_range'] = $marketingHistoryRange;
+        }
+        if (isset($featureToggles['cron_entities_hour']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
+            $markConfig['channels']['facebook_marketing']['cron_entities_hour'] = (int)$featureToggles['cron_entities_hour'];
+        }
+        if (isset($featureToggles['cron_recent_hour']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
+            $markConfig['channels']['facebook_marketing']['cron_recent_hour'] = (int)$featureToggles['cron_recent_hour'];
         }
         if ($type === 'facebook' || $type === 'facebook-marketing') {
             $markConfig['channels']['facebook_marketing']['enabled'] = $enabled;
@@ -844,6 +874,47 @@ class ConfigManagerController extends BaseController
             'ita' => 'Italy',
             'bra' => 'Brazil',
         ];
+    }
+
+    private function getEffectiveCronSchedules(): array
+    {
+        $schedules = [];
+        try {
+            // Read crontab for current user
+            $output = [];
+            exec('crontab -l 2>/dev/null', $output);
+            
+            foreach ($output as $line) {
+                if (empty($line) || str_starts_with($line, '#') || !str_contains($line, 'apis-hub:cache')) {
+                    continue;
+                }
+                
+                // Example line: 0 2 * * * cd /app && php bin/cli.php apis-hub:cache "facebook_marketing" "facebook_marketing_entities" ...
+                $parts = preg_split('/\s+/', $line);
+                if (count($parts) < 5) continue;
+                
+                $minute = $parts[0];
+                $hour = $parts[1];
+                $cronTime = "$minute $hour";
+                
+                // Try to identify the instance or channel/entity
+                $key = 'unknown';
+                if (preg_match('/instance_name=([^&"\s]+)/', $line, $matches)) {
+                    $key = $matches[1];
+                } elseif (preg_match('/apis-hub:cache\s+"([^"]+)"\s+"([^"]+)"/', $line, $matches)) {
+                    $key = $matches[1] . '_' . $matches[2];
+                }
+                
+                $schedules[$key] = [
+                    'minute' => $minute,
+                    'hour' => $hour,
+                    'time' => $cronTime
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Silently fail if crontab not accessible
+        }
+        return $schedules;
     }
 
 }

@@ -144,6 +144,16 @@
         .animate-slide-out { animation: slideOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
         @keyframes slideIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(110%); opacity: 0; } }
+
+        /* Cron Indicators */
+        .cron-status-indicator { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+        .cron-status-indicator.synced { background: rgba(35, 134, 54, 0.1); color: #3fb950; }
+        .cron-status-indicator.pending { background: rgba(210, 153, 34, 0.1); color: #d29922; }
+        .cron-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .cron-dot.synced { background: #3fb950; box-shadow: 0 0 5px #3fb950; }
+        .cron-dot.pending { background: #d29922; box-shadow: 0 0 5px #d29922; }
+        .cron-explanation { font-size: 0.65rem; color: var(--text-dim); line-height: 1.2; }
+        .cron-warning-box { background: rgba(210, 153, 34, 0.05); border: 1px solid rgba(210, 153, 34, 0.2); color: #d29922; font-size: 0.65rem; padding: 4px 8px; border-radius: 6px; display: flex; align-items: center; gap: 6px; font-weight: 700; }
     </style>
 </head>
 <body class="full-screen">
@@ -200,6 +210,19 @@
                         <option value="demo">Demo Mode</option>
                     </select>
                 </div>
+                <div class="card compact-card">
+                    <div class="section-title small"><i data-lucide="clock"></i> System Cron Defaults</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:auto;">
+                        <div>
+                            <div style="font-size:0.55rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:4px;">Entities</div>
+                            <input type="number" id="cron-entities-hour" min="0" max="23" placeholder="2" style="width:100%; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                        </div>
+                        <div>
+                            <div style="font-size:0.55rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:4px;">Recent</div>
+                            <input type="number" id="cron-recent-hour" min="0" max="23" placeholder="5" style="width:100%; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="settings-horizontal-grid">
@@ -237,15 +260,14 @@
                     </label>
                 </div>
                 <div class="card compact-card">
-                    <div class="section-title small"><i data-lucide="calendar"></i> Cache Window</div>
-                    <div style="display:flex; align-items:center; gap:10px; margin-top:auto;">
-                        <select id="gsc-history-range" style="width:100%">
-                            <option value="1 month">1 Month</option>
-                            <option value="3 months">3 Months</option>
-                            <option value="6 months">6 Months</option>
-                            <option value="12 months">12 Months</option>
-                            <option value="16 months">16 Months</option>
-                        </select>
+                    <div class="section-title small"><i data-lucide="clock"></i> Dawn Resync Hour</div>
+                    <div style="display:flex; flex-direction:column; gap:8px; margin-top:auto;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <input type="number" id="gsc-cron-hour" min="0" max="23" placeholder="5" style="width:60px">
+                            <span style="font-size:0.75rem; color:var(--text-dim);">UTC</span>
+                            <div id="gsc-cron-sync-status" class="cron-status-indicator"></div>
+                        </div>
+                        <div class="cron-explanation">Execution hour for daily metrics.</div>
                     </div>
                 </div>
             </div>
@@ -284,6 +306,28 @@
                             <option value="4 years">4 Years</option>
                             <option value="5 years">5 Years</option>
                         </select>
+                    </div>
+                </div>
+                <div class="card compact-card" style="flex:1">
+                    <div class="section-title small"><i data-lucide="clock"></i> Cron Scheduling (Hours)</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:auto;">
+                        <div>
+                            <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:5px;">Entities</div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="number" id="fb-organic-entities-cron-hour" min="0" max="23" placeholder="2" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                                <span id="fb-organic-entities-cron-status" class="cron-dot" title="Status check"></span>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:5px;">Metrics</div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="number" id="fb-organic-recent-cron-hour" min="0" max="23" placeholder="6" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                                <span id="fb-organic-recent-cron-status" class="cron-dot" title="Status check"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="fb-organic-cron-sync-warning" class="cron-warning-box" style="display:none; margin-top:10px;">
+                        <i data-lucide="alert-triangle" size="12"></i> Deployment required
                     </div>
                 </div>
                 <div class="card compact-card" style="flex:2; grid-column: span 2;">
@@ -362,6 +406,28 @@
                             <option value="1 year">1 Year</option>
                             <option value="2 years">2 Years</option>
                         </select>
+                    </div>
+                </div>
+                <div class="card compact-card" style="flex:1">
+                    <div class="section-title small"><i data-lucide="clock"></i> Cron Scheduling (Hours)</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-top:auto;">
+                        <div>
+                            <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:5px;">Entities</div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="number" id="fb-marketing-entities-cron-hour" min="0" max="23" placeholder="2" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                                <span id="fb-marketing-entities-cron-status" class="cron-dot" title="Status check"></span>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:5px;">Metrics</div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <input type="number" id="fb-marketing-recent-cron-hour" min="0" max="23" placeholder="5" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                                <span id="fb-marketing-recent-cron-status" class="cron-dot" title="Status check"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="fb-marketing-cron-sync-warning" class="cron-warning-box" style="display:none; margin-top:10px;">
+                        <i data-lucide="alert-triangle" size="12"></i> Deployment required
                     </div>
                 </div>
                 <div class="card compact-card" style="flex:2; grid-column: span 2;">

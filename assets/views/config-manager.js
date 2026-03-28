@@ -207,6 +207,31 @@ function populateGlobalFields() {
             if (el) el.value = val || '';
         });
         
+        // Cron Scheduling Hours (Global)
+        const globalEntHourEl = document.getElementById('cron-entities-hour');
+        if (globalEntHourEl) globalEntHourEl.value = currentConfig.cron_entities_hour || 2;
+
+        const globalRecHourEl = document.getElementById('cron-recent-hour');
+        if (globalRecHourEl) globalRecHourEl.value = currentConfig.cron_recent_hour || 5;
+
+        // Cron Scheduling Hours (Channels)
+        const gscCronHourEl = document.getElementById('gsc-cron-hour');
+        if (gscCronHourEl) gscCronHourEl.value = currentConfig.gsc_cron_recent_hour || 5;
+
+        const fbOrgEntHourEl = document.getElementById('fb-organic-entities-cron-hour');
+        if (fbOrgEntHourEl) fbOrgEntHourEl.value = currentConfig.fb_organic_cron_entities_hour || 2;
+
+        const fbOrgRecHourEl = document.getElementById('fb-organic-recent-cron-hour');
+        if (fbOrgRecHourEl) fbOrgRecHourEl.value = currentConfig.fb_organic_cron_recent_hour || 6;
+
+        const fbMarkEntHourEl = document.getElementById('fb-marketing-entities-cron-hour');
+        if (fbMarkEntHourEl) fbMarkEntHourEl.value = currentConfig.fb_marketing_cron_entities_hour || 2;
+
+        const fbMarkRecHourEl = document.getElementById('fb-marketing-recent-cron-hour');
+        if (fbMarkRecHourEl) fbMarkRecHourEl.value = currentConfig.fb_marketing_cron_recent_hour || 5;
+
+        updateCronStatusIndicators();
+        
         handleFbLevelChange();
         handleFbOrganicLevelChange();
         handleFbStrategyChange();
@@ -215,6 +240,53 @@ function populateGlobalFields() {
     } catch (e) {
         console.error("Error in populateGlobalFields:", e);
     }
+}
+
+function updateCronStatusIndicators() {
+    if (!currentConfig || !currentConfig.effective_schedules) return;
+    
+    const schedules = currentConfig.effective_schedules;
+    
+    const check = (inputId, statusId, warningId, instancePrefix, expectedHour) => {
+        const input = document.getElementById(inputId);
+        const status = document.getElementById(statusId);
+        const warning = document.getElementById(warningId);
+        
+        if (!input || !status) return;
+        
+        const hour = parseInt(input.value);
+        
+        // Find a matching schedule in effective_schedules
+        // We look for instance names like "facebook-marketing-entities-sync" or "google-search-console-recent"
+        let effective = null;
+        Object.entries(schedules).forEach(([key, val]) => {
+            if (key.includes(instancePrefix)) {
+                effective = val;
+            }
+        });
+
+        const isSynced = effective && parseInt(effective.hour) === hour;
+        
+        status.className = 'cron-dot ' + (isSynced ? 'synced' : 'pending');
+        status.title = isSynced ? 'Cron Synchronized (' + effective.time + ' *)' : 'Real Cron: ' + (effective ? effective.time : 'None') + ' | Expected: ' + hour;
+        
+        if (warning) {
+            warning.style.display = isSynced ? 'none' : 'flex';
+        }
+        
+        // GSC specific (one indicator)
+        if (statusId === 'gsc-cron-sync-status') {
+            status.className = 'cron-status-indicator ' + (isSynced ? 'synced' : 'pending');
+            status.innerHTML = isSynced ? '<i data-lucide="check" size="10"></i> Synced' : '<i data-lucide="clock" size="10"></i> Update Required';
+            lucide.createIcons();
+        }
+    };
+
+    check('gsc-cron-hour', 'gsc-cron-sync-status', null, 'google-search-console', currentConfig.gsc_cron_recent_hour);
+    check('fb-organic-entities-cron-hour', 'fb-organic-entities-cron-status', 'fb-organic-cron-sync-warning', 'facebook-organic-entities', currentConfig.fb_organic_cron_entities_hour);
+    check('fb-organic-recent-cron-hour', 'fb-organic-recent-cron-status', 'fb-organic-cron-sync-warning', 'facebook-organic-recent', currentConfig.fb_organic_cron_recent_hour);
+    check('fb-marketing-entities-cron-hour', 'fb-marketing-entities-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-entities', currentConfig.fb_marketing_cron_entities_hour);
+    check('fb-marketing-recent-cron-hour', 'fb-marketing-recent-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-recent', currentConfig.fb_marketing_cron_recent_hour);
 }
 
 function handleFbLevelChange() {
@@ -767,12 +839,17 @@ async function updateConfig(typeArg) {
         if (typeArg === 'gsc') {
             payload.enabled = document.getElementById('gsc-channel-enabled').checked;
             payload.cache_history_range = document.getElementById('gsc-history-range').value;
+            payload.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
         } else if (typeArg === 'facebook-organic') {
             payload.enabled = document.getElementById('fb-organic-enabled').checked;
             payload.organic_history_range = document.getElementById('fb-organic-history-range').value;
+            payload.cron_entities_hour = document.getElementById('fb-organic-entities-cron-hour')?.value;
+            payload.cron_recent_hour = document.getElementById('fb-organic-recent-cron-hour')?.value;
         } else if (typeArg === 'facebook-marketing') {
             payload.enabled = document.getElementById('fb-marketing-enabled').checked;
             payload.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
+            payload.cron_entities_hour = document.getElementById('fb-marketing-entities-cron-hour')?.value;
+            payload.cron_recent_hour = document.getElementById('fb-marketing-recent-cron-hour')?.value;
             
             payload.entity_filters = {
                 CAMPAIGN: document.getElementById('fb-marketing-campaign-filter')?.value || '',
@@ -852,9 +929,12 @@ async function updateConfig(typeArg) {
             payload.feature_toggles.ig_account_media_metrics = (igLvl === 'media_metrics');
         }
 
-        // Global Infrastructure (Read-only fields are NOT included in payload)
-        payload.jobs_timeout_hours = document.getElementById('jobs-timeout-hours')?.value;
-        payload.cache_raw_metrics = document.getElementById('cache-raw-metrics')?.checked;
+        if (typeArg === 'global') {
+            payload.jobs_timeout_hours = document.getElementById('jobs-timeout-hours').value;
+            payload.cache_raw_metrics = document.getElementById('cache-raw-metrics').checked;
+            payload.cron_entities_hour = document.getElementById('cron-entities-hour')?.value;
+            payload.cron_recent_hour = document.getElementById('cron-recent-hour')?.value;
+        }
 
         const response = await fetch('/api/config-manager/update', {
             method: 'POST',

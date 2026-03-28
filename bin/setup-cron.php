@@ -71,7 +71,26 @@ foreach ($instances as $instance) {
     if (!empty($startDate)) $params['startDate'] = $startDate;
     if (!empty($endDate)) $params['endDate'] = $endDate;
     if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
+
+    // --- 🕒 Cron Hour Override Logic ---
+    $channelConfig = $config['channels'][$channel] ?? [];
+    $overrideHour = null;
     
+    // Determine if this is an "entities" or "recent" job based on instance name
+    if (str_contains($instanceName, 'entities')) {
+        $overrideHour = $channelConfig['cron_entities_hour'] ?? null;
+    } elseif (str_contains($instanceName, 'recent')) {
+        $overrideHour = $channelConfig['cron_recent_hour'] ?? null;
+    }
+
+    if ($overrideHour !== null) {
+        $freqParts = explode(' ', $frequency);
+        if (count($freqParts) >= 2) {
+            $freqParts[1] = $overrideHour;
+            $frequency = implode(' ', $freqParts);
+        }
+    }
+
     $paramString = "";
     if (!empty($params)) {
         $paramString = ' --params="' . http_build_query($params) . '"';
