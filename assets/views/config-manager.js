@@ -153,6 +153,27 @@ function populateGlobalFields() {
             fbLevelEl.value = entLevel;
         }
 
+        // FB Organic Global Granularity
+        const fbOrgLvlEl = document.getElementById('fb-organic-level');
+        const fbIgLvlEl = document.getElementById('fb-ig-level');
+        
+        if (fbOrgLvlEl) {
+            let lvl = 'page';
+            if (t.post_metrics) lvl = 'post_metrics';
+            else if (t.posts) lvl = 'posts';
+            else if (t.page_metrics) lvl = 'page_metrics';
+            fbOrgLvlEl.value = lvl;
+        }
+
+        if (fbIgLvlEl) {
+            let lvl = 'none';
+            if (t.ig_account_media_metrics) lvl = 'media_metrics';
+            else if (t.ig_account_media) lvl = 'media';
+            else if (t.ig_account_metrics) lvl = 'metrics';
+            else if (t.ig_accounts) lvl = 'accounts';
+            fbIgLvlEl.value = lvl;
+        }
+
         if (fbMetricsLevelEl) {
             let metLevel = 'ad_account';
             if (t.creative_metrics) metLevel = 'creative';
@@ -163,17 +184,124 @@ function populateGlobalFields() {
         }
         
         // Strategy Selection
+        console.log("Setting up strategy selectors...");
         const strategy = currentConfig.fb_metrics_strategy || 'default';
         const strategyRadio = document.getElementById('fb-strategy-' + strategy);
         if (strategyRadio) strategyRadio.checked = true;
         
+        // Entity Filters
+        const filters = currentConfig.fb_entity_filters || {};
+        console.log("DEBUG: FB Entity Filters Object from Controller:", JSON.stringify(filters));
+        
+        const map = {
+            'fb-marketing-campaign-filter': filters.CAMPAIGN,
+            'fb-marketing-adset-filter': filters.ADSET,
+            'fb-marketing-ad-filter': filters.AD,
+            'fb-marketing-creative-filter': filters.CREATIVE
+        };
+        
+        console.log("DEBUG: Mapping Filters to UI Elements...", map);
+        
+        Object.entries(map).forEach(([id, val]) => {
+            const el = document.getElementById(id);
+            if (el) el.value = val || '';
+        });
+        
+        // Cron Scheduling Hours (Global)
+        const globalEntHourEl = document.getElementById('cron-entities-hour');
+        if (globalEntHourEl) globalEntHourEl.value = (currentConfig.cron_entities_hour !== undefined && currentConfig.cron_entities_hour !== null) ? currentConfig.cron_entities_hour : 2;
+        const globalEntMinEl = document.getElementById('cron-entities-minute');
+        if (globalEntMinEl) globalEntMinEl.value = (currentConfig.cron_entities_minute !== undefined && currentConfig.cron_entities_minute !== null) ? currentConfig.cron_entities_minute : 0;
+
+        const globalRecHourEl = document.getElementById('cron-recent-hour');
+        if (globalRecHourEl) globalRecHourEl.value = (currentConfig.cron_recent_hour !== undefined && currentConfig.cron_recent_hour !== null) ? currentConfig.cron_recent_hour : 5;
+        const globalRecMinEl = document.getElementById('cron-recent-minute');
+        if (globalRecMinEl) globalRecMinEl.value = (currentConfig.cron_recent_minute !== undefined && currentConfig.cron_recent_minute !== null) ? currentConfig.cron_recent_minute : 0;
+
+        // Cron Scheduling Hours (Channels)
+        const gscCronHourEl = document.getElementById('gsc-cron-hour');
+        if (gscCronHourEl) gscCronHourEl.value = (currentConfig.gsc_cron_recent_hour !== undefined && currentConfig.gsc_cron_recent_hour !== null) ? currentConfig.gsc_cron_recent_hour : 5;
+        const gscCronMinEl = document.getElementById('gsc-cron-minute');
+        if (gscCronMinEl) gscCronMinEl.value = (currentConfig.gsc_cron_recent_minute !== undefined && currentConfig.gsc_cron_recent_minute !== null) ? currentConfig.gsc_cron_recent_minute : 0;
+
+        const fbOrgEntHourEl = document.getElementById('fb-organic-entities-cron-hour');
+        if (fbOrgEntHourEl) fbOrgEntHourEl.value = (currentConfig.fb_organic_cron_entities_hour !== undefined && currentConfig.fb_organic_cron_entities_hour !== null) ? currentConfig.fb_organic_cron_entities_hour : 2;
+        const fbOrgEntMinEl = document.getElementById('fb-organic-entities-cron-minute');
+        if (fbOrgEntMinEl) fbOrgEntMinEl.value = (currentConfig.fb_organic_cron_entities_minute !== undefined && currentConfig.fb_organic_cron_entities_minute !== null) ? currentConfig.fb_organic_cron_entities_minute : 0;
+
+        const fbOrgRecHourEl = document.getElementById('fb-organic-recent-cron-hour');
+        if (fbOrgRecHourEl) fbOrgRecHourEl.value = (currentConfig.fb_organic_cron_recent_hour !== undefined && currentConfig.fb_organic_cron_recent_hour !== null) ? currentConfig.fb_organic_cron_recent_hour : 6;
+        const fbOrgRecMinEl = document.getElementById('fb-organic-recent-cron-minute');
+        if (fbOrgRecMinEl) fbOrgRecMinEl.value = (currentConfig.fb_organic_cron_recent_minute !== undefined && currentConfig.fb_organic_cron_recent_minute !== null) ? currentConfig.fb_organic_cron_recent_minute : 0;
+
+        const fbMarkEntHourEl = document.getElementById('fb-marketing-entities-cron-hour');
+        if (fbMarkEntHourEl) fbMarkEntHourEl.value = (currentConfig.fb_marketing_cron_entities_hour !== undefined && currentConfig.fb_marketing_cron_entities_hour !== null) ? currentConfig.fb_marketing_cron_entities_hour : 2;
+        const fbMarkEntMinEl = document.getElementById('fb-marketing-entities-cron-minute');
+        if (fbMarkEntMinEl) fbMarkEntMinEl.value = (currentConfig.fb_marketing_cron_entities_minute !== undefined && currentConfig.fb_marketing_cron_entities_minute !== null) ? currentConfig.fb_marketing_cron_entities_minute : 0;
+
+        const fbMarkRecHourEl = document.getElementById('fb-marketing-recent-cron-hour');
+        if (fbMarkRecHourEl) fbMarkRecHourEl.value = (currentConfig.fb_marketing_cron_recent_hour !== undefined && currentConfig.fb_marketing_cron_recent_hour !== null) ? currentConfig.fb_marketing_cron_recent_hour : 5;
+        const fbMarkRecMinEl = document.getElementById('fb-marketing-recent-cron-minute');
+        if (fbMarkRecMinEl) fbMarkRecMinEl.value = (currentConfig.fb_marketing_cron_recent_minute !== undefined && currentConfig.fb_marketing_cron_recent_minute !== null) ? currentConfig.fb_marketing_cron_recent_minute : 0;
+
+        updateCronStatusIndicators();
+        
         handleFbLevelChange();
+        handleFbOrganicLevelChange();
         handleFbStrategyChange();
         renderCustomMetricsGrid();
         
     } catch (e) {
         console.error("Error in populateGlobalFields:", e);
     }
+}
+
+function updateCronStatusIndicators() {
+    if (!currentConfig || !currentConfig.effective_schedules) return;
+    
+    const schedules = currentConfig.effective_schedules;
+    
+    const check = (inputId, minId, statusId, warningId, instancePrefix) => {
+        const inputH = document.getElementById(inputId);
+        const inputM = document.getElementById(minId);
+        const status = document.getElementById(statusId);
+        const warning = document.getElementById(warningId);
+        
+        if (!inputH || !status) return;
+        
+        const hour = parseInt(inputH.value);
+        const minute = inputM ? parseInt(inputM.value) : 0;
+        
+        // Find a matching schedule in effective_schedules
+        let effective = null;
+        Object.entries(schedules).forEach(([key, val]) => {
+            if (key.includes(instancePrefix)) {
+                effective = val;
+            }
+        });
+
+        const isSynced = effective && parseInt(effective.hour) === hour && parseInt(effective.minute) === minute;
+        
+        status.className = 'cron-dot ' + (isSynced ? 'synced' : 'pending');
+        status.title = isSynced ? 'Cron Synchronized (' + effective.time + ' *)' : 'Real Cron: ' + (effective ? effective.time : 'None') + ' | Expected: ' + hour + ':' + String(minute).padStart(2,'0');
+        
+        if (warning) {
+            warning.style.display = isSynced ? 'none' : 'flex';
+        }
+        
+        // GSC specific (one indicator)
+        if (statusId === 'gsc-cron-sync-status') {
+            status.className = 'cron-status-indicator ' + (isSynced ? 'synced' : 'pending');
+            status.innerHTML = isSynced ? '<i data-lucide="check" size="10"></i> Synced' : '<i data-lucide="clock" size="10"></i> Update Required';
+            lucide.createIcons();
+        }
+    };
+
+    check('gsc-cron-hour', 'gsc-cron-minute', 'gsc-cron-sync-status', null, 'google-search-console');
+    check('fb-organic-entities-cron-hour', 'fb-organic-entities-cron-minute', 'fb-organic-entities-cron-status', 'fb-organic-cron-sync-warning', 'facebook-organic-entities');
+    check('fb-organic-recent-cron-hour', 'fb-organic-recent-cron-minute', 'fb-organic-recent-cron-status', 'fb-organic-cron-sync-warning', 'facebook-organic-recent');
+    check('fb-marketing-entities-cron-hour', 'fb-marketing-entities-cron-minute', 'fb-marketing-entities-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-entities');
+    check('fb-marketing-recent-cron-hour', 'fb-marketing-recent-cron-minute', 'fb-marketing-recent-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-recent');
 }
 
 function handleFbLevelChange() {
@@ -203,16 +331,16 @@ function handleFbLevelChange() {
 
     const visLevels = ['campaign', 'adset', 'ad', 'creative'];
     
-    // Sync Entity Indicators (infrastructure)
+    // Sync Entity Indicators (infrastructure - Cumulative hierarchy as needed for tree)
     const entActiveIdx = visLevels.indexOf(entEl.value) + 1;
     document.querySelectorAll('[id^="ent-ind-"]').forEach((ind, i) => {
         ind.className = 'level-indicator-dot ' + (i < entActiveIdx ? 'active' : 'inactive');
     });
 
-    // Metrics Indicators (reporting)
+    // Metrics Indicators (reporting - Atomic Radio model)
     const metActiveIdx = visLevels.indexOf(metEl.value) + 1;
     document.querySelectorAll('[id^="met-ind-"]').forEach((ind, i) => {
-        ind.className = 'level-indicator-dot ' + (i < metActiveIdx ? 'active' : 'inactive');
+        ind.className = 'level-indicator-dot ' + (i === metActiveIdx - 1 ? 'active' : 'inactive');
     });
 }
 
@@ -222,6 +350,76 @@ function setFbLevel(lvl) {
         el.value = lvl;
         handleFbLevelChange();
     }
+}
+
+function handleFbOrganicLevelChange() {
+    const fbEl = document.getElementById('fb-organic-level');
+    const igEl = document.getElementById('fb-ig-level');
+    
+    // FB Dots
+    const fbLevels = ['page', 'page_metrics', 'posts', 'post_metrics'];
+    const fbActiveIdx = fbLevels.indexOf(fbEl?.value) + 1; // 1 to 4
+    for (let i = 1; i <= 4; i++) {
+        const ind = document.getElementById('org-fb-ind-' + i);
+        if (ind) ind.className = 'level-indicator-dot ' + (i <= fbActiveIdx ? 'active' : 'inactive');
+    }
+
+    // IG Dots
+    const igLevels = ['accounts', 'metrics', 'media', 'media_metrics'];
+    const igActiveIdx = igLevels.indexOf(igEl?.value) + 1; // 1 to 4
+    for (let i = 1; i <= 4; i++) {
+        const ind = document.getElementById('org-ig-ind-' + i);
+        if (ind) ind.className = 'level-indicator-dot ' + (i <= igActiveIdx ? 'active' : 'inactive');
+    }
+
+    // Enforce global limits on local page toggles
+    enforceGlobalOrganicLimits(fbEl?.value, igEl?.value);
+}
+
+function enforceGlobalOrganicLimits(globalFbLvl, globalIgLvl) {
+    const fbLevels = ['page', 'page_metrics', 'posts', 'post_metrics'];
+    const igLevels = ['accounts', 'metrics', 'media', 'media_metrics'];
+    
+    const maxFbIdx = fbLevels.indexOf(globalFbLvl);
+    const maxIgIdx = igLevels.indexOf(globalIgLvl);
+
+    document.querySelectorAll('.fb-page-main-toggle').forEach(mainToggle => {
+        const pageId = mainToggle.dataset.id;
+        const opts = document.querySelectorAll(`.fb-page-opt[data-page="${pageId}"]`);
+        
+        opts.forEach(opt => {
+            const key = opt.dataset.opt;
+            let allowed = true;
+            
+            // FB Logic
+            if (key === 'page_metrics' && maxFbIdx < 1) allowed = false;
+            if (key === 'posts' && maxFbIdx < 2) allowed = false;
+            if (key === 'post_metrics' && maxFbIdx < 3) allowed = false;
+            
+            // IG Logic
+            if (key === 'ig_accounts' && maxIgIdx < 0) allowed = false;
+            if (key === 'ig_account_metrics' && maxIgIdx < 1) allowed = false;
+            if (key === 'ig_account_media' && maxIgIdx < 2) allowed = false;
+            if (key === 'ig_account_media_metrics' && maxIgIdx < 3) allowed = false;
+
+            opt.disabled = !allowed;
+            if (!allowed) opt.checked = false;
+            
+            // Special sub-item opacity
+            const subItem = opt.closest('.hierarchy-sub-item');
+            if (subItem) subItem.style.opacity = allowed ? '1' : '0.2';
+        });
+    });
+}
+
+function setFbOrganicLevel(lvl) {
+    const el = document.getElementById('fb-organic-level');
+    if (el) { el.value = lvl; handleFbOrganicLevelChange(); }
+}
+
+function setIgLevel(lvl) {
+    const el = document.getElementById('fb-ig-level');
+    if (el) { el.value = lvl; handleFbOrganicLevelChange(); }
 }
 
 function setMetricLevel(lvl) {
@@ -421,28 +619,138 @@ function renderAssets(assets) {
         fbOrganicList.innerHTML = '';
         const pages = assets.facebook_pages || [];
         if (pages.length === 0) fbOrganicList.innerHTML = '<div class="empty-state">No Facebook pages found.</div>';
+        
         pages.forEach(p => {
-            const syncedIds = currentConfig?.fb_page_ids || [];
-            const isSynced = syncedIds.includes(String(p.id)) && !p.lost_access;
+            const getCfg = (key, def = true) => {
+                const savedPages = currentConfig.fb_pages_full_config || [];
+                const pId = String(p.id).trim();
+                const saved = savedPages.find(pg => String(pg.id).trim() === pId);
+                
+                if (saved && saved[key] !== undefined) {
+                    return !!saved[key];
+                }
+                return def;
+            };
+
+            const isSynced = getCfg('enabled') && !p.lost_access;
+            const isNew = p.is_new === true;
+            const lostAccess = p.lost_access === true;
+            
+            let cardClasses = 'glass-card page-config-card';
+            if (isSynced) cardClasses += ' synced';
+            if (isNew) cardClasses += ' is-new';
+            if (lostAccess) cardClasses += ' lost-access';
+
             const div = document.createElement('div');
-            
-            let itemClass = 'asset-item';
-            if (isSynced) itemClass += ' synced';
-            if (p.is_new) itemClass += ' is-new';
-            if (p.lost_access) itemClass += ' lost-access';
-            
-            div.className = itemClass;
             div.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                   <div style="font-size:0.75rem; font-weight:600; color:#fff;">${p.title}</div>
-                   <label class="switch-mini">
-                       <input type="checkbox" class="fb-organic-asset-sync" value="${p.id}" ${isSynced ? 'checked' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
-                       <span class="slider-mini"></span>
-                   </label>
+            <div class="${cardClasses}" data-id="${p.id}" data-ig="${p.ig_account || ''}" style="margin-bottom:20px; padding:15px; border:1px solid var(--border); border-radius:12px; position:relative;">
+                ${isNew ? '<div class="asset-badge-new">NEW</div>' : ''}
+                ${lostAccess ? '<div class="asset-badge-lost">LOST ACCESS</div>' : ''}
+                
+                <!-- Page Header -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="background:rgba(255,255,255,0.05); width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--primary);">
+                            <i data-lucide="layout" size="18"></i>
+                        </div>
+                        <div>
+                            <div style="font-weight:700; color:white; font-size:0.9rem;">${p.title || 'Untitled Page'}</div>
+                            <div style="font-size:0.65rem; color:var(--text-dim);">ID: ${p.id}</div>
+                        </div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" class="fb-page-main-toggle" data-id="${p.id}" ${getCfg('enabled') ? 'checked' : ''} onchange="toggleOrganicHierarchy('${p.id}', this.checked)">
+                        <span class="slider"></span>
+                    </label>
                 </div>
+
+                <!-- Page Options Hierarchy -->
+                <div id="hierarchy-${p.id}" style="display:${getCfg('enabled') ? 'grid' : 'none'}; grid-template-columns: 1fr 1fr; gap:20px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+                    
+                    <!-- FB Section -->
+                    <div class="hierarchy-col">
+                        <div style="font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:12px; font-weight:700; opacity:0.6;">Facebook Extraction</div>
+                        
+                        <div class="hierarchy-item-premium">
+                            <label class="switch-inline">
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="page_metrics" ${getCfg('page_metrics') ? 'checked' : ''}>
+                                <span class="slider-sm"></span>
+                                <span class="lbl">Page Metrics</span>
+                            </label>
+                        </div>
+                        
+                        <div class="hierarchy-item-premium">
+                            <label class="switch-inline">
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="posts" ${getCfg('posts') ? 'checked' : ''}>
+                                <span class="slider-sm"></span>
+                                <span class="lbl">Posts Content</span>
+                            </label>
+                        </div>
+                        
+                        <div class="hierarchy-item-premium" style="margin-left: 20px; border-left: 1px solid rgba(255,255,255,0.1); padding-left:12px;">
+                            <label class="switch-inline">
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="post_metrics" ${getCfg('post_metrics') ? 'checked' : ''}>
+                                <span class="slider-sm"></span>
+                                <span class="lbl">Post Insights</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- IG Section -->
+                    ${p.ig_account ? `
+                    <div class="hierarchy-col" style="border-left: 1px solid rgba(255,255,255,0.05); padding-left: 20px;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
+                            <div style="background:rgba(225, 48, 108, 0.1); color:#E1306C; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:700; text-transform:uppercase; display:flex; align-items:center; gap:5px;">
+                                <i data-lucide="instagram" size="10"></i> ${p.ig_account_name || p.ig_account}
+                            </div>
+                        </div>
+                        
+                        <div class="hierarchy-item-premium">
+                            <label class="switch-inline">
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_accounts" ${getCfg('ig_accounts', false) ? 'checked' : ''} onchange="toggleSubOpt('${p.id}', 'ig_accounts', this.checked)">
+                                <span class="slider-sm"></span>
+                                <span class="lbl">Sync Instagram</span>
+                            </label>
+                        </div>
+
+                        <div id="sub-${p.id}-ig_accounts" style="opacity:${getCfg('ig_accounts', false) ? 1 : 0.3}; margin-left:20px; border-left: 1px solid rgba(255,255,255,0.1); padding-left:12px;">
+                            <div class="hierarchy-item-premium">
+                                <label class="switch-inline">
+                                    <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_metrics" ${getCfg('ig_account_metrics') ? 'checked' : ''} ${!getCfg('ig_accounts') ? 'disabled' : ''}>
+                                    <span class="slider-sm"></span>
+                                    <span class="lbl">Account Metrics</span>
+                                </label>
+                            </div>
+                            <div class="hierarchy-item-premium">
+                                <label class="switch-inline">
+                                    <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_media" ${getCfg('ig_account_media') ? 'checked' : ''} ${!getCfg('ig_accounts') ? 'disabled' : ''} onchange="toggleSubOpt('${p.id}', 'ig_account_media', this.checked)">
+                                    <span class="slider-sm"></span>
+                                    <span class="lbl">Media Content</span>
+                                </label>
+                            </div>
+                            <div id="sub-${p.id}-ig_account_media" class="hierarchy-item-premium" style="opacity:${getCfg('ig_account_media') ? 1 : 0.3}; margin-left:20px; border-left: 1px solid rgba(255,255,255,0.1); padding-left:12px;">
+                                <label class="switch-inline">
+                                    <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_account_media_metrics" ${getCfg('ig_account_media_metrics') ? 'checked' : ''} ${!getCfg('ig_account_media') ? 'disabled' : ''}>
+                                    <span class="slider-sm"></span>
+                                    <span class="lbl">Media Insights</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    ` : `
+                    <div class="hierarchy-col" style="display:flex; align-items:center; justify-content:center; opacity:0.3; border-left: 1px solid rgba(255,255,255,0.05);">
+                        <div style="text-align:center;">
+                            <i data-lucide="instagram-off" size="24"></i>
+                            <div style="font-size:0.6rem; margin-top:5px;">No IG Link</div>
+                        </div>
+                    </div>
+                    `}
+                </div>
+            </div>
             `;
             fbOrganicList.appendChild(div);
         });
+        lucide.createIcons();
     }
 
     if (fbMarketingList) {
@@ -506,38 +814,84 @@ async function updateConfig(typeArg) {
             payload.assets.gsc.push({ url: el.value, target_countries: [], target_keywords: [] });
         });
 
-        document.querySelectorAll('.fb-organic-asset-sync:checked').forEach(el => {
-            payload.assets.pages.push({ id: el.value });
+        // 1. Collect FB Organic Pages (All of them, enabled or not, for granularity preservation)
+        document.querySelectorAll('.page-config-card').forEach(card => {
+            const mainToggle = card.querySelector('.fb-page-main-toggle');
+            if (!mainToggle) return;
+            
+            const pageId = String(mainToggle.dataset.id);
+            const igId = card.dataset.ig || null;
+            
+            const pageData = {
+                id: pageId,
+                enabled: mainToggle.checked,
+                ig_account: igId
+            };
+            
+            card.querySelectorAll('.fb-page-opt').forEach(opt => {
+                pageData[opt.dataset.opt] = opt.checked;
+            });
+            
+            // Meta-info
+            const titleEl = card.querySelector('[style*="font-weight:700"]');
+            if (titleEl) pageData.title = titleEl.textContent.trim();
+            
+            const igText = card.querySelector('[style*="color:#E1306C"]')?.textContent.trim();
+            if (igText) pageData.ig_account_name = igText;
+
+            payload.assets.pages.push(pageData);
         });
 
         document.querySelectorAll('.fb-marketing-asset-sync:checked').forEach(el => {
-            payload.assets.ad_accounts.push({ id: el.value });
+            const item = el.closest('.asset-item');
+            const nameEl = item ? item.querySelector('[style*="font-weight:600"]') : null;
+            payload.assets.ad_accounts.push({ 
+                id: el.value,
+                name: nameEl ? nameEl.textContent.trim() : null
+            });
         });
 
         if (typeArg === 'gsc') {
-            payload.enabled = document.getElementById('gsc-channel-enabled').checked;
-            payload.cache_history_range = document.getElementById('gsc-history-range').value;
+            payload.enabled = document.getElementById('gsc-channel-enabled')?.checked;
+            payload.cache_history_range = document.getElementById('gsc-history-range')?.value;
+            payload.feature_toggles.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
+            payload.feature_toggles.cron_recent_minute = document.getElementById('gsc-cron-minute')?.value;
         } else if (typeArg === 'facebook-organic') {
             payload.enabled = document.getElementById('fb-organic-enabled').checked;
             payload.organic_history_range = document.getElementById('fb-organic-history-range').value;
+            payload.feature_toggles.cron_entities_hour = document.getElementById('fb-organic-entities-cron-hour')?.value;
+            payload.feature_toggles.cron_entities_minute = document.getElementById('fb-organic-entities-cron-minute')?.value;
+            payload.feature_toggles.cron_recent_hour = document.getElementById('fb-organic-recent-cron-hour')?.value;
+            payload.feature_toggles.cron_recent_minute = document.getElementById('fb-organic-recent-cron-minute')?.value;
         } else if (typeArg === 'facebook-marketing') {
             payload.enabled = document.getElementById('fb-marketing-enabled').checked;
             payload.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
+            payload.feature_toggles.cron_entities_hour = document.getElementById('fb-marketing-entities-cron-hour')?.value;
+            payload.feature_toggles.cron_entities_minute = document.getElementById('fb-marketing-entities-cron-minute')?.value;
+            payload.feature_toggles.cron_recent_hour = document.getElementById('fb-marketing-recent-cron-hour')?.value;
+            payload.feature_toggles.cron_recent_minute = document.getElementById('fb-marketing-recent-cron-minute')?.value;
             
+            payload.entity_filters = {
+                CAMPAIGN: document.getElementById('fb-marketing-campaign-filter')?.value || '',
+                ADSET: document.getElementById('fb-marketing-adset-filter')?.value || '',
+                AD: document.getElementById('fb-marketing-ad-filter')?.value || '',
+                CREATIVE: document.getElementById('fb-marketing-creative-filter')?.value || ''
+            };
+
             const entLevel = document.getElementById('fb-marketing-level')?.value || 'ad_account';
             const metLevel = document.getElementById('fb-marketing-metrics-level')?.value || 'ad_account';
 
-            // Feature Toggles (Infrastructure)
+            // Feature Toggles (Infrastructure - Cumulative hierarchy tree)
             payload.feature_toggles.campaigns = true;
             payload.feature_toggles.adsets = (entLevel === 'adset' || entLevel === 'ad' || entLevel === 'creative');
             payload.feature_toggles.ads = (entLevel === 'ad' || entLevel === 'creative');
             payload.feature_toggles.creatives = (entLevel === 'creative');
 
-            // Feature Toggles (Metrics)
-            payload.feature_toggles.ad_account_metrics = true;
-            payload.feature_toggles.campaign_metrics = (metLevel === 'campaign' || metLevel === 'adset' || metLevel === 'ad' || metLevel === 'creative');
-            payload.feature_toggles.adset_metrics = (metLevel === 'adset' || metLevel === 'ad' || metLevel === 'creative');
-            payload.feature_toggles.ad_metrics = (metLevel === 'ad' || metLevel === 'creative');
+            // Feature Toggles (Metrics - Exclusive Radio Logic)
+            payload.feature_toggles.ad_account_metrics = (metLevel === 'ad_account');
+            payload.feature_toggles.campaign_metrics = (metLevel === 'campaign');
+            payload.feature_toggles.adset_metrics = (metLevel === 'adset');
+            payload.feature_toggles.ad_metrics = (metLevel === 'ad');
             payload.feature_toggles.creative_metrics = (metLevel === 'creative');
 
             const stratCustom = document.getElementById('fb-strategy-custom');
@@ -580,9 +934,29 @@ async function updateConfig(typeArg) {
             });
         }
 
-        // Global Infrastructure (Read-only fields are NOT included in payload)
-        payload.jobs_timeout_hours = document.getElementById('jobs-timeout-hours')?.value;
-        payload.cache_raw_metrics = document.getElementById('cache-raw-metrics')?.checked;
+        // Feature Toggles (Organic Tiers - Derived from Selectors)
+        if (typeArg === 'facebook-organic' || typeArg === 'global') {
+            const fbLvl = document.getElementById('fb-organic-level')?.value || 'page';
+            const igLvl = document.getElementById('fb-ig-level')?.value || 'accounts';
+
+            payload.feature_toggles.page_metrics = (fbLvl === 'page_metrics' || fbLvl === 'posts' || fbLvl === 'post_metrics');
+            payload.feature_toggles.posts = (fbLvl === 'posts' || fbLvl === 'post_metrics');
+            payload.feature_toggles.post_metrics = (fbLvl === 'post_metrics');
+
+            payload.feature_toggles.ig_accounts = (igLvl !== 'none');
+            payload.feature_toggles.ig_account_metrics = (igLvl === 'metrics' || igLvl === 'media' || igLvl === 'media_metrics');
+            payload.feature_toggles.ig_account_media = (igLvl === 'media' || igLvl === 'media_metrics');
+            payload.feature_toggles.ig_account_media_metrics = (igLvl === 'media_metrics');
+        }
+
+        if (typeArg === 'global') {
+            payload.jobs_timeout_hours = document.getElementById('jobs-timeout-hours').value;
+            payload.cache_raw_metrics = document.getElementById('cache-raw-metrics').checked;
+            payload.cron_entities_hour = document.getElementById('cron-entities-hour')?.value;
+            payload.cron_entities_minute = document.getElementById('cron-entities-minute')?.value;
+            payload.cron_recent_hour = document.getElementById('cron-recent-hour')?.value;
+            payload.cron_recent_minute = document.getElementById('cron-recent-minute')?.value;
+        }
 
         const response = await fetch('/api/config-manager/update', {
             method: 'POST',
@@ -661,6 +1035,25 @@ function showToast(msg, isError) {
     }, 4000);
 }
 
+function toggleOrganicHierarchy(id, enabled) {
+    const content = document.getElementById('content-' + id);
+    if (content) content.style.display = enabled ? 'block' : 'none';
+    
+    const card = content?.closest('.asset-group-card');
+    if (card) card.classList.toggle('synced', enabled);
+}
+
+function toggleSubOpt(pageId, opt, enabled) {
+    const subContainer = document.getElementById(`sub-${pageId}-${opt}`);
+    if (subContainer) {
+        subContainer.style.opacity = enabled ? '1' : '0.3';
+        subContainer.querySelectorAll('input').forEach(input => {
+            input.disabled = !enabled;
+            if (!enabled) input.checked = false;
+        });
+    }
+}
+
 function setupEventListeners() {
 }
 
@@ -705,6 +1098,70 @@ async function forceRefresh(type) {
     }
 }
 
+/**
+ * Force manual execution of a global sync for a channel.
+ * @param {string} channel 
+ * @param {string} entity 
+ */
+async function triggerFullSync(channel, entity) {
+    if (!confirm(`Are you sure you want to FORCE GLOBAL SYNC for ${channel}?\nThis will create a new background job immediately.`)) {
+        return;
+    }
+
+    const loader = document.getElementById('loading');
+    if (loader) {
+        loader.style.display = 'flex';
+        const textEl = loader.querySelector('div:nth-child(2)');
+        if (textEl) textEl.textContent = 'Triggering Global Pipeline...';
+    }
+
+    try {
+        const response = await fetch(`/cache/${channel}/${entity}`, {
+            method: 'POST',
+            headers: getAdminHeaders(),
+            body: JSON.stringify({})
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast('Success: Global sync scheduled. Check Monitoring Dashboard.', false);
+        } else {
+            throw new Error(data.error || 'Server error occurred');
+        }
+    } catch (e) {
+        console.error("Force Sync Error:", e);
+        showToast(`Failed to trigger sync: ${e.message}`, true);
+    } finally {
+        if (loader) loader.style.display = 'none';
+        
+        // Reset loader text if it exists
+        const loaderText = document.querySelector('#loading div:nth-child(2)');
+        if (loaderText) loaderText.textContent = 'Synchronizing Config...';
+    }
+}
+
+/**
+ * Display a premium notification toast.
+ * @param {string} msg 
+ * @param {boolean} isError 
+ */
+function showToast(msg, isError) {
+    const toast = document.createElement('div');
+    toast.className = 'toast animate-slide-in';
+    if (isError) toast.classList.add('error');
+    toast.innerHTML = `
+        <i data-lucide="${isError ? 'alert-circle' : 'check-circle'}" size="16"></i>
+        <span>${msg}</span>
+    `;
+    document.body.appendChild(toast);
+    lucide.createIcons();
+    setTimeout(() => {
+        toast.classList.add('animate-slide-out');
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
+}
+
 // Global Hooks (Expose to window)
 window.setFbLevel = setFbLevel;
 window.setMetricLevel = setMetricLevel;
@@ -713,8 +1170,15 @@ window.addMetricRule = addMetricRule;
 window.updateConfig = updateConfig;
 window.validateTokens = validateTokens;
 window.handleFbLevelChange = handleFbLevelChange;
+window.handleFbOrganicLevelChange = handleFbOrganicLevelChange;
 window.handleFbStrategyChange = handleFbStrategyChange;
 window.forceRefresh = forceRefresh;
+window.toggleOrganicHierarchy = toggleOrganicHierarchy;
+window.toggleSubOpt = toggleSubOpt;
+window.setFbOrganicLevel = setFbOrganicLevel;
+window.setIgLevel = setIgLevel;
+window.triggerFullSync = triggerFullSync;
+window.showToast = showToast;
 
 console.log("Config Manager script loaded.");
 

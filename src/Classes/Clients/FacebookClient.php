@@ -82,6 +82,10 @@ class FacebookClient
                     tokenPath: (string) ($config['graph_token_path'] ?? ''),
                 );
 
+                if ($logger) {
+                    $apiInstance->setLogger($logger);
+                }
+
                 $logger?->info("Initialized FacebookGraphApi via FacebookClient Singleton");
                 
                 if ($overrideConfig === null) {
@@ -104,16 +108,17 @@ class FacebookClient
     }
 
     /**
-     * Validates and returns the unified Facebook configuration.
-     * Merges global, organic, marketing variables, applies defaults & exclusions.
+     * Validates and returns the Facebook configuration with global defaults.
      *
      * @param LoggerInterface|null $logger
+     * @param string|null $channel Optional channel name (facebook_organic or facebook_marketing)
      * @return array
      * @throws Exception
      */
-    public static function getConfig(?LoggerInterface $logger = null): array
+    public static function getConfig(?LoggerInterface $logger = null, ?string $channel = null): array
     {
-        if (self::$config !== null) {
+        // For BC and general usage, we keep the static cache, but only if no specific channel is requested
+        if ($channel === null && self::$config !== null) {
             return self::$config;
         }
 
@@ -128,8 +133,15 @@ class FacebookClient
             $config = $config['facebook'];
         }
 
-        // Merge specialized files into the main config array
-        $config = array_replace_recursive($config, $organic, $marketing);
+        // Merge specialized files into the main config array selectively
+        if ($channel === 'facebook_organic') {
+            $config = array_replace_recursive($config, $organic);
+        } elseif ($channel === 'facebook_marketing') {
+            $config = array_replace_recursive($config, $marketing);
+        } else {
+            // Legacy behavior: merge all
+            $config = array_replace_recursive($config, $organic, $marketing);
+        }
 
         // Explicitly preserve enablement flags to help with scope detection
         $config['organic_enabled'] = (bool) ($organic['enabled'] ?? false);

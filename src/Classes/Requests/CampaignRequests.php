@@ -49,7 +49,7 @@ class CampaignRequests implements RequestInterface
         }
 
         try {
-            $config = MetricRequests::validateFacebookConfig($logger);
+            $config = MetricRequests::validateFacebookConfig($logger, 'facebook_marketing');
             if (!$api) {
                 $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
             }

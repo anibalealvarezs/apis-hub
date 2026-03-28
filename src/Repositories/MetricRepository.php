@@ -230,7 +230,11 @@ class MetricRepository extends BaseRepository
 
         $this->applyDateFilters($query, $startDate, $endDate);
 
-        return $query->getQuery()->getSingleScalarResult();
+        try {
+            return $query->getQuery()->getSingleScalarResult();
+        } catch (NoResultException $e) {
+            return 0;
+        }
     }
 
     /**
@@ -244,7 +248,7 @@ class MetricRepository extends BaseRepository
 
     public function getMaxMetricDateForChannelAndChanneledAccount(int $channel, int $channeledAccountId): ?string
     {
-        return $this->_em->createQueryBuilder()
+        $query = $this->_em->createQueryBuilder()
             ->select('MAX(mc.metricDate)')
             ->from(\Entities\Analytics\MetricConfig::class, 'mc')
             ->where('mc.channel = :channel')
@@ -253,13 +257,18 @@ class MetricRepository extends BaseRepository
                 'channel' => $channel,
                 'channeledAccount' => $channeledAccountId,
             ])
-            ->getQuery()
-            ->getSingleScalarResult();
+            ->getQuery();
+
+        try {
+            return $query->getSingleScalarResult();
+        } catch (NoResultException $e) {
+            return null;
+        }
     }
 
     public function getMaxMetricDateForChannelAndPage(int $channel, int $pageId): ?string
     {
-        return $this->_em->createQueryBuilder()
+        $query = $this->_em->createQueryBuilder()
             ->select('MAX(mc.metricDate)')
             ->from(\Entities\Analytics\MetricConfig::class, 'mc')
             ->where('mc.channel = :channel')
@@ -268,26 +277,84 @@ class MetricRepository extends BaseRepository
                 'channel' => $channel,
                 'page' => $pageId,
             ])
-            ->getQuery()
-            ->getSingleScalarResult();
+            ->getQuery();
+
+        try {
+            return $query->getSingleScalarResult();
+        } catch (NoResultException $e) {
+            return null;
+        }
     }
 
     public function existsByChannelAndName(int $channel, string $name, Period $period, DateTime $metricDate): bool
     {
-        return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
-                ->join('e.metricConfig', 'mc')
-                ->where('mc.channel = :channel')
-                ->andWhere('mc.name = :name')
-                ->andWhere('mc.period = :period')
-                ->andWhere('mc.metricDate = :metricDate')
-                ->setParameters([
-                    'channel' => $channel,
-                    'name' => $name,
-                    'period' => $period->value,
-                    'metricDate' => $metricDate,
-                ])
-                ->getQuery()
-                ->getSingleScalarResult() > 0;
+        $query = $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
+            ->join('e.metricConfig', 'mc')
+            ->where('mc.channel = :channel')
+            ->andWhere('mc.name = :name')
+            ->andWhere('mc.period = :period')
+            ->andWhere('mc.metricDate = :metricDate')
+            ->setParameters([
+                'channel' => $channel,
+                'name' => $name,
+                'period' => $period->value,
+                'metricDate' => $metricDate,
+            ])
+            ->getQuery();
+
+        try {
+            return $query->getSingleScalarResult() > 0;
+        } catch (NoResultException $e) {
+            return false;
+        }
+    }
+
+    public function getMinDate(?object $filters = null): ?string
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('MIN(mc.metricDate)')
+            ->from(\Entities\Analytics\MetricConfig::class, 'mc');
+
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $query->andWhere('mc.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        try {
+            $res = $query->getQuery()->getSingleScalarResult();
+            if ($res instanceof \DateTimeInterface) {
+                return $res->format('Y-m-d');
+            }
+            return is_string($res) ? $res : null;
+        } catch (NoResultException $e) {
+            return null;
+        }
+    }
+
+    public function getMaxDate(?object $filters = null): ?string
+    {
+        $query = $this->_em->createQueryBuilder()
+            ->select('MAX(mc.metricDate)')
+            ->from(\Entities\Analytics\MetricConfig::class, 'mc');
+
+        if ($filters) {
+            foreach ($filters as $key => $value) {
+                $query->andWhere('mc.' . $key . ' = :' . $key)
+                    ->setParameter($key, $value);
+            }
+        }
+
+        try {
+            $res = $query->getQuery()->getSingleScalarResult();
+            if ($res instanceof \DateTimeInterface) {
+                return $res->format('Y-m-d');
+            }
+            return is_string($res) ? $res : null;
+        } catch (NoResultException $e) {
+            return null;
+        }
     }
 
     public function getByChannelAndName(

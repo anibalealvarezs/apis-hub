@@ -232,8 +232,15 @@ class CacheController extends BaseController
 
             try {
                 // Secondary check inside lock to be 100% sure
-                $existingJobsInner = $qb->getQuery()->getResult();
-                if (count($existingJobsInner) > 0) {
+                $countInner = 0;
+                if ($this->isPostgreSQL()) {
+                    $existingJobsInner = $this->em->getConnection()->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
+                    $countInner = count($existingJobsInner);
+                } else {
+                    $existingJobsInner = $qb->getQuery()->getResult();
+                    $countInner = count($existingJobsInner);
+                }
+                if ($countInner > 0) {
                     $redis->del($lockKey);
                     return $this->createResponse(
                         data: null,

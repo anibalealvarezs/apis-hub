@@ -12,7 +12,7 @@ channels:
       cache_include: ''
       ig_accounts: true
     pages:
-    cache_history_range: '3 years'
+    cache_history_range: '1 year'
     POST:
       cache_include: ''
     IG_ACCOUNT:

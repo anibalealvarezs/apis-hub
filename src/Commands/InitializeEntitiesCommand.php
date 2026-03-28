@@ -9,10 +9,11 @@ use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Country;
 use Entities\Analytics\Device;
 use Entities\Analytics\Page; // Add Page entity
+use Enums\Account as AccountEnum;
+use Enums\PageType;
 use Enums\Channel;
 use Enums\Country as CountryEnum;
 use Enums\Device as DeviceEnum;
-use Enums\Account as AccountEnum;
 use Exception;
 use Helpers\Helpers;
 use Monolog\Handler\StreamHandler;
@@ -152,17 +153,19 @@ class InitializeEntitiesCommand extends Command
                 $title = $site['title'] ?? $siteUrl;
                 $hostname = $site['hostname'] ?? parse_url($siteUrl, PHP_URL_HOST) ?? str_replace('sc-domain:', '', $siteUrl);
 
-                $pageEntity = $pageRepository->getByUrl($normalizedSiteUrl);
+                $canonicalId = Helpers::getCanonicalPageId($normalizedSiteUrl, null, PageType::WEBSITE);
+                $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
                 if (!$pageEntity) {
                     $pageEntity = new Page();
                     $pageEntity->addUrl($normalizedSiteUrl)
+                        ->addCanonicalId($canonicalId)
                         ->addTitle($title)
                         ->addHostname($hostname)
                         ->addPlatformId(md5($normalizedSiteUrl))
                         ->addData(['source' => 'gsc_site']);
                     $this->entityManager->persist($pageEntity);
                     $pagesInitialized++;
-                    $this->logger->info("Initialized Page: URL=$normalizedSiteUrl, Title=$title");
+                    $this->logger->info("Initialized Page: URL=$normalizedSiteUrl, CanonicalID=$canonicalId, Title=$title");
                 } else {
                     // Update if title or hostname changed
                     if ($pageEntity->getTitle() !== $title || $pageEntity->getHostname() !== $hostname) {
@@ -238,6 +241,7 @@ class InitializeEntitiesCommand extends Command
                                         'title' => $pageName,
                                         'hostname' => 'www.facebook.com',
                                         'ig_account' => $apiPage['instagram_business_account']['id'] ?? null,
+                                        'access_token' => $apiPage['access_token'] ?? null,
                                         'enabled' => true
                                     ];
                                 }
@@ -255,24 +259,36 @@ class InitializeEntitiesCommand extends Command
                 $pageUrl = $page['url'] ?? "https://www.facebook.com/" . $platformId;
                 $hostname = $page['hostname'] ?? 'www.facebook.com';
 
-                $pageEntity = $pageRepository->getByPlatformId($platformId);
+                $canonicalId = Helpers::getCanonicalPageId($pageUrl, $platformId, PageType::FACEBOOK_PAGE);
+                $pageData = $page['data'] ?? [];
+                $pageData['source'] = 'fb_page';
+                if (!empty($page['access_token'])) {
+                    $pageData['access_token'] = $page['access_token'];
+                }
+                if (!empty($page['ig_account'])) {
+                    $pageData['instagram_business_account_id'] = $page['ig_account'];
+                }
+
+                $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
                 if (!$pageEntity) {
                     $pageEntity = new Page();
                     $pageEntity->addUrl($pageUrl)
+                        ->addCanonicalId($canonicalId)
                         ->addTitle($title)
                         ->addHostname($hostname)
                         ->addPlatformId($platformId)
                         ->addAccount($accountEntity)
-                        ->addData(['source' => 'fb_page']);
+                        ->addData($pageData);
                     $this->entityManager->persist($pageEntity);
                     $pagesInitialized++;
-                    $this->logger->info("Initialized Page: ID=$platformId, Title=$title");
+                    $this->logger->info("Initialized Page: ID=$platformId, CanonicalID=$canonicalId, Title=$title");
                 } else {
                     // Update if title or hostname changed
                     if ($pageEntity->getTitle() !== $title || $pageEntity->getHostname() !== $hostname) {
                         $pageEntity->addTitle($title)
                             ->addHostname($hostname)
                             ->addUrl($pageUrl)
+                            ->addData(array_merge($pageEntity->getData(), $pageData))
                             ->addUpdatedAt(new DateTime());
                         $this->entityManager->persist($pageEntity);
                         $pagesInitialized++;
@@ -349,9 +365,10 @@ class InitializeEntitiesCommand extends Command
             foreach ($adAccountsToProcess as $adAccount) {
                 /** @var ChanneledAccount|null $adAccountEntity */
                 $adAccountEntity = $channeledAccountRepository->getByPlatformId($adAccount['id'], Channel::facebook_marketing->value);
+                $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbGroupName ?? ("Ad Account " . $adAccount['id']);
+                
                 if (!$adAccountEntity) {
                     $channeledAccount = new ChanneledAccount();
-                    $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbGroupName;
                     $channeledAccount->addPlatformId($adAccount['id'])
                         ->addAccount($accountEntity)
                         ->addType(AccountEnum::META_AD_ACCOUNT)
@@ -362,8 +379,7 @@ class InitializeEntitiesCommand extends Command
                     $this->entityManager->persist($channeledAccount);
                     $this->logger->info("Initialized Ad Account: ID={$adAccount['id']}, Name={$channeledAccountName}");
                 } else {
-                    $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbGroupName;
-                    if ($adAccountEntity->getName() !== $channeledAccountName) {
+                    if ($adAccountEntity->getName() !== $channeledAccountName || empty($adAccountEntity->getName())) {
                         $adAccountEntity->addName($channeledAccountName);
                         $this->entityManager->persist($adAccountEntity);
                         $this->logger->info("Updated Ad Account name: ID={$adAccount['id']}, New Name={$channeledAccountName}");

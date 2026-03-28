@@ -42,7 +42,7 @@ class PageRequests implements RequestInterface
         }
 
         try {
-            $config = MetricRequests::validateFacebookConfig($logger);
+            $config = MetricRequests::validateFacebookConfig($logger, 'facebook_organic');
             $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
             $manager = Helpers::getManager();
             $accountRepo = $manager->getRepository(\Entities\Analytics\Account::class);

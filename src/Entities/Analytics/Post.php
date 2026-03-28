@@ -28,7 +28,7 @@ use Repositories\PostRepository;
 #[ORM\HasLifecycleCallbacks]
 class Post extends Entity
 {
-    #[ORM\Column(name: 'post_id', type: 'string', unique: true)]
+    #[ORM\Column(name: 'post_id', type: 'string')]
     protected string $postId;
 
     #[ORM\Column(type: 'json', nullable: true)]

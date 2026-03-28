@@ -40,7 +40,8 @@ class ProcessJobsCommand extends Command
     protected function configure(): void
     {
         $this->setHelp('This command looks for scheduled jobs in the database and executes them via the CacheController.')
-             ->addOption('force-all', 'f', InputOption::VALUE_NONE, 'Ignore instance/date filters and process all scheduled jobs.');
+             ->addOption('force-all', 'f', InputOption::VALUE_NONE, 'Ignore instance/date filters and process all scheduled jobs.')
+             ->addOption('job-id', 'j', InputOption::VALUE_REQUIRED, 'Process a specific job ID immediately regardless of status.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -80,17 +81,23 @@ class ProcessJobsCommand extends Command
             $progressMade = false;
             Helpers::reconnectIfNeeded($this->em);
 
-            $jobs = $jobRepo->getJobsByStatus(
-                status: JobStatus::scheduled->value,
-                channel: ($forceAll ? null : $envChannel),
-                instanceName: ($forceAll ? null : $envInstance)
-            );
-            $delayedJobs = $jobRepo->getJobsByStatus(
-                status: JobStatus::delayed->value,
-                channel: ($forceAll ? null : $envChannel),
-                instanceName: ($forceAll ? null : $envInstance)
-            );
-            $jobsList = array_merge($jobs, $delayedJobs);
+            $jobId = $input->getOption('job-id');
+            if ($jobId) {
+                $specificJob = $jobRepo->find($jobId);
+                $jobsList = $specificJob ? [$specificJob] : [];
+            } else {
+                $jobs = $jobRepo->getJobsByStatus(
+                    status: JobStatus::scheduled->value,
+                    channel: ($forceAll ? null : $envChannel),
+                    instanceName: ($forceAll ? null : $envInstance)
+                );
+                $delayedJobs = $jobRepo->getJobsByStatus(
+                    status: JobStatus::delayed->value,
+                    channel: ($forceAll ? null : $envChannel),
+                    instanceName: ($forceAll ? null : $envInstance)
+                );
+                $jobsList = array_merge($jobs, $delayedJobs);
+            }
 
             if (empty($jobsList)) {
                 break;
@@ -103,20 +110,20 @@ class ProcessJobsCommand extends Command
 
                 // 1. Instance Name Match (Primary Filter)
                 $jobInstance = $payload['instance_name'] ?? null;
-                if (!$forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance) {
+                if (!$jobId && !$forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance) {
                     $stats['skipped']++;
                     continue;
                 }
 
                 // 2. Date Range Filters (Fallback/Secondary)
-                if ($envStartDate !== false && $envStartDate !== '') {
+                if (!$jobId && $envStartDate !== false && $envStartDate !== '') {
                     $jobStart = $params['startDate'] ?? $params['start_date'] ?? null;
                     if ($jobStart !== $envStartDate) {
                         $stats['skipped']++;
                         continue;
                     }
                 }
-                if ($envEndDate !== false && $envEndDate !== '') {
+                if (!$jobId && $envEndDate !== false && $envEndDate !== '') {
                     $jobEnd = $params['endDate'] ?? $params['end_date'] ?? null;
                     if ($jobEnd !== $envEndDate) {
                         $stats['skipped']++;
@@ -124,13 +131,13 @@ class ProcessJobsCommand extends Command
                     }
                 }
 
-                if ($job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
+                if (!$jobId && $job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
                     $stats['skipped']++;
                     continue;
                 }
 
                 // Global filters from env
-                if ($envChannel = getenv('API_SOURCE')) {
+                if (!$jobId && $envChannel = getenv('API_SOURCE')) {
                     $envChannelEnum = Channel::tryFromName($envChannel);
                     $jobChannelEnum = Channel::tryFromName($job->getChannel());
                     
@@ -142,7 +149,7 @@ class ProcessJobsCommand extends Command
                         continue;
                     }
                 }
-                if ($envEntity = getenv('API_ENTITY')) {
+                if (!$jobId && $envEntity = getenv('API_ENTITY')) {
                     if ($job->getEntity() !== $envEntity) {
                         $stats['skipped']++;
                         continue;
@@ -150,7 +157,7 @@ class ProcessJobsCommand extends Command
                 }
 
                 // Cooldown check for delayed jobs
-                if ($job->getStatus() === JobStatus::delayed->value) {
+                if (!$jobId && $job->getStatus() === JobStatus::delayed->value) {
                     $channelEnum = Channel::tryFromName($job->getChannel());
                     $cooldown = $channelEnum ? $channelEnum->getCooldown() : 600;
                     $updatedAt = $job->getUpdatedAt();
@@ -165,7 +172,7 @@ class ProcessJobsCommand extends Command
 
                 // Dependency check
                 $requires = $params['requires'] ?? null;
-                if ($requires) {
+                if (!$jobId && $requires) {
                     $requiredInstances = array_map('trim', explode(',', $requires));
                     foreach ($requiredInstances as $requiredInstance) {
                         if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
@@ -180,7 +187,7 @@ class ProcessJobsCommand extends Command
 
                 // Guard: Prevent another job for the same instance from running if one is already processing
                 $instanceName = $payload['instance_name'] ?? null;
-                if ($instanceName && $jobRepo->isAnotherJobProcessing($instanceName)) {
+                if (!$jobId && $instanceName && $jobRepo->isAnotherJobProcessing($instanceName)) {
                     if (Helpers::isDebug()) {
                         $output->writeln("<comment>Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.</comment>");
                     }
@@ -195,9 +202,10 @@ class ProcessJobsCommand extends Command
 
                 try {
                     // Atomic claim by repository
+                    // Even if we provide job-id, we must ensure it's not already being processed by another worker
                     if (!$jobRepo->claimJob($job->getId())) {
-                        if (Helpers::isDebug()) {
-                            $output->writeln("Job {$job->getUuid()} already claimed by another worker. Skipping.");
+                        if (Helpers::isDebug() || $jobId) {
+                            $output->writeln("<comment>Job {$job->getUuid()} already claimed or in progress. Skipping.</comment>");
                         }
                         $stats['skipped']++;
                         $stats['total']--;
@@ -234,7 +242,8 @@ class ProcessJobsCommand extends Command
                     // Intelligent incremental sync for entities
                     $instanceName = $payload['instance_name'] ?? null;
                     if ($instanceName && str_ends_with($instanceName, '-entities-sync')) {
-                        if (empty($resolvedParams['startDate'])) {
+                        $smartResume = $params['smart_resume'] ?? $params['resume'] ?? false;
+                        if (filter_var($smartResume, FILTER_VALIDATE_BOOLEAN) && empty($resolvedParams['startDate'])) {
                             $lastRun = $jobRepo->getLastSuccessfulJobTime($instanceName);
                             if ($lastRun) {
                                 // Fetch only what changed since the last successful sync

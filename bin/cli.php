@@ -12,6 +12,7 @@ use Commands\Analytics\CheckCoverageCommand;
 use Commands\Analytics\InspectJobsCommand;
 use Commands\Analytics\AnalyzeLogsCommand;
 use Commands\Analytics\ResetMetricsCommand;
+use Commands\Analytics\ResetEntitiesCommand;
 use Commands\HealthCheckCommand;
 use Commands\Crud\AggregateEntityCommand;
 use Commands\Crud\CreateEntityCommand;
@@ -23,6 +24,7 @@ use Commands\InitializeEntitiesCommand;
 use Commands\RefreshInstancesCommand;
 use Commands\SetupDatabaseCommand;
 use Commands\SeedDemoDataCommand;
+use Commands\MigratePagesCanonicalCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use Helpers\Helpers;
 use Symfony\Component\Console\Application;
@@ -73,6 +75,8 @@ try {
         new SetupDatabaseCommand(),
         new SeedDemoDataCommand(Helpers::getManager()),
         new ResetMetricsCommand(),
+        new ResetEntitiesCommand(),
+        new MigratePagesCanonicalCommand(Helpers::getManager()),
     ]);
 
     // Runs console application

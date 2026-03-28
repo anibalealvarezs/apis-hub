@@ -40,6 +40,16 @@
 
         .dashboard-main-split { display: grid; grid-template-columns: 1.8fr 1.2fr; gap: 30px; }
         @media (max-width: 1200px) { .dashboard-main-split { grid-template-columns: 1fr; } }
+
+        /* Toast Notifications */
+        .toast { position: fixed; bottom: 30px; right: 30px; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(10px); color: #fff; padding: 12px 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 0.9rem; pointer-events: none; }
+        .toast.error { border-color: var(--danger); background: rgba(248, 81, 73, 0.1); color: var(--danger); }
+        .toast i { color: var(--primary); }
+        .toast.error i { color: var(--danger); }
+        .animate-slide-in { animation: slideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .animate-slide-out { animation: slideOut 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        @keyframes slideIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(110%); opacity: 0; } }
     </style>
 </head>
 <body class="full-screen">
@@ -168,6 +178,31 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeCancelModal()" style="border:none; padding:10px 20px;">Keep Running</button>
                 <button id="confirm-cancel-btn" class="btn btn-primary" style="background:var(--danger); border-color:var(--danger); padding:10px 25px;">Cancel Task Now</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Run Now Confirmation Modal -->
+    <div id="run-now-confirmation-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="border-left: 3px solid #10b981;">
+            <div class="modal-header">
+                <h3>FORCE PIPELINE EXECUTION</h3>
+                <button class="modal-close" onclick="closeRunNowModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.9rem; color:#fff;">You are about to force the immediate execution of the following job:</p>
+                <div class="modal-info-box" style="margin-top:10px; border-left-color: #10b981; background: rgba(16, 185, 129, 0.05);">
+                    <div class="modal-info-label" style="color:#10b981;">Target Pipeline</div>
+                    <div id="modal-run-job-name" class="modal-info-value">Loading...</div>
+                </div>
+                <p style="font-size:0.75rem; color:var(--text-dim); margin-top:15px; line-height:1.6;">
+                    This will bypass the standard scheduler cycle and run the job #<span id="modal-run-job-id">--</span> immediately in the background. 
+                    Monitor the "Active Queue" to see real-time progress.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRunNowModal()" style="border:none; padding:10px 20px;">Cancel</button>
+                <button id="confirm-run-now-btn" class="btn btn-primary" style="background:#10b981; border-color:#10b981; padding:10px 25px;">Execute Job Now</button>
             </div>
         </div>
     </div>

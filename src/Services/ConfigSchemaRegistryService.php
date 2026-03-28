@@ -83,6 +83,14 @@ class ConfigSchemaRegistryService
                 'enabled' => true,
                 'exclude_from_caching' => false,
                 'ig_account' => null,
+                'ig_account_name' => null,
+                'ig_accounts' => false,
+                'page_metrics' => true,
+                'posts' => true,
+                'post_metrics' => false,
+                'ig_account_metrics' => false,
+                'ig_account_media' => false,
+                'ig_account_media_metrics' => false,
             ]
         ]
     ];

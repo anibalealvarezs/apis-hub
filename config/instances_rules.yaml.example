@@ -4,14 +4,14 @@
 rules:
   facebook_marketing:
     enabled: true
-    history_months: 24
+    history_months: 6
     entities_sync: facebook_marketing_entities
     recent_cron_hour: 5
     recent_cron_minute: 30
   
   facebook_organic:
     enabled: true
-    history_months: 24
+    history_months: 12
     entities_sync: facebook_organic_entities
     recent_cron_hour: 6
     recent_cron_minute: 30

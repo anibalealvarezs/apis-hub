@@ -48,10 +48,56 @@ foreach ($instances as $instance) {
     $params = [
         'instance_name' => $instanceName
     ];
-    if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];
-    if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
+
+    $startDate = $instance['start_date'] ?? null;
+    $endDate = $instance['end_date'] ?? null;
+
+    // Apply specific Dawn Re-sync rules if dates are missing in project.yaml
+    if (empty($startDate)) {
+        if ($channel === 'facebook_organic') {
+            // Rule 2: Organic (Entities & Metrics) resync -> 3 days
+            $startDate = '-3 days';
+            if (empty($endDate)) $endDate = 'yesterday';
+        } elseif ($channel === 'facebook_marketing') {
+            if ($entity === 'metric') {
+                // Rule 4: Marketing Metrics resync -> 3 days
+                $startDate = '-3 days';
+                if (empty($endDate)) $endDate = 'yesterday';
+            }
+            // Rule 3: Marketing Entities -> Stay empty to use full sync_window from code
+        }
+    }
+
+    if (!empty($startDate)) $params['startDate'] = $startDate;
+    if (!empty($endDate)) $params['endDate'] = $endDate;
     if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
+
+    // --- 🕒 Cron Time Override Logic (Hour & Minute) ---
+    $channelConfig = $config['channels'][$channel] ?? [];
+    $overrideHour = null;
+    $overrideMinute = null;
     
+    // Determine if this is an "entities" or "recent" job based on instance name
+    if (str_contains($instanceName, 'entities')) {
+        $overrideHour = $channelConfig['cron_entities_hour'] ?? ($config['cron']['entities_hour'] ?? null);
+        $overrideMinute = $channelConfig['cron_entities_minute'] ?? ($config['cron']['entities_minute'] ?? null);
+    } elseif (str_contains($instanceName, 'recent')) {
+        $overrideHour = $channelConfig['cron_recent_hour'] ?? ($config['cron']['recent_hour'] ?? null);
+        $overrideMinute = $channelConfig['cron_recent_minute'] ?? ($config['cron']['recent_minute'] ?? null);
+    }
+
+    if ($overrideHour !== null) {
+        $freqParts = explode(' ', $frequency);
+        if (count($freqParts) >= 2) {
+            $freqParts[1] = $overrideHour;
+            // Also override minute if defined
+            if ($overrideMinute !== null) {
+                $freqParts[0] = $overrideMinute;
+            }
+            $frequency = implode(' ', $freqParts);
+        }
+    }
+
     $paramString = "";
     if (!empty($params)) {
         $paramString = ' --params="' . http_build_query($params) . '"';

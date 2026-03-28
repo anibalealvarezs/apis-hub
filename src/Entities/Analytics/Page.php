@@ -15,7 +15,10 @@ use Repositories\PageRepository;
 #[ORM\HasLifecycleCallbacks]
 class Page extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(name: "canonical_id", type: 'string', unique: true, nullable: true)]
+    protected ?string $canonicalId = null;
+
+    #[ORM\Column(type: 'string')]
     protected string $url;
 
     #[ORM\Column(type: 'string', nullable: true)]
@@ -121,6 +124,24 @@ class Page extends Entity
     public function addPlatformId(int|string $platformId): self
     {
         $this->platformId = $platformId;
+        return $this;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getCanonicalId(): ?string
+    {
+        return $this->canonicalId;
+    }
+
+    /**
+     * @param string|null $canonicalId
+     * @return Page
+     */
+    public function addCanonicalId(?string $canonicalId): self
+    {
+        $this->canonicalId = $canonicalId;
         return $this;
     }
 

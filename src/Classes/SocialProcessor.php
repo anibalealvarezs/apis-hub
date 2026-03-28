@@ -25,7 +25,7 @@ class SocialProcessor
         $conn = $manager->getConnection();
         $pages = $channeledCollection->toArray();
 
-        $cols = ['url', 'title', 'hostname', 'platform_id', 'account_id', 'data'];
+        $cols = ['url', 'canonical_id', 'title', 'hostname', 'platform_id', 'account_id', 'data'];
         $numCols = count($cols);
         $chunkSize = (int)floor(30000 / $numCols);
 
@@ -33,6 +33,7 @@ class SocialProcessor
             $params = [];
             foreach ($chunk as $p) {
                 $params[] = $p->url;
+                $params[] = $p->canonicalId ?? null;
                 $params[] = $p->title ?? null;
                 $params[] = $p->hostname ?? null;
                 $params[] = $p->platformId;
@@ -43,8 +44,8 @@ class SocialProcessor
             $sql = Helpers::buildUpsertSql(
                 'pages', 
                 $cols, 
-                ['title', 'platform_id', 'data'], 
-                'url', 
+                ['url', 'title', 'platform_id', 'data'], 
+                'canonical_id', 
                 count($chunk)
             );
             $conn->executeStatement($sql, $params);

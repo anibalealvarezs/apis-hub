@@ -81,12 +81,14 @@ class FacebookAuthController
         if (!empty($config['pages']) || ($config['organic_enabled'] ?? false)) {
             $scopes[] = PagePermission::PAGES_SHOW_LIST->value;
             $scopes[] = PagePermission::PAGES_READ_ENGAGEMENT->value;
-            $scopes[] = 'instagram_basic';
-            $scopes[] = 'instagram_manage_insights';
+            $scopes[] = PagePermission::PAGES_READ_USER_CONTENT->value;
+            $scopes[] = UserPermission::READ_INSIGHTS->value;
+            $scopes[] = UserPermission::INSTAGRAM_BASIC->value;
+            $scopes[] = UserPermission::INSTAGRAM_MANAGE_INSIGHTS->value;
             $scopes[] = PagePermission::BUSINESS_MANAGEMENT->value;
         }
 
-        $url = "https://www.facebook.com/v19.0/dialog/oauth?" . http_build_query([
+        $url = "https://www.facebook.com/v25.0/dialog/oauth?" . http_build_query([
             'client_id' => $this->clientId,
             'redirect_uri' => $this->redirectUri,
             'scope' => implode(',', array_unique($scopes)),
@@ -108,7 +110,7 @@ class FacebookAuthController
         }
 
         // 1. Intercambiar code por Short-Lived User Token (2h)
-        $tokenUrl = "https://graph.facebook.com/v19.0/oauth/access_token?" . http_build_query([
+        $tokenUrl = "https://graph.facebook.com/v25.0/oauth/access_token?" . http_build_query([
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
             'redirect_uri' => $this->redirectUri,
@@ -123,7 +125,7 @@ class FacebookAuthController
         }
 
         // 2. Intercambiar por Long-Lived User Token (60 días)
-        $exchangeUrl = "https://graph.facebook.com/v19.0/oauth/access_token?" . http_build_query([
+        $exchangeUrl = "https://graph.facebook.com/v25.0/oauth/access_token?" . http_build_query([
             'grant_type' => 'fb_exchange_token',
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
@@ -138,7 +140,7 @@ class FacebookAuthController
         }
 
         // 3. Obtener el User ID
-        $meUrl = "https://graph.facebook.com/v19.0/me?" . http_build_query([
+        $meUrl = "https://graph.facebook.com/v25.0/me?" . http_build_query([
             'access_token' => $longLivedToken,
             'fields' => 'id'
         ]);

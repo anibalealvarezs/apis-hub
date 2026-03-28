@@ -7,6 +7,11 @@ use Exception;
 use Helpers\Helpers;
 use Services\CacheStrategyService;
 use Services\ConfigSchemaRegistryService;
+use Entities\Analytics\Account;
+use Entities\Analytics\Channeled\ChanneledAccount;
+use Enums\Channel;
+use Enums\Account as AccountEnum;
+use DateTime;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Yaml\Yaml;
@@ -23,21 +28,11 @@ class ConfigManagerController extends BaseController
     {
         parent::__construct();
         
-        $projectName = strtolower(getenv('PROJECT_NAME') ?: ($_ENV['PROJECT_NAME'] ?? ''));
-        $suffix = $projectName ? '.' . $projectName : '';
-
-        $this->gscConfigPath = __DIR__ . '/../../config/channels/google_search_console.yaml' . $suffix;
-        $this->fbConfigPath = __DIR__ . '/../../config/channels/facebook.yaml'; // Global config usually doesn't have suffix
-        $this->fbOrganicPath = __DIR__ . '/../../config/channels/facebook_organic.yaml' . $suffix;
-        $this->fbMarketingPath = __DIR__ . '/../../config/channels/facebook_marketing.yaml' . $suffix;
-        $this->assetsBackupPath = __DIR__ . '/../../config/assets_backup.yaml' . $suffix;
-
-        // Fallback for paths if suffix files do not exist (optional but recommended for robustness)
-        if ($suffix) {
-            if (!file_exists($this->gscConfigPath)) { $this->gscConfigPath = str_replace($suffix, '', $this->gscConfigPath); }
-            if (!file_exists($this->fbOrganicPath)) { $this->fbOrganicPath = str_replace($suffix, '', $this->fbOrganicPath); }
-            if (!file_exists($this->fbMarketingPath)) { $this->fbMarketingPath = str_replace($suffix, '', $this->fbMarketingPath); }
-        }
+        $this->gscConfigPath = __DIR__ . '/../../config/channels/google_search_console.yaml';
+        $this->fbConfigPath = __DIR__ . '/../../config/channels/facebook.yaml';
+        $this->fbOrganicPath = __DIR__ . '/../../config/channels/facebook_organic.yaml';
+        $this->fbMarketingPath = __DIR__ . '/../../config/channels/facebook_marketing.yaml';
+        $this->assetsBackupPath = __DIR__ . '/../../config/assets_backup.yaml';
     }
 
     public function index(): Response
@@ -60,14 +55,21 @@ class ConfigManagerController extends BaseController
             ];
             $lastUpdated = null;
 
-            // 1. Load effective config from system source of truth (merging all Yaml + Env)
+            // STEP 0: Post-Singleton Load
             $systemConfig = Helpers::getProjectConfig();
+            $logger->info("STEP 0: Global Config CAMPAIGN Filter: " . json_encode($systemConfig['channels']['facebook_marketing']['CAMPAIGN']['cache_include'] ?? 'NOT_FOUND'));
+
             $gsc = $systemConfig['channels']['google_search_console'] ?? [];
             $fbGlobal = $systemConfig['channels']['facebook'] ?? [];
             $fbOrganic = $systemConfig['channels']['facebook_organic'] ?? [];
+            
+            // STEP 1: Channel Extraction
             $fbMarketing = $systemConfig['channels']['facebook_marketing'] ?? [];
+            $logger->info("STEP 1: fbMarketing CAMPAIGN Filter: " . json_encode($fbMarketing['CAMPAIGN']['cache_include'] ?? 'NOT_FOUND'));
 
+            // STEP 2: Mixed Config
             $fbConf = array_replace_recursive($fbGlobal, $fbOrganic, $fbMarketing);
+            $logger->info("STEP 2: fbConf CAMPAIGN Filter: " . json_encode($fbConf['CAMPAIGN']['cache_include'] ?? 'NOT_FOUND'));
 
             $currentConfig = [
                 'gsc' => [], 
@@ -89,7 +91,28 @@ class ConfigManagerController extends BaseController
                 'jobs_timeout_hours' => $systemConfig['jobs']['timeout_hours'] ?? 6,
                 'cache_raw_metrics' => filter_var($systemConfig['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'marketing_debug_logs' => filter_var($systemConfig['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'cron_entities_hour' => $systemConfig['cron']['entities_hour'] ?? 2,
+                'cron_entities_minute' => $systemConfig['cron']['entities_minute'] ?? 0,
+                'cron_recent_hour' => $systemConfig['cron']['recent_hour'] ?? 5,
+                'cron_recent_minute' => $systemConfig['cron']['recent_minute'] ?? 0,
+                'gsc_cron_entities_hour' => $gsc['cron_entities_hour'] ?? null,
+                'gsc_cron_entities_minute' => $gsc['cron_entities_minute'] ?? null,
+                'gsc_cron_recent_hour' => $gsc['cron_recent_hour'] ?? null,
+                'gsc_cron_recent_minute' => $gsc['cron_recent_minute'] ?? null,
+                'fb_organic_cron_entities_hour' => $fbOrganic['cron_entities_hour'] ?? null,
+                'fb_organic_cron_entities_minute' => $fbOrganic['cron_entities_minute'] ?? null,
+                'fb_organic_cron_recent_hour' => $fbOrganic['cron_recent_hour'] ?? null,
+                'fb_organic_cron_recent_minute' => $fbOrganic['cron_recent_minute'] ?? null,
+                'fb_marketing_cron_entities_hour' => $fbMarketing['cron_entities_hour'] ?? null,
+                'fb_marketing_cron_entities_minute' => $fbMarketing['cron_entities_minute'] ?? null,
+                'fb_marketing_cron_recent_hour' => $fbMarketing['cron_recent_hour'] ?? null,
+                'fb_marketing_cron_recent_minute' => $fbMarketing['cron_recent_minute'] ?? null,
+                'effective_schedules' => $this->getEffectiveCronSchedules(),
             ];
+
+            $logger->info("DEBUG: Project Name detected: " . (getenv('PROJECT_NAME') ?: "NOT SET"));
+            $logger->info("DEBUG: FB Marketing Campaign Filter: " . json_encode($fbMarketing['CAMPAIGN'] ?? 'NOT_FOUND'));
+            $logger->info("DEBUG: FB Conf Campaign Filter: " . json_encode($fbConf['CAMPAIGN'] ?? 'NOT_FOUND'));
 
             // Re-map GSC sites with Hydration
             foreach (($gsc['sites'] ?? []) as $site) {
@@ -101,13 +124,18 @@ class ConfigManagerController extends BaseController
             if (!empty($fbConf)) {
                 $entities = ['PAGE', 'POST', 'IG_ACCOUNT', 'IG_MEDIA', 'CAMPAIGN', 'ADSET', 'AD', 'CREATIVE'];
                 foreach ($entities as $e) {
-                    $currentConfig['fb_entity_filters'][$e] = $fbConf[$e]['cache_include'] ?? '';
+                    $currentConfig['fb_entity_filters'][$e] = $fbConf[$e]['cache_include'] ?? ($fbMarketing[$e]['cache_include'] ?? '');
                 }
+                
+                // STEP 3: Post-Mapping
+                $logger->info("STEP 3: currentConfig CAMPAIGN Filter Output: " . ($currentConfig['fb_entity_filters']['CAMPAIGN'] ?: 'EMPTY_STRING'));
 
-                foreach (($fbConf['pages'] ?? []) as $p) {
+                foreach (($fbOrganic['pages'] ?? []) as $p) {
                     $currentConfig['fb_page_ids'][] = (string)$p['id'];
                 }
-                foreach (($fbConf['ad_accounts'] ?? []) as $a) {
+                $currentConfig['fb_pages_full_config'] = $fbOrganic['pages'] ?? [];
+
+                foreach (($fbMarketing['ad_accounts'] ?? []) as $a) {
                     $currentConfig['fb_ad_account_ids'][] = (string)$a['id'];
                 }
 
@@ -179,7 +207,7 @@ class ConfigManagerController extends BaseController
                         userId: $userId,
                         permissions: [], 
                         limit: 100, 
-                        fields: 'id,name,instagram_business_account'
+                        fields: 'id,name,instagram_business_account{id,name,username}'
                     );
 
                     if (!empty($pagesData['data'])) {
@@ -191,6 +219,7 @@ class ConfigManagerController extends BaseController
                                 'url' => '', // 'link' was removed as it might require extra permissions
                                 'hostname' => '',
                                 'ig_account' => $page['instagram_business_account']['id'] ?? null,
+                                'ig_account_name' => $page['instagram_business_account']['username'] ?? $page['instagram_business_account']['name'] ?? null,
                             ];
                         }
                     }
@@ -361,11 +390,16 @@ class ConfigManagerController extends BaseController
                 }
                 $appConf['jobs']['timeout_hours'] = (int) ($data['jobs_timeout_hours'] ?? 6);
 
-                if (!isset($appConf['analytics'])) {
-                    $appConf['analytics'] = [];
-                }
                 $appConf['analytics']['cache_raw_metrics'] = filter_var($data['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
                 $appConf['analytics']['marketing_debug_logs'] = filter_var($data['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+                if (!isset($appConf['cron'])) {
+                    $appConf['cron'] = [];
+                }
+                if (isset($data['cron_entities_hour'])) $appConf['cron']['entities_hour'] = (int) $data['cron_entities_hour'];
+                if (isset($data['cron_entities_minute'])) $appConf['cron']['entities_minute'] = (int) $data['cron_entities_minute'];
+                if (isset($data['cron_recent_hour'])) $appConf['cron']['recent_hour'] = (int) $data['cron_recent_hour'];
+                if (isset($data['cron_recent_minute'])) $appConf['cron']['recent_minute'] = (int) $data['cron_recent_minute'];
 
                 // Explicit Guard: Strip any attempts to modify system-level infrastructure via UI
                 unset($appConf['db_host'], $appConf['db_name'], $appConf['app_mode']);
@@ -461,6 +495,18 @@ class ConfigManagerController extends BaseController
         }
         if ($historyRange) {
             $config['channels']['google_search_console']['cache_history_range'] = $historyRange;
+        }
+        if (isset($featureToggles['cron_entities_hour'])) {
+            $config['channels']['google_search_console']['cron_entities_hour'] = (int)$featureToggles['cron_entities_hour'];
+        }
+        if (isset($featureToggles['cron_entities_minute'])) {
+            $config['channels']['google_search_console']['cron_entities_minute'] = (int)$featureToggles['cron_entities_minute'];
+        }
+        if (isset($featureToggles['cron_recent_hour'])) {
+            $config['channels']['google_search_console']['cron_recent_hour'] = (int)$featureToggles['cron_recent_hour'];
+        }
+        if (isset($featureToggles['cron_recent_minute'])) {
+            $config['channels']['google_search_console']['cron_recent_minute'] = (int)$featureToggles['cron_recent_minute'];
         }
         $config['channels']['google_search_console']['enabled'] = $enabled;
 
@@ -558,6 +604,18 @@ class ConfigManagerController extends BaseController
         if ($organicHistoryRange) {
             $orgConfig['channels']['facebook_organic']['cache_history_range'] = $organicHistoryRange;
         }
+        if (isset($featureToggles['cron_entities_hour']) && ($type === 'facebook' || $type === 'facebook-organic')) {
+            $orgConfig['channels']['facebook_organic']['cron_entities_hour'] = (int)$featureToggles['cron_entities_hour'];
+        }
+        if (isset($featureToggles['cron_entities_minute']) && ($type === 'facebook' || $type === 'facebook-organic')) {
+            $orgConfig['channels']['facebook_organic']['cron_entities_minute'] = (int)$featureToggles['cron_entities_minute'];
+        }
+        if (isset($featureToggles['cron_recent_hour']) && ($type === 'facebook' || $type === 'facebook-organic')) {
+            $orgConfig['channels']['facebook_organic']['cron_recent_hour'] = (int)$featureToggles['cron_recent_hour'];
+        }
+        if (isset($featureToggles['cron_recent_minute']) && ($type === 'facebook' || $type === 'facebook-organic')) {
+            $orgConfig['channels']['facebook_organic']['cron_recent_minute'] = (int)$featureToggles['cron_recent_minute'];
+        }
         if ($type === 'facebook' || $type === 'facebook-organic') {
             $orgConfig['channels']['facebook_organic']['enabled'] = $enabled;
         }
@@ -586,6 +644,18 @@ class ConfigManagerController extends BaseController
         }
         if ($marketingHistoryRange) {
             $markConfig['channels']['facebook_marketing']['cache_history_range'] = $marketingHistoryRange;
+        }
+        if (isset($featureToggles['cron_entities_hour']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
+            $markConfig['channels']['facebook_marketing']['cron_entities_hour'] = (int)$featureToggles['cron_entities_hour'];
+        }
+        if (isset($featureToggles['cron_entities_minute']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
+            $markConfig['channels']['facebook_marketing']['cron_entities_minute'] = (int)$featureToggles['cron_entities_minute'];
+        }
+        if (isset($featureToggles['cron_recent_hour']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
+            $markConfig['channels']['facebook_marketing']['cron_recent_hour'] = (int)$featureToggles['cron_recent_hour'];
+        }
+        if (isset($featureToggles['cron_recent_minute']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
+            $markConfig['channels']['facebook_marketing']['cron_recent_minute'] = (int)$featureToggles['cron_recent_minute'];
         }
         if ($type === 'facebook' || $type === 'facebook-marketing') {
             $markConfig['channels']['facebook_marketing']['enabled'] = $enabled;
@@ -616,7 +686,7 @@ class ConfigManagerController extends BaseController
             }
         }
 
-        // 4. Update Feature Toggles (Global Defaults)
+        // 4. Update Feature Toggles (Global Defaults for reference)
         $fbOrganicFeatures = ['page_metrics', 'posts', 'post_metrics', 'ig_accounts', 'ig_account_metrics', 'ig_account_media', 'ig_account_media_metrics'];
         foreach ($fbOrganicFeatures as $f) {
             if (isset($featureToggles[$f])) {
@@ -633,29 +703,29 @@ class ConfigManagerController extends BaseController
         
         // 2. Handle Pages Sync (Organic)
         if (isset($assets['pages'])) {
-            $selectedPageIds = array_column($assets['pages'], 'id');
-            $currentPages = $orgConfig['channels']['facebook_organic']['pages'] ?? [];
             $newPagesList = [];
-
-            // Keep existing pages still selected
-            foreach ($currentPages as $page) {
-                if (in_array((string)$page['id'], $selectedPageIds)) {
-                    $newPagesList[] = $page;
-                }
-            }
-
-            // Add newly selected pages
-            $existingPageIds = array_map('strval', array_column($currentPages, 'id'));
-            foreach ($assets['pages'] as $newPage) {
-                if (!in_array((string)$newPage['id'], $existingPageIds)) {
-                    $newPagesList[] = ConfigSchemaRegistryService::getEntitySchema('facebook_organic', [
-                        'id' => $newPage['id'],
-                        'url' => $newPage['url'],
-                        'title' => $newPage['title'],
-                        'hostname' => $newPage['hostname'],
-                        'ig_account' => $newPage['ig_account'],
-                    ]);
-                }
+            foreach ($assets['pages'] as $pData) {
+                // Ensure ID is string and boolean flags are casted
+                $pageId = (string)$pData['id'];
+                $item = [
+                    'id' => $pageId,
+                    'title' => $pData['title'] ?? null,
+                    'url' => $pData['url'] ?? null,
+                    'hostname' => $pData['hostname'] ?? null,
+                    'enabled' => filter_var($pData['enabled'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                    'exclude_from_caching' => filter_var($pData['exclude_from_caching'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    'ig_account' => $pData['ig_account'] ?? null,
+                    'ig_account_name' => $pData['ig_account_name'] ?? null,
+                    // Granularity Flags (Stored per page)
+                    'page_metrics' => filter_var($pData['page_metrics'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                    'posts' => filter_var($pData['posts'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                    'post_metrics' => filter_var($pData['post_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    'ig_accounts' => filter_var($pData['ig_accounts'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    'ig_account_metrics' => filter_var($pData['ig_account_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    'ig_account_media' => filter_var($pData['ig_account_media'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    'ig_account_media_metrics' => filter_var($pData['ig_account_media_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                ];
+                $newPagesList[] = ConfigSchemaRegistryService::getEntitySchema('facebook_organic', $item);
             }
             $orgConfig['channels']['facebook_organic']['pages'] = $newPagesList;
         }
@@ -674,19 +744,99 @@ class ConfigManagerController extends BaseController
                 }
             }
 
+            // Sync with DB
+            $fbGroupName = $globalConfig['channels']['facebook']['accounts_group_name'] ?? $orgConfig['channels']['facebook_organic']['accounts_group_name'] ?? $markConfig['channels']['facebook_marketing']['accounts_group_name'] ?? "Default Group";
+            $accountEntity = $this->em->getRepository(Account::class)->getByName($fbGroupName);
+            if (!$accountEntity) {
+                $accountEntity = new Account();
+                $accountEntity->addName($fbGroupName);
+                $this->em->persist($accountEntity);
+                $this->em->flush();
+            }
+
             // Add newly selected accounts
             $existingAccIds = array_map('strval', array_column($currentAccs, 'id'));
             foreach ($assets['ad_accounts'] as $newAcc) {
-                if (!in_array((string)$newAcc['id'], $existingAccIds)) {
+                $accId = (string) $newAcc['id'];
+                $accName = $newAcc['name'] ?? ("Ad Account " . $accId);
+                
+                if (!in_array($accId, $existingAccIds)) {
                     $newAccsList[] = ConfigSchemaRegistryService::getEntitySchema('facebook_marketing', [
-                        'id' => (string)$newAcc['id'],
-                        'name' => $newAcc['name'] ?? '',
+                        'id' => $accId,
+                        'name' => $accName,
                     ]);
                 }
+                
+                // Sync to database physical entity
+                $dbChanneled = $this->em->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $accId, 'channel' => Channel::facebook_marketing->value]);
+                if (!$dbChanneled) {
+                    $dbChanneled = new ChanneledAccount();
+                    $dbChanneled->addPlatformId($accId)
+                        ->addAccount($accountEntity)
+                        ->addType(AccountEnum::META_AD_ACCOUNT)
+                        ->addChannel(Channel::facebook_marketing->value)
+                        ->addName($accName)
+                        ->addPlatformCreatedAt(new DateTime('2010-10-06'))
+                        ->addData([]);
+                    $this->em->persist($dbChanneled);
+                } else {
+                    if ($dbChanneled->getName() !== $accName || empty($dbChanneled->getName())) {
+                        $dbChanneled->addName($accName);
+                        $this->em->persist($dbChanneled);
+                    }
+                }
             }
+            $this->em->flush();
             $markConfig['channels']['facebook_marketing']['ad_accounts'] = $newAccsList;
         }
         file_put_contents($this->fbMarketingPath, Yaml::dump($markConfig, 10, 2));
+
+        // Sync Pages to DB too
+        if (isset($assets['pages'])) {
+            $fbGroupName = $fbGroupName ?? "Default Group";
+            $accountEntity = $accountEntity ?? $this->em->getRepository(Account::class)->getByName($fbGroupName);
+            foreach ($assets['pages'] as $pData) {
+                $pageId = (string)$pData['id'];
+                $pageName = $pData['title'] ?? ("Page " . $pageId);
+                $dbPage = $this->em->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $pageId, 'channel' => Channel::facebook_organic->value]);
+                if (!$dbPage) {
+                    $dbPage = new ChanneledAccount();
+                    $dbPage->addPlatformId($pageId)
+                        ->addAccount($accountEntity)
+                        ->addType(AccountEnum::FACEBOOK_PAGE)
+                        ->addChannel(Channel::facebook_organic->value)
+                        ->addName($pageName)
+                        ->addPlatformCreatedAt(new DateTime('2010-10-06'))
+                        ->addData([]);
+                    $this->em->persist($dbPage);
+                } elseif ($dbPage->getName() !== $pageName || empty($dbPage->getName())) {
+                    $dbPage->addName($pageName);
+                    $this->em->persist($dbPage);
+                }
+                
+                // IG sync if present
+                if (!empty($pData['ig_account'])) {
+                    $igId = (string)$pData['ig_account'];
+                    $igName = $pData['ig_account_name'] ?? $pageName;
+                    $dbIg = $this->em->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $igId, 'channel' => Channel::facebook_organic->value]);
+                    if (!$dbIg) {
+                        $dbIg = new ChanneledAccount();
+                        $dbIg->addPlatformId($igId)
+                            ->addAccount($accountEntity)
+                            ->addType(AccountEnum::INSTAGRAM)
+                            ->addChannel(Channel::facebook_organic->value)
+                            ->addName($igName)
+                            ->addPlatformCreatedAt(new DateTime('2010-10-06'))
+                            ->addData([]);
+                        $this->em->persist($dbIg);
+                    } elseif ($dbIg->getName() !== $igName || empty($dbIg->getName())) {
+                        $dbIg->addName($igName);
+                        $this->em->persist($dbIg);
+                    }
+                }
+            }
+            $this->em->flush();
+        }
     }
 
     private function deriveTitleFromUrl(string $url): string
@@ -752,6 +902,47 @@ class ConfigManagerController extends BaseController
             'ita' => 'Italy',
             'bra' => 'Brazil',
         ];
+    }
+
+    private function getEffectiveCronSchedules(): array
+    {
+        $schedules = [];
+        try {
+            // Read crontab for current user
+            $output = [];
+            exec('crontab -l 2>/dev/null', $output);
+            
+            foreach ($output as $line) {
+                if (empty($line) || str_starts_with($line, '#') || !str_contains($line, 'apis-hub:cache')) {
+                    continue;
+                }
+                
+                // Example line: 0 2 * * * cd /app && php bin/cli.php apis-hub:cache "facebook_marketing" "facebook_marketing_entities" ...
+                $parts = preg_split('/\s+/', $line);
+                if (count($parts) < 5) continue;
+                
+                $minute = $parts[0];
+                $hour = $parts[1];
+                $cronTime = "$minute $hour";
+                
+                // Try to identify the instance or channel/entity
+                $key = 'unknown';
+                if (preg_match('/instance_name=([^&"\s]+)/', $line, $matches)) {
+                    $key = $matches[1];
+                } elseif (preg_match('/apis-hub:cache\s+"([^"]+)"\s+"([^"]+)"/', $line, $matches)) {
+                    $key = $matches[1] . '_' . $matches[2];
+                }
+                
+                $schedules[$key] = [
+                    'minute' => $minute,
+                    'hour' => $hour,
+                    'time' => $cronTime
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Silently fail if crontab not accessible
+        }
+        return $schedules;
     }
 
 }

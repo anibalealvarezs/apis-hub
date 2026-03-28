@@ -290,4 +290,58 @@ class FacebookOrganicMetricConvert
 
         return $collection;
     }
+
+    /**
+     * Converts raw Facebook Page posts into a collection for SocialProcessor.
+     *
+     * @param array $posts
+     * @param Page $pageEntity
+     * @param Account $accountEntity
+     * @return ArrayCollection
+     */
+    public static function toPostsCollection(
+        array $posts,
+        Page $pageEntity,
+        Account $accountEntity,
+    ): ArrayCollection {
+        $collection = new ArrayCollection();
+        foreach ($posts as $post) {
+            $p = new stdClass();
+            $p->platformId = $post['id'];
+            $p->pageId = $pageEntity->getId();
+            $p->accountId = $accountEntity->getId();
+            $p->channeledAccountId = null; // FB Pages don't always have a ChanneledAccount link in this context
+            $p->data = $post;
+            $collection->add($p);
+        }
+        return $collection;
+    }
+
+    /**
+     * Converts raw Instagram Media items into a collection for SocialProcessor.
+     *
+     * @param array $mediaItems
+     * @param Page $pageEntity
+     * @param Account $accountEntity
+     * @param ChanneledAccount $channeledAccountEntity
+     * @return ArrayCollection
+     */
+    public static function toInstagramMediaCollection(
+        array $mediaItems,
+        Page $pageEntity,
+        Account $accountEntity,
+        ChanneledAccount $channeledAccountEntity,
+    ): ArrayCollection {
+        $collection = new ArrayCollection();
+        foreach ($mediaItems as $item) {
+            $p = new stdClass();
+            $p->platformId = $item['id'];
+            $p->pageId = $pageEntity->getId();
+            $p->accountId = $accountEntity->getId();
+            $p->channeledAccountId = $channeledAccountEntity->getId();
+            $p->data = $item;
+            $collection->add($p);
+        }
+        return $collection;
+    }
 }

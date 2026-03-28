@@ -53,13 +53,16 @@ class ResetMetricsCommand extends Command
                 $targetIds = [];
                 $jobChannels = [];
 
-                if (strtolower($channelName) === 'facebook') {
+                if (strtolower($channelName) === 'all') {
+                    $targetIds = [Channel::facebook_marketing->value, Channel::facebook_organic->value, Channel::google_search_console->value];
+                    $jobChannels = ['facebook_marketing', 'facebook_organic', 'google_search_console'];
+                } elseif (strtolower($channelName) === 'facebook') {
                     $targetIds = [Channel::facebook_marketing->value, Channel::facebook_organic->value];
                     $jobChannels = ['facebook_marketing', 'facebook_organic'];
                 } else {
                     $enum = Channel::tryFromName($channelName);
                     if (!$enum) {
-                        throw new \Exception("Unknown channel: $channelName");
+                        throw new \Exception("Unknown channel: $channelName. Use all, facebook, facebook_marketing, or google_search_console.");
                     }
                     $targetIds = [$enum->value];
                     $jobChannels = [$enum->name];

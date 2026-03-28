@@ -51,14 +51,23 @@ class PageRepository extends BaseRepository
             ->getResult();
     }
 
-    /**
-     * @throws NonUniqueResultException
-     */
     public function getByPlatformId(string $platformId): ?Page
     {
         return $this->createQueryBuilder('p')
             ->where('p.platformId = :platformId')
             ->setParameter('platformId', $platformId)
+            ->getQuery()
+            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+    }
+
+    /**
+     * @throws NonUniqueResultException
+     */
+    public function getByCanonicalId(string $canonicalId): ?Page
+    {
+        return $this->createQueryBuilder('p')
+            ->where('p.canonicalId = :canonicalId')
+            ->setParameter('canonicalId', $canonicalId)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }

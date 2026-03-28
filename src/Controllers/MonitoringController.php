@@ -120,22 +120,18 @@ class MonitoringController extends BaseController
         $jobRepo = $this->em->getRepository(Job::class);
 
         // Fetch ONLY pending, processing, or failed jobs for priority visibility
-        // Fetch the 300 most recent jobs overall for historical context
         $allRecentJobs = $jobRepo->findBy([], ['id' => 'DESC'], 300);
-        
-        // We also want to make sure priority jobs (failed, etc.) are included even if they are older
         $priorityJobs = $jobRepo->findBy(
             ['status' => [JobStatus::scheduled->value, JobStatus::processing->value, JobStatus::failed->value]],
             ['id' => 'DESC'],
             100
         );
 
-        // Merge and manually ensure uniqueness by ID to avoid SORT_REGULAR issues
         $finalJobs = [];
         foreach (array_merge($allRecentJobs, $priorityJobs) as $j) {
             $finalJobs[$j->getId()] = $j;
         }
-        krsort($finalJobs); // Keep highest IDs first
+        krsort($finalJobs);
         $allRecentJobs = array_values($finalJobs);
 
         $pipelines = [];
@@ -147,7 +143,6 @@ class MonitoringController extends BaseController
             $normChan = strtolower(trim($job->getChannel()));
             $normEnt = strtolower(trim($job->getEntity()));
 
-            // Create a unique key based on Instance + Entity (normalized)
             $pipelineKey = "{$targetId}:{$normChan}:{$normEnt}";
 
             if (!isset($pipelines[$pipelineKey])) {
@@ -182,7 +177,7 @@ class MonitoringController extends BaseController
                     'status' => $job->getStatus(),
                     'status_text' => strtoupper($statusText),
                     'params' => $params,
-                    'frequency' => $payload['cron'] ?? $frequency, // Use payload['cron'] if available, otherwise instance frequency
+                    'frequency' => $payload['cron'] ?? $frequency,
                     'execution_time' => $executionTime,
                     'created_at' => $createdAt ? $createdAt->format('Y-m-d H:i:s') : 'N/A',
                     'updated_at' => $updatedAt ? $updatedAt->format('Y-m-d H:i:s') : 'N/A',
@@ -192,7 +187,6 @@ class MonitoringController extends BaseController
                     'history' => []
                 ];
             } else {
-                // Add to history of this pipeline if not already full (max 10 for better coverage)
                 if (count($pipelines[$pipelineKey]['history']) < 10) {
                     $pipelines[$pipelineKey]['history'][] = [
                         'status' => $job->getStatus(),
@@ -203,7 +197,6 @@ class MonitoringController extends BaseController
             }
         }
 
-        // Re-group pipelines by channel to match the requested UI hierarchy
         $groupedJobs = [];
         foreach ($pipelines as $pipeline) {
             $chan = $pipeline['channel'];
@@ -211,14 +204,13 @@ class MonitoringController extends BaseController
             $groupedJobs[$chan][] = $pipeline;
         }
 
-        // Sort jobs within each channel group to match the instance order
         $instanceOrder = array_flip(array_column($instances, 'name'));
         foreach ($groupedJobs as $chan => &$jobs) {
             usort($jobs, function($a, $b) use ($instanceOrder) {
                 $idxA = $instanceOrder[$a['group']] ?? 999;
                 $idxB = $instanceOrder[$b['group']] ?? 999;
                 if ($idxA !== $idxB) return $idxA - $idxB;
-                return $b['id'] - $a['id']; // Internal sort by ID desc if in same instance
+                return $b['id'] - $a['id'];
             });
         }
 
@@ -237,8 +229,8 @@ class MonitoringController extends BaseController
             'Discounts' => ['class' => 'Analytics\Discount', 'channeled' => 'Analytics\Channeled\ChanneledDiscount'],
             'Price Rules' => ['class' => 'Analytics\PriceRule', 'channeled' => 'Analytics\Channeled\ChanneledPriceRule'],
             'Vendors' => ['class' => 'Analytics\Vendor', 'channeled' => 'Analytics\Channeled\ChanneledVendor'],
-            'Pages' => ['class' => 'Analytics\Page', 'channeled' => null],
-            'Posts' => ['class' => 'Analytics\Post', 'channeled' => null],
+            'Pages' => ['class' => 'Analytics\Page', 'channeled' => 'Analytics\Page'],
+            'Posts' => ['class' => 'Analytics\Post', 'channeled' => 'Analytics\Post'],
             'Queries' => ['class' => 'Analytics\Query', 'channeled' => null],
             'Countries' => ['class' => 'Analytics\Country', 'channeled' => null],
             'Devices' => ['class' => 'Analytics\Device', 'channeled' => null],
@@ -246,45 +238,102 @@ class MonitoringController extends BaseController
         ];
 
         $dbTotals = [];
-        $conn = $this->em->getConnection();
-        
         foreach ($statsConfig as $label => $config) {
             $entry = ['entity' => $label, 'count' => 0, 'channels' => []];
             
-            // 1. Base Class Count (Raw SQL for speed)
             if ($config['class']) {
                 try {
                     $tableName = self::getTableNameForEntity($config['class']);
                     if ($tableName) {
-                        $count = $conn->fetchOne("SELECT COUNT(*) FROM $tableName");
-                        $entry['count'] = (int)$count;
+                        $entry['count'] = (int)$conn->fetchOne("SELECT COUNT(*) FROM $tableName");
                     }
                 } catch (\Exception $e) {}
             }
 
-            // 2. Channeled Breakdown (Raw SQL for speed)
-            $channeledData = [];
             if ($config['channeled']) {
                 try {
                     $tableName = self::getTableNameForEntity($config['channeled']);
                     if ($tableName) {
-                        $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
-                        
-                        foreach ($results as $res) {
-                            $channelId = (int)$res['channel'];
-                            $channelCount = (int)$res['count'];
-                            $channelName = \Enums\Channel::tryFrom($channelId)?->getCommonName() ?? \Enums\Channel::tryFromName($res['channel'])?->getCommonName() ?? "Ch $channelId";
-                            
-                            if (!isset($channeledData[$channelName])) {
-                                $channeledData[$channelName] = ['name' => $channelName, 'count' => 0];
+                        $sql = "";
+                        if ($tableName === 'channeled_accounts') {
+                            $sql = "SELECT channel, type, COUNT(*) as count FROM channeled_accounts GROUP BY channel, type";
+                        } elseif ($tableName === 'channeled_metrics') {
+                            $sql = "SELECT cm.channel, ca.type, COUNT(*) as count 
+                                  FROM channeled_metrics cm 
+                                  JOIN metrics m ON cm.metric_id = m.id
+                                  JOIN metric_configs mc ON m.metric_config_id = mc.id
+                                  LEFT JOIN channeled_accounts ca ON mc.channeled_account_id = ca.id
+                                  GROUP BY cm.channel, type";
+                        } elseif ($tableName === 'pages') {
+                            $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
+                                  FROM pages p 
+                                  LEFT JOIN channeled_accounts ca ON p.platform_id = ca.platform_id 
+                                  GROUP BY ca.channel, ca.type";
+                        } elseif ($tableName === 'posts') {
+                            $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
+                                  FROM posts e 
+                                  JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
+                                  GROUP BY ca.channel, ca.type";
+                        } elseif (in_array($tableName, ['channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
+                            $sql = "SELECT e.channel, ca.type, COUNT(*) as count 
+                                  FROM $tableName e 
+                                  LEFT JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
+                                  GROUP BY e.channel, ca.type";
+                        } else {
+                            $columns = $conn->fetchFirstColumn("DESCRIBE $tableName");
+                            if (in_array('channeled_account_id', $columns)) {
+                                $sql = "SELECT e.channel, ca.type, COUNT(*) as count 
+                                      FROM $tableName e 
+                                      LEFT JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
+                                      GROUP BY e.channel, ca.type";
+                            } elseif (in_array('platform_id', $columns)) {
+                                $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
+                                      FROM $tableName e 
+                                      LEFT JOIN channeled_accounts ca ON e.platform_id = ca.platform_id 
+                                      GROUP BY ca.channel, ca.type";
+                            } elseif (in_array('channel', $columns)) {
+                                $sql = "SELECT channel, NULL as type, COUNT(*) as count FROM $tableName GROUP BY channel";
                             }
-                            $channeledData[$channelName]['count'] += $channelCount;
                         }
-                        
-                        $entry['channels'] = array_values($channeledData);
-                        
-                        if (!$config['class']) {
-                            $entry['count'] = array_sum(array_column($channeledData, 'count'));
+
+                        if ($sql) {
+                            $resItems = [];
+                            try {
+                                $results = $conn->fetchAllAssociative($sql);
+                                foreach ($results as $res) {
+                                    $channelId = (int)($res['channel'] ?? 0);
+                                    $channelLabel = $channelId ? (\Enums\Channel::tryFrom($channelId)?->getCommonName() ?? "Ch $channelId") : "Unidentified Channel";
+                                    $typeValue = $res['type'] ?? '';
+                                    $typeName = $typeValue;
+                                    if ($typeValue && class_exists('\Enums\Account')) {
+                                        $enum = \Enums\Account::tryFrom($typeValue);
+                                        $typeName = $enum ? ucwords(str_replace('_', ' ', $enum->value)) : $typeValue;
+                                    }
+                                    
+                                    $label = $channelLabel . ($typeName ? " • $typeName" : "");
+                                    $resItems[] = [
+                                        'name' => $label,
+                                        'count' => (int)$res['count'],
+                                        'channel' => $channelLabel,
+                                        'type' => $typeName,
+                                        'type_raw' => $typeValue
+                                    ];
+                                }
+                            } catch (\Exception $e) {
+                                try {
+                                    $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
+                                    foreach ($results as $res) {
+                                        $resItems[] = [
+                                            'name' => \Enums\Channel::tryFrom((int)$res['channel'])?->getCommonName() ?? "Channel " . $res['channel'],
+                                            'count' => (int)$res['count']
+                                        ];
+                                    }
+                                } catch (\Exception $ex) {}
+                            }
+                            $entry['channels'] = $resItems;
+                            if (!$config['class']) {
+                                $entry['count'] = array_sum(array_column($resItems, 'count'));
+                            }
                         }
                     }
                 } catch (\Exception $e) {}
@@ -296,7 +345,7 @@ class MonitoringController extends BaseController
             'containers' => $containers,
             'groupedJobs' => $groupedJobs,
             'dbTotals' => $dbTotals,
-            'projectName' => $config['project'] ?? 'APIs Hub',
+            'projectName' => $this->config['project'] ?? 'APIs Hub',
             'timestamp' => date('Y-m-d H:i:s')
         ]);
     }
@@ -353,20 +402,17 @@ class MonitoringController extends BaseController
                     return new JsonResponse(['success' => true, 'message' => "New job scheduled. Original #$id history preserved."]);
                 
                 case 'process':
-                    if ($job->getStatus() !== JobStatus::scheduled->value) {
-                         return new JsonResponse(['error' => 'Only scheduled jobs can be processed manually'], 400);
+                    if ($job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
+                         return new JsonResponse(['error' => 'Only scheduled or delayed jobs can be processed manually'], 400);
                     }
-                    if (!$jobRepo->claimJob($id)) return new JsonResponse(['error' => 'Job already processing'], 409);
                     
-                    $channel = \Enums\Channel::tryFromName($job->getChannel());
-                    $payload = $job->getPayload() ?? [];
-                    
-                    // Execute in background to avoid blocking the single-threaded web server
-                    $params = json_encode($payload['params'] ?? []);
-                    $cmd = "php bin/cli.php apis-hub:cache \"{$channel->name}\" \"{$job->getEntity()}\" --params='{$params}' > /dev/null 2>&1 &";
+                    // Execute in background WITHOUT claiming here. 
+                    // ProcessJobsCommand will claim it when it actually starts.
+                    $rootPath = realpath(__DIR__ . '/../../');
+                    $cmd = "php {$rootPath}/bin/cli.php app:process-jobs --job-id={$id} >> {$rootPath}/logs/jobs.log 2>&1 &";
                     exec($cmd);
 
-                    return new JsonResponse(['success' => true, 'message' => "Job #$id triggered in background. Refresh in a few moments."]);
+                    return new JsonResponse(['success' => true, 'message' => "Job #$id triggered in background. Once it starts, status will change to 'Processing'."]);
 
                 case 'cancel':
                     $job->addStatus(JobStatus::cancelled->value);

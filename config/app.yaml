@@ -1,10 +1,11 @@
 project: '${PROJECT_NAME:-apis-hub}'
-timezone: '${APP_TIMEZONE:-UTC}'
+timezone: '${APP_TIMEZONE:-America/Caracas}'
 debug: true
 jobs:
   timeout_hours: 6
 analytics:
   cache_raw_metrics: false
+  marketing_debug_logs: false
 
 # Cron Scheduling Defaults
 cron:

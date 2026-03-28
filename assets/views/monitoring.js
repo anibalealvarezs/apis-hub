@@ -141,14 +141,23 @@ function updateDbTotals(totals) {
             `;
         } else {
             channels.forEach(chan => {
-                const chanColor = chan.name.toLowerCase() === 'facebook' ? '#1877F2' : 'var(--primary)';
+                const chanName = chan.channel || chan.name;
+                const chanColor = (chanName.toLowerCase().includes('facebook') || chanName.toLowerCase().includes('meta')) ? '#1877F2' : 'var(--primary)';
+                
+                let labelHtml = `<span style="font-size:0.75rem; color: #fff; font-weight:700;">${chanName}</span>`;
+                if (chan.type) {
+                    labelHtml += ` <span style="font-size:0.6rem; color:var(--text-dim); opacity:0.6;">• ${chan.type}</span>`;
+                }
+
                 breakdownHtml += `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <div style="width:6px; height:6px; border-radius:50%; background:${chanColor};"></div>
-                            <span style="font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; font-weight:700;">${chan.name}</span>
+                    <div style="margin-bottom:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="width:6px; height:6px; border-radius:50%; background:${chanColor}; flex-shrink:0;"></div>
+                                ${labelHtml}
+                            </div>
+                            <span style="font-size:1.1rem; font-weight:800; color:#fff; font-family:var(--font-mono);">${chan.count.toLocaleString()}</span>
                         </div>
-                        <span style="font-size:1.3rem; font-weight:800; color:#fff; font-family:var(--font-mono);">${chan.count.toLocaleString()}</span>
                     </div>
                 `;
             });
@@ -230,20 +239,27 @@ function updateContainers(containers) {
                     </div>
                 </div>
 
-                <div style="border-top: 1px solid rgba(255,255,255,0.03); padding-top:12px; margin-top:10px;">
-                    <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; font-weight:800; letter-spacing:0.05em; margin-bottom:8px;">INSTANCE JOB STATS</div>
-                    <div style="display:flex; align-items:center; gap:12px;">
-                        <div style="display:flex; align-items:center; gap:6px; color:#4ade80; font-weight:700; font-size:0.9rem;">
-                            <i data-lucide="check" size="15"></i>
-                            <span>${completedCount}</span>
+                <div style="border-top: 1px solid rgba(255,255,255,0.03); padding-top:12px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; font-weight:800; letter-spacing:0.05em; margin-bottom:8px;">INSTANCE JOB STATS</div>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <div style="display:flex; align-items:center; gap:6px; color:#4ade80; font-weight:700; font-size:0.9rem;">
+                                <i data-lucide="check" size="15"></i>
+                                <span>${completedCount}</span>
+                            </div>
+                            ${failedCount > 0 ? `
+                                 <div style="display:flex; align-items:center; gap:6px; color:var(--danger); font-weight:700; font-size:0.9rem;">
+                                    <i data-lucide="x-circle" size="15"></i>
+                                    <span>${failedCount}</span>
+                                 </div>
+                            ` : ''}
                         </div>
-                        ${failedCount > 0 ? `
-                             <div style="display:flex; align-items:center; gap:6px; color:var(--danger); font-weight:700; font-size:0.9rem;">
-                                <i data-lucide="x-circle" size="15"></i>
-                                <span>${failedCount}</span>
-                             </div>
-                        ` : ''}
                     </div>
+                    <button class="btn btn-mini disabled-btn" disabled 
+                            style="background:rgba(255, 255, 255, 0.05); color:var(--text-dim); padding:8px; border-radius:8px; border:1px solid rgba(255, 255, 255, 0.1); cursor:not-allowed;"
+                            title="Force Sync (Feature disabled for now. This will allow manual, out-of-schedule execution for specific instances in future updates.)">
+                        <i data-lucide="play-circle" style="opacity:0.3" size="18"></i>
+                    </button>
                 </div>
             `;
             cardGrid.appendChild(card);
@@ -378,22 +394,30 @@ function updatePendingJobsDetailed(groupedJobs) {
                                }).join('')}
                            </div>
                        </div>
-                       <div style="display:flex; gap:8px;">
-                          <button onclick="event.stopPropagation(); processJob(${job.id})" 
-                                  class="btn btn-mini ${!canReschedule ? 'disabled-btn' : ''}" 
-                                  ${!canReschedule ? 'disabled' : ''}
-                                  style="background: rgba(88, 166, 255, 0.1); border-color: rgba(88, 166, 255, 0.2); padding: 8px 15px; color: var(--primary); display:flex; align-items:center; gap:6px;">
-                              <i data-lucide="calendar-plus" size="14"></i>
-                              <span style="font-size:0.75rem; font-weight:700;">Re-schedule</span>
-                          </button>
-                          <button onclick="event.stopPropagation(); cancelJob(${job.id})" 
-                                  class="btn btn-mini ${!canCancel ? 'disabled-btn' : ''}" 
-                                  ${!canCancel ? 'disabled' : ''}
-                                  style="background: rgba(248, 81, 73, 0.1); border-color: rgba(248, 81, 73, 0.2); color:var(--danger); padding: 8px 12px;" 
-                                  title="Abort synchronization">
-                              <i data-lucide="trash-2" size="14"></i>
-                          </button>
-                       </div>
+                        <div style="display:flex; gap:8px;">
+                           ${(job.status === 1 || job.status === 5) ? `
+                               <button onclick="event.stopPropagation(); runJobNow(${job.id})" 
+                                       class="btn btn-mini" 
+                                       style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 12px;" 
+                                       title="Run now (bypass cron cycle)">
+                                   <i data-lucide="play" size="14"></i>
+                               </button>
+                           ` : ''}
+                           <button onclick="event.stopPropagation(); processJob(${job.id})" 
+                                   class="btn btn-mini ${!canReschedule ? 'disabled-btn' : ''}" 
+                                   ${!canReschedule ? 'disabled' : ''}
+                                   style="background: rgba(88, 166, 255, 0.1); border-color: rgba(88, 166, 255, 0.2); padding: 8px 15px; color: var(--primary); display:flex; align-items:center; gap:6px;">
+                               <i data-lucide="calendar-plus" size="14"></i>
+                               <span style="font-size:0.75rem; font-weight:700;">Re-schedule</span>
+                           </button>
+                           <button onclick="event.stopPropagation(); cancelJob(${job.id})" 
+                                   class="btn btn-mini ${!canCancel ? 'disabled-btn' : ''}" 
+                                   ${!canCancel ? 'disabled' : ''}
+                                   style="background: rgba(248, 81, 73, 0.1); border-color: rgba(248, 81, 73, 0.2); color:var(--danger); padding: 8px 12px;" 
+                                   title="Abort synchronization">
+                               <i data-lucide="trash-2" size="14"></i>
+                           </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -521,12 +545,141 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
     if (confirmCancelBtn) confirmCancelBtn.onclick = confirmCancelAction;
+
+    const confirmRunNowBtn = document.getElementById('confirm-run-now-btn');
+    if (confirmRunNowBtn) confirmRunNowBtn.onclick = confirmRunNowAction;
 });
 
+
+/**
+ * Force manual execution of a specific sync pipeline instance.
+ * @param {string} channel 
+ * @param {string} entity 
+ * @param {string} instanceId 
+ */
+async function triggerSyncInstance(channel, entity, instanceId) {
+    if (!confirm(`Are you sure you want to FORCE EXECUTION for ${instanceId}?\nThis will bypass the scheduler and run a full sync now.`)) {
+        return;
+    }
+
+    showToast(`Triggering ${instanceId} sync...`, false);
+
+    try {
+        const response = await fetch(`/cache/${channel}/${entity}`, {
+            method: 'POST',
+            headers: getAdminHeaders(),
+            body: JSON.stringify({
+                instance_name: instanceId
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast('Success: Pipeline triggered in background.', false);
+            // Auto-refresh data to see the new job appearing
+            if (typeof fetchMonitoringData === 'function') {
+                setTimeout(fetchMonitoringData, 1500);
+            } else if (typeof fetchData === 'function') {
+                setTimeout(fetchData, 1500);
+            }
+        } else {
+            throw new Error(data.error || 'Server error occurred');
+        }
+    } catch (e) {
+        console.error("Force Sync Error:", e);
+        showToast(`Failed to trigger sync: ${e.message}`, true);
+    }
+}
+
+/**
+ * Display a premium notification toast.
+ * @param {string} msg 
+ * @param {boolean} isError 
+ */
+function showToast(msg, isError) {
+    const toast = document.createElement('div');
+    toast.className = 'toast animate-slide-in';
+    if (isError) toast.classList.add('error');
+    toast.innerHTML = `
+        <i data-lucide="${isError ? 'alert-circle' : 'check-circle'}" size="16"></i>
+        <span>${msg}</span>
+    `;
+    document.body.appendChild(toast);
+    lucide.createIcons();
+    setTimeout(() => {
+        toast.classList.add('animate-slide-out');
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
+}
+
+/**
+ * Process a specific job immediately in the background.
+ * @param {number} id 
+ */
+async function runJobNow(id) {
+    activeJobId = id;
+    const modal = document.getElementById('run-now-confirmation-modal');
+    const jobNameEl = document.getElementById('modal-run-job-name');
+    const jobIdEl = document.getElementById('modal-run-job-id');
+
+    // Find job details to display in modal
+    let foundJob = null;
+    if (currentData && currentData.groupedJobs) {
+        Object.values(currentData.groupedJobs).forEach(jobs => {
+            const found = jobs.find(j => j.id === id);
+            if (found) foundJob = found;
+        });
+    }
+
+    jobNameEl.textContent = foundJob ? `${foundJob.instance_label || foundJob.group} » ${foundJob.entity.toUpperCase()}` : `JOB #${id}`;
+    jobIdEl.textContent = id;
+    
+    modal.style.display = 'flex';
+}
+
+function closeRunNowModal() {
+    document.getElementById('run-now-confirmation-modal').style.display = 'none';
+}
+
+async function confirmRunNowAction() {
+    if (!activeJobId) return;
+
+    closeRunNowModal();
+    showToast(`Triggering Job #${activeJobId}...`, false);
+
+    try {
+        const response = await fetch('/api/monitoring/jobs/action', {
+            method: 'POST',
+            headers: getAdminHeaders(),
+            body: JSON.stringify({
+                action: 'process',
+                id: activeJobId
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast(`Success: Job #${activeJobId} triggered.`, false);
+            setTimeout(fetchData, 1000);
+        } else {
+            throw new Error(data.error || 'Server error occurred');
+        }
+    } catch (e) {
+        console.error("Run Job Error:", e);
+        showToast(`Failed to trigger job: ${e.message}`, true);
+    }
+}
 
 // Global Exports
 window.processJob = processJob;
 window.cancelJob = cancelJob;
+window.runJobNow = runJobNow;
+window.closeRunNowModal = closeRunNowModal;
+window.confirmRunNowAction = confirmRunNowAction;
+window.triggerSyncInstance = triggerSyncInstance;
+window.showToast = showToast;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', initMonitoring);

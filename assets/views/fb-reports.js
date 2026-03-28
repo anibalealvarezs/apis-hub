@@ -92,33 +92,55 @@ function getActiveMetrics() {
 }
 
 // --- Initialization ---
-function initDashboard() {
+async function initDashboard() {
     lucide.createIcons();
     
+    const headers = getAdminHeaders();
+    if (!headers || !headers.Authorization) return;
+
+    let minStoredDate = dayjs().subtract(1, 'year').format('YYYY-MM-DD'); 
+    try {
+        const rangeRes = await fetch('/facebook_marketing/metric/range', { headers }).then(r => r.json());
+        if (rangeRes.status === 'success' && rangeRes.data.minDate) {
+            minStoredDate = rangeRes.data.minDate;
+            console.log("Historical data horizon detected:", minStoredDate);
+        }
+    } catch(e) { console.error("Range fetch error:", e); }
+
     const flatpickrConfig = {
         dateFormat: "Y-m-d",
         altInput: true,
         altFormat: "F j, Y",
         animate: true,
-        disableMobile: "true"
+        disableMobile: "true",
+        minDate: minStoredDate
     };
 
     const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
     const lastWeek = dayjs().subtract(8, 'day').format('YYYY-MM-DD');
 
-    flatpickr("#startDate", {
+    const startPicker = flatpickr("#startDate", {
         ...flatpickrConfig,
-        defaultDate: lastWeek
+        defaultDate: lastWeek > minStoredDate ? lastWeek : minStoredDate,
+        onChange: function(selectedDates, dateStr) {
+            endPicker.set('minDate', dateStr);
+        }
     });
 
-    flatpickr("#endDate", {
+    const endPicker = flatpickr("#endDate", {
         ...flatpickrConfig,
         defaultDate: yesterday,
-        maxDate: yesterday
+        maxDate: yesterday,
+        onChange: function(selectedDates, dateStr) {
+            startPicker.set('maxDate', dateStr);
+        }
     });
 
-    const headers = getAdminHeaders();
-    if (headers.Authorization) loadReport();
+    // Initial sync of limits
+    const initialStart = document.getElementById('startDate').value;
+    if (initialStart) endPicker.set('minDate', initialStart);
+    
+    loadReport();
 }
 
 function getAdminHeaders() {
@@ -136,8 +158,18 @@ function getAdminHeaders() {
     return { 'Authorization': 'Bearer ' + auth.token, 'Content-Type': 'application/json' };
 }
 
-async function forceRefresh() {
-    if (!confirm("This will clear the aggregation cache for Facebook Marketing and reload. Continue?")) return;
+function forceRefresh() {
+    const modal = document.getElementById('flush-modal');
+    if (modal) modal.classList.add('active');
+}
+
+function closeFlushModal() {
+    const modal = document.getElementById('flush-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+async function confirmFlush() {
+    closeFlushModal();
     const loader = document.getElementById('loader');
     if (loader) loader.style.display = 'flex';
     try {
@@ -146,9 +178,37 @@ async function forceRefresh() {
         });
         const result = await response.json();
         if (result.success) loadReport();
-        else alert(result.error || 'Flush failed');
-    } catch (err) { alert(err.message); }
+        else {
+            showToast(result.error || 'Flush failed', true);
+        }
+    } catch (err) { 
+        showToast(err.message, true);
+    }
     finally { if (loader) loader.style.display = 'none'; }
+}
+
+function showToast(msg, isError) {
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (isError ? 'error' : 'success');
+    toast.style.position = 'fixed';
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '20000';
+    toast.style.padding = '12px 24px';
+    toast.style.borderRadius = '12px';
+    toast.style.background = isError ? 'rgba(248, 81, 73, 0.9)' : 'rgba(35, 134, 54, 0.9)';
+    toast.style.color = 'white';
+    toast.style.boxShadow = '0 10px 25px rgba(0,0,0,0.3)';
+    toast.style.backdropFilter = 'blur(10px)';
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.gap = '10px';
+    toast.style.fontSize = '0.9rem';
+    toast.style.fontWeight = '600';
+    toast.innerHTML = `<i data-lucide="${isError ? 'alert-circle' : 'check-circle'}" size="18"></i> ${msg}`;
+    document.body.appendChild(toast);
+    lucide.createIcons();
+    setTimeout(() => { toast.remove(); }, 4000);
 }
 
 async function loadReport() {
@@ -711,6 +771,8 @@ function renderSparkline(container, points, config = {}) {
 // Global hooks
 window.loadReport = loadReport;
 window.forceRefresh = forceRefresh;
+window.confirmFlush = confirmFlush;
+window.closeFlushModal = closeFlushModal;
 window.initDashboard = initDashboard;
 window.toggleHierarchy = toggleHierarchy;
 window.sortTable = sortTable;

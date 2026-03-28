@@ -126,22 +126,13 @@ class Helpers
         if (is_dir($rootConfigDir)) {
             $files = self::globRecursive($rootConfigDir . '/*.yaml');
             
-            // Smart Suffix Discovery: Load project-specific overrides (e.g., *.yaml.gbs)
-            $projectName = strtolower(getenv('PROJECT_NAME') ?: ($_ENV['PROJECT_NAME'] ?? ''));
-            if ($projectName) {
-                $suffixPattern = $rootConfigDir . '/*.yaml.' . $projectName;
-                $suffixFiles = self::globRecursive($suffixPattern);
-                // We sort files to ensure .yaml comes before .yaml.suffix, 
-                // so the suffix overrides the base config.
-                $files = array_merge($files, $suffixFiles);
-            }
-
             foreach ($files as $file) {
                 $fileConfig = self::loadYamlFile($file);
-                $config = array_replace_recursive($config, $fileConfig);
+                if (!empty($fileConfig)) {
+                    $config = array_replace_recursive($config, $fileConfig);
+                }
             }
         }
-
         // 2. Load environment-specific override if PROJECT_CONFIG_FILE is set
         $envFile = getenv('PROJECT_CONFIG_FILE');
         if ($envFile && is_file($envFile)) {
@@ -810,6 +801,40 @@ class Helpers
     }
 
     /**
+     * Converts a human-readable interval like '3 years' or '1 month' to ISO8601 interval 'P3Y'.
+     *
+     * @param string $human
+     * @return string
+     */
+    public static function humanToIsoInterval(string $human): array|string|null
+    {
+        $human = strtolower(trim($human));
+        
+        $conversions = [
+            'year'   => 'Y',
+            'month'  => 'M',
+            'week'   => 'W',
+            'day'    => 'D',
+            'hour'   => 'H',
+            'minute' => 'M', // Suffix for time part
+            'second' => 'S',
+        ];
+
+        if (preg_match('/^(\d+)\s*(year|month|week|day|hour|minute|second)s?$/', $human, $matches)) {
+            $value = $matches[1];
+            $unit = $matches[2];
+            $suffix = $conversions[$unit];
+            
+            if (in_array($unit, ['hour', 'minute', 'second'])) {
+                return "PT{$value}{$suffix}";
+            }
+            return "P{$value}{$suffix}";
+        }
+
+        return $human; // Return as is if already ISO or unrecognized
+    }
+
+    /**
      * @param Entity $entity
      * @param array|null $fields
      * @return array
@@ -1129,5 +1154,58 @@ class Helpers
         }
 
         return $chunks;
+    }
+
+    /**
+     * @param string $url
+     * @param string|int|null $platformId
+     * @param \Enums\PageType|string|null $type
+     * @param string|null $hostname
+     * @return string
+     */
+    public static function getCanonicalPageId(string $url, string|int|null $platformId = null, \Enums\PageType|string|null $type = null, string|null $hostname = null): string
+    {
+        // 1. Enum based detection or fallback logic
+        $prefix = null;
+        if ($type instanceof \Enums\PageType) {
+            $prefix = $type->getPrefix();
+        } else {
+            // Mapping strings for backward compatibility
+            $prefixMap = [
+                'fb_page' => 'fb:page',
+                'facebook_page' => 'fb:page',
+                'website' => 'web:site'
+            ];
+            $prefix = $prefixMap[$type] ?? null;
+        }
+
+        // 2. Intelligent social detection if no prefix was forced
+        if (!$prefix) {
+            // IG accounts for now are identified as FB assets in this vision
+            $isFacebook = (isset($hostname) && (str_contains($hostname, 'facebook.com') || str_contains($hostname, 'instagram.com')));
+            if ($isFacebook) $prefix = 'fb:page';
+        }
+
+        // 3. Return canonical with platform ID if we have a prefix and an ID
+        if ($platformId && $prefix) {
+            return "$prefix:$platformId";
+        }
+
+        // 4. Normalize URL for websites or fallback
+        $normalizedUrl = preg_replace('~^https?://(?:www\.)?~i', '', $url);
+        $normalizedUrl = rtrim($normalizedUrl, '/');
+        $normalizedUrl = strtolower($normalizedUrl);
+        
+        // If it's a FB page URL but no platformId was given, try to extract it from URL
+        if (str_contains($normalizedUrl, 'facebook.com/') && preg_match('~(\d+)/?$~', $normalizedUrl, $matches)) {
+            return "fb:page:" . $matches[1];
+        }
+
+        // Fallback for cases where URL is JUST the platform ID but hostname is facebook
+        if ($platformId && (string)$normalizedUrl === (string)$platformId && (isset($hostname) && str_contains($hostname, 'facebook.com'))) {
+            return "fb:page:$platformId";
+        }
+
+        return "site:domain:$normalizedUrl";
     }
 }
