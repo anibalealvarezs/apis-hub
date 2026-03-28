@@ -1949,7 +1949,7 @@ class MetricRequests
                 throw $e;
             }
 
-            $logger->info("Completed FB page insights request");
+            $logger->info("Completed IG account insights request");
 
             return $stats;
         } catch (Exception $e) {
@@ -2097,7 +2097,7 @@ class MetricRequests
                 throw $e;
             }
 
-            $logger->info("Completed FB page insights request");
+            $logger->info("Completed IG media insights request");
             $stats['metrics'] = count($allMetrics);
 
             return $stats;
