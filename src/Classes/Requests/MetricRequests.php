@@ -559,6 +559,7 @@ class MetricRequests
                                             $urls[] = "/{$mediaPlatformId}/insights?metric={$mMetrics}";
                                         }
 
+                                        $api->setPageId((string) ($page['id'] ?? ''));
                                         $batchResults = $api->getBatch($urls, \Anibalealvarezs\FacebookGraphApi\Enums\TokenSample::PAGE);
                                         foreach ($batchResults as $resIndex => $batchRes) {
                                             $mediaPlatformId = array_keys($chunk)[$resIndex];
