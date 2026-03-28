@@ -264,12 +264,17 @@ class MonitoringController extends BaseController
                                   JOIN metric_configs mc ON m.metric_config_id = mc.id
                                   LEFT JOIN channeled_accounts ca ON mc.channeled_account_id = ca.id
                                   GROUP BY cm.channel, type";
-                        } elseif ($tableName === 'pages') {
+                        } elseif ($tableName === 'pages') {-
                             $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
                                   FROM pages p 
                                   LEFT JOIN channeled_accounts ca ON p.platform_id = ca.platform_id 
                                   GROUP BY ca.channel, ca.type";
-                        } elseif (in_array($tableName, ['posts', 'channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
+                        } elseif ($tableName === 'posts') {
+                            $sql = "SELECT ca.channel, ca.type, COUNT(*) as count 
+                                  FROM posts e 
+                                  JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
+                                  GROUP BY ca.channel, ca.type";
+                        } elseif (in_array($tableName, ['channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
                             $sql = "SELECT e.channel, ca.type, COUNT(*) as count 
                                   FROM $tableName e 
                                   LEFT JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
