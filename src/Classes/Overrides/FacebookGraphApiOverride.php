@@ -224,6 +224,72 @@ class FacebookGraphApiOverride extends FacebookGraphApi
     }
 
     /**
+     * @param string $postId
+     * @param int $limit
+     * @param \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet $metricSet
+     * @param array $customMetrics
+     * @return array
+     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws Exception
+     */
+    public function getFacebookPostInsights(
+        string $postId,
+        int $limit = 100,
+        \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet $metricSet = \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet::BASIC,
+        array $customMetrics = []
+    ): array {
+        // Definitive set of verified metrics for v25.0 Page Posts
+        $metricProgression = [
+            'post_engaged_users',           // Safe & Universal
+            'post_reactions_by_type_total', // Safe & Universal
+            'post_media_view',              // v25.0 Potential Culprit
+            'post_media_view_unique',       // v25.0 Potential Culprit
+        ];
+
+        $metricsToTry = !empty($customMetrics) ? $customMetrics : $metricProgression;
+
+        try {
+            // First attempt with all metrics
+            return parent::getFacebookPostInsights(
+                postId: $postId,
+                limit: $limit,
+                metricSet: \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet::CUSTOM,
+                customMetrics: $metricsToTry
+            );
+        } catch (Exception $e) {
+            $msg = $e->getMessage();
+            if (stripos($msg, '(#100)') === false) {
+                throw $e;
+            }
+
+            if ($this->logger) {
+                $this->logger->warning("FB API: Post Insights for $postId FAILED with error #100. Switching to incremental search.");
+            }
+
+            $results = ['data' => []];
+            foreach ($metricsToTry as $metric) {
+                try {
+                    $resSingle = parent::getFacebookPostInsights(
+                        postId: $postId,
+                        limit: $limit,
+                        metricSet: \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet::CUSTOM,
+                        customMetrics: [$metric]
+                    );
+                    if (!empty($resSingle['data'])) {
+                        $results['data'] = array_merge($results['data'], $resSingle['data']);
+                        if ($this->logger) $this->logger->info("FB API: Metric '$metric' SUCCESS for Post $postId");
+                    }
+                } catch (Exception $eInner) {
+                    if ($this->logger) {
+                        $this->logger->error("FB API: Metric '$metric' FAILED for Post $postId: " . $eInner->getMessage());
+                    }
+                }
+            }
+            return $results;
+        }
+    }
+
+    /**
      * @param string $method
      * @param string $endpoint
      * @param array $query
