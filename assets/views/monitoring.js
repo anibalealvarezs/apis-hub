@@ -545,6 +545,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
     if (confirmCancelBtn) confirmCancelBtn.onclick = confirmCancelAction;
+
+    const confirmRunNowBtn = document.getElementById('confirm-run-now-btn');
+    if (confirmRunNowBtn) confirmRunNowBtn.onclick = confirmRunNowAction;
 });
 
 
@@ -615,11 +618,35 @@ function showToast(msg, isError) {
  * @param {number} id 
  */
 async function runJobNow(id) {
-    if (!confirm(`Are you sure you want to trigger Job #${id} immediately?`)) {
-        return;
+    activeJobId = id;
+    const modal = document.getElementById('run-now-confirmation-modal');
+    const jobNameEl = document.getElementById('modal-run-job-name');
+    const jobIdEl = document.getElementById('modal-run-job-id');
+
+    // Find job details to display in modal
+    let foundJob = null;
+    if (currentData && currentData.groupedJobs) {
+        Object.values(currentData.groupedJobs).forEach(jobs => {
+            const found = jobs.find(j => j.id === id);
+            if (found) foundJob = found;
+        });
     }
 
-    showToast(`Triggering Job #${id}...`, false);
+    jobNameEl.textContent = foundJob ? `${foundJob.instance_label || foundJob.group} » ${foundJob.entity.toUpperCase()}` : `JOB #${id}`;
+    jobIdEl.textContent = id;
+    
+    modal.style.display = 'flex';
+}
+
+function closeRunNowModal() {
+    document.getElementById('run-now-confirmation-modal').style.display = 'none';
+}
+
+async function confirmRunNowAction() {
+    if (!activeJobId) return;
+
+    closeRunNowModal();
+    showToast(`Triggering Job #${activeJobId}...`, false);
 
     try {
         const response = await fetch('/api/monitoring/jobs/action', {
@@ -627,20 +654,15 @@ async function runJobNow(id) {
             headers: getAdminHeaders(),
             body: JSON.stringify({
                 action: 'process',
-                id: id
+                id: activeJobId
             })
         });
 
         const data = await response.json();
 
         if (response.ok) {
-            showToast(`Success: Job #${id} triggered.`, false);
-            // Refresh
-            if (typeof fetchMonitoringData === 'function') {
-                setTimeout(fetchMonitoringData, 1000);
-            } else if (typeof fetchData === 'function') {
-                setTimeout(fetchData, 1000);
-            }
+            showToast(`Success: Job #${activeJobId} triggered.`, false);
+            setTimeout(fetchData, 1000);
         } else {
             throw new Error(data.error || 'Server error occurred');
         }
@@ -654,6 +676,8 @@ async function runJobNow(id) {
 window.processJob = processJob;
 window.cancelJob = cancelJob;
 window.runJobNow = runJobNow;
+window.closeRunNowModal = closeRunNowModal;
+window.confirmRunNowAction = confirmRunNowAction;
 window.triggerSyncInstance = triggerSyncInstance;
 window.showToast = showToast;
 

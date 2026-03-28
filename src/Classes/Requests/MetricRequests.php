@@ -1422,6 +1422,8 @@ class MetricRequests
         }
         $logger->info("Found Page: ID=" . $pageEntity->getId() . ", platformId=". $page['id']);
 
+        $api->setPageId((string) $page['id']);
+
         $allMetrics = new ArrayCollection();
 
         try {
@@ -1751,6 +1753,8 @@ class MetricRequests
         $channeledAccountMap['map'][(string) $page['ig_account']] = $channeledAccountEntity->getId();
         $channeledAccountMap['mapReverse'][$channeledAccountEntity->getId()] = (string) $page['ig_account'];
 
+        $api->setPageId((string) $page['ig_account']);
+
         try {
             do {
                 $rows = [
@@ -1918,6 +1922,8 @@ class MetricRequests
                 $channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId(),
             ],
         ];
+
+        $api->setPageId((string) $pageEntity->getPlatformId());
 
         $allMetrics = new ArrayCollection();
 
@@ -2615,6 +2621,7 @@ class MetricRequests
         array $postMap,
         array $pageMap,
     ): bool {
+        $api->setPageId((string) $pageEntity->getPlatformId());
         $allMetrics = new ArrayCollection();
 
         try {
