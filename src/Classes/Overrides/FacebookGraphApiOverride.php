@@ -29,11 +29,12 @@ class FacebookGraphApiOverride extends FacebookGraphApi
     ): array {
         // Full set of metrics we want to try (from least risky to most risky)
         $metricProgression = [
-            'page_impressions',     // Very basic
-            'page_views_total',     // Very basic
-            'page_follows',         // High-level
-            'page_video_views',     // Requires video content
-            'page_impressions_paid' // Requires ad activity
+            'page_impressions',           // Very basic
+            'page_views_total',           // Very basic
+            'page_post_engagements',      // High-level interactions
+            'page_fan_adds',              // Standard daily metric for follows
+            'page_video_views',           // Requires video content
+            'page_impressions_paid'       // Requires ad activity
         ];
 
         // If customMetrics are provided, we use those instead
@@ -45,55 +46,66 @@ class FacebookGraphApiOverride extends FacebookGraphApi
 
         try {
             // First attempt with all metrics
-            return parent::getFacebookPageInsights(
+            $res = parent::getFacebookPageInsights(
                 pageId: $pageId,
                 since: $since,
                 until: $until,
                 metricSet: \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet::CUSTOM,
                 customMetrics: $metricsToTry
             );
+            
+            // If the parent call succeeds but returns an empty 'data' array, we might
+            // be hit by a single conflicting metric. Trigger incremental fallback.
+            if ($res && !empty($res['data'])) {
+                return $res;
+            }
+            
+            error_log("FB DEBUG: First attempt for Page $pageId returned EMPTY data. Switching to incremental search.");
+            
         } catch (Exception $e) {
             $msg = $e->getMessage();
             if (stripos($msg, '(#100)') === false || (stripos($msg, 'insights metric') === false && stripos($msg, 'param is not valid') === false)) {
                 throw $e; // Re-throw if not a parameter/metric error
             }
-
-            // Start incremental strategy
-            $results = ['data' => []];
-            $successfulMetrics = [];
-            $failedMetrics = [];
-            
-            error_log("FB DEBUG: Starting incremental metrics search for Page $pageId due to error: $msg");
-
-            foreach ($metricsToTry as $metric) {
-                try {
-                    $res = parent::getFacebookPageInsights(
-                        pageId: $pageId,
-                        since: $since,
-                        until: $until,
-                        metricSet: \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet::CUSTOM,
-                        customMetrics: [$metric]
-                    );
-                    if (!empty($res['data'])) {
-                        // Merge data from single metric results
-                        // Page insights format: data => [ [name => M1, period => day, values => [...] ], ... ]
-                        $results['data'] = array_merge($results['data'], $res['data']);
-                    }
-                    $successfulMetrics[] = $metric;
-                } catch (Exception $eInner) {
-                    error_log("FB DEBUG: Metric '$metric' FAILED for Page $pageId: " . $eInner->getMessage());
-                    $failedMetrics[] = $metric;
-                }
-            }
-
-            if (empty($successfulMetrics)) {
-                throw new Exception("Finished incremental strategy for Page $pageId with NO successful metrics. Last Error: $msg");
-            }
-
-            error_log("FB DEBUG: Incremental strategy finished for Page $pageId. Success: [" . implode(',', $successfulMetrics) . "]. Failed: [" . implode(',', $failedMetrics) . "]");
-
-            return $results;
+            error_log("FB DEBUG: First attempt for Page $pageId FAILED with error: $msg. Switching to incremental search.");
         }
+
+        // Start incremental strategy (reaching here means first attempt was EMPTY or errored on (#100))
+        $results = ['data' => []];
+        $successfulMetrics = [];
+        $failedMetrics = [];
+
+        foreach ($metricsToTry as $metric) {
+            try {
+                $resSingle = parent::getFacebookPageInsights(
+                    pageId: $pageId,
+                    since: $since,
+                    until: $until,
+                    metricSet: \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet::CUSTOM,
+                    customMetrics: [$metric]
+                );
+                
+                if ($resSingle && !empty($resSingle['data'])) {
+                    // Page insights format: data => [ [name => M1, period => day, values => [...] ], ... ]
+                    $results['data'] = array_merge($results['data'], $resSingle['data']);
+                    $successfulMetrics[] = $metric;
+                } else {
+                    $failedMetrics[] = $metric . " (EMPTY)";
+                }
+            } catch (Exception $eInner) {
+                // error_log("FB DEBUG: Metric '$metric' FAILED for Page $pageId: " . $eInner->getMessage());
+                $failedMetrics[] = $metric . " (ERROR: " . substr($eInner->getMessage(), 0, 50) . "...)";
+            }
+        }
+
+        if (empty($successfulMetrics)) {
+            error_log("FB DEBUG: Incremental strategy for Page $pageId FINISHED WITH NO SUCCESSFUL METRICS. Tried: [" . implode(',', $metricsToTry) . "]");
+            return ['data' => []]; // Return empty instead of throwing if we tried our best
+        }
+
+        error_log("FB DEBUG: Incremental strategy finished for Page $pageId. Success: [" . implode(',', $successfulMetrics) . "]. Failed: [" . implode(',', $failedMetrics) . "]");
+
+        return $results;
     }
 
     public function getInstagramAccountInsights(
