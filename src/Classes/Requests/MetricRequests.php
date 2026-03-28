@@ -374,7 +374,7 @@ class MetricRequests
             foreach ($pagesToProcess as $page) {
                 Helpers::checkJobStatus($jobId);
 
-                $api->setPageId((string) ($page['id'] ?? ''));
+                $api->setPageId(trim((string) ($page['id'] ?? '')));
                 $api->setLongLivedPageAccesstoken(null);
 
                 $pageId = (string) ($page['id'] ?? '');
