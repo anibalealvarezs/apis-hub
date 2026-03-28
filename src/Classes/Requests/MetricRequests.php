@@ -491,35 +491,6 @@ class MetricRequests
                                 $logger->warning("Failed to sync media for Instagram Account {$page['ig_account']}: " . $e->getMessage());
                             }
 
-                            if ($page['post_metrics']) {
-                                foreach ($postMap['map'] as $postIdInDb) {
-                                    try {
-                                        $postEntity = $postRepository->find($postIdInDb);
-                                        if ($postEntity) {
-                                            $postMsg = $postEntity->getData()['message'] ?? '';
-                                            $includeFilter = self::getFacebookFilter($config, 'POST', 'cache_include');
-                                            $excludeFilter = self::getFacebookFilter($config, 'POST', 'cache_exclude');
-                                            if (!Helpers::matchesFilter($postMsg, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($postEntity->getPostId(), $includeFilter, $excludeFilter)) {
-                                                continue;
-                                            }
-                                            $res = self::processFacebookPagePost(
-                                                postEntity: $postEntity,
-                                                pageEntity: $pageEntity,
-                                                api: $api,
-                                                manager: $manager,
-                                                logger: $logger,
-                                                postMap: $postMap,
-                                                pageMap: $pageMap,
-                                            );
-                                            $totalMetrics += $res['metrics'] ?? 0;
-                                            $totalRows += $res['rows'] ?? 0;
-                                            $totalDuplicates += $res['duplicates'] ?? 0;
-                                        }
-                                    } catch (Exception $e) {
-                                        $logger->error("Error processing Facebook post " . $postIdInDb . ": " . $e->getMessage());
-                                    }
-                                }
-                            }
                         }
 
                         if (!empty($page['ig_account']) && !empty($page['ig_accounts']) && !empty($page['ig_account_metrics'])) {
@@ -590,6 +561,36 @@ class MetricRequests
                                             $logger->error("Error processing Instagram media " . $mediaIdInDb . ": " . $e->getMessage());
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        if ($page['post_metrics']) {
+                            foreach ($postMap['map'] as $postIdInDb) {
+                                try {
+                                    $postEntity = $postRepository->find($postIdInDb);
+                                    if ($postEntity) {
+                                        $postMsg = $postEntity->getData()['message'] ?? '';
+                                        $includeFilter = self::getFacebookFilter($config, 'POST', 'cache_include');
+                                        $excludeFilter = self::getFacebookFilter($config, 'POST', 'cache_exclude');
+                                        if (!Helpers::matchesFilter($postMsg, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($postEntity->getPostId(), $includeFilter, $excludeFilter)) {
+                                            continue;
+                                        }
+                                        $res = self::processFacebookPagePost(
+                                            postEntity: $postEntity,
+                                            pageEntity: $pageEntity,
+                                            api: $api,
+                                            manager: $manager,
+                                            logger: $logger,
+                                            postMap: $postMap,
+                                            pageMap: $pageMap,
+                                        );
+                                        $totalMetrics += $res['metrics'] ?? 0;
+                                        $totalRows += $res['rows'] ?? 0;
+                                        $totalDuplicates += $res['duplicates'] ?? 0;
+                                    }
+                                } catch (Exception $e) {
+                                    $logger->error("Error processing Facebook post " . $postIdInDb . ": " . $e->getMessage());
                                 }
                             }
                         }
