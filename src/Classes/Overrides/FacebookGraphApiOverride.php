@@ -36,15 +36,13 @@ class FacebookGraphApiOverride extends FacebookGraphApi
         \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet $metricSet = \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet::BASIC,
         array $customMetrics = [],
     ): array {
-        // Full set of metrics we want to try (from least risky to most risky)
+        // Set of metrics compatible with v25.0 (legacy metrics like page_impressions or page_fan_adds are deprecated)
         $metricProgression = [
-            'page_impressions',           // Very basic
-            'page_content_impressions',   // Extremely reliable fallback
-            'page_views_total',           // Very basic
-            'page_post_engagements',      // High-level interactions
-            'page_fan_adds',              // Standard daily metric for follows
-            'page_video_views',           // Requires video content
-            'page_impressions_paid'       // Requires ad activity
+            'page_content_impressions',   // Modern replacement for impressions
+            'page_views_total',           // Still valid in v25.0
+            'page_post_engagements',      // Still valid in v25.0
+            'page_follows',               // Modern way to track follower growth
+            'page_total_actions',         // Aggregate actions on page
         ];
 
         // If customMetrics are provided, we use those instead
