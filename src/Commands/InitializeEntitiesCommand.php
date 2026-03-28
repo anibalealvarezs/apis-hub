@@ -241,6 +241,7 @@ class InitializeEntitiesCommand extends Command
                                         'title' => $pageName,
                                         'hostname' => 'www.facebook.com',
                                         'ig_account' => $apiPage['instagram_business_account']['id'] ?? null,
+                                        'access_token' => $apiPage['access_token'] ?? null,
                                         'enabled' => true
                                     ];
                                 }
@@ -259,6 +260,15 @@ class InitializeEntitiesCommand extends Command
                 $hostname = $page['hostname'] ?? 'www.facebook.com';
 
                 $canonicalId = Helpers::getCanonicalPageId($pageUrl, $platformId, PageType::FACEBOOK_PAGE);
+                $pageData = $page['data'] ?? [];
+                $pageData['source'] = 'fb_page';
+                if (!empty($page['access_token'])) {
+                    $pageData['access_token'] = $page['access_token'];
+                }
+                if (!empty($page['ig_account'])) {
+                    $pageData['instagram_business_account_id'] = $page['ig_account'];
+                }
+
                 $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
                 if (!$pageEntity) {
                     $pageEntity = new Page();
@@ -268,7 +278,7 @@ class InitializeEntitiesCommand extends Command
                         ->addHostname($hostname)
                         ->addPlatformId($platformId)
                         ->addAccount($accountEntity)
-                        ->addData(['source' => 'fb_page']);
+                        ->addData($pageData);
                     $this->entityManager->persist($pageEntity);
                     $pagesInitialized++;
                     $this->logger->info("Initialized Page: ID=$platformId, CanonicalID=$canonicalId, Title=$title");
@@ -278,6 +288,7 @@ class InitializeEntitiesCommand extends Command
                         $pageEntity->addTitle($title)
                             ->addHostname($hostname)
                             ->addUrl($pageUrl)
+                            ->addData(array_merge($pageEntity->getData(), $pageData))
                             ->addUpdatedAt(new DateTime());
                         $this->entityManager->persist($pageEntity);
                         $pagesInitialized++;
