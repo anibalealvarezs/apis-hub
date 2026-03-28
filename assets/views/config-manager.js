@@ -852,8 +852,8 @@ async function updateConfig(typeArg) {
         });
 
         if (typeArg === 'gsc') {
-            payload.enabled = document.getElementById('gsc-channel-enabled').checked;
-            payload.cache_history_range = document.getElementById('gsc-history-range').value;
+            payload.enabled = document.getElementById('gsc-channel-enabled')?.checked;
+            payload.cache_history_range = document.getElementById('gsc-history-range')?.value;
             payload.feature_toggles.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
             payload.feature_toggles.cron_recent_minute = document.getElementById('gsc-cron-minute')?.value;
         } else if (typeArg === 'facebook-organic') {
