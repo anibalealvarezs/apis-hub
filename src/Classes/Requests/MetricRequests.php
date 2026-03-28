@@ -625,7 +625,7 @@ class MetricRequests
                                     if (($batchRes['code'] ?? 0) === 200) {
                                         $providedData = json_decode($batchRes['body'] ?? '{}', true);
                                     } else {
-                                        $logger->warning("Batch error for FB post {$postPlatformId} (Code: " . ($batchRes['code'] ?? '???') . "). Will attempt individual fallback.");
+                                        $logger->warning("Batch error for FB post {$postPlatformId} (Code: " . ($batchRes['code'] ?? '???') . "). Body: " . ($batchRes['body'] ?? 'EMPTY'));
                                     }
 
                                     $res = self::processFacebookPagePost(
