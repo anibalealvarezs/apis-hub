@@ -374,6 +374,9 @@ class MetricRequests
             foreach ($pagesToProcess as $page) {
                 Helpers::checkJobStatus($jobId);
 
+                $api->setPageId((string) ($page['id'] ?? ''));
+                $api->setLongLivedPageAccesstoken(null);
+
                 $pageId = (string) ($page['id'] ?? '');
                 $pageTitle = $page['title'] ?? '';
                 $includeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_include');
@@ -556,7 +559,7 @@ class MetricRequests
                                             $urls[] = "/{$mediaPlatformId}/insights?metric={$mMetrics}";
                                         }
 
-                                        $batchResults = $api->getBatch($urls);
+                                        $batchResults = $api->getBatch($urls, \Anibalealvarezs\FacebookGraphApi\Enums\TokenSample::PAGE);
                                         foreach ($batchResults as $resIndex => $batchRes) {
                                             $mediaPlatformId = array_keys($chunk)[$resIndex];
                                             $mediaEntity = array_values($chunk)[$resIndex];
@@ -617,7 +620,7 @@ class MetricRequests
                                     $urls[] = "/{$postPlatformId}/insights?metric={$pMetrics}&period=lifetime&fields=name,period,values";
                                 }
 
-                                $batchResults = $api->getBatch($urls);
+                                $batchResults = $api->getBatch($urls, \Anibalealvarezs\FacebookGraphApi\Enums\TokenSample::PAGE);
                                 foreach ($batchResults as $resIndex => $batchRes) {
                                     $postPlatformId = array_keys($chunk)[$resIndex];
                                     $postEntity = array_values($chunk)[$resIndex];
