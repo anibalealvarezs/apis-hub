@@ -240,10 +240,9 @@ class FacebookGraphApiOverride extends FacebookGraphApi
     ): array {
         // Definitive set of verified metrics for v25.0 Page Posts
         $metricProgression = [
-            'post_engaged_users',           // Safe & Universal
             'post_reactions_by_type_total', // Safe & Universal
-            'post_media_view',              // v25.0 Potential Culprit
-            'post_media_view_unique',       // v25.0 Potential Culprit
+            'post_media_view',              // v25.0 Verified
+            'post_media_view_unique',       // v25.0 Verified
         ];
 
         $metricsToTry = !empty($customMetrics) ? $customMetrics : $metricProgression;
