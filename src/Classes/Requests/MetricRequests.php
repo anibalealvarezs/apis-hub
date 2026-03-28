@@ -65,6 +65,7 @@ use Repositories\MetricRepository;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Services\CacheService;
+use Classes\SocialProcessor;
 use Symfony\Component\HttpFoundation\Response;
 use Exception;
 
@@ -430,10 +431,44 @@ class MetricRequests
                             $totalMetrics += $res['metrics'] ?? 0;
                             $totalRows += $res['rows'] ?? 0;
                             $totalDuplicates += $res['duplicates'] ?? 0;
+                            // Sync Posts from Facebook before getting metrics
+                            try {
+                                $logger->info("Syncing posts for Facebook Page {$pageId}");
+                                $rawPosts = $api->getFacebookPosts((string) $pageId);
+                                if (!empty($rawPosts['data'])) {
+                                    $postsCollection = FacebookOrganicMetricConvert::toPostsCollection(
+                                        posts: $rawPosts['data'],
+                                        pageEntity: $pageEntity,
+                                        accountEntity: $accountEntity,
+                                    );
+                                    SocialProcessor::processPosts($postsCollection, $manager);
+                                    $logger->info("Synced " . count($rawPosts['data']) . " posts for Facebook Page {$pageId}");
+                                }
+                            } catch (Exception $e) {
+                                $logger->warning("Failed to sync posts for Facebook Page {$pageId}: " . $e->getMessage());
+                            }
                         }
 
                         if ($page['posts']) {
                             $postMap = self::getPostMap($manager, $pageEntity);
+                            // Sync Media from Instagram before getting metrics
+                            try {
+                                $logger->info("Syncing media for Instagram Account {$page['ig_account']}");
+                                $rawMedia = $api->getInstagramMedia((string) $page['ig_account']);
+                                if (!empty($rawMedia['data'])) {
+                                    $mediaCollection = FacebookOrganicMetricConvert::toInstagramMediaCollection(
+                                        mediaItems: $rawMedia['data'],
+                                        pageEntity: $pageEntity,
+                                        accountEntity: $accountEntity,
+                                        channeledAccountEntity: $channeledAccountEntity,
+                                    );
+                                    SocialProcessor::processPosts($mediaCollection, $manager);
+                                    $logger->info("Synced " . count($rawMedia['data']) . " media items for Instagram Account {$page['ig_account']}");
+                                }
+                            } catch (Exception $e) {
+                                $logger->warning("Failed to sync media for Instagram Account {$page['ig_account']}: " . $e->getMessage());
+                            }
+
                             if ($page['post_metrics']) {
                                 foreach ($postMap['map'] as $postIdInDb) {
                                     try {
