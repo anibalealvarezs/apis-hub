@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Classes\Conversions;
 
 use Doctrine\Common\Collections\ArrayCollection;
+use Enums\PageType;
+use Helpers\Helpers;
 
 class FacebookOrganicConvert
 {
@@ -42,6 +44,7 @@ class FacebookOrganicConvert
         return new ArrayCollection(array_map(function ($page) use ($accountId) {
             return (object) [
                 'url' => $page['url'] ?? $page['id'] ?? null,
+                'canonicalId' => Helpers::getCanonicalPageId($page['url'] ?? $page['id'], $page['id'] ?? null, PageType::FACEBOOK_PAGE, $page['hostname'] ?? 'facebook.com'),
                 'title' => $page['title'] ?? $page['name'] ?? $page['id'] ?? '',
                 'hostname' => $page['hostname'] ?? 'facebook.com',
                 'platformId' => $page['id'] ?? null,
