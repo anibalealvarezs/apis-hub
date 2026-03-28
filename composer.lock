@@ -131,13 +131,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "31e0daefa159dfff54882627f3bbe320ff0aece3"
+                "reference": "4c7908ba51f4e9c0a37113e850986b85265110e9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-31e0daefa159dfff54882627f3bbe320ff0aece3-zip-109a2f.zip",
-                "reference": "31e0daefa159dfff54882627f3bbe320ff0aece3",
-                "shasum": "6e15b9e6b79faacabddf60c1e96bc375aea45856"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-4c7908ba51f4e9c0a37113e850986b85265110e9-zip-47e52d.zip",
+                "reference": "4c7908ba51f4e9c0a37113e850986b85265110e9",
+                "shasum": "b4076747c98908ec5e805f699ebd659d14deb462"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -188,7 +188,7 @@
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-27T11:38:20+00:00"
+            "time": "2026-03-28T02:29:07+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -948,12 +948,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/dbal.git",
-                "reference": "822147e135432a9f10646a154d863d57f67a7426"
+                "reference": "f74738b27080c0e686083198c095d0d81b87a700"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/dbal/zipball/822147e135432a9f10646a154d863d57f67a7426",
-                "reference": "822147e135432a9f10646a154d863d57f67a7426",
+                "url": "https://api.github.com/repos/doctrine/dbal/zipball/f74738b27080c0e686083198c095d0d81b87a700",
+                "reference": "f74738b27080c0e686083198c095d0d81b87a700",
                 "shasum": ""
             },
             "require": {
@@ -1054,7 +1054,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-19T16:58:35+00:00"
+            "time": "2026-03-27T18:33:39+00:00"
         },
         {
             "name": "doctrine/deprecations",
@@ -1110,12 +1110,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/event-manager.git",
-                "reference": "1907faecf2d61e456b01707d6477171fe2846aba"
+                "reference": "d96bab250a4bf4cd34d1533dc70b411beef8af7a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/event-manager/zipball/1907faecf2d61e456b01707d6477171fe2846aba",
-                "reference": "1907faecf2d61e456b01707d6477171fe2846aba",
+                "url": "https://api.github.com/repos/doctrine/event-manager/zipball/d96bab250a4bf4cd34d1533dc70b411beef8af7a",
+                "reference": "d96bab250a4bf4cd34d1533dc70b411beef8af7a",
                 "shasum": ""
             },
             "require": {
@@ -1194,7 +1194,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-20T07:42:41+00:00"
+            "time": "2026-03-27T18:33:14+00:00"
         },
         {
             "name": "doctrine/inflector",
