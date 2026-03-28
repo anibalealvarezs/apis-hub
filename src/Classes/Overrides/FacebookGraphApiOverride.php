@@ -217,9 +217,9 @@ class FacebookGraphApiOverride extends FacebookGraphApi
         array $customErrors = [],
         bool $ignoreAuth = false,
         mixed $onFailure = null,
-        \Anibalealvarezs\FacebookGraphApi\Enums\TokenSample $tokenSample = \Anibalealvarezs\FacebookGraphApi\Enums\TokenSample::USER,
+        TokenSample $tokenSample = TokenSample::USER,
     ): mixed {
-        $logFile = __DIR__ . '/../../../storage/logs/facebook_api_debug.log';
+        $logFile = __DIR__ . '/../../../logs/facebook_api_debug.log';
         $logMessage = "[" . date('Y-m-d H:i:s') . "] REQUEST: $method $endpoint\n";
         $logMessage .= "QUERY: " . json_encode($query, JSON_PRETTY_PRINT) . "\n";
         if ($body) $logMessage .= "BODY: " . (is_array($body) ? json_encode($body, JSON_PRETTY_PRINT) : $body) . "\n";
