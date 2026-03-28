@@ -10,4 +10,6 @@ analytics:
 # Cron Scheduling Defaults
 cron:
   entities_hour: 2
+  entities_minute: 0
   recent_hour: 5
+  recent_minute: 0

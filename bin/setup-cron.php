@@ -72,21 +72,28 @@ foreach ($instances as $instance) {
     if (!empty($endDate)) $params['endDate'] = $endDate;
     if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
 
-    // --- 🕒 Cron Hour Override Logic ---
+    // --- 🕒 Cron Time Override Logic (Hour & Minute) ---
     $channelConfig = $config['channels'][$channel] ?? [];
     $overrideHour = null;
+    $overrideMinute = null;
     
     // Determine if this is an "entities" or "recent" job based on instance name
     if (str_contains($instanceName, 'entities')) {
-        $overrideHour = $channelConfig['cron_entities_hour'] ?? null;
+        $overrideHour = $channelConfig['cron_entities_hour'] ?? ($config['cron']['entities_hour'] ?? null);
+        $overrideMinute = $channelConfig['cron_entities_minute'] ?? ($config['cron']['entities_minute'] ?? null);
     } elseif (str_contains($instanceName, 'recent')) {
-        $overrideHour = $channelConfig['cron_recent_hour'] ?? null;
+        $overrideHour = $channelConfig['cron_recent_hour'] ?? ($config['cron']['recent_hour'] ?? null);
+        $overrideMinute = $channelConfig['cron_recent_minute'] ?? ($config['cron']['recent_minute'] ?? null);
     }
 
     if ($overrideHour !== null) {
         $freqParts = explode(' ', $frequency);
         if (count($freqParts) >= 2) {
             $freqParts[1] = $overrideHour;
+            // Also override minute if defined
+            if ($overrideMinute !== null) {
+                $freqParts[0] = $overrideMinute;
+            }
             $frequency = implode(' ', $freqParts);
         }
     }

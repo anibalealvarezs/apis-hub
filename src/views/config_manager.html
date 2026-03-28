@@ -215,11 +215,19 @@
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:auto;">
                         <div>
                             <div style="font-size:0.55rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:4px;">Entities</div>
-                            <input type="number" id="cron-entities-hour" min="0" max="23" placeholder="2" style="width:100%; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <input type="number" id="cron-entities-hour" min="0" max="23" placeholder="2" style="width:100%; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                                <span style="opacity:0.5">:</span>
+                                <input type="number" id="cron-entities-minute" min="0" max="59" placeholder="0" style="width:100%; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                            </div>
                         </div>
                         <div>
                             <div style="font-size:0.55rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:4px;">Recent</div>
-                            <input type="number" id="cron-recent-hour" min="0" max="23" placeholder="5" style="width:100%; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <input type="number" id="cron-recent-hour" min="0" max="23" placeholder="5" style="width:100%; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                                <span style="opacity:0.5">:</span>
+                                <input type="number" id="cron-recent-minute" min="0" max="59" placeholder="0" style="width:100%; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -264,6 +272,8 @@
                     <div style="display:flex; flex-direction:column; gap:8px; margin-top:auto;">
                         <div style="display:flex; align-items:center; gap:10px;">
                             <input type="number" id="gsc-cron-hour" min="0" max="23" placeholder="5" style="width:60px">
+                            <span style="opacity:0.5">:</span>
+                            <input type="number" id="gsc-cron-minute" min="0" max="59" placeholder="0" style="width:60px">
                             <span style="font-size:0.75rem; color:var(--text-dim);">UTC</span>
                             <div id="gsc-cron-sync-status" class="cron-status-indicator"></div>
                         </div>
@@ -315,6 +325,8 @@
                             <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:5px;">Entities</div>
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <input type="number" id="fb-organic-entities-cron-hour" min="0" max="23" placeholder="2" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                                <span style="opacity:0.5">:</span>
+                                <input type="number" id="fb-organic-entities-cron-minute" min="0" max="59" placeholder="0" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
                                 <span id="fb-organic-entities-cron-status" class="cron-dot" title="Status check"></span>
                             </div>
                         </div>
@@ -322,6 +334,8 @@
                             <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:5px;">Metrics</div>
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <input type="number" id="fb-organic-recent-cron-hour" min="0" max="23" placeholder="6" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                                <span style="opacity:0.5">:</span>
+                                <input type="number" id="fb-organic-recent-cron-minute" min="0" max="59" placeholder="0" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
                                 <span id="fb-organic-recent-cron-status" class="cron-dot" title="Status check"></span>
                             </div>
                         </div>
@@ -415,6 +429,8 @@
                             <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:5px;">Entities</div>
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <input type="number" id="fb-marketing-entities-cron-hour" min="0" max="23" placeholder="2" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                                <span style="opacity:0.5">:</span>
+                                <input type="number" id="fb-marketing-entities-cron-minute" min="0" max="59" placeholder="0" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
                                 <span id="fb-marketing-entities-cron-status" class="cron-dot" title="Status check"></span>
                             </div>
                         </div>
@@ -422,6 +438,8 @@
                             <div style="font-size:0.6rem; color:var(--text-dim); text-transform:uppercase; margin-bottom:5px;">Metrics</div>
                             <div style="display:flex; align-items:center; gap:8px;">
                                 <input type="number" id="fb-marketing-recent-cron-hour" min="0" max="23" placeholder="5" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
+                                <span style="opacity:0.5">:</span>
+                                <input type="number" id="fb-marketing-recent-cron-minute" min="0" max="59" placeholder="0" style="width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem;">
                                 <span id="fb-marketing-recent-cron-status" class="cron-dot" title="Status check"></span>
                             </div>
                         </div>

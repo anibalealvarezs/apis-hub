@@ -92,13 +92,21 @@ class ConfigManagerController extends BaseController
                 'cache_raw_metrics' => filter_var($systemConfig['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'marketing_debug_logs' => filter_var($systemConfig['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'cron_entities_hour' => $systemConfig['cron']['entities_hour'] ?? 2,
+                'cron_entities_minute' => $systemConfig['cron']['entities_minute'] ?? 0,
                 'cron_recent_hour' => $systemConfig['cron']['recent_hour'] ?? 5,
+                'cron_recent_minute' => $systemConfig['cron']['recent_minute'] ?? 0,
                 'gsc_cron_entities_hour' => $gsc['cron_entities_hour'] ?? null,
+                'gsc_cron_entities_minute' => $gsc['cron_entities_minute'] ?? null,
                 'gsc_cron_recent_hour' => $gsc['cron_recent_hour'] ?? null,
+                'gsc_cron_recent_minute' => $gsc['cron_recent_minute'] ?? null,
                 'fb_organic_cron_entities_hour' => $fbOrganic['cron_entities_hour'] ?? null,
+                'fb_organic_cron_entities_minute' => $fbOrganic['cron_entities_minute'] ?? null,
                 'fb_organic_cron_recent_hour' => $fbOrganic['cron_recent_hour'] ?? null,
+                'fb_organic_cron_recent_minute' => $fbOrganic['cron_recent_minute'] ?? null,
                 'fb_marketing_cron_entities_hour' => $fbMarketing['cron_entities_hour'] ?? null,
+                'fb_marketing_cron_entities_minute' => $fbMarketing['cron_entities_minute'] ?? null,
                 'fb_marketing_cron_recent_hour' => $fbMarketing['cron_recent_hour'] ?? null,
+                'fb_marketing_cron_recent_minute' => $fbMarketing['cron_recent_minute'] ?? null,
                 'effective_schedules' => $this->getEffectiveCronSchedules(),
             ];
 
@@ -389,7 +397,9 @@ class ConfigManagerController extends BaseController
                     $appConf['cron'] = [];
                 }
                 if (isset($data['cron_entities_hour'])) $appConf['cron']['entities_hour'] = (int) $data['cron_entities_hour'];
+                if (isset($data['cron_entities_minute'])) $appConf['cron']['entities_minute'] = (int) $data['cron_entities_minute'];
                 if (isset($data['cron_recent_hour'])) $appConf['cron']['recent_hour'] = (int) $data['cron_recent_hour'];
+                if (isset($data['cron_recent_minute'])) $appConf['cron']['recent_minute'] = (int) $data['cron_recent_minute'];
 
                 // Explicit Guard: Strip any attempts to modify system-level infrastructure via UI
                 unset($appConf['db_host'], $appConf['db_name'], $appConf['app_mode']);
@@ -489,8 +499,14 @@ class ConfigManagerController extends BaseController
         if (isset($featureToggles['cron_entities_hour'])) {
             $config['channels']['google_search_console']['cron_entities_hour'] = (int)$featureToggles['cron_entities_hour'];
         }
+        if (isset($featureToggles['cron_entities_minute'])) {
+            $config['channels']['google_search_console']['cron_entities_minute'] = (int)$featureToggles['cron_entities_minute'];
+        }
         if (isset($featureToggles['cron_recent_hour'])) {
             $config['channels']['google_search_console']['cron_recent_hour'] = (int)$featureToggles['cron_recent_hour'];
+        }
+        if (isset($featureToggles['cron_recent_minute'])) {
+            $config['channels']['google_search_console']['cron_recent_minute'] = (int)$featureToggles['cron_recent_minute'];
         }
         $config['channels']['google_search_console']['enabled'] = $enabled;
 
@@ -591,8 +607,14 @@ class ConfigManagerController extends BaseController
         if (isset($featureToggles['cron_entities_hour']) && ($type === 'facebook' || $type === 'facebook-organic')) {
             $orgConfig['channels']['facebook_organic']['cron_entities_hour'] = (int)$featureToggles['cron_entities_hour'];
         }
+        if (isset($featureToggles['cron_entities_minute']) && ($type === 'facebook' || $type === 'facebook-organic')) {
+            $orgConfig['channels']['facebook_organic']['cron_entities_minute'] = (int)$featureToggles['cron_entities_minute'];
+        }
         if (isset($featureToggles['cron_recent_hour']) && ($type === 'facebook' || $type === 'facebook-organic')) {
             $orgConfig['channels']['facebook_organic']['cron_recent_hour'] = (int)$featureToggles['cron_recent_hour'];
+        }
+        if (isset($featureToggles['cron_recent_minute']) && ($type === 'facebook' || $type === 'facebook-organic')) {
+            $orgConfig['channels']['facebook_organic']['cron_recent_minute'] = (int)$featureToggles['cron_recent_minute'];
         }
         if ($type === 'facebook' || $type === 'facebook-organic') {
             $orgConfig['channels']['facebook_organic']['enabled'] = $enabled;
@@ -626,8 +648,14 @@ class ConfigManagerController extends BaseController
         if (isset($featureToggles['cron_entities_hour']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
             $markConfig['channels']['facebook_marketing']['cron_entities_hour'] = (int)$featureToggles['cron_entities_hour'];
         }
+        if (isset($featureToggles['cron_entities_minute']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
+            $markConfig['channels']['facebook_marketing']['cron_entities_minute'] = (int)$featureToggles['cron_entities_minute'];
+        }
         if (isset($featureToggles['cron_recent_hour']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
             $markConfig['channels']['facebook_marketing']['cron_recent_hour'] = (int)$featureToggles['cron_recent_hour'];
+        }
+        if (isset($featureToggles['cron_recent_minute']) && ($type === 'facebook' || $type === 'facebook-marketing')) {
+            $markConfig['channels']['facebook_marketing']['cron_recent_minute'] = (int)$featureToggles['cron_recent_minute'];
         }
         if ($type === 'facebook' || $type === 'facebook-marketing') {
             $markConfig['channels']['facebook_marketing']['enabled'] = $enabled;

@@ -209,26 +209,40 @@ function populateGlobalFields() {
         
         // Cron Scheduling Hours (Global)
         const globalEntHourEl = document.getElementById('cron-entities-hour');
-        if (globalEntHourEl) globalEntHourEl.value = currentConfig.cron_entities_hour || 2;
+        if (globalEntHourEl) globalEntHourEl.value = currentConfig.cron_entities_hour !== undefined ? currentConfig.cron_entities_hour : 2;
+        const globalEntMinEl = document.getElementById('cron-entities-minute');
+        if (globalEntMinEl) globalEntMinEl.value = currentConfig.cron_entities_minute !== undefined ? currentConfig.cron_entities_minute : 0;
 
         const globalRecHourEl = document.getElementById('cron-recent-hour');
-        if (globalRecHourEl) globalRecHourEl.value = currentConfig.cron_recent_hour || 5;
+        if (globalRecHourEl) globalRecHourEl.value = currentConfig.cron_recent_hour !== undefined ? currentConfig.cron_recent_hour : 5;
+        const globalRecMinEl = document.getElementById('cron-recent-minute');
+        if (globalRecMinEl) globalRecMinEl.value = currentConfig.cron_recent_minute !== undefined ? currentConfig.cron_recent_minute : 0;
 
         // Cron Scheduling Hours (Channels)
         const gscCronHourEl = document.getElementById('gsc-cron-hour');
-        if (gscCronHourEl) gscCronHourEl.value = currentConfig.gsc_cron_recent_hour || 5;
+        if (gscCronHourEl) gscCronHourEl.value = currentConfig.gsc_cron_recent_hour !== undefined ? currentConfig.gsc_cron_recent_hour : 5;
+        const gscCronMinEl = document.getElementById('gsc-cron-minute');
+        if (gscCronMinEl) gscCronMinEl.value = currentConfig.gsc_cron_recent_minute !== undefined ? currentConfig.gsc_cron_recent_minute : 0;
 
         const fbOrgEntHourEl = document.getElementById('fb-organic-entities-cron-hour');
-        if (fbOrgEntHourEl) fbOrgEntHourEl.value = currentConfig.fb_organic_cron_entities_hour || 2;
+        if (fbOrgEntHourEl) fbOrgEntHourEl.value = currentConfig.fb_organic_cron_entities_hour !== undefined ? currentConfig.fb_organic_cron_entities_hour : 2;
+        const fbOrgEntMinEl = document.getElementById('fb-organic-entities-cron-minute');
+        if (fbOrgEntMinEl) fbOrgEntMinEl.value = currentConfig.fb_organic_cron_entities_minute !== undefined ? currentConfig.fb_organic_cron_entities_minute : 0;
 
         const fbOrgRecHourEl = document.getElementById('fb-organic-recent-cron-hour');
-        if (fbOrgRecHourEl) fbOrgRecHourEl.value = currentConfig.fb_organic_cron_recent_hour || 6;
+        if (fbOrgRecHourEl) fbOrgRecHourEl.value = currentConfig.fb_organic_cron_recent_hour !== undefined ? currentConfig.fb_organic_cron_recent_hour : 6;
+        const fbOrgRecMinEl = document.getElementById('fb-organic-recent-cron-minute');
+        if (fbOrgRecMinEl) fbOrgRecMinEl.value = currentConfig.fb_organic_cron_recent_minute !== undefined ? currentConfig.fb_organic_cron_recent_minute : 0;
 
         const fbMarkEntHourEl = document.getElementById('fb-marketing-entities-cron-hour');
-        if (fbMarkEntHourEl) fbMarkEntHourEl.value = currentConfig.fb_marketing_cron_entities_hour || 2;
+        if (fbMarkEntHourEl) fbMarkEntHourEl.value = currentConfig.fb_marketing_cron_entities_hour !== undefined ? currentConfig.fb_marketing_cron_entities_hour : 2;
+        const fbMarkEntMinEl = document.getElementById('fb-marketing-entities-cron-minute');
+        if (fbMarkEntMinEl) fbMarkEntMinEl.value = currentConfig.fb_marketing_cron_entities_minute !== undefined ? currentConfig.fb_marketing_cron_entities_minute : 0;
 
         const fbMarkRecHourEl = document.getElementById('fb-marketing-recent-cron-hour');
-        if (fbMarkRecHourEl) fbMarkRecHourEl.value = currentConfig.fb_marketing_cron_recent_hour || 5;
+        if (fbMarkRecHourEl) fbMarkRecHourEl.value = currentConfig.fb_marketing_cron_recent_hour !== undefined ? currentConfig.fb_marketing_cron_recent_hour : 5;
+        const fbMarkRecMinEl = document.getElementById('fb-marketing-recent-cron-minute');
+        if (fbMarkRecMinEl) fbMarkRecMinEl.value = currentConfig.fb_marketing_cron_recent_minute !== undefined ? currentConfig.fb_marketing_cron_recent_minute : 0;
 
         updateCronStatusIndicators();
         
@@ -247,17 +261,18 @@ function updateCronStatusIndicators() {
     
     const schedules = currentConfig.effective_schedules;
     
-    const check = (inputId, statusId, warningId, instancePrefix, expectedHour) => {
-        const input = document.getElementById(inputId);
+    const check = (inputId, minId, statusId, warningId, instancePrefix) => {
+        const inputH = document.getElementById(inputId);
+        const inputM = document.getElementById(minId);
         const status = document.getElementById(statusId);
         const warning = document.getElementById(warningId);
         
-        if (!input || !status) return;
+        if (!inputH || !status) return;
         
-        const hour = parseInt(input.value);
+        const hour = parseInt(inputH.value);
+        const minute = inputM ? parseInt(inputM.value) : 0;
         
         // Find a matching schedule in effective_schedules
-        // We look for instance names like "facebook-marketing-entities-sync" or "google-search-console-recent"
         let effective = null;
         Object.entries(schedules).forEach(([key, val]) => {
             if (key.includes(instancePrefix)) {
@@ -265,10 +280,10 @@ function updateCronStatusIndicators() {
             }
         });
 
-        const isSynced = effective && parseInt(effective.hour) === hour;
+        const isSynced = effective && parseInt(effective.hour) === hour && parseInt(effective.minute) === minute;
         
         status.className = 'cron-dot ' + (isSynced ? 'synced' : 'pending');
-        status.title = isSynced ? 'Cron Synchronized (' + effective.time + ' *)' : 'Real Cron: ' + (effective ? effective.time : 'None') + ' | Expected: ' + hour;
+        status.title = isSynced ? 'Cron Synchronized (' + effective.time + ' *)' : 'Real Cron: ' + (effective ? effective.time : 'None') + ' | Expected: ' + hour + ':' + String(minute).padStart(2,'0');
         
         if (warning) {
             warning.style.display = isSynced ? 'none' : 'flex';
@@ -282,11 +297,11 @@ function updateCronStatusIndicators() {
         }
     };
 
-    check('gsc-cron-hour', 'gsc-cron-sync-status', null, 'google-search-console', currentConfig.gsc_cron_recent_hour);
-    check('fb-organic-entities-cron-hour', 'fb-organic-entities-cron-status', 'fb-organic-cron-sync-warning', 'facebook-organic-entities', currentConfig.fb_organic_cron_entities_hour);
-    check('fb-organic-recent-cron-hour', 'fb-organic-recent-cron-status', 'fb-organic-cron-sync-warning', 'facebook-organic-recent', currentConfig.fb_organic_cron_recent_hour);
-    check('fb-marketing-entities-cron-hour', 'fb-marketing-entities-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-entities', currentConfig.fb_marketing_cron_entities_hour);
-    check('fb-marketing-recent-cron-hour', 'fb-marketing-recent-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-recent', currentConfig.fb_marketing_cron_recent_hour);
+    check('gsc-cron-hour', 'gsc-cron-minute', 'gsc-cron-sync-status', null, 'google-search-console');
+    check('fb-organic-entities-cron-hour', 'fb-organic-entities-cron-minute', 'fb-organic-entities-cron-status', 'fb-organic-cron-sync-warning', 'facebook-organic-entities');
+    check('fb-organic-recent-cron-hour', 'fb-organic-recent-cron-minute', 'fb-organic-recent-cron-status', 'fb-organic-cron-sync-warning', 'facebook-organic-recent');
+    check('fb-marketing-entities-cron-hour', 'fb-marketing-entities-cron-minute', 'fb-marketing-entities-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-entities');
+    check('fb-marketing-recent-cron-hour', 'fb-marketing-recent-cron-minute', 'fb-marketing-recent-cron-status', 'fb-marketing-cron-sync-warning', 'facebook-marketing-recent');
 }
 
 function handleFbLevelChange() {
@@ -840,16 +855,21 @@ async function updateConfig(typeArg) {
             payload.enabled = document.getElementById('gsc-channel-enabled').checked;
             payload.cache_history_range = document.getElementById('gsc-history-range').value;
             payload.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
+            payload.cron_recent_minute = document.getElementById('gsc-cron-minute')?.value;
         } else if (typeArg === 'facebook-organic') {
             payload.enabled = document.getElementById('fb-organic-enabled').checked;
             payload.organic_history_range = document.getElementById('fb-organic-history-range').value;
             payload.cron_entities_hour = document.getElementById('fb-organic-entities-cron-hour')?.value;
+            payload.cron_entities_minute = document.getElementById('fb-organic-entities-cron-minute')?.value;
             payload.cron_recent_hour = document.getElementById('fb-organic-recent-cron-hour')?.value;
+            payload.cron_recent_minute = document.getElementById('fb-organic-recent-cron-minute')?.value;
         } else if (typeArg === 'facebook-marketing') {
             payload.enabled = document.getElementById('fb-marketing-enabled').checked;
             payload.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
             payload.cron_entities_hour = document.getElementById('fb-marketing-entities-cron-hour')?.value;
+            payload.cron_entities_minute = document.getElementById('fb-marketing-entities-cron-minute')?.value;
             payload.cron_recent_hour = document.getElementById('fb-marketing-recent-cron-hour')?.value;
+            payload.cron_recent_minute = document.getElementById('fb-marketing-recent-cron-minute')?.value;
             
             payload.entity_filters = {
                 CAMPAIGN: document.getElementById('fb-marketing-campaign-filter')?.value || '',
@@ -933,7 +953,9 @@ async function updateConfig(typeArg) {
             payload.jobs_timeout_hours = document.getElementById('jobs-timeout-hours').value;
             payload.cache_raw_metrics = document.getElementById('cache-raw-metrics').checked;
             payload.cron_entities_hour = document.getElementById('cron-entities-hour')?.value;
+            payload.cron_entities_minute = document.getElementById('cron-entities-minute')?.value;
             payload.cron_recent_hour = document.getElementById('cron-recent-hour')?.value;
+            payload.cron_recent_minute = document.getElementById('cron-recent-minute')?.value;
         }
 
         const response = await fetch('/api/config-manager/update', {
