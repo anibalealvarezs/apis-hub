@@ -13,6 +13,7 @@ use Anibalealvarezs\FacebookGraphApi\Enums\AdAccountPermission;
 use Anibalealvarezs\FacebookGraphApi\Enums\AdPermission;
 use Anibalealvarezs\FacebookGraphApi\Enums\AdsetPermission;
 use Anibalealvarezs\FacebookGraphApi\Enums\CampaignPermission;
+use Anibalealvarezs\FacebookGraphApi\Enums\FacebookPostPermission;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Dimension;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\GroupType;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Operator;
@@ -530,37 +531,57 @@ class MetricRequests
                             if ($channeledAccountEntity) {
                                 $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
                                 if ($page['ig_account_media_metrics']) {
-                                    foreach ($mediaMap['map'] as $mediaIdInDb) {
-                                        Helpers::checkJobStatus($jobId);
-                                        if ($page['ig_account_media_stop_id'] && ($mediaMap['mapReverse'][$mediaIdInDb] == $page['ig_account_media_stop_id'])) {
-                                            break;
-                                        }
-                                        try {
-                                            $mediaEntity = $postRepository->find($mediaIdInDb);
-                                            if ($mediaEntity) {
-                                                $mediaCaption = $mediaEntity->getData()['caption'] ?? '';
-                                                $includeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_include');
-                                                $excludeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_exclude');
-                                                if (!Helpers::matchesFilter($mediaCaption, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($mediaEntity->getPostId(), $includeFilter, $excludeFilter)) {
-                                                    continue;
-                                                }
-                                                $res = self::processInstagramMedia(
-                                                    pageEntity: $pageEntity,
-                                                    postEntity: $mediaEntity,
-                                                    accountEntity: $accountEntity,
-                                                    channeledAccountEntity: $channeledAccountEntity,
-                                                    api: $api,
-                                                    manager: $manager,
-                                                    logger: $logger,
-                                                    mediaMap: $mediaMap,
-                                                    pageMap: $pageMap,
-                                                );
-                                                $totalMetrics += $res['metrics'] ?? 0;
-                                                $totalRows += $res['rows'] ?? 0;
-                                                $totalDuplicates += $res['duplicates'] ?? 0;
+                                    $logger->info("Syncing insights for " . count($mediaMap['map']) . " Instagram media items in batches of 50...");
+                                    $filteredMediaMap = [];
+                                    foreach ($mediaMap['map'] as $mediaId => $idInDb) {
+                                        $mediaEntity = $postRepository->find($idInDb);
+                                        if ($mediaEntity) {
+                                            $mediaCaption = $mediaEntity->getData()['caption'] ?? '';
+                                            $includeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_include');
+                                            $excludeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_exclude');
+                                            if (Helpers::matchesFilter($mediaCaption, $includeFilter, $excludeFilter) || Helpers::matchesFilter($mediaEntity->getPostId(), $includeFilter, $excludeFilter)) {
+                                                $filteredMediaMap[$mediaId] = $mediaEntity;
                                             }
-                                        } catch (Exception $e) {
-                                            $logger->error("Error processing Instagram media " . $mediaIdInDb . ": " . $e->getMessage());
+                                        }
+                                    }
+
+                                    $mediaChunks = array_chunk($filteredMediaMap, 50, true);
+                                    foreach ($mediaChunks as $chunkIndex => $chunk) {
+                                        Helpers::checkJobStatus($jobId);
+                                        $logger->info("Processing Instagram batch " . ($chunkIndex + 1) . "/" . count($mediaChunks));
+                                        $urls = [];
+                                        foreach ($chunk as $mediaPlatformId => $mediaEntity) {
+                                            $mType = $mediaMap['mapData'][$mediaPlatformId] ?? 'IMAGE';
+                                            $mMetrics = MediaType::from($mType)->insightsFields();
+                                            $urls[] = "/{$mediaPlatformId}/insights?metric={$mMetrics}";
+                                        }
+
+                                        $batchResults = $api->getBatch($urls);
+                                        foreach ($batchResults as $resIndex => $batchRes) {
+                                            $mediaPlatformId = array_keys($chunk)[$resIndex];
+                                            $mediaEntity = array_values($chunk)[$resIndex];
+                                            $providedData = null;
+                                            if (($batchRes['code'] ?? 0) === 200) {
+                                                $providedData = json_decode($batchRes['body'], true);
+                                            } else {
+                                                $logger->warning("Batch error for IG media {$mediaPlatformId} (Code: " . ($batchRes['code'] ?? '???') . "). Will attempt individual fallback.");
+                                            }
+
+                                            $res = self::processInstagramMedia(
+                                                pageEntity: $pageEntity,
+                                                postEntity: $mediaEntity,
+                                                accountEntity: $accountEntity,
+                                                channeledAccountEntity: $channeledAccountEntity,
+                                                api: $api,
+                                                manager: $manager,
+                                                logger: $logger,
+                                                mediaMap: $mediaMap,
+                                                pageMap: $pageMap,
+                                                providedData: $providedData
+                                            );
+                                            $totalMetrics += $res['metrics'] ?? 0;
+                                            $totalRows += $res['rows'] ?? 0;
+                                            $totalDuplicates += $res['duplicates'] ?? 0;
                                         }
                                     }
                                 }
@@ -568,32 +589,54 @@ class MetricRequests
                         }
 
                         if ($page['post_metrics']) {
-                            foreach ($postMap['map'] as $postIdInDb) {
-                                Helpers::checkJobStatus($jobId);
-                                try {
-                                    $postEntity = $postRepository->find($postIdInDb);
-                                    if ($postEntity) {
-                                        $postMsg = $postEntity->getData()['message'] ?? '';
-                                        $includeFilter = self::getFacebookFilter($config, 'POST', 'cache_include');
-                                        $excludeFilter = self::getFacebookFilter($config, 'POST', 'cache_exclude');
-                                        if (!Helpers::matchesFilter($postMsg, $includeFilter, $excludeFilter) && !Helpers::matchesFilter($postEntity->getPostId(), $includeFilter, $excludeFilter)) {
-                                            continue;
-                                        }
-                                        $res = self::processFacebookPagePost(
-                                            postEntity: $postEntity,
-                                            pageEntity: $pageEntity,
-                                            api: $api,
-                                            manager: $manager,
-                                            logger: $logger,
-                                            postMap: $postMap,
-                                            pageMap: $pageMap,
-                                        );
-                                        $totalMetrics += $res['metrics'] ?? 0;
-                                        $totalRows += $res['rows'] ?? 0;
-                                        $totalDuplicates += $res['duplicates'] ?? 0;
+                            $logger->info("Syncing insights for " . count($postMap['map']) . " Facebook posts in batches of 50...");
+                            $filteredPostMap = [];
+                            foreach ($postMap['map'] as $postPlatformId => $idInDb) {
+                                $postEntity = $postRepository->find($idInDb);
+                                if ($postEntity) {
+                                    $postMsg = $postEntity->getData()['message'] ?? '';
+                                    $includeFilter = self::getFacebookFilter($config, 'POST', 'cache_include');
+                                    $excludeFilter = self::getFacebookFilter($config, 'POST', 'cache_exclude');
+                                    if (Helpers::matchesFilter($postMsg, $includeFilter, $excludeFilter) || Helpers::matchesFilter($postPlatformId, $includeFilter, $excludeFilter)) {
+                                        $filteredPostMap[$postPlatformId] = $postEntity;
                                     }
-                                } catch (Exception $e) {
-                                    $logger->error("Error processing Facebook post " . $postIdInDb . ": " . $e->getMessage());
+                                }
+                            }
+
+                            $postChunks = array_chunk($filteredPostMap, 50, true);
+                            foreach ($postChunks as $chunkIndex => $chunk) {
+                                Helpers::checkJobStatus($jobId);
+                                $logger->info("Processing Facebook post batch " . ($chunkIndex + 1) . "/" . count($postChunks));
+                                $urls = [];
+                                foreach ($chunk as $postPlatformId => $postEntity) {
+                                    $pMetrics = FacebookPostPermission::DEFAULT->insightsFields();
+                                    $urls[] = "/{$postPlatformId}/insights?metric={$pMetrics}&period=lifetime";
+                                }
+
+                                $batchResults = $api->getBatch($urls);
+                                foreach ($batchResults as $resIndex => $batchRes) {
+                                    $postPlatformId = array_keys($chunk)[$resIndex];
+                                    $postEntity = array_values($chunk)[$resIndex];
+                                    $providedData = null;
+                                    if (($batchRes['code'] ?? 0) === 200) {
+                                        $providedData = json_decode($batchRes['body'] ?? '{}', true);
+                                    } else {
+                                        $logger->warning("Batch error for FB post {$postPlatformId} (Code: " . ($batchRes['code'] ?? '???') . "). Will attempt individual fallback.");
+                                    }
+
+                                    $res = self::processFacebookPagePost(
+                                        postEntity: $postEntity,
+                                        pageEntity: $pageEntity,
+                                        api: $api,
+                                        manager: $manager,
+                                        logger: $logger,
+                                        postMap: $postMap,
+                                        pageMap: $pageMap,
+                                        providedData: $providedData
+                                    );
+                                    $totalMetrics += $res['metrics'] ?? 0;
+                                    $totalRows += $res['rows'] ?? 0;
+                                    $totalDuplicates += $res['duplicates'] ?? 0;
                                 }
                             }
                         }
@@ -1986,6 +2029,7 @@ class MetricRequests
         LoggerInterface $logger,
         array $mediaMap,
         array $pageMap,
+        ?array $providedData = null,
     ): array {
 
         $accountMap = [
@@ -2016,26 +2060,31 @@ class MetricRequests
             $fetched = false;
             $insights = ['data' => []];
 
-            while ($retryCount < $maxRetries && !$fetched) {
-                try {
-                    $insights = $api->getInstagramMediaInsights(
-                        mediaId: $postEntity->getPostId(),
-                        mediaType: MediaType::from($mediaMap['mapData'][$postEntity->getPostId()]),
-                    );
-                    $fetched = true;
-                } catch (Exception $e) {
-                    $msg = $e->getMessage();
-                    $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
-                    
-                    $retryCount++;
-                    if ($retryCount >= $maxRetries || $isFatal) {
-                        $logger->error(($isFatal ? "FATAL IG MEDIA ERROR" : "Failed") . " to retrieve IG media insights " . $postEntity->getPostId() . ": " . $msg);
-                        $fetched = true; // Break loop
-                        if (!$isFatal) throw $e;
-                        return $stats;
+            if ($providedData !== null) {
+                $insights = $providedData;
+                $fetched = true;
+            } else {
+                while ($retryCount < $maxRetries && !$fetched) {
+                    try {
+                        $insights = $api->getInstagramMediaInsights(
+                            mediaId: $postEntity->getPostId(),
+                            mediaType: MediaType::from($mediaMap['mapData'][$postEntity->getPostId()]),
+                        );
+                        $fetched = true;
+                    } catch (Exception $e) {
+                        $msg = $e->getMessage();
+                        $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
+                        
+                        $retryCount++;
+                        if ($retryCount >= $maxRetries || $isFatal) {
+                            $logger->error(($isFatal ? "FATAL IG MEDIA ERROR" : "Failed") . " to retrieve IG media insights " . $postEntity->getPostId() . ": " . $msg);
+                            $fetched = true; // Break loop
+                            if (!$isFatal) throw $e;
+                            return $stats;
+                        }
+                        $logger->warning("Retry $retryCount/$maxRetries for IG media insights " . $postEntity->getPostId() . ": " . $msg);
+                        usleep(200000 * $retryCount);
                     }
-                    $logger->warning("Retry $retryCount/$maxRetries for IG media insights " . $postEntity->getPostId() . ": " . $msg);
-                    usleep(200000 * $retryCount);
                 }
             }
 
@@ -2710,6 +2759,7 @@ class MetricRequests
         LoggerInterface $logger,
         array $postMap,
         array $pageMap,
+        ?array $providedData = null,
     ): array {
         $api->setPageId((string) $pageEntity->getPlatformId());
         $allMetrics = new ArrayCollection();
@@ -2721,19 +2771,24 @@ class MetricRequests
             $fetched = false;
             $rows = ['data' => []];
 
-            while ($retryCount < $maxRetries && !$fetched) {
-                try {
-                    $rows = $api->getFacebookPostInsights(
-                        postId: $postEntity->getPostId(),
-                    );
-                    $fetched = true;
-                } catch (Exception $e) {
-                    $retryCount++;
-                    if ($retryCount >= $maxRetries) {
-                        throw $e;
+            if ($providedData !== null) {
+                $rows = $providedData;
+                $fetched = true;
+            } else {
+                while ($retryCount < $maxRetries && !$fetched) {
+                    try {
+                        $rows = $api->getFacebookPostInsights(
+                            postId: $postEntity->getPostId(),
+                        );
+                        $fetched = true;
+                    } catch (Exception $e) {
+                        $retryCount++;
+                        if ($retryCount >= $maxRetries) {
+                            throw $e;
+                        }
+                        $logger->warning("Retry $retryCount/$maxRetries for FB post insights " . $postEntity->getPostId() . ": " . $e->getMessage());
+                        usleep(200000 * $retryCount);
                     }
-                    $logger->warning("Retry $retryCount/$maxRetries for FB post insights " . $postEntity->getPostId() . ": " . $e->getMessage());
-                    usleep(200000 * $retryCount);
                 }
             }
 
