@@ -459,21 +459,33 @@ class MetricRequests
                             // Sync Media from Instagram before getting metrics
                             try {
                                 $logger->info("Syncing media for Instagram Account {$page['ig_account']}");
-                                // Only sync media items from the start of the current year
-                                $syncSince = Carbon::now()->startOfYear()->timestamp;
-                                $rawMedia = $api->getInstagramMedia(
-                                    igUserId: (string) $page['ig_account'],
-                                    additionalParams: ['since' => $syncSince]
-                                );
-                                if (!empty($rawMedia['data'])) {
-                                    $mediaCollection = FacebookOrganicMetricConvert::toInstagramMediaCollection(
-                                        mediaItems: $rawMedia['data'],
-                                        pageEntity: $pageEntity,
-                                        accountEntity: $accountEntity,
-                                        channeledAccountEntity: $channeledAccountEntity,
+                                // Retrieve the ChanneledAccount entity for Instagram
+                                $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
+                                $channeledAccountEntity = $channeledAccountRepository->findOneBy([
+                                    'platformId' => (string) $page['ig_account'],
+                                    'channel' => Channel::facebook_organic->value,
+                                    'type' => AccountEnum::INSTAGRAM->value,
+                                ]);
+
+                                if (!$channeledAccountEntity) {
+                                    $logger->warning("ChanneledAccount not found for Instagram profile {$page['ig_account']}. Skipping media sync.");
+                                } else {
+                                    // Only sync media items from the start of the current year
+                                    $syncSince = Carbon::now()->startOfYear()->timestamp;
+                                    $rawMedia = $api->getInstagramMedia(
+                                        igUserId: (string) $page['ig_account'],
+                                        additionalParams: ['since' => $syncSince]
                                     );
-                                    SocialProcessor::processPosts($mediaCollection, $manager);
-                                    $logger->info("Synced " . count($rawMedia['data']) . " media items for Instagram Account {$page['ig_account']}");
+                                    if (!empty($rawMedia['data'])) {
+                                        $mediaCollection = FacebookOrganicMetricConvert::toInstagramMediaCollection(
+                                            mediaItems: $rawMedia['data'],
+                                            pageEntity: $pageEntity,
+                                            accountEntity: $accountEntity,
+                                            channeledAccountEntity: $channeledAccountEntity,
+                                        );
+                                        SocialProcessor::processPosts($mediaCollection, $manager);
+                                        $logger->info("Synced " . count($rawMedia['data']) . " media items for Instagram Account {$page['ig_account']}");
+                                    }
                                 }
                             } catch (Exception $e) {
                                 $logger->warning("Failed to sync media for Instagram Account {$page['ig_account']}: " . $e->getMessage());
