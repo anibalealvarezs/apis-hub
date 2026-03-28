@@ -82,6 +82,10 @@ class FacebookClient
                     tokenPath: (string) ($config['graph_token_path'] ?? ''),
                 );
 
+                if ($logger) {
+                    $apiInstance->setLogger($logger);
+                }
+
                 $logger?->info("Initialized FacebookGraphApi via FacebookClient Singleton");
                 
                 if ($overrideConfig === null) {

@@ -7,9 +7,18 @@ use Anibalealvarezs\FacebookGraphApi\Enums\FacebookPostField;
 use Anibalealvarezs\FacebookGraphApi\Enums\InstagramMediaField;
 use Anibalealvarezs\FacebookGraphApi\Enums\TokenSample;
 use Exception;
+use Psr\Log\LoggerInterface;
 
 class FacebookGraphApiOverride extends FacebookGraphApi
 {
+    protected ?LoggerInterface $logger = null;
+
+    public function setLogger(LoggerInterface $logger): self
+    {
+        $this->logger = $logger;
+        return $this;
+    }
+
     /**
      * @param string $pageId
      * @param string|null $since
@@ -30,6 +39,7 @@ class FacebookGraphApiOverride extends FacebookGraphApi
         // Full set of metrics we want to try (from least risky to most risky)
         $metricProgression = [
             'page_impressions',           // Very basic
+            'page_content_impressions',   // Extremely reliable fallback
             'page_views_total',           // Very basic
             'page_post_engagements',      // High-level interactions
             'page_fan_adds',              // Standard daily metric for follows
@@ -60,14 +70,24 @@ class FacebookGraphApiOverride extends FacebookGraphApi
                 return $res;
             }
             
-            error_log("FB DEBUG: First attempt for Page $pageId returned EMPTY data. Switching to incremental search.");
+            $msg = "First attempt for Page $pageId returned EMPTY data. Switching to incremental search.";
+            if ($this->logger) {
+                $this->logger->warning("FB API: $msg");
+            } else {
+                error_log("FB DEBUG: $msg");
+            }
             
         } catch (Exception $e) {
             $msg = $e->getMessage();
             if (stripos($msg, '(#100)') === false || (stripos($msg, 'insights metric') === false && stripos($msg, 'param is not valid') === false)) {
                 throw $e; // Re-throw if not a parameter/metric error
             }
-            error_log("FB DEBUG: First attempt for Page $pageId FAILED with error: $msg. Switching to incremental search.");
+            $logMsg = "First attempt for Page $pageId FAILED with error: $msg. Switching to incremental search.";
+            if ($this->logger) {
+                $this->logger->warning("FB API: $logMsg");
+            } else {
+                error_log("FB DEBUG: $logMsg");
+            }
         }
 
         // Start incremental strategy (reaching here means first attempt was EMPTY or errored on (#100))
@@ -103,7 +123,12 @@ class FacebookGraphApiOverride extends FacebookGraphApi
             return ['data' => []]; // Return empty instead of throwing if we tried our best
         }
 
-        error_log("FB DEBUG: Incremental strategy finished for Page $pageId. Success: [" . implode(',', $successfulMetrics) . "]. Failed: [" . implode(',', $failedMetrics) . "]");
+        $finMsg = "Incremental strategy finished for Page $pageId. Success: [" . implode(',', $successfulMetrics) . "]. Failed: [" . implode(',', $failedMetrics) . "]";
+        if ($this->logger) {
+            $this->logger->info("FB API: $finMsg");
+        } else {
+            error_log("FB DEBUG: $finMsg");
+        }
 
         return $results;
     }
@@ -146,7 +171,12 @@ class FacebookGraphApiOverride extends FacebookGraphApi
                 throw $e;
             }
 
-            error_log("IG DEBUG: Starting incremental metrics search for IG Account $instagramAccountId due to error: $msg");
+            $logMsg = "Starting incremental metrics search for IG Account $instagramAccountId due to error: $msg";
+            if ($this->logger) {
+                $this->logger->info("IG API: $logMsg");
+            } else {
+                error_log("IG DEBUG: $logMsg");
+            }
             
             $results = ['data' => []];
             $successfulMetrics = [];
@@ -181,7 +211,12 @@ class FacebookGraphApiOverride extends FacebookGraphApi
                 throw new Exception("Finished IG incremental strategy for $instagramAccountId with NO successful metrics. Last Error: $msg");
             }
 
-            error_log("IG DEBUG: Incremental strategy finished for IG Account $instagramAccountId. Success: [" . implode(',', $successfulMetrics) . "]. Failed: [" . implode(',', $failedMetrics) . "]");
+            $successMsg = "Incremental strategy finished for IG Account $instagramAccountId. Success: [" . implode(',', $successfulMetrics) . "]. Failed: [" . implode(',', $failedMetrics) . "]";
+            if ($this->logger) {
+                $this->logger->info("IG API: $successMsg");
+            } else {
+                error_log("IG DEBUG: $successMsg");
+            }
 
             return $results;
         }
