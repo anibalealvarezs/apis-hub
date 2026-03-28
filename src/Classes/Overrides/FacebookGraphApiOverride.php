@@ -36,13 +36,11 @@ class FacebookGraphApiOverride extends FacebookGraphApi
         \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet $metricSet = \Anibalealvarezs\FacebookGraphApi\Enums\MetricSet::BASIC,
         array $customMetrics = [],
     ): array {
-        // Set of metrics compatible with v25.0 (legacy metrics like page_impressions or page_fan_adds are deprecated)
+        // Set of metrics compatible with v25.0
         $metricProgression = [
             'page_content_impressions',   // Modern replacement for impressions
-            'page_views_total',           // Still valid in v25.0
-            'page_post_engagements',      // Still valid in v25.0
-            'page_follows',               // Modern way to track follower growth
-            'page_total_actions',         // Aggregate actions on page
+            'page_views_total',           // Standard visits
+            'page_post_engagements',      // Standard engagements
         ];
 
         // If customMetrics are provided, we use those instead
@@ -80,7 +78,7 @@ class FacebookGraphApiOverride extends FacebookGraphApi
             if (stripos($msg, '(#100)') === false || (stripos($msg, 'insights metric') === false && stripos($msg, 'param is not valid') === false)) {
                 throw $e; // Re-throw if not a parameter/metric error
             }
-            $logMsg = "First attempt for Page $pageId FAILED with error: $msg. Switching to incremental search.";
+            $logMsg = "First attempt for Page $pageId FAILED with error #100. Switching to incremental search to identify the culprit.";
             if ($this->logger) {
                 $this->logger->warning("FB API: $logMsg");
             } else {
@@ -88,7 +86,7 @@ class FacebookGraphApiOverride extends FacebookGraphApi
             }
         }
 
-        // Start incremental strategy (reaching here means first attempt was EMPTY or errored on (#100))
+        // Start incremental strategy
         $results = ['data' => []];
         $successfulMetrics = [];
         $failedMetrics = [];
@@ -107,12 +105,17 @@ class FacebookGraphApiOverride extends FacebookGraphApi
                     // Page insights format: data => [ [name => M1, period => day, values => [...] ], ... ]
                     $results['data'] = array_merge($results['data'], $resSingle['data']);
                     $successfulMetrics[] = $metric;
+                    if ($this->logger) $this->logger->info("FB API: Metric '$metric' SUCCESS for Page $pageId");
                 } else {
                     $failedMetrics[] = $metric . " (EMPTY)";
+                    if ($this->logger) $this->logger->warning("FB API: Metric '$metric' returned NO DATA for Page $pageId");
                 }
             } catch (Exception $eInner) {
-                // error_log("FB DEBUG: Metric '$metric' FAILED for Page $pageId: " . $eInner->getMessage());
-                $failedMetrics[] = $metric . " (ERROR: " . substr($eInner->getMessage(), 0, 50) . "...)";
+                $errMsg = $eInner->getMessage();
+                $failedMetrics[] = $metric . " (ERROR: " . substr($errMsg, 0, 100) . ")";
+                if ($this->logger) {
+                    $this->logger->error("FB API: Metric '$metric' FAILED for Page $pageId: $errMsg");
+                }
             }
         }
 
