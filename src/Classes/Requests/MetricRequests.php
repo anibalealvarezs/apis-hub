@@ -434,8 +434,8 @@ class MetricRequests
                             // Sync Posts from Facebook before getting metrics
                             try {
                                 $logger->info("Syncing posts for Facebook Page {$pageId}");
-                                // Only sync posts from the start of the current year to avoid heavy historical loads
-                                $syncSince = Carbon::now()->startOfYear()->timestamp;
+                                // Sync posts starting from the job's start date (start of that year)
+                                $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
                                 $rawPosts = $api->getFacebookPosts(
                                     pageId: (string) $pageId,
                                     additionalParams: ['since' => $syncSince]
@@ -470,8 +470,8 @@ class MetricRequests
                                 if (!$channeledAccountEntity) {
                                     $logger->warning("ChanneledAccount not found for Instagram profile {$page['ig_account']}. Skipping media sync.");
                                 } else {
-                                    // Only sync media items from the start of the current year
-                                    $syncSince = Carbon::now()->startOfYear()->timestamp;
+                                    // Sync media starting from the job's start date
+                                    $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
                                     $rawMedia = $api->getInstagramMedia(
                                         igUserId: (string) $page['ig_account'],
                                         additionalParams: ['since' => $syncSince]
