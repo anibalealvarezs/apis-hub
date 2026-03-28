@@ -38,9 +38,10 @@ class FacebookGraphApiOverride extends FacebookGraphApi
     ): array {
         // Set of metrics compatible with v25.0
         $metricProgression = [
-            'page_content_impressions',   // Modern replacement for impressions
-            'page_views_total',           // Standard visits
-            'page_post_engagements',      // Standard engagements
+            'page_views_total',           // SUCCESS - (returned empty but no error #100)
+            'page_post_engagements',      // SUCCESS - (returned empty but no error #100)
+            'page_daily_active_users',    // Very stable reach/activity metric
+            'page_impressions',           // Verification - check if v25.0 still accepts it
         ];
 
         // If customMetrics are provided, we use those instead
