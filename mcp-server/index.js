@@ -368,27 +368,9 @@ if (MODE === "sse") {
     next();
   });
 
-  // Manejador para el endpoint SSE (GET inicia el stream, otros métodos devolvemos JSON-RPC válido para inicialización)
   app.all("/mcp/sse", async (req, res) => {
     if (req.method !== "GET") {
-        console.error(`[DEBUG-REQ] Antigravity probando método ${req.method} en SSE. Enviando Handshake completo.`);
-        return res.status(200).json({ 
-            jsonrpc: "2.0", 
-            id: req.body ? req.body.id : (req.query.id || 1),
-            result: { 
-                protocolVersion: "2024-11-05",
-                capabilities: {
-                    logging: {},
-                    prompts: { listChanged: true },
-                    resources: { subscribe: true, listChanged: true },
-                    tools: { listChanged: true }
-                },
-                serverInfo: {
-                    name: "apis-hub-mcp-server",
-                    version: "1.0.0"
-                }
-            }
-        });
+        return res.status(405).send("Method Not Allowed. Use GET for SSE connection.");
     }
 
     console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
@@ -397,13 +379,11 @@ if (MODE === "sse") {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
-    // Detección dinámica de Host y Protocolo (Proxy-aware)
-    const endpoint = `${req.protocol}://${req.get('host')}/mcp/messages`;
+    res.setHeader('X-Accel-Buffering', 'no'); // Específico para Nginx
     
-    console.error(`[SSE] Publicando endpoint ABSOLUTO: ${endpoint}`);
-
-    // Native transport handles the 'endpoint' event automatically using the first argument
-    const transport = new SSEServerTransport(endpoint, res);
+    // Usar una ruta relativa para el endpoint de mensajes.
+    // El SDK de MCP resolverá esto automáticamente basándose en la petición del cliente.
+    const transport = new SSEServerTransport("/mcp/messages", res);
     
     sessions.set(transport.sessionId, transport);
     console.error(`[SSE] Sesión creada: ${transport.sessionId}`);
