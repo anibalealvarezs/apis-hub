@@ -416,23 +416,33 @@ if (MODE === "sse") {
     if (Array.isArray(sessionId)) sessionId = sessionId[0];
 
     if (!sessionId) {
-        console.error(`[MSG] Error: No se encontró sessionId en ${req.method}. Body: ${JSON.stringify(req.body).substring(0,50)}`);
-        return res.status(400).send("Session ID is required.");
+        // FALLBACK: Si no hay sessionId pero solo hay 1 sesión activa, asumimos que es esa.
+        // Esto es vital para clientes que ignoran la redirección de mensajes y postean a /mcp/sse.
+        if (sessions.size === 1) {
+            sessionId = Array.from(sessions.keys())[0];
+            console.error(`[MSG] Fallback: No venía sessionId, usando la única sesión activa: ${sessionId}`);
+        } else if (sessions.size > 1) {
+            console.error(`[MSG] Error: Múltiples sesiones (${sessions.size}) y no vino sessionId.`);
+            return res.status(400).send("Session ID required (Multiple active sessions found).");
+        } else {
+            console.error(`[MSG] Error: No vino sessionId y no hay sesiones activas.`);
+            return res.status(400).send("Session ID required (No active sessions).");
+        }
     }
 
     const transport = sessions.get(sessionId);
     
     if (transport) {
-      console.error(`[MSG] Procesando mensaje para sesión ${sessionId}. (Total activas: ${sessions.size})`);
+      console.error(`[MSG] OK: Procesando ${req.method} para ${sessionId}.`);
       try {
         await transport.handlePostMessage(req, res);
       } catch (err) {
-        console.error(`[MSG] Error en handlePostMessage: ${err.message}`);
+        console.error(`[MSG] EXCEPTION en handlePostMessage: ${err.message}`);
         res.status(500).send(err.message);
       }
     } else {
-      console.error(`[MSG] Sesión NO ENCONTRADA o EXPIRADA: ${sessionId}. Sesiones en memoria: ${Array.from(sessions.keys()).join(', ')}`);
-      res.status(404).send(`Session not found or expired: ${sessionId}`);
+      console.error(`[MSG] Error: Sesión ${sessionId} no encontrada en el registro.`);
+      res.status(404).send(`Session not found: ${sessionId}`);
     }
   }
 
