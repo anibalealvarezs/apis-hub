@@ -348,6 +348,7 @@ if (MODE === "sse") {
   const app = express();
   app.use(cors());
   app.set('trust proxy', true); // Permitir detección correcta tras proxies/docker
+  app.use(express.json()); // Parser para leer sessionId del cuerpo de la petición
   const PORT = process.env.MCP_PORT || 3000;
 
   // Track active sessions and their transports
@@ -357,14 +358,9 @@ if (MODE === "sse") {
     res.send("APIs Hub MCP Server (SSE Mode) is running. Connect to /mcp/sse");
   });
 
-  // EXCLUDE express.json() from /mcp/messages to allow SDK to read raw stream
-  // (SDK needs to read the body directly from the request stream)
-  // Or alternatively, we can use express.json() and re-emit the data,
-  // but simpler to just use it selectively.
-
   // Middleware de logging total para debuggear peticiones de Antigravity
   app.use((req, res, next) => {
-    console.error(`[DEBUG-REQ] ${req.method} ${req.url} | Headers: ${JSON.stringify(req.headers).substring(0, 50)}...`);
+    console.error(`[MSG-IN] ${req.method} ${req.url} | Session: ${req.query.sessionId || 'N/A'} | Body keys: ${Object.keys(req.body || {})}`);
     next();
   });
 
