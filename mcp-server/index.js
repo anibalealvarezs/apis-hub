@@ -366,7 +366,7 @@ if (MODE === "sse") {
 
   // MANEJO DE DISCOVERY: Si Antigravity explora cualquier GET en la raíz o .well-known,
   // iniciamos el flujo SSE para que tenga una sesión activa.
-  app.get("*", async (req, res) => {
+  app.get(/.*/, async (req, res) => {
     // Si es un GET al SSE o cualquier ruta de descubrimiento, iniciar stream
     console.error(`[DISC] Discovery GET detectado en ${req.url}`);
     
@@ -424,7 +424,7 @@ if (MODE === "sse") {
     }
   }
 
-  app.post("*", async (req, res) => {
+  app.post(/.*/, async (req, res) => {
     await handleIncomingMessage(req, res);
   });
 
