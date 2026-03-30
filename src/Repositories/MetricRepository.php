@@ -309,7 +309,7 @@ class MetricRepository extends BaseRepository
         }
     }
 
-    public function getMinDate(?object $filters = null): ?string
+    public function getMinDate(object|array $filters = []): ?string
     {
         $query = $this->_em->createQueryBuilder()
             ->select('MIN(mc.metricDate)')
@@ -333,7 +333,7 @@ class MetricRepository extends BaseRepository
         }
     }
 
-    public function getMaxDate(?object $filters = null): ?string
+    public function getMaxDate(object|array $filters = []): ?string
     {
         $query = $this->_em->createQueryBuilder()
             ->select('MAX(mc.metricDate)')

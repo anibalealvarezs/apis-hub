@@ -40,3 +40,7 @@ dev-recurrences.md
 */*.hetzner
 *.py
 */*.py
+
+check_db.php
+
+debug_data.php

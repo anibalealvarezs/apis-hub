@@ -406,7 +406,8 @@ class ChanneledCrudController extends BaseController
             }
 
             // --- Redis Caching Logic ---
-            $isCacheable = $endDate && CacheStrategyService::isCacheable($channelKey);
+            // Force skip cache for organic in development/demo to prevent stale results during dashboard tuning
+            $isCacheable = $endDate && CacheStrategyService::isCacheable($channelKey) && $channelKey !== 'facebook_organic';
             $cacheType = $isCacheable ? CacheStrategyService::getTargetCacheType($endDate) : null;
             $cacheKey = $cacheType ? CacheStrategyService::generateKey($channelKey, [
                 'entity' => $entity,
@@ -437,6 +438,16 @@ class ChanneledCrudController extends BaseController
                 orderBy: $params['orderBy'] ?? null,
                 orderDir: $params['orderDir'] ?? 'ASC'
             );
+
+            $logger = Helpers::setLogger('api_debug.log');
+            $logger->info("=== API AGGREGATE DEBUG ===");
+            $logger->info("Filters: " . json_encode($params['filters'] ?? []));
+            $logger->info("Dates: " . ($params['startDate'] ?? 'null') . " to " . ($params['endDate'] ?? 'null'));
+            $logger->info("Aggregations: " . json_encode($aggregations));
+            $logger->info("GroupBy: " . json_encode($groupBy));
+            $logger->info("Result Count: " . count($data));
+            $logger->info("Result Dump: " . json_encode(array_slice($data, 0, 1)));
+            $logger->info("===========================");
 
             // --- Cache the results ---
             if ($cacheKey && !empty($data)) {

@@ -1,0 +1,441 @@
+/** 
+ * APIs Hub | Facebook Organic Reports View Logic 🛡️📱
+ * Specialized Metrics Analytics Engine for Organic Meta Channels (IG & FB).
+ */
+
+// Global state
+let currentData = [];
+let sortConfig = { key: 'account', dir: 'asc' };
+const TREND_DATA_CACHE = {}; 
+const NESTED_DATA_CACHE = {}; 
+
+const HIERARCHY = {
+    instagram: { next: 'facebook', label: 'Instagram Account', icon: 'instagram', color: '#E1306C', idField: 'channeledAccount', nameField: 'account', filterKey: 'channeledAccount' },
+    facebook: { next: 'content', label: 'Facebook Page', icon: 'facebook', color: '#1877F2', idField: 'page_id', nameField: 'page_title', filterKey: 'page' },
+    content: { next: null, label: 'Content Breakdown', icon: 'image', color: '#8b5cf6', idField: 'post_id', nameField: 'caption' }
+};
+
+// --- Initialization ---
+async function initDashboard() {
+    lucide.createIcons();
+    
+    const headers = getAdminHeaders();
+    if (!headers || !headers.Authorization) return;
+
+    let minStoredDate = dayjs().subtract(1, 'year').format('YYYY-MM-DD'); 
+    try {
+        const rangeRes = await fetch('/facebook_organic/metric/range', { headers }).then(r => r.json());
+        if (rangeRes.status === 'success' && rangeRes.data.minDate) {
+            minStoredDate = rangeRes.data.minDate;
+        }
+    } catch(e) { console.error("Range fetch error:", e); }
+
+    const flatpickrConfig = {
+        dateFormat: "Y-m-d", altInput: true, altFormat: "F j, Y", animate: true, disableMobile: "true", minDate: minStoredDate
+    };
+
+    const yesterday = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+    const lastWeek = dayjs().subtract(30, 'day').format('YYYY-MM-DD');
+
+    flatpickr("#startDate", { ...flatpickrConfig, defaultDate: lastWeek > minStoredDate ? lastWeek : minStoredDate });
+    flatpickr("#endDate", { ...flatpickrConfig, defaultDate: yesterday, maxDate: yesterday });
+
+    loadReport();
+}
+
+function getActiveMetrics(level = 'instagram', isFb = false) {
+    // Config based on level
+    if (level === 'instagram') {
+        return [
+            { key: 'reach', label: 'REACH', format: 'number', precision: 0, original: 'reach', sparkline: true },
+            { key: 'impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions', sparkline: true },
+            { key: 'total_interactions', label: 'INTER', format: 'number', precision: 0, original: 'total_interactions', sparkline: false },
+            { key: 'profile_views', label: 'VIEWS', format: 'number', precision: 0, original: 'profile_views', sparkline: false },
+            { key: 'follower_count', label: 'FANS', format: 'number', precision: 0, original: 'follower_count', sparkline: true }
+        ];
+    }
+    if (level === 'facebook') {
+        return [
+            { key: 'page_impressions', label: 'IMPR', format: 'number', precision: 0, original: 'page_impressions', sparkline: true },
+            { key: 'page_post_engagements', label: 'ENGAG', format: 'number', precision: 0, original: 'page_post_engagements', sparkline: true },
+            { key: 'page_views_total', label: 'VIEWS', format: 'number', precision: 0, original: 'page_views_total', sparkline: false },
+            { key: 'page_fans', label: 'LIKES', format: 'number', precision: 0, original: 'page_fans', sparkline: true }
+        ];
+    }
+    // Level Content
+    if (level === 'content') {
+        if (isFb) {
+            return [
+                { key: 'impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions' },
+                { key: 'total_interactions', label: 'ENGAG', format: 'number', precision: 0, original: 'total_interactions' },
+                { key: 'likes', label: 'LIKES', format: 'number', precision: 0, original: 'likes' }
+            ];
+        }
+        return [
+            { key: 'impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions' },
+            { key: 'reach', label: 'REACH', format: 'number', precision: 0, original: 'reach' },
+            { key: 'likes', label: 'LIKES', format: 'number', precision: 0, original: 'likes' },
+            { key: 'comments', label: 'COMM', format: 'number', precision: 0, original: 'comments' },
+            { key: 'shares', label: 'SHAR', format: 'number', precision: 0, original: 'shares' },
+            { key: 'plays', label: 'PLAY', format: 'number', precision: 0, original: 'plays' }
+        ];
+    }
+    return [];
+}
+
+async function loadReport() {
+    const start = document.getElementById('startDate').value;
+    const end = document.getElementById('endDate').value;
+    const loader = document.getElementById('loader');
+    const emptyMsg = document.getElementById('empty-msg');
+    
+    if (loader) loader.style.display = 'flex';
+    if (emptyMsg) emptyMsg.style.display = 'none';
+
+    try {
+        const headers = getAdminHeaders();
+        const metrics = getActiveMetrics('instagram');
+        const aggs = {}; metrics.forEach(m => aggs[m.key] = m.original);
+        
+        // 1. Fetch IG Master Accounts
+        const payload = { 
+            aggregations: aggs, 
+            filters: { account_type: 'instagram' },
+            groupBy: ["channeledAccount", "account", "linked_fb_page_id", "channeled_account_id"], 
+            startDate: start, endDate: end 
+        };
+        const resMain = await fetch('/facebook_organic/metric/aggregate', { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json());
+        
+        console.log("Organic Dashboard - Master Accounts:", resMain.data);
+
+        if (resMain.status === 'success' && resMain.data) {
+            currentData = resMain.data;
+            
+            // 2. Trend data for Sparklines
+            const trendAggs = {}; metrics.filter(m => m.sparkline).forEach(m => trendAggs[`trend_${m.key}`] = m.original);
+            const resTrend = await fetch('/facebook_organic/metric/aggregate', { 
+                method: 'POST', headers, 
+                body: JSON.stringify({ aggregations: trendAggs, groupBy: ["daily", "channeledAccount"], startDate: start, endDate: end }) 
+            }).then(r => r.json());
+
+            if (resTrend.status === 'success' && resTrend.data) {
+                TREND_DATA_CACHE['instagram'] = {};
+                resTrend.data.forEach(d => {
+                    const cid = d.channeledAccount;
+                    if (!TREND_DATA_CACHE['instagram'][cid]) TREND_DATA_CACHE['instagram'][cid] = {};
+                    metrics.filter(m => m.sparkline).forEach(m => {
+                        if (!TREND_DATA_CACHE['instagram'][cid][m.key]) TREND_DATA_CACHE['instagram'][cid][m.key] = [];
+                        TREND_DATA_CACHE['instagram'][cid][m.key].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) });
+                    });
+                });
+            }
+            render(start, end);
+        } else {
+            if (emptyMsg) emptyMsg.style.display = 'block';
+        }
+    } catch (error) { console.error("Organic Load Error:", error); }
+    finally { if (loader) loader.style.display = 'none'; lucide.createIcons(); }
+}
+
+function render(start, end) {
+    const body = document.getElementById('table-body');
+    if (!body) return;
+    body.innerHTML = '';
+    const metrics = getActiveMetrics('instagram');
+    const headRow = document.getElementById('table-head-row');
+    
+    headRow.innerHTML = `
+        <th class="col-actions">&nbsp;</th>
+        <th onclick="sortTable('account')" class="clickable" style="text-align: left;">INSTAGRAM ACCOUNT</th>
+        <th style="text-align: left;">LINKED FB</th>
+        ${metrics.map(m => `<th style="text-align: right;">${m.label}</th>`).join('')}
+    `;
+
+    currentData.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        const rowId = `row-ig-${row.channeledAccount}`.replace(/[^a-z0-9\-]/gi, '-');
+        tr.id = rowId;
+        const fbLinkedId = row.linked_fb_page_id || 'N/A';
+        const accountId = row.channeled_account_id;
+        
+        tr.innerHTML = `
+            <td class="col-actions">
+                <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                    <button class="btn-expand next-btn-fb" onclick="toggleOrganicHierarchy(this, '${rowId}', 'facebook', '${accountId}', '${fbLinkedId.replace(/'/g, "\\'")}')" title="View Linked Facebook Page">
+                        <i data-lucide="layers" size="14"></i>
+                    </button>
+                    <button class="btn-expand next-btn-ig" onclick="toggleOrganicHierarchy(this, '${rowId}', 'content', '${accountId}', null)" title="View Instagram Posts" style="background-color:rgba(139,92,246,0.1); color:#8b5cf6; border-color:rgba(139,92,246,0.3);">
+                        <i data-lucide="image" size="14"></i>
+                    </button>
+                </div>
+            </td>
+            <td style="text-align: left;"><strong>${row.channeledAccount}</strong></td>
+            <td style="text-align: left;"><span class="badge-${fbLinkedId !== 'N/A' ? 'success' : 'dim'}">${fbLinkedId}</span></td>
+            ${metrics.map(m => {
+                const val = row[m.key] || 0;
+                const sparkId = `spark-ig-${m.key}-${accountId}`.toLowerCase();
+                return `<td style="text-align: right;">
+                    <div class="metric-flex-end">
+                        <span>${formatNum(val)}</span>
+                        ${m.sparkline ? `<div id="${sparkId}" class="sparkline-inline"></div>` : ''}
+                    </div>
+                </td>`;
+            }).join('')}
+        `;
+        body.appendChild(tr);
+    });
+    
+    for (const row of currentData) {
+        const accountId = row.channeled_account_id;
+        for (const m of metrics) {
+            if (m.sparkline) {
+                const sparkId = `spark-ig-${m.key}-${accountId}`.toLowerCase();
+                const sparkEl = document.getElementById(sparkId);
+                const points = TREND_DATA_CACHE['instagram']?.[row.channeledAccount]?.[m.key] || [];
+                if (sparkEl && points.length > 1) {
+                    try {
+                        const vals = points.sort((a,b) => a.day.localeCompare(b.day)).map(p => p.val);
+                        renderSparkline(sparkEl, vals, m.color || '#6366f1', start, end);
+                    } catch(e) { console.error("Sparkline render error:", e); }
+                }
+            }
+        }
+    }
+    
+    renderSummaryFields();
+    lucide.createIcons();
+}
+
+async function toggleOrganicHierarchy(btn, rowId, level, parentId, childPlatformId) {
+    const mainRow = document.getElementById(rowId);
+    const nextRow = mainRow?.nextElementSibling;
+    
+    if (nextRow?.classList.contains('hierarchy-row') && nextRow.dataset.parentRow === rowId) {
+        if (nextRow.dataset.level === level) {
+            nextRow.remove();
+            btn.classList.remove('active');
+            return;
+        }
+        // If it was another level, remove it first
+        nextRow.remove();
+        document.querySelectorAll(`#${rowId} .btn-expand`).forEach(b => b.classList.remove('active'));
+    }
+    
+    btn.classList.add('active');
+    const breakdownRow = document.createElement('tr');
+    breakdownRow.className = 'hierarchy-row';
+    breakdownRow.dataset.parentRow = rowId;
+    breakdownRow.dataset.level = level;
+    const containerId = `container-${level}-${rowId}`.replace(/[^a-z0-9\-]/gi, '-');
+    breakdownRow.innerHTML = `<td colspan="20"><div id="${containerId}" class="nested-container"><div class="spinner"></div> Loading ${level}...</div></td>`;
+    mainRow.after(breakdownRow);
+
+    const headers = getAdminHeaders();
+    const start = document.getElementById('startDate').value;
+    const end = document.getElementById('endDate').value;
+    const container = document.getElementById(containerId);
+
+    try {
+        if (level === 'facebook') {
+            const metrics = getActiveMetrics('facebook');
+            const aggs = {}; metrics.forEach(m => aggs[m.key] = m.original);
+            
+            // Search for the specific linked FB Page
+            const payload = { 
+                aggregations: aggs, 
+                filters: { page: childPlatformId, channeledAccount: 'N/A' },
+                groupBy: ["page", "page_title"],
+                startDate: start, endDate: end 
+            };
+            const res = await fetch('/facebook_organic/metric/aggregate', { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json());
+            
+            if (res.status === 'success' && res.data) {
+                renderFacebookSubtable(container, res.data, rowId);
+            } else {
+                container.innerHTML = `<div class="empty-state">No linked Facebook Page data found for this period.</div>`;
+            }
+        } else if (level === 'content') {
+            // Level content is reached from a FB row (row.page) or IG row (row.channeledAccount)
+            // parentId is either a FB Page URL/ID or an IG Account ID
+            const isFromFb = rowId.includes('-fb-'); 
+            const groupBy = ["post", "post_id", "caption", "message", "media_type", "permalink", "permalink_url", "timestamp", "created_time"]; 
+            const filters = isFromFb ? { page: parentId, post: 'NOT_NULL', channeledAccount: 'N/A' } : { channeledAccount: parentId, account_type: 'instagram', post: 'NOT_NULL' };
+            
+            const metrics = getActiveMetrics('content', isFromFb);
+            const aggs = {}; metrics.forEach(m => aggs[m.key] = m.original);
+
+            const res = await fetch('/facebook_organic/metric/aggregate', { 
+                method: 'POST', headers, 
+                body: JSON.stringify({ aggregations: aggs, filters, groupBy, startDate: start, endDate: end }) 
+            }).then(r => r.json());
+
+            if (res.status === 'success' && res.data) {
+                renderContentSubtable(container, res.data, isFromFb);
+            } else {
+                container.innerHTML = `<div class="empty-state">No organic content found for this period.</div>`;
+            }
+        }
+    } catch(e) { 
+        console.error("Hierarchy error:", e);
+        container.innerHTML = `<div class="error-state">${e.message}</div>`; 
+    }
+    lucide.createIcons();
+}
+
+function renderFacebookSubtable(container, data, parentRowId) {
+    const metrics = getActiveMetrics('facebook');
+    let html = `
+        <div class="breakdown-title" style="color:#1877F2;"><i data-lucide="facebook"></i> Linked Facebook Pages Metrics</div>
+        <table class="nested-table">
+            <thead>
+                <tr>
+                    <th style="width:50px;"></th>
+                    <th style="text-align: left;">PAGE NAME</th>
+                    ${metrics.map(m => `<th style="text-align: right;">${m.label}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>`;
+    
+    data.forEach(row => {
+        const platformId = row.channeledAccount || row.page;
+        const subRowId = `row-fb-${platformId}`.replace(/[^a-z0-9\-]/gi, '-');
+        
+        const displayName = row.page_title || row.account || platformId;
+        let nameHtml = `<strong>${displayName}</strong>`;
+        if (row.page && row.page !== 'N/A' && row.page.startsWith('http')) {
+            nameHtml = `<a href="${row.page}" target="_blank" class="clickable-text"><strong>${displayName}</strong> <i data-lucide="external-link" size="10"></i></a>`;
+        }
+        
+        html += `
+            <tr id="${subRowId}">
+                <td class="text-center">
+                    <button class="btn-expand" onclick="toggleOrganicHierarchy(this, '${subRowId}', 'content', '${platformId}', null)" title="View Posts">
+                        <i data-lucide="image" size="12"></i>
+                    </button>
+                </td>
+                <td style="text-align: left;">${nameHtml}</td>
+                ${metrics.map(m => `<td style="text-align: right;">${formatNum(row[m.key])}</td>`).join('')}
+            </tr>`;
+    });
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
+
+function renderContentSubtable(container, data, isFb = false) {
+    const metrics = getActiveMetrics('content', isFb);
+    let html = `
+        <div class="breakdown-title" style="color:#8b5cf6;"><i data-lucide="image"></i> Organic Content Performance</div>
+        <table class="nested-table">
+            <thead>
+                <tr>
+                    <th style="text-align: left;">CONTENT / CAPTION</th>
+                    <th style="text-align: center;">TYPE</th>
+                    <th style="text-align: center;">DATE</th>
+                    ${metrics.map(m => `<th style="text-align: right;">${m.label}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>`;
+    
+    data.forEach(row => {
+        let caption = 'No caption';
+        if (row.caption && row.caption !== 'N/A') caption = row.caption;
+        else if (row.message && row.message !== 'N/A') caption = row.message;
+        
+        let linkDetails = '';
+        let theLink = null;
+        if (row.permalink && row.permalink !== 'N/A') theLink = row.permalink;
+        else if (row.permalink_url && row.permalink_url !== 'N/A') theLink = row.permalink_url;
+        
+        const shortCaption = caption.length > 80 ? caption.substring(0, 80) + '...' : caption;
+        if (theLink) {
+            linkDetails = `<a href="${theLink}" target="_blank" class="clickable-text" title="${caption.replace(/"/g, '&quot;')}">${shortCaption} <i data-lucide="external-link" size="10"></i></a>`;
+        } else {
+            linkDetails = `<div class="clickable-text" title="${caption.replace(/"/g, '&quot;')}">${shortCaption}</div>`;
+        }
+        
+        let dateVal = 'N/A';
+        if (row.timestamp && row.timestamp !== 'N/A') dateVal = row.timestamp;
+        else if (row.created_time && row.created_time !== 'N/A') dateVal = row.created_time;
+        
+        const formattedDate = dateVal !== 'N/A' ? dayjs(dateVal).format('MMM D, YYYY') : 'Unknown';
+        const mediaTypeLabel = (row.media_type && row.media_type !== 'N/A') ? row.media_type : (isFb ? 'POST' : 'IMAGE');
+        
+        html += `
+            <tr>
+                <td style="text-align: left;">${linkDetails}</td>
+                <td style="text-align: center;"><span class="badge-dim" style="font-size:0.7em; letter-spacing:0.5px; padding:2px 6px;">${mediaTypeLabel}</span></td>
+                <td style="text-align: center;"><span style="color:#94a3b8; font-size:0.85em;">${formattedDate}</span></td>
+                ${metrics.map(m => `<td style="text-align: right;">${formatNum(row[m.key])}</td>`).join('')}
+            </tr>`;
+    });
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
+
+// --- Utils ---
+function getAdminHeaders() {
+    if (window.AUTH_BYPASS) return { 'Authorization': 'Bearer DEMO_BYPASS', 'Content-Type': 'application/json' };
+    let auth = JSON.parse(localStorage.getItem('apis_hub_admin_auth') || '{}');
+    return { 'Authorization': 'Bearer ' + (auth.token || ''), 'Content-Type': 'application/json' };
+}
+
+function formatNum(v) { return (parseFloat(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+
+function renderSparkline(container, points, color = '#6366f1', start, end) {
+    if (!container || !points || points.length < 2) return;
+    const width = 80; const height = 24;
+    const max = Math.max(...points); const min = Math.min(...points);
+    const range = (max - min) || 1;
+    const svgPoints = points.map((p, i) => `${(i / (points.length - 1)) * width},${height - ((p - min) / range) * (height - 4) - 2}`);
+    const strokeColor = points[points.length-1] >= points[0] ? '#10b981' : '#ef4444';
+    container.innerHTML = `<svg width="${width}" height="${height}" style="overflow:visible">
+        <polyline fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="${svgPoints.join(' ')}" />
+    </svg>`;
+}
+
+function renderSummaryFields() {
+    const sums = currentData.reduce((acc, r) => {
+        acc.reach += parseInt(r.reach || 0);
+        acc.impr += parseInt(r.impressions || 0);
+        acc.inter += parseInt(r.total_interactions || 0);
+        acc.fans += parseInt(r.follower_count || 0);
+        return acc;
+    }, { reach:0, impr:0, inter:0, fans:0 });
+    
+    document.getElementById('total-reach').textContent = formatNum(sums.reach);
+    document.getElementById('total-impressions').textContent = formatNum(sums.impr);
+    document.getElementById('total-interactions').textContent = formatNum(sums.inter);
+    document.getElementById('total-followers').textContent = formatNum(sums.fans);
+    document.getElementById('total-eng-rate').textContent = ((sums.inter / (sums.reach || 1)) * 100).toFixed(2) + '%';
+}
+
+function forceRefresh() {
+    const modal = document.getElementById('flush-modal');
+    if (modal) modal.classList.add('active');
+}
+
+function closeFlushModal() {
+    const modal = document.getElementById('flush-modal');
+    if (modal) modal.classList.remove('active');
+}
+
+async function confirmFlush() {
+    closeFlushModal();
+    const loader = document.getElementById('loader');
+    if (loader) loader.style.display = 'flex';
+    try {
+        await fetch('/api/config-manager/flush-cache', { 
+            method: 'POST', headers: getAdminHeaders(), body: JSON.stringify({ channel: 'facebook_organic' })
+        });
+        loadReport();
+    } catch (err) { console.error(err); }
+    finally { if (loader) loader.style.display = 'none'; }
+}
+
+window.loadReport = loadReport;
+window.forceRefresh = forceRefresh;
+window.confirmFlush = confirmFlush;
+window.closeFlushModal = closeFlushModal;
+window.toggleOrganicHierarchy = toggleOrganicHierarchy;
+
+document.addEventListener('DOMContentLoaded', initDashboard);

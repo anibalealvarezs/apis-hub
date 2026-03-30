@@ -71,7 +71,13 @@
 
                 <li class="nav-item">
                     <a href="/fb-reports" class="nav-link">
-                        <i data-lucide="bar-chart-3"></i> Reports
+                        <i data-lucide="bar-chart-3"></i> Marketing
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="/fb-organic-reports" class="nav-link">
+                        <i data-lucide="bar-chart-2"></i> Organic
                     </a>
                 </li>
 

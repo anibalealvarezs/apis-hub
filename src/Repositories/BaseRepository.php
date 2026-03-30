@@ -25,6 +25,82 @@ class BaseRepository extends EntityRepository
     private array $hideFields = [];
     protected bool $isChanneledMetric = false;
     private array $activeAggregateJoins = [];
+    protected static array $relationMap = [
+        'query'    => ['table' => 'queries', 'fk' => 'query_id', 'field' => 'query', 'alias' => 'rq'],
+        'page'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rp'],
+        'account'  => ['table' => 'accounts', 'fk' => 'account_id', 'field' => 'name', 'alias' => 'ra'],
+        'campaign' => ['table' => 'campaigns', 'fk' => 'campaign_id', 'field' => 'name', 'alias' => 'rc'],
+        'channeledAccount'  => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
+        'channeled_account_id' => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'id', 'alias' => 'rca'],
+        'channeledCampaign' => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'platform_id', 'alias' => 'rcc'],
+        'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeled_ad_group_id', 'field' => 'name', 'alias' => 'rag'],
+        'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'name', 'alias' => 'rad'],
+        'creative' => ['table' => 'creatives', 'fk' => 'creative_id', 'field' => 'name', 'alias' => 'rcre'],
+        'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
+        'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'name', 'alias' => 'rd'],
+        'page_title' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'title', 'alias' => 'rp_t'],
+        'page_platform_id' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rp_p'],
+        'linked_fb_page_id' => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'data', 'alias' => 'rca', 'isJSON' => true, 'jsonPath' => 'facebook_page_id'],
+        'post'      => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo'],
+        'post_id'   => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo_id'],
+        'caption'   => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_c', 'isJSON' => true, 'jsonPath' => 'caption'],
+        'message'   => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_m', 'isJSON' => true, 'jsonPath' => 'message'],
+        'media_type'=> ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_mt', 'isJSON' => true, 'jsonPath' => 'media_type'],
+        'permalink' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pl', 'isJSON' => true, 'jsonPath' => 'permalink'],
+        'permalink_url' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pu', 'isJSON' => true, 'jsonPath' => 'permalink_url'],
+        'timestamp' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ts', 'isJSON' => true, 'jsonPath' => 'timestamp'],
+        'created_time' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ct', 'isJSON' => true, 'jsonPath' => 'created_time']
+    ];
+
+    /**
+     * Get the minimum date available for these metrics.
+     */
+    public function getMinDate(array|\stdClass $filters = []): ?string
+    {
+        $dateField = $this->getDateFieldName();
+        $qb = $this->createQueryBuilder('e')
+            ->select("MIN(e.$dateField)");
+        
+        foreach ($filters as $key => $value) {
+            if ($this->_class->hasField($key)) {
+                $qb->andWhere("e.$key = :$key")
+                   ->setParameter($key, $value);
+            }
+        }
+
+        return $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Get the maximum date available for these metrics.
+     */
+    public function getMaxDate(array|\stdClass $filters = []): ?string
+    {
+        $dateField = $this->getDateFieldName();
+        $qb = $this->createQueryBuilder('e')
+            ->select("MAX(e.$dateField)");
+        
+        foreach ($filters as $key => $value) {
+            if ($this->_class->hasField($key)) {
+                $qb->andWhere("e.$key = :$key")
+                   ->setParameter($key, $value);
+            }
+        }
+
+        return $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Get the date field name for the current entity.
+     */
+    protected function getDateFieldName(): string
+    {
+        $entityClass = $this->getEntityName();
+        if (str_contains($entityClass, 'Channeled')) {
+            return 'platformCreatedAt';
+        }
+        return 'metricDate';
+    }
 
     /**
      * Set the list of fields to hide from the result.
@@ -103,13 +179,19 @@ class BaseRepository extends EntityRepository
         $tableName = $this->_class->getTableName();
         $qb->from($tableName, 'e');
 
-        // Specialized logic for ChanneledMetric to support deep joins in aggregation
+        // Specialized logic for Metric entities (Metric or ChanneledMetric) to support deep joins
         $this->activeAggregateJoins = [];
-        $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
+        $entityName = $this->getEntityName();
+        $this->isChanneledMetric = str_ends_with($entityName, 'ChanneledMetric');
+        $isMetric = str_ends_with($entityName, 'Analytics\Metric');
+
         if ($this->isChanneledMetric) {
             $qb->join('e', 'metrics', 'm', 'e.metric_id = m.id')
                ->join('m', 'metric_configs', 'mc', 'm.metric_config_id = mc.id');
             $this->activeAggregateJoins['m'] = true;
+            $this->activeAggregateJoins['mc'] = true;
+        } elseif ($isMetric) {
+            $qb->join('e', 'metric_configs', 'mc', 'e.metric_config_id = mc.id');
             $this->activeAggregateJoins['mc'] = true;
         }
 
@@ -130,20 +212,7 @@ class BaseRepository extends EntityRepository
             $qb->addSelect("$parsedExpr AS $alias");
         }
 
-        $relationMap = [
-            'query'    => ['table' => 'queries', 'fk' => 'query_id', 'field' => 'query', 'alias' => 'rq'],
-            'page'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rp'],
-            'account'  => ['table' => 'accounts', 'fk' => 'account_id', 'field' => 'name', 'alias' => 'ra'],
-            'campaign' => ['table' => 'campaigns', 'fk' => 'campaign_id', 'field' => 'name', 'alias' => 'rc'],
-            'channeledAccount'  => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
-            'channeledCampaign' => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'platform_id', 'alias' => 'rcc'],
-            'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeled_ad_group_id', 'field' => 'name', 'alias' => 'rag'],
-            'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'name', 'alias' => 'rad'],
-            'creative' => ['table' => 'creatives', 'fk' => 'creative_id', 'field' => 'name', 'alias' => 'rcre'],
-            'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
-            'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'name', 'alias' => 'rd'],
-        ];
-        $standardRelations = array_keys($relationMap);
+        $standardRelations = array_keys(self::$relationMap);
         $dateFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'year', 'month', 'day', 'week', 'quarter', 'dayofweek', 'dayname', 'monthname', 'metricDate', 'platformCreatedAt', 'createdAt', 'date'];
 
         $safeLeftJoin = function(string $from, string $table, string $alias, string $condition) use ($qb) {
@@ -158,12 +227,16 @@ class BaseRepository extends EntityRepository
 
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
-            $quotedField = $field;
+            // Virtual aliases like linked_fb_page_id shouldn't be quoted for result mapping consistency
+            $quotedField = $field; 
+            if (!preg_match('/^[a-zA-Z0-9_]+$/', $field)) {
+                $quotedField = '"' . $field . '"';
+            }
             $isDimension = str_starts_with($field, 'dimensions.');
             $dimKey = $isDimension ? substr($field, 11) : $field;
 
-            // Automatic dimension detection: if it's a ChanneledMetric and not a standard relation/date/field
-            if ($this->isChanneledMetric && ($isDimension || (!in_array($field, $standardRelations) && !in_array($field, $dateFields) && !$this->_class->hasField($field)))) {
+            // Automatic dimension detection: if it's a ChanneledMetric taxonomy and not a standard relation/date/field
+            if (($isMetric || $this->isChanneledMetric) && ($isDimension || ($field !== 'account_type' && !in_array($field, $standardRelations) && !in_array($field, $dateFields) && !$this->_class->hasField($field)))) {
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                 $qb->setParameter("key_$dimAlias", $dimKey);
                 
@@ -180,18 +253,18 @@ class BaseRepository extends EntityRepository
                 
                 $qb->addSelect("dv_$dimAlias.value AS \"$quotedField\"")
                    ->addGroupBy("dv_$dimAlias.value");
-            } elseif ($this->isChanneledMetric && in_array($field, ['account', 'campaign'])) {
+            } elseif (($isMetric || $this->isChanneledMetric) && in_array($field, ['account', 'campaign'])) {
                 $isAccount = $field === 'account';
                 $genericKey = $isAccount ? 'account' : 'campaign';
                 $channeledKey = $isAccount ? 'channeledAccount' : 'channeledCampaign';
-                $genericMap = $relationMap[$genericKey];
-                $channeledMap = $relationMap[$channeledKey];
+                $genericMap = self::$relationMap[$genericKey];
+                $channeledMap = self::$relationMap[$channeledKey];
                 
                 $safeLeftJoin('mc', $genericMap['table'], $genericMap['alias'], "mc.{$genericMap['fk']} = {$genericMap['alias']}.id");
                 $safeLeftJoin('mc', $channeledMap['table'], $channeledMap['alias'], "mc.{$channeledMap['fk']} = {$channeledMap['alias']}.id");
 
                 if ($isAccount) {
-                    $campaignMap = $relationMap['channeledCampaign'];
+                    $campaignMap = self::$relationMap['channeledCampaign'];
                     $safeLeftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
                     $safeLeftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
                     
@@ -205,27 +278,40 @@ class BaseRepository extends EntityRepository
                        ->addGroupBy("mc.{$channeledMap['fk']}")
                        ->addGroupBy("mc.{$genericMap['fk']}");
                 } else {
-                    $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                    $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
-                       ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
-                       ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
-                       ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
-                       ->addGroupBy("{$channeledMap['alias']}.platform_id")
-                       ->addGroupBy("mc.{$channeledMap['fk']}")
-                       ->addGroupBy("mc.{$genericMap['fk']}");
+                    if (isset($genericMap['isJSON']) && $genericMap['isJSON']) {
+                        $sqlField = $this->mapFieldToSql($field);
+                        $qb->addSelect("COALESCE($sqlField, 'N/A') AS \"$quotedField\"")
+                           ->addGroupBy($sqlField);
+                    } else {
+                        $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
+                        $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
+                           ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
+                           ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
+                           ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
+                           ->addGroupBy("{$channeledMap['alias']}.platform_id")
+                           ->addGroupBy("mc.{$channeledMap['fk']}")
+                           ->addGroupBy("mc.{$genericMap['fk']}");
+                    }
                 }
-            } elseif ($this->isChanneledMetric && isset($relationMap[$field])) {
-                $map = $relationMap[$field];
+            } elseif (($isMetric || $this->isChanneledMetric) && isset(self::$relationMap[$field])) {
+                $map = self::$relationMap[$field];
                 $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
                 
                 $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
-                   ->addSelect("mc.{$map['fk']} AS \"{$quotedField}_id\"")
-                   ->addGroupBy("{$map['alias']}.{$map['field']}")
-                   ->addGroupBy("mc.{$map['fk']}");
+                if (isset($map['isJSON']) && $map['isJSON']) {
+                    $sqlField = $this->mapFieldToSql($field);
+                    $qb->addSelect("COALESCE($sqlField, 'N/A') AS \"$quotedField\"")
+                       ->addGroupBy($sqlField);
+                } else {
+                    $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
+                       ->addSelect("mc.{$map['fk']} AS \"{$quotedField}_id\"")
+                       ->addGroupBy("{$map['alias']}.{$map['field']}")
+                       ->addGroupBy("mc.{$map['fk']}");
+                }
             } else {
                 $sqlField = $this->mapFieldToSql($field);
-                $qb->addSelect("$sqlField AS \"$quotedField\"")->addGroupBy($sqlField);
+                $qb->addSelect("$sqlField AS \"$quotedField\"")
+                   ->addGroupBy($sqlField);
             }
         }
 
@@ -235,7 +321,7 @@ class BaseRepository extends EntityRepository
                 $isDimension = str_starts_with($key, 'dimensions.');
                 $dimKey = $isDimension ? substr($key, 11) : $key;
 
-                if ($this->isChanneledMetric && ($isDimension || (!in_array($key, $standardRelations) && !in_array($key, $dateFields) && !$this->_class->hasField($key)))) {
+                if ($this->isChanneledMetric && ($isDimension || ($key !== 'account_type' && !in_array($key, $standardRelations) && !in_array($key, $dateFields) && !$this->_class->hasField($key)))) {
                     $dimAlias = "f_dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                     $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id");
                     $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
@@ -244,26 +330,39 @@ class BaseRepository extends EntityRepository
                     $qb->setParameter("key_$dimAlias", $dimKey)
                        ->andWhere("dv_$dimAlias.value = :val_$dimAlias")
                        ->setParameter("val_$dimAlias", $value);
-                } elseif ($this->isChanneledMetric && isset($relationMap[$key])) {
-                    $map = $relationMap[$key];
-                    // We join the relation to allow filtering by platform_id OR database ID
+                } elseif ((str_ends_with($entityName, 'Metric') || $this->isChanneledMetric) && (isset(self::$relationMap[$key]) || $key === 'account_type')) {
+                    $realKey = ($key === 'account_type') ? 'channeledAccount' : $key;
+                    $map = self::$relationMap[$realKey];
                     $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
                     
-                    // Safety check to prevent integer overflow and type mismatch in PostgreSQL
+                    $targetCol = ($key === 'account_type') ? 'type' : 'platform_id';
+                    // If the value looks like a URL, use the 'url' field from the mapping (if defined) or platform_id
+                    if (str_starts_with((string)$value, 'http')) {
+                        $targetCol = $map['field']; // For page, this is 'url'
+                    }
+
                     $isPlatformIdValue = is_numeric($value) && (float)$value > 2147483647;
                     $isPostgres = Helpers::isPostgres();
                     
-                    if ($isPlatformIdValue) {
-                        $qb->andWhere("{$map['alias']}.platform_id = :f_$key")
+                    if ($value === 'N/A') {
+                        $sqlKey = (isset($map['fk'])) ? "mc.{$map['fk']}" : "mc.$key";
+                        if ($key === 'page') $sqlKey = 'mc.page_id';
+                        $qb->andWhere("$sqlKey IS NULL");
+                    } else if ($value === 'NOT_NULL') {
+                        $sqlKey = (isset($map['fk'])) ? "mc.{$map['fk']}" : "mc.$key";
+                        if ($key === 'page') $sqlKey = 'mc.page_id';
+                        $qb->andWhere("$sqlKey IS NOT NULL");
+                    } else if (($isPlatformIdValue || str_starts_with((string)$value, 'http')) && ($targetCol === 'platform_id' || $targetCol === 'url')) {
+                        $qb->andWhere("{$map['alias']}.$targetCol = :f_$key")
                            ->setParameter("f_$key", (string)$value);
                     } else {
                         if ($isPostgres) {
-                            // On PostgreSQL, we MUST cast the integer FK to text to compare with a parameter 
-                            // that might be a non-numeric string, otherwise it fails with SQLSTATE[22P02]
-                            $qb->andWhere("(CAST(mc.{$map['fk']} AS text) = :f_$key OR {$map['alias']}.platform_id = :f_$key)")
+                            $condition = ($targetCol === 'type') ? "{$map['alias']}.type = :f_$key" : "(CAST(mc.{$map['fk']} AS text) = :f_$key OR {$map['alias']}.platform_id = :f_$key)";
+                            $qb->andWhere($condition)
                                ->setParameter("f_$key", (string)$value);
                         } else {
-                            $qb->andWhere("(mc.{$map['fk']} = :f_$key OR {$map['alias']}.platform_id = :f_$key)")
+                            $condition = ($targetCol === 'type') ? "{$map['alias']}.type = :f_$key" : "(mc.{$map['fk']} = :f_$key OR {$map['alias']}.platform_id = :f_$key)";
+                            $qb->andWhere($condition)
                                ->setParameter("f_$key", $value);
                         }
                     }
@@ -271,19 +370,25 @@ class BaseRepository extends EntityRepository
                     $sqlKey = $this->mapFieldToSql($key);
                     $paramName = 'f_' . preg_replace('/[^a-z0-9]/i', '_', $key);
                     
-                    $isPostgres = Helpers::isPostgres();
-                    if ($isPostgres) {
-                        // Cast both sides to text if the input is not numeric to prevent type mismatch
-                        if (!is_numeric($value)) {
-                            $qb->andWhere("CAST($sqlKey AS text) = :$paramName")
-                               ->setParameter($paramName, (string)$value);
+                    if ($value === 'N/A') {
+                        $qb->andWhere("$sqlKey IS NULL");
+                    } else if ($value === 'NOT_NULL') {
+                        $qb->andWhere("$sqlKey IS NOT NULL");
+                    } else {
+                        $isPostgres = Helpers::isPostgres();
+                        if ($isPostgres) {
+                            // Cast both sides to text if the input is not numeric to prevent type mismatch
+                            if (!is_numeric($value)) {
+                                $qb->andWhere("CAST($sqlKey AS text) = :$paramName")
+                                   ->setParameter($paramName, (string)$value);
+                            } else {
+                                $qb->andWhere("$sqlKey = :$paramName")
+                                   ->setParameter($paramName, $value);
+                            }
                         } else {
                             $qb->andWhere("$sqlKey = :$paramName")
                                ->setParameter($paramName, $value);
                         }
-                    } else {
-                        $qb->andWhere("$sqlKey = :$paramName")
-                           ->setParameter($paramName, $value);
                     }
                 }
             }
@@ -291,11 +396,15 @@ class BaseRepository extends EntityRepository
 
         // Apply date filters using the correctly mapped column names
         if ($startDate || $endDate) {
-            $dateField = 'platformCreatedAt'; // Default for channeled entities
-            if (!$this->_class->hasField($dateField)) {
-                $dateField = $this->_class->hasField('createdAt') ? 'createdAt' : 'date';
+            if ($this->isChanneledMetric || $isMetric) {
+                $sqlDateField = 'mc.metric_date';
+            } else {
+                $dateField = 'platformCreatedAt';
+                if (!$this->_class->hasField($dateField)) {
+                    $dateField = $this->_class->hasField('createdAt') ? 'createdAt' : 'date';
+                }
+                $sqlDateField = $this->mapFieldToSql($dateField);
             }
-            $sqlDateField = $this->mapFieldToSql($dateField);
 
             if ($startDate) {
                 $qb->andWhere("$sqlDateField >= :startDate")
@@ -313,7 +422,14 @@ class BaseRepository extends EntityRepository
             $qb->orderBy($orderBy, $direction);
         }
 
-        $results = $qb->executeQuery()->fetchAllAssociative();
+        if (isset($_GET['debug_sql']) || php_sapi_name() === 'cli') {
+            echo "==== DBAL DEBUG ====\nSQL:\n" . $qb->getSQL() . "\nParameters:\n";
+            print_r($qb->getParameters());
+            echo "====================\n";
+        }
+        
+        $stmt = $qb->executeQuery();
+        $results = $stmt->fetchAllAssociative();
 
         // 4. Smoothing: Fill temporal gaps for time-series data
         if ($startDate && $endDate) {
@@ -446,19 +562,22 @@ class BaseRepository extends EntityRepository
         $field = trim($expr);            
         $lowerField = strtolower($field);
 
-        // Specialized metric formulas for ChanneledMetric to handle cross-row aggregation
+        // Specialized metric formulas for ChanneledMetric and Metric to handle cross-row aggregation
         $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
-        if ($this->isChanneledMetric && $isAggregate) {
+        $isMetric = str_ends_with($this->getEntityName(), 'Analytics\Metric');
+        
+        if (($this->isChanneledMetric || $isMetric) && $isAggregate) {
+            $valCol = $this->isChanneledMetric ? 'm.value' : 'e.value';
             $formulas = [
-                'spend'       => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END)",
-                'clicks'      => "SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END)",
-                'impressions' => "SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END)",
-                'reach'       => "SUM(CASE WHEN mc.name = 'reach' THEN m.value ELSE 0 END)",
-                'frequency'   => "SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'reach' THEN m.value ELSE 0 END), 0)",
-                'ctr'         => "SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0)",
-                'cpc'         => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END), 0)",
-                'cpm'         => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0) / 1000)",
-                'position'    => "SUM(CASE WHEN mc.name = 'position' THEN m.value ELSE 0 END * (
+                'spend'       => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END)",
+                'clicks'      => "SUM(CASE WHEN mc.name = 'clicks' THEN $valCol ELSE 0 END)",
+                'impressions' => "SUM(CASE WHEN mc.name IN ('impressions', 'post_impressions', 'page_impressions') THEN $valCol ELSE 0 END)",
+                'reach'       => "SUM(CASE WHEN mc.name IN ('reach', 'post_reach') THEN $valCol ELSE 0 END)",
+                'frequency'   => "SUM(CASE WHEN mc.name = 'impressions' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'reach' THEN $valCol ELSE 0 END), 0)",
+                'ctr'         => "SUM(CASE WHEN mc.name = 'clicks' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN $valCol ELSE 0 END), 0)",
+                'cpc'         => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'clicks' THEN $valCol ELSE 0 END), 0)",
+                'cpm'         => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN $valCol ELSE 0 END), 0) / 1000)",
+                'position'    => "SUM(CASE WHEN mc.name = 'position' THEN $valCol ELSE 0 END * (
                     SELECT m2.value 
                     FROM metrics m2 
                     JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id 
@@ -468,17 +587,33 @@ class BaseRepository extends EntityRepository
                     AND (mc2.query_id = mc.query_id OR (mc2.query_id IS NULL AND mc.query_id IS NULL))
                     AND (mc2.page_id = mc.page_id OR (mc2.page_id IS NULL AND mc.page_id IS NULL))
                     LIMIT 1
-                )) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0)",
-                'unique_clicks' => "SUM(CASE WHEN mc.name = 'unique_clicks' THEN m.value ELSE 0 END)",
-                'results'       => "SUM(CASE WHEN mc.name = 'results' THEN m.value ELSE 0 END)",
-                'cost_per_result' => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'results' THEN m.value ELSE 0 END), 0)",
-                'result_rate'     => "SUM(CASE WHEN mc.name = 'results' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0)",
-                'roas'            => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN m.value ELSE NULL END)",
-                'website_roas'    => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN m.value ELSE NULL END)",
-                'actions'         => "SUM(CASE WHEN mc.name = 'actions' THEN m.value ELSE 0 END)",
+                )) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN $valCol ELSE 0 END), 0)",
+                'unique_clicks' => "SUM(CASE WHEN mc.name = 'unique_clicks' THEN $valCol ELSE 0 END)",
+                'results'       => "SUM(CASE WHEN mc.name = 'results' THEN $valCol ELSE 0 END)",
+                'cost_per_result' => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'results' THEN $valCol ELSE 0 END), 0)",
+                'result_rate'     => "SUM(CASE WHEN mc.name = 'results' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN $valCol ELSE 0 END), 0)",
+                'roas'            => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN $valCol ELSE NULL END)",
+                'website_roas'    => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN $valCol ELSE NULL END)",
+                'actions'         => "SUM(CASE WHEN mc.name = 'actions' THEN $valCol ELSE 0 END)",
                 'campaign_status' => "MIN(rcc.status)",
-                'purchase_roas'   => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN m.value ELSE NULL END)",
-                'website_purchase_roas' => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN m.value ELSE NULL END)",
+                'purchase_roas'   => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN $valCol ELSE NULL END)",
+                'website_purchase_roas' => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN $valCol ELSE NULL END)",
+                // Organic & Shared Metrics - Mapped for Unification
+                'total_interactions' => "SUM(CASE WHEN mc.name IN ('total_interactions', 'post_engagement', 'page_post_engagements') THEN $valCol ELSE 0 END)",
+                'profile_views'      => "SUM(CASE WHEN mc.name = 'profile_views' THEN $valCol ELSE 0 END)",
+                'follower_count'     => "SUM(CASE WHEN mc.name IN ('follower_count', 'page_fans') THEN $valCol ELSE 0 END)",
+                'page_impressions'   => "SUM(CASE WHEN mc.name = 'page_impressions' THEN $valCol ELSE 0 END)",
+                'page_post_engagements' => "SUM(CASE WHEN mc.name = 'page_post_engagements' THEN $valCol ELSE 0 END)",
+                'page_views_total'   => "SUM(CASE WHEN mc.name = 'page_views_total' THEN $valCol ELSE 0 END)",
+                'page_fans'          => "SUM(CASE WHEN mc.name = 'page_fans' THEN $valCol ELSE 0 END)",
+                'post_impressions'   => "SUM(CASE WHEN mc.name = 'post_impressions' THEN $valCol ELSE 0 END)",
+                'post_engagement'    => "SUM(CASE WHEN mc.name = 'post_engagement' THEN $valCol ELSE 0 END)",
+                'post_reactions_by_type_total' => "SUM(CASE WHEN mc.name = 'post_reactions_by_type_total' THEN $valCol ELSE 0 END)",
+                'likes'              => "SUM(CASE WHEN mc.name IN ('likes', 'post_reactions_by_type_total') THEN $valCol ELSE 0 END)",
+                'comments'           => "SUM(CASE WHEN mc.name IN ('comments', 'post_comments') THEN $valCol ELSE 0 END)",
+                'shares'             => "SUM(CASE WHEN mc.name IN ('shares', 'post_shares') THEN $valCol ELSE 0 END)",
+                'saves'              => "SUM(CASE WHEN mc.name = 'saves' THEN $valCol ELSE 0 END)",
+                'plays'              => "SUM(CASE WHEN mc.name = 'plays' THEN $valCol ELSE 0 END)",
             ];
 
             if (isset($formulas[$lowerField])) {
@@ -527,6 +662,36 @@ class BaseRepository extends EntityRepository
             return "JSON_UNQUOTE(JSON_EXTRACT($source, '$.$path'))";
         }
 
+        // Relation metadata extraction (relationName.metadata.field)
+        if (preg_match('/^([a-zA-Z0-9]+)\.(metadata|data)\.([a-zA-Z0-9_]+)$/', $field, $matches)) {
+            $relName = $matches[1];
+            $jsonField = $matches[2];
+            $path = $matches[3];
+            
+            if (isset(self::$relationMap[$relName])) {
+                $map = self::$relationMap[$relName];
+                $source = $map['alias'] . '.' . $jsonField;
+                
+                $isPostgres = Helpers::isPostgres();
+                if ($isPostgres) {
+                    return "($source #>> '{$path}')";
+                } else {
+                    return "JSON_UNQUOTE(JSON_EXTRACT($source, '$.$path'))";
+                }
+            }
+        }
+
+        // Handle generic JSON extraction from relationMap
+        if (isset(self::$relationMap[$lowerField]['isJSON']) && self::$relationMap[$lowerField]['isJSON']) {
+             $map = self::$relationMap[$lowerField];
+             $jsonPath = $map['jsonPath'] ?? '';
+             if (Helpers::isPostgres()) {
+                 return "COALESCE(({$map['alias']}.{$map['field']} #>> '{{$jsonPath}}'), 'N/A')";
+             } else {
+                 return "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT({$map['alias']}.{$map['field']}, '$.$jsonPath')) AS CHAR), 'N/A')";
+             }
+        }
+
         // Relation mapping for metrics
         if (str_starts_with($field, 'metric.')) {
             return "m." . substr($field, 7);
@@ -541,7 +706,7 @@ class BaseRepository extends EntityRepository
         if ($field === 'metricDate') {
             return "mc.metric_date";
         }
-        if ($field === 'name' || $field === 'period') {
+        if ($field === 'name' || $field === 'period' || $field === 'channel') {
             return "mc.$field";
         }
         

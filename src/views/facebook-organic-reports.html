@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>APIs Hub | Facebook Marketing Reports</title>
+    <title>APIs Hub | Facebook Organic Reports</title>
     <meta name="app-env" content="demo">
     <link rel="icon" type="image/png" href="/assets/images/apishub-favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -42,28 +42,28 @@
         }
         .modal-overlay.active .modal-card { transform: scale(1); }
         .modal-header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
-        .modal-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(24, 119, 242, 0.1); color: #1877f2; }
+        .modal-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(246, 121, 24, 0.1); color: #f67918; }
         .modal-title { font-size: 1.2rem; font-weight: 700; color: white; }
         .modal-body { color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; margin-bottom: 25px; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
         .btn-modal { padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; }
         .btn-cancel { background: rgba(255, 255, 255, 0.05); color: white; border-color: rgba(255, 255, 255, 0.1); }
         .btn-cancel:hover { background: rgba(255, 255, 255, 0.1); }
-        .btn-confirm { background: #1877f2; color: white; box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3); }
-        .btn-confirm:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(24, 119, 242, 0.4); }
+        .btn-confirm { background: #f67918; color: white; box-shadow: 0 4px 12px rgba(246, 121, 24, 0.3); }
+        .btn-confirm:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(246, 121, 24, 0.4); }
     </style>
 </head>
 <body class="full-screen">
 
     <div id="loader" class="loader-overlay">
         <div class="spinner"></div>
-        <p class="loader-text">AGGREGATING METRICS...</p>
+        <p class="loader-text">AGGREGATING ORGANIC METRICS...</p>
     </div>
 
     <main>
         <div class="section-title">
-            <i data-lucide="bar-chart-3" class="meta-blue-icon"></i>
-            Facebook Marketing Performance
+            <i data-lucide="instagram" class="meta-blue-icon" style="color: #E1306C;"></i>
+            Facebook & Instagram Organic Performance
         </div>
 
         <div class="controls-card">
@@ -83,38 +83,38 @@
 
         <div class="summary-grid">
             <div class="card-stat">
-                <div class="stat-label"><i data-lucide="dollar-sign"></i> Total Spend</div>
-                <div class="stat-value" id="total-spend">€ 0.00</div>
+                <div class="stat-label"><i data-lucide="users"></i> Total Reach</div>
+                <div class="stat-value" id="total-reach">0</div>
             </div>
             <div class="card-stat">
                 <div class="stat-label"><i data-lucide="eye"></i> Impressions</div>
                 <div class="stat-value" id="total-impressions">0</div>
             </div>
             <div class="card-stat">
-                <div class="stat-label"><i data-lucide="mouse-pointer-2"></i> Clicks</div>
-                <div class="stat-value" id="total-clicks">0</div>
+                <div class="stat-label"><i data-lucide="heart"></i> Interactions</div>
+                <div class="stat-value" id="total-interactions">0</div>
             </div>
             <div class="card-stat">
-                <div class="stat-label"><i data-lucide="trending-up"></i> Avg. CTR</div>
-                <div class="stat-value" id="total-ctr">0.00%</div>
+                <div class="stat-label"><i data-lucide="trending-up"></i> Eng. Rate</div>
+                <div class="stat-value" id="total-eng-rate">0.00%</div>
             </div>
             <div class="card-stat">
-                <div class="stat-label" id="total-roas-label"><i data-lucide="shopping-bag"></i> ROAS</div>
-                <div class="stat-value" id="total-roas">0.00x</div>
+                <div class="stat-label" id="total-followers-label"><i data-lucide="user-plus"></i> New Followers</div>
+                <div class="stat-value" id="total-followers">0</div>
             </div>
         </div>
 
         <div class="report-card">
             <div class="table-header">
                 <div class="table-title">
-                    <i data-lucide="layers" class="meta-blue-icon"></i>
-                    Aggregated Metrics by Platform ID
+                    <i data-lucide="layers" class="meta-blue-icon" style="color: #8b5cf6;"></i>
+                    Organic Accounts Hierarchy
                 </div>
                 <div class="table-meta">
                     <span id="cache-badge" style="display: none;">
                         <i data-lucide="database" size="12"></i> CACHED
                     </span>
-                    <span id="record-count">0</span> campaigns found in range
+                    <span id="record-count">0</span> accounts found in range
                 </div>
             </div>
 
@@ -123,9 +123,8 @@
                     <thead>
                         <tr id="table-head-row">
                             <th class="col-actions">&nbsp;</th>
-                            <th class="col-account">Ad Account</th>
-                            <th class="col-campaign">Campaign Name</th>
-                            <th class="col-status text-center">Status</th>
+                            <th class="col-account">Platform Account</th>
+                            <th class="col-status text-center">Linked IG</th>
                         </tr>
                     </thead>
                     <tbody id="table-body"></tbody>
@@ -146,7 +145,7 @@
                 <div class="modal-title">Clear Aggregation Cache</div>
             </div>
             <div class="modal-body">
-                This will clear the specialized metrics aggregation cache for Meta Marketing. All reports will be re-calculated from the database. This may take a few seconds but ensures data accuracy.
+                This will clear the specialized metrics aggregation cache for Meta Organic. All reports will be re-calculated from the database. This may take a few seconds but ensures data accuracy.
             </div>
             <div class="modal-actions">
                 <button class="btn-modal btn-cancel" onclick="closeFlushModal()">Cancel</button>
@@ -155,7 +154,7 @@
         </div>
     </div>
 
-    <!-- FB_CONFIG_PLACEHOLDER -->
-    <script src="/assets/views/fb-reports.js?v=1.1"></script>
+    <!-- FB_ORGANIC_CONFIG_PLACEHOLDER -->
+    <script src="/assets/views/fb-organic-reports.js?v=1.1"></script>
 </body>
 </html>
