@@ -416,17 +416,13 @@ if (MODE === "sse") {
     if (Array.isArray(sessionId)) sessionId = sessionId[0];
 
     if (!sessionId) {
-        // FALLBACK: Si no hay sessionId pero solo hay 1 sesión activa, asumimos que es esa.
-        // Esto es vital para clientes que ignoran la redirección de mensajes y postean a /mcp/sse.
+        // FALLBACK: Si no hay sessionId pero solo hay 1 sesión activa, usamos esa.
         if (sessions.size === 1) {
             sessionId = Array.from(sessions.keys())[0];
-            console.error(`[MSG] Fallback: No venía sessionId, usando la única sesión activa: ${sessionId}`);
-        } else if (sessions.size > 1) {
-            console.error(`[MSG] Error: Múltiples sesiones (${sessions.size}) y no vino sessionId.`);
-            return res.status(400).send("Session ID required (Multiple active sessions found).");
+            console.error(`[MSG] Auto-Session Fallback: Usando sesión única activa: ${sessionId}`);
         } else {
-            console.error(`[MSG] Error: No vino sessionId y no hay sesiones activas.`);
-            return res.status(400).send("Session ID required (No active sessions).");
+            console.error(`[MSG] Error: No se pudo determinar sessionId (Activas: ${sessions.size}).`);
+            return res.status(401).send("Session ID required. Please refresh the connection.");
         }
     }
 
@@ -441,8 +437,8 @@ if (MODE === "sse") {
         res.status(500).send(err.message);
       }
     } else {
-      console.error(`[MSG] Error: Sesión ${sessionId} no encontrada en el registro.`);
-      res.status(404).send(`Session not found: ${sessionId}`);
+      console.error(`[MSG] Error: Sesión ${sessionId} no encontrada o expirada. (Total: ${sessions.size})`);
+      res.status(404).send(`Session not found or expired: ${sessionId}. Please reconnect.`);
     }
   }
 
