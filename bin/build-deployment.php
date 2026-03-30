@@ -88,7 +88,7 @@ foreach ($instances as $instance) {
         ],
         'restart'     => 'always',
         'environment' => $envBlock,
-        'volumes'     => ['./:/app', '/app/vendor'],
+        'volumes'     => ['./:/app', '/app/vendor', '/app/mcp-server/node_modules'],
         'depends_on'  => ['redis'],
         'extra_hosts' => ['host.docker.internal:host-gateway'],
     ];
