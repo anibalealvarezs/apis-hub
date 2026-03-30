@@ -55,7 +55,8 @@ class SetupDatabaseCommand extends Command
             $initEntitiesCommand->run(new ArrayInput([]), $output);
 
             // 4. Auto-Seed for Demo (Smart Zero-Touch)
-            if (getenv('APP_ENV') === 'demo' && getenv('SKIP_SEED') !== '1') {
+            $skipSeed = (string)getenv('SKIP_SEED');
+            if (getenv('APP_ENV') === 'demo' && $skipSeed !== '1' && $skipSeed !== 'true') {
                 $output->writeln("<info>🎁 Environment is 'demo'. Filling with sample data (Marketing & Organic)...</info>");
                 $seedDemoCommand = $this->getApplication()->find('app:seed-demo-data');
                 // By default, SeedDemoDataCommand now seeds all channels if no --channels is provided, 
