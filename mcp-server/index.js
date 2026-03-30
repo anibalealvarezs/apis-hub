@@ -373,49 +373,57 @@ if (MODE === "sse") {
         return res.status(405).send("Method Not Allowed. Use GET for SSE connection.");
     }
 
-    console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
+    console.error(`[SSE] Nueva conexión. Host detectado: ${req.get('host')}`);
     
-    // Cabeceras CRÍTICAS para evitar que proxies (Nginx/Laragon/Túneles) guarden en buffer la respuesta
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Específico para Nginx
+    res.setHeader('X-Accel-Buffering', 'no');
     
-    const transport = new SSEServerTransport("/mcp/messages", res);
+    // Reconstruir URL absoluta dinámica para máxima compatibilidad con túneles
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.get('host');
+    const endpoint = `${protocol}://${host}/mcp/messages`;
+    
+    console.error(`[SSE] Endpoint de mensajes: ${endpoint}`);
+    const transport = new SSEServerTransport(endpoint, res);
     
     sessions.set(transport.sessionId, transport);
-    console.error(`[SSE] Sesión creada: ${transport.sessionId}`);
+    console.error(`[SSE] Sesión ACTIVADA: ${transport.sessionId}. Total: ${sessions.size}`);
 
     const server = createMcpServer();
     await server.connect(transport);
     
     res.on("close", () => {
-        console.error(`[SSE] Conexión cerrada para sesión: ${transport.sessionId}`);
-        sessions.delete(transport.sessionId);
+        console.error(`[SSE] Conexión cerrada para sesión: ${transport.sessionId}. (Manteniendo sesión en memoria 2min para mensajes tardíos)`);
+        // No borramos inmediatamente para permitir que lleguen mensajes POST que vienen por otra vía
+        setTimeout(() => {
+            if (sessions.has(transport.sessionId)) {
+                sessions.delete(transport.sessionId);
+                console.error(`[SSE] Sesión EXPIRADA: ${transport.sessionId}`);
+            }
+        }, 120000); 
     });
   });
 
   async function handleIncomingMessage(req, res) {
-    // Intentar obtener sessionId de todas las fuentes posibles
+    // Buscar sessionId en todas partes (Query -> Headers -> Body)
     let sessionId = req.query.sessionId || 
                     req.headers['x-session-id'] || 
                     req.headers['sse-session-id'] ||
                     (req.body && req.body.sessionId);
 
-    if (Array.isArray(sessionId)) {
-        sessionId = sessionId[0];
-    }
+    if (Array.isArray(sessionId)) sessionId = sessionId[0];
 
     if (!sessionId) {
-        console.error("[MSG] Error: No se pudo encontrar sessionId");
+        console.error(`[MSG] Error: No se encontró sessionId en ${req.method}. Body: ${JSON.stringify(req.body).substring(0,50)}`);
         return res.status(400).send("Session ID is required.");
     }
 
     const transport = sessions.get(sessionId);
     
     if (transport) {
-      const bodyPreview = req.body ? JSON.stringify(req.body).substring(0, 100) : "Raw Stream";
-      console.error(`[MSG] Procesando mensaje para sesión ${sessionId}. Body: ${bodyPreview}...`);
+      console.error(`[MSG] Procesando mensaje para sesión ${sessionId}. (Total activas: ${sessions.size})`);
       try {
         await transport.handlePostMessage(req, res);
       } catch (err) {
@@ -423,8 +431,8 @@ if (MODE === "sse") {
         res.status(500).send(err.message);
       }
     } else {
-      console.error(`[MSG] Sesión no encontrada: ${sessionId}`);
-      res.status(404).send(`Session not found: ${sessionId}`);
+      console.error(`[MSG] Sesión NO ENCONTRADA o EXPIRADA: ${sessionId}. Sesiones en memoria: ${Array.from(sessions.keys()).join(', ')}`);
+      res.status(404).send(`Session not found or expired: ${sessionId}`);
     }
   }
 
