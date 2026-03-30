@@ -98,20 +98,25 @@ class SeedDemoDataCommand extends Command
                 $this->conn->executeStatement($truncateSql); 
             }
         } else {
-            foreach ($channels as $chan) {
-                $output->writeln("🧹 Cleaning existing data for channel: $chan...");
-                $this->conn->executeStatement("DELETE FROM channeled_metrics WHERE channel = ?", [$chan]);
-                $this->conn->executeStatement("DELETE FROM metrics WHERE metric_config_id IN (SELECT id FROM metric_configs WHERE channel = ?)", [$chan]);
-                $this->conn->executeStatement("DELETE FROM metric_configs WHERE channel = ?", [$chan]);
-                $this->conn->executeStatement("DELETE FROM channeled_ads WHERE channel = ?", [$chan]);
-                $this->conn->executeStatement("DELETE FROM channeled_ad_groups WHERE channel = ?", [$chan]);
-                $this->conn->executeStatement("DELETE FROM channeled_campaigns WHERE channel = ?", [$chan]);
-                $this->conn->executeStatement("DELETE FROM channeled_accounts WHERE channel = ?", [$chan]);
-                if ($chan === 'google_search_console' || $chan === 'facebook_organic') {
-                    // Posts and queries are often channel-specific or entity-linked
-                    // but since pages might be shared, we only delete those linked to these specific channeled entities if we had a mapping.
-                    // For demo purposes, we will leave shared entities like 'pages' and 'accounts' to ensure no cross-channel break.
+            foreach ($channels as $chanName) {
+                $chan = Channel::tryFromName($chanName);
+                if (!$chan) {
+                    $output->writeln("<comment>⚠️ Channel '$chanName' unknown, skipping cleanup.</comment>");
+                    continue;
                 }
+                $chanId = $chan->value;
+                $output->writeln("🧹 Cleaning existing data for channel: $chanName ($chanId)...");
+                
+                $this->conn->executeStatement("DELETE FROM channeled_metrics WHERE channel = ?", [$chanId]);
+                $this->conn->executeStatement("DELETE FROM metrics WHERE metric_config_id IN (SELECT id FROM metric_configs WHERE channel = ?)", [$chanId]);
+                $this->conn->executeStatement("DELETE FROM metric_configs WHERE channel = ?", [$chanId]);
+                $this->conn->executeStatement("DELETE FROM channeled_ads WHERE channel = ?", [$chanId]);
+                $this->conn->executeStatement("DELETE FROM channeled_ad_groups WHERE channel = ?", [$chanId]);
+                $this->conn->executeStatement("DELETE FROM channeled_campaigns WHERE channel = ?", [$chanId]);
+                $this->conn->executeStatement("DELETE FROM channeled_accounts WHERE channel = ?", [$chanId]);
+                
+                // Optional: Clean up posts related to these channels
+                $this->conn->executeStatement("DELETE FROM posts WHERE channeled_account_id IN (SELECT id FROM channeled_accounts WHERE channel = ?)", [$chanId]);
             }
         }
 
@@ -211,12 +216,16 @@ class SeedDemoDataCommand extends Command
             $pId = "GSC-P$i";
             $page = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $pId]);
             if (!$page) {
-                $page = new Page(); $page->addUrl("https://demo.site/p$i")->addTitle($this->faker->sentence(3))->addHostname("demo.site")->addPlatformId($pId);
+                $page = new Page();
+                $page->addUrl("https://demo.site/p$i")
+                    ->addTitle("GSC Demo Page $i")
+                    ->addHostname("demo.site")
+                    ->addPlatformId($pId);
                 $this->entityManager->persist($page);
+                $this->entityManager->flush();
             }
             $pages[] = $page;
         }
-        $this->entityManager->flush();
         foreach ($this->getDates(60) as $date) {
             foreach ($pages as $p) { 
                 $this->queueMetric(
@@ -421,22 +430,26 @@ class SeedDemoDataCommand extends Command
                 'follower_count' => [1000, 5000, 'trend']
             ], $gId, $caIgId, null, null, null, $pId, $gAccName, $igPId, $pageUrl);
 
-            // 6. Generate FB Posts (50-100)
-            $numFbPosts = rand(50, 100);
+            // 6. Generate FB Posts (deterministic IDs for idempotency)
+            $numFbPosts = 50; 
             for ($p = 0; $p < $numFbPosts; $p++) {
-                $postPId = $this->generatePlatformId();
+                $postPId = "FB-POST-" . md5($namePrefix . $p);
                 $postCreated = $dates[array_rand($dates)];
-                $postObj = new \Entities\Analytics\Post();
-                $postObj->addPostId($postPId)
-                    ->addAccount($fbParent)
-                    ->addPage($page)
-                    ->addData([
-                        'message' => $this->faker->paragraph(),
-                        'created_time' => $postCreated . 'T' . rand(10, 20) . ':00:00+0000',
-                        'permalink_url' => $pageUrl . "/posts/" . $postPId
-                    ]);
-                $this->entityManager->persist($postObj);
-                $this->entityManager->flush();
+                
+                $postObj = $this->entityManager->getRepository(\Entities\Analytics\Post::class)->findOneBy(['postId' => $postPId, 'page' => $page]);
+                if (!$postObj) {
+                    $postObj = new \Entities\Analytics\Post();
+                    $postObj->addPostId($postPId)
+                        ->addAccount($fbParent)
+                        ->addPage($page)
+                        ->addData([
+                            'message' => $this->faker->paragraph(),
+                            'created_time' => $postCreated . 'T' . rand(10, 20) . ':00:00+0000',
+                            'permalink_url' => $pageUrl . "/posts/" . $postPId
+                        ]);
+                    $this->entityManager->persist($postObj);
+                    $this->entityManager->flush();
+                }
                 
                 // Metrics for this post from creation date
                 $postDates = array_filter($dates, fn($d) => $d >= $postCreated);
@@ -447,26 +460,29 @@ class SeedDemoDataCommand extends Command
                 ], $gId, null, null, null, $postObj->getId(), $pId, $gAccName, null, $pageUrl, $postPId);
             }
 
-            // 7. Generate IG Media (100-200)
-            $numIgMedia = rand(100, 200);
+            // 7. Generate IG Media (deterministic IDs for idempotency)
+            $numIgMedia = 100;
             for ($m = 0; $m < $numIgMedia; $m++) {
-                $mediaPId = $this->generatePlatformId();
+                $mediaPId = "IG-MEDIA-" . md5($namePrefix . $m);
                 $mediaCreated = $dates[array_rand($dates)];
                 $mediaType = $igMediaTypes[array_rand($igMediaTypes)];
                 
-                $postIg = new \Entities\Analytics\Post();
-                $postIg->addPostId($mediaPId)
-                    ->addAccount($fbParent)
-                    ->addPage($page)
-                    ->addChanneledAccount($caIg)
-                    ->addData([
-                        'caption' => $this->faker->paragraph(),
-                        'media_type' => $mediaType,
-                        'timestamp' => $mediaCreated . 'T' . rand(10, 20) . ':00:00+0000',
-                        'permalink' => "https://instagram.com/p/" . $mediaPId
-                    ]);
-                $this->entityManager->persist($postIg);
-                $this->entityManager->flush();
+                $postIg = $this->entityManager->getRepository(\Entities\Analytics\Post::class)->findOneBy(['postId' => $mediaPId, 'channeledAccount' => $caIg]);
+                if (!$postIg) {
+                    $postIg = new \Entities\Analytics\Post();
+                    $postIg->addPostId($mediaPId)
+                        ->addAccount($fbParent)
+                        ->addPage($page)
+                        ->addChanneledAccount($caIg)
+                        ->addData([
+                            'caption' => $this->faker->paragraph(),
+                            'media_type' => $mediaType,
+                            'timestamp' => $mediaCreated . 'T' . rand(10, 20) . ':00:00+0000',
+                            'permalink' => "https://instagram.com/p/" . $mediaPId
+                        ]);
+                    $this->entityManager->persist($postIg);
+                    $this->entityManager->flush();
+                }
 
                 // Metrics for this media from creation date
                 $mediaDates = array_filter($dates, fn($d) => $d >= $mediaCreated);

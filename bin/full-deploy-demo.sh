@@ -26,13 +26,13 @@ export ENV_FILE=.env.demo
 # This will trigger InstanceGeneratorService to create only 1 master instance
 sh bin/full-deploy.sh
 
-# Seeding
+# Seeding is now handled automatically by the master instance during bootstrap (app:setup-db)
+# We just wait a few seconds and show the status.
 echo ""
-echo -e "${BLUE}🌱 [6/5] Seeding massive demo data into apis-hub-demo...${NC}"
-echo "  (This might take a minute due to the volume of metrics)"
-
-# We execute inside the master instance container
-docker compose --env-file .env.demo exec demo-entities-sync php bin/cli.php app:seed-demo-data
+echo -e "${GREEN}✅ Deployment successful!${NC}"
+echo -e "Automatic seeding is now running in the background inside the container."
+echo "You can monitor progress with: docker compose logs -f demo-entities-sync"
+echo ""
 
 echo ""
 echo -e "${GREEN}✅ DEMO Deployment and Seeding complete!${NC}"
