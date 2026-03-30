@@ -369,6 +369,10 @@ if (MODE === "sse") {
   });
 
   app.all("/mcp/sse", async (req, res) => {
+    if (req.method === "POST") {
+        return handleIncomingMessage(req, res);
+    }
+
     if (req.method !== "GET") {
         return res.status(405).send("Method Not Allowed. Use GET for SSE connection.");
     }
@@ -381,8 +385,6 @@ if (MODE === "sse") {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no'); // Específico para Nginx
     
-    // Usar una ruta relativa para el endpoint de mensajes.
-    // El SDK de MCP resolverá esto automáticamente basándose en la petición del cliente.
     const transport = new SSEServerTransport("/mcp/messages", res);
     
     sessions.set(transport.sessionId, transport);
@@ -397,7 +399,7 @@ if (MODE === "sse") {
     });
   });
 
-  app.post("/mcp/messages", async (req, res) => {
+  async function handleIncomingMessage(req, res) {
     // Intentar obtener sessionId de todas las fuentes posibles
     let sessionId = req.query.sessionId || 
                     req.headers['x-session-id'] || 
@@ -408,29 +410,30 @@ if (MODE === "sse") {
         sessionId = sessionId[0];
     }
 
-    console.error(`[POST] Request URL: ${req.url}`);
-    console.error(`[POST] Session ID: ${sessionId || 'MISSING'}`);
-    
     if (!sessionId) {
-        console.error("[POST] Error: No se pudo encontrar sessionId en Query, Headers o Body");
-        return res.status(400).send("Session ID is required and was not found in any source.");
+        console.error("[MSG] Error: No se pudo encontrar sessionId");
+        return res.status(400).send("Session ID is required.");
     }
 
     const transport = sessions.get(sessionId);
     
     if (transport) {
       const bodyPreview = req.body ? JSON.stringify(req.body).substring(0, 100) : "Raw Stream";
-      console.error(`[POST] Procesando mensaje para sesión ${sessionId}. Body: ${bodyPreview}...`);
+      console.error(`[MSG] Procesando mensaje para sesión ${sessionId}. Body: ${bodyPreview}...`);
       try {
         await transport.handlePostMessage(req, res);
       } catch (err) {
-        console.error(`[POST] Error en handlePostMessage: ${err.message}`);
+        console.error(`[MSG] Error en handlePostMessage: ${err.message}`);
         res.status(500).send(err.message);
       }
     } else {
-      console.error(`[POST] Sesión no encontrada: ${sessionId}. Sesiones activas: ${Array.from(sessions.keys()).join(", ")}`);
+      console.error(`[MSG] Sesión no encontrada: ${sessionId}`);
       res.status(404).send(`Session not found: ${sessionId}`);
     }
+  }
+
+  app.post("/mcp/messages", async (req, res) => {
+    await handleIncomingMessage(req, res);
   });
 
   // Wait for PHP server to be ready before starting MCP (useful in Docker)

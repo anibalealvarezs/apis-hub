@@ -21,6 +21,13 @@ fi
 
 # Configuration
 export ENV_FILE=.env.demo
+export SKIP_SEED=0
+
+# Check for --no-seed option
+if [ "$1" == "--no-seed" ]; then
+    echo -e "${YELLOW}⏩ Skipping seeding as requested...${NC}"
+    export SKIP_SEED=1
+fi
 
 # Run the standard deployment with the demo env
 # This will trigger InstanceGeneratorService to create only 1 master instance
