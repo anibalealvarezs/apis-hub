@@ -347,6 +347,7 @@ const MODE = process.env.MCP_MODE || "stdio";
 if (MODE === "sse") {
   const app = express();
   app.use(cors());
+  app.set('trust proxy', true); // Permitir detección correcta tras proxies/docker
   const PORT = process.env.MCP_PORT || 3000;
 
   // Track active sessions and their transports
@@ -396,11 +397,8 @@ if (MODE === "sse") {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Específico para Nginx
-    
-    // Detección de Host y Protocolo
-    const host = 'localhost:3010'; 
-    const endpoint = `http://localhost:3010/mcp/messages`;
+    // Detección dinámica de Host y Protocolo (Proxy-aware)
+    const endpoint = `${req.protocol}://${req.get('host')}/mcp/messages`;
     
     console.error(`[SSE] Publicando endpoint ABSOLUTO: ${endpoint}`);
 
