@@ -56,9 +56,11 @@ class SetupDatabaseCommand extends Command
 
             // 4. Auto-Seed for Demo (Smart Zero-Touch)
             if (getenv('APP_ENV') === 'demo') {
-                $output->writeln("<info>🎁 Environment is 'demo'. Filling with sample data...</info>");
-                $seedDemoCommand = $this->getApplication()->find('app:seed-demo');
-                $seedDemoCommand->run(new ArrayInput([]), $output);
+                $output->writeln("<info>🎁 Environment is 'demo'. Filling with sample data (Marketing & Organic)...</info>");
+                $seedDemoCommand = $this->getApplication()->find('app:seed-demo-data');
+                // By default, SeedDemoDataCommand now seeds all channels if no --channels is provided, 
+                // but we pass them explicitly here to be clear and follow the request.
+                $seedDemoCommand->run(new ArrayInput(['--channels' => 'facebook_marketing,facebook_organic,google_search_console']), $output);
             }
 
             $output->writeln("<info>✅ Database setup complete!</info>");

@@ -54,13 +54,24 @@ class SeedDemoDataCommand extends Command
 
     protected function configure(): void
     {
-        $this->addOption('channels', 'c', InputOption::VALUE_OPTIONAL, 'Channels to seed', 'facebook_marketing');
+        $this->addOption('channels', 'c', InputOption::VALUE_OPTIONAL, 'Channels to seed (comma separated: facebook_marketing,facebook_organic,google_search_console)');
+        $this->addOption('fresh', 'f', InputOption::VALUE_NONE, 'Wipe the entire database before seeding');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $channels = explode(',', $input->getOption('channels'));
-        $output->writeln("<info>🚀 Seeding Ultra Realistic Demo Data (Names & PlatformIDs)...</info>");
+        $allChannels = ['google_search_console', 'facebook_marketing', 'facebook_organic'];
+        $channelsInput = $input->getOption('channels');
+        $channels = $channelsInput ? explode(',', $channelsInput) : $allChannels;
+        $isFresh = $input->getOption('fresh') || !$channelsInput;
+
+        $output->writeln("<info>🚀 Seeding Realistic Demo Data...</info>");
+        if ($isFresh) {
+            $output->writeln("<comment>⚠️ Performing full database wipe...</comment>");
+        } else {
+            $output->writeln("<comment>📝 Performing partial update for channels: " . implode(', ', $channels) . "</comment>");
+        }
+
         // --- 🧹 CLEAR REDIS CACHE ---
         try {
             $output->writeln("🧹 Flushing Redis cache...");
@@ -80,11 +91,28 @@ class SeedDemoDataCommand extends Command
             $this->conn->executeStatement('SET FOREIGN_KEY_CHECKS = 0');
         }
 
-        $tables = ['channeled_metrics', 'metrics', 'metric_configs', 'dimension_set_items', 'dimension_sets', 'dimension_values', 'dimension_keys', 'channeled_ads', 'channeled_ad_groups', 'channeled_campaigns', 'campaigns', 'channeled_accounts', 'accounts', 'pages', 'queries', 'posts', 'countries', 'devices'];
-        foreach ($tables as $table) { 
-            // Postgres needs CASCADE to truncate tables with foreign keys
-            $truncateSql = $isPostgres ? "TRUNCATE TABLE $table RESTART IDENTITY CASCADE" : "TRUNCATE TABLE $table";
-            $this->conn->executeStatement($truncateSql); 
+        if ($isFresh) {
+            $tables = ['channeled_metrics', 'metrics', 'metric_configs', 'dimension_set_items', 'dimension_sets', 'dimension_values', 'dimension_keys', 'channeled_ads', 'channeled_ad_groups', 'channeled_campaigns', 'campaigns', 'channeled_accounts', 'accounts', 'pages', 'queries', 'posts', 'countries', 'devices'];
+            foreach ($tables as $table) { 
+                $truncateSql = $isPostgres ? "TRUNCATE TABLE $table RESTART IDENTITY CASCADE" : "TRUNCATE TABLE $table";
+                $this->conn->executeStatement($truncateSql); 
+            }
+        } else {
+            foreach ($channels as $chan) {
+                $output->writeln("🧹 Cleaning existing data for channel: $chan...");
+                $this->conn->executeStatement("DELETE FROM channeled_metrics WHERE channel = ?", [$chan]);
+                $this->conn->executeStatement("DELETE FROM metrics WHERE metric_config_id IN (SELECT id FROM metric_configs WHERE channel = ?)", [$chan]);
+                $this->conn->executeStatement("DELETE FROM metric_configs WHERE channel = ?", [$chan]);
+                $this->conn->executeStatement("DELETE FROM channeled_ads WHERE channel = ?", [$chan]);
+                $this->conn->executeStatement("DELETE FROM channeled_ad_groups WHERE channel = ?", [$chan]);
+                $this->conn->executeStatement("DELETE FROM channeled_campaigns WHERE channel = ?", [$chan]);
+                $this->conn->executeStatement("DELETE FROM channeled_accounts WHERE channel = ?", [$chan]);
+                if ($chan === 'google_search_console' || $chan === 'facebook_organic') {
+                    // Posts and queries are often channel-specific or entity-linked
+                    // but since pages might be shared, we only delete those linked to these specific channeled entities if we had a mapping.
+                    // For demo purposes, we will leave shared entities like 'pages' and 'accounts' to ensure no cross-channel break.
+                }
+            }
         }
 
         $this->seedBasicEntities();
@@ -102,7 +130,7 @@ class SeedDemoDataCommand extends Command
             $this->conn->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
         }
 
-        $output->writeln("\n<info>✅ Ultra Realistic Seeding Completed!</info>");
+        $output->writeln("\n<info>✅ Seeding Completed!</info>");
         return Command::SUCCESS;
     }
 
@@ -114,6 +142,9 @@ class SeedDemoDataCommand extends Command
     private function seedBasicEntities(): void
     {
         foreach ([CountryEnum::USA, CountryEnum::ESP, CountryEnum::MEX, CountryEnum::COL] as $c) {
+            $existing = $this->conn->fetchOne("SELECT id FROM countries WHERE name = ?", [$c->getFullName()]);
+            if ($existing) continue;
+            
             $country = new Country(); $country->addCode($c)->addName($c->getFullName()); $this->entityManager->persist($country);
         }
         $this->entityManager->flush();
@@ -121,29 +152,53 @@ class SeedDemoDataCommand extends Command
 
     private function seedDimensionHierarchy(OutputInterface $output): void
     {
-        $output->writeln("🛠️ Populating Dimensions...");
-        $this->conn->insert('dimension_keys', ['name' => 'age', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
-        $ageK = $this->conn->lastInsertId();
-        $this->conn->insert('dimension_keys', ['name' => 'gender', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
-        $genK = $this->conn->lastInsertId();
+        $output->writeln("🛠️ Ensuring Dimensions...");
+        
+        // Age Key
+        $ageK = $this->conn->fetchOne("SELECT id FROM dimension_keys WHERE name = 'age'");
+        if (!$ageK) {
+            $this->conn->insert('dimension_keys', ['name' => 'age', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
+            $ageK = $this->conn->lastInsertId();
+        }
+        
+        // Gender Key
+        $genK = $this->conn->fetchOne("SELECT id FROM dimension_keys WHERE name = 'gender'");
+        if (!$genK) {
+            $this->conn->insert('dimension_keys', ['name' => 'gender', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
+            $genK = $this->conn->lastInsertId();
+        }
+        
         $ageValIds = [];
         foreach ($this->ages as $age) {
-            $this->conn->insert('dimension_values', ['dimension_key_id' => $ageK, 'value' => $age, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
-            $ageValIds[$age] = $this->conn->lastInsertId();
+            $id = $this->conn->fetchOne("SELECT id FROM dimension_values WHERE dimension_key_id = ? AND value = ?", [$ageK, $age]);
+            if (!$id) {
+                $this->conn->insert('dimension_values', ['dimension_key_id' => $ageK, 'value' => $age, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
+                $id = $this->conn->lastInsertId();
+            }
+            $ageValIds[$age] = $id;
         }
+        
         $genValIds = [];
         foreach ($this->genders as $gen) {
-            $this->conn->insert('dimension_values', ['dimension_key_id' => $genK, 'value' => $gen, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
-            $genValIds[$gen] = $this->conn->lastInsertId();
+            $id = $this->conn->fetchOne("SELECT id FROM dimension_values WHERE dimension_key_id = ? AND value = ?", [$genK, $gen]);
+            if (!$id) {
+                $this->conn->insert('dimension_values', ['dimension_key_id' => $genK, 'value' => $gen, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
+                $id = $this->conn->lastInsertId();
+            }
+            $genValIds[$gen] = $id;
         }
+        
         foreach ($this->ages as $age) {
             foreach ($this->genders as $gen) {
                 $h = md5("age:{$age}|gender:{$gen}");
-                $this->conn->insert('dimension_sets', ['hash' => $h, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
-                $setId = $this->conn->lastInsertId();
+                $setId = $this->conn->fetchOne("SELECT id FROM dimension_sets WHERE hash = ?", [$h]);
+                if (!$setId) {
+                    $this->conn->insert('dimension_sets', ['hash' => $h, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
+                    $setId = $this->conn->lastInsertId();
+                    $this->conn->insert('dimension_set_items', ['dimension_set_id' => $setId, 'dimension_value_id' => $ageValIds[$age]]);
+                    $this->conn->insert('dimension_set_items', ['dimension_set_id' => $setId, 'dimension_value_id' => $genValIds[$gen]]);
+                }
                 $this->dimensionSetCache["$age|$gen"] = $setId;
-                $this->conn->insert('dimension_set_items', ['dimension_set_id' => $setId, 'dimension_value_id' => $ageValIds[$age]]);
-                $this->conn->insert('dimension_set_items', ['dimension_set_id' => $setId, 'dimension_value_id' => $genValIds[$gen]]);
             }
         }
     }
@@ -153,8 +208,13 @@ class SeedDemoDataCommand extends Command
         $output->writeln("🔍 GSC seeding...");
         $pages = [];
         for ($i = 0; $i < 20; $i++) {
-            $page = new Page(); $page->addUrl("https://demo.site/p$i")->addTitle($this->faker->sentence(3))->addHostname("demo.site")->addPlatformId($this->generatePlatformId());
-            $this->entityManager->persist($page); $pages[] = $page;
+            $pId = "GSC-P$i";
+            $page = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $pId]);
+            if (!$page) {
+                $page = new Page(); $page->addUrl("https://demo.site/p$i")->addTitle($this->faker->sentence(3))->addHostname("demo.site")->addPlatformId($pId);
+                $this->entityManager->persist($page);
+            }
+            $pages[] = $page;
         }
         $this->entityManager->flush();
         foreach ($this->getDates(60) as $date) {
@@ -303,34 +363,38 @@ class SeedDemoDataCommand extends Command
 
         for ($i = 0; $i < 3; $i++) {
             $namePrefix = $this->faker->unique()->company();
-            $pagePId = $this->generatePlatformId();
+            $pagePId = "FB-PAGE-" . md5($namePrefix);
             $pageUrl = "https://facebook.com/" . strtolower(str_replace(' ', '.', $namePrefix));
             
-            // 1. Create FB Page
-            $page = new Page();
-            $page->addPlatformId($pagePId)
-                ->addAccount($fbParent)
-                ->addTitle($namePrefix . " Official Page")
-                ->addUrl($pageUrl)
-                ->addHostname("facebook.com")
-                ->addData(['source' => 'facebook']);
-            
-            $this->entityManager->persist($page);
-            $this->entityManager->flush();
+            // 1. Create/Find FB Page
+            $page = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $pagePId]);
+            if (!$page) {
+                $page = new Page();
+                $page->addPlatformId($pagePId)
+                    ->addAccount($fbParent)
+                    ->addTitle($namePrefix . " Official Page")
+                    ->addUrl($pageUrl)
+                    ->addHostname("facebook.com")
+                    ->addData(['source' => 'facebook']);
+                $this->entityManager->persist($page);
+                $this->entityManager->flush();
+            }
             $pId = $page->getId();
 
-            // 2. Create Linked IG Account
-            $igPId = $this->generatePlatformId();
-            $caIg = new ChanneledAccount();
-            $caIg->addPlatformId($igPId)
-                ->addAccount($fbParent)
-                ->addType(AccountType::INSTAGRAM)
-                ->addChannel($fbChan->value)
-                ->addName($namePrefix . " Instagram")
-                ->addData(['facebook_page_id' => $pagePId]);
-            
-            $this->entityManager->persist($caIg);
-            $this->entityManager->flush();
+            // 2. Create/Find Linked IG Account
+            $igPId = "IG-ACC-" . md5($namePrefix);
+            $caIg = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $igPId, 'channel' => $fbChan->value]);
+            if (!$caIg) {
+                $caIg = new ChanneledAccount();
+                $caIg->addPlatformId($igPId)
+                    ->addAccount($fbParent)
+                    ->addType(AccountType::INSTAGRAM)
+                    ->addChannel($fbChan->value)
+                    ->addName($namePrefix . " Instagram")
+                    ->addData(['facebook_page_id' => $pagePId]);
+                $this->entityManager->persist($caIg);
+                $this->entityManager->flush();
+            }
             $caIgId = $caIg->getId();
 
             // 3. Link IG to FB Page (Data metadata)
