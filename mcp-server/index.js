@@ -364,50 +364,35 @@ if (MODE === "sse") {
     next();
   });
 
-  app.all("/mcp/sse", async (req, res) => {
-    if (req.method === "POST") {
-        return handleIncomingMessage(req, res);
-    }
-
-    if (req.method !== "GET") {
-        return res.status(405).send("Method Not Allowed. Use GET for SSE connection.");
-    }
-
-    console.error(`[SSE] Nueva conexión. Host detectado: ${req.get('host')}`);
+  // MANEJO DE DISCOVERY: Si Antigravity explora cualquier GET en la raíz o .well-known,
+  // iniciamos el flujo SSE para que tenga una sesión activa.
+  app.get("*", async (req, res) => {
+    // Si es un GET al SSE o cualquier ruta de descubrimiento, iniciar stream
+    console.error(`[DISC] Discovery GET detectado en ${req.url}`);
     
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     
-    // Reconstruir URL absoluta dinámica para máxima compatibilidad con túneles
     const protocol = req.headers['x-forwarded-proto'] || req.protocol;
     const host = req.get('host');
     const endpoint = `${protocol}://${host}/mcp/messages`;
     
-    console.error(`[SSE] Endpoint de mensajes: ${endpoint}`);
     const transport = new SSEServerTransport(endpoint, res);
-    
     sessions.set(transport.sessionId, transport);
-    console.error(`[SSE] Sesión ACTIVADA: ${transport.sessionId}. Total: ${sessions.size}`);
+    console.error(`[DISC] Sesión iniciada desde descubrimiento: ${transport.sessionId}`);
 
     const server = createMcpServer();
     await server.connect(transport);
     
     res.on("close", () => {
-        console.error(`[SSE] Conexión cerrada para sesión: ${transport.sessionId}. (Manteniendo sesión en memoria 2min para mensajes tardíos)`);
-        // No borramos inmediatamente para permitir que lleguen mensajes POST que vienen por otra vía
-        setTimeout(() => {
-            if (sessions.has(transport.sessionId)) {
-                sessions.delete(transport.sessionId);
-                console.error(`[SSE] Sesión EXPIRADA: ${transport.sessionId}`);
-            }
-        }, 120000); 
+        console.error(`[DISC] Conexión cerrada. Persistiendo ${transport.sessionId} 2min.`);
+        setTimeout(() => sessions.delete(transport.sessionId), 120000); 
     });
   });
 
   async function handleIncomingMessage(req, res) {
-    // Buscar sessionId en todas partes (Query -> Headers -> Body)
     let sessionId = req.query.sessionId || 
                     req.headers['x-session-id'] || 
                     req.headers['sse-session-id'] ||
@@ -415,34 +400,31 @@ if (MODE === "sse") {
 
     if (Array.isArray(sessionId)) sessionId = sessionId[0];
 
+    // FALLBACK INTELIGENTE: Si no hay ID pero hay una sesión activa reciente, usarla.
+    if (!sessionId && sessions.size > 0) {
+        sessionId = Array.from(sessions.keys())[sessions.size - 1];
+        console.error(`[MSG] Usando sesión de descubrimiento más reciente: ${sessionId}`);
+    }
+
     if (!sessionId) {
-        // FALLBACK: Si no hay sessionId pero solo hay 1 sesión activa, usamos esa.
-        if (sessions.size === 1) {
-            sessionId = Array.from(sessions.keys())[0];
-            console.error(`[MSG] Auto-Session Fallback: Usando sesión única activa: ${sessionId}`);
-        } else {
-            console.error(`[MSG] Error: No se pudo determinar sessionId (Activas: ${sessions.size}).`);
-            return res.status(401).send("Session ID required. Please refresh the connection.");
-        }
+        console.error(`[MSG] Error: Sin sesiones activas para responder al POST.`);
+        return res.status(401).send("No active session. Please initiate a GET request first.");
     }
 
     const transport = sessions.get(sessionId);
-    
     if (transport) {
-      console.error(`[MSG] OK: Procesando ${req.method} para ${sessionId}.`);
       try {
         await transport.handlePostMessage(req, res);
       } catch (err) {
-        console.error(`[MSG] EXCEPTION en handlePostMessage: ${err.message}`);
+        console.error(`[MSG] Error SDK: ${err.message}`);
         res.status(500).send(err.message);
       }
     } else {
-      console.error(`[MSG] Error: Sesión ${sessionId} no encontrada o expirada. (Total: ${sessions.size})`);
-      res.status(404).send(`Session not found or expired: ${sessionId}. Please reconnect.`);
+      res.status(404).send("Session expired. Please reconnect.");
     }
   }
 
-  app.post("/mcp/messages", async (req, res) => {
+  app.post("*", async (req, res) => {
     await handleIncomingMessage(req, res);
   });
 
