@@ -269,7 +269,7 @@ class BaseRepository extends EntityRepository
                     $safeLeftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
                     
                     $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
+                    $qb->addSelect("COALESCE(CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST(rca_fallback.name AS $castType), CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
                        ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("rca_fallback.name")
@@ -284,7 +284,7 @@ class BaseRepository extends EntityRepository
                            ->addGroupBy($sqlField);
                     } else {
                         $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                        $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
+                        $qb->addSelect("COALESCE(CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
                            ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
                            ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
                            ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
@@ -303,7 +303,7 @@ class BaseRepository extends EntityRepository
                     $qb->addSelect("COALESCE($sqlField, 'N/A') AS \"$quotedField\"")
                        ->addGroupBy($sqlField);
                 } else {
-                    $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
+                    $qb->addSelect("COALESCE(CAST({$map['alias']}.{$map['field']} AS $castType), CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
                        ->addSelect("mc.{$map['fk']} AS \"{$quotedField}_id\"")
                        ->addGroupBy("{$map['alias']}.{$map['field']}")
                        ->addGroupBy("mc.{$map['fk']}");
