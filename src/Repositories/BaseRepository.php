@@ -615,7 +615,11 @@ class BaseRepository extends EntityRepository
                 'saves'              => "SUM(CASE WHEN mc.name IN ('saves', 'saved') THEN $valCol ELSE 0 END)",
                 'saved'              => "SUM(CASE WHEN mc.name IN ('saves', 'saved') THEN $valCol ELSE 0 END)",
                 'plays'              => "SUM(CASE WHEN mc.name IN ('plays', 'video_views', 'views') THEN $valCol ELSE 0 END)",
-                'views'              => "SUM(CASE WHEN mc.name IN ('plays', 'video_views', 'views', 'post_video_views', 'page_video_views', 'profile_views') THEN $valCol ELSE 0 END)",
+                'views'              => "SUM(CASE WHEN mc.name IN ('plays', 'video_views', 'views', 'post_video_views', 'page_video_views') THEN $valCol ELSE 0 END)",
+                'replies'            => "SUM(CASE WHEN mc.name = 'replies' THEN $valCol ELSE 0 END)",
+                'accounts_engaged'   => "SUM(CASE WHEN mc.name = 'accounts_engaged' THEN $valCol ELSE 0 END)",
+                'website_clicks'     => "SUM(CASE WHEN mc.name = 'website_clicks' THEN $valCol ELSE 0 END)",
+                'follows_and_unfollows' => "SUM(CASE WHEN mc.name = 'follows_and_unfollows' THEN $valCol ELSE 0 END)",
             ];
 
             if (isset($formulas[$lowerField])) {

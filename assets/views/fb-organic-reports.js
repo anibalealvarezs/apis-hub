@@ -48,14 +48,15 @@ function getActiveMetrics(level = 'instagram', isFb = false) {
     if (level === 'instagram') {
         return [
             { key: 'reach', label: 'REACH', format: 'number', precision: 0, original: 'reach', sparkline: true },
-            { key: 'impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions', sparkline: true },
-            { key: 'likes', label: 'LIKES', format: 'number', precision: 0, original: 'likes', sparkline: false },
-            { key: 'comments', label: 'COMM', format: 'number', precision: 0, original: 'comments', sparkline: false },
-            { key: 'shares', label: 'SHAR', format: 'number', precision: 0, original: 'shares', sparkline: false },
-            { key: 'saved', label: 'SAVE', format: 'number', precision: 0, original: 'saved', sparkline: false },
-            { key: 'total_interactions', label: 'INTER', format: 'number', precision: 0, original: 'total_interactions', sparkline: false },
-            { key: 'views', label: 'VIEW', format: 'number', precision: 0, original: 'views', sparkline: false },
-            { key: 'follower_count', label: 'FANS', format: 'number', precision: 0, original: 'follower_count', sparkline: true }
+            { key: 'views', label: 'VIEWS', format: 'number', precision: 0, original: 'views', sparkline: true },
+            { key: 'total_interactions', label: 'INTER', format: 'number', precision: 0, original: 'total_interactions', sparkline: true },
+            { key: 'shares', label: 'SHARES', format: 'number', precision: 0, original: 'shares', sparkline: false },
+            { key: 'saves', label: 'SAVES', format: 'number', precision: 0, original: 'saves', sparkline: false },
+            { key: 'replies', label: 'REPLIES', format: 'number', precision: 0, original: 'replies', sparkline: false },
+            { key: 'accounts_engaged', label: 'ENGAGED', format: 'number', precision: 0, original: 'accounts_engaged', sparkline: false },
+            { key: 'profile_views', label: 'PRF VIEW', format: 'number', precision: 0, original: 'profile_views', sparkline: false },
+            { key: 'website_clicks', label: 'WEB CLK', format: 'number', precision: 0, original: 'website_clicks', sparkline: false },
+            { key: 'follows_and_unfollows', label: 'FOLLOWS', format: 'number', precision: 0, original: 'follows_and_unfollows', sparkline: true }
         ];
     }
     if (level === 'facebook') {
@@ -402,16 +403,16 @@ function renderSparkline(container, points, color = '#6366f1', start, end) {
 function renderSummaryFields() {
     const sums = currentData.reduce((acc, r) => {
         acc.reach += parseInt(r.reach || 0);
-        acc.impr += parseInt(r.impressions || 0);
+        acc.views += parseInt(r.views || 0);
         acc.inter += parseInt(r.total_interactions || 0);
-        acc.fans += parseInt(r.follower_count || 0);
+        acc.follows += parseInt(r.follows_and_unfollows || 0);
         return acc;
-    }, { reach:0, impr:0, inter:0, fans:0 });
+    }, { reach:0, views:0, inter:0, follows:0 });
     
     document.getElementById('total-reach').textContent = formatNum(sums.reach);
-    document.getElementById('total-impressions').textContent = formatNum(sums.impr);
+    document.getElementById('total-impressions').textContent = formatNum(sums.views);
     document.getElementById('total-interactions').textContent = formatNum(sums.inter);
-    document.getElementById('total-followers').textContent = formatNum(sums.fans);
+    document.getElementById('total-followers').textContent = formatNum(sums.follows);
     document.getElementById('total-eng-rate').textContent = ((sums.inter / (sums.reach || 1)) * 100).toFixed(2) + '%';
 }
 
