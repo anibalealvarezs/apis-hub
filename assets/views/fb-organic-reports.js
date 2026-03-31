@@ -49,8 +49,12 @@ function getActiveMetrics(level = 'instagram', isFb = false) {
         return [
             { key: 'reach', label: 'REACH', format: 'number', precision: 0, original: 'reach', sparkline: true },
             { key: 'impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions', sparkline: true },
+            { key: 'likes', label: 'LIKES', format: 'number', precision: 0, original: 'likes', sparkline: false },
+            { key: 'comments', label: 'COMM', format: 'number', precision: 0, original: 'comments', sparkline: false },
+            { key: 'shares', label: 'SHAR', format: 'number', precision: 0, original: 'shares', sparkline: false },
+            { key: 'saved', label: 'SAVE', format: 'number', precision: 0, original: 'saved', sparkline: false },
             { key: 'total_interactions', label: 'INTER', format: 'number', precision: 0, original: 'total_interactions', sparkline: false },
-            { key: 'profile_views', label: 'VIEWS', format: 'number', precision: 0, original: 'profile_views', sparkline: false },
+            { key: 'views', label: 'VIEW', format: 'number', precision: 0, original: 'views', sparkline: false },
             { key: 'follower_count', label: 'FANS', format: 'number', precision: 0, original: 'follower_count', sparkline: true }
         ];
     }
@@ -72,12 +76,14 @@ function getActiveMetrics(level = 'instagram', isFb = false) {
             ];
         }
         return [
-            { key: 'impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions' },
             { key: 'reach', label: 'REACH', format: 'number', precision: 0, original: 'reach' },
+            { key: 'impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions' },
             { key: 'likes', label: 'LIKES', format: 'number', precision: 0, original: 'likes' },
             { key: 'comments', label: 'COMM', format: 'number', precision: 0, original: 'comments' },
             { key: 'shares', label: 'SHAR', format: 'number', precision: 0, original: 'shares' },
-            { key: 'plays', label: 'PLAY', format: 'number', precision: 0, original: 'plays' }
+            { key: 'saved', label: 'SAVE', format: 'number', precision: 0, original: 'saved' },
+            { key: 'total_interactions', label: 'INTER', format: 'number', precision: 0, original: 'total_interactions' },
+            { key: 'views', label: 'VIEW', format: 'number', precision: 0, original: 'views' }
         ];
     }
     return [];

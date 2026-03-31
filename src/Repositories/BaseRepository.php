@@ -571,27 +571,27 @@ class BaseRepository extends EntityRepository
             $formulas = [
                 'spend'       => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END)",
                 'clicks'      => "SUM(CASE WHEN mc.name = 'clicks' THEN $valCol ELSE 0 END)",
-                'impressions' => "SUM(CASE WHEN mc.name IN ('impressions', 'post_impressions', 'page_impressions') THEN $valCol ELSE 0 END)",
+                'impressions' => "SUM(CASE WHEN mc.name IN ('impressions', 'post_impressions', 'page_impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END)",
                 'reach'       => "SUM(CASE WHEN mc.name IN ('reach', 'post_reach') THEN $valCol ELSE 0 END)",
-                'frequency'   => "SUM(CASE WHEN mc.name = 'impressions' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'reach' THEN $valCol ELSE 0 END), 0)",
-                'ctr'         => "SUM(CASE WHEN mc.name = 'clicks' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN $valCol ELSE 0 END), 0)",
+                'frequency'   => "SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('reach', 'post_reach') THEN $valCol ELSE 0 END), 0)",
+                'ctr'         => "SUM(CASE WHEN mc.name = 'clicks' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0)",
                 'cpc'         => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'clicks' THEN $valCol ELSE 0 END), 0)",
-                'cpm'         => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN $valCol ELSE 0 END), 0) / 1000)",
+                'cpm'         => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0) / 1000)",
                 'position'    => "SUM(CASE WHEN mc.name = 'position' THEN $valCol ELSE 0 END * (
                     SELECT m2.value 
                     FROM metrics m2 
                     JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id 
-                    WHERE mc2.name = 'impressions' 
+                    WHERE mc2.name IN ('impressions', 'page_media_view', 'post_media_view') 
                     AND mc2.metric_date = mc.metric_date 
                     AND mc2.channel = mc.channel
                     AND (mc2.query_id = mc.query_id OR (mc2.query_id IS NULL AND mc.query_id IS NULL))
                     AND (mc2.page_id = mc.page_id OR (mc2.page_id IS NULL AND mc.page_id IS NULL))
                     LIMIT 1
-                )) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN $valCol ELSE 0 END), 0)",
+                )) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0)",
                 'unique_clicks' => "SUM(CASE WHEN mc.name = 'unique_clicks' THEN $valCol ELSE 0 END)",
                 'results'       => "SUM(CASE WHEN mc.name = 'results' THEN $valCol ELSE 0 END)",
                 'cost_per_result' => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'results' THEN $valCol ELSE 0 END), 0)",
-                'result_rate'     => "SUM(CASE WHEN mc.name = 'results' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN $valCol ELSE 0 END), 0)",
+                'result_rate'     => "SUM(CASE WHEN mc.name = 'results' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0)",
                 'roas'            => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN $valCol ELSE NULL END)",
                 'website_roas'    => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN $valCol ELSE NULL END)",
                 'actions'         => "SUM(CASE WHEN mc.name = 'actions' THEN $valCol ELSE 0 END)",
@@ -602,18 +602,20 @@ class BaseRepository extends EntityRepository
                 'total_interactions' => "SUM(CASE WHEN mc.name IN ('total_interactions', 'post_engagement', 'page_post_engagements') THEN $valCol ELSE 0 END)",
                 'profile_views'      => "SUM(CASE WHEN mc.name = 'profile_views' THEN $valCol ELSE 0 END)",
                 'follower_count'     => "SUM(CASE WHEN mc.name IN ('follower_count', 'page_fans') THEN $valCol ELSE 0 END)",
-                'page_impressions'   => "SUM(CASE WHEN mc.name = 'page_impressions' THEN $valCol ELSE 0 END)",
+                'page_impressions'   => "SUM(CASE WHEN mc.name IN ('page_impressions', 'page_media_view') THEN $valCol ELSE 0 END)",
                 'page_post_engagements' => "SUM(CASE WHEN mc.name = 'page_post_engagements' THEN $valCol ELSE 0 END)",
                 'page_views_total'   => "SUM(CASE WHEN mc.name = 'page_views_total' THEN $valCol ELSE 0 END)",
                 'page_fans'          => "SUM(CASE WHEN mc.name = 'page_fans' THEN $valCol ELSE 0 END)",
-                'post_impressions'   => "SUM(CASE WHEN mc.name = 'post_impressions' THEN $valCol ELSE 0 END)",
+                'post_impressions'   => "SUM(CASE WHEN mc.name IN ('post_impressions', 'post_media_view') THEN $valCol ELSE 0 END)",
                 'post_engagement'    => "SUM(CASE WHEN mc.name = 'post_engagement' THEN $valCol ELSE 0 END)",
                 'post_reactions_by_type_total' => "SUM(CASE WHEN mc.name = 'post_reactions_by_type_total' THEN $valCol ELSE 0 END)",
                 'likes'              => "SUM(CASE WHEN mc.name IN ('likes', 'post_reactions_by_type_total') THEN $valCol ELSE 0 END)",
                 'comments'           => "SUM(CASE WHEN mc.name IN ('comments', 'post_comments') THEN $valCol ELSE 0 END)",
                 'shares'             => "SUM(CASE WHEN mc.name IN ('shares', 'post_shares') THEN $valCol ELSE 0 END)",
-                'saves'              => "SUM(CASE WHEN mc.name = 'saves' THEN $valCol ELSE 0 END)",
-                'plays'              => "SUM(CASE WHEN mc.name = 'plays' THEN $valCol ELSE 0 END)",
+                'saves'              => "SUM(CASE WHEN mc.name IN ('saves', 'saved') THEN $valCol ELSE 0 END)",
+                'saved'              => "SUM(CASE WHEN mc.name IN ('saves', 'saved') THEN $valCol ELSE 0 END)",
+                'plays'              => "SUM(CASE WHEN mc.name IN ('plays', 'video_views', 'views') THEN $valCol ELSE 0 END)",
+                'views'              => "SUM(CASE WHEN mc.name IN ('plays', 'video_views', 'views', 'post_video_views', 'page_video_views', 'profile_views') THEN $valCol ELSE 0 END)",
             ];
 
             if (isset($formulas[$lowerField])) {
