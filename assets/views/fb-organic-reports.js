@@ -50,6 +50,8 @@ function getActiveMetrics(level = 'instagram', isFb = false) {
             { key: 'reach', label: 'REACH', format: 'number', precision: 0, original: 'reach', sparkline: true },
             { key: 'views', label: 'VIEWS', format: 'number', precision: 0, original: 'views', sparkline: true },
             { key: 'total_interactions', label: 'INTER', format: 'number', precision: 0, original: 'total_interactions', sparkline: true },
+            { key: 'likes', label: 'LIKES', format: 'number', precision: 0, original: 'likes', sparkline: false },
+            { key: 'comments', label: 'COMM', format: 'number', precision: 0, original: 'comments', sparkline: false },
             { key: 'shares', label: 'SHARES', format: 'number', precision: 0, original: 'shares', sparkline: false },
             { key: 'saves', label: 'SAVES', format: 'number', precision: 0, original: 'saves', sparkline: false },
             { key: 'replies', label: 'REPLIES', format: 'number', precision: 0, original: 'replies', sparkline: false },
