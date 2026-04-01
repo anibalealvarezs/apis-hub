@@ -352,13 +352,13 @@ function drawTableSparklines(level, data, cacheKey = null) {
 
         if (level.startsWith('dim-') && cacheKey) {
             const entry = NESTED_DATA_CACHE[cacheKey];
-            const dimKey = entry.dims.map(d => row[d]).join('-');
+            const dimKey = entry.dims.map(d => row[d] || row[String(d).toLowerCase()]).join('-');
             lookupKey = dimKey;
             entityId = `dim-${entry.parentId}-${dimKey}`;
         } else {
             const hItem = HIERARCHY[level];
             if (!hItem) return;
-            const eId = row[hItem.idField];
+            const eId = row[hItem.idField] || row[String(hItem.idField).toLowerCase()];
             lookupKey = eId;
             entityId = eId;
         }
