@@ -1837,8 +1837,8 @@ class MetricRequests
         ]);
         $channeledAccountMap['map'][(string) $page['ig_account']] = $channeledAccountEntity->getId();
         $channeledAccountMap['mapReverse'][$channeledAccountEntity->getId()] = (string) $page['ig_account'];
-
-        $api->setPageId((string) $page['ig_account']);
+ 
+        $api->setPageId((string) $pageEntity->getPlatformId());
 
         $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
 
