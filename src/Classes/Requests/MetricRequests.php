@@ -447,10 +447,6 @@ class MetricRequests
                                 ]);
 
                                 if ($channeledAccountEntity) {
-                                    // REPAIR: Claim any orphaned posts before fetching metrics
-                                    $repairSql = "UPDATE posts SET channeled_account_id = ? WHERE page_id = ? AND channeled_account_id IS NULL AND (post_id LIKE 'ig_%' OR post_id ~ '^[0-9]+_[0-9]+$')";
-                                    $manager->getConnection()->executeStatement($repairSql, [$channeledAccountEntity->getId(), $pageEntity->getId()]);
-
                                     $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
                                     $rawMedia = $api->getInstagramMedia(igUserId: (string) $page['ig_account'], additionalParams: ['since' => $syncSince]);
                                     if (!empty($rawMedia['data'])) {
