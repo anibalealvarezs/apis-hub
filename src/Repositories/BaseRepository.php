@@ -386,7 +386,11 @@ class BaseRepository extends EntityRepository
                         
                         if (in_array($key, $platformEntities)) {
                             $whereClauses = [];
-                            if ($fk) $whereClauses[] = "mc.$fk = :f_$key";
+                            // Safety: Only search by DB ID if the value is actually numeric to avoid Postgres type errors
+                            if ($fk && is_numeric($value)) {
+                                $whereClauses[] = "mc.$fk = :f_id_$key";
+                                $qb->setParameter("f_id_$key", (int)$value);
+                            }
                             
                             if ($isPostgres && !is_numeric($value)) {
                                 $whereClauses[] = "LOWER(CAST({$map['alias']}.$idCol AS text)) = LOWER(:f_$key)";
@@ -396,7 +400,7 @@ class BaseRepository extends EntityRepository
                                 $whereClauses[] = "{$map['alias']}.$nameCol = :f_$key";
                             }
                             $qb->andWhere("(" . implode(' OR ', $whereClauses) . ")")
-                               ->setParameter("f_$key", $value);
+                               ->setParameter("f_$key", (string)$value);
                         } else {
                             if ($isPostgres && !is_numeric($value)) {
                                 $qb->andWhere("LOWER(CAST({$map['alias']}.$nameCol AS text)) = LOWER(:f_$key)")
