@@ -258,15 +258,17 @@ async function loadReport() {
 
                 if (resTrend.status === 'success' && resTrend.data) {
                     TREND_DATA_CACHE['campaign'] = {};
+                    console.log(`[Dashboard] Fetched ${resTrend.data.length} trend points for campaigns.`);
                     resTrend.data.forEach(d => {
-                        const cid = d.channeledCampaign || d.channeledcampaign;
+                        const cid = d.channeledCampaign || d.channeledcampaign || d.channeledCampaign_id || d.channeledcampaign_id;
                         if (!cid) return;
-                        if (!TREND_DATA_CACHE['campaign'][cid]) TREND_DATA_CACHE['campaign'][cid] = {};
+                        const entityId = String(cid);
+                        if (!TREND_DATA_CACHE['campaign'][entityId]) TREND_DATA_CACHE['campaign'][entityId] = {};
                         sparkMetrics.forEach(m => {
                             const valKey = `trend_${m.key}`;
                             const val = d[valKey] || d[valKey.toLowerCase()] || 0;
-                            if (!TREND_DATA_CACHE['campaign'][cid][m.key]) TREND_DATA_CACHE['campaign'][cid][m.key] = [];
-                            TREND_DATA_CACHE['campaign'][cid][m.key].push({ day: d.daily, val: parseFloat(val) });
+                            if (!TREND_DATA_CACHE['campaign'][entityId][m.key]) TREND_DATA_CACHE['campaign'][entityId][m.key] = [];
+                            TREND_DATA_CACHE['campaign'][entityId][m.key].push({ day: d.daily, val: parseFloat(val) });
                         });
                     });
                 }
@@ -301,7 +303,7 @@ function render() {
     }
     let currentAccount = '';
     currentData.forEach((row, idx) => {
-        const cid = row.channeledCampaign || row.channeledcampaign;
+        const cid = row.channeledCampaign || row.channeledcampaign || row.channeledCampaign_id || row.channeledcampaign_id;
         if (row.account !== currentAccount) {
             const groupRow = document.createElement('tr');
             groupRow.className = 'account-group-row';
@@ -352,15 +354,18 @@ function drawTableSparklines(level, data, cacheKey = null) {
 
         if (level.startsWith('dim-') && cacheKey) {
             const entry = NESTED_DATA_CACHE[cacheKey];
-            const dimKey = entry.dims.map(d => row[d] || row[String(d).toLowerCase()]).join('-');
+            const dimKey = entry.dims.map(d => {
+                const val = row[d] || row[String(d).toLowerCase()];
+                return String(val || 'N/A');
+            }).join('-');
             lookupKey = dimKey;
             entityId = `dim-${entry.parentId}-${dimKey}`;
         } else {
             const hItem = HIERARCHY[level];
             if (!hItem) return;
-            const eId = row[hItem.idField] || row[String(hItem.idField).toLowerCase()];
-            lookupKey = eId;
-            entityId = eId;
+            const eId = row[hItem.idField] || row[String(hItem.idField).toLowerCase()] || row[hItem.idField + '_id'] || row[String(hItem.idField).toLowerCase() + '_id'];
+            lookupKey = String(eId);
+            entityId = String(eId);
         }
 
         if (!entityId) return;
@@ -376,9 +381,11 @@ function drawTableSparklines(level, data, cacheKey = null) {
             if (rawTrend && rawTrend.length > 1) {
                 rawTrend.sort((a,b) => a.day.localeCompare(b.day));
                 renderSparkline(container, rawTrend.map(x => x.val), m.config);
-            } else {
+            } else if (rawTrend && rawTrend.length === 1) {
                 // Period is 1-day or No Trend data
-                container.innerHTML = '<span style="color:var(--text-dim); font-size: 0.6rem; opacity: 0.2;">--</span>';
+                container.innerHTML = '<span class="badge-dim" style="font-size:0.55rem; opacity:0.3; letter-spacing:0.02em;">1D</span>';
+            } else {
+                container.remove();
             }
         });
     });
