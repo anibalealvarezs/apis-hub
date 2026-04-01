@@ -452,12 +452,6 @@ class BaseRepository extends EntityRepository
         error_log("SQL: " . $generatedSql);
         error_log("Params: " . json_encode($generatedParams));
         
-        if (isset($_GET['debug_sql']) || php_sapi_name() === 'cli') {
-            echo "==== DBAL DEBUG ====\nSQL:\n" . $generatedSql . "\nParameters:\n";
-            print_r($generatedParams);
-            echo "====================\n";
-        }
-        
         $stmt = $qb->executeQuery();
         $results = $stmt->fetchAllAssociative();
 
