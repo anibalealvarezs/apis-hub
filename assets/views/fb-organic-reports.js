@@ -131,12 +131,14 @@ async function loadReport() {
                     if (!TREND_DATA_CACHE['instagram'][cid]) TREND_DATA_CACHE['instagram'][cid] = {};
                     metrics.filter(m => m.sparkline).forEach(m => {
                         const valKey = `trend_${m.key}`;
-                        const val = d[valKey] || d[valKey.toLowerCase()];
+                        const val = d[m.key] || d[valKey] || d[valKey.toLowerCase()] || 0;
                         if (!TREND_DATA_CACHE['instagram'][cid][m.key]) TREND_DATA_CACHE['instagram'][cid][m.key] = [];
                         TREND_DATA_CACHE['instagram'][cid][m.key].push({ day: d.daily, val: parseFloat(val || 0) });
                     });
                 });
             }
+            const recordCountEl = document.getElementById('record-count');
+            if (recordCountEl) recordCountEl.textContent = currentData.length;
             render(start, end);
         } else {
             if (emptyMsg) emptyMsg.style.display = 'block';
@@ -161,15 +163,16 @@ function render(start, end) {
 
     currentData.forEach((row, idx) => {
         const tr = document.createElement('tr');
-        const rowId = `row-ig-${row.channeledAccount}`.replace(/[^a-z0-9\-]/gi, '-');
+        const cid_raw = row.channeledAccount || row.channeledaccount;
+        const rowId = `row-ig-${cid_raw}`.replace(/[^a-z0-9\-]/gi, '-');
         tr.id = rowId;
-        const fbLinkedId = row.linked_fb_page_id || 'N/A';
-        const accountId = row.channeled_account_id;
+        const fbLinkedId = row.linked_fb_page_id || row.linked_fb_page_id_id || 'N/A';
+        const accountId = row.channeled_account_id || row.channeled_account_id_id;
         
         tr.innerHTML = `
             <td class="col-actions">
                 <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
-                    <button class="btn-expand next-btn-fb" onclick="toggleOrganicHierarchy(this, '${rowId}', 'facebook', '${accountId}', '${fbLinkedId.replace(/'/g, "\\'")}')" title="View Linked Facebook Page">
+                    <button class="btn-expand next-btn-fb" onclick="toggleOrganicHierarchy(this, '${rowId}', 'facebook', '${accountId}', '${String(fbLinkedId).replace(/'/g, "\\'")}')" title="View Linked Facebook Page">
                         <i data-lucide="layers" size="14"></i>
                     </button>
                     <button class="btn-expand next-btn-ig" onclick="toggleOrganicHierarchy(this, '${rowId}', 'content', '${accountId}', null)" title="View Instagram Posts" style="background-color:rgba(139,92,246,0.1); color:#8b5cf6; border-color:rgba(139,92,246,0.3);">
@@ -177,7 +180,7 @@ function render(start, end) {
                     </button>
                 </div>
             </td>
-            <td style="text-align: left;"><strong>${row.channeledAccount}</strong></td>
+            <td style="text-align: left;"><strong>${cid_raw}</strong></td>
             <td style="text-align: left;"><span class="badge-${fbLinkedId !== 'N/A' ? 'success' : 'dim'}">${fbLinkedId}</span></td>
             ${metrics.map(m => {
                 const val = row[m.key] || row[String(m.key).toLowerCase()] || 0;
