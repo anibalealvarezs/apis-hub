@@ -364,14 +364,17 @@ class BaseRepository extends EntityRepository
                     $isPlatformIdValue = is_numeric($value) && (float)$value > 2147483647;
                     $isPostgres = Helpers::isPostgres();
                     
-                    if ($value === 'N/A') {
-                        $sqlKey = (isset($map['fk'])) ? "mc.{$map['fk']}" : "mc.$key";
-                        if ($key === 'page') $sqlKey = 'mc.page_id';
-                        $qb->andWhere("$sqlKey IS NULL");
-                    } else if ($value === 'NOT_NULL') {
-                        $sqlKey = (isset($map['fk'])) ? "mc.{$map['fk']}" : "mc.$key";
-                        if ($key === 'page') $sqlKey = 'mc.page_id';
-                        $qb->andWhere("$sqlKey IS NOT NULL");
+                    $sqlKey = (isset($map['alias'])) ? "{$map['alias']}.{$targetCol}" : "mc.$key";
+                    if ($key === 'page') $sqlKey = 'rp.url';
+
+                    if ($value === 'N/A' || $value === 'NULL') {
+                        $nullTarget = (isset($map['fk'])) ? "mc.{$map['fk']}" : $sqlKey;
+                        if ($key === 'page') $nullTarget = 'mc.page_id';
+                        $qb->andWhere("$nullTarget IS NULL");
+                    } elseif ($value === 'NOT_NULL') {
+                        $nullTarget = (isset($map['fk'])) ? "mc.{$map['fk']}" : $sqlKey;
+                        if ($key === 'page') $nullTarget = 'mc.page_id';
+                        $qb->andWhere("$nullTarget IS NOT NULL");
                     } else if (($isPlatformIdValue || str_starts_with((string)$value, 'http')) && ($targetCol === 'platform_id' || $targetCol === 'url')) {
                         $qb->andWhere("{$map['alias']}.$targetCol = :f_$key")
                            ->setParameter("f_$key", (string)$value);
