@@ -531,17 +531,21 @@ function renderRecursiveTable(container, data, level, parentRowId, parentName, c
     });
     html += `</tr></thead><tbody>`;
     data.forEach((row, idx) => {
-        const eId = row[hItem.idField];
+        // Casing defense for ID and Name fields (PostgreSQL compatibility)
+        const eId = row[hItem.idField] || row[String(hItem.idField).toLowerCase()] || row[String(hItem.idField).replace(/_id$/i, 'id').toLowerCase()] || row[String(hItem.idField).replace(/id$/i, '_id').toLowerCase()];
+        const eName = row[hItem.nameField] || row[String(hItem.nameField).toLowerCase()] || 'Unknown';
+        const rowStatus = row.status || row.campaign_status || row.campaignstatus || 'unknown';
+
         const rowId = `row-${level}-${eId}`.replace(/[^a-z0-9\-]/gi, '-');
         html += `<tr id="${rowId}">
             <td class="text-center">
                 <div class="btn-group-center">
-                    <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', '${level}', '${eId}', '${row[hItem.nameField].replace(/'/g, "\\'")}')"><i data-lucide="users" size="12"></i></button>
-                    ${hItem.next && canDisaggregate(hItem.next) ? `<button class="btn-expand next-btn" onclick="toggleHierarchy('${rowId}', 'next', '${level}', '${eId}', '${row[hItem.nameField].replace(/'/g, "\\'")}')"><i data-lucide="${HIERARCHY[hItem.next].icon}" size="12"></i></button>` : ''}
+                    <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', '${level}', '${eId}', '${String(eName).replace(/'/g, "\\'")}')"><i data-lucide="users" size="12"></i></button>
+                    ${hItem.next && canDisaggregate(hItem.next) ? `<button class="btn-expand next-btn" onclick="toggleHierarchy('${rowId}', 'next', '${level}', '${eId}', '${String(eName).replace(/'/g, "\\'")}')"><i data-lucide="${HIERARCHY[hItem.next].icon}" size="12"></i></button>` : ''}
                 </div>
             </td>
-            <td class="campaign-cell"><strong>${row[hItem.nameField]}</strong></td>
-            <td class="text-center">${getStatusIcon(row.status || row.campaign_status)}</td>`;
+            <td class="campaign-cell"><strong>${eName}</strong></td>
+            <td class="text-center">${getStatusIcon(rowStatus)}</td>`;
         activeMetrics.forEach(m => {
             const val = row[m.key] || 0;
             const sparkId = getSparkId(level, m.key, eId);
