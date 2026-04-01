@@ -338,6 +338,9 @@ class BaseRepository extends EntityRepository
         // Apply filters
         if ($filters) {
             foreach ($filters as $key => $value) {
+                // Skip technical/debug parameters
+                if ($key === 'debug_sql' || $key === '_') continue;
+
                 $isDimension = str_starts_with($key, 'dimensions.');
                 $dimKey = $isDimension ? substr($key, 11) : $key;
 
