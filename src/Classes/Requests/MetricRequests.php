@@ -2598,7 +2598,7 @@ class MetricRequests
         if (!$channeledAccountEntity) {
              return ['map' => [], 'mapReverse' => []];
         }
-        $sql = "SELECT id, post_id, data FROM posts WHERE page_id = ? AND (channeled_account_id = ? OR channeled_account_id IS NULL)";
+        $sql = "SELECT id, post_id, data FROM posts WHERE page_id = ? AND channeled_account_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId(), $channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
         $mapData = [];
