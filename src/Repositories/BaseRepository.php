@@ -365,6 +365,7 @@ class BaseRepository extends EntityRepository
                     }
 
                     $isPlatformIdValue = is_numeric($value) && (float)$value > 2147483647;
+                    $isNameValue = !is_numeric($value) && !in_array($value, ['NULL', 'NOT_NULL', 'N/A']);
                     $isPostgres = Helpers::isPostgres();
                     
                     $sqlKey = (isset($map['alias'])) ? "{$map['alias']}.{$targetCol}" : "mc.$key";
@@ -378,19 +379,17 @@ class BaseRepository extends EntityRepository
                         $nullTarget = (isset($map['fk'])) ? "mc.{$map['fk']}" : $sqlKey;
                         if ($key === 'page') $nullTarget = 'mc.page_id';
                         $qb->andWhere("$nullTarget IS NOT NULL");
-                    } else if (($isPlatformIdValue || str_starts_with((string)$value, 'http')) && ($targetCol === 'platform_id' || $targetCol === 'url')) {
+                    } elseif ($isNameValue && isset($map['alias']) && isset($map['field'])) {
+                        // If it's a string name, search by name field
+                        $qb->andWhere("{$map['alias']}.{$map['field']} = :f_$key")
+                           ->setParameter("f_$key", $value);
+                    } elseif (($isPlatformIdValue || str_starts_with((string)$value, 'http')) && ($targetCol === 'platform_id' || $targetCol === 'url')) {
                         $qb->andWhere("{$map['alias']}.$targetCol = :f_$key")
                            ->setParameter("f_$key", (string)$value);
                     } else {
-                        if ($isPostgres) {
-                            $condition = ($targetCol === 'type') ? "{$map['alias']}.type = :f_$key" : "(CAST(mc.{$map['fk']} AS text) = :f_$key OR {$map['alias']}.platform_id = :f_$key)";
-                            $qb->andWhere($condition)
-                               ->setParameter("f_$key", (string)$value);
-                        } else {
-                            $condition = ($targetCol === 'type') ? "{$map['alias']}.type = :f_$key" : "(mc.{$map['fk']} = :f_$key OR {$map['alias']}.platform_id = :f_$key)";
-                            $qb->andWhere($condition)
-                               ->setParameter("f_$key", $value);
-                        }
+                        // Fallback: search by mapped SQL key (mc.column or joined column)
+                        $qb->andWhere("$sqlKey = :val_$key")
+                           ->setParameter("val_$key", $value);
                     }
                 } else {
                     $sqlKey = $this->mapFieldToSql($key);
