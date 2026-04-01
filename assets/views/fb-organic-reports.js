@@ -118,13 +118,10 @@ async function loadReport() {
             
             // 2. Trend data for Sparklines
             const trendAggs = {}; metrics.filter(m => m.sparkline).forEach(m => trendAggs[`trend_${m.key}`] = m.original);
-            const currentAccountType = payload.filters.account_type || 'facebook_page';
-            const channelToFetch = (currentAccountType === 'instagram') ? 'instagram' : 'facebook_organic';
-            const groupByField = (currentAccountType === 'instagram') ? 'channeledAccount' : 'page';
-
-            const resTrend = await fetch(`/${channelToFetch}/metric/aggregate`, { 
+            
+            const resTrend = await fetch('/facebook_organic/metric/aggregate', { 
                 method: 'POST', headers, 
-                body: JSON.stringify({ aggregations: trendAggs, groupBy: ['daily', groupByField], startDate: start, endDate: end }) 
+                body: JSON.stringify({ aggregations: trendAggs, groupBy: ['daily', 'channeledAccount'], startDate: start, endDate: end }) 
             }).then(r => r.json());
 
             if (resTrend.status === 'success' && resTrend.data) {
@@ -282,8 +279,7 @@ async function toggleOrganicHierarchy(btn, rowId, level, parentId, childPlatform
             const metrics = getActiveMetrics('content', isFromFb);
             const aggs = {}; metrics.forEach(m => aggs[m.key] = m.original);
 
-            const channelToUse = isFromFb ? 'facebook_organic' : 'instagram';
-            const res = await fetch(`/${channelToUse}/metric/aggregate`, { 
+            const res = await fetch('/facebook_organic/metric/aggregate', { 
                 method: 'POST', headers, 
                 body: JSON.stringify({ aggregations: aggs, filters, groupBy, startDate: start, endDate: end }) 
             }).then(r => r.json());

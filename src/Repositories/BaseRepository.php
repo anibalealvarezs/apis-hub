@@ -385,7 +385,7 @@ class BaseRepository extends EntityRepository
                             $qb->andWhere("{$map['alias']}.type = :f_$key")
                                ->setParameter("f_$key", $value);
                         } else {
-                            $qb->andWhere("{$map['alias']}.{$map['field']} = :f_$key")
+                            $qb->andWhere("LOWER({$map['alias']}.{$map['field']}) = LOWER(:f_$key)")
                                ->setParameter("f_$key", $value);
                         }
                     } elseif (($isPlatformIdValue || str_starts_with((string)$value, 'http')) && ($targetCol === 'platform_id' || $targetCol === 'url')) {
@@ -409,7 +409,7 @@ class BaseRepository extends EntityRepository
                         if ($isPostgres) {
                             // Cast both sides to text if the input is not numeric to prevent type mismatch
                             if (!is_numeric($value)) {
-                                $qb->andWhere("CAST($sqlKey AS text) = :$paramName")
+                                $qb->andWhere("LOWER(CAST($sqlKey AS text)) = LOWER(:$paramName)")
                                    ->setParameter($paramName, (string)$value);
                             } else {
                                 $qb->andWhere("$sqlKey = :$paramName")
