@@ -118,15 +118,19 @@ async function loadReport() {
             
             // 2. Trend data for Sparklines
             const trendAggs = {}; metrics.filter(m => m.sparkline).forEach(m => trendAggs[`trend_${m.key}`] = m.original);
-            const resTrend = await fetch('/facebook_organic/metric/aggregate', { 
+            const channelToFetch = (type === 'instagram') ? 'instagram' : 'facebook_organic';
+            const groupByField = (type === 'instagram') ? 'channeledAccount' : 'page';
+
+            const resTrend = await fetch(`/${channelToFetch}/metric/aggregate`, { 
                 method: 'POST', headers, 
-                body: JSON.stringify({ aggregations: trendAggs, groupBy: ["daily", "channeledAccount"], startDate: start, endDate: end }) 
+                body: JSON.stringify({ aggregations: trendAggs, groupBy: ['daily', groupByField], startDate: start, endDate: end }) 
             }).then(r => r.json());
 
             if (resTrend.status === 'success' && resTrend.data) {
+                const trendData = Array.isArray(resTrend.data) ? resTrend.data : (resTrend.data.data || []);
                 TREND_DATA_CACHE['instagram'] = {};
-                resTrend.data.forEach(d => {
-                    const cid = d.channeledAccount || d.channeledaccount;
+                trendData.forEach(d => {
+                    const cid = d.channeledAccount || d.channeledaccount || d.page || d.platform_id;
                     if (!cid) return;
                     if (!TREND_DATA_CACHE['instagram'][cid]) TREND_DATA_CACHE['instagram'][cid] = {};
                     metrics.filter(m => m.sparkline).forEach(m => {
@@ -277,7 +281,8 @@ async function toggleOrganicHierarchy(btn, rowId, level, parentId, childPlatform
             const metrics = getActiveMetrics('content', isFromFb);
             const aggs = {}; metrics.forEach(m => aggs[m.key] = m.original);
 
-            const res = await fetch('/facebook_organic/metric/aggregate', { 
+            const channelToUse = isFromFb ? 'facebook_organic' : 'instagram';
+            const res = await fetch(`/${channelToUse}/metric/aggregate`, { 
                 method: 'POST', headers, 
                 body: JSON.stringify({ aggregations: aggs, filters, groupBy, startDate: start, endDate: end }) 
             }).then(r => r.json());
