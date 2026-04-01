@@ -11,589 +11,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <script src="/assets/navbar.js"></script>
     <script src="/assets/footer.js"></script>
-    <style>
-        :root {
-            --bg-dark: #0a0c10;
-            --bg-card: rgba(22, 27, 34, 0.7);
-            --bg-accent: #21262d;
-            --primary: #58a6ff;
-            --primary-glow: rgba(88, 166, 255, 0.3);
-            --secondary: #238636;
-            --text-main: #c9d1d9;
-            --text-dim: #8b949e;
-            --border: rgba(48, 54, 61, 0.8);
-            --header-h: 70px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .nav-link.active {
-            color: var(--primary);
-            font-weight: 500;
-        }
-
-        footer {
-            padding: 40px;
-            border-top: 1px solid var(--border);
-            text-align: center;
-            color: var(--text-dim);
-            font-size: 0.85rem;
-            margin-top: 40px;
-        }
-
-        .subtle-link {
-            color: inherit;
-            text-decoration: none;
-            transition: color 0.3s;
-            opacity: 0.5;
-        }
-
-        .subtle-link:hover {
-            opacity: 1;
-            color: var(--primary);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            line-height: 1.6;
-            overflow-x: hidden;
-            background-image: 
-                radial-gradient(circle at 20% 20%, rgba(88, 166, 255, 0.05) 0%, transparent 40%),
-                radial-gradient(circle at 80% 80%, rgba(35, 134, 54, 0.05) 0%, transparent 40%);
-            min-height: 100vh;
-        }
-
-        header {
-            height: var(--header-h);
-            background: rgba(13, 17, 23, 0.8);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 40px;
-            position: fixed;
-            top: 0;
-            width: 100%;
-            z-index: 100;
-        }
-
-        .logo {
-            font-weight: 700;
-            font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #fff;
-            text-decoration: none;
-        }
-
-        .logo i {
-            color: var(--primary);
-        }
-
-        .logo span {
-            color: var(--text-dim);
-            font-weight: 400;
-            margin-left: 5px;
-            font-size: 0.9rem;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 20px;
-        }
-
-        .nav-link {
-            color: var(--text-dim);
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: var(--transition);
-        }
-
-        .nav-link:hover {
-            color: var(--primary);
-        }
-
-        main {
-            padding: 20px 40px 40px 40px;
-            max-width: 1750px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 680px 1fr 340px;
-            gap: 30px;
-            align-items: start;
-        }
-
-        @media (max-width: 1400px) {
-            main {
-                grid-template-columns: 1fr 1fr;
-            }
-            .preview-pane { grid-column: 1 / span 2; }
-            .history-pane { grid-column: 1 / span 2; }
-        }
-
-        @media (max-width: 900px) {
-            main {
-                grid-template-columns: 1fr;
-            }
-            .history-pane { grid-column: auto; }
-        }
-
-        .section-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 30px;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            height: fit-content;
-        }
-
-        #card-agg, #card-docker, #card-semantic {
-            display: none;
-        }
-
-        #card-agg.active, #card-docker.active, #card-semantic.active {
-            display: block;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 30px;
-            background: rgba(13, 17, 23, 0.4);
-            padding: 5px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            width: fit-content;
-        }
-
-        .tab {
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: var(--text-dim);
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .tab:hover {
-            background: rgba(255, 255, 255, 0.05);
-            color: #fff;
-        }
-
-        .tab.active {
-            background: var(--bg-accent);
-            color: var(--primary);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: var(--text-dim);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        select, input, textarea {
-            width: 100%;
-            background: var(--bg-accent);
-            border: 1px solid var(--border);
-            color: #fff;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-family: inherit;
-            font-size: 0.95rem;
-            outline: none;
-            transition: var(--transition);
-        }
-
-        select:focus, input:focus, textarea:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 4px var(--primary-glow);
-        }
-
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        .badge-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .badge {
-            background: var(--bg-accent);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            border: 1px solid var(--border);
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .badge:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-
-        .badge.active {
-            background: var(--primary);
-            color: #fff;
-            border-color: var(--primary);
-        }
-
-        .preview-pane {
-            position: sticky;
-            top: 110px;
-        }
-
-        .terminal {
-            background: #0d1117;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-        }
-
-        .terminal-header {
-            background: #161b22;
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .terminal-dots {
-            display: flex;
-            gap: 8px;
-        }
-
-        .dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-        }
-
-        .dot-red { background: #ff5f56; }
-        .dot-yellow { background: #ffbd2e; }
-        .dot-green { background: #27c93f; }
-
-        .terminal-body {
-            padding: 24px;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.95rem;
-            color: #d1d5db;
-            min-height: 200px;
-            white-space: pre-wrap;
-            word-break: break-all;
-            position: relative;
-        }
-
-        .curl-pane {
-            margin-top: 20px;
-            display: none;
-        }
-
-        .curl-pane.active {
-            display: block;
-        }
-
-        .terminal-prompt {
-            color: var(--primary);
-            margin-right: 10px;
-        }
-
-        .command-arg { color: #f97316; }
-        .command-val { color: #22c55e; }
-        .command-flag { color: #a855f7; }
-
-        .copy-btn {
-            background: var(--primary);
-            color: #fff;
-            border: none;
-            padding: 6px 14px;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            white-space: nowrap;
-        }
-
-        #command-name-input {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 6px 12px;
-            color: #fff;
-            font-size: 0.8rem;
-            width: 180px;
-            outline: none;
-            transition: var(--transition);
-        }
-
-        #command-name-input:focus {
-            border-color: var(--primary);
-            background: rgba(255, 255, 255, 0.08);
-        }
-        .copy-btn:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
-        }
-
-        .copy-btn:active {
-            transform: translateY(0);
-        }
-
-        .input-pill-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            padding: 8px;
-            background: var(--bg-accent);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            min-height: 48px;
-        }
-
-        .input-pill {
-            background: rgba(88, 166, 255, 0.1);
-            color: var(--primary);
-            border: 1px solid rgba(88, 166, 255, 0.2);
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .input-pill span {
-            cursor: pointer;
-            opacity: 0.6;
-        }
-
-        .input-pill span:hover {
-            opacity: 1;
-        }
-
-        .pill-input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: #fff;
-            min-width: 100px;
-            padding: 4px;
-        }
-
-        .pill-input:focus {
-            box-shadow: none;
-            border: none;
-        }
-
-        .hint {
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            margin-top: 6px;
-        }
-
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .animate-fade {
-            animation: fadeIn 0.5s ease forwards;
-        }
-
-        .dynamic-list {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.4s ease-out;
-        }
-
-        .dynamic-list.open {
-            max-height: 1000px;
-        }
-
-        .agg-item {
-            display: grid;
-            grid-template-columns: 1fr 1fr auto;
-            gap: 10px;
-            margin-bottom: 10px;
-            background: rgba(255,255,255,0.03);
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-        }
-
-        .remove-btn {
-            background: rgba(255, 95, 86, 0.1);
-            color: #ff5f56;
-            border: 1px solid rgba(255, 95, 86, 0.2);
-            padding: 8px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        .add-btn {
-            background: rgba(35, 134, 54, 0.1);
-            color: #238636;
-            border: 1px solid rgba(35, 134, 54, 0.2);
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            font-weight: 500;
-            margin-top: 10px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .history-item {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            margin-bottom: 10px;
-            overflow: hidden;
-            transition: var(--transition);
-        }
-
-        .history-header {
-            padding: 12px 15px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .history-header:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .history-content {
-            padding: 15px;
-            background: #0d1117;
-            border-top: 1px solid var(--border);
-            font-family: 'Fira Code', monospace;
-            font-size: 0.8rem;
-            color: var(--text-dim);
-            display: none;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .history-item.active .history-content {
-            display: block;
-        }
-
-        .history-item.active .history-header i[data-lucide="chevron-down"] {
-            transform: rotate(180deg);
-        }
-
-        .history-header i {
-            transition: transform 0.3s ease;
-        }
-
-        .history-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .history-action-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-dim);
-            cursor: pointer;
-            padding: 4px;
-            border-radius: 4px;
-            transition: var(--transition);
-        }
-
-        .history-action-btn:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .history-action-btn.delete:hover {
-            color: #ff5f56;
-            background: rgba(255, 95, 86, 0.1);
-        }
-
-        .history-tag {
-            font-size: 0.7rem;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: var(--bg-accent);
-            color: var(--primary);
-            text-transform: uppercase;
-            font-weight: 600;
-        }
-
-        /* Loading Animation */
-        .loader {
-            width: 16px;
-            height: 16px;
-            border: 2px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-    </style>
+    <link rel="stylesheet" href="/assets/css/command-builder.css">
 </head>
 <body>
 
     <header>
         <a href="/" class="logo">
-            <img src="/assets/images/apishub-trans-light-600.png" alt="APIs Hub Logo" style="height: 28px; width: auto;">
+            <img src="/assets/images/apishub-trans-light-600.png" alt="APIs Hub Logo" class="builder-logo-img">
             <span>Command Builder</span>
         </a>
         <nav class="nav-links">
@@ -607,15 +31,15 @@
         </nav>
     </header>
 
-    <div class="shell" style="max-width: 1750px; margin: 0 auto; padding: calc(var(--header-h) + 30px) 40px 0 40px;">
-        <div class="tabs">
+    <div class="shell builder-shell-header">
+        <div class="tabs-builder">
             <div class="tab active" data-tab="agg" onclick="switchTab('agg')"><i data-lucide="calculator"></i> Aggregations</div>
             <div class="tab" data-tab="docker" onclick="switchTab('docker')"><i data-lucide="box"></i> Docker Admin</div>
             <div class="tab" data-tab="semantic" onclick="switchTab('semantic')"><i data-lucide="play-circle"></i> Semantic Ops</div>
         </div>
     </div>
 
-    <main>
+    <main class="builder-layout">
         <!-- Aggregation Panel -->
         <div id="card-agg" class="card active animate-fade">
             <h2 class="section-title"><i data-lucide="settings-2"></i> Command Configurator</h2>
@@ -813,7 +237,7 @@
                         <div class="dot dot-yellow"></div>
                         <div class="dot dot-green"></div>
                     </div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
+                    <div class="header-flex" style="gap:10px">
                         <input type="text" id="command-name-input" placeholder="Name this command...">
                         <button class="copy-btn" id="save-btn" style="background: var(--secondary);">
                             <i data-lucide="save" size="16"></i> Save
@@ -837,7 +261,7 @@
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <span id="curl-method" style="font-size: 0.7rem; color: var(--text-dim);">METHOD: GET</span>
                         </div>
-                        <div style="display: flex; gap: 8px;">
+                        <div class="header-flex" style="gap:8px">
                             <button class="copy-btn" id="copy-url-btn" style="padding: 4px 10px; font-size: 0.75rem; background: var(--bg-accent);">
                                 <i data-lucide="link" size="12"></i> Copy URL
                             </button>
@@ -855,11 +279,11 @@
                 </div>
             </div>
             
-            <div class="card" style="margin-top: 30px; padding: 20px;">
-                <h4 style="font-size: 0.9rem; margin-bottom: 15px; color: var(--text-dim); display: flex; align-items: center; gap: 8px;">
+            <div class="card builder-tip-card">
+                <h4 class="builder-tip-title">
                     <i data-lucide="info" size="16"></i> Quick Tips
                 </h4>
-                <ul style="font-size: 0.85rem; color: var(--text-dim); padding-left: 20px;">
+                <ul class="builder-tip-list">
                     <li style="margin-bottom: 8px;">Use <code style="color: var(--primary)">dimensions.FIELD</code> for granular platform attributes.</li>
                     <li style="margin-bottom: 8px;">Temporal grouping (daily, weekly) automatically fills gaps for charts.</li>
                     <li>Weighted formulas like <code style="color: var(--primary)">ctr</code> or <code style="color: var(--primary)">cpc</code> are handled intelligently.</li>
@@ -869,7 +293,7 @@
 
         <!-- History Pane -->
         <div class="history-pane animate-fade" style="animation-delay: 0.2s;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+            <div class="builder-history-header">
                 <h2 class="section-title" style="margin-bottom: 0;"><i data-lucide="history"></i> History</h2>
                 <button class="history-action-btn delete" id="clear-history-btn" title="Clear All History">
                     <i data-lucide="trash-2" size="20"></i>
@@ -880,7 +304,7 @@
                 <!-- Saved commands go here -->
             </div>
             
-            <div id="empty-history" style="text-align: center; padding: 40px 20px; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 12px; display: none;">
+            <div id="empty-history" class="builder-empty-history">
                 <i data-lucide="ghost" size="48" style="opacity: 0.2; margin-bottom: 15px;"></i>
                 <p style="font-size: 0.9rem;">No saved commands yet.</p>
             </div>

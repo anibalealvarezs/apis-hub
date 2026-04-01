@@ -480,7 +480,7 @@ function renderTable(data, dimKey) {
     let dimContent = '';
     if (configKey === "pages") {
         dimContent = `
-            <div class="gsc-url-container" style="max-width: fit-content; width: 100%;">
+            <div class="gsc-url-container" style="max-width: 100%; width: 100%;">
                 <div class="gsc-url-text" title="${dimValue}">${dimValue}</div>
                 <a href="${dimValue}" target="_blank" class="gsc-external-link" style="margin-left: 4px;">
                     <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
