@@ -445,9 +445,16 @@ class BaseRepository extends EntityRepository
             $qb->orderBy($orderBy, $direction);
         }
 
+        // DBAL Debugging
+        $generatedSql = $qb->getSQL();
+        $generatedParams = $qb->getParameters();
+        error_log("==== APISHUB AGGREGATE DEBUG ====");
+        error_log("SQL: " . $generatedSql);
+        error_log("Params: " . json_encode($generatedParams));
+        
         if (isset($_GET['debug_sql']) || php_sapi_name() === 'cli') {
-            echo "==== DBAL DEBUG ====\nSQL:\n" . $qb->getSQL() . "\nParameters:\n";
-            print_r($qb->getParameters());
+            echo "==== DBAL DEBUG ====\nSQL:\n" . $generatedSql . "\nParameters:\n";
+            print_r($generatedParams);
             echo "====================\n";
         }
         
@@ -469,6 +476,16 @@ class BaseRepository extends EntityRepository
             if ($temporalField) {
                 $results = $this->fillTemporalGaps($results, $temporalField, $temporalType, $startDate, $endDate, $aggregations, $groupBy);
             }
+        }
+
+        // Include SQL debug info in the response if debug is active
+        if (isset($_GET['debug_sql'])) {
+            $results = [
+                'data' => $results,
+                'debug_sql' => $generatedSql,
+                'debug_params' => $generatedParams
+            ];
+            return $results;
         }
 
         return $results;

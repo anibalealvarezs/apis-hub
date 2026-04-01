@@ -277,13 +277,18 @@ async function toggleOrganicHierarchy(btn, rowId, level, parentId, childPlatform
             const metrics = getActiveMetrics('content', isFromFb);
             const aggs = {}; metrics.forEach(m => aggs[m.key] = m.original);
 
-            const res = await fetch('/facebook_organic/metric/aggregate', { 
+            const res = await fetch('/facebook_organic/metric/aggregate?debug_sql=1', { 
                 method: 'POST', headers, 
                 body: JSON.stringify({ aggregations: aggs, filters, groupBy, startDate: start, endDate: end }) 
             }).then(r => r.json());
 
             if (res.status === 'success' && res.data) {
-                renderContentSubtable(container, res.data, isFromFb);
+                const finalData = Array.isArray(res.data) ? res.data : (res.data.data || []);
+                if (Array.isArray(res.data.debug_sql) || res.data.debug_sql) {
+                    console.log("SQL DEBUG:", res.data.debug_sql);
+                    console.log("SQL PARAMS:", res.data.debug_params);
+                }
+                renderContentSubtable(container, finalData, isFromFb);
             } else {
                 container.innerHTML = `<div class="empty-state">No organic content found for this period.</div>`;
             }
