@@ -126,11 +126,14 @@ async function loadReport() {
             if (resTrend.status === 'success' && resTrend.data) {
                 TREND_DATA_CACHE['instagram'] = {};
                 resTrend.data.forEach(d => {
-                    const cid = d.channeledAccount;
+                    const cid = d.channeledAccount || d.channeledaccount;
+                    if (!cid) return;
                     if (!TREND_DATA_CACHE['instagram'][cid]) TREND_DATA_CACHE['instagram'][cid] = {};
                     metrics.filter(m => m.sparkline).forEach(m => {
+                        const valKey = `trend_${m.key}`;
+                        const val = d[valKey] || d[valKey.toLowerCase()];
                         if (!TREND_DATA_CACHE['instagram'][cid][m.key]) TREND_DATA_CACHE['instagram'][cid][m.key] = [];
-                        TREND_DATA_CACHE['instagram'][cid][m.key].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) });
+                        TREND_DATA_CACHE['instagram'][cid][m.key].push({ day: d.daily, val: parseFloat(val || 0) });
                     });
                 });
             }
@@ -177,7 +180,8 @@ function render(start, end) {
             <td style="text-align: left;"><strong>${row.channeledAccount}</strong></td>
             <td style="text-align: left;"><span class="badge-${fbLinkedId !== 'N/A' ? 'success' : 'dim'}">${fbLinkedId}</span></td>
             ${metrics.map(m => {
-                const val = row[m.key] || 0;
+                const val = row[m.key] || row[String(m.key).toLowerCase()] || 0;
+                const cid = row.channeledAccount || row.channeledaccount;
                 const sparkId = `spark-ig-${m.key}-${accountId}`.toLowerCase();
                 return `<td style="text-align: right;">
                     <div class="metric-flex-end">
@@ -196,7 +200,8 @@ function render(start, end) {
             if (m.sparkline) {
                 const sparkId = `spark-ig-${m.key}-${accountId}`.toLowerCase();
                 const sparkEl = document.getElementById(sparkId);
-                const points = TREND_DATA_CACHE['instagram']?.[row.channeledAccount]?.[m.key] || [];
+                const cid = row.channeledAccount || row.channeledaccount;
+                const points = TREND_DATA_CACHE['instagram']?.[cid]?.[m.key] || [];
                 if (sparkEl && points.length > 1) {
                     try {
                         const vals = points.sort((a,b) => a.day.localeCompare(b.day)).map(p => p.val);

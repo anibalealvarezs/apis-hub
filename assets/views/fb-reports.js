@@ -259,12 +259,14 @@ async function loadReport() {
                 if (resTrend.status === 'success' && resTrend.data) {
                     TREND_DATA_CACHE['campaign'] = {};
                     resTrend.data.forEach(d => {
-                        const cid = d.channeledCampaign;
+                        const cid = d.channeledCampaign || d.channeledcampaign;
                         if (!cid) return;
                         if (!TREND_DATA_CACHE['campaign'][cid]) TREND_DATA_CACHE['campaign'][cid] = {};
                         sparkMetrics.forEach(m => {
+                            const valKey = `trend_${m.key}`;
+                            const val = d[valKey] || d[valKey.toLowerCase()] || 0;
                             if (!TREND_DATA_CACHE['campaign'][cid][m.key]) TREND_DATA_CACHE['campaign'][cid][m.key] = [];
-                            TREND_DATA_CACHE['campaign'][cid][m.key].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) });
+                            TREND_DATA_CACHE['campaign'][cid][m.key].push({ day: d.daily, val: parseFloat(val) });
                         });
                     });
                 }
@@ -299,6 +301,7 @@ function render() {
     }
     let currentAccount = '';
     currentData.forEach((row, idx) => {
+        const cid = row.channeledCampaign || row.channeledcampaign;
         if (row.account !== currentAccount) {
             const groupRow = document.createElement('tr');
             groupRow.className = 'account-group-row';
@@ -307,24 +310,24 @@ function render() {
             currentAccount = row.account;
         }
         const tr = document.createElement('tr');
-        const rowId = `row-campaign-${row.channeledCampaign}`.replace(/[^a-z0-9\-]/gi, '-');
+        const rowId = `row-campaign-${cid}`.replace(/[^a-z0-9\-]/gi, '-');
         tr.id = rowId;
         const nameEscaped = row.campaign.replace(/'/g, "\\'");
         const isDisaggregatable = canDisaggregate('adset');
         tr.innerHTML = `
             <td class="col-actions cell-no-padding">
                 <div class="btn-group-center">
-                    <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', 'campaign', '${row.channeledCampaign}', '${nameEscaped}')" title="Audience Analysis" ${!isDisaggregatable ? 'disabled class="disabled-btn"' : ''}><i data-lucide="users" size="14"></i></button>
-                    <button class="btn-expand next-btn" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign}', '${nameEscaped}')" title="Explore AdSets" ${!isDisaggregatable ? 'disabled class="disabled-btn"' : ''}><i data-lucide="layers" size="14"></i></button>
+                    <button class="btn-expand dim-btn" onclick="toggleHierarchy('${rowId}', 'dimensions', 'campaign', '${cid}', '${nameEscaped}')" title="Audience Analysis" ${!isDisaggregatable ? 'disabled class="disabled-btn"' : ''}><i data-lucide="users" size="14"></i></button>
+                    <button class="btn-expand next-btn" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${cid}', '${nameEscaped}')" title="Explore AdSets" ${!isDisaggregatable ? 'disabled class="disabled-btn"' : ''}><i data-lucide="layers" size="14"></i></button>
                 </div>
             </td>
             <td class="account-cell">${row.account}</td>
-            <td class="campaign-cell clickable-text" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${row.channeledCampaign}', '${nameEscaped}')">${row.campaign}</td>
+            <td class="campaign-cell clickable-text" onclick="toggleHierarchy('${rowId}', 'next', 'campaign', '${cid}', '${nameEscaped}')">${row.campaign}</td>
             <td class="text-center">${getStatusIcon(row.campaign_status)}</td>
             ${activeMetrics.map(m => {
-                const val = row[m.key] || 0;
+                const val = row[m.key] || row[String(m.key).toLowerCase()] || 0;
                 const formatted = applyFormatting(val, m.format, m.key, m.precision);
-                const sparkId = getSparkId('campaign', m.key, row.channeledCampaign);
+                const sparkId = getSparkId('campaign', m.key, cid);
                 const badgeClass = applyConditional(val, m.config.conditional, m.key);
                 return `<td class="text-right metric-cell"><div class="metric-flex-end"><span class="${badgeClass}">${formatted}</span>${m.config.sparkline ? `<div id="${sparkId}" class="sparkline-inline"><div class="spark-loading"></div></div>` : ''}</div></td>`;
             }).join('')}
@@ -444,12 +447,14 @@ async function toggleHierarchy(rowId, type, level, entityId, entityName) {
                     if (!TREND_DATA_CACHE[levelKey]) TREND_DATA_CACHE[levelKey] = {};
                     
                     resTrend.data.forEach(d => {
-                        const dimKey = set.dims.map(dim => d[dim]).join('-');
+                        const dimKey = set.dims.map(dim => d[dim] || d[String(dim).toLowerCase()]).join('-');
                         if (!TREND_DATA_CACHE[levelKey][dimKey]) TREND_DATA_CACHE[levelKey][dimKey] = {};
                         activeMetrics.forEach(m => { 
-                            if (d[`trend_${m.key}`] !== undefined) { 
+                            const valKey = `trend_${m.key}`;
+                            const val = d[valKey] || d[valKey.toLowerCase()];
+                            if (val !== undefined) { 
                                 if (!TREND_DATA_CACHE[levelKey][dimKey][m.key]) TREND_DATA_CACHE[levelKey][dimKey][m.key] = []; 
-                                TREND_DATA_CACHE[levelKey][dimKey][m.key].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) }); 
+                                TREND_DATA_CACHE[levelKey][dimKey][m.key].push({ day: d.daily, val: parseFloat(val || 0) }); 
                             } 
                         });
                     });
@@ -481,12 +486,15 @@ async function toggleHierarchy(rowId, type, level, entityId, entityName) {
             if (resTrend.status === 'success' && resTrend.data) {
                 if (!TREND_DATA_CACHE[hItem.next]) TREND_DATA_CACHE[hItem.next] = {};
                 resTrend.data.forEach(d => {
-                    const nextId = d[nextHItem.idField]; if (!nextId) return;
+                    const nextId = d[nextHItem.idField] || d[String(nextHItem.idField).toLowerCase()]; 
+                    if (!nextId) return;
                     if (!TREND_DATA_CACHE[hItem.next][nextId]) TREND_DATA_CACHE[hItem.next][nextId] = {};
                     activeMetrics.forEach(m => { 
-                        if (d[`trend_${m.key}`] !== undefined) { 
+                        const valKey = `trend_${m.key}`;
+                        const val = d[valKey] || d[valKey.toLowerCase()];
+                        if (val !== undefined) { 
                             if (!TREND_DATA_CACHE[hItem.next][nextId][m.key]) TREND_DATA_CACHE[hItem.next][nextId][m.key] = []; 
-                            TREND_DATA_CACHE[hItem.next][nextId][m.key].push({ day: d.daily, val: parseFloat(d[`trend_${m.key}`] || 0) }); 
+                            TREND_DATA_CACHE[hItem.next][nextId][m.key].push({ day: d.daily, val: parseFloat(val || 0) }); 
                         } 
                     });
                 });
