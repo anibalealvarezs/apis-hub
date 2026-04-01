@@ -138,7 +138,7 @@ async function loadReport() {
                 });
             }
             const recordCountEl = document.getElementById('record-count');
-            if (recordCountEl) recordCountEl.textContent = currentData.length;
+            if (recordCountEl) recordCountEl.textContent = currentData.length + ' ';
             render(start, end);
         } else {
             if (emptyMsg) emptyMsg.style.display = 'block';
@@ -175,7 +175,7 @@ function render(start, end) {
                     <button class="btn-expand next-btn-fb" onclick="toggleOrganicHierarchy(this, '${rowId}', 'facebook', '${accountId}', '${String(fbLinkedId).replace(/'/g, "\\'")}')" title="View Linked Facebook Page">
                         <i data-lucide="layers" size="14"></i>
                     </button>
-                    <button class="btn-expand next-btn-ig" onclick="toggleOrganicHierarchy(this, '${rowId}', 'content', '${accountId}', null)" title="View Instagram Posts" style="background-color:rgba(139,92,246,0.1); color:#8b5cf6; border-color:rgba(139,92,246,0.3);">
+                    <button class="btn-expand next-btn-ig" onclick="toggleOrganicHierarchy(this, '${rowId}', 'content', '${cid_raw}', null)" title="View Instagram Posts" style="background-color:rgba(139,92,246,0.1); color:#8b5cf6; border-color:rgba(139,92,246,0.3);">
                         <i data-lucide="image" size="14"></i>
                     </button>
                 </div>
