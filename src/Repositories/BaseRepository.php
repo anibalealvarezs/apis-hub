@@ -25,6 +25,7 @@ class BaseRepository extends EntityRepository
     private array $hideFields = [];
     protected bool $isChanneledMetric = false;
     private array $activeAggregateJoins = [];
+    private bool $needsImpressionsJoin = false;
     protected static array $relationMap = [
         'query'    => ['table' => 'queries', 'fk' => 'query_id', 'field' => 'query', 'alias' => 'rq'],
         'page'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rp'],
@@ -37,19 +38,19 @@ class BaseRepository extends EntityRepository
         'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'name', 'alias' => 'rad'],
         'creative' => ['table' => 'creatives', 'fk' => 'creative_id', 'field' => 'name', 'alias' => 'rcre'],
         'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
-        'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'name', 'alias' => 'rd'],
+        'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'type', 'alias' => 'rd'],
         'page_title' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'title', 'alias' => 'rp_t'],
         'page_platform_id' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rp_p'],
         'linked_fb_page_id' => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'data', 'alias' => 'rca', 'isJSON' => true, 'jsonPath' => 'facebook_page_id'],
         'post'      => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo'],
         'post_id'   => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo_id'],
-        'caption'   => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_c', 'isJSON' => true, 'jsonPath' => 'caption'],
-        'message'   => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_m', 'isJSON' => true, 'jsonPath' => 'message'],
-        'media_type'=> ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_mt', 'isJSON' => true, 'jsonPath' => 'media_type'],
-        'permalink' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pl', 'isJSON' => true, 'jsonPath' => 'permalink'],
         'permalink_url' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pu', 'isJSON' => true, 'jsonPath' => 'permalink_url'],
+        'permalink' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pl', 'isJSON' => true, 'jsonPath' => 'permalink'],
         'timestamp' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ts', 'isJSON' => true, 'jsonPath' => 'timestamp'],
-        'created_time' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ct', 'isJSON' => true, 'jsonPath' => 'created_time']
+        'created_time' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ct', 'isJSON' => true, 'jsonPath' => 'created_time'],
+        'media_type' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_mt', 'isJSON' => true, 'jsonPath' => 'media_type'],
+        'message' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_msg', 'isJSON' => true, 'jsonPath' => 'message'],
+        'caption' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_cap', 'isJSON' => true, 'jsonPath' => 'caption'],
     ];
 
     /**
@@ -188,6 +189,7 @@ class BaseRepository extends EntityRepository
         if ($this->isChanneledMetric) {
             $qb->join('e', 'metrics', 'm', 'e.metric_id = m.id')
                ->join('m', 'metric_configs', 'mc', 'm.metric_config_id = mc.id');
+            
             $this->activeAggregateJoins['m'] = true;
             $this->activeAggregateJoins['mc'] = true;
         } elseif ($isMetric) {
@@ -196,6 +198,18 @@ class BaseRepository extends EntityRepository
         }
 
         // Selects with aggregation functions
+        $this->needsImpressionsJoin = false;
+        foreach ($aggregations as $expr) {
+            if (str_contains(strtolower($expr), 'position')) {
+                $this->needsImpressionsJoin = true;
+                break;
+            }
+        }
+
+        if ($this->needsImpressionsJoin && $this->isChanneledMetric) {
+            // Reverted JOIN due to performance impact on non-indexed tables
+        }
+
         foreach ($aggregations as $alias => $expr) {
             $parsedExpr = $this->mapFieldToSql($expr, true);
             
@@ -227,10 +241,13 @@ class BaseRepository extends EntityRepository
 
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
+            $isPostgres = Helpers::isPostgres();
+            $quoteChar = $isPostgres ? '"' : '`';
+            
             // Virtual aliases like linked_fb_page_id shouldn't be quoted for result mapping consistency
             $quotedField = $field; 
             if (!preg_match('/^[a-zA-Z0-9_]+$/', $field)) {
-                $quotedField = '"' . $field . '"';
+                $quotedField = $quoteChar . $field . $quoteChar;
             }
             $isDimension = str_starts_with($field, 'dimensions.');
             $dimKey = $isDimension ? substr($field, 11) : $field;
@@ -251,7 +268,7 @@ class BaseRepository extends EntityRepository
                 $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", $dsiCondition);
                 $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
                 
-                $qb->addSelect("dv_$dimAlias.value AS \"$quotedField\"")
+                $qb->addSelect("dv_$dimAlias.value AS $quotedField")
                    ->addGroupBy("dv_$dimAlias.value");
             } elseif (($isMetric || $this->isChanneledMetric) && in_array($field, ['account', 'campaign'])) {
                 $isAccount = $field === 'account';
@@ -269,8 +286,9 @@ class BaseRepository extends EntityRepository
                     $safeLeftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
                     
                     $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                    $qb->addSelect("COALESCE(CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST(rca_fallback.name AS $castType), CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
-                       ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
+                    $quotedFieldId = $quoteChar . $field . "_id" . $quoteChar;
+                    $qb->addSelect("COALESCE(CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST(rca_fallback.name AS $castType), CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS $quotedField")
+                       ->addSelect("mc.{$channeledMap['fk']} AS $quotedFieldId")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("rca_fallback.name")
                        ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
@@ -280,12 +298,13 @@ class BaseRepository extends EntityRepository
                 } else {
                     if (isset($genericMap['isJSON']) && $genericMap['isJSON']) {
                         $sqlField = $this->mapFieldToSql($field);
-                        $qb->addSelect("COALESCE($sqlField, 'N/A') AS \"$quotedField\"")
+                        $qb->addSelect("COALESCE($sqlField, 'N/A') AS $quotedField")
                            ->addGroupBy($sqlField);
                     } else {
+                        $quotedFieldId = $quoteChar . $field . "_id" . $quoteChar;
                         $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                        $qb->addSelect("COALESCE(CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
-                           ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
+                        $qb->addSelect("COALESCE(CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS $quotedField")
+                           ->addSelect("mc.{$channeledMap['fk']} AS $quotedFieldId")
                            ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
                            ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                            ->addGroupBy("{$channeledMap['alias']}.platform_id")
@@ -300,17 +319,18 @@ class BaseRepository extends EntityRepository
                 $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
                 if (isset($map['isJSON']) && $map['isJSON']) {
                     $sqlField = $this->mapFieldToSql($field);
-                    $qb->addSelect("COALESCE($sqlField, 'N/A') AS \"$quotedField\"")
+                    $qb->addSelect("COALESCE($sqlField, 'N/A') AS $quotedField")
                        ->addGroupBy($sqlField);
                 } else {
-                    $qb->addSelect("COALESCE(CAST({$map['alias']}.{$map['field']} AS $castType), CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
-                       ->addSelect("mc.{$map['fk']} AS \"{$quotedField}_id\"")
+                    $quotedFieldId = $quoteChar . $field . "_id" . $quoteChar;
+                    $qb->addSelect("COALESCE(CAST({$map['alias']}.{$map['field']} AS $castType), CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS $quotedField")
+                       ->addSelect("mc.{$map['fk']} AS $quotedFieldId")
                        ->addGroupBy("{$map['alias']}.{$map['field']}")
                        ->addGroupBy("mc.{$map['fk']}");
                 }
             } else {
                 $sqlField = $this->mapFieldToSql($field);
-                $qb->addSelect("$sqlField AS \"$quotedField\"")
+                $qb->addSelect("$sqlField AS $quotedField")
                    ->addGroupBy($sqlField);
             }
         }
@@ -569,25 +589,17 @@ class BaseRepository extends EntityRepository
         if (($this->isChanneledMetric || $isMetric) && $isAggregate) {
             $valCol = $this->isChanneledMetric ? 'm.value' : 'e.value';
             $formulas = [
-                'spend'       => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END)",
-                'clicks'      => "SUM(CASE WHEN mc.name = 'clicks' THEN $valCol ELSE 0 END)",
-                'impressions' => "SUM(CASE WHEN mc.name IN ('impressions', 'post_impressions', 'page_impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END)",
-                'reach'       => "SUM(CASE WHEN mc.name IN ('reach', 'post_reach') THEN $valCol ELSE 0 END)",
-                'frequency'   => "SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('reach', 'post_reach') THEN $valCol ELSE 0 END), 0)",
-                'ctr'         => "SUM(CASE WHEN mc.name = 'clicks' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0)",
-                'cpc'         => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'clicks' THEN $valCol ELSE 0 END), 0)",
-                'cpm'         => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0) / 1000)",
-                'position'    => "SUM(CASE WHEN mc.name = 'position' THEN $valCol ELSE 0 END * (
-                    SELECT m2.value 
-                    FROM metrics m2 
-                    JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id 
-                    WHERE mc2.name IN ('impressions', 'page_media_view', 'post_media_view') 
-                    AND mc2.metric_date = mc.metric_date 
-                    AND mc2.channel = mc.channel
-                    AND (mc2.query_id = mc.query_id OR (mc2.query_id IS NULL AND mc.query_id IS NULL))
-                    AND (mc2.page_id = mc.page_id OR (mc2.page_id IS NULL AND mc.page_id IS NULL))
-                    LIMIT 1
-                )) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0)",
+                'spend'       => "SUM(CASE WHEN mc.name IN ('spend', 'spend_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'clicks'      => "SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'impressions' => "SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily', 'post_impressions', 'post_impressions_daily', 'page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'reach'       => "SUM(CASE WHEN mc.name IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'frequency'   => "SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('reach', 'reach_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END), 0)",
+                'ctr'         => "SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END), 0)",
+                'cpc'         => "SUM(CASE WHEN mc.name IN ('spend', 'spend_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END), 0)",
+                'cpm'         => "SUM(CASE WHEN mc.name IN ('spend', 'spend_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END), 0) / 1000)",
+                'position'    => $this->needsImpressionsJoin ? 
+                    "SUM(CASE WHEN mc.name = 'position' THEN $valCol * (SELECT m2.value FROM metrics m2 JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id WHERE mc2.name IN ('impressions', 'page_media_view', 'post_media_view') AND mc2.metric_date = mc.metric_date AND mc2.channel = mc.channel AND (mc2.dimension_set_id <=> mc.dimension_set_id) AND (mc2.query_id <=> mc.query_id) AND (mc2.page_id <=> mc.page_id) LIMIT 1) ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0)" :
+                    "NULL",
                 'unique_clicks' => "SUM(CASE WHEN mc.name = 'unique_clicks' THEN $valCol ELSE 0 END)",
                 'results'       => "SUM(CASE WHEN mc.name = 'results' THEN $valCol ELSE 0 END)",
                 'cost_per_result' => "SUM(CASE WHEN mc.name = 'spend' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'results' THEN $valCol ELSE 0 END), 0)",
@@ -599,27 +611,39 @@ class BaseRepository extends EntityRepository
                 'purchase_roas'   => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN $valCol ELSE NULL END)",
                 'website_purchase_roas' => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN $valCol ELSE NULL END)",
                 // Organic & Shared Metrics - Mapped for Unification
-                'total_interactions' => "SUM(CASE WHEN mc.name IN ('total_interactions', 'post_engagement', 'page_post_engagements') THEN $valCol ELSE 0 END)",
-                'profile_views'      => "SUM(CASE WHEN mc.name = 'profile_views' THEN $valCol ELSE 0 END)",
-                'follower_count'     => "SUM(CASE WHEN mc.name IN ('follower_count', 'page_fans') THEN $valCol ELSE 0 END)",
-                'page_impressions'   => "SUM(CASE WHEN mc.name IN ('page_impressions', 'page_media_view') THEN $valCol ELSE 0 END)",
-                'page_post_engagements' => "SUM(CASE WHEN mc.name = 'page_post_engagements' THEN $valCol ELSE 0 END)",
-                'page_views_total'   => "SUM(CASE WHEN mc.name = 'page_views_total' THEN $valCol ELSE 0 END)",
-                'page_fans'          => "SUM(CASE WHEN mc.name = 'page_fans' THEN $valCol ELSE 0 END)",
-                'post_impressions'   => "SUM(CASE WHEN mc.name IN ('post_impressions', 'post_media_view') THEN $valCol ELSE 0 END)",
-                'post_engagement'    => "SUM(CASE WHEN mc.name = 'post_engagement' THEN $valCol ELSE 0 END)",
-                'post_reactions_by_type_total' => "SUM(CASE WHEN mc.name = 'post_reactions_by_type_total' THEN $valCol ELSE 0 END)",
-                'likes'              => "SUM(CASE WHEN mc.name IN ('likes', 'post_reactions_by_type_total') THEN $valCol ELSE 0 END)",
-                'comments'           => "SUM(CASE WHEN mc.name IN ('comments', 'post_comments') THEN $valCol ELSE 0 END)",
-                'shares'             => "SUM(CASE WHEN mc.name IN ('shares', 'post_shares') THEN $valCol ELSE 0 END)",
-                'saves'              => "SUM(CASE WHEN mc.name IN ('saves', 'saved') THEN $valCol ELSE 0 END)",
-                'saved'              => "SUM(CASE WHEN mc.name IN ('saves', 'saved') THEN $valCol ELSE 0 END)",
-                'plays'              => "SUM(CASE WHEN mc.name IN ('plays', 'video_views', 'views') THEN $valCol ELSE 0 END)",
-                'views'              => "SUM(CASE WHEN mc.name IN ('plays', 'video_views', 'views', 'post_video_views', 'page_video_views') THEN $valCol ELSE 0 END)",
-                'replies'            => "SUM(CASE WHEN mc.name = 'replies' THEN $valCol ELSE 0 END)",
-                'accounts_engaged'   => "SUM(CASE WHEN mc.name = 'accounts_engaged' THEN $valCol ELSE 0 END)",
-                'website_clicks'     => "SUM(CASE WHEN mc.name = 'website_clicks' THEN $valCol ELSE 0 END)",
-                'follows_and_unfollows' => "SUM(CASE WHEN mc.name = 'follows_and_unfollows' THEN $valCol ELSE 0 END)",
+                // Intelligence: Detect period and apply SUM or DELTA (Current - Previous)
+                'total_interactions' => "SUM(CASE WHEN mc.name IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'profile_views'      => "SUM(CASE WHEN mc.name IN ('profile_views', 'profile_views_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'follower_count'     => "SUM(CASE WHEN mc.name IN ('follower_count', 'follower_count_daily', 'page_fans', 'page_fans_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'page_impressions'   => "SUM(CASE WHEN mc.name IN ('page_impressions', 'page_impressions_daily', 'page_media_view', 'page_media_view_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'page_post_engagements' => "SUM(CASE WHEN mc.name IN ('page_post_engagements', 'page_post_engagements_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'page_views_total'   => "SUM(CASE WHEN mc.name IN ('page_views_total', 'page_views_total_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'page_fans'          => "SUM(CASE WHEN mc.name IN ('page_fans', 'page_fans_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'post_impressions'   => "SUM(CASE WHEN mc.name IN ('post_impressions', 'post_impressions_daily', 'post_media_view', 'post_media_view_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'post_engagement'    => "SUM(CASE WHEN mc.name IN ('post_engagement', 'post_engagement_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'post_reactions_by_type_total' => "SUM(CASE WHEN mc.name IN ('post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'likes'              => "SUM(CASE WHEN mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'comments'           => "SUM(CASE WHEN mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'shares'             => "SUM(CASE WHEN mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'saves'              => "SUM(CASE WHEN mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'saved'              => "SUM(CASE WHEN mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'plays'              => "SUM(CASE WHEN mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'views'              => "SUM(CASE WHEN mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'replies'            => "SUM(CASE WHEN mc.name IN ('replies', 'replies_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'accounts_engaged'   => "SUM(CASE WHEN mc.name IN ('accounts_engaged', 'accounts_engaged_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'website_clicks'     => "SUM(CASE WHEN mc.name IN ('website_clicks', 'website_clicks_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'profile_links_taps' => "SUM(CASE WHEN mc.name IN ('profile_links_taps', 'profile_links_taps_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'follows_and_unfollows' => "SUM(CASE WHEN mc.name IN ('follows_and_unfollows', 'follows_and_unfollows_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                
+                // Mappings for exact _daily metric fields (Post Level Content)
+                'reach_daily'       => "SUM(CASE WHEN mc.name = 'reach_daily' AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'impressions_daily' => "SUM(CASE WHEN mc.name = 'impressions_daily' AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'likes_daily'       => "SUM(CASE WHEN mc.name = 'likes_daily' AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'comments_daily'    => "SUM(CASE WHEN mc.name = 'comments_daily' AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'shares_daily'      => "SUM(CASE WHEN mc.name = 'shares_daily' AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'saved_daily'       => "SUM(CASE WHEN mc.name = 'saved_daily' AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'total_interactions_daily' => "SUM(CASE WHEN mc.name = 'total_interactions_daily' AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
+                'views_daily'       => "SUM(CASE WHEN mc.name = 'views_daily' AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
             ];
 
             if (isset($formulas[$lowerField])) {

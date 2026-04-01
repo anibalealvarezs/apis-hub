@@ -17,6 +17,13 @@ class DimensionManager
     {
     }
 
+    public function clearCaches(): void
+    {
+        $this->keyCache = [];
+        $this->valueCache = [];
+        $this->setCache = [];
+    }
+
     /**
      * @param array $dimensions Array of ['dimensionKey' => '...', 'dimensionValue' => '...']
      * @return DimensionSet

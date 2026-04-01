@@ -197,5 +197,12 @@ return [
         'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
         'html' => true,
         'admin' => false
+    ],
+    '/gsc-reports' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new PageController())->gscReports(),
+        'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
+        'html' => true,
+        'admin' => false
     ]
 ];

@@ -224,6 +224,7 @@ class FacebookOrganicMetricConvert
      */
     public static function igMediaMetrics(
         array $rows,
+        string $date,
         ?Page $pageEntity,
         ?Post $postEntity,
         ?Account $accountEntity,
@@ -238,12 +239,11 @@ class FacebookOrganicMetricConvert
         $elements = [];
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
-            $today = Carbon::today()->toDateString();
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: Channel::facebook_organic->value,
                 name: $row['name'] ?? 'unknown',
                 period: Period::Lifetime->value,
-                metricDate: $today,
+                metricDate: $date,
                 account: $accountEntity->getName(),
                 channeledAccount:  $channeledAccountEntity->getPlatformId(),
                 page:  $pageEntity->getUrl(),
@@ -256,9 +256,9 @@ class FacebookOrganicMetricConvert
             $channeledMetric->channel = Channel::facebook_organic->value;
             $channeledMetric->name = $row['name'] ?? 'unknown';
             $channeledMetric->period = Period::Lifetime->value;
-            $channeledMetric->metricDate = $today;
+            $channeledMetric->metricDate = $date;
             $channeledMetric->platformId = $postEntity->getPostId();
-            $channeledMetric->platformCreatedAt = $today;
+            $channeledMetric->platformCreatedAt = $date;
             $channeledMetric->account = $accountEntity;
             $channeledMetric->channeledAccount = $channeledAccountEntity;
             $channeledMetric->page = $pageEntity;

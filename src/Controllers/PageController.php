@@ -54,6 +54,12 @@ class PageController extends BaseController
         return $this->renderFacebookReport($html, 'facebook_organic', '<!-- FB_ORGANIC_CONFIG_PLACEHOLDER -->');
     }
 
+    public function gscReports(): Response
+    {
+        $html = file_get_contents(__DIR__ . '/../views/gsc-reports.html');
+        return $this->renderFacebookReport($html, 'google_search_console', '<!-- GSC_CONFIG_PLACEHOLDER -->');
+    }
+
     private function renderFacebookReport(string $html, string $channel, string $placeholder): Response
     {
         $channelsConfig = \Helpers\Helpers::getChannelsConfig();

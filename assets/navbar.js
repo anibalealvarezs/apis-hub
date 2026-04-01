@@ -81,6 +81,11 @@
                     </a>
                 </li>
 
+                <li class="nav-item">
+                    <a href="/gsc-reports" class="nav-link">
+                        <i data-lucide="search"></i> Search
+                    </a>
+                </li>
                 ${(!isDemo && window.location.pathname.indexOf('/config-manager') === -1) ? `
                 <li class="nav-item">
                     <a href="/docs" class="nav-link">

@@ -18,7 +18,7 @@ use Repositories\MetricConfigRepository;
 #[ORM\Index(columns: ['channel', 'name', 'period', 'metric_date'], name: 'idx_metric_configs_metricDate_period_idx')]
 #[ORM\Index(columns: ['channel', 'name', 'metric_date'], name: 'idx_metric_configs_metricDate_base_idx')]
 #[ORM\Index(
-    columns: ['channel', 'name', 'period', 'metric_date', 'query_id', 'page_id', 'country_id', 'device_id'],
+    columns: ['channel', 'name', 'period', 'metric_date', 'query_id', 'page_id', 'country_id', 'device_id', 'dimension_set_id'],
     name: 'idx_metric_configs_lookup_full_idx'
 )]
 #[ORM\Index(
@@ -28,6 +28,10 @@ use Repositories\MetricConfigRepository;
 #[ORM\Index(
     columns: ['channel', 'name', 'period', 'metric_date', 'account_id'],
     name: 'idx_metric_configs_lookup_account_idx'
+)]
+#[ORM\Index(
+    columns: ['channel', 'name', 'period', 'metric_date', 'post_id'],
+    name: 'idx_metric_configs_lookup_post_idx'
 )]
 #[ORM\UniqueConstraint(name: 'metric_config_signature_unique', columns: ['config_signature'])]
 #[ORM\HasLifecycleCallbacks]
@@ -107,6 +111,10 @@ class MetricConfig extends Entity
     #[ORM\ManyToOne(targetEntity: Device::class)]
     #[ORM\JoinColumn(name: 'device_id', onDelete: 'SET NULL')]
     protected ?Device $device = null;
+
+    #[ORM\ManyToOne(targetEntity: \Entities\Analytics\Channeled\DimensionSet::class)]
+    #[ORM\JoinColumn(name: 'dimension_set_id', onDelete: 'SET NULL')]
+    protected ?\Entities\Analytics\Channeled\DimensionSet $dimensionSet = null;
 
     #[ORM\Column(name: 'config_signature', type: 'string', length: 32, unique: true)]
     protected string $configSignature;
@@ -505,6 +513,28 @@ class MetricConfig extends Entity
 
     #[ORM\PrePersist]
     #[ORM\PreUpdate]
+    /**
+     * @return \Entities\Analytics\Channeled\DimensionSet|null
+     */
+    public function getDimensionSet(): ?\Entities\Analytics\Channeled\DimensionSet
+    {
+        return $this->dimensionSet;
+    }
+
+    /**
+     * @param \Entities\Analytics\Channeled\DimensionSet|null $dimensionSet
+     * @return self
+     */
+    public function addDimensionSet(?\Entities\Analytics\Channeled\DimensionSet $dimensionSet): self
+    {
+        $this->dimensionSet = $dimensionSet;
+        return $this;
+    }
+
+    /**
+     * @return void
+     */
+    #[ORM\PrePersist, ORM\PreUpdate]
     public function updateSignature(): void
     {
         $this->configSignature = \Classes\KeyGenerator::generateMetricConfigKey(
@@ -526,7 +556,8 @@ class MetricConfig extends Entity
             customer: $this->customer,
             order: $this->order,
             country: $this->country,
-            device: $this->device
+            device: $this->device,
+            dimensionSet: $this->dimensionSet
         );
     }
 }

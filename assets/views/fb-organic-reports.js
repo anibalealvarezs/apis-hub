@@ -47,23 +47,19 @@ function getActiveMetrics(level = 'instagram', isFb = false) {
     // Config based on level
     if (level === 'instagram') {
         return [
-            { key: 'reach', label: 'REACH', format: 'number', precision: 0, original: 'reach', sparkline: true },
-            { key: 'views', label: 'VIEWS', format: 'number', precision: 0, original: 'views', sparkline: true },
-            { key: 'total_interactions', label: 'INTER', format: 'number', precision: 0, original: 'total_interactions', sparkline: true },
-            { key: 'likes', label: 'LIKES', format: 'number', precision: 0, original: 'likes', sparkline: false },
-            { key: 'comments', label: 'COMM', format: 'number', precision: 0, original: 'comments', sparkline: false },
-            { key: 'shares', label: 'SHARES', format: 'number', precision: 0, original: 'shares', sparkline: false },
-            { key: 'saves', label: 'SAVES', format: 'number', precision: 0, original: 'saves', sparkline: false },
-            { key: 'replies', label: 'REPLIES', format: 'number', precision: 0, original: 'replies', sparkline: false },
-            { key: 'accounts_engaged', label: 'ENGAGED', format: 'number', precision: 0, original: 'accounts_engaged', sparkline: false },
+            { key: 'reach', label: 'REACH', format: 'number', precision: 0, original: 'reach', sparkline: false },
+            { key: 'impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions', sparkline: false },
             { key: 'profile_views', label: 'PRF VIEW', format: 'number', precision: 0, original: 'profile_views', sparkline: false },
             { key: 'website_clicks', label: 'WEB CLK', format: 'number', precision: 0, original: 'website_clicks', sparkline: false },
-            { key: 'follows_and_unfollows', label: 'FOLLOWS', format: 'number', precision: 0, original: 'follows_and_unfollows', sparkline: true }
+            { key: 'profile_links_taps', label: 'LNK TAPS', format: 'number', precision: 0, original: 'profile_links_taps', sparkline: false },
+            { key: 'follows_and_unfollows', label: 'FOLLOWS', format: 'number', precision: 0, original: 'follows_and_unfollows', sparkline: true },
+            { key: 'replies', label: 'REPLIES', format: 'number', precision: 0, original: 'replies', sparkline: false },
+            { key: 'accounts_engaged', label: 'ENGAGED', format: 'number', precision: 0, original: 'accounts_engaged', sparkline: false }
         ];
     }
     if (level === 'facebook') {
         return [
-            { key: 'page_impressions', label: 'IMPR', format: 'number', precision: 0, original: 'page_impressions', sparkline: true },
+            { key: 'page_impressions', label: 'IMPR', format: 'number', precision: 0, original: 'page_impressions', sparkline: false },
             { key: 'page_post_engagements', label: 'ENGAG', format: 'number', precision: 0, original: 'page_post_engagements', sparkline: true },
             { key: 'page_views_total', label: 'VIEWS', format: 'number', precision: 0, original: 'page_views_total', sparkline: false },
             { key: 'page_fans', label: 'LIKES', format: 'number', precision: 0, original: 'page_fans', sparkline: true }
@@ -79,14 +75,14 @@ function getActiveMetrics(level = 'instagram', isFb = false) {
             ];
         }
         return [
-            { key: 'reach', label: 'REACH', format: 'number', precision: 0, original: 'reach' },
-            { key: 'impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions' },
-            { key: 'likes', label: 'LIKES', format: 'number', precision: 0, original: 'likes' },
-            { key: 'comments', label: 'COMM', format: 'number', precision: 0, original: 'comments' },
-            { key: 'shares', label: 'SHAR', format: 'number', precision: 0, original: 'shares' },
-            { key: 'saved', label: 'SAVE', format: 'number', precision: 0, original: 'saved' },
-            { key: 'total_interactions', label: 'INTER', format: 'number', precision: 0, original: 'total_interactions' },
-            { key: 'views', label: 'VIEW', format: 'number', precision: 0, original: 'views' }
+            { key: 'reach', label: 'REACH', format: 'number', precision: 0, original: 'reach_daily' },
+            { key: 'impressions', label: 'IMPR', format: 'number', precision: 0, original: 'impressions_daily' },
+            { key: 'likes', label: 'LIKES', format: 'number', precision: 0, original: 'likes_daily' },
+            { key: 'comments', label: 'COMM', format: 'number', precision: 0, original: 'comments_daily' },
+            { key: 'shares', label: 'SHAR', format: 'number', precision: 0, original: 'shares_daily' },
+            { key: 'saved', label: 'SAVE', format: 'number', precision: 0, original: 'saved_daily' },
+            { key: 'total_interactions', label: 'INTER', format: 'number', precision: 0, original: 'total_interactions_daily' },
+            { key: 'views', label: 'VIEW', format: 'number', precision: 0, original: 'views_daily' }
         ];
     }
     return [];
@@ -252,7 +248,7 @@ async function toggleOrganicHierarchy(btn, rowId, level, parentId, childPlatform
             // Search for the specific linked FB Page
             const payload = { 
                 aggregations: aggs, 
-                filters: { page: childPlatformId, channeledAccount: 'N/A' },
+                filters: { page: childPlatformId },
                 groupBy: ["page", "page_title"],
                 startDate: start, endDate: end 
             };
@@ -268,7 +264,7 @@ async function toggleOrganicHierarchy(btn, rowId, level, parentId, childPlatform
             // parentId is either a FB Page URL/ID or an IG Account ID
             const isFromFb = rowId.includes('-fb-'); 
             const groupBy = ["post", "post_id", "caption", "message", "media_type", "permalink", "permalink_url", "timestamp", "created_time"]; 
-            const filters = isFromFb ? { page: parentId, post: 'NOT_NULL', channeledAccount: 'N/A' } : { channeledAccount: parentId, account_type: 'instagram', post: 'NOT_NULL' };
+            const filters = isFromFb ? { page: parentId, account_type: 'facebook_page', post: 'NOT_NULL' } : { channeledAccount: parentId, account_type: 'instagram', post: 'NOT_NULL' };
             
             const metrics = getActiveMetrics('content', isFromFb);
             const aggs = {}; metrics.forEach(m => aggs[m.key] = m.original);

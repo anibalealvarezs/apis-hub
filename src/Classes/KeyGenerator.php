@@ -74,7 +74,8 @@ class KeyGenerator
         Customer|string|null $customer = null,
         Order|string|null $order = null,
         Country|CountryEnum|string|null $country = null,
-        Device|DeviceEnum|string|null $device = null
+        Device|DeviceEnum|string|null $device = null,
+        \Entities\Analytics\Channeled\DimensionSet|int|string|null $dimensionSet = null
     ): string {
 
         return match($channel) {
@@ -98,6 +99,7 @@ class KeyGenerator
                 'order' => (string) ($order instanceof Order ? $order->getOrderId() : $order),
                 'country' => $country instanceof Country ? $country->getCode() : ($country instanceof CountryEnum ? $country->value : $country),
                 'device' => $device instanceof Device ? $device->getType() : ($device instanceof DeviceEnum ? $device->value : $device),
+                'dimensionSet' => $dimensionSet instanceof \Entities\Analytics\Channeled\DimensionSet ? $dimensionSet->getId() : $dimensionSet
             ], JSON_UNESCAPED_UNICODE)),
 
             default => md5(string: json_encode([
@@ -119,7 +121,8 @@ class KeyGenerator
                 'customer' => $customer instanceof Customer ? $customer->getEmail() : $customer,
                 'order' => (string) ($order instanceof Order ? $order->getOrderId() : $order),
                 'country' => $country instanceof Country ? $country->getCode() : ($country instanceof CountryEnum ? $country->value : $country),
-                'device' => $device instanceof Device ? $device->getType() : ($device instanceof DeviceEnum ? $device->value : $device)
+                'device' => $device instanceof Device ? $device->getType() : ($device instanceof DeviceEnum ? $device->value : $device),
+                'dimensionSet' => $dimensionSet instanceof \Entities\Analytics\Channeled\DimensionSet ? $dimensionSet->getId() : $dimensionSet
             ], JSON_UNESCAPED_UNICODE))
         };
     }

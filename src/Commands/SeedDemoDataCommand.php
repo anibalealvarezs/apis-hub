@@ -14,6 +14,7 @@ use Entities\Analytics\Channeled\ChanneledCampaign;
 use Entities\Analytics\Country;
 use Entities\Analytics\Device;
 use Entities\Analytics\Page;
+use Entities\Analytics\Post;
 use Entities\Analytics\Query;
 use Enums\Account as AccountType;
 use Enums\Channel;
@@ -76,14 +77,15 @@ class SeedDemoDataCommand extends Command
         try {
             $output->writeln("🧹 Flushing Redis cache...");
             \Helpers\Helpers::getRedisClient()->flushdb();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $output->writeln("<comment>⚠️ Redis Flush skipped: " . $e->getMessage() . "</comment>");
         }
 
         ini_set('memory_limit', '4G');
         set_time_limit(0);
 
-        $isPostgres = $this->conn->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+        $platform = $this->conn->getDatabasePlatform();
+        $isPostgres = str_contains(strtolower(get_class($platform)), 'postgre');
         
         if ($isPostgres) {
             $this->conn->executeStatement("SET session_replication_role = 'replica'");
@@ -92,12 +94,20 @@ class SeedDemoDataCommand extends Command
         }
 
         if ($isFresh) {
+            $output->writeln("🧹 Wiping tables...");
             $tables = ['channeled_metrics', 'metrics', 'metric_configs', 'dimension_set_items', 'dimension_sets', 'dimension_values', 'dimension_keys', 'channeled_ads', 'channeled_ad_groups', 'channeled_campaigns', 'campaigns', 'channeled_accounts', 'accounts', 'pages', 'queries', 'posts', 'countries', 'devices'];
             foreach ($tables as $table) { 
-                $truncateSql = $isPostgres ? "TRUNCATE TABLE $table RESTART IDENTITY CASCADE" : "TRUNCATE TABLE $table";
-                $this->conn->executeStatement($truncateSql); 
+                try {
+                    $output->write("   - Truncating $table... ");
+                    $truncateSql = $isPostgres ? "TRUNCATE TABLE $table RESTART IDENTITY CASCADE" : "TRUNCATE TABLE $table";
+                    $this->conn->executeStatement($truncateSql); 
+                    $output->writeln("<info>OK</info>");
+                } catch (\Throwable $e) {
+                    $output->writeln("<comment>⚠️ Skipped: " . $e->getMessage() . "</comment>");
+                }
             }
         } else {
+            $output->writeln("🧹 Cleaning existing data for selected channels...");
             foreach ($channels as $chanName) {
                 $chan = Channel::tryFromName($chanName);
                 if (!$chan) {
@@ -114,19 +124,21 @@ class SeedDemoDataCommand extends Command
                 $this->conn->executeStatement("DELETE FROM channeled_ad_groups WHERE channel = ?", [$chanId]);
                 $this->conn->executeStatement("DELETE FROM channeled_campaigns WHERE channel = ?", [$chanId]);
                 $this->conn->executeStatement("DELETE FROM channeled_accounts WHERE channel = ?", [$chanId]);
-                
-                // Optional: Clean up posts related to these channels
                 $this->conn->executeStatement("DELETE FROM posts WHERE channeled_account_id IN (SELECT id FROM channeled_accounts WHERE channel = ?)", [$chanId]);
             }
         }
 
+        $output->writeln("🛠️ Ensuring Basic Entities (Countries)...");
         $this->seedBasicEntities();
+        
+        $output->writeln("🛠️ Ensuring Dimension Hierarchy...");
         $this->seedDimensionHierarchy($output);
 
         if (in_array('google_search_console', $channels)) { $this->seedGscData($output); }
         if (in_array('facebook_marketing', $channels)) { $this->seedFacebookMarketingRealistic($output); }
-        if (in_array('facebook_organic', $channels)) { $this->seedFacebookOrganicData($output); }
+        if (in_array('facebook_organic', $channels)) { $this->seedFacebookOrganicDataUnified($output); }
 
+        $output->writeln("💾 Final flushing and synchronization...");
         $this->flushAll();
         
         if ($isPostgres) {
@@ -210,119 +222,245 @@ class SeedDemoDataCommand extends Command
 
     private function seedGscData(OutputInterface $output): void
     {
-        $output->writeln("🔍 GSC seeding...");
-        $pages = [];
-        for ($i = 0; $i < 20; $i++) {
-            $pId = "GSC-P$i";
-            $page = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $pId]);
-            if (!$page) {
-                $page = new Page();
-                $page->addUrl("https://demo.site/p$i")
-                    ->addTitle("GSC Demo Page $i")
-                    ->addHostname("demo.site")
-                    ->addPlatformId($pId);
-                $this->entityManager->persist($page);
-                $this->entityManager->flush();
+        $output->writeln("🔍 GSC (10 Sites, 6 Months, Correct Universal SEO Domain Model)...");
+        
+        $gscChan = \Enums\Channel::google_search_console;
+        $dates = $this->getDates(180); 
+        $countryEnumValues = ['USA', 'ESP', 'MEX', 'COL'];
+        $deviceEnumValues = ['desktop', 'mobile', 'tablet'];
+        $appearances = ['AMP_TOP_STORIES', 'PRODUCT_SNIPPETS', 'REVIEW_SNIPPET', 'VIDEO', 'ORGANIC_SHOPPING'];
+        
+        $dimManager = new \Classes\DimensionManager($this->entityManager);
+
+        // Pre-fetch Universal Entities
+        $countries = [];
+        foreach ($countryEnumValues as $code) {
+            $enum = \Enums\Country::from($code);
+            $c = $this->entityManager->getRepository(\Entities\Analytics\Country::class)->findOneBy(['code' => $enum]);
+            if (!$c) {
+                $c = (new \Entities\Analytics\Country())->addCode($enum)->addName($code);
+                $this->entityManager->persist($c);
             }
-            $pages[] = $page;
+            $countries[$code] = $c;
         }
-        foreach ($this->getDates(60) as $date) {
-            foreach ($pages as $p) { 
-                $this->queueMetric(
-                    channel: Channel::google_search_console, 
-                    name: 'clicks', 
-                    date: $date, 
-                    value: rand(10, 100), 
-                    pageId: $p->getId(),
-                    pageUrl: $p->getUrl()
-                ); 
+        $devices = [];
+        foreach ($deviceEnumValues as $type) {
+            $enum = \Enums\Device::from($type);
+            $d = $this->entityManager->getRepository(\Entities\Analytics\Device::class)->findOneBy(['type' => $enum]);
+            if (!$d) {
+                $d = (new \Entities\Analytics\Device())->addType($enum);
+                $this->entityManager->persist($d);
             }
+            $devices[$type] = $d;
+        }
+        $this->entityManager->flush();
+
+        for ($s = 1; $s <= 10; $s++) {
+            $hostname = "blog" . $s . ".demo-agency.com";
+            $siteName = "Brand Blog $s ($hostname)";
+            
+            $property = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $hostname]);
+            if (!$property) {
+                $property = (new Page())->addUrl("https://$hostname")->addTitle($siteName)->addHostname($hostname)->addPlatformId($hostname);
+                $this->entityManager->persist($property);
+                $this->entityManager->flush($property);
+            }
+
+            $childUrls = [];
+            for($i=0; $i<20; $i++) $childUrls[] = "https://$hostname/article-" . $this->faker->slug();
+            
+            $queries = [];
+            for($i=0; $i<30; $i++) $queries[] = $this->faker->words(rand(1, 4), true);
+
+            foreach ($dates as $date) {
+                for ($j = 0; $j < 8; $j++) {
+                    $url = $childUrls[array_rand($childUrls)];
+                    $qStr = $queries[array_rand($queries)];
+                    $code = $countryEnumValues[array_rand($countryEnumValues)];
+                    $type = $deviceEnumValues[array_rand($deviceEnumValues)];
+                    
+                    $country = $countries[$code]; $device = $devices[$type];
+                    $appearance = $appearances[array_rand($appearances)];
+
+                    // Resolve Dimensions (Universal values are OUT, but Page and Query are dimensions!)
+                    $setId = $dimManager->resolveDimensionSet([
+                        ['dimensionKey' => 'page', 'dimensionValue' => $url],
+                        ['dimensionKey' => 'query', 'dimensionValue' => $qStr],
+                        ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $appearance]
+                    ])->getId();
+
+                    $imps = rand(10, 200); $clicks = (int)($imps * rand(1, 10) / 100); $pos = (float)rand(10, 80) / 10;
+                    $data = ['impressions' => $imps, 'clicks' => $clicks, 'ctr' => $imps > 0 ? $clicks / $imps : 0, 'position' => $pos, 'keys' => [$url, $qStr, $code, $type, $appearance]];
+
+                    foreach (['impressions', 'clicks', 'ctr', 'position'] as $name) {
+                        $this->queueMetric(
+                            channel: $gscChan, name: $name, date: $date, value: $data[$name], setId: $setId,
+                            pageId: $property->getId(), 
+                            queryId: null, // Strategic Only
+                            countryId: $country->getId(),
+                            deviceId: $device->getId(),
+                            postId: null,
+                            data: json_encode($data),
+                            pageUrl: $property->getUrl(),
+                            queryPId: null,
+                            countryPId: $code,
+                            devicePId: $type
+                        );
+                    }
+                }
+            }
+            $this->entityManager->clear(); 
+            $dimManager->clearCaches();
+            $output->writeln("   - Site $hostname complete.");
         }
         $this->flushAll();
     }
 
     private function seedFacebookMarketingRealistic(OutputInterface $output): void
     {
-        $output->writeln("📊 FB Marketing (30 Acc, Core Breakdown Hierarchy)...");
-        $fbParent = new Account(); 
-        $gAccName = "Client " . $this->faker->company();
-        $fbParent->addName($gAccName); 
-        $this->entityManager->persist($fbParent); 
-        $this->entityManager->flush();
+        $output->writeln("📊 FB Marketing (Massive Simulation, JSON Source Logic)...");
+        
+        $fbChan = \Enums\Channel::facebook_marketing;
+        $accCount = 30; // 30 Ad Accounts as requested
+        $dates = $this->getDates(30); 
+        $statuses = ['ACTIVE', 'PAUSED', 'ARCHIVED'];
+        $objectives = ['OUTCOME_SALES', 'OUTCOME_AWARENESS', 'OUTCOME_LEADS', 'OUTCOME_TRAFFIC'];
+
+        // Parent Account (Client)
+        $fbParent = $this->entityManager->getRepository(Account::class)->findOneBy(['name' => "Marketing Demo Client"]);
+        if (!$fbParent) {
+            $fbParent = (new Account())->addName("Marketing Demo Client");
+            $this->entityManager->persist($fbParent); 
+            $this->entityManager->flush();
+        }
         $gId = $fbParent->getId();
-        $dates = $this->getDates(60); 
-        $fbChan = Channel::facebook_marketing;
-        $progressBar = new ProgressBar($output, 30); 
-        $progressBar->start();
-        for ($i = 0; $i < 30; $i++) {
-            $caPId = $this->generatePlatformId();
-            $ca = new ChanneledAccount(); 
-            $ca->addPlatformId($caPId)
+
+        $progress = new ProgressBar($output, $accCount);
+        $progress->start();
+
+        for ($i = 0; $i < $accCount; $i++) {
+            // 1. Channeled Ad Account
+            $caPId = 'act_' . $this->generatePlatformId();
+            $ca = (new ChanneledAccount())
+                ->addPlatformId($caPId)
                 ->addAccount($fbParent)
                 ->addType(AccountType::META_AD_ACCOUNT)
                 ->addChannel($fbChan->value)
-                ->addName($this->faker->company());
+                ->addName($this->faker->company())
+                ->addData([
+                    'id' => $caPId,
+                    'account_status' => 1,
+                    'currency' => 'USD',
+                    'timezone_name' => 'America/New_York',
+                    'business_name' => $this->faker->company()
+                ]);
             $this->entityManager->persist($ca); 
             $this->entityManager->flush();
-            $caId = $ca->getId();
 
-            $numC = rand(3, 5);
-            for ($c = 0; $c < $numC; $c++) {
+            // 2. Campaigns
+            $campCount = rand(5, 10);
+            for ($c = 0; $c < $campCount; $c++) {
                 $gCpPId = $this->generatePlatformId();
-                $campG = new Campaign(); 
-                $campG->addCampaignId($gCpPId)->addName($this->faker->catchPhrase()); 
+                $campG = (new Campaign())->addCampaignId($gCpPId)->addName($this->faker->catchPhrase()); 
                 $this->entityManager->persist($campG);
                 
-                $cpPId = $gCpPId; // Same for Meta usually
-                $cp = new ChanneledCampaign(); 
-                $cp->addPlatformId($cpPId)->addChanneledAccount($ca)->addCampaign($campG)->addChannel($fbChan->value)->addBudget(rand(100, 500));
-                $this->entityManager->persist($cp); 
+                $cp = (new ChanneledCampaign())
+                    ->addPlatformId($gCpPId)
+                    ->addChanneledAccount($ca)
+                    ->addCampaign($campG)
+                    ->addChannel($fbChan->value)
+                    ->addBudget(rand(100, 500))
+                    ->addData([
+                        'id' => $gCpPId,
+                        'name' => $campG->getName(),
+                        'objective' => $objectives[array_rand($objectives)],
+                        'status' => $statuses[array_rand($statuses)],
+                        'buying_type' => 'AUCTION',
+                        'daily_budget' => rand(5000, 20000) // cents
+                    ]);
+                $this->entityManager->persist($cp);
                 $this->entityManager->flush();
-                $cpId = $cp->getId();
 
-                for ($s = 0; $s < rand(1, 2); $s++) {
+                // 3. AdSets
+                $agCount = rand(2, 4);
+                for ($s = 0; $s < $agCount; $s++) {
                     $agPId = $this->generatePlatformId();
-                    $ag = new ChanneledAdGroup(); 
-                    $ag->addPlatformId($agPId)->addChanneledAccount($ca)->addChannel($fbChan->value)->addName("AdSet: " . $this->faker->words(3, true))->addChanneledCampaign($cp);
-                    $this->entityManager->persist($ag); 
+                    $agName = "AdSet: " . $this->faker->words(3, true);
+                    $ag = (new ChanneledAdGroup())
+                        ->addPlatformId($agPId)
+                        ->addChanneledAccount($ca)
+                        ->addChannel($fbChan->value)
+                        ->addName($agName)
+                        ->addChanneledCampaign($cp)
+                        ->addData([
+                            'id' => $agPId,
+                            'name' => $agName,
+                            'status' => $statuses[array_rand($statuses)],
+                            'billing_event' => 'IMPRESSIONS',
+                            'optimization_goal' => 'REACH',
+                            'targeting' => ['geo_locations' => ['countries' => ['US']]]
+                        ]);
+                    $this->entityManager->persist($ag);
                     $this->entityManager->flush();
-                    $agId = $ag->getId();
 
-                    for ($a = 0; $a < rand(1, 2); $a++) {
+                    // 4. Ads
+                    $adCount = rand(2, 5);
+                    for ($a = 0; $a < $adCount; $a++) {
                         $adPId = $this->generatePlatformId();
-                        $ad = new ChanneledAd(); 
-                        $ad->addPlatformId($adPId)->addChanneledAccount($ca)->addChannel($fbChan->value)->addName("Ad: " . $this->faker->words(2, true))->addChanneledAdGroup($ag);
-                        $this->entityManager->persist($ad); 
+                        $adName = "Ad: " . $this->faker->words(2, true);
+                        $ad = (new ChanneledAd())
+                            ->addPlatformId($adPId)
+                            ->addChanneledAccount($ca)
+                            ->addChannel($fbChan->value)
+                            ->addName($adName)
+                            ->addChanneledAdGroup($ag)
+                            ->addData([
+                                'id' => $adPId,
+                                'name' => $adName,
+                                'status' => $statuses[array_rand($statuses)],
+                                'creative' => ['id' => 'cre_' . rand(1000, 9999)],
+                                'preview_shareable_link' => "https://fb.com/ads/preview/$adPId"
+                            ]);
+                        $this->entityManager->persist($ad);
                         $this->entityManager->flush();
-                        $this->seedRealisticAdDaily($dates, $gId, $caId, $campG->getId(), $cpId, $agId, $ad->getId(), $gAccName, $caPId, $gCpPId, $cpPId, $agPId, $adPId);
+
+                        // 5. Metrics (Daily Insights Simulation)
+                        $this->seedRealisticAdDaily($dates, $gId, $ca->getId(), $campG->getId(), $cp->getId(), $ag->getId(), $ad->getId(), $fbParent->getName(), $caPId, $gCpPId, $gCpPId, $agPId, $adPId);
                     }
                 }
             }
-            $progressBar->advance(); 
+            $progress->advance();
             $this->entityManager->clear();
             $fbParent = $this->entityManager->getRepository(Account::class)->findOneBy(['id' => $gId]);
-            if (!$fbParent) {
-                $fbParent = new Account(); 
-                $fbParent->addName($gAccName); 
-                $this->entityManager->persist($fbParent); 
-                $this->entityManager->flush();
-                $gId = $fbParent->getId();
-            }
         }
-        $progressBar->finish(); $output->writeln("");
+        $progress->finish(); $output->writeln("");
     }
 
     private function seedRealisticAdDaily($dates, $gId, $caId, $gCpId, $cpId, $agId, $adId, $accName, $caPId, $gCpPId, $cpPId, $agPId, $adPId): void
     {
-        $fbChan = Channel::facebook_marketing;
+        $fbChan = \Enums\Channel::facebook_marketing;
         foreach ($dates as $date) {
             $used = [];
-            for ($b = 0; $b < rand(2, 4); $b++) {
+            for ($b = 0; $b < rand(1, 2); $b++) { // Reduced dimensions for performance
                 $age = $this->ages[array_rand($this->ages)]; $gen = $this->genders[array_rand($this->genders)];
                 if (isset($used["$age|$gen"])) continue; $used["$age|$gen"] = true;
                 $setId = $this->dimensionSetCache["$age|$gen"];
-                $imps = rand(1, 1000); $spend = (float)(($imps / 1000) * rand(2, 20)); $reach = (float)($imps * (rand(700, 950) / 1000)); $clicks = (int)($imps * (rand(0, 100) / 1000)); $results = (int)($clicks * (rand(0, 1000) / 1000));
-                $data = ['impressions' => $imps, 'spend' => $spend, 'reach' => $reach, 'frequency' => $imps/($reach?:1), 'clicks' => $clicks, 'ctr' => $clicks/($imps?:1), 'cpc' => $spend/($clicks?:1), 'cpm' => ($spend/($imps?:1))*1000, 'results' => $results, 'cost_of_result' => $spend/($results?:1), 'results_rate' => $results/($imps?:1), 'actions' => (float)($clicks*rand(75, 125)/100)];
+                
+                $imps = rand(100, 2000); 
+                $reach = (int)($imps * rand(70, 95) / 100);
+                $spend = (float)($imps * rand(5, 15) / 1000);
+                $clicks = (int)($imps * rand(1, 5) / 100);
+                
+                $data = [
+                    'impressions' => $imps, 
+                    'spend' => $spend, 
+                    'reach' => $reach, 
+                    'clicks' => $clicks,
+                    'ctr' => $imps > 0 ? $clicks / $imps : 0,
+                    'cpc' => $clicks > 0 ? $spend / $clicks : 0,
+                    'results' => (int)($clicks * rand(5, 15) / 100)
+                ];
+
                 foreach ($data as $name => $val) { 
                     $this->queueMetric(
                         channel: $fbChan, 
@@ -336,181 +474,308 @@ class SeedDemoDataCommand extends Command
                         cpId: $cpId, 
                         agId: $agId, 
                         adId: $adId,
-                        // Signature inputs
                         accName: $accName,
                         caPId: $caPId,
                         gCpPId: $gCpPId,
                         cpPId: $cpPId,
                         agPId: $agPId,
-                        adPId: $adPId
+                        adPId: $adPId,
+                        data: json_encode($data) // Here we store the "API Like" JSON source
                     ); 
                 }
             }
         }
     }
 
-    private function seedFacebookOrganicData(OutputInterface $output): void
+    private function seedFacebookOrganicDataUnified(OutputInterface $output): void
     {
-        $output->writeln("📱 FB Organic & IG Business (30 Pages/Accounts, Full Depth)...");
+        $output->writeln("🚀 Seeding High-Volume Realistic Demo Data...");
         
-        $fbParent = $this->entityManager->getRepository(Account::class)->findOneBy(['name' => "Client Demo (FB)"]);
-        if (!$fbParent) {
-            $fbParent = new Account();
-            $fbParent->addName("Client Demo (FB)");
-            $this->entityManager->persist($fbParent);
-            $this->entityManager->flush();
-        }
-        $gId = $fbParent->getId();
-        $gAccName = $fbParent->getName();
-        
-        $dates = $this->getDates(365);
-        $fbChan = Channel::facebook_organic;
+        $fbChan = \Enums\Channel::facebook_organic;
         $igMediaTypes = ['IMAGE', 'VIDEO', 'CAROUSEL_ALBUM', 'REEL'];
-        
-        $progressBar = new ProgressBar($output, 3);
-        $progressBar->start();
+        $igProductTypes = ['FEED', 'REELS', 'STORY'];
+        $dates = $this->getDates(30); 
 
-        for ($i = 0; $i < 3; $i++) {
-            $namePrefix = $this->faker->unique()->company();
-            $pagePId = "FB-PAGE-" . md5($namePrefix);
-            $pageUrl = "https://facebook.com/" . strtolower(str_replace(' ', '.', $namePrefix));
+        // 1. Ensure 3 Demo Pages & Accounts exist (Dimensions)
+        $pagesToSeed = 3;
+        $seededPages = [];
+        for ($i = 1; $i <= $pagesToSeed; $i++) {
+            $name = "Demo Brand $i";
+            $fbAcc = $this->entityManager->getRepository(Account::class)->findOneBy(['name' => "$name (FB)"]);
+            if (!$fbAcc) {
+                $fbAcc = (new Account())->addName("$name (FB)");
+                $this->entityManager->persist($fbAcc);
+            }
             
-            // 1. Create/Find FB Page
-            $page = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $pagePId]);
+            $fbPId = "fb_page_$i";
+            $page = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $fbPId]);
             if (!$page) {
-                $page = new Page();
-                $page->addPlatformId($pagePId)
-                    ->addAccount($fbParent)
-                    ->addTitle($namePrefix . " Official Page")
-                    ->addUrl($pageUrl)
-                    ->addHostname("facebook.com")
-                    ->addData(['source' => 'facebook']);
+                $page = (new Page())->addPlatformId($fbPId)->addAccount($fbAcc)->addTitle("$name FB Page")->addUrl("https://fb.com/$fbPId");
                 $this->entityManager->persist($page);
-                $this->entityManager->flush();
             }
-            $pId = $page->getId();
 
-            // 2. Create/Find Linked IG Account
-            $igPId = "IG-ACC-" . md5($namePrefix);
-            $caIg = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $igPId, 'channel' => $fbChan->value]);
+            $caFb = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $fbPId]);
+            if (!$caFb) {
+                $caFb = (new ChanneledAccount())->addPlatformId($fbPId)->addAccount($fbAcc)->addType(AccountType::FACEBOOK_PAGE)->addChannel($fbChan->value)->addName("$name FB Page");
+                $this->entityManager->persist($caFb);
+            }
+
+            $igPId = "ig_acc_$i";
+            $caIg = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $igPId]);
             if (!$caIg) {
-                $caIg = new ChanneledAccount();
-                $caIg->addPlatformId($igPId)
-                    ->addAccount($fbParent)
-                    ->addType(AccountType::INSTAGRAM)
-                    ->addChannel($fbChan->value)
-                    ->addName($namePrefix . " Instagram")
-                    ->addData(['facebook_page_id' => $pagePId]);
+                $caIg = (new ChanneledAccount())->addPlatformId($igPId)->addAccount($fbAcc)->addType(AccountType::INSTAGRAM)->addChannel($fbChan->value)->addName("$name IG Account");
+                $caIg->addData(['instagram_id' => $igPId, 'facebook_page_id' => $fbPId]); // Store it for lookup
                 $this->entityManager->persist($caIg);
-                $this->entityManager->flush();
             }
-            $caIgId = $caIg->getId();
-
-            // 3. Link IG to FB Page (Data metadata)
-            $page->addData(array_merge($page->getData(), [
-                'ig_account' => $igPId,
-                'ig_account_name' => $caIg->getName()
-            ]));
-            $this->entityManager->persist($page);
             $this->entityManager->flush();
-
-            // 4. Generate FB Page Daily Metrics (365 days)
-            $this->seedDailyMetrics($dates, $fbChan, [
-                'page_impressions' => [1000, 5000],
-                'page_post_engagements' => [50, 200],
-                'page_views_total' => [20, 100],
-                'page_fans' => [5000, 15000, 'trend']
-            ], $gId, null, null, null, null, $pId, $gAccName, null, $pageUrl);
-
-            // 5. Generate IG Account Daily Metrics (365 days)
-            $this->seedDailyMetrics($dates, $fbChan, [
-                'impressions' => [2000, 10000],
-                'reach' => [1500, 8000],
-                'profile_views' => [10, 50],
-                'follower_count' => [1000, 5000, 'trend']
-            ], $gId, $caIgId, null, null, null, $pId, $gAccName, $igPId, $pageUrl);
-
-            // 6. Generate FB Posts (deterministic IDs for idempotency)
-            $numFbPosts = 50; 
-            for ($p = 0; $p < $numFbPosts; $p++) {
-                $postPId = "FB-POST-" . md5($namePrefix . $p);
-                $postCreated = $dates[array_rand($dates)];
-                
-                $postObj = $this->entityManager->getRepository(\Entities\Analytics\Post::class)->findOneBy(['postId' => $postPId, 'page' => $page]);
-                if (!$postObj) {
-                    $postObj = new \Entities\Analytics\Post();
-                    $postObj->addPostId($postPId)
-                        ->addAccount($fbParent)
-                        ->addPage($page)
-                        ->addData([
-                            'message' => $this->faker->paragraph(),
-                            'created_time' => $postCreated . 'T' . rand(10, 20) . ':00:00+0000',
-                            'permalink_url' => $pageUrl . "/posts/" . $postPId
-                        ]);
-                    $this->entityManager->persist($postObj);
-                    $this->entityManager->flush();
-                }
-                
-                // Metrics for this post from creation date
-                $postDates = array_filter($dates, fn($d) => $d >= $postCreated);
-                $this->seedDailyMetrics($postDates, $fbChan, [
-                    'post_impressions' => [100, 500],
-                    'post_engagement' => [5, 30],
-                    'post_reactions_by_type_total' => [2, 15]
-                ], $gId, null, null, null, $postObj->getId(), $pId, $gAccName, null, $pageUrl, $postPId);
-            }
-
-            // 7. Generate IG Media (deterministic IDs for idempotency)
-            $numIgMedia = 100;
-            for ($m = 0; $m < $numIgMedia; $m++) {
-                $mediaPId = "IG-MEDIA-" . md5($namePrefix . $m);
-                $mediaCreated = $dates[array_rand($dates)];
-                $mediaType = $igMediaTypes[array_rand($igMediaTypes)];
-                
-                $postIg = $this->entityManager->getRepository(\Entities\Analytics\Post::class)->findOneBy(['postId' => $mediaPId, 'channeledAccount' => $caIg]);
-                if (!$postIg) {
-                    $postIg = new \Entities\Analytics\Post();
-                    $postIg->addPostId($mediaPId)
-                        ->addAccount($fbParent)
-                        ->addPage($page)
-                        ->addChanneledAccount($caIg)
-                        ->addData([
-                            'caption' => $this->faker->paragraph(),
-                            'media_type' => $mediaType,
-                            'timestamp' => $mediaCreated . 'T' . rand(10, 20) . ':00:00+0000',
-                            'permalink' => "https://instagram.com/p/" . $mediaPId
-                        ]);
-                    $this->entityManager->persist($postIg);
-                    $this->entityManager->flush();
-                }
-
-                // Metrics for this media from creation date
-                $mediaDates = array_filter($dates, fn($d) => $d >= $mediaCreated);
-                $igMetrics = [
-                    'reach' => [500, 2000],
-                    'impressions' => [600, 2500],
-                    'total_interactions' => [20, 100],
-                    'likes' => [15, 80],
-                    'comments' => [2, 10],
-                    'shares' => [1, 5],
-                    'saves' => [1, 10]
-                ];
-                if ($mediaType === 'VIDEO' || $mediaType === 'REEL') {
-                    $igMetrics['plays'] = [1000, 5000];
-                }
-                
-                $this->seedDailyMetrics($mediaDates, $fbChan, $igMetrics, $gId, $caIgId, null, null, $postIg->getId(), $pId, $gAccName, $igPId, $pageUrl, $mediaPId);
-            }
-
-            $progressBar->advance();
-            $this->entityManager->clear();
-            $fbParent = $this->entityManager->getRepository(Account::class)->findOneBy(['id' => $gId]);
+            $seededPages[] = ['page' => $page, 'fbAcc' => $fbAcc, 'caIg' => $caIg, 'caFb' => $caFb];
         }
-        $progressBar->finish();
+
+        $progress = new ProgressBar($output, count($seededPages));
+        $progress->start();
+
+        foreach ($seededPages as $data) {
+            $page = $data['page'];
+            $fbParent = $data['fbAcc'];
+            $caIg = $data['caIg'];
+            $caFb = $data['caFb'];
+
+            // 1. Create Media Entities
+            $mediaEntities = [];
+            $currentLifetimeValues = [];
+            $igMediaCount = rand(100, 200);
+            
+            $postParams = [];
+            $now = date('Y-m-d H:i:s');
+            
+            for ($m = 0; $m < $igMediaCount; $m++) {
+                $mediaPId = 'ig_media_' . $page->getId() . '_' . $m;
+                $itemDate = $dates[array_rand($dates)];
+                
+                $postParams[] = [
+                    'post_id' => $mediaPId,
+                    'account_id' => $fbParent->getId(),
+                    'page_id' => $page->getId(),
+                    'channeled_account_id' => $caIg->getId(),
+                    'data' => json_encode([
+                        'id' => $mediaPId,
+                        'caption' => $this->faker->sentence(),
+                        'media_type' => $igMediaTypes[array_rand($igMediaTypes)],
+                        'media_product_type' => $igProductTypes[array_rand($igProductTypes)],
+                        'permalink' => "https://www.instagram.com/p/demo_" . $mediaPId,
+                        'timestamp' => $itemDate . 'T07:00:00+0000'
+                    ]),
+                    'created_at' => $now,
+                    'updated_at' => $now
+                ];
+
+                $postIg = new Post();
+                $postIg->addPostId($mediaPId)->addAccount($fbParent)->addPage($page)->addChanneledAccount($caIg);
+                $mediaEntities[] = $postIg;
+                
+                $currentLifetimeValues[$mediaPId] = [
+                    'reach' => rand(10, 50), 'impressions' => rand(15, 60), 'likes' => 0, 'comments' => 0,
+                    'saved' => 0, 'shares' => 0, 'views' => 0, 'total_interactions' => 0
+                ];
+            }
+
+            // 2. Create FB Post Entities
+            $fbPostCount = rand(50, 100);
+            for ($p = 0; $p < $fbPostCount; $p++) {
+                $postPId = 'fb_post_' . $page->getId() . '_' . $p;
+                $itemDate = $dates[array_rand($dates)];
+                
+                $postParams[] = [
+                    'post_id' => $postPId,
+                    'account_id' => $fbParent->getId(),
+                    'page_id' => $page->getId(),
+                    'channeled_account_id' => $caFb->getId(),
+                    'data' => json_encode([
+                        'id' => $postPId,
+                        'message' => $this->faker->sentence(),
+                        'created_time' => $itemDate . 'T07:00:00+0000',
+                        'permalink_url' => "https://www.facebook.com/posts/demo_" . $postPId
+                    ]),
+                    'created_at' => $now,
+                    'updated_at' => $now
+                ];
+            }
+            
+            // Ultra-fast batch insert
+            if (!empty($postParams)) {
+                $output->writeln(" \n➤ Creating $fbPostCount FB posts and $igMediaCount IG Media items for '{$page->getTitle()}'...");
+                $cols = array_keys($postParams[0]);
+                $sql = "INSERT IGNORE INTO posts (" . implode(', ', $cols) . ") VALUES ";
+                $values = [];
+                $params = [];
+                foreach ($postParams as $row) {
+                    $values[] = "(?, ?, ?, ?, ?, ?, ?)";
+                    foreach ($row as $val) {
+                        $params[] = $val;
+                    }
+                }
+                $output->writeln("  - Inserting posts in DBAL batch...");
+                $sql .= implode(', ', $values);
+                $this->entityManager->getConnection()->executeStatement($sql, $params);
+            }
+            
+            $output->writeln("  - Re-fetching post IDs from DB...");
+            // Re-fetch posts for IDs
+            $allPosts = $this->entityManager->getRepository(Post::class)->findBy(['page' => $page]);
+            $fbPostEntities = [];
+            $mediaMap = ['map' => []]; // We will populate this with real DB ids for IG media
+            
+            foreach ($allPosts as $pst) {
+                if (str_starts_with($pst->getPostId(), 'fb_post_')) {
+                    $fbPostEntities[] = $pst;
+                } elseif (str_starts_with($pst->getPostId(), 'ig_media_')) {
+                    $mediaMap['map'][$pst->getPostId()] = $pst->getId();
+                    
+                    // Update our IG Media objects with real IDs if needed
+                    foreach ($mediaEntities as $mediaEntity) {
+                        if ($mediaEntity->getPostId() === $pst->getPostId()) {
+                            // Link them up
+                        }
+                    }
+                }
+            }
+
+            $output->writeln("  - Processing Facebook Simulation (Page & Posts)...");
+            // 3. FB Simulation
+            $fbChan = \Enums\Channel::facebook_organic;
+            $gId = $fbParent->getId();
+            $gAccName = $fbParent->getName();
+            $pId = $page->getId();
+            $pageUrl = $page->getUrl();
+            $caFbId = $caFb->getId();
+            
+            $fbPageMetrics = [
+                'page_fans' => [0, 10, 'trend'],
+                'page_impressions' => [50, 500],
+                'page_post_engagements' => [10, 100],
+                'page_views_total' => [5, 40]
+            ];
+            $this->seedDailyMetrics($dates, $fbChan, $fbPageMetrics, $gId, $caFbId, null, null, null, $pId, $gAccName, (string)$caFb->getPlatformId(), null, null, null, $pageUrl, null);
+
+            $fbPostMetrics = [
+                'post_impressions' => [10, 100],
+                'post_engagement' => [2, 20],
+                'post_reactions_by_type_total' => [1, 10]
+            ];
+            foreach ($fbPostEntities as $fbPostEntity) {
+                $this->seedDailyMetrics($dates, $fbChan, $fbPostMetrics, $gId, $caFbId, null, null, $fbPostEntity->getId(), $pId, $gAccName, (string)$caFb->getPlatformId(), null, null, null, $pageUrl, $fbPostEntity->getPostId());
+            }
+
+            $output->writeln("  - Starting 30-day Instagram Simulation loop...");
+            // 4. IG Simulation Loop
+            $allIgMediaMetrics = new \Doctrine\Common\Collections\ArrayCollection();
+            $pageMap = ['map' => [$page->getPlatformId() => $page->getId()]];
+            $accountMap = ['map' => [$fbParent->getName() => $fbParent->getId()], 'mapReverse' => [$fbParent->getId() => $fbParent->getName()]];
+            $channeledAccountMap = ['map' => [$caIg->getPlatformId() => $caIg->getId()], 'mapReverse' => [$caIg->getId() => $caIg->getPlatformId()]];
+            // $mediaMap is already populated above from DB fetch
+
+            foreach ($dates as $date) {
+                // A. IG Account Metrics (Daily)
+                // IG Accounts natively return these metrics as daily
+                $accountPayload = [
+                    'data' => [
+                        ['name' => 'reach', 'total_value' => ['value' => rand(100, 500)]],
+                        ['name' => 'impressions', 'total_value' => ['value' => rand(150, 600)]],
+                        ['name' => 'profile_views', 'total_value' => ['value' => rand(10, 100)]],
+                        ['name' => 'website_clicks', 'total_value' => ['value' => rand(0, 5)]],
+                        ['name' => 'profile_links_taps', 'total_value' => ['value' => rand(0, 5)]],
+                        ['name' => 'follows_and_unfollows', 'total_value' => ['value' => rand(-2, 5)]],
+                        ['name' => 'replies', 'total_value' => ['value' => rand(0, 5)]],
+                        ['name' => 'accounts_engaged', 'total_value' => ['value' => rand(5, 40)]]
+                    ]
+                ];
+                \Classes\Requests\MetricRequests::processInstagramAccount(
+                    ['id' => $page->getId(), 'ig_account' => (string)$caIg->getPlatformId()],
+                    new \Classes\Overrides\FacebookGraphApiOverride('1', '1', '1', 'https://example.com'), 
+                    $this->entityManager, $fbParent, $page, \Helpers\Helpers::setLogger('seed.log'),
+                    ['map' => [$page->getPlatformId() => $page->getId()]], $date, $date, [], 'facebook_organic', $accountPayload
+                );
+
+                // B. IG Media Metrics (Lifetime)
+                foreach ($mediaEntities as $media) {
+                    $mId = (string)$media->getPostId();
+                    $currentLifetimeValues[$mId]['reach'] += rand(5, 50);
+                    $currentLifetimeValues[$mId]['impressions'] += rand(10, 100);
+                    $currentLifetimeValues[$mId]['likes'] += rand(0, 5);
+                    $currentLifetimeValues[$mId]['comments'] += rand(0, 2);
+                    $currentLifetimeValues[$mId]['saved'] += rand(0, 3);
+                    $currentLifetimeValues[$mId]['shares'] += rand(0, 2);
+                    $currentLifetimeValues[$mId]['views'] += rand(10, 40);
+                    $currentLifetimeValues[$mId]['total_interactions'] = 
+                    $currentLifetimeValues[$mId]['likes'] + 
+                    $currentLifetimeValues[$mId]['comments'] + 
+                    $currentLifetimeValues[$mId]['saved'] + 
+                    $currentLifetimeValues[$mId]['shares'];
+
+                    $mediaPayload = [];
+                    foreach ($currentLifetimeValues[$mId] as $n => $v) {
+                        $mediaPayload[] = ['name' => $n, 'values' => [['value' => $v, 'end_time' => $date . 'T07:00:00+0000']]];
+                    }
+
+                    $metrics = \Classes\Conversions\FacebookOrganicMetricConvert::igMediaMetrics(
+                        $mediaPayload, $date, $page, $media, $fbParent, $caIg, \Helpers\Helpers::setLogger('seed.log')
+                    );
+
+                    foreach ($metrics as $metric) {
+                        $metric->post = $media; // Attach actual Doctrine Entity
+                        $metric->page = $page;
+                        $metric->account = $fbParent;
+                        $metric->channeledAccount = $caIg;
+                        $metric->platformId = $mId; // Fallback
+                        $allIgMediaMetrics->add($metric);
+                    }
+                }
+            } // end dates loop
+
+            $output->writeln("  - Running MetricsProcessor massive batch upsert (transactional) for IG Media...");
+            // Execute Batch Processing for IG Media Metrics
+            if (!$allIgMediaMetrics->isEmpty()) {
+                try {
+                    $this->entityManager->getConnection()->beginTransaction();
+
+                    $metricConfigMap = \Classes\MetricsProcessor::processMetricConfigs(
+                        metrics: $allIgMediaMetrics,
+                        manager: $this->entityManager,
+                        pageMap: $pageMap,
+                        postMap: $mediaMap,
+                        accountMap: $accountMap,
+                        channeledAccountMap: $channeledAccountMap,
+                    );
+
+                    $metricMap = \Classes\MetricsProcessor::processMetrics(
+                        metrics: $allIgMediaMetrics,
+                        manager: $this->entityManager,
+                        metricConfigMap: $metricConfigMap,
+                    );
+
+                    \Classes\MetricsProcessor::processChanneledMetrics(
+                        metrics: $allIgMediaMetrics,
+                        manager: $this->entityManager,
+                        metricMap: $metricMap,
+                        logger: \Helpers\Helpers::setLogger('seed.log'),
+                    );
+
+                    $this->entityManager->getConnection()->commit();
+                } catch (\Exception $e) {
+                    if ($this->entityManager->getConnection()->isTransactionActive()) {
+                        $this->entityManager->getConnection()->rollBack();
+                    }
+                    throw $e;
+                }
+            }
+            
+            $progress->advance();
+        }
+        $progress->finish();
         $output->writeln("");
     }
 
-    private function seedDailyMetrics(array $dates, Channel $channel, array $metricDefs, int $gAccId, ?int $caId = null, ?int $gCpId = null, ?int $cpId = null, ?int $postId = null, ?int $pageId = null, ?string $accName = null, ?string $caPId = null, ?string $pageUrl = null, ?string $postPId = null): void
+    private function seedDailyMetrics(array $dates, Channel $channel, array $metricDefs, int $gAccId, ?int $caId = null, ?int $gCpId = null, ?int $cpId = null, ?int $postId = null, ?int $pageId = null, ?string $accName = null, ?string $caPId = null, ?string $gCpPId = null, ?string $cpPId = null, ?string $agPId = null, ?string $pageUrl = null, ?string $postPId = null): void
     {
         $trendValues = [];
         foreach ($dates as $date) {
@@ -544,6 +809,9 @@ class SeedDemoDataCommand extends Command
                     postId: $postId,
                     accName: $accName,
                     caPId: $caPId,
+                    gCpPId: $gCpPId,
+                    cpPId: $cpPId,
+                    agPId: $agPId,
                     pageUrl: $pageUrl,
                     postPId: $postPId
                 );
@@ -559,8 +827,11 @@ class SeedDemoDataCommand extends Command
     }
 
     private function queueMetric(
-        Channel $channel, $name, $date, $value, $setId = null, $pageId = null, $adId = null, $agId = null, $cpId = null, $caId = null, $gAccId = null, $gCpId = null, $postId = null,
-        ?string $accName = null, ?string $caPId = null, ?string $gCpPId = null, ?string $cpPId = null, ?string $agPId = null, ?string $adPId = null, ?string $pageUrl = null, ?string $postPId = null
+        \Enums\Channel $channel, $name, $date, $value, $setId = null, $pageId = null, $adId = null, $agId = null, $cpId = null, $caId = null, $gAccId = null, $gCpId = null, $postId = null,
+        $queryId = null, $countryId = null, $deviceId = null, $productId = null, $customerId = null, $orderId = null, $creativeId = null,
+        ?string $accName = null, ?string $caPId = null, ?string $gCpPId = null, ?string $cpPId = null, ?string $agPId = null, ?string $adPId = null, ?string $pageUrl = null, ?string $postPId = null,
+        ?string $queryPId = null, ?string $countryPId = null, ?string $devicePId = null, ?string $productPId = null, ?string $customerPId = null, ?string $orderPId = null, ?string $creativePId = null,
+        ?string $data = null
     ): void {
         $sig = \Classes\KeyGenerator::generateMetricConfigKey(
             channel: $channel,
@@ -574,7 +845,15 @@ class SeedDemoDataCommand extends Command
             channeledAdGroup: $agPId,
             channeledAd: $adPId,
             page: $pageUrl,
-            post: $postPId
+            query: $queryPId,
+            post: $postPId,
+            country: $countryPId,
+            device: $devicePId,
+            creative: $creativePId,
+            product: $productPId,
+            customer: $customerPId,
+            order: $orderPId,
+            dimensionSet: $setId
         );
         $this->bufferConfigs[] = [
             'channel' => $channel->value, 
@@ -589,9 +868,17 @@ class SeedDemoDataCommand extends Command
             'channeled_account_id' => $caId, 
             'account_id' => $gAccId, 
             'post_id' => $postId,
+            'query_id' => $queryId,
+            'country_id' => $countryId,
+            'device_id' => $deviceId,
+            'creative_id' => $creativeId,
+            'product_id' => $productId,
+            'customer_id' => $customerId,
+            'order_id' => $orderId,
             'config_signature' => $sig, 
             'value' => (float)$value, 
-            'dimension_set_id' => $setId
+            'dimension_set_id' => $setId,
+            'data' => $data
         ];
         if (count($this->bufferConfigs) >= self::BULK_SIZE) { $this->flushAll(); }
     }
@@ -614,6 +901,13 @@ class SeedDemoDataCommand extends Command
                 'campaign_id' => $row['campaign_id'], 
                 'channeled_account_id' => $row['channeled_account_id'], 
                 'account_id' => $row['account_id'], 
+                'query_id' => $row['query_id'],
+                'country_id' => $row['country_id'],
+                'device_id' => $row['device_id'],
+                'creative_id' => $row['creative_id'],
+                'product_id' => $row['product_id'],
+                'customer_id' => $row['customer_id'],
+                'order_id' => $row['order_id'],
                 'config_signature' => $row['config_signature'], 
                 'created_at' => $now, 
                 'updated_at' => $now
@@ -651,7 +945,8 @@ class SeedDemoDataCommand extends Command
                 'channel' => $c['channel'], 
                 'metric_id' => $mId, 
                 'dimension_set_id' => $c['dimension_set_id'], 
-                'platform_created_at' => $c['metric_date'], 
+                'platform_created_at' => $c['metric_date'] . ' 00:00:00',
+                'data' => $c['data'],
                 'created_at' => $now, 
                 'updated_at' => $now
             ];

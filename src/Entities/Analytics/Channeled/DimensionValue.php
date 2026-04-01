@@ -12,7 +12,7 @@ use Entities\Analytics\Channeled\DimensionKey;
 #[ORM\UniqueConstraint(name: 'dimension_value_unique', columns: ['dimension_key_id', 'value'])]
 class DimensionValue extends Entity
 {
-    #[ORM\ManyToOne(targetEntity: DimensionKey::class, inversedBy: 'values')]
+    #[ORM\ManyToOne(targetEntity: DimensionKey::class, inversedBy: 'values', cascade: ['persist'])]
     #[ORM\JoinColumn(name: 'dimension_key_id', nullable: false, onDelete: 'CASCADE')]
     protected DimensionKey $dimensionKey;
 

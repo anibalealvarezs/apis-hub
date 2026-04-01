@@ -1527,7 +1527,7 @@ class MetricRequests
      * @throws \Doctrine\DBAL\Exception
      * @throws Exception
      */
-    private static function processFacebookPage(
+    public static function processFacebookPage(
         array $page,
         ?string $startDate,
         ?string $endDate,
@@ -1820,7 +1820,7 @@ class MetricRequests
      * @throws \Doctrine\DBAL\Exception
      * @throws Exception
      */
-    private static function processInstagramAccount(
+    public static function processInstagramAccount(
         array $page,
         FacebookGraphApi $api,
         EntityManager $manager,
@@ -1831,7 +1831,8 @@ class MetricRequests
         ?string $startDate = null,
         ?string $endDate = null,
         array $config = [],
-        string $channel = 'facebook_organic'
+        string $channel = 'facebook_organic',
+        ?array $providedData = null
     ): array {
 
         if (!$startDate) {
@@ -1887,11 +1888,18 @@ class MetricRequests
         $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
 
         try {
-            do {
-                $rows = [
-                    'data' => [],
-                ];
-                $option = 1;
+            if ($providedData !== null) {
+                $rows = $providedData;
+                $metrics = FacebookOrganicMetricConvert::igAccountMetrics($rows['data'] ?? $rows, $startDate->toDateString(), $pageEntity, $accountEntity, $channeledAccountEntity, $logger);
+                foreach ($metrics as $metric) {
+                    $allMetrics->add($metric);
+                }
+            } else {
+                do {
+                    $rows = [
+                        'data' => [],
+                    ];
+                    $option = 1;
                 while ($option <= 5) {
                     // OPTIONS LIST:
                     // 1. Get REACH and VIEWS broken by FOLLOW_TYPE and MEDIA_PRODUCT_TYPE (Default)
@@ -1958,6 +1966,7 @@ class MetricRequests
                 }
                 $startDate->addDay();
             } while ($startDate->isBefore(Carbon::now()->endOfDay()->subDays(2)) && $startDate->isBefore(Carbon::parse($endDate))); // Continue until 2 days ago
+        }
 
             if (count($allMetrics) === 0) {
                 $logger->info("No metrics found for page " . $page['id']);
@@ -2027,7 +2036,7 @@ class MetricRequests
      * @throws GuzzleException
      * @throws \Doctrine\DBAL\Exception
      */
-    private static function processInstagramMedia(
+    public static function processInstagramMedia(
         Page $pageEntity,
         Post $postEntity,
         Account $accountEntity,
@@ -2038,6 +2047,7 @@ class MetricRequests
         array $mediaMap,
         array $pageMap,
         ?array $providedData = null,
+        ?string $startDate = null,
     ): array {
 
         $accountMap = [
@@ -2104,6 +2114,7 @@ class MetricRequests
 
             $metrics = FacebookOrganicMetricConvert::igMediaMetrics(
                 rows: $insights['data'],
+                date: $startDate ?: Carbon::now()->toDateString(),
                 pageEntity: $pageEntity,
                 postEntity: $postEntity,
                 accountEntity: $accountEntity,
@@ -2764,7 +2775,7 @@ class MetricRequests
      * @throws GuzzleException
      * @throws \Doctrine\DBAL\Exception
      */
-    private static function processFacebookPagePost(
+    public static function processFacebookPagePost(
         Post $postEntity,
         Page $pageEntity,
         FacebookGraphApi $api,

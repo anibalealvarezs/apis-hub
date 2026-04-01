@@ -16,7 +16,7 @@ class DimensionSet extends Entity
     #[ORM\Column(type: 'string', length: 32, unique: true)]
     protected string $hash;
 
-    #[ORM\ManyToMany(targetEntity: DimensionValue::class)]
+    #[ORM\ManyToMany(targetEntity: DimensionValue::class, cascade: ['persist'])]
     #[ORM\JoinTable(name: 'dimension_set_items')]
     #[ORM\JoinColumn(name: 'dimension_set_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
     #[ORM\InverseJoinColumn(name: 'dimension_value_id', referencedColumnName: 'id', onDelete: 'CASCADE')]

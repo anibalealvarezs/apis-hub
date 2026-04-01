@@ -129,6 +129,7 @@ class ChanneledCrudController extends BaseController
             }
 
             $params = $this->prepareChanneledReadMultipleParams(
+                entity: $entity,
                 params: $params,
                 repositoryClass: $repository::class,
                 body: $body,
@@ -163,6 +164,7 @@ class ChanneledCrudController extends BaseController
      * @return array
      */
     protected function prepareChanneledReadMultipleParams(
+        string $entity,
         ?array $params,
         string $repositoryClass,
         ?string $body,
@@ -170,7 +172,12 @@ class ChanneledCrudController extends BaseController
     ): array {
         $params = $this->prepareCrudParams(params: $params, body: $body);
 
-        if (!isset($params['filters']->channel)) {
+        // Standard entities like 'Page' or 'Account' don't have a 'channel' field.
+        // Channeled entities do. We check metadata before injecting the filter.
+        $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
+        $metadata = $this->em->getClassMetadata($repository->getClassName());
+        
+        if ($metadata->hasField('channel') && !isset($params['filters']->channel)) {
             $params['filters']->channel = $channel->value;
         }
 
@@ -256,6 +263,7 @@ class ChanneledCrudController extends BaseController
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
             $params = $this->prepareChanneledReadMultipleParams(
+                entity: $entity,
                 params: $params,
                 repositoryClass: $repository::class,
                 body: $body,
@@ -320,6 +328,7 @@ class ChanneledCrudController extends BaseController
             }
 
             $params = $this->prepareChanneledReadMultipleParams(
+                entity: $entity,
                 params: $params,
                 repositoryClass: $repository::class,
                 body: $body,
@@ -385,6 +394,7 @@ class ChanneledCrudController extends BaseController
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
             $params = $this->prepareChanneledReadMultipleParams(
+                entity: $entity,
                 params: $params,
                 repositoryClass: $repository::class,
                 body: $body,
