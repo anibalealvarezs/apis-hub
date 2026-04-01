@@ -605,7 +605,14 @@ class SeedDemoDataCommand extends Command
             if (!empty($postParams)) {
                 $output->writeln(" \n➤ Creating $fbPostCount FB posts and $igMediaCount IG Media items for '{$page->getTitle()}'...");
                 $cols = array_keys($postParams[0]);
-                $sql = "INSERT IGNORE INTO posts (" . implode(', ', $cols) . ") VALUES ";
+                
+                $plat = $this->conn->getDatabasePlatform();
+                $isP = str_contains(strtolower(get_class($plat)), 'postgre');
+                $ignore = $isP ? "" : "IGNORE";
+                $suffix = $isP ? " ON CONFLICT DO NOTHING" : "";
+                
+                $sql = "INSERT $ignore INTO posts (" . implode(', ', $cols) . ") VALUES ";
+                
                 $values = [];
                 $params = [];
                 foreach ($postParams as $row) {
@@ -615,7 +622,7 @@ class SeedDemoDataCommand extends Command
                     }
                 }
                 $output->writeln("  - Inserting posts in DBAL batch...");
-                $sql .= implode(', ', $values);
+                $sql .= implode(', ', $values) . $suffix;
                 $this->entityManager->getConnection()->executeStatement($sql, $params);
             }
             
