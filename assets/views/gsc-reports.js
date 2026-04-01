@@ -171,7 +171,18 @@ async function loadReport() {
       start,
       end,
     );
-    updateSummaryCards(summary[0] || {});
+
+    // Fetch Previous Period for Comparison
+    const [prevStart, prevEnd] = calculatePreviousPeriod(start, end);
+    const prevSummary = await fetchAggregation(
+      ["clicks", "impressions", "ctr", "position"],
+      [],
+      { page: pageId },
+      prevStart,
+      prevEnd,
+    );
+
+    updateSummaryCards(summary[0] || {}, prevSummary[0] || {});
 
     // 2. Fetch Chart Data (Daily)
     const dailyData = await fetchAggregation(
@@ -230,17 +241,66 @@ function json_encode_fix(obj) {
   return JSON.stringify(obj);
 }
 
-function updateSummaryCards(data) {
-  const clicks = parseInt(data.clicks || 0);
-  const imps = parseInt(data.impressions || 0);
-  const ctr = parseFloat(data.ctr || 0);
-  const pos = parseFloat(data.position || 0);
+function updateSummaryCards(data, prevData) {
+  const metrics = [
+    { id: 'clicks', val: parseInt(data.clicks || 0), prev: parseInt(prevData?.clicks || 0), type: 'num' },
+    { id: 'impressions', val: parseInt(data.impressions || 0), prev: parseInt(prevData?.impressions || 0), type: 'num' },
+    { id: 'ctr', val: parseFloat(data.ctr || 0), prev: parseFloat(prevData?.ctr || 0), type: 'pct' },
+    { id: 'position', val: parseFloat(data.position || 0), prev: parseFloat(prevData?.position || 0), type: 'pos' }
+  ];
 
-  document.getElementById("val-clicks").textContent = clicks.toLocaleString();
-  document.getElementById("val-impressions").textContent =
-    imps.toLocaleString();
-  document.getElementById('val-ctr').textContent = (ctr * 100).toFixed(2) + '%';
-  document.getElementById("val-position").textContent = pos.toFixed(1);
+  metrics.forEach(m => {
+    const el = document.getElementById(`val-${m.id}`);
+    if (el) {
+      if (m.type === 'num') el.textContent = m.val.toLocaleString();
+      else if (m.type === 'pct') el.textContent = (m.val * 100).toFixed(2) + '%';
+      else el.textContent = m.val.toFixed(1);
+    }
+
+    const trendEl = document.getElementById(`trend-${m.id}`);
+    if (trendEl) {
+      if (!prevData || Object.keys(prevData).length === 0) {
+        trendEl.textContent = '--';
+        trendEl.className = 'card-metric-trend';
+        return;
+      }
+
+      let diff = 0;
+      let pct = 0;
+      let isPositive = false;
+
+      if (m.type === 'pos') {
+        // For position, lower is better
+        diff = m.prev - m.val;
+        isPositive = diff > 0;
+        pct = m.prev > 0 ? (diff / m.prev) * 100 : 0;
+      } else {
+        diff = m.val - m.prev;
+        isPositive = diff > 0;
+        pct = m.prev > 0 ? (diff / m.prev) * 100 : 0;
+      }
+
+      const icon = isPositive ? 'arrow-up' : 'arrow-down';
+      const color = isPositive ? '#22c55e' : '#ef4444';
+      const sign = diff > 0 ? '+' : '';
+
+      trendEl.style.color = color;
+      trendEl.innerHTML = `<i data-lucide="${icon}" style="width:12px; height:12px; vertical-align:middle;"></i> ${sign}${pct.toFixed(1)}%`;
+    }
+  });
+
+  lucide.createIcons();
+}
+
+function calculatePreviousPeriod(start, end) {
+  const s = dayjs(start);
+  const e = dayjs(end);
+  const diff = e.diff(s, 'day') + 1;
+  
+  const prevEnd = s.subtract(1, 'day');
+  const prevStart = prevEnd.subtract(diff - 1, 'day');
+  
+  return [prevStart.format('YYYY-MM-DD'), prevEnd.format('YYYY-MM-DD')];
 }
 
 function renderChart(data) {

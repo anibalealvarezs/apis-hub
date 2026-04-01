@@ -1552,7 +1552,7 @@ class MetricRequests
         $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
 
         try {
-            $maxRetries = 3;
+            $maxRetries = 5;
             $retryCount = 0;
             $fetched = false;
             $rows = ['data' => []];
@@ -1579,7 +1579,7 @@ class MetricRequests
                         return $stats; // Continue to next page
                     }
                     $logger->warning("Retry $retryCount/$maxRetries for FB page insights " . $page['id'] . ": " . $msg);
-                    usleep(200000 * $retryCount);
+                    usleep(1000000 * $retryCount);
                 }
             }
 
@@ -1909,7 +1909,7 @@ class MetricRequests
                     // 5. Get WEBSITE_CLICKS, PROFILE_VIEWS, ACCOUNTS_ENGAGED, REPLIES and CONTENT_VIEWS with no breakdowns
                     $logger->info("Fetching Instagram account insights for page " . $page['id'] . ", option: $option");
                     
-                    $maxRetries = 3;
+                    $maxRetries = 5;
                     $retryCount = 0;
                     $fetched = false;
                     $insights = ['data' => []];
@@ -1937,7 +1937,7 @@ class MetricRequests
                                 continue;
                             }
                             $logger->warning("Retry $retryCount/$maxRetries for IG account insights " . $page['ig_account'] . " (option $option): " . $msg);
-                            usleep(200000 * $retryCount);
+                            usleep(1000000 * $retryCount);
                         }
                     }
 
@@ -2073,7 +2073,7 @@ class MetricRequests
         $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
 
         try {
-            $maxRetries = 3;
+            $maxRetries = 5;
             $retryCount = 0;
             $fetched = false;
             $insights = ['data' => []];
@@ -2101,7 +2101,7 @@ class MetricRequests
                             return $stats;
                         }
                         $logger->warning("Retry $retryCount/$maxRetries for IG media insights " . $postEntity->getPostId() . ": " . $msg);
-                        usleep(200000 * $retryCount);
+                        usleep(1000000 * $retryCount);
                     }
                 }
             }
@@ -2790,7 +2790,7 @@ class MetricRequests
         $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
 
         try {
-            $maxRetries = 3;
+            $maxRetries = 5;
             $retryCount = 0;
             $fetched = false;
             $rows = ['data' => []];
@@ -2808,10 +2808,12 @@ class MetricRequests
                     } catch (Exception $e) {
                         $retryCount++;
                         if ($retryCount >= $maxRetries) {
+                            $logger->error("Failed to retrieve insights for post " . $postEntity->getPostId() . " after $maxRetries retries: " . $e->getMessage());
+                            $fetched = true; // Break loop
                             throw $e;
                         }
                         $logger->warning("Retry $retryCount/$maxRetries for FB post insights " . $postEntity->getPostId() . ": " . $e->getMessage());
-                        usleep(200000 * $retryCount);
+                        usleep(1000000 * $retryCount);
                     }
                 }
             }

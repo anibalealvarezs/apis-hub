@@ -9,27 +9,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script src="/assets/navbar.js"></script>
     <script src="/assets/footer.js"></script>
+    <link rel="stylesheet" href="/assets/css/main.css">
     <link rel="stylesheet" href="/assets/css/command-builder.css">
 </head>
-<body>
-
-    <header>
-        <a href="/" class="logo">
-            <img src="/assets/images/apishub-trans-light-600.png" alt="APIs Hub Logo" class="builder-logo-img">
-            <span>Command Builder</span>
-        </a>
-        <nav class="nav-links">
-            <a href="/" class="nav-link"><i data-lucide="home"></i> Home</a>
-            <a href="/monitoring" class="nav-link"><i data-lucide="activity"></i> Monitoring</a>
-            <a href="/logs" class="nav-link"><i data-lucide="scroll"></i> Logs</a>
-            <a href="/command-builder" class="nav-link active"><i data-lucide="terminal"></i> Builder</a>
-            <a href="/config-manager" class="nav-link"><i data-lucide="settings"></i> Config</a>
-            <a href="/fb-reports" class="nav-link"><i data-lucide="bar-chart-3"></i> Reports</a>
-            <a href="/docs" class="nav-link"><i data-lucide="book"></i> API Docs</a>
-        </nav>
-    </header>
+<body class="full-screen">
 
     <div class="shell builder-shell-header">
         <div class="tabs-builder">
@@ -84,10 +70,10 @@
                 <button class="add-btn" id="add-agg"><i data-lucide="plus"></i> Add Metric</button>
             </div>
 
-            <div class="form-group" style="margin-top: 20px;">
+            <div class="form-group mt-20">
                 <label>Group By</label>
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <select id="group-by-select" onchange="if(this.value) { addGroup(this.value); this.value=''; }" style="flex: 1;">
+                <div class="flex flex-gap-10 mb-10">
+                    <select id="group-by-select" onchange="if(this.value) { addGroup(this.value); this.value=''; }" class="flex-1">
                         <option value="">Add grouping dimension...</option>
                         <!-- Options filled by DICTIONARY -->
                     </select>
@@ -98,12 +84,12 @@
                 <div class="hint">Suggested: monthly, daily, account</div>
             </div>
 
-            <div id="filter-config" style="margin-top: 20px;">
+            <div id="filter-config" class="mt-20">
                 <label>Filters</label>
                 <div id="filter-list">
                     <!-- Dynamic Filter Items -->
                 </div>
-                <button class="add-btn" id="add-filter" style="border-color: rgba(249, 115, 22, 0.2); color: #f97316; background: rgba(249, 115, 22, 0.1);"><i data-lucide="filter"></i> Add Filter</button>
+                <button class="add-btn btn-filter-custom" id="add-filter"><i data-lucide="filter"></i> Add Filter</button>
             </div>
 
             <div class="grid-2">
@@ -141,37 +127,37 @@
                 <div class="hint">Click to select targets. Multi-select enabled for these operations.</div>
             </div>
 
-            <div class="form-group" style="margin-top: 30px;">
+            <div class="form-group mt-30">
                 <label>Quick Actions</label>
                 <div class="grid-2">
-                    <button class="add-btn" onclick="setDockerOp('restart')" style="width:100%"><i data-lucide="refresh-cw"></i> Restart</button>
-                    <button class="add-btn" onclick="setDockerOp('redeploy')" style="width:100%"><i data-lucide="server"></i> Re-deploy (up -d)</button>
-                    <button class="add-btn" onclick="setDockerOp('composer')" style="width:100%"><i data-lucide="package"></i> Composer Update</button>
-                    <button class="add-btn" onclick="setDockerOp('logs')" style="width:100%"><i data-lucide="list"></i> Tail Logs (-f)</button>
-                    <button class="add-btn" onclick="setDockerOp('health')" style="width:100%"><i data-lucide="heart"></i> Health Check</button>
-                    <button class="add-btn" onclick="setDockerOp('time')" style="width:100%"><i data-lucide="clock"></i> Check Time</button>
-                    <button class="add-btn" onclick="setDockerOp('bash')" style="width:100%"><i data-lucide="terminal"></i> Interactive Shell</button>
+                    <button class="add-btn w-full" onclick="setDockerOp('restart')"><i data-lucide="refresh-cw"></i> Restart</button>
+                    <button class="add-btn w-full" onclick="setDockerOp('redeploy')"><i data-lucide="server"></i> Re-deploy (up -d)</button>
+                    <button class="add-btn w-full" onclick="setDockerOp('composer')"><i data-lucide="package"></i> Composer Update</button>
+                    <button class="add-btn w-full" onclick="setDockerOp('logs')"><i data-lucide="list"></i> Tail Logs (-f)</button>
+                    <button class="add-btn w-full" onclick="setDockerOp('health')"><i data-lucide="heart"></i> Health Check</button>
+                    <button class="add-btn w-full" onclick="setDockerOp('time')"><i data-lucide="clock"></i> Check Time</button>
+                    <button class="add-btn w-full" onclick="setDockerOp('bash')"><i data-lucide="terminal"></i> Interactive Shell</button>
                 </div>
             </div>
 
-            <div class="form-group" style="margin-top: 30px;">
+            <div class="form-group mt-30">
                 <label>Job Review & Monitoring</label>
-                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
-                    <select id="job-status-select" style="flex: 1;" onchange="state.jobStatus = this.value; updatePreview();">
+                <div class="flex flex-gap-10 mb-12">
+                    <select id="job-status-select" class="flex-1" onchange="state.jobStatus = this.value; updatePreview();">
                         <option value="scheduled">Scheduled</option>
                         <option value="processing">Processing</option>
                         <option value="completed">Completed</option>
                         <option value="failed">Failed</option>
                         <option value="delayed">Delayed</option>
                     </select>
-                    <button class="add-btn" onclick="setDockerOp('review-jobs')" style="margin-top:0; white-space:nowrap">
+                    <button class="add-btn mt-0 nowrap" onclick="setDockerOp('review-jobs')">
                         <i data-lucide="eye"></i> Review Jobs
                     </button>
                 </div>
                 <div class="hint">Inspect technical Job entities inside the container filtering by status.</div>
             </div>
 
-            <div class="form-group" style="margin-top: 30px;">
+            <div class="form-group mt-30">
                 <label>Global Operations</label>
                 <div class="badge-group">
                     <div class="badge" onclick="setDockerOp('global-up')"><i data-lucide="cloud-lightning"></i> Full Rebuild & Up</div>
@@ -185,7 +171,7 @@
         <div id="card-semantic" class="card animate-fade">
             <h2 class="section-title"><i data-lucide="play-circle"></i> Semantic Workflows</h2>
             
-            <div class="form-group" style="margin-bottom: 25px;">
+            <div class="form-group mb-25">
                 <label>Target Container</label>
                 <div id="semantic-container-selector" class="badge-group">
                     <!-- Dynamic Containers -->
@@ -193,37 +179,32 @@
                 <div class="hint">The selected container will be used for all command chains below.</div>
             </div>
 
-            <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 20px;">Common command chains based on local development recurrences.</p>
+            <p class="semantic-intro mb-20">Common command chains based on local development recurrences.</p>
             
-            <div style="display: flex; flex-direction: column; gap: 15px;">
-                <div class="agg-item" onclick="setSemanticOp('refresh-code')" style="cursor:pointer; display:block">
-                    <div style="font-weight:600; color:var(--primary); margin-bottom:5px">🔄 Refresh Code Base</div>
-                    <div style="font-size:0.75rem; color:var(--text-dim)">Restarts services and ensures dependencies are synced after commits.</div>
+            <div class="flex flex-column flex-gap-15" id="semantic-list">
+                <div class="semantic-item agg-item" onclick="setSemanticOp('refresh-code')">
+                    <div class="semantic-title text-primary">🔄 Refresh Code Base</div>
+                    <div class="semantic-desc">Restarts services and ensures dependencies are synced after commits.</div>
                 </div>
 
-                <div class="agg-item" onclick="setSemanticOp('breaking-rebuild')" style="cursor:pointer; display:block">
-                    <div style="font-weight:600; color:#ef4444; margin-bottom:5px">⚡ Full Rebuild & Sync</div>
-                    <div style="font-size:0.75rem; color:var(--text-dim)">Complete cycle: build -> down -> up -> composer -> schema -> seed -> health.</div>
+                <div class="semantic-item agg-item" onclick="setSemanticOp('breaking-rebuild')">
+                    <div class="semantic-title text-danger">⚡ Full Rebuild & Sync</div>
+                    <div class="semantic-desc">Complete cycle: build -> down -> up -> composer -> schema -> seed -> health.</div>
                 </div>
 
-                <div class="agg-item" onclick="setSemanticOp('clear-cache')" style="cursor:pointer; display:block">
-                    <div style="font-weight:600; color:#eab308; margin-bottom:5px">🧹 Clear Redis Cache</div>
-                    <div style="font-size:0.75rem; color:var(--text-dim)">Invalidates all data in Redis across instances.</div>
+                <div class="semantic-item agg-item" onclick="setSemanticOp('clear-cache')">
+                    <div class="semantic-title text-warning">🧹 Clear Redis Cache</div>
+                    <div class="semantic-desc">Invalidates all data in Redis across instances.</div>
                 </div>
 
-                <div class="agg-item" onclick="setSemanticOp('run-tests')" style="cursor:pointer; display:block">
-                    <div style="font-weight:600; color:#22c55e; margin-bottom:5px">🧪 Quality Check (Tests + PHPStan)</div>
-                    <div style="font-size:0.75rem; color:var(--text-dim)">Runs PHPUnit and PHPStan analysis in the primary container.</div>
+                <div class="semantic-item agg-item" onclick="setSemanticOp('run-tests')">
+                    <div class="semantic-title text-success">🧪 Quality Check (Tests + PHPStan)</div>
+                    <div class="semantic-desc">Runs entire test suite and static analysis sequentially.</div>
                 </div>
                 
-                <div class="agg-item" onclick="setSemanticOp('job-lifecycle')" style="cursor:pointer; display:block">
-                    <div style="font-weight:600; color:#fb923c; margin-bottom:5px">⚡ Job Lifecycle Chain</div>
-                    <div style="font-size:0.75rem; color:var(--text-dim)">Sequence: Reset Schedule -> Listen -> Process. Ideal for debugging data ingestion.</div>
-                </div>
-                
-                <div class="agg-item" onclick="setSemanticOp('schema-update')" style="cursor:pointer; display:block">
-                    <div style="font-weight:600; color:var(--primary); margin-bottom:5px">🗄️ Database Schema Sync</div>
-                    <div style="font-size:0.75rem; color:var(--text-dim)">Checks and applies Doctrine schema updates (--force).</div>
+                <div class="semantic-item agg-item" onclick="setSemanticOp('schema-update')">
+                    <div class="semantic-title text-primary">🗄️ Database Schema Sync</div>
+                    <div class="semantic-desc">Checks and applies Doctrine schema updates (--force).</div>
                 </div>
             </div>
         </div>
@@ -294,7 +275,7 @@
         <!-- History Pane -->
         <div class="history-pane animate-fade" style="animation-delay: 0.2s;">
             <div class="builder-history-header">
-                <h2 class="section-title" style="margin-bottom: 0;"><i data-lucide="history"></i> History</h2>
+                <h2 class="section-title mb-0"><i data-lucide="history"></i> History</h2>
                 <button class="history-action-btn delete" id="clear-history-btn" title="Clear All History">
                     <i data-lucide="trash-2" size="20"></i>
                 </button>
@@ -306,7 +287,7 @@
             
             <div id="empty-history" class="builder-empty-history">
                 <i data-lucide="ghost" size="48" style="opacity: 0.2; margin-bottom: 15px;"></i>
-                <p style="font-size: 0.9rem;">No saved commands yet.</p>
+                <p class="text-xs">No saved commands yet.</p>
             </div>
         </div>
     </main>
@@ -317,7 +298,7 @@
 
     <script>
         // Init Lucide Icons
-        lucide.createIcons();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
 
         // Metadata Dictionary for APIs Hub
         const DICTIONARY = {
@@ -644,13 +625,13 @@
                 const opOptions = ['(Default)', ...DICTIONARY.operations].map(op => `<option value="${op === '(Default)' ? '' : op}" ${agg.operation === (op === '(Default)' ? '' : op) ? 'selected' : ''}>${op}</option>`).join('');
 
                 div.innerHTML = `
-                    <div style="display:flex; flex-direction:column; gap:5px">
-                        <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Alias</label>
+                    <div class="agg-field-group">
+                        <label class="agg-label">Alias</label>
                         <input type="text" placeholder="Alias" value="${agg.alias}" onchange="updateAgg(${index}, 'alias', this.value)">
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px">
-                        <div>
-                            <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Metric/Formula</label>
+                        <div class="agg-field-group">
+                            <label class="agg-label">Metric/Formula</label>
                             <select onchange="updateAgg(${index}, 'formula', this.value)">
                                 ${metricOptions}
                                 <optgroup label="Custom">
@@ -658,8 +639,8 @@
                                 </optgroup>
                             </select>
                         </div>
-                        <div>
-                            <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Operation ${shouldDisableOp ? '<i data-lucide="lock" size="10" style="vertical-align:middle; margin-left:4px; opacity:0.6"></i>' : ''}</label>
+                        <div class="agg-field-group">
+                            <label class="agg-label">Operation ${shouldDisableOp ? '<i data-lucide="lock" size="10"></i>' : ''}</label>
                             <select onchange="updateAgg(${index}, 'operation', this.value)" 
                                     ${shouldDisableOp ? 'disabled' : ''} 
                                     style="${shouldDisableOp ? 'opacity:0.5; cursor:not-allowed;' : ''}">
@@ -667,38 +648,39 @@
                             </select>
                         </div>
                     </div>
-                    <button class="remove-btn" onclick="removeAgg(${index})" style="align-self: flex-end; margin-bottom: 2px;"><i data-lucide="trash-2"></i></button>
+                    <button class="remove-btn" onclick="removeAgg(${index})" style="align-self: flex-end; margin-bottom: 2px;">
+                        <i data-lucide="trash-2" size="16"></i>
+                    </button>
                 `;
 
                 if (agg.formula === 'CUSTOM' || (!DICTIONARY.metrics.find(m => m.id === agg.formula) && agg.formula)) {
                     const customInput = document.createElement('input');
                     customInput.type = 'text';
+                    customInput.className = 'agg-custom-row';
                     customInput.value = agg.formula === 'CUSTOM' ? '' : agg.formula;
                     customInput.placeholder = 'Enter field or SQL expression...';
-                    customInput.style.marginTop = '10px';
-                    customInput.style.gridColumn = '1 / span 3';
                     customInput.onchange = (e) => updateAgg(index, 'formula', e.target.value);
                     div.appendChild(customInput);
                 }
 
                 aggListEl.appendChild(div);
             });
-            lucide.createIcons();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
             updatePreview();
         }
+
 
         function renderFilters() {
             filterListEl.innerHTML = '';
             state.filters.forEach((filter, index) => {
                 const div = document.createElement('div');
-                div.className = 'agg-item';
-                div.style.background = 'rgba(249, 115, 22, 0.05)';
+                div.className = 'agg-item filter-item';
                 
                 const dimOptions = DICTIONARY.dimensions.map(d => `<option value="${d}" ${filter.key === d ? 'selected' : ''}>${d}</option>`).join('');
 
                 div.innerHTML = `
-                    <div style="display:flex; flex-direction:column; gap:5px">
-                        <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Field/Dimension</label>
+                    <div class="agg-field-group">
+                        <label class="agg-label">Field/Dimension</label>
                         <select onchange="updateFilter(${index}, 'key', this.value)">
                             ${dimOptions}
                             <optgroup label="Custom">
@@ -706,29 +688,31 @@
                             </optgroup>
                         </select>
                     </div>
-                    <div style="display:flex; flex-direction:column; gap:5px">
-                        <label style="font-size:0.7rem; color:var(--text-dim); margin-bottom:2px">Value</label>
+                    <div class="agg-field-group">
+                        <label class="agg-label">Value</label>
                         <input type="text" placeholder="e.g. female, campaign_123..." value="${filter.value}" onchange="updateFilter(${index}, 'value', this.value)">
                     </div>
-                    <button class="remove-btn" onclick="removeFilter(${index})" style="align-self: flex-end; margin-bottom: 2px;"><i data-lucide="trash-2"></i></button>
+                    <button class="remove-btn" onclick="removeFilter(${index})" style="align-self: flex-end; margin-bottom: 2px;">
+                        <i data-lucide="trash-2" size="16"></i>
+                    </button>
                 `;
 
                 if (filter.key === 'CUSTOM' || (!DICTIONARY.dimensions.includes(filter.key) && filter.key)) {
                     const customInput = document.createElement('input');
                     customInput.type = 'text';
+                    customInput.className = 'agg-custom-row';
                     customInput.value = filter.key === 'CUSTOM' ? '' : filter.key;
                     customInput.placeholder = 'Enter field name...';
-                    customInput.style.marginTop = '10px';
-                    customInput.style.gridColumn = '1 / span 3';
                     customInput.onchange = (e) => updateFilter(index, 'key', e.target.value);
                     div.appendChild(customInput);
                 }
 
                 filterListEl.appendChild(div);
             });
-            lucide.createIcons();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
             updatePreview();
         }
+
 
         window.updateFilter = (index, key, val) => {
             state.filters[index][key] = val;

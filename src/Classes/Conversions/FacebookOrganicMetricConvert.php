@@ -164,31 +164,32 @@ class FacebookOrganicMetricConvert
             $channeledMetric->metricConfigKey = $metricConfigKey;
             $channeledMetric->metadata = [];
             $channeledMetric->data = $row;
-            if (isset($row['total_value']['breakdowns'])) {
+            if (isset($row['total_value']['breakdowns']) && !empty($row['total_value']['breakdowns'][0]['results'])) {
                 $breakdowns = $row['total_value']['breakdowns'][0]['dimension_keys'];
-                if (isset($row['total_value']['breakdowns'][0]['results'])) {
-                    foreach ($row['total_value']['breakdowns'][0]['results'] as $vector) {
-                        $channeledMetric->value = is_array($vector['value']) ? ($vector['value'][0]['value'] ?? ($vector['value'][0]['amount'] ?? 0)) : $vector['value'];
-                        $dimensions = [];
-                        foreach ($breakdowns as $key => $breakdown) {
-                            $dimensions[] = [
-                                'dimensionKey' => $breakdown,
-                                'dimensionValue' => $vector['dimension_values'][$key],
-                            ];
-                        }
-                        $channeledMetric->dimensions = $dimensions;
-                        $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
-
-                        if (!isset($elements[$metricConfigKey][$row['name']])) {
-                            $elements[$metricConfigKey][$row['name']] = [];
-                        }
-                        $elements[$metricConfigKey][$row['name']][] = $channeledMetric;
+                foreach ($row['total_value']['breakdowns'][0]['results'] as $vector) {
+                    $channeledMetricBreakdown = clone $channeledMetric;
+                    $channeledMetricBreakdown->value = is_array($vector['value']) ? ($vector['value'][0]['value'] ?? ($vector['value'][0]['amount'] ?? 0)) : $vector['value'];
+                    $dimensions = [];
+                    foreach ($breakdowns as $key => $breakdown) {
+                        $dimensions[] = [
+                            'dimensionKey' => $breakdown,
+                            'dimensionValue' => $vector['dimension_values'][$key],
+                        ];
                     }
-                } else {
-                    $skippedRows++;
-                    $logger?->warning("Skipping row $index/$rowCount, platformId: {$channeledAccountEntity->getPlatformId()}(), no breakdowns found for metric " . $row['name']);
+                    $channeledMetricBreakdown->dimensions = $dimensions;
+                    $channeledMetricBreakdown->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
+
+                    if (!isset($elements[$metricConfigKey][$row['name']])) {
+                        $elements[$metricConfigKey][$row['name']] = [];
+                    }
+                    $elements[$metricConfigKey][$row['name']][] = $channeledMetricBreakdown;
                 }
             } else {
+                if (!isset($row['total_value']['value']) && isset($row['total_value']['breakdowns'])) {
+                     $logger?->warning("Skipping row $index/$rowCount, platformId: {$channeledAccountEntity->getPlatformId()}(), no breakdowns found for metric " . $row['name'] . " and no total value available.");
+                     $skippedRows++;
+                     continue;
+                }
                 $channeledMetric->value = $row['total_value']['value'] ?? 0;
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash([]);
 
