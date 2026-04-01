@@ -118,8 +118,9 @@ async function loadReport() {
             
             // 2. Trend data for Sparklines
             const trendAggs = {}; metrics.filter(m => m.sparkline).forEach(m => trendAggs[`trend_${m.key}`] = m.original);
-            const channelToFetch = (type === 'instagram') ? 'instagram' : 'facebook_organic';
-            const groupByField = (type === 'instagram') ? 'channeledAccount' : 'page';
+            const currentAccountType = filters.account_type || 'facebook_page';
+            const channelToFetch = (currentAccountType === 'instagram') ? 'instagram' : 'facebook_organic';
+            const groupByField = (currentAccountType === 'instagram') ? 'channeledAccount' : 'page';
 
             const resTrend = await fetch(`/${channelToFetch}/metric/aggregate`, { 
                 method: 'POST', headers, 
