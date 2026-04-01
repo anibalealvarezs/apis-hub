@@ -435,35 +435,10 @@ class MetricRequests
                             $totalMetrics += $res['metrics'] ?? 0;
                             $totalRows += $res['rows'] ?? 0;
                             $totalDuplicates += $res['duplicates'] ?? 0;
-                            // Sync Posts from Facebook before getting metrics
-                            try {
-                                $logger->info("Syncing posts for Facebook Page {$pageId}");
-                                // Sync posts starting from the job's start date (start of that year)
-                                $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
-                                $rawPosts = $api->getFacebookPosts(
-                                    pageId: (string) $pageId,
-                                    additionalParams: ['since' => $syncSince]
-                                );
-                                if (!empty($rawPosts['data'])) {
-                                    $postsCollection = FacebookOrganicMetricConvert::toPostsCollection(
-                                        posts: $rawPosts['data'],
-                                        pageEntity: $pageEntity,
-                                        accountEntity: $accountEntity,
-                                    );
-                                    SocialProcessor::processPosts($postsCollection, $manager);
-                                    $logger->info("Synced " . count($rawPosts['data']) . " posts for Facebook Page {$pageId}");
-                                }
-                            } catch (Exception $e) {
-                                $logger->warning("Failed to sync posts for Facebook Page {$pageId}: " . $e->getMessage());
-                            }
-                        }
 
-                        if ($page['posts']) {
-                            $postMap = self::getPostMap($manager, $pageEntity);
-                            // Sync Media from Instagram before getting metrics
+                            // 1. Sync Instagram Media first to claim posts
                             try {
                                 $logger->info("Syncing media for Instagram Account {$page['ig_account']}");
-                                // Retrieve the ChanneledAccount entity for Instagram
                                 $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
                                 $channeledAccountEntity = $channeledAccountRepository->findOneBy([
                                     'platformId' => (string) $page['ig_account'],
@@ -471,22 +446,15 @@ class MetricRequests
                                     'type' => AccountEnum::INSTAGRAM->value,
                                 ]);
 
-                                if (!$channeledAccountEntity) {
-                                    $logger->warning("ChanneledAccount not found for Instagram profile {$page['ig_account']}. Skipping media sync.");
-                                } else {
-                                    // Sync media starting from the job's start date
+                                if ($channeledAccountEntity) {
+                                    // REPAIR: Claim any orphaned posts before fetching metrics
+                                    $repairSql = "UPDATE posts SET channeled_account_id = ? WHERE page_id = ? AND channeled_account_id IS NULL AND (post_id LIKE 'ig_%' OR post_id ~ '^[0-9]+_[0-9]+$')";
+                                    $manager->getConnection()->executeStatement($repairSql, [$channeledAccountEntity->getId(), $pageEntity->getId()]);
+
                                     $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
-                                    $rawMedia = $api->getInstagramMedia(
-                                        igUserId: (string) $page['ig_account'],
-                                        additionalParams: ['since' => $syncSince]
-                                    );
+                                    $rawMedia = $api->getInstagramMedia(igUserId: (string) $page['ig_account'], additionalParams: ['since' => $syncSince]);
                                     if (!empty($rawMedia['data'])) {
-                                        $mediaCollection = FacebookOrganicMetricConvert::toInstagramMediaCollection(
-                                            mediaItems: $rawMedia['data'],
-                                            pageEntity: $pageEntity,
-                                            accountEntity: $accountEntity,
-                                            channeledAccountEntity: $channeledAccountEntity,
-                                        );
+                                        $mediaCollection = FacebookOrganicMetricConvert::toInstagramMediaCollection($rawMedia['data'], $pageEntity, $accountEntity, $channeledAccountEntity);
                                         SocialProcessor::processPosts($mediaCollection, $manager);
                                         $logger->info("Synced " . count($rawMedia['data']) . " media items for Instagram Account {$page['ig_account']}");
                                     }
@@ -495,14 +463,27 @@ class MetricRequests
                                 $logger->warning("Failed to sync media for Instagram Account {$page['ig_account']}: " . $e->getMessage());
                             }
 
+                            // 2. Sync Facebook Page Posts second
+                            if ($page['posts']) {
+                                try {
+                                    $logger->info("Syncing posts for Facebook Page {$pageId}");
+                                    $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
+                                    $rawPosts = $api->getFacebookPosts(pageId: (string) $pageId, additionalParams: ['since' => $syncSince]);
+                                    if (!empty($rawPosts['data'])) {
+                                        $postsCollection = FacebookOrganicMetricConvert::toPostsCollection($rawPosts['data'], $pageEntity, $accountEntity);
+                                        SocialProcessor::processPosts($postsCollection, $manager);
+                                        $logger->info("Synced " . count($rawPosts['data']) . " posts for Facebook Page {$pageId}");
+                                    }
+                                } catch (Exception $e) {
+                                    $logger->warning("Failed to sync posts for Facebook Page {$pageId}: " . $e->getMessage());
+                                }
+                                $postMap = self::getPostMap($manager, $pageEntity);
+                            }
                         }
 
+                        // Process Account Metrics
                         if (!empty($page['ig_account']) && !empty($page['ig_accounts']) && !empty($page['ig_account_metrics'])) {
-                            $includeFilter = self::getFacebookFilter($config, 'IG_ACCOUNT', 'cache_include');
-                            $excludeFilter = self::getFacebookFilter($config, 'IG_ACCOUNT', 'cache_exclude');
-                            if (!Helpers::matchesFilter((string) $page['ig_account'], $includeFilter, $excludeFilter)) {
-                                $logger->info("Skipping Instagram account: " . $page['ig_account'] . " (filtered out)");
-                            } elseif ($accountEntity) {
+                            if ($accountEntity) {
                                 $res = self::processInstagramAccount(
                                     page: $page,
                                     api: $api,
@@ -519,11 +500,10 @@ class MetricRequests
                                 $totalMetrics += $res['metrics'] ?? 0;
                                 $totalRows += $res['rows'] ?? 0;
                                 $totalDuplicates += $res['duplicates'] ?? 0;
-                            } else {
-                                $logger->error("Cannot process Instagram account " . $page['ig_account'] . " because accountEntity is null.");
                             }
                         }
 
+                        // Process Media Metrics
                         if (!empty($page['ig_account']) && !empty($page['ig_accounts']) && !empty($page['ig_account_media'])) {
                             $channeledAccountEntity = $channeledAccountRepository->findOneBy([
                                 'platformId' => (string) $page['ig_account'],
@@ -539,19 +519,13 @@ class MetricRequests
                                     foreach ($mediaMap['map'] as $mediaId => $idInDb) {
                                         $mediaEntity = $postRepository->find($idInDb);
                                         if ($mediaEntity) {
-                                            $mediaCaption = $mediaEntity->getData()['caption'] ?? '';
-                                            $includeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_include');
-                                            $excludeFilter = self::getFacebookFilter($config, 'IG_MEDIA', 'cache_exclude');
-                                            if (Helpers::matchesFilter($mediaCaption, $includeFilter, $excludeFilter) || Helpers::matchesFilter($mediaEntity->getPostId(), $includeFilter, $excludeFilter)) {
-                                                $filteredMediaMap[$mediaId] = $mediaEntity;
-                                            }
+                                            $filteredMediaMap[$mediaId] = $mediaEntity;
                                         }
                                     }
 
                                     $mediaChunks = array_chunk($filteredMediaMap, 50, true);
-                                    foreach ($mediaChunks as $chunkIndex => $chunk) {
+                                    foreach ($mediaChunks as $chunk) {
                                         Helpers::checkJobStatus($jobId);
-                                        $logger->info("Processing Instagram batch " . ($chunkIndex + 1) . "/" . count($mediaChunks));
                                         $urls = [];
                                         foreach ($chunk as $mediaPlatformId => $mediaEntity) {
                                             $mType = $mediaMap['mapData'][$mediaPlatformId] ?? 'IMAGE';
@@ -559,17 +533,11 @@ class MetricRequests
                                             $urls[] = "/{$mediaPlatformId}/insights?metric={$mMetrics}";
                                         }
 
-                                        $api->setPageId((string) ($page['id'] ?? ''));
                                         $batchResults = $api->getBatch($urls, \Anibalealvarezs\FacebookGraphApi\Enums\TokenSample::PAGE);
                                         foreach ($batchResults as $resIndex => $batchRes) {
                                             $mediaPlatformId = array_keys($chunk)[$resIndex];
                                             $mediaEntity = array_values($chunk)[$resIndex];
-                                            $providedData = null;
-                                            if (($batchRes['code'] ?? 0) === 200) {
-                                                $providedData = json_decode($batchRes['body'], true);
-                                            } else {
-                                                $logger->warning("Batch error for IG media {$mediaPlatformId} (Code: " . ($batchRes['code'] ?? '???') . "). Will attempt individual fallback.");
-                                            }
+                                            $providedData = ($batchRes['code'] ?? 0) === 200 ? json_decode($batchRes['body'], true) : null;
 
                                             $res = self::processInstagramMedia(
                                                 pageEntity: $pageEntity,
@@ -593,45 +561,31 @@ class MetricRequests
                             }
                         }
 
-                        if ($page['post_metrics']) {
-                            $logger->info("Syncing insights for " . count($postMap['map']) . " Facebook posts in batches of 50...");
+                        // Process FB Post Metrics
+                        if ($page['post_metrics'] && isset($postMap)) {
                             $filteredPostMap = [];
                             foreach ($postMap['map'] as $postPlatformId => $idInDb) {
                                 $postEntity = $postRepository->find($idInDb);
                                 if ($postEntity) {
-                                    $postMsg = $postEntity->getData()['message'] ?? '';
-                                    $includeFilter = self::getFacebookFilter($config, 'POST', 'cache_include');
-                                    $excludeFilter = self::getFacebookFilter($config, 'POST', 'cache_exclude');
-                                    if (Helpers::matchesFilter($postMsg, $includeFilter, $excludeFilter) || Helpers::matchesFilter($postPlatformId, $includeFilter, $excludeFilter)) {
-                                        $filteredPostMap[$postPlatformId] = $postEntity;
-                                    }
+                                    $filteredPostMap[$postPlatformId] = $postEntity;
                                 }
                             }
 
                             $postChunks = array_chunk($filteredPostMap, 50, true);
-                            foreach ($postChunks as $chunkIndex => $chunk) {
+                            foreach ($postChunks as $chunk) {
                                 Helpers::checkJobStatus($jobId);
-                                $logger->info("Processing Facebook post batch " . ($chunkIndex + 1) . "/" . count($postChunks));
                                 $urls = [];
                                 foreach ($chunk as $postPlatformId => $postEntity) {
                                     $postType = $postMap['mapData'][$postPlatformId] ?? 'status';
                                     $pMetrics = 'post_reactions_by_type_total';
-                                    if ($postType === 'video') {
-                                        $pMetrics .= ',post_media_view';
-                                    }
+                                    if ($postType === 'video') { $pMetrics .= ',post_media_view'; }
                                     $urls[] = "/{$postPlatformId}/insights?metric={$pMetrics}&period=lifetime&fields=name,period,values";
                                 }
 
                                 $batchResults = $api->getBatch($urls, \Anibalealvarezs\FacebookGraphApi\Enums\TokenSample::PAGE);
                                 foreach ($batchResults as $resIndex => $batchRes) {
-                                    $postPlatformId = array_keys($chunk)[$resIndex];
                                     $postEntity = array_values($chunk)[$resIndex];
-                                    $providedData = null;
-                                    if (($batchRes['code'] ?? 0) === 200) {
-                                        $providedData = json_decode($batchRes['body'] ?? '{}', true);
-                                    } else {
-                                        $logger->warning("Batch error for FB post {$postPlatformId} (Code: " . ($batchRes['code'] ?? '???') . "). Body: " . ($batchRes['body'] ?? 'EMPTY'));
-                                    }
+                                    $providedData = ($batchRes['code'] ?? 0) === 200 ? json_decode($batchRes['body'] ?? '{}', true) : null;
 
                                     $res = self::processFacebookPagePost(
                                         postEntity: $postEntity,
@@ -651,7 +605,7 @@ class MetricRequests
                         }
                     }
                 } catch (Exception $e) {
-                    $logger->error("Error processing page " . $page['id'] . ": " . $e->getMessage());
+                    $logger->error("Error processing page " . ($page['id'] ?? 'unknown') . ": " . $e->getMessage());
                 }
             }
 
@@ -2648,7 +2602,7 @@ class MetricRequests
         if (!$channeledAccountEntity) {
              return ['map' => [], 'mapReverse' => []];
         }
-        $sql = "SELECT id, post_id, data FROM posts WHERE page_id = ? AND channeled_account_id = ?";
+        $sql = "SELECT id, post_id, data FROM posts WHERE page_id = ? AND (channeled_account_id = ? OR channeled_account_id IS NULL)";
         $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId(), $channeledAccountEntity->getId()])->fetchAllAssociative();
         $map = [];
         $mapData = [];

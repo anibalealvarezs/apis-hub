@@ -83,7 +83,7 @@ class SocialProcessor
             $sql = Helpers::buildUpsertSql(
                 'posts', 
                 $cols, 
-                ['data'], 
+                ['data', 'channeled_account_id', 'account_id', 'page_id'], 
                 ['post_id', 'page_id', 'account_id', 'channeled_account_id'], 
                 count($chunk)
             );

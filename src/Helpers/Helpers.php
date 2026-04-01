@@ -330,6 +330,10 @@ class Helpers
                     $updateClauses[] = "{$col} = CURRENT_TIMESTAMP";
                     continue;
                 }
+                if ($col === 'channeled_account_id' || $col === 'account_id' || $col === 'page_id') {
+                    $updateClauses[] = "{$col} = COALESCE(EXCLUDED.{$col}, {$table}.{$col})";
+                    continue;
+                }
                 $updateClauses[] = "{$col} = EXCLUDED.{$col}";
             }
             $updateString = implode(', ', $updateClauses);
