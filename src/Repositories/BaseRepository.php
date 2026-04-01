@@ -380,9 +380,14 @@ class BaseRepository extends EntityRepository
                         if ($key === 'page') $nullTarget = 'mc.page_id';
                         $qb->andWhere("$nullTarget IS NOT NULL");
                     } elseif ($isNameValue && isset($map['alias']) && isset($map['field'])) {
-                        // If it's a string name, search by name field
-                        $qb->andWhere("{$map['alias']}.{$map['field']} = :f_$key")
-                           ->setParameter("f_$key", $value);
+                        // If it's a string name, search by name field, BUT NOT for account_type which uses 'type'
+                        if ($key === 'account_type') {
+                            $qb->andWhere("{$map['alias']}.type = :f_$key")
+                               ->setParameter("f_$key", $value);
+                        } else {
+                            $qb->andWhere("{$map['alias']}.{$map['field']} = :f_$key")
+                               ->setParameter("f_$key", $value);
+                        }
                     } elseif (($isPlatformIdValue || str_starts_with((string)$value, 'http')) && ($targetCol === 'platform_id' || $targetCol === 'url')) {
                         $qb->andWhere("{$map['alias']}.$targetCol = :f_$key")
                            ->setParameter("f_$key", (string)$value);
