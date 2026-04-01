@@ -371,8 +371,14 @@ class BaseRepository extends EntityRepository
                         if ($key === 'page') $nullTarget = 'mc.page_id';
                         $qb->andWhere("$nullTarget IS NOT NULL");
                     } elseif ($key === 'account_type') {
-                        $qb->andWhere("{$map['alias']}.type = :f_$key")
-                           ->setParameter("f_$key", $value);
+                        $isPostgres = Helpers::isPostgres();
+                        if ($isPostgres) {
+                            $qb->andWhere("LOWER(CAST({$map['alias']}.type AS text)) = LOWER(:f_$key)")
+                               ->setParameter("f_$key", (string)$value);
+                        } else {
+                            $qb->andWhere("{$map['alias']}.type = :f_$key")
+                               ->setParameter("f_$key", $value);
+                        }
                     } else {
                         /**
                          * Triple Identity Lookup:
@@ -406,7 +412,8 @@ class BaseRepository extends EntityRepository
                                 $qb->andWhere("LOWER(CAST({$map['alias']}.$nameCol AS text)) = LOWER(:f_$key)")
                                    ->setParameter("f_$key", (string)$value);
                             } else {
-                                $qb->andWhere("{$map['alias']}.$nameCol = :f_$key")
+                                $targetCol = $map['field'] ?? $nameCol;
+                                $qb->andWhere("{$map['alias']}.$targetCol = :f_$key")
                                    ->setParameter("f_$key", $value);
                             }
                         }
