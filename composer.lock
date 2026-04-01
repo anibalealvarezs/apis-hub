@@ -131,13 +131,13 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/anibalealvarezs/facebook-graph-api.git",
-                "reference": "b7a3ee519b85f3e09ee666d92a60a968995e141e"
+                "reference": "00ad311fdf346520f23a5356aa9f6c3af5894442"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-b7a3ee519b85f3e09ee666d92a60a968995e141e-zip-fb9276.zip",
-                "reference": "b7a3ee519b85f3e09ee666d92a60a968995e141e",
-                "shasum": "47cbbeaf5b00cc6faf9c0366f01d0dd7ca3fecb3"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-00ad311fdf346520f23a5356aa9f6c3af5894442-zip-d839b7.zip",
+                "reference": "00ad311fdf346520f23a5356aa9f6c3af5894442",
+                "shasum": "ed8ddeb932e1bc740eacd75ec4d2cf2ded7473ba"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -188,7 +188,7 @@
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues",
                 "source": "https://github.com/anibalealvarezs/facebook-graph-api/tree/main"
             },
-            "time": "2026-03-31T13:45:01+00:00"
+            "time": "2026-04-01T04:39:03+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -3668,12 +3668,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/http-kernel.git",
-                "reference": "b22a712e646064a6b84153ececeb963948944146"
+                "reference": "4fedf6eaa23e111d0a5fef77fa2ba150a4f3aed7"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/b22a712e646064a6b84153ececeb963948944146",
-                "reference": "b22a712e646064a6b84153ececeb963948944146",
+                "url": "https://api.github.com/repos/symfony/http-kernel/zipball/4fedf6eaa23e111d0a5fef77fa2ba150a4f3aed7",
+                "reference": "4fedf6eaa23e111d0a5fef77fa2ba150a4f3aed7",
                 "shasum": ""
             },
             "require": {
@@ -3778,7 +3778,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-22T13:52:11+00:00"
+            "time": "2026-03-31T20:41:12+00:00"
         },
         {
             "name": "symfony/messenger",
@@ -6289,12 +6289,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "a71778ade547d17881d1039314375ec273a0b32f"
+                "reference": "b2419311b187389f5fcf686be09656777da3ac1d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/a71778ade547d17881d1039314375ec273a0b32f",
-                "reference": "a71778ade547d17881d1039314375ec273a0b32f",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/b2419311b187389f5fcf686be09656777da3ac1d",
+                "reference": "b2419311b187389f5fcf686be09656777da3ac1d",
                 "shasum": ""
             },
             "require": {
@@ -6376,7 +6376,7 @@
                     "type": "other"
                 }
             ],
-            "time": "2026-03-03T16:43:55+00:00"
+            "time": "2026-03-31T14:31:40+00:00"
         },
         {
             "name": "sebastian/cli-parser",
