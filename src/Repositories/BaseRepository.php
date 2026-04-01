@@ -374,19 +374,29 @@ class BaseRepository extends EntityRepository
                         $qb->andWhere("{$map['alias']}.type = :f_$key")
                            ->setParameter("f_$key", $value);
                     } else {
-                        // Dual Identity Lookup: Support both Platform ID and Name/URL
-                        // Accounts only have 'name', others have both.
+                        /**
+                         * Triple Identity Lookup:
+                         * 1. Internal Database ID (Foreign Key)
+                         * 2. External Platform ID
+                         * 3. Descriptive Name/URL
+                         */
                         $isPostgres = Helpers::isPostgres();
                         $platformEntities = ['page', 'post', 'channeledAccount', 'channeledCampaign', 'adGroup', 'ad'];
+                        $fk = $map['fk'] ?? null;
                         
                         if (in_array($key, $platformEntities)) {
+                            $whereClauses = [];
+                            if ($fk) $whereClauses[] = "mc.$fk = :f_$key";
+                            
                             if ($isPostgres && !is_numeric($value)) {
-                                $qb->andWhere("(LOWER(CAST({$map['alias']}.$idCol AS text)) = LOWER(:f_$key) OR LOWER(CAST({$map['alias']}.$nameCol AS text)) = LOWER(:f_$key))")
-                                   ->setParameter("f_$key", (string)$value);
+                                $whereClauses[] = "LOWER(CAST({$map['alias']}.$idCol AS text)) = LOWER(:f_$key)";
+                                $whereClauses[] = "LOWER(CAST({$map['alias']}.$nameCol AS text)) = LOWER(:f_$key)";
                             } else {
-                                $qb->andWhere("({$map['alias']}.$idCol = :f_$key OR {$map['alias']}.$nameCol = :f_$key)")
-                                   ->setParameter("f_$key", $value);
+                                $whereClauses[] = "{$map['alias']}.$idCol = :f_$key";
+                                $whereClauses[] = "{$map['alias']}.$nameCol = :f_$key";
                             }
+                            $qb->andWhere("(" . implode(' OR ', $whereClauses) . ")")
+                               ->setParameter("f_$key", $value);
                         } else {
                             if ($isPostgres && !is_numeric($value)) {
                                 $qb->andWhere("LOWER(CAST({$map['alias']}.$nameCol AS text)) = LOWER(:f_$key)")
