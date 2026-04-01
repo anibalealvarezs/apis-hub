@@ -581,7 +581,8 @@ class MetricRequests
                                                 logger: $logger,
                                                 mediaMap: $mediaMap,
                                                 pageMap: $pageMap,
-                                                providedData: $providedData
+                                                providedData: $providedData,
+                                                startDate: $cEnd
                                             );
                                             $totalMetrics += $res['metrics'] ?? 0;
                                             $totalRows += $res['rows'] ?? 0;

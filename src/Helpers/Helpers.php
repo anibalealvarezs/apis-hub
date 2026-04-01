@@ -315,7 +315,7 @@ class Helpers
     public static function buildUpsertSql(string $table, array $insertCols, array $updateCols, array|string $uniqueCols, int $rowCount = 1): string
     {
         $dbConfig = self::getDbConfig();
-        $isPostgres = ($dbConfig['driver'] === 'pdo_pgsql');
+        $isPostgres = self::isPostgres();
 
         $colString = implode(', ', $insertCols);
         $placeholders = '(' . implode(', ', array_fill(0, count($insertCols), '?')) . ')';
@@ -364,7 +364,7 @@ class Helpers
     public static function buildInsertIgnoreSql(string $table, array $insertCols, array|string $uniqueCols, int $rowCount = 1): string
     {
         $dbConfig = self::getDbConfig();
-        $isPostgres = ($dbConfig['driver'] === 'pdo_pgsql');
+        $isPostgres = self::isPostgres();
 
         $colString = implode(', ', $insertCols);
         $placeholders = '(' . implode(', ', array_fill(0, count($insertCols), '?')) . ')';
@@ -421,7 +421,15 @@ class Helpers
     public static function isPostgres(): bool
     {
         $config = self::getDbConfig();
-        return ($config['driver'] === 'pdo_pgsql');
+        $driver = $config['driver'] ?? '';
+        return (
+            $driver === 'pdo_pgsql' || 
+            $driver === 'pgsql' || 
+            $driver === 'postgres' || 
+            $driver === 'postgresql' ||
+            str_contains($driver, 'pgsql') ||
+            str_contains($driver, 'postgres')
+        );
     }
 
     /**

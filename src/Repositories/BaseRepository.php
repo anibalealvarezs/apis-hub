@@ -478,6 +478,12 @@ class BaseRepository extends EntityRepository
             $qb->orderBy($orderBy, $direction);
         }
 
+        $isPostgres = Helpers::isPostgres();
+        $logger = Helpers::setLogger('api_debug.log');
+        $logger->info("=== REPOSITORY AGGREGATE SQL DEBUG ===");
+        $logger->info("SQL: " . $qb->getSQL());
+        $logger->info("PARAMS: " . json_encode($qb->getParameters()));
+
         $stmt = $qb->executeQuery();
         $results = $stmt->fetchAllAssociative();
 
