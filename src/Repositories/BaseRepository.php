@@ -518,7 +518,9 @@ class BaseRepository extends EntityRepository
             foreach ($results as $row) {
                 $combo = [];
                 foreach ($otherGroups as $field) {
-                    $combo[$field] = $row[$field] ?? null;
+                    // Casing defense (PostgreSQL returns lowercase even with quotes in some envs)
+                    $val = $row[$field] ?? $row[strtolower($field)] ?? null;
+                    $combo[$field] = $val;
                 }
                 $comboKey = serialize($combo);
                 $uniqueCombos[$comboKey] = $combo;
@@ -528,9 +530,11 @@ class BaseRepository extends EntityRepository
             foreach ($results as $row) {
                 $combo = [];
                 foreach ($otherGroups as $field) {
-                    $combo[$field] = $row[$field] ?? null;
+                    $val = $row[$field] ?? $row[strtolower($field)] ?? null;
+                    $combo[$field] = $val;
                 }
-                $key = $row[$temporalField] . '|' . serialize($combo);
+                $temporalVal = $row[$temporalField] ?? $row[strtolower($temporalField)] ?? null;
+                $key = $temporalVal . '|' . serialize($combo);
                 $indexedResults[$key] = $row;
             }
 
@@ -555,7 +559,8 @@ class BaseRepository extends EntityRepository
         // Simple case: only temporal grouping
         $indexedResults = [];
         foreach ($results as $row) {
-            $indexedResults[$row[$temporalField]] = $row;
+            $temporalVal = $row[$temporalField] ?? $row[strtolower($temporalField)] ?? null;
+            $indexedResults[$temporalVal] = $row;
         }
 
         $finalResults = [];
