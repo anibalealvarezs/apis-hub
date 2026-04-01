@@ -10,7 +10,7 @@ const TREND_DATA_CACHE = {};
 const NESTED_DATA_CACHE = {}; 
 
 const HIERARCHY = {
-    instagram: { next: 'facebook', label: 'Instagram Account', icon: 'instagram', color: '#E1306C', idField: 'channeledAccount', nameField: 'account', filterKey: 'channeledAccount' },
+    instagram: { next: 'facebook', label: 'Instagram Account', icon: 'instagram', color: '#E1306C', idField: 'channeledAccount_id', nameField: 'account', filterKey: 'channeledAccount' },
     facebook: { next: 'content', label: 'Facebook Page', icon: 'facebook', color: '#1877F2', idField: 'page_id', nameField: 'page_title', filterKey: 'page' },
     content: { next: null, label: 'Content Breakdown', icon: 'image', color: '#8b5cf6', idField: 'post_id', nameField: 'caption' }
 };
@@ -106,7 +106,7 @@ async function loadReport() {
         const payload = { 
             aggregations: aggs, 
             filters: { account_type: 'instagram' },
-            groupBy: ["channeledAccount", "account", "linked_fb_page_id", "channeled_account_id"], 
+            groupBy: ["channeledAccount", "account", "linked_fb_page_id", "channeled_account_id", "page_id"], 
             startDate: start, endDate: end 
         };
         const resMain = await fetch('/facebook_organic/metric/aggregate', { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json());
@@ -121,14 +121,14 @@ async function loadReport() {
             
             const resTrend = await fetch('/facebook_organic/metric/aggregate', { 
                 method: 'POST', headers, 
-                body: JSON.stringify({ aggregations: trendAggs, groupBy: ['daily', 'channeledAccount'], startDate: start, endDate: end }) 
+                body: JSON.stringify({ aggregations: trendAggs, groupBy: ['daily', 'channeledAccount', 'channeled_account_id'], startDate: start, endDate: end }) 
             }).then(r => r.json());
 
             if (resTrend.status === 'success' && resTrend.data) {
                 const trendData = Array.isArray(resTrend.data) ? resTrend.data : (resTrend.data.data || []);
                 TREND_DATA_CACHE['instagram'] = {};
                 trendData.forEach(d => {
-                    const cid = d.channeledAccount || d.channeledaccount || d.page || d.platform_id;
+                    const cid = d.channeled_account_id || d.channeledaccount_id || d.channeledAccount_id || d.channeledAccount || d.page_id;
                     if (!cid) return;
                     if (!TREND_DATA_CACHE['instagram'][cid]) TREND_DATA_CACHE['instagram'][cid] = {};
                     metrics.filter(m => m.sparkline).forEach(m => {
@@ -168,7 +168,7 @@ function render(start, end) {
         const cid_raw = row.channeledAccount || row.channeledaccount;
         const rowId = `row-ig-${cid_raw}`.replace(/[^a-z0-9\-]/gi, '-');
         tr.id = rowId;
-        const fbLinkedId = row.linked_fb_page_id || row.linked_fb_page_id_id || 'N/A';
+        const fbLinkedId = row.page_id || row.page_id_id || row.linked_fb_page_id || 'N/A';
         const accountId = row.channeled_account_id || row.channeled_account_id_id;
         
         tr.innerHTML = `
@@ -177,7 +177,7 @@ function render(start, end) {
                     <button class="btn-expand next-btn-fb" onclick="toggleOrganicHierarchy(this, '${rowId}', 'facebook', '${accountId}', '${String(fbLinkedId).replace(/'/g, "\\'")}')" title="View Linked Facebook Page">
                         <i data-lucide="layers" size="14"></i>
                     </button>
-                    <button class="btn-expand next-btn-ig" onclick="toggleOrganicHierarchy(this, '${rowId}', 'content', '${cid_raw}', null)" title="View Instagram Posts" style="background-color:rgba(139,92,246,0.1); color:#8b5cf6; border-color:rgba(139,92,246,0.3);">
+                    <button class="btn-expand next-btn-ig" onclick="toggleOrganicHierarchy(this, '${rowId}', 'content', '${accountId}', null)" title="View Instagram Posts" style="background-color:rgba(139,92,246,0.1); color:#8b5cf6; border-color:rgba(139,92,246,0.3);">
                         <i data-lucide="image" size="14"></i>
                     </button>
                 </div>
@@ -205,8 +205,7 @@ function render(start, end) {
             if (m.sparkline) {
                 const sparkId = `spark-ig-${m.key}-${accountId}`.toLowerCase();
                 const sparkEl = document.getElementById(sparkId);
-                const cid = row.channeledAccount || row.channeledaccount;
-                const points = TREND_DATA_CACHE['instagram']?.[cid]?.[m.key] || [];
+                const points = TREND_DATA_CACHE['instagram']?.[accountId]?.[m.key] || [];
                 if (sparkEl && points.length > 1) {
                     try {
                         const vals = points.sort((a,b) => a.day.localeCompare(b.day)).map(p => p.val);
@@ -259,7 +258,7 @@ async function toggleOrganicHierarchy(btn, rowId, level, parentId, childPlatform
             const payload = { 
                 aggregations: aggs, 
                 filters: { page: childPlatformId },
-                groupBy: ["page", "page_title"],
+                groupBy: ["page", "page_id", "page_title"],
                 startDate: start, endDate: end 
             };
             const res = await fetch('/facebook_organic/metric/aggregate', { method: 'POST', headers, body: JSON.stringify(payload) }).then(r => r.json());
@@ -312,19 +311,20 @@ function renderFacebookSubtable(container, data, parentRowId) {
             <tbody>`;
     
     data.forEach(row => {
-        const platformId = row.channeledAccount || row.page;
-        const subRowId = `row-fb-${platformId}`.replace(/[^a-z0-9\-]/gi, '-');
+        const platformUrl = row.page;
+        const pageNumericId = row.page_id || row.page_id_id;
+        const subRowId = `row-fb-${pageNumericId}`.replace(/[^a-z0-9\-]/gi, '-');
         
-        const displayName = row.page_title || row.account || platformId;
+        const displayName = row.page_title || row.account || platformUrl;
         let nameHtml = `<strong>${displayName}</strong>`;
-        if (row.page && row.page !== 'N/A' && row.page.startsWith('http')) {
-            nameHtml = `<a href="${row.page}" target="_blank" class="clickable-text"><strong>${displayName}</strong> <i data-lucide="external-link" size="10"></i></a>`;
+        if (platformUrl && platformUrl !== 'N/A' && platformUrl.startsWith('http')) {
+            nameHtml = `<a href="${platformUrl}" target="_blank" class="clickable-text"><strong>${displayName}</strong> <i data-lucide="external-link" size="10"></i></a>`;
         }
         
         html += `
             <tr id="${subRowId}">
                 <td class="text-center">
-                    <button class="btn-expand" onclick="toggleOrganicHierarchy(this, '${subRowId}', 'content', '${platformId}', null)" title="View Posts">
+                    <button class="btn-expand" onclick="toggleOrganicHierarchy(this, '${subRowId}', 'content', '${pageNumericId}', null)" title="View Posts">
                         <i data-lucide="image" size="12"></i>
                     </button>
                 </td>

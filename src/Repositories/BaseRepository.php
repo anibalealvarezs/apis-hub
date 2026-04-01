@@ -28,29 +28,29 @@ class BaseRepository extends EntityRepository
     private bool $needsImpressionsJoin = false;
     protected static array $relationMap = [
         'query'    => ['table' => 'queries', 'fk' => 'query_id', 'field' => 'query', 'alias' => 'rq'],
-        'page'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rp'],
-        'account'  => ['table' => 'accounts', 'fk' => 'account_id', 'field' => 'name', 'alias' => 'ra'],
-        'campaign' => ['table' => 'campaigns', 'fk' => 'campaign_id', 'field' => 'name', 'alias' => 'rc'],
         'channeledAccount'  => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
+        'account'           => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
+        'page'              => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rpa'],
+        'campaign'          => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'data', 'alias' => 'rcc', 'isJSON' => true, 'jsonPath' => 'name'],
         'channeled_account_id' => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'id', 'alias' => 'rca'],
-        'channeledCampaign' => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'platform_id', 'alias' => 'rcc'],
+        'channeledCampaign' => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'data', 'alias' => 'rcc', 'isJSON' => true, 'jsonPath' => 'name'],
         'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeled_ad_group_id', 'field' => 'name', 'alias' => 'rag'],
         'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'name', 'alias' => 'rad'],
         'creative' => ['table' => 'creatives', 'fk' => 'creative_id', 'field' => 'name', 'alias' => 'rcre'],
         'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
         'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'type', 'alias' => 'rd'],
-        'page_title' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'title', 'alias' => 'rp_t'],
-        'page_platform_id' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rp_p'],
-        'linked_fb_page_id' => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'data', 'alias' => 'rca', 'isJSON' => true, 'jsonPath' => 'facebook_page_id'],
+        'page_title' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'title', 'alias' => 'rp_t', 'isAttribute' => true],
+        'page_platform_id' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rp_p', 'isAttribute' => true],
+        'linked_fb_page_id' => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'data', 'alias' => 'rca', 'isJSON' => true, 'jsonPath' => 'facebook_page_id', 'isAttribute' => true],
         'post'              => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo'],
         'post_id'   => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo_id'],
-        'permalink_url' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pu', 'isJSON' => true, 'jsonPath' => 'permalink_url'],
-        'permalink' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pl', 'isJSON' => true, 'jsonPath' => 'permalink'],
-        'timestamp' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ts', 'isJSON' => true, 'jsonPath' => 'timestamp'],
-        'created_time' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ct', 'isJSON' => true, 'jsonPath' => 'created_time'],
-        'media_type' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_mt', 'isJSON' => true, 'jsonPath' => 'media_type'],
-        'message' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_msg', 'isJSON' => true, 'jsonPath' => 'message'],
-        'caption' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_cap', 'isJSON' => true, 'jsonPath' => 'caption'],
+        'permalink_url' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pu', 'isJSON' => true, 'jsonPath' => 'permalink_url', 'isAttribute' => true],
+        'permalink' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pl', 'isJSON' => true, 'jsonPath' => 'permalink', 'isAttribute' => true],
+        'timestamp' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ts', 'isJSON' => true, 'jsonPath' => 'timestamp', 'isAttribute' => true],
+        'created_time' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ct', 'isJSON' => true, 'jsonPath' => 'created_time', 'isAttribute' => true],
+        'media_type' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_mt', 'isJSON' => true, 'jsonPath' => 'media_type', 'isAttribute' => true],
+        'message' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_msg', 'isJSON' => true, 'jsonPath' => 'message', 'isAttribute' => true],
+        'caption' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_cap', 'isJSON' => true, 'jsonPath' => 'caption', 'isAttribute' => true],
     ];
 
     /**
@@ -239,6 +239,26 @@ class BaseRepository extends EntityRepository
             $qb->leftJoin($from, $table, $alias, $condition);
         };
 
+        $rootAlias = ($this->isChanneledMetric) ? 'mc' : 'm';
+
+        $joinRelation = function (string $field) use (&$activeAggregateJoins, $safeLeftJoin, $rootAlias, &$joinRelation) {
+            if (!isset(self::$relationMap[$field])) return;
+            $map = self::$relationMap[$field];
+
+            if (isset($activeAggregateJoins[$map['alias']])) return;
+
+            // Recurse to join source mapping if defined
+            $sourceAlias = $rootAlias;
+            if (isset($map['from'])) {
+                $joinRelation($map['from']);
+                $sourceAlias = self::$relationMap[$map['from']]['alias'];
+            }
+
+            // Ensure join only happens once
+            $safeLeftJoin($sourceAlias, $map['table'], $map['alias'], "$sourceAlias.{$map['fk']} = {$map['alias']}.id");
+            $activeAggregateJoins[$map['alias']] = true;
+        };
+
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
             $isPostgres = Helpers::isPostgres();
@@ -253,48 +273,79 @@ class BaseRepository extends EntityRepository
             $dimKey = $isDimension ? substr($field, 11) : $field;
 
             // Automatic dimension detection: if it's a ChanneledMetric taxonomy and not a standard relation/date/field
-            if (($isMetric || $this->isChanneledMetric) && ($isDimension || ($field !== 'account_type' && !in_array($field, $standardRelations) && !in_array($field, $dateFields) && !$this->_class->hasField($field)))) {
+            if (($isMetric || $this->isChanneledMetric) && ($isDimension || ($field !== 'account_type' && !in_array($field, $standardRelations) && !str_ends_with($field, '_id') && !in_array($field, $dateFields) && !$this->_class->hasField($field)))) {
+                $dimRootAlias = ($this->isChanneledMetric) ? 'e' : 'mc';
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                 $qb->setParameter("key_$dimAlias", $dimKey);
                 
-                // Optimized join strategy to prevent Cartesian product without using junction table ID
-                // Each branch ONLY captures its intended dimension value from the set
-                $dsiCondition = "e.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
+                $safeLeftJoin($dimRootAlias, 'dimension_set_items', "dsi_$dimAlias", "$dimRootAlias.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
                     SELECT sub_dv.id FROM dimension_values sub_dv 
                     JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
                     WHERE sub_dk.name = :key_$dimAlias
-                )";
-                
-                $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", $dsiCondition);
+                )");
                 $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
                 
                 $qb->addSelect("dv_$dimAlias.value AS $quotedField")
                    ->addGroupBy("dv_$dimAlias.value");
+            } elseif (in_array($field, $standardRelations) || str_ends_with($field, '_id')) {
+                // Handling Relations and strict FKs
+                $relationKey = $field;
+                $isExplicitId = str_ends_with($field, '_id');
+                if ($isExplicitId && !isset(self::$relationMap[$field])) {
+                    $relationKey = substr($field, 0, -3);
+                    if ($relationKey === 'channeled_account') $relationKey = 'channeledAccount';
+                    if ($relationKey === 'channeled_campaign') $relationKey = 'channeledCampaign';
+                }
+                
+                if (isset(self::$relationMap[$relationKey])) {
+                    $joinRelation($relationKey);
+                    $map = self::$relationMap[$relationKey];
+                    
+                    if ($isExplicitId || $field === $map['fk']) {
+                        $qb->addSelect("$rootAlias.{$map['fk']} AS $quotedField")
+                           ->addGroupBy("$rootAlias.{$map['fk']}");
+                    } else {
+                        // Use mapFieldToSql to handle JSON extraction or complex fields correctly
+                        $parsedIdField = $this->mapFieldToSql($field);
+                        $qb->addSelect("$parsedIdField AS $quotedField")
+                           ->addGroupBy($parsedIdField);
+                           
+                        // Only add shadow ID for primary relation concepts (post, account, etc.), not for secondary attributes
+                        if ($field === $relationKey && !isset($map['isAttribute'])) {
+                            $shadowId = $quoteChar . $field . "_id" . $quoteChar;
+                            $qb->addSelect("$rootAlias.{$map['fk']} AS $shadowId")
+                               ->addGroupBy("$rootAlias.{$map['fk']}");
+                        }
+                    }
+                } else {
+                    // Raw Column Fallback
+                    $qb->addSelect("$rootAlias.$field AS $quotedField")
+                       ->addGroupBy("$rootAlias.$field");
+                }
             } elseif (($isMetric || $this->isChanneledMetric) && in_array($field, ['account', 'campaign'])) {
+                // Keep existing legacy account/campaign logic for cross-channel merging
                 $isAccount = $field === 'account';
                 $genericKey = $isAccount ? 'account' : 'campaign';
                 $channeledKey = $isAccount ? 'channeledAccount' : 'channeledCampaign';
                 $genericMap = self::$relationMap[$genericKey];
                 $channeledMap = self::$relationMap[$channeledKey];
-                
-                $safeLeftJoin('mc', $genericMap['table'], $genericMap['alias'], "mc.{$genericMap['fk']} = {$genericMap['alias']}.id");
-                $safeLeftJoin('mc', $channeledMap['table'], $channeledMap['alias'], "mc.{$channeledMap['fk']} = {$channeledMap['alias']}.id");
+                $joinRelation($genericKey);
+                $joinRelation($channeledKey);
 
                 if ($isAccount) {
-                    $campaignMap = self::$relationMap['channeledCampaign'];
-                    $safeLeftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
-                    $safeLeftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
+                    $joinRelation('channeledCampaign');
+                    $campaignAlias = self::$relationMap['channeledCampaign']['alias'];
+                    $safeLeftJoin($campaignAlias, 'channeled_accounts', 'rca_fallback', "{$campaignAlias}.channeled_account_id = rca_fallback.id");
                     
                     $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
                     $quotedFieldId = $quoteChar . $field . "_id" . $quoteChar;
-                    $qb->addSelect("COALESCE(CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST(rca_fallback.name AS $castType), CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS $quotedField")
+                    $qb->addSelect("COALESCE(CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST(rca_fallback.name AS $castType), CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), 'Unknown') AS $quotedField")
                        ->addSelect("mc.{$channeledMap['fk']} AS $quotedFieldId")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("rca_fallback.name")
                        ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
                        ->addGroupBy("{$channeledMap['alias']}.platform_id")
-                       ->addGroupBy("mc.{$channeledMap['fk']}")
-                       ->addGroupBy("mc.{$genericMap['fk']}");
+                       ->addGroupBy("mc.{$channeledMap['fk']}");
                 } else {
                     if (isset($genericMap['isJSON']) && $genericMap['isJSON']) {
                         $sqlField = $this->mapFieldToSql($field);
@@ -303,18 +354,17 @@ class BaseRepository extends EntityRepository
                     } else {
                         $quotedFieldId = $quoteChar . $field . "_id" . $quoteChar;
                         $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                        $qb->addSelect("COALESCE(CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS $quotedField")
+                        $qb->addSelect("COALESCE(CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), 'Unknown') AS $quotedField")
                            ->addSelect("mc.{$channeledMap['fk']} AS $quotedFieldId")
-                           ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
                            ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
+                           ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
                            ->addGroupBy("{$channeledMap['alias']}.platform_id")
-                           ->addGroupBy("mc.{$channeledMap['fk']}")
-                           ->addGroupBy("mc.{$genericMap['fk']}");
+                           ->addGroupBy("mc.{$channeledMap['fk']}");
                     }
                 }
             } elseif (($isMetric || $this->isChanneledMetric) && isset(self::$relationMap[$field])) {
+                $joinRelation($field);
                 $map = self::$relationMap[$field];
-                $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
                 
                 $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
                 if (isset($map['isJSON']) && $map['isJSON']) {
@@ -346,76 +396,40 @@ class BaseRepository extends EntityRepository
 
                 if ($this->isChanneledMetric && ($isDimension || ($key !== 'account_type' && !in_array($key, $standardRelations) && !in_array($key, $dateFields) && !$this->_class->hasField($key)))) {
                     $dimAlias = "f_dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
-                    $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id");
+                    $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
+                        SELECT sub_dv.id FROM dimension_values sub_dv 
+                        JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
+                        WHERE sub_dk.name = :key_$dimAlias
+                    )");
                     $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
-                    $safeLeftJoin("dv_$dimAlias", 'dimension_keys', "dk_$dimAlias", "dv_$dimAlias.dimension_key_id = dk_$dimAlias.id AND dk_$dimAlias.name = :key_$dimAlias");
                     
                     $qb->setParameter("key_$dimAlias", $dimKey)
                        ->andWhere("dv_$dimAlias.value = :val_$dimAlias")
                        ->setParameter("val_$dimAlias", $value);
                 } elseif ((str_ends_with($entityName, 'Metric') || $this->isChanneledMetric) && (isset(self::$relationMap[$key]) || $key === 'account_type')) {
                     $realKey = ($key === 'account_type') ? 'channeledAccount' : $key;
+                    $joinRelation($realKey);
                     $map = self::$relationMap[$realKey];
-                    $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
-                    
-                    $idCol = 'platform_id';
-                    if ($key === 'post' || $key === 'post_id') $idCol = 'post_id';
-                    $nameCol = $map['field'] ?? 'name';
+                    $fk = $map['fk'] ?? null;
                     
                     if ($value === 'N/A' || $value === 'NULL') {
-                        $nullTarget = (isset($map['fk'])) ? "mc.{$map['fk']}" : "{$map['alias']}.$idCol";
-                        if ($key === 'page') $nullTarget = 'mc.page_id';
+                        $nullTarget = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
                         $qb->andWhere("$nullTarget IS NULL");
                     } elseif ($value === 'NOT_NULL') {
-                        $nullTarget = (isset($map['fk'])) ? "mc.{$map['fk']}" : "{$map['alias']}.$idCol";
-                        if ($key === 'page') $nullTarget = 'mc.page_id';
+                        $nullTarget = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
                         $qb->andWhere("$nullTarget IS NOT NULL");
                     } elseif ($key === 'account_type') {
-                        $isPostgres = Helpers::isPostgres();
-                        if ($isPostgres) {
-                            $qb->andWhere("LOWER(CAST({$map['alias']}.type AS text)) = LOWER(:f_$key)")
-                               ->setParameter("f_$key", (string)$value);
-                        } else {
-                            $qb->andWhere("{$map['alias']}.type = :f_$key")
-                               ->setParameter("f_$key", $value);
-                        }
+                        $qb->andWhere("{$map['alias']}.type = :f_$key")
+                           ->setParameter("f_$key", $value);
                     } else {
-                        /**
-                         * Triple Identity Lookup:
-                         * 1. Internal Database ID (Foreign Key)
-                         * 2. External Platform ID
-                         * 3. Descriptive Name/URL
-                         */
-                        $isPostgres = Helpers::isPostgres();
-                        $platformEntities = ['page', 'post', 'channeledAccount', 'channeledCampaign', 'adGroup', 'ad'];
-                        $fk = $map['fk'] ?? null;
-                        
-                        if (in_array($key, $platformEntities)) {
-                            $whereClauses = [];
-                            // Safety: Only search by DB ID if the value is actually numeric to avoid Postgres type errors
-                            if ($fk && is_numeric($value)) {
-                                $whereClauses[] = "mc.$fk = :f_id_$key";
-                                $qb->setParameter("f_id_$key", (int)$value);
-                            }
-                            
-                            if ($isPostgres && !is_numeric($value)) {
-                                $whereClauses[] = "LOWER(CAST({$map['alias']}.$idCol AS text)) = LOWER(:f_$key)";
-                                $whereClauses[] = "LOWER(CAST({$map['alias']}.$nameCol AS text)) = LOWER(:f_$key)";
-                            } else {
-                                $whereClauses[] = "{$map['alias']}.$idCol = :f_$key";
-                                $whereClauses[] = "{$map['alias']}.$nameCol = :f_$key";
-                            }
-                            $qb->andWhere("(" . implode(' OR ', $whereClauses) . ")")
-                               ->setParameter("f_$key", (string)$value);
+                        // Strict Relation Identity Model (Professional ID-only)
+                        $targetCol = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
+                        if (is_numeric($value)) {
+                            $qb->andWhere("$targetCol = :f_$key")
+                               ->setParameter("f_$key", (int)$value);
                         } else {
-                            if ($isPostgres && !is_numeric($value)) {
-                                $qb->andWhere("LOWER(CAST({$map['alias']}.$nameCol AS text)) = LOWER(:f_$key)")
-                                   ->setParameter("f_$key", (string)$value);
-                            } else {
-                                $targetCol = $map['field'] ?? $nameCol;
-                                $qb->andWhere("{$map['alias']}.$targetCol = :f_$key")
-                                   ->setParameter("f_$key", $value);
-                            }
+                            // If identifier is not an ID, no results (Correct behavior for relations)
+                            $qb->andWhere('1 = 0');
                         }
                     }
                 } else {
@@ -730,15 +744,21 @@ class BaseRepository extends EntityRepository
             }
         }
 
-        // Handle generic JSON extraction from relationMap
-        if (isset(self::$relationMap[$lowerField]['isJSON']) && self::$relationMap[$lowerField]['isJSON']) {
-             $map = self::$relationMap[$lowerField];
-             $jsonPath = $map['jsonPath'] ?? '';
-             if (Helpers::isPostgres()) {
-                 return "COALESCE(({$map['alias']}.{$map['field']} #>> '{{$jsonPath}}'), 'N/A')";
-             } else {
-                 return "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT({$map['alias']}.{$map['field']}, '$.$jsonPath')) AS CHAR), 'N/A')";
+        // Handle generic Relation extraction from relationMap (JSON or standard fields)
+        $normalizedField = isset(self::$relationMap[$field]) ? $field : (isset(self::$relationMap[$lowerField]) ? $lowerField : null);
+        if ($normalizedField) {
+             $map = self::$relationMap[$normalizedField];
+             if (isset($map['isJSON']) && $map['isJSON']) {
+                 $jsonPath = $map['jsonPath'] ?? '';
+                 if (Helpers::isPostgres()) {
+                     $postgresPath = '{' . str_replace('.', ',', $jsonPath) . '}';
+                     return "COALESCE(({$map['alias']}.{$map['field']} #>> '$postgresPath'), 'N/A')";
+                 } else {
+                     return "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT({$map['alias']}.{$map['field']}, '$.$jsonPath')) AS CHAR), 'N/A')";
+                 }
              }
+             $targetCol = $map['field'] ?? 'name';
+             return "{$map['alias']}.$targetCol";
         }
 
         // Relation mapping for metrics
