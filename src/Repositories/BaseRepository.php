@@ -42,7 +42,7 @@ class BaseRepository extends EntityRepository
         'page_title' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'title', 'alias' => 'rp_t'],
         'page_platform_id' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rp_p'],
         'linked_fb_page_id' => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'data', 'alias' => 'rca', 'isJSON' => true, 'jsonPath' => 'facebook_page_id'],
-        'post'      => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo'],
+        'post'              => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo'],
         'post_id'   => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo_id'],
         'permalink_url' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pu', 'isJSON' => true, 'jsonPath' => 'permalink_url'],
         'permalink' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pl', 'isJSON' => true, 'jsonPath' => 'permalink'],
@@ -358,43 +358,44 @@ class BaseRepository extends EntityRepository
                     $map = self::$relationMap[$realKey];
                     $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
                     
-                    $targetCol = ($key === 'account_type') ? 'type' : 'platform_id';
-                    // If the value looks like a URL, use the 'url' field from the mapping (if defined) or platform_id
-                    if (str_starts_with((string)$value, 'http')) {
-                        $targetCol = $map['field']; // For page, this is 'url'
-                    }
-
-                    $isPlatformIdValue = is_numeric($value) && (float)$value > 2147483647;
-                    $isNameValue = !is_numeric($value) && !in_array($value, ['NULL', 'NOT_NULL', 'N/A']);
-                    $isPostgres = Helpers::isPostgres();
+                    $idCol = 'platform_id';
+                    if ($key === 'post' || $key === 'post_id') $idCol = 'post_id';
+                    $nameCol = $map['field'] ?? 'name';
                     
-                    $sqlKey = (isset($map['alias'])) ? "{$map['alias']}.{$targetCol}" : "mc.$key";
-                    if ($key === 'page') $sqlKey = 'rp.url';
-
                     if ($value === 'N/A' || $value === 'NULL') {
-                        $nullTarget = (isset($map['fk'])) ? "mc.{$map['fk']}" : $sqlKey;
+                        $nullTarget = (isset($map['fk'])) ? "mc.{$map['fk']}" : "{$map['alias']}.$idCol";
                         if ($key === 'page') $nullTarget = 'mc.page_id';
                         $qb->andWhere("$nullTarget IS NULL");
                     } elseif ($value === 'NOT_NULL') {
-                        $nullTarget = (isset($map['fk'])) ? "mc.{$map['fk']}" : $sqlKey;
+                        $nullTarget = (isset($map['fk'])) ? "mc.{$map['fk']}" : "{$map['alias']}.$idCol";
                         if ($key === 'page') $nullTarget = 'mc.page_id';
                         $qb->andWhere("$nullTarget IS NOT NULL");
-                    } elseif ($isNameValue && isset($map['alias']) && isset($map['field'])) {
-                        // If it's a string name, search by name field, BUT NOT for account_type which uses 'type'
-                        if ($key === 'account_type') {
-                            $qb->andWhere("{$map['alias']}.type = :f_$key")
-                               ->setParameter("f_$key", $value);
-                        } else {
-                            $qb->andWhere("LOWER({$map['alias']}.{$map['field']}) = LOWER(:f_$key)")
-                               ->setParameter("f_$key", $value);
-                        }
-                    } elseif (($isPlatformIdValue || str_starts_with((string)$value, 'http')) && ($targetCol === 'platform_id' || $targetCol === 'url')) {
-                        $qb->andWhere("{$map['alias']}.$targetCol = :f_$key")
-                           ->setParameter("f_$key", (string)$value);
+                    } elseif ($key === 'account_type') {
+                        $qb->andWhere("{$map['alias']}.type = :f_$key")
+                           ->setParameter("f_$key", $value);
                     } else {
-                        // Fallback: search by mapped SQL key (mc.column or joined column)
-                        $qb->andWhere("$sqlKey = :val_$key")
-                           ->setParameter("val_$key", $value);
+                        // Dual Identity Lookup: Support both Platform ID and Name/URL
+                        // Accounts only have 'name', others have both.
+                        $isPostgres = Helpers::isPostgres();
+                        $platformEntities = ['page', 'post', 'channeledAccount', 'channeledCampaign', 'adGroup', 'ad'];
+                        
+                        if (in_array($key, $platformEntities)) {
+                            if ($isPostgres && !is_numeric($value)) {
+                                $qb->andWhere("(LOWER(CAST({$map['alias']}.$idCol AS text)) = LOWER(:f_$key) OR LOWER(CAST({$map['alias']}.$nameCol AS text)) = LOWER(:f_$key))")
+                                   ->setParameter("f_$key", (string)$value);
+                            } else {
+                                $qb->andWhere("({$map['alias']}.$idCol = :f_$key OR {$map['alias']}.$nameCol = :f_$key)")
+                                   ->setParameter("f_$key", $value);
+                            }
+                        } else {
+                            if ($isPostgres && !is_numeric($value)) {
+                                $qb->andWhere("LOWER(CAST({$map['alias']}.$nameCol AS text)) = LOWER(:f_$key)")
+                                   ->setParameter("f_$key", (string)$value);
+                            } else {
+                                $qb->andWhere("{$map['alias']}.$nameCol = :f_$key")
+                                   ->setParameter("f_$key", $value);
+                            }
+                        }
                     }
                 } else {
                     $sqlKey = $this->mapFieldToSql($key);
@@ -405,20 +406,8 @@ class BaseRepository extends EntityRepository
                     } else if ($value === 'NOT_NULL') {
                         $qb->andWhere("$sqlKey IS NOT NULL");
                     } else {
-                        $isPostgres = Helpers::isPostgres();
-                        if ($isPostgres) {
-                            // Cast both sides to text if the input is not numeric to prevent type mismatch
-                            if (!is_numeric($value)) {
-                                $qb->andWhere("LOWER(CAST($sqlKey AS text)) = LOWER(:$paramName)")
-                                   ->setParameter($paramName, (string)$value);
-                            } else {
-                                $qb->andWhere("$sqlKey = :$paramName")
-                                   ->setParameter($paramName, $value);
-                            }
-                        } else {
-                            $qb->andWhere("$sqlKey = :$paramName")
-                               ->setParameter($paramName, $value);
-                        }
+                        $qb->andWhere("$sqlKey = :$paramName")
+                           ->setParameter($paramName, $value);
                     }
                 }
             }
