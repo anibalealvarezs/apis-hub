@@ -411,10 +411,38 @@ class ConfigManagerController extends BaseController
             }
 
             $logger->info("Config updated successfully for type: " . $type);
+            
+            // Auto-trigger entity synchronization to ensure database reflects new config
+            $this->triggerEntitySync($logger);
+
             return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
         } catch (Exception $e) {
             $logger->error("Error updating config: " . $e->getMessage());
             return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
+        }
+    }
+
+    /**
+     * Executes the entity initialization command in the background to avoid blocking the UI
+     */
+    private function triggerEntitySync($logger): void
+    {
+        try {
+            $consolePath = realpath(__DIR__ . '/../../bin/console');
+            if ($consolePath) {
+                $phpPath = PHP_BINARY ?: 'php';
+                // Run in background to not block the UI response, but ensure it starts
+                $command = "\"$phpPath\" \"$consolePath\" app:initialize-entities > /dev/null 2>&1 &";
+                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                    $command = "start /B $phpPath \"$consolePath\" app:initialize-entities > NUL 2>&1";
+                }
+                exec($command);
+                $logger->info("Entity synchronization triggered successfully via: $command");
+            } else {
+                $logger->error("Could not find console binary to trigger synchronization.");
+            }
+        } catch (Exception $e) {
+            $logger->error("Failed to trigger entity synchronization: " . $e->getMessage());
         }
     }
 
