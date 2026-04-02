@@ -262,18 +262,28 @@ class InitializeEntitiesCommand extends Command
                 $apiPageData = $apiPagesMap[$platformId] ?? null;
                 $title = $apiPageData['name'] ?? $page['title'] ?? "Page " . $platformId;
                 $pageUrl = $page['url'] ?? "https://www.facebook.com/" . $platformId;
+                if (!str_starts_with($pageUrl, 'http')) {
+                    $pageUrl = "https://www.facebook.com/" . $platformId;
+                }
                 $hostname = $page['hostname'] ?? 'www.facebook.com';
 
                 $canonicalId = Helpers::getCanonicalPageId($pageUrl, $platformId, PageType::FACEBOOK_PAGE);
                 
-                // Construct full Page data
-                $pageData = array_merge($apiPageData ?? [], $page['data'] ?? []);
+                // Construct full Page data: Prioritize API data and avoid injecting internal config flags
+                $pageData = $apiPageData ?? [];
                 $pageData['source'] = 'fb_page';
-                if (!empty($page['access_token']) || !empty($apiPageData['access_token'])) {
-                    $pageData['access_token'] = $page['access_token'] ?? $apiPageData['access_token'];
+                
+                // Add specific metadata that might be in config but isn't in main API response
+                if (!empty($page['access_token'])) {
+                    $pageData['access_token'] = $page['access_token'];
                 }
-                if (!empty($page['ig_account']) || !empty($apiPageData['instagram_business_account']['id'])) {
-                    $pageData['instagram_business_account_id'] = $page['ig_account'] ?? $apiPageData['instagram_business_account']['id'];
+                if (!empty($apiPageData['access_token'])) {
+                    $pageData['access_token'] = $apiPageData['access_token'];
+                }
+                
+                $igId = $page['ig_account'] ?? $apiPageData['instagram_business_account']['id'] ?? null;
+                if ($igId) {
+                    $pageData['instagram_business_account_id'] = $igId;
                 }
 
                 $pageEntity = $pageRepository->getByCanonicalId($canonicalId);

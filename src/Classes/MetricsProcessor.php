@@ -693,7 +693,7 @@ class MetricsProcessor
         array $metricConfigMap
     ): array {
         $config = Helpers::getProjectConfig();
-        $cacheRawMetrics = filter_var($config['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $cacheRawMetrics = filter_var($config['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $uniqueMetrics = [];
         foreach ($metrics->toArray() as $metric) {
@@ -845,7 +845,7 @@ class MetricsProcessor
         LoggerInterface $logger,
     ): array {
         $config = Helpers::getProjectConfig();
-        $cacheRawMetrics = filter_var($config['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $cacheRawMetrics = filter_var($config['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $metricsMapByMKey = [];
         foreach ($metrics as $m) {

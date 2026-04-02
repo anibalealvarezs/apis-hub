@@ -97,14 +97,30 @@
                     </div>
                 </div>
                 <div class="card compact-card" style="flex-direction:row; justify-content:space-between; align-items:center;">
-                    <div>
+                    <div style="flex: 1;">
                         <div class="section-title small" style="margin-bottom:5px; border:none; padding:0;"><i data-lucide="hard-drive"></i> Raw Metrics</div>
                         <div style="font-size:0.75rem; color:var(--text-dim);">Cache all API raw responses</div>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" id="cache-raw-metrics">
+                        <input type="checkbox" id="cache-raw-metrics" onchange="toggleRawMetricsWarning(this.checked)">
                         <span class="slider"></span>
                     </label>
+                </div>
+            </div>
+
+            <!-- Danger Warning for Raw Metrics -->
+            <div id="raw-metrics-danger-zone" class="card danger-card" style="display:none; margin-top:-20px; border: 1px solid var(--danger); background: rgba(248, 81, 73, 0.05);">
+                <div style="display:flex; gap:15px; align-items:flex-start;">
+                    <div style="background:var(--danger); color:white; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <i data-lucide="alert-octagon" size="18"></i>
+                    </div>
+                    <div>
+                        <div style="color:var(--danger); font-weight:700; font-size:0.85rem; margin-bottom:4px;">ADVERTENCIA DE RENDIMIENTO</div>
+                        <p style="font-size:0.75rem; color:var(--text); margin:0; line-height:1.4; opacity:0.9;">
+                            Si se activa esta opción, se afectará <b>negativamente</b> la base de datos al guardar gran cantidad de información técnica (raw data) no necesaria para la operación normal. 
+                            Esto <b>incrementará masivamente el peso</b> de las tablas y <b>disminuirá drásticamente el performance</b> general del sistema.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
