@@ -8,6 +8,7 @@ use Doctrine\ORM\Query\Expr\Join;
 use Entities\Analytics\Campaign;
 use Entities\Analytics\Channeled\ChanneledCampaign;
 use Entities\Analytics\Metric;
+use Entities\Analytics\MetricConfig;
 use Entities\Analytics\Page;
 use Helpers\Helpers;
 use Monolog\Handler\StreamHandler;
@@ -104,8 +105,9 @@ class PageRepository extends BaseRepository
         return $this->getEntityManager()->createQueryBuilder()
             ->select('p')
             ->from(Page::class, 'p')
-            ->join(Metric::class, 'm', Join::WITH, 'm.page = p')
-            ->join(ChanneledCampaign::class, 'cc', Join::WITH, 'm.channeledCampaign = cc')
+            ->join(MetricConfig::class, 'mc', Join::WITH, 'mc.page = p')
+            ->join(Metric::class, 'm', Join::WITH, 'm.metricConfig = mc')
+            ->join(ChanneledCampaign::class, 'cc', Join::WITH, 'mc.channeledCampaign = cc')
             ->join(Campaign::class, 'c', Join::WITH, 'cc.campaign = c')
             ->where('c.campaignId = :campaignId')
             ->setParameter('campaignId', $campaignId)
@@ -119,8 +121,9 @@ class PageRepository extends BaseRepository
         return $this->getEntityManager()->createQueryBuilder()
             ->select('p')
             ->from(Page::class, 'p')
-            ->join(Metric::class, 'm', Join::WITH, 'm.page = p')
-            ->where('m.name = :metricName')
+            ->join(MetricConfig::class, 'mc', Join::WITH, 'mc.page = p')
+            ->join(Metric::class, 'm', Join::WITH, 'm.metricConfig = mc')
+            ->where('mc.name = :metricName')
             ->andWhere("m.value $operator :value")
             ->setParameter('metricName', $metricName)
             ->setParameter('value', $value)
