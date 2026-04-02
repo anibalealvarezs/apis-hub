@@ -214,15 +214,17 @@ class InitializeEntitiesCommand extends Command
 
             $pagesToProcess = $mergedFbConfig['pages'] ?? [];
             $apiPagesMap = [];
-            if ($mergedFbConfig['cache_all'] ?? false) {
-                $this->logger->info("Facebook 'cache_all' enabled. Fetching all pages from API.");
-                try {
-                    $apiPages = $this->fetchFbPages($mergedFbConfig);
-                    if (isset($apiPages['data']) && is_array($apiPages['data'])) {
-                        foreach ($apiPages['data'] as $apiPage) {
-                            $pageId = (string)$apiPage['id'];
-                            $apiPagesMap[$pageId] = $apiPage['name'] ?? null;
-                            
+            
+            $this->logger->info("Fetching actual pages details from Meta API to enrich configurations...");
+            try {
+                $apiPages = $this->fetchFbPages($mergedFbConfig);
+                if (isset($apiPages['data']) && is_array($apiPages['data'])) {
+                    foreach ($apiPages['data'] as $apiPage) {
+                        $pageId = (string)$apiPage['id'];
+                        $apiPagesMap[$pageId] = $apiPage;
+                        
+                        // Only add newly discovered pages if 'cache_all' is enabled
+                        if ($mergedFbConfig['cache_all'] ?? false) {
                             $alreadyInConfig = false;
                             foreach ($pagesToProcess as $p) {
                                 if ((string)$p['id'] === $pageId) {
@@ -242,31 +244,36 @@ class InitializeEntitiesCommand extends Command
                                         'hostname' => 'www.facebook.com',
                                         'ig_account' => $apiPage['instagram_business_account']['id'] ?? null,
                                         'access_token' => $apiPage['access_token'] ?? null,
-                                        'enabled' => true
+                                        'enabled' => true,
+                                        'instagram_business_account' => $apiPage['instagram_business_account'] ?? null
                                     ];
                                 }
                             }
                         }
                     }
-                } catch (Exception $e) {
-                    $this->logger->error("Error fetching Facebook pages: " . $e->getMessage());
                 }
+            } catch (Exception $e) {
+                $this->logger->error("Error fetching Facebook pages: " . $e->getMessage());
             }
 
             foreach ($pagesToProcess as $page) {
                 $platformId = $page['id'];
-                $title = $apiPagesMap[$platformId] ?? $page['title'] ?? "Page " . $platformId;
+                // Prioritize API data for title/metadata
+                $apiPageData = $apiPagesMap[$platformId] ?? null;
+                $title = $apiPageData['name'] ?? $page['title'] ?? "Page " . $platformId;
                 $pageUrl = $page['url'] ?? "https://www.facebook.com/" . $platformId;
                 $hostname = $page['hostname'] ?? 'www.facebook.com';
 
                 $canonicalId = Helpers::getCanonicalPageId($pageUrl, $platformId, PageType::FACEBOOK_PAGE);
-                $pageData = $page['data'] ?? [];
+                
+                // Construct full Page data
+                $pageData = array_merge($apiPageData ?? [], $page['data'] ?? []);
                 $pageData['source'] = 'fb_page';
-                if (!empty($page['access_token'])) {
-                    $pageData['access_token'] = $page['access_token'];
+                if (!empty($page['access_token']) || !empty($apiPageData['access_token'])) {
+                    $pageData['access_token'] = $page['access_token'] ?? $apiPageData['access_token'];
                 }
-                if (!empty($page['ig_account'])) {
-                    $pageData['instagram_business_account_id'] = $page['ig_account'];
+                if (!empty($page['ig_account']) || !empty($apiPageData['instagram_business_account']['id'])) {
+                    $pageData['instagram_business_account_id'] = $page['ig_account'] ?? $apiPageData['instagram_business_account']['id'];
                 }
 
                 $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
@@ -352,15 +359,16 @@ class InitializeEntitiesCommand extends Command
             $this->logger->info("Flushed Facebook pages and Instagram accounts");
             $adAccountsToProcess = $mergedFbConfig['ad_accounts'] ?? [];
             $apiAdAccsMap = [];
-            if ($mergedFbConfig['cache_all'] ?? false) {
-                $this->logger->info("Facebook 'cache_all' enabled. Fetching all ad accounts from API.");
-                try {
-                    $apiAdAccs = $this->fetchFbAdAccounts($mergedFbConfig);
-                    if (isset($apiAdAccs['data']) && is_array($apiAdAccs['data'])) {
-                        foreach ($apiAdAccs['data'] as $apiAdAcc) {
-                            $adAccId = (string)$apiAdAcc['id'];
-                            $apiAdAccsMap[$adAccId] = $apiAdAcc;
-                            
+            
+            $this->logger->info("Fetching actual ad accounts details from Meta API...");
+            try {
+                $apiAdAccs = $this->fetchFbAdAccounts($mergedFbConfig);
+                if (isset($apiAdAccs['data']) && is_array($apiAdAccs['data'])) {
+                    foreach ($apiAdAccs['data'] as $apiAdAcc) {
+                        $adAccId = (string)$apiAdAcc['id'];
+                        $apiAdAccsMap[$adAccId] = $apiAdAcc;
+                        
+                        if ($mergedFbConfig['cache_all'] ?? false) {
                             $alreadyInConfig = false;
                             foreach ($adAccountsToProcess as $aac) {
                                 if ((string)$aac['id'] === $adAccId) {
@@ -383,17 +391,18 @@ class InitializeEntitiesCommand extends Command
                             }
                         }
                     }
-                } catch (Exception $e) {
-                    $this->logger->error("Error fetching Facebook ad accounts: " . $e->getMessage());
                 }
+            } catch (Exception $e) {
+                $this->logger->error("Error fetching Facebook ad accounts: " . $e->getMessage());
             }
 
             foreach ($adAccountsToProcess as $adAccount) {
                 /** @var ChanneledAccount|null $adAccountEntity */
                 $adAccountEntity = $channeledAccountRepository->getByPlatformId($adAccount['id'], Channel::facebook_marketing->value);
                 
-                $rawData = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['data'] ?? $adAccount;
-                $channeledAccountName = $rawData['name'] ?? $adAccount['name'] ?? $fbGroupName ?? ("Ad Account " . $adAccount['id']);
+                $apiAdAccData = $apiAdAccsMap[$adAccount['id']] ?? null;
+                $rawData = array_merge($apiAdAccData ?? [], $adAccount['data'] ?? [], $adAccount);
+                $channeledAccountName = $apiAdAccData['name'] ?? $adAccount['name'] ?? $fbGroupName ?? ("Ad Account " . $adAccount['id']);
                 
                 if (!$adAccountEntity) {
                     $channeledAccount = new ChanneledAccount();
