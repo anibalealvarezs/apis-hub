@@ -304,6 +304,7 @@ class FacebookOrganicMetricConvert
         array $posts,
         Page $pageEntity,
         Account $accountEntity,
+        int|string|null $channeledAccountId = null
     ): ArrayCollection {
         $collection = new ArrayCollection();
         foreach ($posts as $post) {
@@ -311,7 +312,7 @@ class FacebookOrganicMetricConvert
             $p->platformId = $post['id'];
             $p->pageId = $pageEntity->getId();
             $p->accountId = $accountEntity->getId();
-            $p->channeledAccountId = null; // FB Pages don't always have a ChanneledAccount link in this context
+            $p->channeledAccountId = $channeledAccountId;
             $p->data = $post;
             $collection->add($p);
         }

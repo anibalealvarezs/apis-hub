@@ -72,6 +72,22 @@ class PageRepository extends BaseRepository
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }
 
+    /**
+     * Finds a page by canonical ID (preferred) or platform ID.
+     * 
+     * @param string $platformId
+     * @param string|null $url
+     * @param \Enums\PageType|string|null $type
+     * @param string|null $hostname
+     * @return Page|null
+     * @throws NonUniqueResultException
+     */
+    public function findByPlatformOrCanonical(string $platformId, ?string $url = null, $type = null, ?string $hostname = null): ?Page
+    {
+        $canonicalId = Helpers::getCanonicalPageId($url ?? $platformId, $platformId, $type, $hostname);
+        return $this->getByCanonicalId($canonicalId) ?? $this->getByPlatformId($platformId);
+    }
+
     public function findByDataAttribute(string $key, string $value, int $limit = 100): array
     {
         return $this->createQueryBuilder('p')

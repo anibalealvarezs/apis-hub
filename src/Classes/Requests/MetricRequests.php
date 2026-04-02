@@ -466,7 +466,17 @@ class MetricRequests
                                     $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
                                     $rawPosts = $api->getFacebookPosts(pageId: (string) $pageId, additionalParams: ['since' => $syncSince]);
                                     if (!empty($rawPosts['data'])) {
-                                        $postsCollection = FacebookOrganicMetricConvert::toPostsCollection($rawPosts['data'], $pageEntity, $accountEntity);
+                                        $fbChanneledAccount = $channeledAccountRepository->findOneBy([
+                                            'platformId' => (string) $pageId,
+                                            'channel' => Channel::facebook_organic->value,
+                                            'type' => AccountEnum::FACEBOOK_PAGE->value,
+                                        ]);
+                                        $postsCollection = FacebookOrganicMetricConvert::toPostsCollection(
+                                            $rawPosts['data'],
+                                            $pageEntity,
+                                            $accountEntity,
+                                            $fbChanneledAccount?->getId()
+                                        );
                                         SocialProcessor::processPosts($postsCollection, $manager);
                                         $logger->info("Synced " . count($rawPosts['data']) . " posts for Facebook Page {$pageId}");
                                     }

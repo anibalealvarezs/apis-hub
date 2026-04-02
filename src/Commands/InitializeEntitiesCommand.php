@@ -300,27 +300,52 @@ class InitializeEntitiesCommand extends Command
                 }
 
                 // Initialize Instagram Account from facebook config
-                if ($page['ig_account']) {
+                if (!empty($page['ig_account'])) {
                     /** @var ChanneledAccount|null $channeledAccountEntity */
                     $channeledAccountEntity = $channeledAccountRepository->getByPlatformId($page['ig_account'], Channel::facebook_organic->value);
+                    
+                    // Extract IG-specific name from raw data if available
+                    $igData = $page['instagram_business_account'] ?? [];
+                    $igName = $igData['name'] ?? $igData['username'] ?? $title;
+
                     if (!$channeledAccountEntity) {
                         $channeledAccount = new ChanneledAccount();
                         $channeledAccount->addPlatformId($page['ig_account'])
                             ->addAccount($accountEntity)
                             ->addType(AccountEnum::INSTAGRAM)
                             ->addChannel(Channel::facebook_organic->value)
-                            ->addName($title)
+                            ->addName($igName)
                             ->addPlatformCreatedAt(new DateTime('2010-10-06'))
-                            ->addData([]);
+                            ->addData($igData);
                         $this->entityManager->persist($channeledAccount);
-                        $this->logger->info("Initialized Instagram Account: ID={$page['ig_account']}, Name={$title}");
+                        $this->logger->info("Initialized Instagram Account: ID={$page['ig_account']}, Name={$igName}");
                     } else {
-                        if ($channeledAccountEntity->getName() !== $title) {
-                            $channeledAccountEntity->addName($title);
-                            $this->entityManager->persist($channeledAccountEntity);
-                            $this->logger->info("Updated Instagram Account name: ID={$page['ig_account']}, New Name={$title}");
+                        if ($channeledAccountEntity->getName() !== $igName) {
+                            $channeledAccountEntity->addName($igName);
                         }
+                        $channeledAccountEntity->addData(array_merge($channeledAccountEntity->getData() ?? [], $igData));
+                        $this->entityManager->persist($channeledAccountEntity);
+                        $this->logger->info("Updated Instagram Account: ID={$page['ig_account']}, Name={$igName}");
                     }
+                }
+
+                // Initialize Facebook Page ChanneledAccount
+                /** @var ChanneledAccount|null $fbChanneledAccount */
+                $fbChanneledAccount = $channeledAccountRepository->getByPlatformId((string)$platformId, Channel::facebook_organic->value);
+                if (!$fbChanneledAccount) {
+                    $fbChanneledAccount = new ChanneledAccount();
+                    $fbChanneledAccount->addPlatformId((string)$platformId)
+                        ->addAccount($accountEntity)
+                        ->addType(AccountEnum::FACEBOOK_PAGE)
+                        ->addChannel(Channel::facebook_organic->value)
+                        ->addName($title)
+                        ->addPlatformCreatedAt(new DateTime('2004-02-04'))
+                        ->addData($page);
+                    $this->entityManager->persist($fbChanneledAccount);
+                    $this->logger->info("Initialized FB Page ChanneledAccount: ID=$platformId, Name=$title");
+                } else {
+                    $fbChanneledAccount->addData(array_merge($fbChanneledAccount->getData() ?? [], $page));
+                    $this->entityManager->persist($fbChanneledAccount);
                 }
             }
             $this->entityManager->flush();
@@ -334,7 +359,7 @@ class InitializeEntitiesCommand extends Command
                     if (isset($apiAdAccs['data']) && is_array($apiAdAccs['data'])) {
                         foreach ($apiAdAccs['data'] as $apiAdAcc) {
                             $adAccId = (string)$apiAdAcc['id'];
-                            $apiAdAccsMap[$adAccId] = $apiAdAcc['name'] ?? null;
+                            $apiAdAccsMap[$adAccId] = $apiAdAcc;
                             
                             $alreadyInConfig = false;
                             foreach ($adAccountsToProcess as $aac) {
@@ -351,6 +376,7 @@ class InitializeEntitiesCommand extends Command
                                     $adAccountsToProcess[] = [
                                         'id' => $adAccId,
                                         'name' => $adAccName,
+                                        'data' => $apiAdAcc,
                                         'enabled' => true
                                     ];
                                 }
@@ -365,7 +391,9 @@ class InitializeEntitiesCommand extends Command
             foreach ($adAccountsToProcess as $adAccount) {
                 /** @var ChanneledAccount|null $adAccountEntity */
                 $adAccountEntity = $channeledAccountRepository->getByPlatformId($adAccount['id'], Channel::facebook_marketing->value);
-                $channeledAccountName = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['name'] ?? $fbGroupName ?? ("Ad Account " . $adAccount['id']);
+                
+                $rawData = $apiAdAccsMap[$adAccount['id']] ?? $adAccount['data'] ?? $adAccount;
+                $channeledAccountName = $rawData['name'] ?? $adAccount['name'] ?? $fbGroupName ?? ("Ad Account " . $adAccount['id']);
                 
                 if (!$adAccountEntity) {
                     $channeledAccount = new ChanneledAccount();
@@ -375,15 +403,16 @@ class InitializeEntitiesCommand extends Command
                         ->addChannel(Channel::facebook_marketing->value)
                         ->addName($channeledAccountName)
                         ->addPlatformCreatedAt(new DateTime('2010-10-06'))
-                        ->addData([]);
+                        ->addData($rawData);
                     $this->entityManager->persist($channeledAccount);
                     $this->logger->info("Initialized Ad Account: ID={$adAccount['id']}, Name={$channeledAccountName}");
                 } else {
                     if ($adAccountEntity->getName() !== $channeledAccountName || empty($adAccountEntity->getName())) {
                         $adAccountEntity->addName($channeledAccountName);
-                        $this->entityManager->persist($adAccountEntity);
-                        $this->logger->info("Updated Ad Account name: ID={$adAccount['id']}, New Name={$channeledAccountName}");
                     }
+                    $adAccountEntity->addData($rawData);
+                    $this->entityManager->persist($adAccountEntity);
+                    $this->logger->info("Updated Ad Account: ID={$adAccount['id']}, Name={$channeledAccountName}");
                 }
             }
 
@@ -417,12 +446,12 @@ class InitializeEntitiesCommand extends Command
     protected function fetchFbPages(array $fbConfig): array
     {
         $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $this->logger);
-        return $fbApi->getMyPages();
+        return $fbApi->getMyPages(fields: 'id,name,username,access_token,instagram_business_account{id,name,username}');
     }
 
     protected function fetchFbAdAccounts(array $fbConfig): array
     {
         $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $this->logger);
-        return $fbApi->getMyAdAccounts();
+        return $fbApi->getMyAdAccounts(fields: 'id,account_id,name,currency,timezone_name');
     }
 }
