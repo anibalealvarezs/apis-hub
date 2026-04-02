@@ -1574,7 +1574,7 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                     metrics: $allMetrics,
                     manager: $manager,
                     pageMap: $pageMap,
@@ -1727,7 +1727,7 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                     metrics: $allMetrics,
                     manager: $manager,
                     accountMap: $accountMap,
@@ -1942,7 +1942,7 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                     metrics: $allMetrics,
                     manager: $manager,
                     pageMap: $pageMap,
@@ -2097,7 +2097,7 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                     metrics: $allMetrics,
                     manager: $manager,
                     pageMap: $pageMap,
@@ -2233,7 +2233,7 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                     metrics: $allMetrics,
                     manager: $manager,
                     channeledAccountMap: $channeledAccountMap,
@@ -2374,7 +2374,7 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                     metrics: $allMetrics,
                     manager: $manager,
                     channeledAccountMap: $channeledAccountMap,
@@ -2522,7 +2522,7 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                     metrics: $allMetrics,
                     manager: $manager,
                     channeledAccountMap: $channeledAccountMap,
@@ -2806,7 +2806,7 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metrics
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                     metrics: $allMetrics,
                     manager: $manager,
                     pageMap: $pageMap,
@@ -2998,7 +2998,7 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metrics configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                     metrics: $allMetrics,
                     manager: $manager,
                     processQueries: true,
@@ -4411,12 +4411,13 @@ class MetricRequests
             if (count($globalAllMetrics) > 0) {
                 try {
                     $manager->getConnection()->beginTransaction();
-                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                         metrics: $globalAllMetrics,
                         manager: $manager,
                         channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
                         campaignMap: $campaignMap,
                         channeledCampaignMap: $channeledCampaignMap,
+                        
                     );
                     $metricMap = MetricsProcessor::processMetrics(
                         metrics: $globalAllMetrics,
@@ -4601,13 +4602,14 @@ class MetricRequests
             if (count($globalAllMetrics) > 0) {
                 try {
                     $manager->getConnection()->beginTransaction();
-                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                         metrics: $globalAllMetrics,
                         manager: $manager,
                         channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
                         campaignMap: $campaignMap,
                         channeledCampaignMap: $channeledCampaignMap,
                         channeledAdGroupMap: $channeledAdGroupMap,
+                        
                     );
                     $metricMap = MetricsProcessor::processMetrics(
                         metrics: $globalAllMetrics,
@@ -4844,7 +4846,7 @@ class MetricRequests
                     $manager->getConnection()->beginTransaction();
                     
                     $logger->info("Starting processMetricConfigs for " . count($globalAllMetrics) . " metrics...");
-                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                         metrics: $globalAllMetrics,
                         manager: $manager,
                         channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
@@ -4853,6 +4855,7 @@ class MetricRequests
                         channeledAdGroupMap: $channeledAdGroupMap,
                         channeledAdMap: $channeledAdMap,
                         creativeMap: $creativeMap,
+                        
                     );
                     $logger->info("Completed processMetricConfigs. Starting processMetrics...");
                     
@@ -5014,7 +5017,7 @@ class MetricRequests
                 if ($metrics->count() > 0) {
                     try {
                         $manager->getConnection()->beginTransaction();
-                        $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                        $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
                             metrics: $metrics,
                             manager: $manager,
                             channeledAccountMap: [
@@ -5024,7 +5027,8 @@ class MetricRequests
                             creativeMap: [
                                 'map' => [$creative->getCreativeId() => $creative->getId()],
                                 'mapReverse' => [$creative->getId() => $creative->getCreativeId()]
-                            ]
+                            ],
+                            
                         );
                         $metricMap = MetricsProcessor::processMetrics(
                             metrics: $metrics,
