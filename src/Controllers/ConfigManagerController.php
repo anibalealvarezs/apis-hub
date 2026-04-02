@@ -428,7 +428,7 @@ class ConfigManagerController extends BaseController
     private function triggerEntitySync($logger): void
     {
         try {
-            $consolePath = realpath(__DIR__ . '/../../bin/console');
+            $consolePath = realpath(__DIR__ . '/../../bin/cli.php');
             if ($consolePath) {
                 $phpPath = PHP_BINARY ?: 'php';
                 // Run in background to not block the UI response, but ensure it starts
