@@ -62,7 +62,6 @@ class FacebookOrganicMetricConvert
                     channel: Channel::facebook_organic->value,
                     name: $row['name'] ?? 'unknown',
                     period: $period->value,
-                    metricDate: $metricDate,
                     page:  $pageEntity?->getUrl(),
                     post: $postEntity?->getPostId(),
                 );
@@ -139,7 +138,6 @@ class FacebookOrganicMetricConvert
                 channel: Channel::facebook_organic->value,
                 name: $row['name'] ?? 'unknown',
                 period: $period->value,
-                metricDate: $metricDateString,
                 account: $accountEntity->getName(),
                 channeledAccount:  $channeledAccountEntity->getPlatformId(),
                 page:  $pageEntity?->getUrl(),
@@ -244,7 +242,6 @@ class FacebookOrganicMetricConvert
                 channel: Channel::facebook_organic->value,
                 name: $row['name'] ?? 'unknown',
                 period: Period::Lifetime->value,
-                metricDate: $date,
                 account: $accountEntity->getName(),
                 channeledAccount:  $channeledAccountEntity->getPlatformId(),
                 page:  $pageEntity->getUrl(),

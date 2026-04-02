@@ -525,7 +525,6 @@ class MetricsProcessor
                 channel: $metric->channel,
                 name: $metric->name,
                 period: $metric->period,
-                metricDate: $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
                 account: isset($metric->account) ? $metric->account->getName() : null,
                 channeledAccount: isset($metric->channeledAccount) ? (string) $metric->channeledAccount->getPlatformId() : null,
                 campaign: isset($metric->campaign) ? (string) $metric->campaign->getCampaignId() : null,
@@ -549,7 +548,6 @@ class MetricsProcessor
                 'channel' => $metric->channel,
                 'name' => $metric->name,
                 'period' => $metric->period,
-                'metricDate' => $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
                 'account_id' => isset($metric->account) ? ($accountMap['map'][$metric->account->getId() ?? 0] ?? null) : null,
                 'channeled_account_id' => isset($metric->channeledAccount) ? ($channeledAccountMap['map'][$metric->channeledAccount->getPlatformId()] ?? null) : (isset($metric->channeledAccountPlatformId) ? ($channeledAccountMap['map'][$metric->channeledAccountPlatformId] ?? null) : null),
                 'campaign_id' => isset($metric->campaign) ? ($campaignMap['map'][$metric->campaign->getCampaignId()] ?? null) : (isset($metric->campaignPlatformId) ? ($campaignMap['map'][$metric->campaignPlatformId] ?? null) : null),
@@ -599,7 +597,6 @@ class MetricsProcessor
                     'channel' => $metricConfig['channel'],
                     'name' => $metricConfig['name'],
                     'period' => $metricConfig['period'],
-                    'metric_date' => $metricConfig['metricDate'],
                     'account_id' => $metricConfig['account_id'] ?? null,
                     'channeled_account_id' => $metricConfig['channeled_account_id'] ?? null,
                     'campaign_id' => $metricConfig['campaign_id'] ?? null,
@@ -622,7 +619,7 @@ class MetricsProcessor
 
         // INSERT IGNORE: atomic upsert.
         if (!empty($uniqueMetricConfigs)) {
-            $cols = ['channel', 'name', 'period', 'metric_date', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id', 'creative_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id', 'dimension_set_id', 'config_signature'];
+            $cols = ['channel', 'name', 'period', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id', 'creative_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id', 'dimension_set_id', 'config_signature'];
             $numCols = count($cols);
             $chunkSize = floor(30000 / $numCols); // Ultra safe margin for Postgres (30k params max per chunk)
             
@@ -632,7 +629,6 @@ class MetricsProcessor
                     $insertParams[] = $metricConfig['channel'];
                     $insertParams[] = $metricConfig['name'];
                     $insertParams[] = $metricConfig['period'];
-                    $insertParams[] = $metricConfig['metric_date'];
                     $insertParams[] = $metricConfig['account_id'] ?? null;
                     $insertParams[] = $metricConfig['channeled_account_id'] ?? null;
                     $insertParams[] = $metricConfig['campaign_id'] ?? null;
@@ -651,9 +647,10 @@ class MetricsProcessor
                     $insertParams[] = $metricConfig['dimension_set_id'] ?? null;
                     $insertParams[] = $metricConfig['key']; // config_signature
                 }
-                $sql = Helpers::buildInsertIgnoreSql(
+                $sql = Helpers::buildUpsertSql(
                     'metric_configs', 
                     $cols, 
+                    ['dimension_set_id'], 
                     ['config_signature'], 
                     count($chunk)
                 );
@@ -704,6 +701,7 @@ class MetricsProcessor
             $metricKey = KeyGenerator::generateMetricKey(
                 dimensionsHash: $dimensionsHash,
                 metricConfigKey: $metric->metricConfigKey,
+                metricDate: $metric->metricDate,
             );
 
             if (!isset($metricConfigMap['map'][$metric->metricConfigKey])) {
@@ -717,6 +715,7 @@ class MetricsProcessor
                 'metadata' => $metric->metadata,
                 'dimensions_hash' => $dimensionsHash,
                 'metric_config_id' => $metricConfigMap['map'][$metric->metricConfigKey],
+                'metric_date' => $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
             ];
         }
 
@@ -726,17 +725,18 @@ class MetricsProcessor
             $selectParams = [];
             $tuples = [];
             foreach ($chunkMetrics as $m) {
-                if (isset($m['dimensions_hash']) && isset($m['metric_config_id'])) {
+                if (isset($m['dimensions_hash']) && isset($m['metric_config_id']) && isset($m['metric_date'])) {
                     $selectParams[] = $m['dimensions_hash'];
                     $selectParams[] = $m['metric_config_id'];
-                    $tuples[] = '(?, ?)';
+                    $selectParams[] = $m['metric_date'];
+                    $tuples[] = '(?, ?, ?)';
                 }
             }
             if (!empty($tuples)) {
                 $placeholders = implode(', ', $tuples);
-                $sql = "SELECT id, dimensions_hash, metric_config_id 
+                $sql = "SELECT id, dimensions_hash, metric_config_id, metric_date 
                         FROM metrics 
-                        WHERE (dimensions_hash, metric_config_id) IN ($placeholders)";
+                        WHERE (dimensions_hash, metric_config_id, metric_date) IN ($placeholders)";
                 
                 $chunkMap = MapGenerator::getMetricMap($manager, $sql, $selectParams, $metricConfigMap);
                 foreach ($chunkMap as $k => $v) {
@@ -755,6 +755,7 @@ class MetricsProcessor
                     'metadata' => $cacheRawMetrics ? json_encode($metric['metadata'] ?? []) : null,
                     'dimensions_hash' => $metric['dimensions_hash'],
                     'metric_config_id' => $metric['metric_config_id'],
+                    'metric_date' => $metric['metric_date'],
                     'key' => $key,
                 ];
             } else {
@@ -768,7 +769,7 @@ class MetricsProcessor
         Helpers::setLogger('facebook-marketing.log')->info("Metrics analysis: " . count($metricsToInsert) . " new metrics to insert, " . count($metricsToUpdate) . " existing metrics to update.");
 
         if (!empty($metricsToInsert)) {
-            $cols = ['value', 'metadata', 'dimensions_hash', 'metric_config_id'];
+            $cols = ['value', 'metadata', 'dimensions_hash', 'metric_config_id', 'metric_date'];
             $numCols = count($cols);
             $chunkSize = floor(30000 / $numCols); // Safe buffer under 65535, aiming for ~30k params
             
@@ -779,12 +780,13 @@ class MetricsProcessor
                     $insertParams[] = $row['metadata'];
                     $insertParams[] = $row['dimensions_hash'];
                     $insertParams[] = $row['metric_config_id'];
+                    $insertParams[] = $row['metric_date'];
                 }
                 
                 $sql = Helpers::buildInsertIgnoreSql(
                     'metrics', 
                     $cols, 
-                    ['metric_config_id', 'dimensions_hash'], 
+                    ['metric_config_id', 'dimensions_hash', 'metric_date'], 
                     count($chunk)
                 );
                 $affected = $manager->getConnection()->executeStatement($sql, $insertParams);
@@ -798,18 +800,20 @@ class MetricsProcessor
                 foreach ($chunk as $row) {
                     $reFetchParams[] = $row['dimensions_hash'];
                     $reFetchParams[] = (int)$row['metric_config_id'];
-                    $tuples[] = $isPostgres ? '(?::text, ?::integer)' : '(?, ?)';
+                    $reFetchParams[] = $row['metric_date'];
+                    $tuples[] = $isPostgres ? '(?::text, ?::integer, ?::date)' : '(?, ?, ?)';
                 }
                 $placeholders = implode(', ', $tuples);
                 $isPostgres = Helpers::isPostgres();
-                $reFetchSql = "SELECT id, dimensions_hash, metric_config_id FROM metrics WHERE " .
-                    ($isPostgres ? "(dimensions_hash::text, metric_config_id::integer) " : "(dimensions_hash, metric_config_id) ") .
+                $reFetchSql = "SELECT id, dimensions_hash, metric_config_id, metric_date FROM metrics WHERE " .
+                    ($isPostgres ? "(dimensions_hash::text, metric_config_id::integer, metric_date::date) " : "(dimensions_hash, metric_config_id, metric_date) ") .
                     "IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
                 $fetched = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
                 foreach ($fetched as $metricRow) {
                     $metricKey = KeyGenerator::generateMetricKey(
                         dimensionsHash: $metricRow['dimensions_hash'],
                         metricConfigKey: $metricConfigMap['mapReverse'][$metricRow['metric_config_id']],
+                        metricDate: $metricRow['metric_date'],
                     );
                     $metricMap[$metricKey] = (int)$metricRow['id'];
                 }
@@ -851,7 +855,8 @@ class MetricsProcessor
         foreach ($metrics as $m) {
             $mKey = KeyGenerator::generateMetricKey(
                 dimensionsHash: $m->dimensions_hash ?? $m->dimensionsHash,
-                metricConfigKey: $m->metric_config_key ?? $m->metricConfigKey
+                metricConfigKey: $m->metric_config_key ?? $m->metricConfigKey,
+                metricDate: $m->metric_date ?? $m->metricDate
             );
             $metricsMapByMKey[$mKey] = $m;
         }
@@ -861,6 +866,7 @@ class MetricsProcessor
             $metricKey = KeyGenerator::generateMetricKey(
                 dimensionsHash: $metric->dimensions_hash ?? $metric->dimensionsHash,
                 metricConfigKey: $metric->metric_config_key ?? $metric->metricConfigKey,
+                metricDate: $metric->metric_date ?? $metric->metricDate,
             );
 
             if (!isset($metricMap['map'][$metricKey])) continue;

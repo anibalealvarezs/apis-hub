@@ -39,7 +39,7 @@ class SeedDemoDataCommand extends Command
     private $faker;
     private Connection $conn;
     private array $bufferConfigs = [];
-    private const BULK_SIZE = 10000;
+    private const BULK_SIZE = 2000;
     
     private array $ages = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
     private array $genders = ['Female', 'Male', 'Unknown'];
@@ -207,7 +207,11 @@ class SeedDemoDataCommand extends Command
         
         foreach ($this->ages as $age) {
             foreach ($this->genders as $gen) {
-                $h = md5("age:{$age}|gender:{$gen}");
+                $dimensions = [
+                    ['dimensionKey' => 'age', 'dimensionValue' => $age],
+                    ['dimensionKey' => 'gender', 'dimensionValue' => $gen]
+                ];
+                $h = \Classes\KeyGenerator::generateDimensionsHash($dimensions);
                 $setId = $this->conn->fetchOne("SELECT id FROM dimension_sets WHERE hash = ?", [$h]);
                 if (!$setId) {
                     $this->conn->insert('dimension_sets', ['hash' => $h, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
@@ -215,7 +219,7 @@ class SeedDemoDataCommand extends Command
                     $this->conn->insert('dimension_set_items', ['dimension_set_id' => $setId, 'dimension_value_id' => $ageValIds[$age]]);
                     $this->conn->insert('dimension_set_items', ['dimension_set_id' => $setId, 'dimension_value_id' => $genValIds[$gen]]);
                 }
-                $this->dimensionSetCache["$age|$gen"] = $setId;
+                $this->dimensionSetCache["$age|$gen"] = ['id' => $setId, 'hash' => $h];
             }
         }
     }
@@ -261,7 +265,7 @@ class SeedDemoDataCommand extends Command
             
             $property = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $hostname]);
             if (!$property) {
-                $property = (new Page())->addUrl("https://$hostname")->addTitle($siteName)->addHostname($hostname)->addPlatformId($hostname);
+                $property = (new Page())->addUrl("https://$hostname")->addTitle($siteName)->addHostname($hostname)->addPlatformId($hostname)->addCanonicalId($hostname);
                 $this->entityManager->persist($property);
                 $this->entityManager->flush($property);
             }
@@ -283,18 +287,20 @@ class SeedDemoDataCommand extends Command
                     $appearance = $appearances[array_rand($appearances)];
 
                     // Resolve Dimensions (Universal values are OUT, but Page and Query are dimensions!)
-                    $setId = $dimManager->resolveDimensionSet([
+                    $dimensionSet = $dimManager->resolveDimensionSet([
                         ['dimensionKey' => 'page', 'dimensionValue' => $url],
                         ['dimensionKey' => 'query', 'dimensionValue' => $qStr],
                         ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $appearance]
-                    ])->getId();
+                    ]);
+                    $setId = $dimensionSet->getId();
 
                     $imps = rand(10, 200); $clicks = (int)($imps * rand(1, 10) / 100); $pos = (float)rand(10, 80) / 10;
                     $data = ['impressions' => $imps, 'clicks' => $clicks, 'ctr' => $imps > 0 ? $clicks / $imps : 0, 'position' => $pos, 'keys' => [$url, $qStr, $code, $type, $appearance]];
 
                     foreach (['impressions', 'clicks', 'ctr', 'position'] as $name) {
                         $this->queueMetric(
-                            channel: $gscChan, name: $name, date: $date, value: $data[$name], setId: $setId,
+                            channel: $gscChan, name: $name, date: $date, value: $data[$name], 
+                            setId: $setId,
                             pageId: $property->getId(), 
                             queryId: null, // Strategic Only
                             countryId: $country->getId(),
@@ -304,7 +310,8 @@ class SeedDemoDataCommand extends Command
                             pageUrl: $property->getUrl(),
                             queryPId: null,
                             countryPId: $code,
-                            devicePId: $type
+                            devicePId: $type,
+                            setHash: $dimensionSet->getHash()
                         );
                     }
                 }
@@ -444,7 +451,9 @@ class SeedDemoDataCommand extends Command
             for ($b = 0; $b < rand(1, 2); $b++) { // Reduced dimensions for performance
                 $age = $this->ages[array_rand($this->ages)]; $gen = $this->genders[array_rand($this->genders)];
                 if (isset($used["$age|$gen"])) continue; $used["$age|$gen"] = true;
-                $setId = $this->dimensionSetCache["$age|$gen"];
+                $setInfo = $this->dimensionSetCache["$age|$gen"];
+                $setId = $setInfo['id'];
+                $setHash = $setInfo['hash'];
                 
                 $imps = rand(100, 2000); 
                 $reach = (int)($imps * rand(70, 95) / 100);
@@ -468,6 +477,7 @@ class SeedDemoDataCommand extends Command
                         date: $date, 
                         value: $val, 
                         setId: $setId, 
+                        setHash: $setHash,
                         caId: $caId, 
                         gAccId: $gId, 
                         gCpId: $gCpId, 
@@ -510,7 +520,7 @@ class SeedDemoDataCommand extends Command
             $fbPId = "fb_page_$i";
             $page = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $fbPId]);
             if (!$page) {
-                $page = (new Page())->addPlatformId($fbPId)->addAccount($fbAcc)->addTitle("$name FB Page")->addUrl("https://fb.com/$fbPId");
+                $page = (new Page())->addPlatformId($fbPId)->addAccount($fbAcc)->addTitle("$name FB Page")->addUrl("https://fb.com/$fbPId")->addCanonicalId($fbPId);
                 $this->entityManager->persist($page);
             }
 
@@ -820,7 +830,8 @@ class SeedDemoDataCommand extends Command
                     cpPId: $cpPId,
                     agPId: $agPId,
                     pageUrl: $pageUrl,
-                    postPId: $postPId
+                    postPId: $postPId,
+                    setHash: null
                 );
             }
         }
@@ -838,13 +849,13 @@ class SeedDemoDataCommand extends Command
         $queryId = null, $countryId = null, $deviceId = null, $productId = null, $customerId = null, $orderId = null, $creativeId = null,
         ?string $accName = null, ?string $caPId = null, ?string $gCpPId = null, ?string $cpPId = null, ?string $agPId = null, ?string $adPId = null, ?string $pageUrl = null, ?string $postPId = null,
         ?string $queryPId = null, ?string $countryPId = null, ?string $devicePId = null, ?string $productPId = null, ?string $customerPId = null, ?string $orderPId = null, ?string $creativePId = null,
-        ?string $data = null
+        ?string $data = null,
+        ?string $setHash = null
     ): void {
         $sig = \Classes\KeyGenerator::generateMetricConfigKey(
             channel: $channel,
             name: $name,
             period: 'daily',
-            metricDate: $date,
             account: $accName,
             channeledAccount: $caPId,
             campaign: $gCpPId,
@@ -860,7 +871,7 @@ class SeedDemoDataCommand extends Command
             product: $productPId,
             customer: $customerPId,
             order: $orderPId,
-            dimensionSet: $setId
+            dimensionSet: $setHash ?: $setId
         );
         $this->bufferConfigs[] = [
             'channel' => $channel->value, 
@@ -885,6 +896,7 @@ class SeedDemoDataCommand extends Command
             'config_signature' => $sig, 
             'value' => (float)$value, 
             'dimension_set_id' => $setId,
+            'dimension_set_hash' => $setHash ?: ( $setId ? null : \Classes\KeyGenerator::generateDimensionsHash([]) ), // Default unsegmented hash for null ID
             'data' => $data
         ];
         if (count($this->bufferConfigs) >= self::BULK_SIZE) { $this->flushAll(); }
@@ -894,12 +906,12 @@ class SeedDemoDataCommand extends Command
     {
         if (empty($this->bufferConfigs)) return;
         $now = date('Y-m-d H:i:s');
-        $configsToInsert = array_map(function($row) use ($now) { 
-            return [
+        $configsToInsert = [];
+        foreach ($this->bufferConfigs as $row) { 
+            $configsToInsert[$row['config_signature']] = [
                 'channel' => $row['channel'], 
                 'name' => $row['name'], 
                 'period' => 'daily', 
-                'metric_date' => $row['metric_date'], 
                 'page_id' => $row['page_id'], 
                 'post_id' => $row['post_id'],
                 'channeled_ad_id' => $row['channeled_ad_id'], 
@@ -915,13 +927,14 @@ class SeedDemoDataCommand extends Command
                 'product_id' => $row['product_id'],
                 'customer_id' => $row['customer_id'],
                 'order_id' => $row['order_id'],
+                'dimension_set_id' => $row['dimension_set_id'],
                 'config_signature' => $row['config_signature'], 
                 'created_at' => $now, 
                 'updated_at' => $now
             ]; 
-        }, $this->bufferConfigs);
+        }
         
-        $this->bulkInsert('metric_configs', $configsToInsert);
+        $this->bulkInsert('metric_configs', array_values($configsToInsert), ['dimension_set_id']);
         
         $quotedSigs = array_map(fn($c) => $this->conn->quote($c['config_signature']), $this->bufferConfigs);
         $idMap = $this->conn->fetchAllKeyValue("SELECT config_signature, id FROM metric_configs WHERE config_signature IN (" . implode(',', $quotedSigs) . ")");
@@ -929,24 +942,37 @@ class SeedDemoDataCommand extends Command
         $metricsToInsert = [];
         foreach ($this->bufferConfigs as $c) {
             $cfgId = $idMap[$c['config_signature']] ?? null;
-            if ($cfgId) $metricsToInsert[] = [
+            if (!$cfgId) continue;
+            
+            $dimHash = $c['dimension_set_hash'] ?? md5((string)$c['dimension_set_id']);
+            $mKey = $cfgId . '|' . $dimHash . '|' . $c['metric_date'];
+            
+            $metricsToInsert[$mKey] = [
                 'metric_config_id' => $cfgId, 
-                'dimensions_hash' => md5((string)$c['dimension_set_id']), 
+                'dimensions_hash' => $dimHash, 
                 'value' => $c['value'], 
+                'metric_date' => $c['metric_date'],
                 'created_at' => $now, 
                 'updated_at' => $now
             ];
         }
-        $this->bulkInsert('metrics', $metricsToInsert);
+        $this->bulkInsert('metrics', array_values($metricsToInsert), ['value']);
         
         $quotedConfigIds = array_map('intval', array_values($idMap));
         if (empty($quotedConfigIds)) return;
         
-        $mMap = $this->conn->fetchAllKeyValue("SELECT metric_config_id, id FROM metrics WHERE metric_config_id IN (" . implode(',', $quotedConfigIds) . ")");
+        $isPostgres = $this->conn->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+        $mMap = [];
+        $mRows = $this->conn->fetchAllAssociative("SELECT id, metric_config_id, dimensions_hash, metric_date FROM metrics WHERE metric_config_id IN (" . implode(',', $quotedConfigIds) . ")");
+        foreach ($mRows as $mRow) {
+            $k = $mRow['metric_config_id'] . '|' . $mRow['dimensions_hash'] . '|' . $mRow['metric_date'];
+            $mMap[$k] = $mRow['id'];
+        }
         
         $chanToInsert = [];
         foreach ($this->bufferConfigs as $c) {
-            $mId = $mMap[$idMap[$c['config_signature']] ?? 0] ?? null;
+            $mKey = ($idMap[$c['config_signature']] ?? 0) . '|' . ($c['dimension_set_hash'] ?? md5((string)$c['dimension_set_id'])) . '|' . $c['metric_date'];
+            $mId = $mMap[$mKey] ?? null;
             if ($mId) $chanToInsert[] = [
                 'platform_id' => $this->generatePlatformId(), 
                 'channel' => $c['channel'], 
@@ -962,16 +988,37 @@ class SeedDemoDataCommand extends Command
         $this->bufferConfigs = [];
     }
 
-    private function bulkInsert(string $table, array $rows): void
+    private function bulkInsert(string $table, array $rows, array $updateCols = []): void
     {
         if (empty($rows)) return;
+        
+        if (empty($updateCols)) {
+            $columns = array_keys($rows[0]);
+            $vals = [];
+            foreach ($rows as $row) { $vals[] = "(" . implode(',', array_map(fn($v) => is_null($v) ? 'NULL' : $this->conn->quote((string)$v), array_values($row))) . ")"; }
+            
+            $isPostgres = $this->conn->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+            $insertSql = $isPostgres ? "INSERT INTO $table (" . implode(',', $columns) . ") VALUES " . implode(',', $vals) . " ON CONFLICT DO NOTHING" : "INSERT IGNORE INTO $table (" . implode(',', $columns) . ") VALUES " . implode(',', $vals);
+            
+            $this->conn->executeStatement($insertSql);
+            return;
+        }
+
+        // Use buildUpsertSql if updateCols are provided
         $columns = array_keys($rows[0]);
-        $vals = [];
-        foreach ($rows as $row) { $vals[] = "(" . implode(',', array_map(fn($v) => is_null($v) ? 'NULL' : $this->conn->quote((string)$v), array_values($row))) . ")"; }
-        
-        $isPostgres = $this->conn->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
-        $insertSql = $isPostgres ? "INSERT INTO $table (" . implode(',', $columns) . ") VALUES " . implode(',', $vals) . " ON CONFLICT DO NOTHING" : "INSERT IGNORE INTO $table (" . implode(',', $columns) . ") VALUES " . implode(',', $vals);
-        
-        $this->conn->executeStatement($insertSql);
+        $numCols = count($columns);
+        $chunkSize = (int)floor(60000 / $numCols);
+        $uniqueCols = ($table === 'metric_configs') ? ['config_signature'] : (($table === 'metrics') ? ['metric_config_id', 'dimensions_hash', 'metric_date'] : []);
+
+        foreach (array_chunk($rows, $chunkSize) as $chunk) {
+            $sql = \Helpers\Helpers::buildUpsertSql($table, $columns, $updateCols, $uniqueCols, count($chunk));
+            $params = [];
+            foreach ($chunk as $row) {
+                foreach ($row as $val) {
+                    $params[] = $val;
+                }
+            }
+            $this->conn->executeStatement($sql, $params);
+        }
     }
 }

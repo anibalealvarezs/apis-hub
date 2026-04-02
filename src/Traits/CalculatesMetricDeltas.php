@@ -35,15 +35,14 @@ trait CalculatesMetricDeltas
         }
 
         // 1. Generate "Yesterday Signatures" for all lifetime metrics
-        $yesterdaySignatures = [];
+        $signatures = [];
         foreach ($lifetimeMetrics as $metric) {
             $yesterdayDate = Carbon::parse($metric->metricDate)->subDay()->toDateString();
             
-            $yesterdaySignature = KeyGenerator::generateMetricConfigKey(
+            $signature = KeyGenerator::generateMetricConfigKey(
                 channel: $metric->channel,
                 name: $metric->name,
                 period: $metric->period,
-                metricDate: $yesterdayDate,
                 account: isset($metric->account) ? $metric->account->getName() : null,
                 channeledAccount: isset($metric->channeledAccount) ? (string) $metric->channeledAccount->getPlatformId() : (isset($metric->channeledAccountPlatformId) ? (string)$metric->channeledAccountPlatformId : null),
                 campaign: isset($metric->campaign) ? (string) $metric->campaign->getCampaignId() : (isset($metric->campaignPlatformId) ? (string)$metric->campaignPlatformId : null),
@@ -61,31 +60,41 @@ trait CalculatesMetricDeltas
                 creative: isset($metric->creative) ? $metric->creative->getCreativeId() : null,
             );
             
-            $metric->yesterdaySignature = $yesterdaySignature;
-            $yesterdaySignatures[] = $yesterdaySignature;
+            $metric->atemporalSignature = $signature;
+            $metric->yesterdayDate = $yesterdayDate;
+            $signatures[] = $signature;
         }
 
         // 2. Batch lookup previous values from database
         $previousValuesMap = [];
-        if (!empty($yesterdaySignatures)) {
-            $chunks = array_chunk($yesterdaySignatures, 1000);
+        if (!empty($signatures)) {
+            $chunks = array_chunk($lifetimeMetrics, 1000);
             foreach ($chunks as $chunk) {
-                $placeholders = implode(', ', array_fill(0, count($chunk), '?'));
-                $sql = "SELECT mc.config_signature, m.value 
+                $params = [];
+                $tuples = [];
+                foreach ($chunk as $m) {
+                    $params[] = $m->atemporalSignature;
+                    $params[] = $m->yesterdayDate;
+                    $tuples[] = '(?, ?)';
+                }
+                $placeholders = implode(', ', $tuples);
+                $sql = "SELECT mc.config_signature, m.metric_date, m.value 
                         FROM metrics m 
                         JOIN metric_configs mc ON m.metric_config_id = mc.id 
-                        WHERE mc.config_signature IN ($placeholders)";
+                        WHERE (mc.config_signature, m.metric_date) IN ($placeholders)";
                 
-                $results = $manager->getConnection()->executeQuery($sql, $chunk)->fetchAllAssociative();
+                $results = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
                 foreach ($results as $row) {
-                    $previousValuesMap[$row['config_signature']] = (float)$row['value'];
+                    $key = $row['config_signature'] . '|' . $row['metric_date'];
+                    $previousValuesMap[$key] = (float)$row['value'];
                 }
             }
         }
 
         // 3. Create and inject virtual DAILY metrics
         foreach ($lifetimeMetrics as $metric) {
-            $prevValue = $previousValuesMap[$metric->yesterdaySignature] ?? 0;
+            $lookupKey = $metric->atemporalSignature . '|' . $metric->yesterdayDate;
+            $prevValue = $previousValuesMap[$lookupKey] ?? 0;
             $delta = (float)$metric->value - $prevValue;
             
             // Create daily virtual metric
@@ -100,7 +109,6 @@ trait CalculatesMetricDeltas
                 channel: $virtual->channel,
                 name: $virtual->name,
                 period: $virtual->period,
-                metricDate: $virtual->metricDate,
                 account: isset($virtual->account) ? $virtual->account->getName() : null,
                 channeledAccount: isset($virtual->channeledAccount) ? (string) $virtual->channeledAccount->getPlatformId() : (isset($virtual->channeledAccountPlatformId) ? (string)$virtual->channeledAccountPlatformId : null),
                 campaign: isset($virtual->campaign) ? (string) $virtual->campaign->getCampaignId() : (isset($virtual->campaignPlatformId) ? (string)$virtual->campaignPlatformId : null),

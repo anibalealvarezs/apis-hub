@@ -452,8 +452,10 @@ class BaseRepository extends EntityRepository
 
         // Apply date filters using the correctly mapped column names
         if ($startDate || $endDate) {
-            if ($this->isChanneledMetric || $isMetric) {
-                $sqlDateField = 'mc.metric_date';
+            if ($this->isChanneledMetric) {
+                $sqlDateField = 'm.metric_date';
+            } elseif ($isMetric) {
+                $sqlDateField = 'e.metric_date';
             } else {
                 $dateField = 'platformCreatedAt';
                 if (!$this->_class->hasField($dateField)) {
@@ -640,7 +642,7 @@ class BaseRepository extends EntityRepository
                 'cpc'         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('clicks', 'clicks_daily')" : "mc.name IN ('clicks', 'clicks_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0)",
                 'cpm'         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / (NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'impressions_daily')" : "mc.name IN ('impressions', 'impressions_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0) / 1000)",
                 'position'    => $this->needsImpressionsJoin ? 
-                    "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'position'" : "mc.name = 'position'")." THEN $valCol * (SELECT m2.value FROM metrics m2 JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id WHERE ".($isPostgres ? "LOWER(mc2.name) IN ('impressions', 'page_media_view', 'post_media_view')" : "mc2.name IN ('impressions', 'page_media_view', 'post_media_view')")." AND mc2.metric_date = mc.metric_date AND mc2.channel = mc.channel AND (mc2.dimension_set_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.dimension_set_id) AND (mc2.query_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.query_id) AND (mc2.page_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.page_id) LIMIT 1) ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'page_media_view', 'post_media_view')" : "mc.name IN ('impressions', 'page_media_view', 'post_media_view')")." THEN $valCol ELSE 0 END), 0)" :
+                    "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'position'" : "mc.name = 'position'")." THEN $valCol * (SELECT m2.value FROM metrics m2 JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id WHERE ".($isPostgres ? "LOWER(mc2.name) IN ('impressions', 'page_media_view', 'post_media_view')" : "mc2.name IN ('impressions', 'page_media_view', 'post_media_view')")." AND m2.metric_date = ".($this->isChanneledMetric ? "m.metric_date" : "e.metric_date")." AND mc2.channel = mc.channel AND (mc2.dimension_set_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.dimension_set_id) AND (mc2.query_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.query_id) AND (mc2.page_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.page_id) LIMIT 1) ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'page_media_view', 'post_media_view')" : "mc.name IN ('impressions', 'page_media_view', 'post_media_view')")." THEN $valCol ELSE 0 END), 0)" :
                     "NULL",
                 'unique_clicks' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'unique_clicks'" : "mc.name = 'unique_clicks'")." THEN $valCol ELSE 0 END)",
                 'results'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END)",
@@ -776,13 +778,14 @@ class BaseRepository extends EntityRepository
         }
         if (str_starts_with($field, 'metricConfig.')) {
             $subField = substr($field, 13);
-            if ($subField === 'metricDate') $subField = 'metric_date';
             return "mc." . $subField;
         }
 
         // Common aliasing for metricDate and name
         if ($field === 'metricDate') {
-            return "mc.metric_date";
+            if ($this->isChanneledMetric) return "m.metric_date";
+            if ($isMetric) return "e.metric_date";
+            return "e.metric_date"; // Fallback to root entity alias
         }
         if ($field === 'name' || $field === 'period' || $field === 'channel') {
             return "mc.$field";
@@ -790,7 +793,9 @@ class BaseRepository extends EntityRepository
         
         // Temporal virtual fields
         if ($this->isChanneledMetric) {
-            $baseDate = 'mc.metric_date';
+            $baseDate = 'm.metric_date';
+        } elseif ($isMetric) {
+            $baseDate = 'e.metric_date';
         } else {
             $baseDate = 'e.platform_created_at';
             if (!$this->_class->hasField('platformCreatedAt')) {

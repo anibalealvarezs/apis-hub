@@ -22,7 +22,7 @@ use Repositories\MetricRepository;
     columns: ['metric_config_id'],
     name: 'idx_metrics_metric_config_lookup_idx'
 )]
-#[ORM\UniqueConstraint(name: 'metric_unique', columns: ['metric_config_id', 'dimensions_hash'])]
+#[ORM\UniqueConstraint(name: 'metric_unique', columns: ['metric_config_id', 'dimensions_hash', 'metric_date'])]
 #[ORM\HasLifecycleCallbacks]
 class Metric extends Entity
 {
@@ -41,6 +41,9 @@ class Metric extends Entity
 
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $metadata = [];
+
+    #[ORM\Column(name: 'metric_date', type: 'date')]
+    protected \DateTimeInterface $metricDate;
 
     /**
      * @return MetricConfig
@@ -111,6 +114,24 @@ class Metric extends Entity
     public function addMetadata(?array $metadata): self
     {
         $this->metadata = $metadata;
+        return $this;
+    }
+
+    /**
+     * @return \DateTimeInterface
+     */
+    public function getMetricDate(): \DateTimeInterface
+    {
+        return $this->metricDate;
+    }
+
+    /**
+     * @param \DateTimeInterface $metricDate
+     * @return self
+     */
+    public function addMetricDate(\DateTimeInterface $metricDate): self
+    {
+        $this->metricDate = $metricDate;
         return $this;
     }
 }

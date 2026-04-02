@@ -59,7 +59,6 @@ class KeyGenerator
         Channel|int|string $channel,
         string $name,
         Period|string $period,
-        DateTime|string $metricDate,
         Account|string|null $account = null,
         ChanneledAccount|string|null $channeledAccount = null,
         Campaign|string|null $campaign = null,
@@ -77,13 +76,14 @@ class KeyGenerator
         Device|DeviceEnum|string|null $device = null,
         \Entities\Analytics\Channeled\DimensionSet|int|string|null $dimensionSet = null
     ): string {
+        $emptyHash = self::generateDimensionsHash([]);
+        if ($dimensionSet === $emptyHash) { $dimensionSet = null; }
 
-        return match($channel) {
+        return match($channel instanceof Channel ? $channel : Channel::from($channel)) {
             Channel::google_search_console => md5(string: json_encode([
-                'channel' => $channel->getName(),
+                'channel' => $channel instanceof Channel ? $channel->getName() : Channel::from($channel)->getName(),
                 'name' => $name,
                 'period' => $period instanceof Period ? $period->value : $period,
-                'metricDate' => $metricDate instanceof DateTime ? $metricDate->format('Y-m-d') : $metricDate,
                 'account' => $account instanceof Account ? $account->getName() : $account,
                 'channeledAccount' => (string) ($channeledAccount instanceof ChanneledAccount ? $channeledAccount->getPlatformId() : $channeledAccount),
                 'campaign' => (string) ($campaign instanceof Campaign ? $campaign->getCampaignId() : $campaign),
@@ -99,14 +99,13 @@ class KeyGenerator
                 'order' => (string) ($order instanceof Order ? $order->getOrderId() : $order),
                 'country' => $country instanceof Country ? $country->getCode() : ($country instanceof CountryEnum ? $country->value : $country),
                 'device' => $device instanceof Device ? $device->getType() : ($device instanceof DeviceEnum ? $device->value : $device),
-                'dimensionSet' => $dimensionSet instanceof \Entities\Analytics\Channeled\DimensionSet ? $dimensionSet->getId() : $dimensionSet
+                'dimensionSet' => $dimensionSet instanceof \Entities\Analytics\Channeled\DimensionSet ? $dimensionSet->getHash() : $dimensionSet
             ], JSON_UNESCAPED_UNICODE)),
 
             default => md5(string: json_encode([
                 'channel' => $channel instanceof Channel ? $channel->getName() : $channel,
                 'name' => $name,
                 'period' => $period instanceof Period ? $period->value : $period,
-                'metricDate' => $metricDate instanceof DateTime ? $metricDate->format('Y-m-d') : $metricDate,
                 'account' => $account instanceof Account ? $account->getName() : $account,
                 'channeledAccount' => (string) ($channeledAccount instanceof ChanneledAccount ? $channeledAccount->getPlatformId() : $channeledAccount),
                 'campaign' => (string) ($campaign instanceof Campaign ? $campaign->getCampaignId() : $campaign),
@@ -122,7 +121,7 @@ class KeyGenerator
                 'order' => (string) ($order instanceof Order ? $order->getOrderId() : $order),
                 'country' => $country instanceof Country ? $country->getCode() : ($country instanceof CountryEnum ? $country->value : $country),
                 'device' => $device instanceof Device ? $device->getType() : ($device instanceof DeviceEnum ? $device->value : $device),
-                'dimensionSet' => $dimensionSet instanceof \Entities\Analytics\Channeled\DimensionSet ? $dimensionSet->getId() : $dimensionSet
+                'dimensionSet' => $dimensionSet instanceof \Entities\Analytics\Channeled\DimensionSet ? $dimensionSet->getHash() : $dimensionSet
             ], JSON_UNESCAPED_UNICODE))
         };
     }
@@ -183,7 +182,6 @@ class KeyGenerator
                 channel: $channel,
                 name: $name,
                 period: $period,
-                metricDate: $metricDate,
                 account: $account,
                 channeledAccount: $channeledAccount,
                 campaign: $campaign,
@@ -198,7 +196,8 @@ class KeyGenerator
                 customer: $customer,
                 order: $order,
                 country: $country,
-                device: $device
+                device: $device,
+                dimensionSet: $dimensionsHash
             );
         }
         if (is_null($dimensionsHash)) {
@@ -208,6 +207,7 @@ class KeyGenerator
         return md5(string: json_encode([
             'metricConfig' => $metricConfigKey,
             'dimensionsHash' => $dimensionsHash,
+            'metricDate' => $metricDate instanceof DateTime ? $metricDate->format('Y-m-d') : $metricDate,
         ], JSON_UNESCAPED_UNICODE));
     }
 
