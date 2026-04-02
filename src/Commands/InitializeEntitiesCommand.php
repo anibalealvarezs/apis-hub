@@ -114,14 +114,21 @@ class InitializeEntitiesCommand extends Command
             }
             $pagesInitialized = 0;
             $pagesSkipped = 0;
-            $gscConfig = MetricRequests::validateGoogleConfig($this->logger);
-            $gscEnabled = $gscConfig['google_search_console']['enabled'] ?? false;
+            $countriesInitializedCode = 0;
+            $countriesSkipped = 0;
+            $devicesInitialized = 0;
+            $devicesSkipped = 0;
+            $countriesInitialized = 0;
+
+            // GSC Section: Only validate and process if explicitly enabled
+            $gscEnabled = $channelsConfig['google_search_console']['enabled'] ?? false;
+            $sitesToProcess = [];
             
             if (!$gscEnabled) {
                 $this->logger->info("Google Search Console channel is disabled. Skipping entity initialization for GSC.");
-                $sitesToProcess = [];
             } else {
                 $this->logger->info("Initializing Entities for GSC...");
+                $gscConfig = MetricRequests::validateGoogleConfig($this->logger);
                 $sitesToProcess = $gscConfig['google_search_console']['sites'] ?? [];
 
                 if ($gscConfig['google_search_console']['cache_all'] ?? false) {
@@ -315,8 +322,11 @@ class InitializeEntitiesCommand extends Command
                     /** @var ChanneledAccount|null $channeledAccountEntity */
                     $channeledAccountEntity = $channeledAccountRepository->getByPlatformId($page['ig_account'], Channel::facebook_organic->value);
                     
-                    // Extract IG-specific name from raw data if available
-                    $igData = $page['instagram_business_account'] ?? [];
+                    // Extract IG-specific name and data from raw API data if available
+                    $igData = $apiPageData['instagram_business_account'] ?? $page['instagram_business_account'] ?? [];
+                    if (empty($igData) && !empty($page['ig_account'])) {
+                        $igData = ['id' => $page['ig_account']];
+                    }
                     $igName = $igData['name'] ?? $igData['username'] ?? $title;
 
                     if (!$channeledAccountEntity) {
@@ -334,7 +344,7 @@ class InitializeEntitiesCommand extends Command
                         if ($channeledAccountEntity->getName() !== $igName) {
                             $channeledAccountEntity->addName($igName);
                         }
-                        $channeledAccountEntity->addData(array_merge($channeledAccountEntity->getData() ?? [], $igData));
+                        $channeledAccountEntity->addData($igData); // Replace with fresh API data
                         $this->entityManager->persist($channeledAccountEntity);
                         $this->logger->info("Updated Instagram Account: ID={$page['ig_account']}, Name={$igName}");
                     }
