@@ -1283,12 +1283,14 @@ class MetricRequests
         };
 
         $breakdowns = $config['metrics_breakdowns'] ?? $defaultBreakdowns;
+        $allFields = array_unique(array_filter(array_merge($enabledMetrics, $idFields)));
 
         return [
             'metricSet' => MetricSet::CUSTOM,
-            'metrics' => array_unique(array_filter(array_merge($enabledMetrics, $idFields))),
+            'metrics' => array_unique(array_filter($enabledMetrics)),
+            'dimensions' => array_unique(array_filter($idFields)),
             'breakdowns' => $breakdowns,
-            'fields' => implode(',', array_unique(array_filter(array_merge($enabledMetrics, $idFields))))
+            'fields' => implode(',', $allFields)
         ];
     }
     
@@ -1707,7 +1709,7 @@ class MetricRequests
                 accountEntity: $accountEntity,
                 channeledAccountPlatformId: $channeledAccountEntity->getPlatformId(),
                 metricSet: $metricConfig['metricSet'],
-                customFields: $metricConfig['fields'] ?? null,
+                metricsToProcess: $metricConfig['metrics'] ?? [],
             );
 
             foreach ($metrics as $metric) {
@@ -4395,7 +4397,7 @@ class MetricRequests
                     campaignEntity: $campaignEntity,
                     channeledCampaignEntity: $channeledCampaignEntity,
                     metricSet: $metricConfig['metricSet'],
-                    customFields: $metricConfig['fields'] ?? null,
+                    metricsToProcess: $metricConfig['metrics'] ?? [],
                 );
 
                 foreach ($metrics as $metric) {
@@ -4584,7 +4586,7 @@ class MetricRequests
                     channeledCampaignEntity: $channeledCampaignEntity,
                     channeledAdGroupEntity: $channeledAdGroupEntity,
                     metricSet: $metricConfig['metricSet'],
-                    customFields: $metricConfig['fields'] ?? null,
+                    metricsToProcess: $metricConfig['metrics'] ?? [],
                 );
 
                 foreach ($metrics as $metric) {
@@ -4823,7 +4825,7 @@ class MetricRequests
                     channeledAdGroupEntity: $channeledAdGroupEntity,
                     channeledAdEntity: $channeledAdEntity,
                     metricSet: $metricConfig['metricSet'],
-                    customFields: $metricConfig['fields'] ?? null,
+                    metricsToProcess: $metricConfig['metrics'] ?? [],
                 );
 
                 foreach ($metrics as $metric) {
@@ -5006,7 +5008,7 @@ class MetricRequests
                     channeledAccountEntity: $channeledAccountEntity,
                     creativeEntity: $creative,
                     metricSet: $metricConfig['metricSet'],
-                    customFields: $metricConfig['fields'] ?? null,
+                    metricsToProcess: $metricConfig['metrics'] ?? [],
                 );
                 
                 if ($metrics->count() > 0) {

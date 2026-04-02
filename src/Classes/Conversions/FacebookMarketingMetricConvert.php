@@ -44,6 +44,7 @@ class FacebookMarketingMetricConvert
         ?Creative $creativeEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        array $metricsToProcess = [],
         ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
@@ -52,7 +53,7 @@ class FacebookMarketingMetricConvert
         $skippedRows = 0;
 
         // Creatives usually use Ad insights fields but for the creative itself
-        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = !empty($metricsToProcess) ? $metricsToProcess : ($customFields ? explode(',', $customFields) : explode(',', AdPermission::DEFAULT->insightsFields($metricSet)));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -72,10 +73,12 @@ class FacebookMarketingMetricConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach ($row as $key => $value) {
-                if (!in_array($key, $metricsList)) {
+
+            foreach ($metricsList as $key) {
+                if (!isset($row[$key])) {
                     continue;
                 }
+                $value = $row[$key];
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
@@ -94,9 +97,6 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
-                if (!is_numeric($val)) {
-                    continue;
-                }
                 $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
@@ -155,6 +155,7 @@ class FacebookMarketingMetricConvert
         ?string $channeledAccountPlatformId = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        array $metricsToProcess = [],
         ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
@@ -162,7 +163,7 @@ class FacebookMarketingMetricConvert
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdAccountPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = !empty($metricsToProcess) ? $metricsToProcess : ($customFields ? explode(',', $customFields) : explode(',', AdAccountPermission::DEFAULT->insightsFields($metricSet)));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -184,10 +185,11 @@ class FacebookMarketingMetricConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach ($row as $key => $value) {
-                if (!in_array($key, $metricsList)) {
+            foreach ($metricsList as $key) {
+                if (!isset($row[$key])) {
                     continue;
                 }
+                $value = $row[$key];
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
@@ -202,9 +204,6 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
-                if (!is_numeric($val)) {
-                    continue;
-                }
                 $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
@@ -260,6 +259,7 @@ class FacebookMarketingMetricConvert
         ?ChanneledCampaign $channeledCampaignEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        array $metricsToProcess = [],
         ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
@@ -289,10 +289,11 @@ class FacebookMarketingMetricConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach ($row as $key => $value) {
-                if (!in_array($key, $metricsList)) {
+            foreach ($metricsList as $key) {
+                if (!isset($row[$key])) {
                     continue;
                 }
+                $value = $row[$key];
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
@@ -308,9 +309,6 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
-                if (!is_numeric($val)) {
-                    continue;
-                }
                 $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
@@ -370,6 +368,7 @@ class FacebookMarketingMetricConvert
         ?ChanneledAdGroup $channeledAdGroupEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        array $metricsToProcess = [],
         ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
@@ -377,7 +376,7 @@ class FacebookMarketingMetricConvert
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdsetPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = !empty($metricsToProcess) ? $metricsToProcess : ($customFields ? explode(',', $customFields) : explode(',', AdsetPermission::DEFAULT->insightsFields($metricSet)));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -399,10 +398,11 @@ class FacebookMarketingMetricConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach ($row as $key => $value) {
-                if (!in_array($key, $metricsList)) {
+            foreach ($metricsList as $key) {
+                if (!isset($row[$key])) {
                     continue;
                 }
+                $value = $row[$key];
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
@@ -419,9 +419,6 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
-                if (!is_numeric($val)) {
-                    continue;
-                }
                 $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
@@ -484,6 +481,7 @@ class FacebookMarketingMetricConvert
         ?ChanneledAd $channeledAdEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        array $metricsToProcess = [],
         ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
@@ -491,7 +489,7 @@ class FacebookMarketingMetricConvert
         $collection = new ArrayCollection();
         $skippedRows = 0;
 
-        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = !empty($metricsToProcess) ? $metricsToProcess : ($customFields ? explode(',', $customFields) : explode(',', AdPermission::DEFAULT->insightsFields($metricSet)));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
 
@@ -513,10 +511,11 @@ class FacebookMarketingMetricConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach ($row as $key => $value) {
-                if (!in_array($key, $metricsList)) {
+            foreach ($metricsList as $key) {
+                if (!isset($row[$key])) {
                     continue;
                 }
+                $value = $row[$key];
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
@@ -534,9 +533,6 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
-                if (!is_numeric($val)) {
-                    continue;
-                }
                 $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
