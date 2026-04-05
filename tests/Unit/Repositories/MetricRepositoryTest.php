@@ -65,7 +65,7 @@ class MetricRepositoryTest extends TestCase
     {
         $this->queryBuilder->expects($this->once())
             ->method('select')
-            ->with('partial e.{id, value, metadata}')
+            ->with('partial e.{id, value, metricDate, metadata}')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(15))
             ->method('addSelect')

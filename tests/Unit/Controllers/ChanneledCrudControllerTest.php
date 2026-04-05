@@ -241,7 +241,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
             ]
         ]);
 
-        $result = $this->controller->prepareChanneledReadMultipleParams($params, $repositoryClass, $body, $channel);
+        $result = $this->controller->prepareChanneledReadMultipleParams($repositoryClass, $params, $repositoryClass, $body, $channel);
 
         $this->assertEquals($expected, $result);
     }
@@ -264,7 +264,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid parameters');
 
-        $this->controller->prepareChanneledReadMultipleParams($params, $repositoryClass, null, $channel);
+        $this->controller->prepareChanneledReadMultipleParams($repositoryClass, $params, $repositoryClass, null, $channel);
     }
 
     /**
@@ -1037,6 +1037,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
     }
 
     public function prepareChanneledReadMultipleParams(
+        string $entity,
         ?array $params,
         string $repositoryClass,
         ?string $body,
@@ -1053,7 +1054,8 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         return $params;
     }
 
-    public function read(string $entity, Channel $channel, ?int $id = null, bool $rawData = false, array $hideFields = []): Response
+    public function read(string $entity, Channel $channel, int|string|null $id = null, bool $rawData = false, array $hideFields = []): Response
+
     {
         try {
             if ($id === null) {
@@ -1093,6 +1095,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         try {
             $repository = $this->getRepository($entity);
             $params = $this->prepareChanneledReadMultipleParams(
+                entity: $entity,
                 params: $params,
                 repositoryClass: $entity,
                 body: $body,
@@ -1133,6 +1136,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         try {
             $repository = $this->getRepository($entity);
             $params = $this->prepareChanneledReadMultipleParams(
+                entity: $entity,
                 params: $params,
                 repositoryClass: $entity,
                 body: $body,
@@ -1210,7 +1214,8 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function update(string $entity, Channel $channel, ?int $id = null, ?string $body = null): Response
+    public function update(string $entity, Channel $channel, int|string|null $id = null, ?string $body = null): Response
+
     {
         try {
             if (!$id) {
@@ -1300,7 +1305,8 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function delete(string $entity, Channel $channel, ?int $id = null): Response
+    public function delete(string $entity, Channel $channel, int|string|null $id = null): Response
+
     {
         try {
             if (!$id) {
@@ -1364,11 +1370,11 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         string $entity,
         string $channel,
         string $method,
-        ?int $id = null,
+        int|string|null $id = null,
         ?string $body = null,
-        ?array $params = null,
-        ...$extraArgs
+        ?array $params = null
     ): Response {
+
         $channelsConfig = $this->getChannelsConfig();
         $validChannels = ['shopify', 'klaviyo', 'facebook', 'bigcommerce', 'netsuite', 'amazon'];
         $channelEnum = Channel::tryFromName($channel);
@@ -1423,11 +1429,12 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         try {
             return match ($method) {
                 'read' => $this->read($entity, $channelEnum, $id),
-                'update' => $this->update($entity, $channelEnum, $id, $extraArgs[0] ?? null),
+                'update' => $this->update($entity, $channelEnum, $id, $body),
                 'delete' => $this->delete($entity, $channelEnum, $id),
-                'create' => $this->create($entity, $channelEnum, $extraArgs[0] ?? null),
-                'aggregate', 'count', 'list' => $this->$method($entity, $channelEnum, ...$extraArgs),
+                'create' => $this->create($entity, $channelEnum, $body),
+                'aggregate', 'count', 'list' => $this->$method($entity, $channelEnum, $body, $params),
                 default => $this->createResponse(
+
                     data: null,
                     status: 'error',
                     error: 'Unsupported method',

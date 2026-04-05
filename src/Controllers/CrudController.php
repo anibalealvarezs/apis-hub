@@ -30,7 +30,7 @@ class CrudController extends BaseController
     public function __invoke(
         string $entity,
         string $method,
-        ?int $id = null,
+        int|string|null $id = null,
         ?string $body = null,
         ?array $params = null
     ): Response {
@@ -82,7 +82,7 @@ class CrudController extends BaseController
      * @return Response
      * @throws NotSupported
      */
-    protected function read(string $entity, ?int $id = null, array $hideFields = []): Response
+    protected function read(string $entity, int|string|null $id = null, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity);
@@ -359,7 +359,7 @@ class CrudController extends BaseController
      * @return Response
      * @throws NotSupported
      */
-    protected function update(string $entity, ?int $id = null, ?string $body = null): Response
+    protected function update(string $entity, int|string|null $id = null, ?string $body = null): Response
     {
         try {
             if (!$id) {
@@ -419,7 +419,7 @@ class CrudController extends BaseController
      * @return Response
      * @throws NotSupported
      */
-    protected function delete(string $entity, ?int $id = null): Response
+    protected function delete(string $entity, int|string|null $id = null): Response
     {
         try {
             if (!$id) {

@@ -87,7 +87,6 @@ class GoogleSearchConsoleConvert
                     channel: Channel::google_search_console->value,
                     name: 'impressions',
                     period: Period::Daily->value,
-                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
                     page:  $pageEntity?->getUrl() ?? $siteUrl,
                     query: null, // Universal Query is now NULL for generic GSC metrics
                     country: $dimensionValues['country'],
@@ -98,7 +97,6 @@ class GoogleSearchConsoleConvert
                     channel: Channel::google_search_console->value,
                     name: 'clicks',
                     period: Period::Daily->value,
-                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
                     page:  $pageEntity?->getUrl() ?? $siteUrl,
                     query: null,
                     country: $dimensionValues['country'],
@@ -109,7 +107,6 @@ class GoogleSearchConsoleConvert
                     channel: Channel::google_search_console->value,
                     name: 'position',
                     period: Period::Daily->value,
-                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
                     page:  $pageEntity?->getUrl() ?? $siteUrl,
                     query: null,
                     country: $dimensionValues['country'],
@@ -120,7 +117,6 @@ class GoogleSearchConsoleConvert
                     channel: Channel::google_search_console->value,
                     name: 'ctr',
                     period: Period::Daily->value,
-                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
                     page:  $pageEntity?->getUrl() ?? $siteUrl,
                     query: null,
                     country: $dimensionValues['country'],
@@ -177,7 +173,7 @@ class GoogleSearchConsoleConvert
                 $channeledMetric->metricDate = Carbon::parse($row['keys'][$flippedDimensions['date']])->toDateString();
                 $channeledMetric->platformId = $platformId;
                 $channeledMetric->platformCreatedAt = Carbon::parse($row['keys'][$flippedDimensions['date']])->toDateTimeString();
-                $channeledMetric->query = null; // Unbound from Universal Query entity
+                $channeledMetric->query = $dimensionValues['query'] ?? null; // Unbound from Universal Query entity
                 $channeledMetric->countryCode = $row['keys'][$flippedDimensions['country']] ?? Country::UNK->value;
                 $channeledMetric->deviceType = $row['keys'][$flippedDimensions['device']] ?? Device::UNKNOWN->value;
                 $channeledMetric->page = $pageEntity;

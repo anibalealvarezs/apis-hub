@@ -60,7 +60,7 @@ class InitializeEntitiesCacheAllTest extends BaseIntegrationTestCase
             {
                 return [
                     'siteEntry' => [
-                        ['siteUrl' => 'https://example.com/'],
+                        ['siteUrl' => 'https://example-test1.com/'],
                         ['siteUrl' => 'https://test.com/']
                     ]
                 ];
@@ -104,7 +104,7 @@ class InitializeEntitiesCacheAllTest extends BaseIntegrationTestCase
 
         // Verify GSC Sites (Pages)
         $pageRepo = $this->entityManager->getRepository(Page::class);
-        $this->assertNotNull($pageRepo->findOneBy(['url' => 'https://example.com']), 'GSC site example.com not found');
+        $this->assertNotNull($pageRepo->findOneBy(['url' => 'https://example-test1.com']), 'GSC site example-test1.com not found');
         $this->assertNotNull($pageRepo->findOneBy(['url' => 'https://test.com']), 'GSC site test.com not found');
 
         // Verify Facebook Page

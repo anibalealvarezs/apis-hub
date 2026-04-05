@@ -110,6 +110,10 @@ foreach ($instances as $instance) {
 // Also add the job processor cron (runs every minute)
 $cronLines[] = "* * * * * cd /app && /usr/local/bin/php bin/cli.php jobs:process >> /app/logs/jobs.log 2>&1";
 
+// Add the scale-down cron (runs every 15 minutes)
+$cronLines[] = "*/15 * * * * cd /app && /usr/local/bin/php bin/cli.php app:scale-down >> /app/logs/management.log 2>&1";
+
+
 $cronFile = '/tmp/apis-hub-cron';
 file_put_contents($cronFile, implode("\n", $cronLines) . "\n");
 chmod($cronFile, 0644);

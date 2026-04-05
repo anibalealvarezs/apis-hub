@@ -243,14 +243,14 @@ class MetricRepository extends BaseRepository
      */
     protected function getFieldAlias(string $field): string
     {
-        return in_array($field, ['id', 'value', 'dimensionsHash', 'metadata', 'channeledMetrics', 'metricConfig']) ? 'e' : 'mc';
+        return in_array($field, ['id', 'value', 'metricDate', 'dimensionsHash', 'metadata', 'channeledMetrics', 'metricConfig']) ? 'e' : 'mc';
     }
 
     public function getMaxMetricDateForChannelAndChanneledAccount(int $channel, int $channeledAccountId): ?string
     {
         $query = $this->_em->createQueryBuilder()
             ->select('MAX(e.metricDate)')
-            ->from(\Entities\Analytics\Metric::class, 'e')
+            ->from(Metric::class, 'e')
             ->join('e.metricConfig', 'mc')
             ->where('mc.channel = :channel')
             ->andWhere('IDENTITY(mc.channeledAccount) = :channeledAccount')
@@ -576,11 +576,11 @@ class MetricRepository extends BaseRepository
         }
 
         if ($startDate) {
-            $query->andWhere("mc.metricDate >= :startDate")
+            $query->andWhere("e.metricDate >= :startDate")
                 ->setParameter('startDate', $startDate);
         }
         if ($endDate) {
-            $query->andWhere("mc.metricDate <= :endDate")
+            $query->andWhere("e.metricDate <= :endDate")
                 ->setParameter('endDate', $endDate);
         }
     }

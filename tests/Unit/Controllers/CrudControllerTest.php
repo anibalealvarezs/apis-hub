@@ -897,7 +897,8 @@ class ConcreteCrudController extends CrudController
         return parent::prepareCrudParams($params, $body);
     }
 
-    public function read(string $entity, ?int $id = null, array $hideFields = []): Response
+    public function read(string $entity, string|int|null $id = null, array $hideFields = []): Response
+
     {
         return parent::read($entity, $id, $hideFields);
     }
@@ -960,7 +961,8 @@ class ConcreteCrudController extends CrudController
         }
     }
 
-    public function update(string $entity, ?int $id = null, ?string $body = null): Response
+    public function update(string $entity, string|int|null $id = null, ?string $body = null): Response
+
     {
         try {
             if (!$id) {
@@ -1007,7 +1009,8 @@ class ConcreteCrudController extends CrudController
         }
     }
 
-    public function delete(string $entity, ?int $id = null): Response
+    public function delete(string $entity, string|int|null $id = null): Response
+
     {
         try {
             if (!$id) {

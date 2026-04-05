@@ -76,8 +76,10 @@ try {
         new SeedDemoDataCommand(Helpers::getManager()),
         new ResetMetricsCommand(),
         new ResetEntitiesCommand(),
+        new \Commands\Analytics\ScaleDownCommand($entityManager),
         new MigratePagesCanonicalCommand(Helpers::getManager()),
     ]);
+
 
     // Runs console application
     $cli->run();

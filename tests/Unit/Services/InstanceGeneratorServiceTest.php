@@ -36,9 +36,14 @@ class InstanceGeneratorServiceTest extends TestCase
         // Ensure we're not in demo mode for tests
         $this->originalAppEnv = getenv('APP_ENV');
         putenv('APP_ENV=testing');
+        putenv('APP_MODE=testing');
+        putenv('PROJECT_NAME=testing');
         \Helpers\Helpers::resetConfigs();
 
         $this->setMockProjectConfig([
+            'name' => 'testing',
+            'mode' => 'testing',
+            'project' => 'testing',
             'rules' => [
                 'facebook_marketing' => [
                     'enabled' => true,
@@ -124,6 +129,9 @@ class InstanceGeneratorServiceTest extends TestCase
         $this->assertGreaterThan(0, count($fbMarketing));
 
         for ($i = 1; $i < count($fbMarketing); $i++) {
+            if (str_ends_with($fbMarketing[$i]['name'], '-recent')) {
+                continue;
+            }
             $this->assertArrayHasKey('requires', $fbMarketing[$i]);
             $this->assertEquals($fbMarketing[$i-1]['name'], $fbMarketing[$i]['requires']);
         }

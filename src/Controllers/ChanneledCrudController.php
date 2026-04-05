@@ -40,7 +40,7 @@ class ChanneledCrudController extends BaseController
         string $entity,
         string $channel,
         string $method,
-        ?int $id = null,
+        int|string|null $id = null,
         ?string $body = null,
         ?array $params = null
     ): Response {
@@ -190,7 +190,7 @@ class ChanneledCrudController extends BaseController
      * @param int|null $id
      * @return Response
      */
-    protected function read(string $entity, Channel $channel, ?int $id = null, bool $rawData = false, array $hideFields = []): Response
+    protected function read(string $entity, \Enums\Channel $channel, int|string|null $id = null, bool $rawData = false, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
@@ -549,7 +549,7 @@ class ChanneledCrudController extends BaseController
      * @param string|null $body
      * @return Response
      */
-    protected function update(string $entity, Channel $channel, ?int $id = null, ?string $body = null): Response
+    protected function update(string $entity, \Enums\Channel $channel, int|string|null $id = null, ?string $body = null): Response
     {
         try {
             if (!$id) {
@@ -610,7 +610,7 @@ class ChanneledCrudController extends BaseController
      * @param int|null $id
      * @return Response
      */
-    protected function delete(string $entity, Channel $channel, ?int $id = null): Response
+    protected function delete(string $entity, \Enums\Channel $channel, int|string|null $id = null): Response
     {
         try {
             if (!$id) {

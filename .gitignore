@@ -23,6 +23,7 @@ docker-compose.yml
 
 # Development recurrences
 dev-recurrences.md
+NEW_PROJECT_PLAN.md
 
 # Storage (Generated tokens, logs, etc.)
 /storage/
@@ -40,7 +41,15 @@ dev-recurrences.md
 */*.hetzner
 *.py
 */*.py
-
 check_db.php
-
 debug_data.php
+
+coverage.txt
+
+docs/manual-deployment.md
+
+unit_coverage.txt
+
+.agent/workflows/manual-deployment.md
+
+security_hardening_plan.md

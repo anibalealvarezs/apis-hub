@@ -147,7 +147,9 @@ class InitializeEntitiesCommand extends Command
                                     }
                                 }
                                 if (!$alreadyInConfig) {
-                                    if (Helpers::matchesFilter($siteUrl, $gscConfig['cache_include'] ?? null, $gscConfig['cache_exclude'] ?? null)) {
+                                    $include = $gscConfig['google_search_console']['cache_include'] ?? null;
+                                    $exclude = $gscConfig['google_search_console']['cache_exclude'] ?? null;
+                                    if (Helpers::matchesFilter($siteUrl, $include, $exclude)) {
                                         $sitesToProcess[] = [
                                             'url' => $siteUrl,
                                             'title' => $siteUrl,
@@ -161,7 +163,6 @@ class InitializeEntitiesCommand extends Command
                         $this->logger->error("Error fetching GSC sites: " . $e->getMessage());
                     }
                 }
-            }
 
             foreach ($sitesToProcess as $site) {
                 $siteUrl = $site['url'];
@@ -189,8 +190,9 @@ class InitializeEntitiesCommand extends Command
             }
             $this->entityManager->flush();
             $this->logger->info("Flushed GSC pages");
+        }
 
-            // Initialize Pages from facebook config
+        // Initialize Pages from facebook config
             /** @var \Repositories\PageRepository $pageRepository */
             $pageRepository = $this->entityManager->getRepository(Page::class);
             $channelsConfig = Helpers::getChannelsConfig();

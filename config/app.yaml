@@ -2,12 +2,10 @@ project: '${PROJECT_NAME:-apis-hub}'
 timezone: '${APP_TIMEZONE:-America/Caracas}'
 debug: true
 jobs:
-  timeout_hours: 6
+  timeout_hours: 12
 analytics:
-  cache_raw_metrics: false
+  cache_raw_metrics: true
   marketing_debug_logs: false
-
-# Cron Scheduling Defaults
 cron:
   entities_hour: 2
   entities_minute: 0

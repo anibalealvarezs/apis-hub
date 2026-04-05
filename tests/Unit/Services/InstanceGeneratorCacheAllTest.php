@@ -33,7 +33,10 @@ class InstanceGeneratorCacheAllTest extends TestCase
         // Ensure we're not in demo mode for tests
         $this->originalAppEnv = getenv('APP_ENV');
         putenv('APP_ENV=testing');
+        putenv('APP_MODE=testing');
+        putenv('PROJECT_NAME=testing');
         Helpers::resetConfigs();
+        $this->setMockProjectConfig(['name' => 'testing', 'mode' => 'testing', 'project' => 'testing']);
     }
 
     protected function tearDown(): void
@@ -126,6 +129,9 @@ class InstanceGeneratorCacheAllTest extends TestCase
     public function testGenerateIncludesCacheAllChannels(): void
     {
         $mockProjectConfig = [
+            'name' => 'testing',
+            'mode' => 'testing',
+            'project' => 'testing',
             'rules' => [
                 'facebook_marketing' => [
                     'enabled' => true,

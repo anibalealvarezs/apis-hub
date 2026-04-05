@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 abstract class BaseIntegrationTestCase extends TestCase
 {
+    protected static ?EntityManager $staticEntityManager = null;
     protected ?EntityManager $entityManager = null;
     protected \Faker\Generator $faker;
     protected array $config = [];
@@ -20,15 +21,56 @@ abstract class BaseIntegrationTestCase extends TestCase
         parent::setUp();
         
         $this->faker = \Faker\Factory::create();
-        // In the real environment, bootstrap.php injects $GLOBALS['app_config']
         $this->config = $GLOBALS['app_config'] ?? [];
 
-        // Set up the Doctrine annotations mapping
+        // Ensure we're not in demo mode for tests
+        putenv('APP_ENV=testing');
+        putenv('APP_MODE=testing');
+        putenv('PROJECT_NAME=testing');
+        putenv('ENV_FILE=/dev/null'); // Prevent loading real .env files
+        $_ENV['APP_ENV'] = 'testing';
+        $_ENV['APP_MODE'] = 'testing';
+        $_ENV['PROJECT_NAME'] = 'testing';
+        $_ENV['ENV_FILE'] = '/dev/null';
+
+        // Explicitly clear some persistent demo vars that might have leaked from bootstrap
+        putenv('GOOGLE_REFRESH_TOKEN');
+        putenv('GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN');
+        unset($_ENV['GOOGLE_REFRESH_TOKEN'], $_ENV['GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN']);
+
+        if (class_exists(\Helpers\Helpers::class)) {
+            \Helpers\Helpers::resetConfigs();
+        }
+
+        if (self::$staticEntityManager === null || !self::$staticEntityManager->isOpen()) {
+            $this->initializeStaticEntityManager();
+        }
+
+        $this->entityManager = self::$staticEntityManager;
+        $this->entityManager->clear();
+        
+        // Inject EM into Helpers
+        if (class_exists(\Helpers\Helpers::class)) {
+            $reflection = new \ReflectionClass(\Helpers\Helpers::class);
+            $property = $reflection->getProperty('entityManager');
+            $property->setAccessible(true);
+            $property->setValue(null, $this->entityManager);
+        }
+
+        // Start transaction for speed and isolation
+        if ($this->entityManager->getConnection()->isTransactionActive()) {
+            while ($this->entityManager->getConnection()->getTransactionNestingLevel() > 0) {
+                $this->entityManager->getConnection()->rollBack();
+            }
+        }
+        $this->entityManager->getConnection()->beginTransaction();
+    }
+
+    private function initializeStaticEntityManager(): void
+    {
         $paths = [__DIR__ . '/../../src/Entities'];
         $isDevMode = true;
 
-        // Enable configuration of the test database via Environment Variables or local dbconfig.yaml
-        // It strictly defaults to appending '-test' to the existing DB name to prevent data loss.
         $defaultConfig = class_exists(\Helpers\Helpers::class) ? \Helpers\Helpers::getDbConfig() : [];
 
         $dbParams = [
@@ -40,67 +82,70 @@ abstract class BaseIntegrationTestCase extends TestCase
         ];
 
         $testDbName = getenv('TEST_DB_NAME') ?: (($defaultConfig['dbname'] ?? 'apis-hub') . '-test');
-
-        // 1. Create a configuration block for Doctrine
         $config = ORMSetup::createAttributeMetadataConfiguration($paths, $isDevMode);
 
-        // 2. Connect without dbname to safely auto-create the testing database
+        // Safely create DB if not exists
         $tmpConnection = DriverManager::getConnection($dbParams, $config);
-        $tmpConnection->executeStatement("CREATE DATABASE IF NOT EXISTS `{$testDbName}`");
+        if ($dbParams['driver'] === 'pdo_pgsql') {
+            $exists = $tmpConnection->fetchOne("SELECT 1 FROM pg_database WHERE datname = '{$testDbName}'");
+            if (!$exists) {
+                $tmpConnection->executeStatement("CREATE DATABASE \"{$testDbName}\"");
+            }
+        } else {
+            $tmpConnection->executeStatement("CREATE DATABASE IF NOT EXISTS `{$testDbName}`");
+        }
         $tmpConnection->close();
 
-        // 3. Connect formally to the test database
         $dbParams['dbname'] = $testDbName;
         $connection = DriverManager::getConnection($dbParams, $config);
+        self::$staticEntityManager = new EntityManager($connection, $config);
 
-        // 3. Create the EntityManager
-        $this->entityManager = new EntityManager($connection, $config);
-
-        // 4. Automatically generate the schema for testing
-        $schemaTool = new SchemaTool($this->entityManager);
-        $classes = $this->entityManager->getMetadataFactory()->getAllMetadata();
-        
-        if (!empty($classes) && !self::$schemaCreated) {
-            $schemaTool->dropSchema($classes);
-            $schemaTool->createSchema($classes);
-            self::$schemaCreated = true;
-        }
-
-        // Truncate tables to ensure isolation between tests if not using a fresh schema
-        if (!empty($classes)) {
-            $connection = $this->entityManager->getConnection();
-            $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 0');
-            foreach ($classes as $class) {
-                $classMetadata = $this->entityManager->getClassMetadata($class->getName());
-                if ($classMetadata->isMappedSuperclass) {
-                    continue;
-                }
-                $this->entityManager->createQuery('DELETE FROM ' . $class->getName())->execute();
+        if (!self::$schemaCreated) {
+            $schemaTool = new SchemaTool(self::$staticEntityManager);
+            $classes = self::$staticEntityManager->getMetadataFactory()->getAllMetadata();
+            
+            try {
+                // Ensure schema exists
+                $schemaTool->createSchema($classes);
+            } catch (\Exception $e) {
+                // Ignore if schema already exists
+                $schemaTool->updateSchema($classes);
             }
-            $connection->executeStatement('SET FOREIGN_KEY_CHECKS = 1');
-        }
 
-        // Force the main application to use our transactional test EntityManager
-        if (class_exists(\Helpers\Helpers::class)) {
-            $reflection = new \ReflectionClass(\Helpers\Helpers::class);
-            $property = $reflection->getProperty('entityManager');
-            $property->setAccessible(true);
-            $property->setValue(null, $this->entityManager);
+            // Perform one-time TRUNCATE for a clean slate
+            $tableNames = [];
+            foreach ($classes as $class) {
+                $classMetadata = self::$staticEntityManager->getClassMetadata($class->getName());
+                if ($classMetadata->isMappedSuperclass) continue;
+                $tableNames[] = ($dbParams['driver'] === 'pdo_pgsql' ? "\"{$classMetadata->getTableName()}\"" : "`{$classMetadata->getTableName()}`");
+            }
+
+            if (!empty($tableNames)) {
+                $allTables = implode(', ', $tableNames);
+                if ($dbParams['driver'] === 'pdo_pgsql') {
+                    self::$staticEntityManager->getConnection()->executeStatement("TRUNCATE TABLE {$allTables} RESTART IDENTITY CASCADE");
+                } else {
+                    self::$staticEntityManager->getConnection()->executeStatement("SET FOREIGN_KEY_CHECKS = 0");
+                    foreach ($tableNames as $tbl) {
+                        self::$staticEntityManager->getConnection()->executeStatement("TRUNCATE TABLE {$tbl}");
+                    }
+                    self::$staticEntityManager->getConnection()->executeStatement("SET FOREIGN_KEY_CHECKS = 1");
+                }
+            }
+            self::$schemaCreated = true;
         }
     }
 
     protected function tearDown(): void
     {
         if ($this->entityManager) {
-            $this->entityManager->close();
-            $this->entityManager = null;
+            if ($this->entityManager->getConnection()->isTransactionActive()) {
+                $this->entityManager->getConnection()->rollBack();
+            }
         }
         parent::tearDown();
     }
 
-    /**
-     * Helper method to safely retrieve config keys
-     */
     protected function getConfig(string $key, $default = null)
     {
         return $this->config[$key] ?? $default;

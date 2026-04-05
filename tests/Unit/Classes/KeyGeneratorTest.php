@@ -25,7 +25,6 @@ class KeyGeneratorTest extends BaseUnitTestCase
             channel: $channel,
             name: $name,
             period: $period,
-            metricDate: $date,
             account: $account,
             customer: $customer
         );
@@ -34,7 +33,6 @@ class KeyGeneratorTest extends BaseUnitTestCase
             channel: $channel,
             name: $name,
             period: $period,
-            metricDate: $date,
             account: $account,
             customer: $customer
         );
@@ -55,7 +53,6 @@ class KeyGeneratorTest extends BaseUnitTestCase
             channel: $channel,
             name: $name,
             period: $period,
-            metricDate: $date,
             account: $account,
             customer: $this->faker->email()
         );
@@ -64,7 +61,6 @@ class KeyGeneratorTest extends BaseUnitTestCase
             channel: $channel,
             name: $name,
             period: $period,
-            metricDate: $date,
             account: $account,
             customer: $this->faker->email() // different customer
         );
@@ -79,7 +75,6 @@ class KeyGeneratorTest extends BaseUnitTestCase
             'channel' => Channel::google_ads,
             'name' => $this->faker->word(),
             'period' => Period::Daily,
-            'metricDate' => $this->faker->date(),
             'account' => $this->faker->company(),
             'channeledAccount' => $this->faker->uuid(),
             'campaign' => $this->faker->sentence(),
@@ -108,7 +103,7 @@ class KeyGeneratorTest extends BaseUnitTestCase
             }
             
             // Skip the ones that might have special formatting if modified blindly
-            if (in_array($key, ['channel', 'period', 'metricDate'])) continue;
+            if (in_array($key, ['channel', 'period'])) continue;
 
             $newKey = KeyGenerator::generateMetricConfigKey(...$modifiedParams);
             $this->assertNotEquals($baseKey, $newKey, "Modifying $key should change the hash");
@@ -123,7 +118,6 @@ class KeyGeneratorTest extends BaseUnitTestCase
             channel: Channel::google_search_console,
             name: 'clicks',
             period: Period::Daily,
-            metricDate: $date,
             country: \Enums\Country::USA,
             device: \Enums\Device::MOBILE
         );
@@ -132,7 +126,6 @@ class KeyGeneratorTest extends BaseUnitTestCase
             channel: Channel::google_search_console,
             name: 'clicks',
             period: Period::Daily,
-            metricDate: $dateStr, // string date
             country: 'USA', // match enum value 'USA'
             device: 'mobile' // match enum value 'mobile'
         );

@@ -26,6 +26,11 @@
             <directory>tests/Integration</directory>
         </testsuite>
     </testsuites>
+    <coverage processUncoveredFiles="true">
+        <include>
+            <directory suffix=".php">src</directory>
+        </include>
+    </coverage>
 
     <php>
         <!-- Path to the YAML config file for tests.

@@ -34,24 +34,26 @@ class JobRepositoryTest extends TestCase
     private string $entityName = 'Entities\Entity';
     private MockObject|ReflectionEnum $analyticsEntitiesEnum;
     private MockObject|ReflectionEnum $channelsEnum;
+    private MockObject|EntityManager $entityManager;
+    private MockObject|\Doctrine\DBAL\Connection $connection;
 
     protected function setUp(): void
     {
         $this->faker = Factory::create();
 
-        $entityManager = $this->createMock(EntityManager::class);
+        $this->entityManager = $this->createMock(EntityManager::class);
         $this->queryBuilder = $this->createMock(QueryBuilder::class);
         $this->query = $this->createMock(AbstractQuery::class);
 
-        $entityManager->method('createQueryBuilder')
+        $this->entityManager->method('createQueryBuilder')
             ->willReturnCallback(function () {
                 return $this->queryBuilder;
             });
 
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $this->connection = $this->createMock(\Doctrine\DBAL\Connection::class);
         $platform = $this->createMock(\Doctrine\DBAL\Platforms\AbstractPlatform::class);
-        $connection->method('getDatabasePlatform')->willReturn($platform);
-        $entityManager->method('getConnection')->willReturn($connection);
+        $this->connection->method('getDatabasePlatform')->willReturn($platform);
+        $this->entityManager->method('getConnection')->willReturn($this->connection);
 
         $this->queryBuilder->method('select')->willReturnCallback(function ($alias) {
             return $this->queryBuilder;
@@ -67,8 +69,10 @@ class JobRepositoryTest extends TestCase
 
         $classMetadata = $this->createMock(ClassMetadata::class);
         $classMetadata->fieldMappings = [];
+        $classMetadata->associationMappings = [];
+        $classMetadata->method('getColumnNames')->willReturn([]);
         $classMetadata->name = $this->entityName;
-        $entityManager->method('getClassMetadata')
+        $this->entityManager->method('getClassMetadata')
             ->with($this->entityName)
             ->willReturn($classMetadata);
 
@@ -76,7 +80,7 @@ class JobRepositoryTest extends TestCase
         $this->channelsEnum = $this->createMock(ReflectionEnum::class);
 
         $this->repository = $this->getMockBuilder(JobRepository::class)
-            ->setConstructorArgs([$entityManager, $classMetadata])
+            ->setConstructorArgs([$this->entityManager, $classMetadata])
             ->onlyMethods(['getStatusName', 'create', 'update'])
             ->getMock();
 
@@ -115,7 +119,7 @@ class JobRepositoryTest extends TestCase
         $entityNameProperty = $reflection->getProperty('_entityName');
         $entityNameProperty->setValue($this->repository, $this->entityName);
         $emProperty = $reflection->getProperty('_em');
-        $emProperty->setValue($this->repository, $entityManager);
+        $emProperty->setValue($this->repository, $this->entityManager);
     }
 
     /**
@@ -336,8 +340,13 @@ class JobRepositoryTest extends TestCase
         $this->queryBuilder->expects($this->once())->method('select')->willReturnSelf();
         $this->queryBuilder->expects($this->once())->method('from')->willReturnSelf();
 
-        // Expect filters for channel, entity, and payload date patterns
-        $this->queryBuilder->expects($this->exactly(4))
+        // In Postgres, payload LIKE filters are skipped in buildReadMultipleQuery 
+        // as they are handled via Native SQL in specific methods.
+        $isPostgres = \Helpers\Helpers::isPostgres();
+        $expectedAndWhere = $isPostgres ? 2 : 4;
+        $expectedSetParam = $isPostgres ? 2 : 6;
+
+        $this->queryBuilder->expects($this->exactly($expectedAndWhere))
             ->method('andWhere')
             ->with($this->callback(function ($condition) {
                 return in_array($condition, [
@@ -349,7 +358,7 @@ class JobRepositoryTest extends TestCase
             }))
             ->willReturnSelf();
 
-        $this->queryBuilder->expects($this->exactly(6))
+        $this->queryBuilder->expects($this->exactly($expectedSetParam))
             ->method('setParameter')
             ->willReturnSelf();
 
@@ -407,17 +416,23 @@ class JobRepositoryTest extends TestCase
     public function testGetJobsByStatus(): void
     {
         $status = JobStatus::scheduled->value;
-        $job = ['id' => 1, 'status' => $status];
-        $expected = ['id' => 1, 'status' => 'scheduled'];
-
-        $this->queryBuilder->method($this->anything())->willReturnSelf();
-        $this->queryBuilder->method('getQuery')->willReturn($this->query);
-        $this->query->method('getScalarResult')->willReturn([['id' => 1]]);
-        $this->query->method('getResult')->willReturn([$job]);
+        $jobData = ['id' => 1, 'status' => $status];
+        
+        if (\Helpers\Helpers::isPostgres()) {
+            $nativeQuery = $this->createMock(\Doctrine\ORM\NativeQuery::class);
+            $nativeQuery->method('getResult')->willReturn([$jobData]);
+            $nativeQuery->method('setParameters')->willReturnSelf();
+            
+            $this->entityManager->method('createNativeQuery')->willReturn($nativeQuery);
+        } else {
+            $this->queryBuilder->method($this->anything())->willReturnSelf();
+            $this->queryBuilder->method('getQuery')->willReturn($this->query);
+            $this->query->method('getResult')->willReturn([$jobData]);
+        }
 
         $result = $this->repository->getJobsByStatus($status);
 
-        $this->assertEquals([$job], $result);
+        $this->assertEquals([$jobData], $result);
     }
 
     public function testGetJobsByUuid(): void
@@ -509,35 +524,44 @@ class JobRepositoryTest extends TestCase
     {
         $instanceName = 'test-instance';
         
-        $this->queryBuilder->expects($this->once())
-            ->method('select')
-            ->with('count(e.id)')
-            ->willReturnSelf();
+        if (\Helpers\Helpers::isPostgres()) {
+            $stmt = $this->createMock(\Doctrine\DBAL\Statement::class);
+            $result = $this->createMock(\Doctrine\DBAL\Result::class);
             
-        $this->queryBuilder->expects($this->once())
-            ->method('from')
-            ->with($this->entityName, 'e')
-            ->willReturnSelf();
+            $this->connection->method('prepare')->willReturn($stmt);
+            $stmt->method('executeQuery')->willReturn($result);
+            $result->method('fetchOne')->willReturn(1);
+        } else {
+            $this->queryBuilder->expects($this->once())
+                ->method('select')
+                ->with('count(e.id)')
+                ->willReturnSelf();
+                
+            $this->queryBuilder->expects($this->once())
+                ->method('from')
+                ->with($this->entityName, 'e')
+                ->willReturnSelf();
 
-        $this->queryBuilder->expects($this->once())
-            ->method('where')
-            ->with('e.payload LIKE :instance_name_pattern')
-            ->willReturnSelf();
+            $this->queryBuilder->expects($this->once())
+                ->method('where')
+                ->with('e.payload LIKE :instance_name_pattern')
+                ->willReturnSelf();
 
-        $this->queryBuilder->expects($this->exactly(2))
-            ->method('andWhere')
-            ->with($this->callback(function ($condition) {
-                return in_array($condition, ['e.status = :completed', 'e.updatedAt >= :since']);
-            }))
-            ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(2))
+                ->method('andWhere')
+                ->with($this->callback(function ($condition) {
+                    return in_array($condition, ['e.status = :completed', 'e.updatedAt >= :since']);
+                }))
+                ->willReturnSelf();
 
-        $this->queryBuilder->expects($this->exactly(3))
-            ->method('setParameter')
-            ->willReturnSelf();
+            $this->queryBuilder->expects($this->exactly(3))
+                ->method('setParameter')
+                ->willReturnSelf();
 
-        $this->query->expects($this->once())
-            ->method('getSingleScalarResult')
-            ->willReturn(1);
+            $this->query->expects($this->once())
+                ->method('getSingleScalarResult')
+                ->willReturn(1);
+        }
 
         $result = $this->repository->hasSuccessfulRecentJob($instanceName);
         

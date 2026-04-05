@@ -68,7 +68,7 @@ class FacebookMarketingMetricConvert
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
             foreach ($metricsList as $key) {
-                if (!isset($row[$key])) {
+                if (!isset($row[$key]) || $key === 'date_start') {
                     continue;
                 }
                 $value = $row[$key];
@@ -171,7 +171,7 @@ class FacebookMarketingMetricConvert
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
             foreach ($metricsList as $key) {
-                if (!isset($row[$key])) {
+                if (!isset($row[$key]) || $key === 'date_start') {
                     continue;
                 }
                 $value = $row[$key];
@@ -267,7 +267,7 @@ class FacebookMarketingMetricConvert
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
             foreach ($metricsList as $key) {
-                if (!isset($row[$key])) {
+                if (!isset($row[$key]) || $key === 'date_start') {
                     continue;
                 }
                 $value = $row[$key];
@@ -368,7 +368,7 @@ class FacebookMarketingMetricConvert
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
             foreach ($metricsList as $key) {
-                if (!isset($row[$key])) {
+                if (!isset($row[$key]) || $key === 'date_start') {
                     continue;
                 }
                 $value = $row[$key];
@@ -473,7 +473,7 @@ class FacebookMarketingMetricConvert
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
             foreach ($metricsList as $key) {
-                if (!isset($row[$key])) {
+                if (!isset($row[$key]) || $key === 'date_start') {
                     continue;
                 }
                 $value = $row[$key];

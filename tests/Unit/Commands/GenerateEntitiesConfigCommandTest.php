@@ -475,6 +475,14 @@ class GenerateEntitiesConfigCommandTest extends TestCase
                 'setHideFields' => [
                     'parameters' => ['fields'],
                     'return_type' => 'static'
+                ],
+                'getMinDate' => [
+                    'parameters' => ['filters'],
+                    'return_type' => 'string'
+                ],
+                'getMaxDate' => [
+                    'parameters' => ['filters'],
+                    'return_type' => 'string'
                 ]
             ]
         ];

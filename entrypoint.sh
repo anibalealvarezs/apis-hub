@@ -2,10 +2,10 @@
 set -e
 
 # Ensure persistent log directory exists (mapped to host via volume)
-mkdir -p /app/logs
+mkdir -p /app/logs /app/storage
 
 # Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
-if [[ "$INSTANCE_NAME" == *"entities-sync"* ]]; then
+if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     # Use mkdir for atomic lock
     if mkdir "/app/storage/db_lock" 2>/dev/null; then
         echo "Master Instance ($INSTANCE_NAME): Acquired lock. Initializing database and entities..."
@@ -22,7 +22,8 @@ if [[ "$INSTANCE_NAME" == *"entities-sync"* ]]; then
     fi
 fi
 
-if [[ "$INSTANCE_NAME" != *"entities-sync"* ]] || [[ "$INSTANCE_TYPE" == "waiting-master" ]]; then
+if [[ "$INSTANCE_NAME" != *"master"* ]] || [[ "$INSTANCE_TYPE" == "waiting-master" ]]; then
+
     # Wait for the database and jobs table to exist (up to 2 minutes)
     MAX_RETRIES=60
     RETRY_COUNT=0
@@ -55,8 +56,9 @@ if [ -n "$PROJECT_CONFIG_FILE" ]; then
     
     # Ensure instances.yaml is fresh. Only one instance needs to do this to avoid race conditions.
     # But all instances need the result for the cron setup.
-    if [[ "$INSTANCE_NAME" == *"entities-sync"* ]]; then
+    if [[ "$INSTANCE_NAME" == *"master"* ]]; then
         if mkdir "/app/storage/refresh_lock" 2>/dev/null; then
+
              echo "Regenerating instance configuration..."
              php bin/cli.php app:refresh-instances || echo "Instance refresh failed"
              # We keep the lock for 10 seconds to allow others to see the file is ready
@@ -101,7 +103,14 @@ export MCP_MODE=sse
 export MCP_PORT=3000
 node mcp-server/index.js &
 
-# Run the web server
-echo "Starting PHP server on port $PORT..."
-exec php -S 0.0.0.0:${PORT} -t . bin/index.php
+# If arguments are provided to the container (like 'vendor/bin/phpunit'), execute them instead of the web server
+if [ $# -gt 0 ]; then
+    echo "Executing custom command: $@"
+    exec "$@"
+else
+    # Run the web server (Default behavior)
+    echo "Starting PHP server on port $PORT with compression..."
+    exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
+
+fi
 

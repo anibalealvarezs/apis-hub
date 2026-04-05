@@ -79,7 +79,10 @@ class ProcessJobsCommandTest extends TestCase
             ->willReturn(false);
 
         $input = $this->createMock(\Symfony\Component\Console\Input\InputInterface::class);
-        $input->method('getOption')->with('force-all')->willReturn(true);
+        $input->method('getOption')->willReturnMap([
+            ['force-all', true],
+            ['job-id', null],
+        ]);
         $output = new BufferedOutput();
 
         // Use reflection to call protected execute
@@ -128,7 +131,10 @@ class ProcessJobsCommandTest extends TestCase
         $this->jobRepository->method('claimJob')->willReturn(false); 
 
         $input = $this->createMock(\Symfony\Component\Console\Input\InputInterface::class);
-        $input->method('getOption')->with('force-all')->willReturn(true);
+        $input->method('getOption')->willReturnMap([
+            ['force-all', true],
+            ['job-id', null],
+        ]);
         $output = new BufferedOutput();
 
         $method = new \ReflectionMethod(ProcessJobsCommand::class, 'execute');

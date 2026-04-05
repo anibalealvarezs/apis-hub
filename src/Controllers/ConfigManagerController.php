@@ -28,11 +28,12 @@ class ConfigManagerController extends BaseController
     {
         parent::__construct();
         
-        $this->gscConfigPath = __DIR__ . '/../../config/channels/google_search_console.yaml';
-        $this->fbConfigPath = __DIR__ . '/../../config/channels/facebook.yaml';
-        $this->fbOrganicPath = __DIR__ . '/../../config/channels/facebook_organic.yaml';
-        $this->fbMarketingPath = __DIR__ . '/../../config/channels/facebook_marketing.yaml';
-        $this->assetsBackupPath = __DIR__ . '/../../config/assets_backup.yaml';
+        $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
+        $this->gscConfigPath = $configDir . '/channels/google_search_console.yaml';
+        $this->fbConfigPath = $configDir . '/channels/facebook.yaml';
+        $this->fbOrganicPath = $configDir . '/channels/facebook_organic.yaml';
+        $this->fbMarketingPath = $configDir . '/channels/facebook_marketing.yaml';
+        $this->assetsBackupPath = $configDir . '/assets_backup.yaml';
     }
 
     public function index(): Response
@@ -774,13 +775,7 @@ class ConfigManagerController extends BaseController
 
             // Sync with DB
             $fbGroupName = $globalConfig['channels']['facebook']['accounts_group_name'] ?? $orgConfig['channels']['facebook_organic']['accounts_group_name'] ?? $markConfig['channels']['facebook_marketing']['accounts_group_name'] ?? "Default Group";
-            $accountEntity = $this->em->getRepository(Account::class)->getByName($fbGroupName);
-            if (!$accountEntity) {
-                $accountEntity = new Account();
-                $accountEntity->addName($fbGroupName);
-                $this->em->persist($accountEntity);
-                $this->em->flush();
-            }
+            $accountEntity = $this->getOrCreateAccount($fbGroupName);
 
             // Add newly selected accounts
             $existingAccIds = array_map('strval', array_column($currentAccs, 'id'));
@@ -822,7 +817,7 @@ class ConfigManagerController extends BaseController
         // Sync Pages to DB too
         if (isset($assets['pages'])) {
             $fbGroupName = $fbGroupName ?? "Default Group";
-            $accountEntity = $accountEntity ?? $this->em->getRepository(Account::class)->getByName($fbGroupName);
+            $accountEntity = $this->getOrCreateAccount($fbGroupName);
             foreach ($assets['pages'] as $pData) {
                 $pageId = (string)$pData['id'];
                 $pageName = $pData['title'] ?? ("Page " . $pageId);
@@ -973,4 +968,15 @@ class ConfigManagerController extends BaseController
         return $schedules;
     }
 
+    private function getOrCreateAccount(string $name): Account
+    {
+        $accountEntity = $this->em->getRepository(Account::class)->getByName($name);
+        if (!$accountEntity) {
+            $accountEntity = new Account();
+            $accountEntity->addName($name);
+            $this->em->persist($accountEntity);
+            $this->em->flush();
+        }
+        return $accountEntity;
+    }
 }
