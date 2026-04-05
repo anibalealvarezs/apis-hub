@@ -228,7 +228,7 @@ class SeedDemoDataCommand extends Command
     {
         $output->writeln("🔍 GSC (10 Sites, 6 Months, Correct Universal SEO Domain Model)...");
         
-        $gscChan = \Enums\Channel::google_search_console;
+        $gscChan = Channel::google_search_console;
         $dates = $this->getDates(180); 
         $countryEnumValues = ['USA', 'ESP', 'MEX', 'COL'];
         $deviceEnumValues = ['desktop', 'mobile', 'tablet'];
@@ -239,20 +239,20 @@ class SeedDemoDataCommand extends Command
         // Pre-fetch Universal Entities
         $countries = [];
         foreach ($countryEnumValues as $code) {
-            $enum = \Enums\Country::from($code);
-            $c = $this->entityManager->getRepository(\Entities\Analytics\Country::class)->findOneBy(['code' => $enum]);
+            $enum = CountryEnum::from($code);
+            $c = $this->entityManager->getRepository(Country::class)->findOneBy(['code' => $enum]);
             if (!$c) {
-                $c = (new \Entities\Analytics\Country())->addCode($enum)->addName($code);
+                $c = (new Country())->addCode($enum)->addName($code);
                 $this->entityManager->persist($c);
             }
             $countries[$code] = $c;
         }
         $devices = [];
         foreach ($deviceEnumValues as $type) {
-            $enum = \Enums\Device::from($type);
-            $d = $this->entityManager->getRepository(\Entities\Analytics\Device::class)->findOneBy(['type' => $enum]);
+            $enum = DeviceType::from($type);
+            $d = $this->entityManager->getRepository(Device::class)->findOneBy(['type' => $enum]);
             if (!$d) {
-                $d = (new \Entities\Analytics\Device())->addType($enum);
+                $d = (new Device())->addType($enum);
                 $this->entityManager->persist($d);
             }
             $devices[$type] = $d;
@@ -267,7 +267,7 @@ class SeedDemoDataCommand extends Command
             if (!$property) {
                 $property = (new Page())->addUrl("https://$hostname")->addTitle($siteName)->addHostname($hostname)->addPlatformId($hostname)->addCanonicalId($hostname);
                 $this->entityManager->persist($property);
-                $this->entityManager->flush($property);
+                $this->entityManager->flush();
             }
 
             $childUrls = [];
@@ -327,7 +327,7 @@ class SeedDemoDataCommand extends Command
     {
         $output->writeln("📊 FB Marketing (Massive Simulation, JSON Source Logic)...");
         
-        $fbChan = \Enums\Channel::facebook_marketing;
+        $fbChan = Channel::facebook_marketing;
         $accCount = 30; // 30 Ad Accounts as requested
         $dates = $this->getDates(30); 
         $statuses = ['ACTIVE', 'PAUSED', 'ARCHIVED'];
@@ -445,7 +445,7 @@ class SeedDemoDataCommand extends Command
 
     private function seedRealisticAdDaily($dates, $gId, $caId, $gCpId, $cpId, $agId, $adId, $accName, $caPId, $gCpPId, $cpPId, $agPId, $adPId): void
     {
-        $fbChan = \Enums\Channel::facebook_marketing;
+        $fbChan = Channel::facebook_marketing;
         foreach ($dates as $date) {
             $used = [];
             for ($b = 0; $b < rand(1, 2); $b++) { // Reduced dimensions for performance
@@ -501,7 +501,7 @@ class SeedDemoDataCommand extends Command
     {
         $output->writeln("🚀 Seeding High-Volume Realistic Demo Data...");
         
-        $fbChan = \Enums\Channel::facebook_organic;
+        $fbChan = Channel::facebook_organic;
         $igMediaTypes = ['IMAGE', 'VIDEO', 'CAROUSEL_ALBUM', 'REEL'];
         $igProductTypes = ['FEED', 'REELS', 'STORY'];
         $dates = $this->getDates(30); 
@@ -659,7 +659,7 @@ class SeedDemoDataCommand extends Command
 
             $output->writeln("  - Processing Facebook Simulation (Page & Posts)...");
             // 3. FB Simulation
-            $fbChan = \Enums\Channel::facebook_organic;
+            $fbChan = Channel::facebook_organic;
             $gId = $fbParent->getId();
             $gAccName = $fbParent->getName();
             $pId = $page->getId();
@@ -845,7 +845,7 @@ class SeedDemoDataCommand extends Command
     }
 
     private function queueMetric(
-        \Enums\Channel $channel, $name, $date, $value, $setId = null, $pageId = null, $adId = null, $agId = null, $cpId = null, $caId = null, $gAccId = null, $gCpId = null, $postId = null,
+        Channel $channel, $name, $date, $value, $setId = null, $pageId = null, $adId = null, $agId = null, $cpId = null, $caId = null, $gAccId = null, $gCpId = null, $postId = null,
         $queryId = null, $countryId = null, $deviceId = null, $productId = null, $customerId = null, $orderId = null, $creativeId = null,
         ?string $accName = null, ?string $caPId = null, ?string $gCpPId = null, ?string $cpPId = null, ?string $agPId = null, ?string $adPId = null, ?string $pageUrl = null, ?string $postPId = null,
         ?string $queryPId = null, ?string $countryPId = null, ?string $devicePId = null, ?string $productPId = null, ?string $customerPId = null, ?string $orderPId = null, ?string $creativePId = null,
