@@ -1,0 +1,85 @@
+/* Legal Pages Specific Styles (Privacy, ToS, Data Deletion) */
+.legal-main {
+    padding: 40px 20px 40px 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+    flex: 1;
+    width: 100%;
+}
+
+.content-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 50px;
+    backdrop-filter: blur(8px);
+    animation: legalFadeIn 0.8s ease-out;
+}
+
+@keyframes legalFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.content-card h1 { 
+    font-size: 2.5rem; 
+    color: #fff; 
+    margin-bottom: 30px; 
+    border-bottom: 1px solid var(--border); 
+    padding-bottom: 20px; 
+}
+
+.content-card h2 { 
+    font-size: 1.6rem; 
+    color: var(--primary); 
+    margin-top: 40px; 
+    margin-bottom: 20px; 
+    font-weight: 600; 
+}
+
+.content-card h3 { 
+    font-size: 1.2rem; 
+    color: #fff; 
+    margin-top: 30px; 
+    margin-bottom: 15px; 
+}
+
+.content-card p { 
+    margin-bottom: 1.5rem; 
+    color: var(--text-main); 
+    font-size: 1.05rem; 
+}
+
+.content-card a { 
+    color: var(--primary); 
+    text-decoration: none; 
+    transition: var(--transition); 
+}
+
+.content-card a:hover { 
+    text-decoration: underline; 
+    opacity: 0.8; 
+}
+
+.content-card ul, .content-card ol { 
+    margin-left: 20px; 
+    margin-bottom: 20px; 
+}
+
+.content-card li { 
+    margin-bottom: 10px; 
+    color: var(--text-main); 
+}
+
+.update-date { 
+    color: var(--text-dim); 
+    font-size: 0.9rem; 
+    margin-bottom: 40px; 
+    display: block; 
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .content-card { padding: 30px; }
+    .content-card h1 { font-size: 2rem; }
+}

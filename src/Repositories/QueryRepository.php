@@ -83,4 +83,16 @@ class QueryRepository extends BaseRepository
             ->getQuery()
             ->getResult();
     }
+
+    public function getOrCreateQuery(string $queryText): Query
+    {
+        $query = $this->findOneBy(['query' => $queryText]);
+        if (!$query) {
+            $query = new Query();
+            $query->addQuery($queryText);
+            $this->getEntityManager()->persist($query);
+            $this->getEntityManager()->flush();
+        }
+        return $query;
+    }
 }

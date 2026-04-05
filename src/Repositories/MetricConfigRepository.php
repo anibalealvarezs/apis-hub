@@ -85,7 +85,7 @@ class MetricConfigRepository extends BaseRepository
     {
         $query = $this->_em->createQueryBuilder();
         match ($type) {
-            QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('partial e.{id, channel, name, period, metricDate}'),
+            QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('partial e.{id, channel, name, period}'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
             QueryBuilderType::CUSTOM => throw new Exception('To be implemented'),
         };
@@ -135,18 +135,16 @@ class MetricConfigRepository extends BaseRepository
      * @throws NonUniqueResultException
      * @throws NoResultException
      */
-    public function existsByChannelAndName(int $channel, string $name, Period $period, DateTime $metricDate): bool
+    public function existsByChannelAndName(int $channel, string $name, Period $period): bool
     {
         return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
                 ->where('e.channel = :channel')
                 ->andWhere('e.name = :name')
                 ->andWhere('e.period = :period')
-                ->andWhere('e.metricDate = :metricDate')
                 ->setParameters([
                     'channel' => $channel,
                     'name' => $name,
                     'period' => $period->value,
-                    'metricDate' => $metricDate,
                 ])
                 ->getQuery()
                 ->getSingleScalarResult() > 0;
@@ -159,19 +157,16 @@ class MetricConfigRepository extends BaseRepository
     public function getByChannelAndName(
         int $channel,
         string $name,
-        Period $period,
-        DateTime $metricDate
+        Period $period
     ): ?Metric {
         return $this->createQueryBuilder('m')
             ->where('m.channel = :channel')
             ->andWhere('m.name = :name')
             ->andWhere('m.period = :period')
-            ->andWhere('m.metricDate = :metricDate')
             ->setParameters([
                 'channel' => $channel,
                 'name' => $name,
                 'period' => $period->value,
-                'metricDate' => $metricDate,
             ])
             ->setMaxResults(1)
             ->getQuery()
@@ -180,10 +175,11 @@ class MetricConfigRepository extends BaseRepository
 
     public function findMetricConfigsByPeriod(int $channel, string $name, Period $period, DateTime $start, DateTime $end): array
     {
-        return $this->createQueryBuilder('m')
-            ->where('m.channel = :channel')
-            ->andWhere('m.name = :name')
-            ->andWhere('m.period = :period')
+        return $this->createQueryBuilder('e')
+            ->join('e.metrics', 'm')
+            ->where('e.channel = :channel')
+            ->andWhere('e.name = :name')
+            ->andWhere('e.period = :period')
             ->andWhere('m.metricDate BETWEEN :start AND :end')
             ->setParameters([
                 'channel' => $channel,
@@ -200,10 +196,9 @@ class MetricConfigRepository extends BaseRepository
      * @throws NonUniqueResultException
      */
     public function findByChannelAndDimensions(
-        int $channel, // Changed from int to string
+        int $channel,
         string $name,
         Period $period,
-        DateTime $metricDate,
         array $dimensions,
         ?Query $queryEntity = null,
         ?Page $page = null,
@@ -215,7 +210,6 @@ class MetricConfigRepository extends BaseRepository
                 channel: $channel,
                 name: $name,
                 period: $period,
-                metricDate: $metricDate,
                 query: $queryEntity,
                 page: $page,
                 country: $country,
@@ -275,7 +269,7 @@ class MetricConfigRepository extends BaseRepository
             ->where('e.channel = :channel')
             ->andWhere('e.name = :name')
             ->andWhere('e.period = :period')
-            ->andWhere('e.metricDate BETWEEN :start AND :end')
+            ->andWhere('m.metricDate BETWEEN :start AND :end')
             ->setParameters([
                 'channel' => $channel,
                 'name' => $name,
@@ -302,7 +296,6 @@ class MetricConfigRepository extends BaseRepository
     {
         $result = $this->replaceChannelName($result);
         $result = $this->stripPositionWeighted($result);
-        $result = $this->formatDate($result);
         return parent::processResult($result);
     }
 
@@ -313,16 +306,6 @@ class MetricConfigRepository extends BaseRepository
     protected function replaceChannelName(array $entity): array
     {
         $entity['channel'] = Channel::from($entity['channel'])->getName();
-        return $entity;
-    }
-
-    /**
-     * @param array $entity
-     * @return array
-     */
-    protected function formatDate(array $entity): array
-    {
-        $entity['metricDate'] = $entity['metricDate']->format('Y-m-d');
         return $entity;
     }
 
@@ -345,5 +328,35 @@ class MetricConfigRepository extends BaseRepository
         }
         unset($entity['query']['data']['position_weighted']);
         return $entity;
+    }
+
+    /**
+     * Updates the signature of the given MetricConfig entity.
+     * @param MetricConfig $entity
+     * @return void
+     */
+    public function updateSignature(MetricConfig $entity): void
+    {
+        $entity->addConfigSignature(\Classes\KeyGenerator::generateMetricConfigKey(
+            channel: $entity->getChannel(),
+            name: $entity->getName(),
+            period: $entity->getPeriod(),
+            account: $entity->getAccount(),
+            channeledAccount: $entity->getChanneledAccount(),
+            campaign: $entity->getCampaign(),
+            channeledCampaign: $entity->getChanneledCampaign(),
+            channeledAdGroup: $entity->getChanneledAdGroup(),
+            channeledAd: $entity->getChanneledAd(),
+            creative: $entity->getCreative()?->getCreativeId(),
+            page: $entity->getPage(),
+            query: $entity->getQuery(),
+            post: $entity->getPost(),
+            product: $entity->getProduct(),
+            customer: $entity->getCustomer(),
+            order: $entity->getOrder(),
+            country: $entity->getCountry(),
+            device: $entity->getDevice(),
+            dimensionSet: $entity->getDimensionSet()
+        ));
     }
 }

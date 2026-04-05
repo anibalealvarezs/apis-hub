@@ -50,15 +50,26 @@ try {
     $response = $app->handle($request);
     $response->send();
 } catch (Exception $e) {
+    // Determine the user-facing message
+    $isDebug = \Helpers\Helpers::isDebug();
+    $status = 'error';
+    $error = ($e instanceof \Exceptions\ConfigurationException) ? 'Configuration Error' : 'Internal Server Error';
+    $message = $isDebug ? $e->getMessage() : 'An unexpected error occurred. Please check the logs or contact support.';
+    
+    // Optionally log the full error here if not already handled
+    $logger = \Helpers\Helpers::setLogger('fatal_errors.log');
+    $logger->error($e->getMessage(), ['exception' => $e]);
+
     $response = new Response(json_encode([
-        'status' => 'error',
-        'error' => ($e instanceof \Exceptions\ConfigurationException) ? 'Configuration Error' : 'Internal Server Error',
-        'message' => $e->getMessage()
+        'status' => $status,
+        'error' => $error,
+        'message' => $message
     ]), Response::HTTP_INTERNAL_SERVER_ERROR, [
         'Content-Type' => 'application/json'
     ]);
     $response->send();
 } finally {
+
     if ($entityManager !== null) {
         $entityManager->close();
     }

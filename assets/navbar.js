@@ -71,10 +71,21 @@
 
                 <li class="nav-item">
                     <a href="/fb-reports" class="nav-link">
-                        <i data-lucide="bar-chart-3"></i> Reports
+                        <i data-lucide="bar-chart-3"></i> Marketing
                     </a>
                 </li>
 
+                <li class="nav-item">
+                    <a href="/fb-organic-reports" class="nav-link">
+                        <i data-lucide="bar-chart-2"></i> Organic
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a href="/gsc-reports" class="nav-link">
+                        <i data-lucide="search"></i> Search
+                    </a>
+                </li>
                 ${(!isDemo && window.location.pathname.indexOf('/config-manager') === -1) ? `
                 <li class="nav-item">
                     <a href="/docs" class="nav-link">

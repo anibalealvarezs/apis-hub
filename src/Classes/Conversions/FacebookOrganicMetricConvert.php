@@ -62,7 +62,6 @@ class FacebookOrganicMetricConvert
                     channel: Channel::facebook_organic->value,
                     name: $row['name'] ?? 'unknown',
                     period: $period->value,
-                    metricDate: $metricDate,
                     page:  $pageEntity?->getUrl(),
                     post: $postEntity?->getPostId(),
                 );
@@ -139,7 +138,6 @@ class FacebookOrganicMetricConvert
                 channel: Channel::facebook_organic->value,
                 name: $row['name'] ?? 'unknown',
                 period: $period->value,
-                metricDate: $metricDateString,
                 account: $accountEntity->getName(),
                 channeledAccount:  $channeledAccountEntity->getPlatformId(),
                 page:  $pageEntity?->getUrl(),
@@ -164,31 +162,32 @@ class FacebookOrganicMetricConvert
             $channeledMetric->metricConfigKey = $metricConfigKey;
             $channeledMetric->metadata = [];
             $channeledMetric->data = $row;
-            if (isset($row['total_value']['breakdowns'])) {
+            if (isset($row['total_value']['breakdowns']) && !empty($row['total_value']['breakdowns'][0]['results'])) {
                 $breakdowns = $row['total_value']['breakdowns'][0]['dimension_keys'];
-                if (isset($row['total_value']['breakdowns'][0]['results'])) {
-                    foreach ($row['total_value']['breakdowns'][0]['results'] as $vector) {
-                        $channeledMetric->value = is_array($vector['value']) ? ($vector['value'][0]['value'] ?? ($vector['value'][0]['amount'] ?? 0)) : $vector['value'];
-                        $dimensions = [];
-                        foreach ($breakdowns as $key => $breakdown) {
-                            $dimensions[] = [
-                                'dimensionKey' => $breakdown,
-                                'dimensionValue' => $vector['dimension_values'][$key],
-                            ];
-                        }
-                        $channeledMetric->dimensions = $dimensions;
-                        $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
-
-                        if (!isset($elements[$metricConfigKey][$row['name']])) {
-                            $elements[$metricConfigKey][$row['name']] = [];
-                        }
-                        $elements[$metricConfigKey][$row['name']][] = $channeledMetric;
+                foreach ($row['total_value']['breakdowns'][0]['results'] as $vector) {
+                    $channeledMetricBreakdown = clone $channeledMetric;
+                    $channeledMetricBreakdown->value = is_array($vector['value']) ? ($vector['value'][0]['value'] ?? ($vector['value'][0]['amount'] ?? 0)) : $vector['value'];
+                    $dimensions = [];
+                    foreach ($breakdowns as $key => $breakdown) {
+                        $dimensions[] = [
+                            'dimensionKey' => $breakdown,
+                            'dimensionValue' => $vector['dimension_values'][$key],
+                        ];
                     }
-                } else {
-                    $skippedRows++;
-                    $logger?->warning("Skipping row $index/$rowCount, platformId: {$channeledAccountEntity->getPlatformId()}(), no breakdowns found for metric " . $row['name']);
+                    $channeledMetricBreakdown->dimensions = $dimensions;
+                    $channeledMetricBreakdown->dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
+
+                    if (!isset($elements[$metricConfigKey][$row['name']])) {
+                        $elements[$metricConfigKey][$row['name']] = [];
+                    }
+                    $elements[$metricConfigKey][$row['name']][] = $channeledMetricBreakdown;
                 }
             } else {
+                if (!isset($row['total_value']['value']) && isset($row['total_value']['breakdowns'])) {
+                     $logger?->warning("Skipping row $index/$rowCount, platformId: {$channeledAccountEntity->getPlatformId()}(), no breakdowns found for metric " . $row['name'] . " and no total value available.");
+                     $skippedRows++;
+                     continue;
+                }
                 $channeledMetric->value = $row['total_value']['value'] ?? 0;
                 $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash([]);
 
@@ -224,6 +223,7 @@ class FacebookOrganicMetricConvert
      */
     public static function igMediaMetrics(
         array $rows,
+        string $date,
         ?Page $pageEntity,
         ?Post $postEntity,
         ?Account $accountEntity,
@@ -238,12 +238,10 @@ class FacebookOrganicMetricConvert
         $elements = [];
         foreach ($rows as $index => $row) {
             $rowStart = microtime(true);
-            $today = Carbon::today()->toDateString();
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: Channel::facebook_organic->value,
                 name: $row['name'] ?? 'unknown',
                 period: Period::Lifetime->value,
-                metricDate: $today,
                 account: $accountEntity->getName(),
                 channeledAccount:  $channeledAccountEntity->getPlatformId(),
                 page:  $pageEntity->getUrl(),
@@ -256,9 +254,9 @@ class FacebookOrganicMetricConvert
             $channeledMetric->channel = Channel::facebook_organic->value;
             $channeledMetric->name = $row['name'] ?? 'unknown';
             $channeledMetric->period = Period::Lifetime->value;
-            $channeledMetric->metricDate = $today;
+            $channeledMetric->metricDate = $date;
             $channeledMetric->platformId = $postEntity->getPostId();
-            $channeledMetric->platformCreatedAt = $today;
+            $channeledMetric->platformCreatedAt = $date;
             $channeledMetric->account = $accountEntity;
             $channeledMetric->channeledAccount = $channeledAccountEntity;
             $channeledMetric->page = $pageEntity;
@@ -303,6 +301,7 @@ class FacebookOrganicMetricConvert
         array $posts,
         Page $pageEntity,
         Account $accountEntity,
+        int|string|null $channeledAccountId = null
     ): ArrayCollection {
         $collection = new ArrayCollection();
         foreach ($posts as $post) {
@@ -310,7 +309,7 @@ class FacebookOrganicMetricConvert
             $p->platformId = $post['id'];
             $p->pageId = $pageEntity->getId();
             $p->accountId = $accountEntity->getId();
-            $p->channeledAccountId = null; // FB Pages don't always have a ChanneledAccount link in this context
+            $p->channeledAccountId = $channeledAccountId;
             $p->data = $post;
             $collection->add($p);
         }

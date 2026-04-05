@@ -44,7 +44,7 @@ return [
     ],
     '/{channel}/{entity}/{id}' => [
         'httpMethod' => 'GET',
-        'callable' => function (string $channel, string $entity, int $id, ?string $body = null, ?array $params = null) {
+        'callable' => function (string $channel, string $entity, string|int $id, ?string $body = null, ?array $params = null) {
             return (new ChanneledCrudController())(
                 entity: $entity,
                 channel: $channel,

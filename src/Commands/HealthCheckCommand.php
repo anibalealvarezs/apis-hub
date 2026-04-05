@@ -22,23 +22,27 @@ class HealthCheckCommand extends Command
 
         // 1. Database Connection
         $output->write("📡 <comment>Database Connectivity:</comment> ");
+        $dbStatus = true;
         try {
             $em = Helpers::getManager();
             $em->getConnection()->connect();
             $output->writeln("<info>ONLINE</info>");
         } catch (Throwable $e) {
             $output->writeln("<error>OFFLINE: " . $e->getMessage() . "</error>");
+            $dbStatus = false;
             $allPassed = false;
         }
 
         // 2. Redis Connection
         $output->write("🗄️  <comment>Redis Cache Server:</comment> ");
+        $redisStatus = true;
         try {
             $redis = Helpers::getRedisClient();
             $redis->ping();
             $output->writeln("<info>ONLINE</info>");
         } catch (Throwable $e) {
             $output->writeln("<error>OFFLINE: " . $e->getMessage() . "</error>");
+            $redisStatus = false;
             $allPassed = false;
         }
 
@@ -95,15 +99,21 @@ class HealthCheckCommand extends Command
 
         // 4. Catalog Entities (Countries/Devices/Accounts/Pages)
         $output->write("🌱 <comment>Catalog Integrity:</comment> ");
+        $catalogStats = [];
         try {
             $db = Helpers::getManager()->getConnection();
-            $countries = $db->fetchOne("SELECT COUNT(*) FROM countries");
-            $devices = $db->fetchOne("SELECT COUNT(*) FROM devices");
-            $accounts = $db->fetchOne("SELECT COUNT(*) FROM channeled_accounts");
-            $pages = $db->fetchOne("SELECT COUNT(*) FROM pages");
+            $catalogStats = [
+                'countries' => (int)$db->fetchOne("SELECT COUNT(*) FROM countries"),
+                'devices' => (int)$db->fetchOne("SELECT COUNT(*) FROM devices"),
+                'accounts' => (int)$db->fetchOne("SELECT COUNT(*) FROM channeled_accounts"),
+                'pages' => (int)$db->fetchOne("SELECT COUNT(*) FROM pages"),
+                'campaigns' => (int)$db->fetchOne("SELECT COUNT(*) FROM campaigns"),
+                'posts' => (int)$db->fetchOne("SELECT COUNT(*) FROM posts"),
+                'queries' => (int)$db->fetchOne("SELECT COUNT(*) FROM queries")
+            ];
             
-            if ($countries > 0 && $devices > 0) {
-                $output->writeln("<info>INITIALIZED ($countries countries, $devices devices, $accounts accounts, $pages pages)</info>");
+            if ($catalogStats['countries'] > 0 && $catalogStats['devices'] > 0) {
+                $output->writeln("<info>INITIALIZED ({$catalogStats['countries']} countries, {$catalogStats['devices']} devices, {$catalogStats['accounts']} accounts, {$catalogStats['pages']} pages, {$catalogStats['campaigns']} campaigns, {$catalogStats['posts']} posts, {$catalogStats['queries']} queries)</info>");
             } else {
                 $output->writeln("<error>EMPTY TABLES (Run app:initialize-entities)</error>");
                 $allPassed = false;
@@ -115,6 +125,7 @@ class HealthCheckCommand extends Command
 
         // 5. MCP Node.js Server
         $output->write("🧠 <comment>MCP Interface (Port 3000):</comment> ");
+        $mcpStatus = true;
         try {
             $mcpPort = getenv('MCP_PORT') ?: 3000;
             $connection = @fsockopen('127.0.0.1', $mcpPort, $errno, $errstr, 2);
@@ -123,14 +134,56 @@ class HealthCheckCommand extends Command
                 fclose($connection);
             } else {
                 $output->writeln("<error>OFFLINE (Port $mcpPort inaccessible)</error>");
+                $mcpStatus = false;
                 $allPassed = false;
             }
         } catch (Throwable $e) {
             $output->writeln("<error>CHECK FAILED: " . $e->getMessage() . "</error>");
+            $mcpStatus = false;
             $allPassed = false;
         }
 
         $output->writeln("\n" . str_repeat("─", 40));
+
+        $status = $allPassed ? 'online' : 'error';
+        $errorCount = $allPassed ? 0 : 1; // Basic count, could be expanded
+
+        // 6. Report to Facade (Optional)
+        $facadeUrl = getenv('MONITOR_FACADE_URL') ?: ($_ENV['MONITOR_FACADE_URL'] ?? null);
+        $token = getenv('MONITOR_TOKEN') ?: ($_ENV['MONITOR_TOKEN'] ?? null);
+
+        if ($facadeUrl && $token) {
+            $output->write("📡 <comment>Reporting to Facade ($facadeUrl):</comment> ");
+            try {
+                $statusReport = \Services\HealthService::getFullHealthReport();
+                $statusReport['status_summary'] = $allPassed ? 'System fully operational' : 'Issues detected in diagnostic';
+                $statusReport['system']['mcp'] = $mcpStatus;
+                
+                $payload = json_encode($statusReport);
+
+                $ch = curl_init($facadeUrl . '/api/heartbeat');
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Content-Type: application/json',
+                    'X-Monitoring-Token: ' . $token,
+                ]);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+
+                $response = curl_exec($ch);
+                $info = curl_getinfo($ch);
+                if ($response === false || $info['http_code'] !== 200) {
+                    $output->write("<error>FAILED (" . curl_errno($ch) . "): " . curl_error($ch) . " HTTP " . $info['http_code'] . "</error>\n");
+                } else {
+                    $output->write("<info>PASSED</info>\n");
+                }
+                curl_close($ch);
+            } catch (Throwable $e) {
+                $output->write("<error>ERROR (" . $e->getMessage() . ")</error>\n");
+            }
+        }
+
         if ($allPassed) {
             $output->writeln("<info>✅ SYSTEM HEALTHY - Deployment ready.</info>");
             return Command::SUCCESS;

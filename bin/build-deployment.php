@@ -1,176 +1,139 @@
 #!/usr/bin/env php
 <?php
 /**
- * apis-hub deployment builder
- *
- * Usage:
- *   php bin/build-deployment.php <project-name>
- *
- * Reads:  deploy/<project-name>.yaml
- * Writes: docker-compose.yml
- *         config/channelsconfig.env
- *
- * The project YAML is your single source of truth for a deployment:
- * instances, DB credentials, and all channel/API credentials.
+ * apis-hub deployment builder (Standardized Master Architecture)
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Symfony\Component\Yaml\Yaml;
+use Helpers\Helpers;
 
 // ─── Load Configuration ───────────────────────────────────────────────────────
-use Helpers\Helpers;
 $config = Helpers::getProjectConfig();
 
 // ─── Validate required sections ───────────────────────────────────────────────
 foreach (['database', 'instances', 'channels'] as $required) {
     if (empty($config[$required])) {
         fwrite(STDERR, "Missing required section '{$required}' in your config/ directory.\n");
-        fwrite(STDERR, "Please ensure your YAML files are correctly populated.\n");
         exit(1);
     }
 }
 
-$env      = getenv('APP_ENV') ?: 'testing';
-$dbConfig = $config['database'];
-$db       = $dbConfig[$env] ?? array_shift($dbConfig); // Default to specified env or first block
+$env             = getenv('APP_ENV') ?: 'testing';
+$dbConfig        = $config['database'];
+$db              = $dbConfig[$env] ?? array_shift($dbConfig);
+$redis           = $config['redis'] ?? ['host' => 'redis', 'port' => 6379];
+$instances       = $config['instances'];
+$projectLabel    = $config['project'] ?? 'apis-hub';
+$deploymentName  = getenv('DEPLOYMENT_NAME') ?: 'apis-hub';
 
-$redis   = $config['redis'] ?? ['host' => 'redis', 'port' => 6379];
-$instances = $config['instances'];
-$channels  = $config['channels'];
-$projectLabel = $config['project'] ?? 'apis-hub';
-echo "⚒  Building deployment for environment: " . strtoupper($env) . "\n";
+echo "⚒  Building standardized Master/Worker deployment for: " . strtoupper($env) . "\n";
 
-// ─── Build docker-compose.yml ─────────────────────────────────────────────────
 $services = [];
-foreach ($instances as $instance) {
-    $ports     = [];
-    $name      = $instance['name'];
-    $port      = $instance['port'] ?? null;
-    $channel   = $instance['channel'];
-    $entity    = $instance['entity'];
-    $startDate = $instance['start_date'] ?? null;
-    $endDate   = $instance['end_date']   ?? null;
 
-    $extractEnvVar = function($str) {
-        if (!str_contains((string)$str, '${')) return (string)$str;
-        return preg_replace('/^\$\{.*:-(.*)\}$/', '$1', (string) $str);
-    };
-
-    $envBlock = [
+// Helper to build environment block
+$buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($db, $redis, $config, $env) {
+    return [
         "PORT=8080",
         "API_SOURCE={$channel}",
         "API_ENTITY={$entity}",
-        "DB_DRIVER=" . $extractEnvVar($db['driver'] ?? 'pdo_mysql'),
-        "DB_HOST=" . str_replace(['127.0.0.1', 'localhost'], 'host.docker.internal', $extractEnvVar($db['host'] ?? 'host.docker.internal')),
-        "DB_PORT=" . $extractEnvVar($db['port'] ?? 3306),
-        "DB_USER=" . $extractEnvVar($db['user'] ?? 'root'),
-        "DB_PASSWORD=" . $extractEnvVar($db['password'] ?? ''),
-        "DB_NAME=" . $extractEnvVar($db['name'] ?? ''),
+        "DB_DRIVER=" . ($db['driver'] ?? 'pdo_pgsql'),
+        "DB_HOST=" . str_replace(['127.0.0.1', 'localhost'], 'host.docker.internal', ($db['host'] ?? 'db')),
+        "DB_PORT=" . ($db['port'] ?? 5432),
+        "DB_USER=" . ($db['user'] ?? 'postgres'),
+        "DB_PASSWORD=" . ($db['password'] ?? ''),
+        "DB_NAME=" . ($db['name'] ?? 'apis-hub'),
         "REDIS_HOST=" . $redis['host'],
         "REDIS_PORT=" . $redis['port'],
         "PROJECT_CONFIG_FILE=/app/config/" . ($config['project'] ?? 'apis-hub') . ".yaml",
-        "INSTANCE_NAME={$name}",
+        "INSTANCE_NAME={$instanceName}",
+        "SKIP_SEED=" . (getenv('SKIP_SEED') ?: '0'),
         "ENV_FILE=" . (getenv('ENV_FILE') ?: '.env'),
     ];
+};
 
-    if ($startDate) {
-        $envBlock[] = "START_DATE={$startDate}";
-    }
-    if ($endDate) {
-        $envBlock[] = "END_DATE={$endDate}";
-    }
+// ─── Phase 1: Create Standardized Master ────────────────────────────────────────
+$masterName = "{$deploymentName}-master";
+$externalPort = getenv('EXTERNAL_PORT') ?: ($instances[0]['port'] ?? 10000);
+$mcpPort = getenv('MCP_PORT') ?: 3000;
 
-    $serviceConfig = [
-        'build' => [
+$services['master'] = [
+    'container_name' => $masterName,
+    'build' => [
+        'context'    => '.',
+        'dockerfile' => 'Dockerfile',
+    ],
+    'restart'     => 'always',
+    'environment' => $buildEnv($masterName),
+    'volumes'     => ['./:/app', '/app/vendor', '/app/mcp-server/node_modules', '/var/run/docker.sock:/var/run/docker.sock'],
+    'depends_on'  => ['redis'],
+    'extra_hosts' => ['host.docker.internal:host-gateway'],
+    'ports'       => [
+        "{$externalPort}:8080",
+        "{$mcpPort}:3000"
+    ]
+];
+
+// ─── Phase 2: Create Workers from Instances Configuration ───────────────────────
+foreach ($instances as $instance) {
+    $name    = $instance['name'];
+    $channel = $instance['channel'];
+    $entity  = $instance['entity'];
+
+    // Worker configuration (No ports exposed)
+    $services[$name] = [
+        'container_name' => "{$deploymentName}-{$name}",
+        'build'          => [
             'context'    => '.',
             'dockerfile' => 'Dockerfile',
         ],
         'restart'     => 'always',
-        'environment' => $envBlock,
-        'volumes'     => ['./:/app', '/app/vendor'],
-        'depends_on'  => ['redis'],
-        'extra_hosts' => ['host.docker.internal:host-gateway'],
+        'environment' => $buildEnv($name, $channel, $entity),
+        'volumes'     => ['./:/app'],
+        'depends_on'  => ['master', 'redis'],
     ];
-
-    // Gateway pattern: Only map PHP and MCP ports for the first master sync instance found
-    if (str_contains($name, 'entities-sync')) {
-        if (!isset($gatewayAssigned)) {
-            // Map PHP port if defined in config
-            if ($port) {
-                $ports[] = "{$port}:8080";
-                $gatewayAssigned = $name;
-            }
-            // Map MCP port
-            $mcpHostPort = getenv('MCP_PORT') ?: 3000;
-            $ports[] = "{$mcpHostPort}:3000";
-        }
-    }
-
-    if (!empty($ports)) {
-        $serviceConfig['ports'] = $ports;
-    }
-
-    $services[$name] = $serviceConfig;
 }
 
-// ─── Add Database Service if DB_HOST is 'db' ─────────────────────────────────────
-$dbHost = $extractEnvVar($db['host'] ?? '');
-$dbDriver = $extractEnvVar($db['driver'] ?? 'pdo_mysql');
-if (str_contains($dbHost, 'db') && !isset($services['db'])) {
-    if ($dbDriver === 'pdo_pgsql') {
-        $dbHostPort = getenv('DB_HOST_PORT') ?: 5432;
-        $services['db'] = [
-            'image' => 'postgres:16-alpine',
-            'restart' => 'always',
-            'environment' => [
-                'POSTGRES_USER' => $extractEnvVar($db['user'] ?? 'postgres'),
-                'POSTGRES_PASSWORD' => $extractEnvVar($db['password'] ?? 'postgres'),
-                'POSTGRES_DB' => $extractEnvVar($db['name'] ?? 'apis-hub'),
-            ],
-            'ports' => ["127.0.0.1:{$dbHostPort}:5432"],
-            'volumes' => ['db_data:/var/lib/postgresql/data'],
-        ];
-    } else {
-        $dbHostPort = getenv('DB_HOST_PORT') ?: 3306;
-        $services['db'] = [
-            'image' => 'mysql:8.0',
-            'restart' => 'always',
-            'environment' => [
-                'MYSQL_ROOT_PASSWORD' => $extractEnvVar($db['password'] ?? 'root'),
-                'MYSQL_DATABASE' => $extractEnvVar($db['name'] ?? 'apis-hub'),
-            ],
-            'ports' => ["127.0.0.1:{$dbHostPort}:3306"],
-            'volumes' => ['db_data:/var/lib/mysql'],
-        ];
-    }
+// ─── Phase 3: Infrastructure (DB & Redis) ────────────────────────────────────────
+$dbHost = $db['host'] ?? 'db';
+if (str_contains($dbHost, 'db')) {
+    $dbHostPort = getenv('DB_HOST_PORT') ?: 5432;
+    $services['db'] = [
+        'container_name' => "{$deploymentName}-db",
+        'image'         => ($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'postgres:16-alpine' : 'mysql:8.0',
+        'restart'       => 'always',
+        'environment'   => [
+            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_USER' : 'MYSQL_USER') => ($db['user'] ?? 'postgres'),
+            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_PASSWORD' : 'MYSQL_PASSWORD') => ($db['password'] ?? 'postgres'),
+            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_DB' : 'MYSQL_DATABASE') => ($db['name'] ?? 'apis-hub'),
+        ],
+        'ports'   => ["127.0.0.1:{$dbHostPort}:5432"],
+        'volumes' => ['db_data:/var/lib/postgresql/data'],
+    ];
 }
 
 $redisHostPort = getenv('REDIS_HOST_PORT') ?: 6379;
 $services['redis'] = [
-    'image'   => 'redis:alpine',
-    'restart' => 'always',
-    'ports'   => ["{$redisHostPort}:6379"],
-    'volumes' => ['redis_data:/data'],
+    'container_name' => "{$deploymentName}-redis",
+    'image'         => 'redis:alpine',
+    'restart'       => 'always',
+    'ports'         => ["{$redisHostPort}:6379"],
+    'volumes'       => ['redis_data:/data'],
 ];
 
-$dbVolumeName = getenv('DB_VOLUME_NAME');
-$redisVolumeName = getenv('REDIS_VOLUME_NAME');
+// ─── Write docker-compose.yml ──────────────────────────────────────────────────
+$dbVolumeName    = getenv('DB_VOLUME_NAME')    ?: "{$deploymentName}-db-data";
+$redisVolumeName = getenv('REDIS_VOLUME_NAME') ?: "{$deploymentName}-redis-data";
 
 $compose = [
-    'name'     => getenv('DEPLOYMENT_NAME') ?: 'apis-hub',
+    'name'     => $deploymentName,
     'services' => $services,
     'volumes'  => [
-        'redis_data' => $redisVolumeName ? ['name' => $redisVolumeName] : null,
-        'db_data' => $dbVolumeName ? ['name' => $dbVolumeName] : null
+        'redis_data' => ['name' => $redisVolumeName],
+        'db_data'    => ['name' => $dbVolumeName]
     ],
 ];
 
-$composeYaml = Yaml::dump($compose, 6, 2, Yaml::DUMP_NULL_AS_TILDE);
-
-$composeOut  = __DIR__ . '/../docker-compose.yml';
-file_put_contents($composeOut, $composeYaml);
-echo "✔  Written: docker-compose.yml  ({$projectLabel}: " . count($instances) . " instance(s))\n";
-
-echo "\nDeploy with:\n";
-echo "  docker compose up -d --build\n";
+file_put_contents(__DIR__ . '/../docker-compose.yml', Yaml::dump($compose, 6, 2, Yaml::DUMP_NULL_AS_TILDE));
+echo "✔  Written: docker-compose.yml (Master Architecture Enabled)\n";

@@ -16,6 +16,8 @@ use Entities\Analytics\Channeled\DimensionValue;
 
 class MetricsProcessor
 {
+    use \Traits\CalculatesMetricDeltas;
+
     /**
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
@@ -24,12 +26,15 @@ class MetricsProcessor
     public static function processQueries(ArrayCollection $metrics, EntityManager $manager): array
     {
         // Extract queries from metrics
-        $queries = array_map(function ($metric) {
-            return $metric->query;
-        }, $metrics->toArray());
+        $queries = array_filter(array_map(function ($metric) {
+            return is_object($metric->query) ? $metric->query->getQuery() : $metric->query;
+        }, $metrics->toArray()));
 
         // Remove duplicates
         $uniqueQueries = array_unique($queries);
+        if (empty($uniqueQueries)) {
+            return ['map' => [], 'mapReverse' => []];
+        }
 
         // Batch select queries from list
         $selectParams = array_values($uniqueQueries);
@@ -57,45 +62,84 @@ class MetricsProcessor
 
         // INSERT IGNORE: atomic upsert to handle race conditions
         if (!empty($queriesToInsert)) {
-            $cols = ['query'];
-            $chunkSize = 1000;
-            foreach (array_chunk($queriesToInsert, $chunkSize) as $chunk) {
-                try {
-                    $sql = Helpers::buildInsertIgnoreSql(
-                        'queries', 
-                        $cols, 
-                        ['query'], 
-                        count($chunk)
-                    );
-                    $manager->getConnection()->executeStatement($sql, array_values($chunk));
-                } catch (Exception $e) {
-                    throw new RuntimeException("Failed to insert queries: " . $e->getMessage(), 0, $e);
+            $cols = ['query', 'created_at', 'updated_at'];
+            $now = date('Y-m-d H:i:s');
+            $insertParams = [];
+            foreach ($queriesToInsert as $q) {
+                $insertParams[] = $q;
+                $insertParams[] = $now;
+                $insertParams[] = $now;
+            }
+            $sql = Helpers::buildInsertIgnoreSql(
+                'queries', 
+                $cols, 
+                ['query'], 
+                count($queriesToInsert)
+            );
+            $manager->getConnection()->executeStatement($sql, $insertParams);
+        }
+
+        // Re-fetch ALL unique queries to ensure map is complete
+        try {
+            $allExistingQueries = $manager->getConnection()
+                ->executeQuery($sql = "SELECT id, query FROM queries WHERE query IN ($selectPlaceholders)", $selectParams)
+                ->fetchAllAssociative();
+        } catch (Exception $e) {
+            throw new RuntimeException("Failed to re-fetch queries: " . $e->getMessage(), 0, $e);
+        }
+
+        $finalMap = [];
+        $mapReverse = [];
+        foreach ($allExistingQueries as $query) {
+            $finalMap[$query['query']] = $query['id'];
+            $mapReverse[$query['id']] = $query['query'];
+        }
+
+        return ['map' => $finalMap, 'mapReverse' => $mapReverse];
+    }
+
+    public static function processCountries(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        $repo = $manager->getRepository(\Entities\Analytics\Country::class);
+        $countries = $repo->findAll();
+        $map = [];
+        $mapReverse = [];
+        /** @var \Entities\Analytics\Country $country */
+        foreach ($countries as $country) {
+            $map[$country->getCode()->value] = $country;
+            $mapReverse[$country->getId()] = $country;
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
+    }
+
+    public static function processDevices(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        $repo = $manager->getRepository(\Entities\Analytics\Device::class);
+        $devices = $repo->findAll();
+        $map = [];
+        $mapReverse = [];
+        /** @var \Entities\Analytics\Device $device */
+        foreach ($devices as $device) {
+            $map[$device->getType()->value] = $device;
+            $mapReverse[$device->getId()] = $device;
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
+    }
+
+    public static function processDimensionSets(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        $dimManager = new \Classes\DimensionManager($manager);
+        $map = [];
+        foreach ($metrics as $metric) {
+            if (isset($metric->dimensions) && !empty($metric->dimensions)) {
+                $hash = $metric->dimensionsHash ?? KeyGenerator::generateDimensionsHash((array)$metric->dimensions);
+                if (!isset($map[$hash])) {
+                    $set = $dimManager->resolveDimensionSet((array)$metric->dimensions);
+                    $map[$hash] = $set->getId();
                 }
             }
         }
-
-        // Always re-fetch ALL unique queries to ensure map is complete
-        $selectParams = array_values($uniqueQueries);
-        $selectPlaceholders = implode(', ', array_fill(0, count($selectParams), '?'));
-
-        $sql = "SELECT id, query
-                FROM queries
-                WHERE query IN ($selectPlaceholders)";
-        try {
-            $finalQueries = $manager->getConnection()
-                ->executeQuery($sql, $selectParams)
-                ->fetchAllAssociative();
-        } catch (Exception $e) {
-            throw new RuntimeException("Failed to fetch existing queries: " . $e->getMessage(), 0, $e);
-        }
-        foreach ($finalQueries as $query) {
-            $map[$query['query']] = $query['id'];
-        }
-
-        return [
-            'map' => $map,
-            'mapReverse' => array_flip($map),
-        ];
+        return ['map' => $map];
     }
 
     /**
@@ -379,8 +423,12 @@ class MetricsProcessor
         bool $processProducts = false,
         bool $processCustomers = false,
         bool $processOrders = false,
+        bool $processCountries = false,
+        bool $processDevices = false,
+        bool $processDimensions = false,
         ?array $countryMap = null,
         ?array $deviceMap = null,
+        ?array $dimensionSetMap = null,
         ?array $pageMap = null,
         ?array $postMap = null,
         ?array $accountMap = null,
@@ -391,6 +439,8 @@ class MetricsProcessor
         ?array $channeledAdMap = null,
         ?array $creativeMap = null,
     ): array {
+        // Inject virtual DAILY metrics from LIFETIME ones (Channel Agnostic Delta Engine)
+        self::injectVirtualDailyMetrics($metrics, $manager);
 
         // Initialize null maps
         $queryMap = null;
@@ -401,6 +451,21 @@ class MetricsProcessor
         // Map queries
         if ($processQueries) {
             $queryMap = self::processQueries($metrics, $manager);
+        }
+
+        // Map countries
+        if ($processCountries && !$countryMap) {
+            $countryMap = self::processCountries($metrics, $manager);
+        }
+
+        // Map devices
+        if ($processDevices && !$deviceMap) {
+            $deviceMap = self::processDevices($metrics, $manager);
+        }
+
+        // Map dimension sets
+        if ($processDimensions && !$dimensionSetMap) {
+            $dimensionSetMap = self::processDimensionSets($metrics, $manager);
         }
 
         // Map accounts
@@ -460,7 +525,6 @@ class MetricsProcessor
                 channel: $metric->channel,
                 name: $metric->name,
                 period: $metric->period,
-                metricDate: $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
                 account: isset($metric->account) ? $metric->account->getName() : null,
                 channeledAccount: isset($metric->channeledAccount) ? (string) $metric->channeledAccount->getPlatformId() : null,
                 campaign: isset($metric->campaign) ? (string) $metric->campaign->getCampaignId() : null,
@@ -476,6 +540,7 @@ class MetricsProcessor
                 country: $metric->countryCode ?? null,
                 device: $metric->deviceType ?? null,
                 creative: isset($metric->creative) ? $metric->creative->getCreativeId() : null,
+                dimensionSet: $metric->dimensionsHash ?? (isset($metric->dimensions) ? KeyGenerator::generateDimensionsHash((array)$metric->dimensions) : null)
             );
             $metric->metricConfigKey = $metricConfigKey;
 
@@ -483,7 +548,6 @@ class MetricsProcessor
                 'channel' => $metric->channel,
                 'name' => $metric->name,
                 'period' => $metric->period,
-                'metricDate' => $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
                 'account_id' => isset($metric->account) ? ($accountMap['map'][$metric->account->getId() ?? 0] ?? null) : null,
                 'channeled_account_id' => isset($metric->channeledAccount) ? ($channeledAccountMap['map'][$metric->channeledAccount->getPlatformId()] ?? null) : (isset($metric->channeledAccountPlatformId) ? ($channeledAccountMap['map'][$metric->channeledAccountPlatformId] ?? null) : null),
                 'campaign_id' => isset($metric->campaign) ? ($campaignMap['map'][$metric->campaign->getCampaignId()] ?? null) : (isset($metric->campaignPlatformId) ? ($campaignMap['map'][$metric->campaignPlatformId] ?? null) : null),
@@ -496,9 +560,10 @@ class MetricsProcessor
                 'product_id' => isset($metric->product) ? ($productMap['map'][$metric->product->getProductId()] ?? null) : null,
                 'customer_id' => isset($metric->customer) ? ($customerMap['map'][$metric->customer->getEmail()] ?? null) : null,
                 'order_id' => isset($metric->order) ? ($orderMap['map'][$metric->order->getOrderId()] ?? null) : null,
-                'country_id' => isset($metric->countryCode) ? ($countryMap['map'][$metric->countryCode]->getId()) : null,
-                'device_id' => isset($metric->deviceType) ? ($deviceMap['map'][$metric->deviceType]->getId()) : null,
+                'country_id' => isset($metric->countryCode) ? ($countryMap['map'][$metric->countryCode]->getId() ?? null) : (isset($metric->country) ? $metric->country->getId() : null),
+                'device_id' => isset($metric->deviceType) ? ($deviceMap['map'][$metric->deviceType]->getId() ?? null) : (isset($metric->device) ? $metric->device->getId() : null),
                 'creative_id' => isset($metric->creative) ? ($creativeMap['map'][$metric->creative->getCreativeId()] ?? ($creativeMap['map'][$metric->creative->getCreativeId()] ?? null)) : null,
+                'dimension_set_id' => $dimensionSetMap['map'][$metric->dimensionsHash ?? KeyGenerator::generateDimensionsHash((array)$metric->dimensions)] ?? ($dimensionSetMap[$metric->dimensionsHash ?? KeyGenerator::generateDimensionsHash((array)$metric->dimensions)] ?? null),
                 'key' => $metricConfigKey,
             ];
         }
@@ -532,7 +597,6 @@ class MetricsProcessor
                     'channel' => $metricConfig['channel'],
                     'name' => $metricConfig['name'],
                     'period' => $metricConfig['period'],
-                    'metric_date' => $metricConfig['metricDate'],
                     'account_id' => $metricConfig['account_id'] ?? null,
                     'channeled_account_id' => $metricConfig['channeled_account_id'] ?? null,
                     'campaign_id' => $metricConfig['campaign_id'] ?? null,
@@ -547,6 +611,7 @@ class MetricsProcessor
                     'order_id' => $metricConfig['order_id'] ?? null,
                     'country_id' => $metricConfig['country_id'] ?? null,
                     'device_id' => $metricConfig['device_id'] ?? null,
+                    'dimension_set_id' => $metricConfig['dimension_set_id'] ?? null,
                     'key' => $key,
                 ];
             }
@@ -554,17 +619,16 @@ class MetricsProcessor
 
         // INSERT IGNORE: atomic upsert.
         if (!empty($uniqueMetricConfigs)) {
-            $cols = ['channel', 'name', 'period', 'metric_date', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id', 'creative_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id', 'config_signature'];
+            $cols = ['channel', 'name', 'period', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id', 'creative_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id', 'dimension_set_id', 'config_signature'];
             $numCols = count($cols);
             $chunkSize = floor(30000 / $numCols); // Ultra safe margin for Postgres (30k params max per chunk)
             
-            foreach (array_chunk($uniqueMetricConfigs, (int)$chunkSize) as $chunk) {
+            foreach (array_chunk($metricConfigsToInsert, (int)$chunkSize) as $chunk) {
                 $insertParams = [];
                 foreach ($chunk as $metricConfig) {
                     $insertParams[] = $metricConfig['channel'];
                     $insertParams[] = $metricConfig['name'];
                     $insertParams[] = $metricConfig['period'];
-                    $insertParams[] = $metricConfig['metricDate'];
                     $insertParams[] = $metricConfig['account_id'] ?? null;
                     $insertParams[] = $metricConfig['channeled_account_id'] ?? null;
                     $insertParams[] = $metricConfig['campaign_id'] ?? null;
@@ -580,11 +644,13 @@ class MetricsProcessor
                     $insertParams[] = $metricConfig['order_id'] ?? null;
                     $insertParams[] = $metricConfig['country_id'] ?? null;
                     $insertParams[] = $metricConfig['device_id'] ?? null;
+                    $insertParams[] = $metricConfig['dimension_set_id'] ?? null;
                     $insertParams[] = $metricConfig['key']; // config_signature
                 }
-                $sql = Helpers::buildInsertIgnoreSql(
+                $sql = Helpers::buildUpsertSql(
                     'metric_configs', 
                     $cols, 
+                    ['dimension_set_id'], 
                     ['config_signature'], 
                     count($chunk)
                 );
@@ -624,7 +690,7 @@ class MetricsProcessor
         array $metricConfigMap
     ): array {
         $config = Helpers::getProjectConfig();
-        $cacheRawMetrics = filter_var($config['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $cacheRawMetrics = filter_var($config['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $uniqueMetrics = [];
         foreach ($metrics->toArray() as $metric) {
@@ -635,7 +701,13 @@ class MetricsProcessor
             $metricKey = KeyGenerator::generateMetricKey(
                 dimensionsHash: $dimensionsHash,
                 metricConfigKey: $metric->metricConfigKey,
+                metricDate: $metric->metricDate,
             );
+
+            if (!isset($metricConfigMap['map'][$metric->metricConfigKey])) {
+                Helpers::setLogger('metrics-error.log')->warning("Missing metric_config_id for key: " . $metric->metricConfigKey . " (Metric: " . $metric->name . ")");
+                continue;
+            }
 
             KeyGenerator::sortDimensions($dimensions);
             $uniqueMetrics[$metricKey] = [
@@ -643,6 +715,7 @@ class MetricsProcessor
                 'metadata' => $metric->metadata,
                 'dimensions_hash' => $dimensionsHash,
                 'metric_config_id' => $metricConfigMap['map'][$metric->metricConfigKey],
+                'metric_date' => $metric->metricDate instanceof DateTime ? $metric->metricDate->format('Y-m-d') : $metric->metricDate,
             ];
         }
 
@@ -652,17 +725,18 @@ class MetricsProcessor
             $selectParams = [];
             $tuples = [];
             foreach ($chunkMetrics as $m) {
-                if (isset($m['dimensions_hash']) && isset($m['metric_config_id'])) {
+                if (isset($m['dimensions_hash']) && isset($m['metric_config_id']) && isset($m['metric_date'])) {
                     $selectParams[] = $m['dimensions_hash'];
                     $selectParams[] = $m['metric_config_id'];
-                    $tuples[] = '(?, ?)';
+                    $selectParams[] = $m['metric_date'];
+                    $tuples[] = '(?, ?, ?)';
                 }
             }
             if (!empty($tuples)) {
                 $placeholders = implode(', ', $tuples);
-                $sql = "SELECT id, dimensions_hash, metric_config_id 
+                $sql = "SELECT id, dimensions_hash, metric_config_id, metric_date 
                         FROM metrics 
-                        WHERE (dimensions_hash, metric_config_id) IN ($placeholders)";
+                        WHERE (dimensions_hash, metric_config_id, metric_date) IN ($placeholders)";
                 
                 $chunkMap = MapGenerator::getMetricMap($manager, $sql, $selectParams, $metricConfigMap);
                 foreach ($chunkMap as $k => $v) {
@@ -681,6 +755,7 @@ class MetricsProcessor
                     'metadata' => $cacheRawMetrics ? json_encode($metric['metadata'] ?? []) : null,
                     'dimensions_hash' => $metric['dimensions_hash'],
                     'metric_config_id' => $metric['metric_config_id'],
+                    'metric_date' => $metric['metric_date'],
                     'key' => $key,
                 ];
             } else {
@@ -694,7 +769,7 @@ class MetricsProcessor
         Helpers::setLogger('facebook-marketing.log')->info("Metrics analysis: " . count($metricsToInsert) . " new metrics to insert, " . count($metricsToUpdate) . " existing metrics to update.");
 
         if (!empty($metricsToInsert)) {
-            $cols = ['value', 'metadata', 'dimensions_hash', 'metric_config_id'];
+            $cols = ['value', 'metadata', 'dimensions_hash', 'metric_config_id', 'metric_date'];
             $numCols = count($cols);
             $chunkSize = floor(30000 / $numCols); // Safe buffer under 65535, aiming for ~30k params
             
@@ -705,12 +780,13 @@ class MetricsProcessor
                     $insertParams[] = $row['metadata'];
                     $insertParams[] = $row['dimensions_hash'];
                     $insertParams[] = $row['metric_config_id'];
+                    $insertParams[] = $row['metric_date'];
                 }
                 
                 $sql = Helpers::buildInsertIgnoreSql(
                     'metrics', 
                     $cols, 
-                    ['metric_config_id', 'dimensions_hash'], 
+                    ['metric_config_id', 'dimensions_hash', 'metric_date'], 
                     count($chunk)
                 );
                 $affected = $manager->getConnection()->executeStatement($sql, $insertParams);
@@ -724,18 +800,20 @@ class MetricsProcessor
                 foreach ($chunk as $row) {
                     $reFetchParams[] = $row['dimensions_hash'];
                     $reFetchParams[] = (int)$row['metric_config_id'];
-                    $tuples[] = $isPostgres ? '(?::text, ?::integer)' : '(?, ?)';
+                    $reFetchParams[] = $row['metric_date'];
+                    $tuples[] = $isPostgres ? '(?::text, ?::integer, ?::date)' : '(?, ?, ?)';
                 }
                 $placeholders = implode(', ', $tuples);
                 $isPostgres = Helpers::isPostgres();
-                $reFetchSql = "SELECT id, dimensions_hash, metric_config_id FROM metrics WHERE " .
-                    ($isPostgres ? "(dimensions_hash::text, metric_config_id::integer) " : "(dimensions_hash, metric_config_id) ") .
+                $reFetchSql = "SELECT id, dimensions_hash, metric_config_id, metric_date FROM metrics WHERE " .
+                    ($isPostgres ? "(dimensions_hash::text, metric_config_id::integer, metric_date::date) " : "(dimensions_hash, metric_config_id, metric_date) ") .
                     "IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
                 $fetched = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
                 foreach ($fetched as $metricRow) {
                     $metricKey = KeyGenerator::generateMetricKey(
                         dimensionsHash: $metricRow['dimensions_hash'],
                         metricConfigKey: $metricConfigMap['mapReverse'][$metricRow['metric_config_id']],
+                        metricDate: $metricRow['metric_date'],
                     );
                     $metricMap[$metricKey] = (int)$metricRow['id'];
                 }
@@ -771,13 +849,14 @@ class MetricsProcessor
         LoggerInterface $logger,
     ): array {
         $config = Helpers::getProjectConfig();
-        $cacheRawMetrics = filter_var($config['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $cacheRawMetrics = filter_var($config['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         $metricsMapByMKey = [];
         foreach ($metrics as $m) {
             $mKey = KeyGenerator::generateMetricKey(
                 dimensionsHash: $m->dimensions_hash ?? $m->dimensionsHash,
-                metricConfigKey: $m->metric_config_key ?? $m->metricConfigKey
+                metricConfigKey: $m->metric_config_key ?? $m->metricConfigKey,
+                metricDate: $m->metric_date ?? $m->metricDate
             );
             $metricsMapByMKey[$mKey] = $m;
         }
@@ -787,6 +866,7 @@ class MetricsProcessor
             $metricKey = KeyGenerator::generateMetricKey(
                 dimensionsHash: $metric->dimensions_hash ?? $metric->dimensionsHash,
                 metricConfigKey: $metric->metric_config_key ?? $metric->metricConfigKey,
+                metricDate: $metric->metric_date ?? $metric->metricDate,
             );
 
             if (!isset($metricMap['map'][$metricKey])) continue;

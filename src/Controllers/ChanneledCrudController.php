@@ -40,7 +40,7 @@ class ChanneledCrudController extends BaseController
         string $entity,
         string $channel,
         string $method,
-        ?int $id = null,
+        int|string|null $id = null,
         ?string $body = null,
         ?array $params = null
     ): Response {
@@ -129,6 +129,7 @@ class ChanneledCrudController extends BaseController
             }
 
             $params = $this->prepareChanneledReadMultipleParams(
+                entity: $entity,
                 params: $params,
                 repositoryClass: $repository::class,
                 body: $body,
@@ -163,6 +164,7 @@ class ChanneledCrudController extends BaseController
      * @return array
      */
     protected function prepareChanneledReadMultipleParams(
+        string $entity,
         ?array $params,
         string $repositoryClass,
         ?string $body,
@@ -170,7 +172,12 @@ class ChanneledCrudController extends BaseController
     ): array {
         $params = $this->prepareCrudParams(params: $params, body: $body);
 
-        if (!isset($params['filters']->channel)) {
+        // Standard entities like 'Page' or 'Account' don't have a 'channel' field.
+        // Channeled entities do. We check metadata before injecting the filter.
+        $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
+        $metadata = $this->em->getClassMetadata($repository->getClassName());
+        
+        if ($metadata->hasField('channel') && !isset($params['filters']->channel)) {
             $params['filters']->channel = $channel->value;
         }
 
@@ -183,7 +190,7 @@ class ChanneledCrudController extends BaseController
      * @param int|null $id
      * @return Response
      */
-    protected function read(string $entity, Channel $channel, ?int $id = null, bool $rawData = false, array $hideFields = []): Response
+    protected function read(string $entity, \Enums\Channel $channel, int|string|null $id = null, bool $rawData = false, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
@@ -256,6 +263,7 @@ class ChanneledCrudController extends BaseController
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
             $params = $this->prepareChanneledReadMultipleParams(
+                entity: $entity,
                 params: $params,
                 repositoryClass: $repository::class,
                 body: $body,
@@ -320,6 +328,7 @@ class ChanneledCrudController extends BaseController
             }
 
             $params = $this->prepareChanneledReadMultipleParams(
+                entity: $entity,
                 params: $params,
                 repositoryClass: $repository::class,
                 body: $body,
@@ -385,6 +394,7 @@ class ChanneledCrudController extends BaseController
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
             $params = $this->prepareChanneledReadMultipleParams(
+                entity: $entity,
                 params: $params,
                 repositoryClass: $repository::class,
                 body: $body,
@@ -406,7 +416,8 @@ class ChanneledCrudController extends BaseController
             }
 
             // --- Redis Caching Logic ---
-            $isCacheable = $endDate && CacheStrategyService::isCacheable($channelKey);
+            // Force skip cache for organic in development/demo to prevent stale results during dashboard tuning
+            $isCacheable = $endDate && CacheStrategyService::isCacheable($channelKey) && $channelKey !== 'facebook_organic';
             $cacheType = $isCacheable ? CacheStrategyService::getTargetCacheType($endDate) : null;
             $cacheKey = $cacheType ? CacheStrategyService::generateKey($channelKey, [
                 'entity' => $entity,
@@ -437,6 +448,16 @@ class ChanneledCrudController extends BaseController
                 orderBy: $params['orderBy'] ?? null,
                 orderDir: $params['orderDir'] ?? 'ASC'
             );
+
+            $logger = Helpers::setLogger('api_debug.log');
+            $logger->info("=== API AGGREGATE DEBUG ===");
+            $logger->info("Filters: " . json_encode($params['filters'] ?? []));
+            $logger->info("Dates: " . ($params['startDate'] ?? 'null') . " to " . ($params['endDate'] ?? 'null'));
+            $logger->info("Aggregations: " . json_encode($aggregations));
+            $logger->info("GroupBy: " . json_encode($groupBy));
+            $logger->info("Result Count: " . count($data));
+            $logger->info("Result Dump: " . json_encode(array_slice($data, 0, 1)));
+            $logger->info("===========================");
 
             // --- Cache the results ---
             if ($cacheKey && !empty($data)) {
@@ -528,7 +549,7 @@ class ChanneledCrudController extends BaseController
      * @param string|null $body
      * @return Response
      */
-    protected function update(string $entity, Channel $channel, ?int $id = null, ?string $body = null): Response
+    protected function update(string $entity, \Enums\Channel $channel, int|string|null $id = null, ?string $body = null): Response
     {
         try {
             if (!$id) {
@@ -589,7 +610,7 @@ class ChanneledCrudController extends BaseController
      * @param int|null $id
      * @return Response
      */
-    protected function delete(string $entity, Channel $channel, ?int $id = null): Response
+    protected function delete(string $entity, \Enums\Channel $channel, int|string|null $id = null): Response
     {
         try {
             if (!$id) {

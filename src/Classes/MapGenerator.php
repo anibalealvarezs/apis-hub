@@ -234,7 +234,8 @@ class MapGenerator
         foreach ($existingMetrics as $metric) {
             $metricKey = KeyGenerator::generateMetricKey(
                 dimensionsHash: $metric['dimensions_hash'],
-                metricConfigKey: $metricConfigMap['mapReverse'][$metric['metric_config_id']]
+                metricConfigKey: $metricConfigMap['mapReverse'][$metric['metric_config_id']],
+                metricDate: $metric['metric_date'],
             );
             $metricMap[$metricKey] = (int)$metric['id'];
         }

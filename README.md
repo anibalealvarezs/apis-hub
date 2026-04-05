@@ -137,6 +137,7 @@ Detailed guides for setting up and maintaining the infrastructure:
 - [Data Aggregation Guide](docs/aggregations.md)
 - [Cloud Architecture & Data Access Strategy](docs/cloud-architecture.md)
 - [Deployment Checklist](docs/deployment-checklist.md)
+- [Manual Deployment Tutorial](docs/manual-deployment.md)
 
 ## 🛠 Installation & Deployment
 

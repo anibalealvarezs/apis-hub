@@ -137,7 +137,10 @@ function populateGlobalFields() {
         if (timeoutEl) timeoutEl.value = currentConfig.jobs_timeout_hours || 6;
         
         const rawMetricsEl = document.getElementById('cache-raw-metrics');
-        if (rawMetricsEl) rawMetricsEl.checked = !!currentConfig.cache_raw_metrics;
+        if (rawMetricsEl) {
+            rawMetricsEl.checked = !!currentConfig.cache_raw_metrics;
+            toggleRawMetricsWarning(rawMetricsEl.checked);
+        }
 
         // Extraction Granularity (Conceptual Separation)
         const fbLevelEl = document.getElementById('fb-marketing-level');
@@ -1187,4 +1190,18 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initConfig);
 } else {
     initConfig();
+}
+
+function toggleRawMetricsWarning(show) {
+    const el = document.getElementById('raw-metrics-danger-zone');
+    if (el) {
+        el.style.display = show ? 'block' : 'none';
+        if (show) {
+            el.animate([
+                { borderColor: 'var(--danger)', background: 'rgba(248, 81, 73, 0.1)' },
+                { borderColor: 'transparent', background: 'transparent' },
+                { borderColor: 'var(--danger)', background: 'rgba(248, 81, 73, 0.05)' }
+            ], { duration: 500, iterations: 2 });
+        }
+    }
 }

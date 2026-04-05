@@ -1,9 +1,6 @@
 <?php
-
 declare(strict_types=1);
-
 namespace Classes\Conversions;
-
 use Carbon\Carbon;
 use Classes\KeyGenerator;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -23,7 +20,6 @@ use Anibalealvarezs\FacebookGraphApi\Enums\AdsetPermission;
 use Anibalealvarezs\FacebookGraphApi\Enums\CampaignPermission;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
 use stdClass;
-
 class FacebookMarketingMetricConvert
 {
     /**
@@ -44,18 +40,17 @@ class FacebookMarketingMetricConvert
         ?Creative $creativeEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        array $metricsToProcess = [],
         ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
-
         // Creatives usually use Ad insights fields but for the creative itself
-        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = !empty($metricsToProcess) ? $metricsToProcess : ($customFields ? explode(',', $customFields) : explode(',', AdPermission::DEFAULT->insightsFields($metricSet)));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
-
         $logger?->info("Starting metrics conversion for creativeId {$creativeEntity->getCreativeId()}, rows=$rowCount");
         $elements = [];
         foreach ($rows as $index => $row) {
@@ -72,17 +67,17 @@ class FacebookMarketingMetricConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach ($row as $key => $value) {
-                if (!in_array($key, $metricsList)) {
+            foreach ($metricsList as $key) {
+                if (!isset($row[$key]) || $key === 'date_start') {
                     continue;
                 }
+                $value = $row[$key];
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook_marketing->value,
                     name: $key,
                     period: $period->value,
-                    metricDate: $metricDate,
                     channeledAccount:  $channeledAccountEntity->getPlatformId(),
                     campaign: $row['campaign_id'] ?? null,
                     channeledCampaign: $row['campaign_id'] ?? null,
@@ -94,9 +89,6 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
-                if (!is_numeric($val)) {
-                    continue;
-                }
                 $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
@@ -114,14 +106,12 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channeledCampaignPlatformId = $row['campaign_id'] ?? null;
                 $channeledMetric->channeledAdGroupPlatformId = $row['adset_id'] ?? null;
                 $channeledMetric->channeledAdPlatformId = $row['ad_id'] ?? null;
-
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
                 }
                 $elements[$metricConfigsGroupKey][$key][] = $channeledMetric;
             }
         }
-
         foreach ($elements as $element) {
             foreach ($element as $metricNameElement) {
                 foreach ($metricNameElement as $metricElement) {
@@ -129,14 +119,11 @@ class FacebookMarketingMetricConvert
                 }
             }
         }
-
         $totalTime = microtime(true) - $startTime;
         $memory = memory_get_usage() / 1024 / 1024;
         $logger?->info("Completed creative metrics conversion: $rowCount rows to " . $collection->count() . " metrics, took $totalTime seconds, memory: $memory MB");
-
         return $collection;
     }
-
     /**
      * Converts Facebook Ad Account API rows into a collection of metric objects.
      *
@@ -155,17 +142,16 @@ class FacebookMarketingMetricConvert
         ?string $channeledAccountPlatformId = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        array $metricsToProcess = [],
         ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
-
-        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdAccountPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = !empty($metricsToProcess) ? $metricsToProcess : ($customFields ? explode(',', $customFields) : explode(',', AdAccountPermission::DEFAULT->insightsFields($metricSet)));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
-
         $logger?->info("Starting metrics conversion for platformId $channeledAccountPlatformId, rows=$rowCount");
         $elements = [];
         foreach ($rows as $index => $row) {
@@ -184,17 +170,17 @@ class FacebookMarketingMetricConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach ($row as $key => $value) {
-                if (!in_array($key, $metricsList)) {
+            foreach ($metricsList as $key) {
+                if (!isset($row[$key]) || $key === 'date_start') {
                     continue;
                 }
+                $value = $row[$key];
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook_marketing->value,
                     name: $key,
                     period: $period->value,
-                    metricDate: $metricDate,
                     account: $accountEntity,
                     channeledAccount:  $channeledAccountPlatformId,
                 );
@@ -202,9 +188,6 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
-                if (!is_numeric($val)) {
-                    continue;
-                }
                 $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
@@ -217,14 +200,12 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->data = $row;
                 $channeledMetric->account = $accountEntity;
                 $channeledMetric->channeledAccountPlatformId = $channeledAccountPlatformId;
-
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
                 }
                 $elements[$metricConfigsGroupKey][$key][] = $channeledMetric;
             }
         }
-
         foreach ($elements as $element) {
             foreach ($element as $metricNameElement) {
                 foreach ($metricNameElement as $metricElement) {
@@ -232,14 +213,11 @@ class FacebookMarketingMetricConvert
                 }
             }
         }
-
         $totalTime = microtime(true) - $startTime;
         $memory = memory_get_usage() / 1024 / 1024;
         $logger?->info("Completed metrics conversion: $rowCount rows to " . $collection->count() . " metrics, skipped $skippedRows rows, took $totalTime seconds, memory: $memory MB");
-
         return $collection;
     }
-
     /**
      * Converts Facebook Campaign API rows into a collection of metric objects.
      *
@@ -260,17 +238,16 @@ class FacebookMarketingMetricConvert
         ?ChanneledCampaign $channeledCampaignEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        array $metricsToProcess = [],
         ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
-
         $metricsList = $customFields ? explode(',', $customFields) : explode(',', CampaignPermission::DEFAULT->insightsFields($metricSet));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
-
         $logger?->info("Starting metrics conversion for platformId {$channeledCampaignEntity->getPlatformId()}, rows=$rowCount");
         $elements = [];
         foreach ($rows as $index => $row) {
@@ -289,17 +266,17 @@ class FacebookMarketingMetricConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach ($row as $key => $value) {
-                if (!in_array($key, $metricsList)) {
+            foreach ($metricsList as $key) {
+                if (!isset($row[$key]) || $key === 'date_start') {
                     continue;
                 }
+                $value = $row[$key];
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook_marketing->value,
                     name: $key,
                     period: $period->value,
-                    metricDate: $metricDate,
                     channeledAccount:  $channeledAccountEntity->getPlatformId(),
                     campaign: $campaignEntity->getCampaignId(),
                     channeledCampaign: $channeledCampaignEntity->getPlatformId(),
@@ -308,9 +285,6 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
-                if (!is_numeric($val)) {
-                    continue;
-                }
                 $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
@@ -325,14 +299,12 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channeledAccount = $channeledAccountEntity;
                 $channeledMetric->campaign = $campaignEntity;
                 $channeledMetric->channeledCampaign = $channeledCampaignEntity;
-
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
                 }
                 $elements[$metricConfigsGroupKey][$key][] = $channeledMetric;
             }
         }
-
         foreach ($elements as $element) {
             foreach ($element as $metricNameElement) {
                 foreach ($metricNameElement as $metricElement) {
@@ -340,14 +312,11 @@ class FacebookMarketingMetricConvert
                 }
             }
         }
-
         $totalTime = microtime(true) - $startTime;
         $memory = memory_get_usage() / 1024 / 1024;
         $logger?->info("Completed metrics conversion: $rowCount rows to " . $collection->count() . " metrics, skipped $skippedRows rows, took $totalTime seconds, memory: $memory MB");
-
         return $collection;
     }
-
     /**
      * Converts Facebook Adset API rows into a collection of metric objects.
      *
@@ -370,17 +339,16 @@ class FacebookMarketingMetricConvert
         ?ChanneledAdGroup $channeledAdGroupEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        array $metricsToProcess = [],
         ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
-
-        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdsetPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = !empty($metricsToProcess) ? $metricsToProcess : ($customFields ? explode(',', $customFields) : explode(',', AdsetPermission::DEFAULT->insightsFields($metricSet)));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
-
         $logger?->info("Starting metrics conversion for platformId {$channeledAdGroupEntity->getPlatformId()}, rows=$rowCount");
         $elements = [];
         foreach ($rows as $index => $row) {
@@ -399,17 +367,17 @@ class FacebookMarketingMetricConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach ($row as $key => $value) {
-                if (!in_array($key, $metricsList)) {
+            foreach ($metricsList as $key) {
+                if (!isset($row[$key]) || $key === 'date_start') {
                     continue;
                 }
+                $value = $row[$key];
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook_marketing->value,
                     name: $key,
                     period: $period->value,
-                    metricDate: $metricDate,
                     channeledAccount:  $channeledAccountEntity->getPlatformId(),
                     campaign: $campaignEntity->getCampaignId(),
                     channeledCampaign: $channeledCampaignEntity->getPlatformId(),
@@ -419,9 +387,6 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
-                if (!is_numeric($val)) {
-                    continue;
-                }
                 $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
@@ -437,14 +402,12 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->campaign = $campaignEntity;
                 $channeledMetric->channeledCampaign = $channeledCampaignEntity;
                 $channeledMetric->channeledAdGroup = $channeledAdGroupEntity;
-
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
                 }
                 $elements[$metricConfigsGroupKey][$key][] = $channeledMetric;
             }
         }
-
         foreach ($elements as $element) {
             foreach ($element as $metricNameElement) {
                 foreach ($metricNameElement as $metricElement) {
@@ -452,14 +415,11 @@ class FacebookMarketingMetricConvert
                 }
             }
         }
-
         $totalTime = microtime(true) - $startTime;
         $memory = memory_get_usage() / 1024 / 1024;
         $logger?->info("Completed metrics conversion: $rowCount rows to " . $collection->count() . " metrics, skipped $skippedRows rows, took $totalTime seconds, memory: $memory MB");
-
         return $collection;
     }
-
     /**
      * Converts Facebook Ad API rows into a collection of metric objects.
      *
@@ -484,17 +444,16 @@ class FacebookMarketingMetricConvert
         ?ChanneledAd $channeledAdEntity = null,
         Period $period = Period::Daily,
         MetricSet $metricSet = MetricSet::KEY,
+        array $metricsToProcess = [],
         ?string $customFields = null,
     ): ArrayCollection {
         $startTime = microtime(true);
         $rowCount = count($rows);
         $collection = new ArrayCollection();
         $skippedRows = 0;
-
-        $metricsList = $customFields ? explode(',', $customFields) : explode(',', AdPermission::DEFAULT->insightsFields($metricSet));
+        $metricsList = !empty($metricsToProcess) ? $metricsToProcess : ($customFields ? explode(',', $customFields) : explode(',', AdPermission::DEFAULT->insightsFields($metricSet)));
         $breakdowns = ['age', 'gender'];
         $metadataFields = ['actions', 'cost_per_action_type'];
-
         $logger?->info("Starting metrics conversion for platformId {$channeledAdEntity->getPlatformId()}, rows=$rowCount");
         $elements = [];
         foreach ($rows as $index => $row) {
@@ -513,17 +472,17 @@ class FacebookMarketingMetricConvert
             $metadata = array_filter($row, function ($key) use ($metadataFields) {
                 return in_array($key, $metadataFields);
             }, ARRAY_FILTER_USE_KEY);
-            foreach ($row as $key => $value) {
-                if (!in_array($key, $metricsList)) {
+            foreach ($metricsList as $key) {
+                if (!isset($row[$key]) || $key === 'date_start') {
                     continue;
                 }
+                $value = $row[$key];
                 $dateStart = $row['date_start'] ?? null;
                 $metricDate = $dateStart ? Carbon::parse($dateStart)->toDateString() : Carbon::now()->toDateString();
                 $metricConfigsGroupKey = KeyGenerator::generateMetricConfigKey(
                     channel: Channel::facebook_marketing->value,
                     name: $key,
                     period: $period->value,
-                    metricDate: $metricDate,
                     channeledAccount:  $channeledAccountEntity->getPlatformId(),
                     campaign: $campaignEntity->getCampaignId(),
                     channeledCampaign: $channeledCampaignEntity->getPlatformId(),
@@ -534,9 +493,6 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channel = Channel::facebook_marketing->value;
                 $channeledMetric->name = $key;
                 $val = is_array($value) ? ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value[0]['values'][0]['value'] ?? 0))) : $value;
-                if (!is_numeric($val)) {
-                    continue;
-                }
                 $channeledMetric->value = $val;
                 $channeledMetric->period = $period->value;
                 $channeledMetric->metricDate = $metricDate;
@@ -553,14 +509,12 @@ class FacebookMarketingMetricConvert
                 $channeledMetric->channeledCampaign = $channeledCampaignEntity;
                 $channeledMetric->channeledAdGroup = $channeledAdGroupEntity;
                 $channeledMetric->channeledAd = $channeledAdEntity;
-
                 if (!isset($elements[$metricConfigsGroupKey][$key])) {
                     $elements[$metricConfigsGroupKey][$key] = [];
                 }
                 $elements[$metricConfigsGroupKey][$key][] = $channeledMetric;
             }
         }
-
         foreach ($elements as $element) {
             foreach ($element as $metricNameElement) {
                 foreach ($metricNameElement as $metricElement) {
@@ -568,11 +522,9 @@ class FacebookMarketingMetricConvert
                 }
             }
         }
-
         $totalTime = microtime(true) - $startTime;
         $memory = memory_get_usage() / 1024 / 1024;
         $logger?->info("Completed metrics conversion: $rowCount rows to " . $collection->count() . " metrics, skipped $skippedRows rows, took $totalTime seconds, memory: $memory MB");
-
         return $collection;
     }
 }

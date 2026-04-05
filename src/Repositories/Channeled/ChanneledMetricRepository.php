@@ -47,8 +47,8 @@ class ChanneledMetricRepository extends ChanneledBaseRepository
         $query->from($this->getEntityName(), 'e');
 
         if ($type === QueryBuilderType::SELECT || $type === QueryBuilderType::AGGREGATE || $type === QueryBuilderType::LAST) {
-            $query->addSelect('partial m.{id, value, dimensionsHash, metadata}')
-                ->addSelect('partial mc.{id, channel, name, period, metricDate}')
+            $query->addSelect('partial m.{id, value, metricDate, dimensionsHash, metadata}')
+                ->addSelect('partial mc.{id, channel, name, period}')
                 ->addSelect('ds')
                 ->leftJoin('e.metric', 'm')
                 ->leftJoin('m.metricConfig', 'mc')

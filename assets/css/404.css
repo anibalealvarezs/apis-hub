@@ -1,0 +1,61 @@
+/* 404 Page Specific Styles */
+body.error-404 {
+    margin: 0;
+    background-color: #17212a;
+    color: #ffffff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    text-align: center;
+    flex-direction: column;
+    padding: 2rem;
+}
+
+.error-404 h1 {
+    font-size: 3rem;
+    color: #e7980b;
+    margin-bottom: 0.5rem;
+}
+
+.error-404 p {
+    font-size: 1.25rem;
+    max-width: 600px;
+    margin-bottom: 2rem;
+    line-height: 1.6;
+}
+
+.error-404 a.button {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background-color: #2089ab;
+    color: #ffffff;
+    border-radius: 30px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+
+.error-404 a.button:hover {
+    background-color: #186b8c;
+}
+
+.error-404 .ghost {
+    font-size: 5rem;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 600px) {
+    .error-404 h1 {
+        font-size: 2.2rem;
+    }
+
+    .error-404 p {
+        font-size: 1rem;
+    }
+
+    .error-404 .ghost {
+        font-size: 4rem;
+    }
+}

@@ -19,20 +19,34 @@ if [ ! -f ".env.demo" ]; then
     exit 1
 fi
 
+# Check for --no-seed option
+if [ "$1" == "--no-seed" ]; then
+    echo -e "${YELLOW}⏩ Skipping seeding as requested...${NC}"
+    export SKIP_SEED=1
+fi
+
 # Configuration
-export ENV_FILE=.env.demo
+export ENV_FILE=${ENV_FILE:-.env.demo}
+export SKIP_SEED=${SKIP_SEED:-0}
+
+# --- ENSURE CLEAN SLATE FOR DEMO (Crucial to synchronize DB credentials) ---
+echo -e "${YELLOW}🧹 Cleaning up previous demo data & volumes...${NC}"
+if [ -f "docker-compose.yml" ]; then
+    docker compose --env-file "$ENV_FILE" down -v --remove-orphans || echo "  ⚠️ Cleanup had issues, continuing..."
+fi
+# ----------------------------------------------------------------------------
 
 # Run the standard deployment with the demo env
 # This will trigger InstanceGeneratorService to create only 1 master instance
 sh bin/full-deploy.sh
 
-# Seeding
+# Seeding is now handled automatically by the master instance during bootstrap (app:setup-db)
+# We just wait a few seconds and show the status.
 echo ""
-echo -e "${BLUE}🌱 [6/5] Seeding massive demo data into apis-hub-demo...${NC}"
-echo "  (This might take a minute due to the volume of metrics)"
-
-# We execute inside the master instance container
-docker compose --env-file .env.demo exec demo-entities-sync php bin/cli.php app:seed-demo-data
+echo -e "${GREEN}✅ Deployment successful!${NC}"
+echo -e "Automatic seeding is now running in the background inside the container."
+echo "You can monitor progress with: docker compose logs -f demo-entities-sync"
+echo ""
 
 echo ""
 echo -e "${GREEN}✅ DEMO Deployment and Seeding complete!${NC}"

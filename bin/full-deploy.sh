@@ -92,6 +92,7 @@ echo -e "${YELLOW}🔄 [2/5] Calculating instance nodes and splits...${NC}"
 MSYS_NO_PATHCONV=1 docker run --rm \
     -v "$(pwd):/app" \
     -e "ENV_FILE=$ENV_FILE" \
+    -e "SKIP_SEED=$SKIP_SEED" \
     --env-file "$ENV_FILE" \
     -w /app \
     php:8.3-cli \
@@ -104,6 +105,7 @@ echo -e "${YELLOW}📂 [3/5] Building Docker Compose manifest...${NC}"
 MSYS_NO_PATHCONV=1 docker run --rm \
     -v "$(pwd):/app" \
     -e "ENV_FILE=$ENV_FILE" \
+    -e "SKIP_SEED=$SKIP_SEED" \
     --env-file "$ENV_FILE" \
     -w /app \
     php:8.3-cli \

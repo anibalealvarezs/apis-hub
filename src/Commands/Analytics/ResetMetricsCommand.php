@@ -119,12 +119,22 @@ class ResetMetricsCommand extends Command
                     $connection->executeStatement("SET FOREIGN_KEY_CHECKS = 1");
                 }
 
-                // Cleanup orphaned dimension sets
-                $output->writeln('<info>🧹 Cleaning orphaned dimension sets...</info>');
+                // Cleanup orphaned dimension sets and items
+                $output->writeln('<info>  Cleaning orphaned dimension sets and items...</info>');
+                $connection->executeStatement("
+                    DELETE FROM dimension_set_items 
+                    WHERE dimension_set_id NOT IN (SELECT DISTINCT dimension_set_id FROM channeled_metrics WHERE dimension_set_id IS NOT NULL)
+                    AND dimension_set_id NOT IN (SELECT DISTINCT dimension_set_id FROM metric_configs WHERE dimension_set_id IS NOT NULL)
+                ");
                 $connection->executeStatement("
                     DELETE FROM dimension_sets 
                     WHERE id NOT IN (SELECT DISTINCT dimension_set_id FROM channeled_metrics WHERE dimension_set_id IS NOT NULL)
+                    AND id NOT IN (SELECT DISTINCT dimension_set_id FROM metric_configs WHERE dimension_set_id IS NOT NULL)
                 ");
+
+                // Optional: Prune unused dimension values and keys to ensure absolute reset
+                $connection->executeStatement("DELETE FROM dimension_values WHERE id NOT IN (SELECT dimension_value_id FROM dimension_set_items)");
+                $connection->executeStatement("DELETE FROM dimension_keys WHERE id NOT IN (SELECT dimension_key_id FROM dimension_values)");
                 
             } else {
                 // Global TRUNCATE

@@ -5,7 +5,10 @@ use Controllers\MonitoringController;
 use Controllers\PageController;
 use Controllers\FacebookAuthController;
 use Controllers\PrivacyController;
+use Controllers\ManagementController;
+use Controllers\PublicDataController;
 use Symfony\Component\HttpFoundation\Request;
+
 
 return [
     '/' => [
@@ -47,7 +50,7 @@ return [
     '/fb-callback' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
-            return (new FacebookAuthController())->callback(\Symfony\Component\HttpFoundation\Request::createFromGlobals());
+            return (new FacebookAuthController())->callback(Request::createFromGlobals());
         },
         'public' => true,
         'html' => true
@@ -136,8 +139,8 @@ return [
     ],
     '/api/config-manager/assets' => [
         'httpMethod' => 'GET',
-        'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $request = Request::create('', 'GET', $params ?? [], [], [], [], $body);
             return (new ConfigManagerController())->fetchAssets($request);
         },
         'public' => false,
@@ -146,8 +149,8 @@ return [
     ],
     '/api/config-manager/update' => [
         'httpMethod' => 'POST',
-        'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $request = Request::create('', 'POST', $params ?? [], [], [], [], $body);
             return (new ConfigManagerController())->updateConfig($request);
         },
         'public' => false,
@@ -156,8 +159,8 @@ return [
     ],
     '/api/config-manager/validate-tokens' => [
         'httpMethod' => 'POST',
-        'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $request = Request::create('', 'POST', $params ?? [], [], [], [], $body);
             return (new ConfigManagerController())->validateTokens($request);
         },
         'public' => false,
@@ -166,8 +169,8 @@ return [
     ],
     '/api/config-manager/export' => [
         'httpMethod' => 'POST',
-        'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $request = Request::create('', 'POST', $params ?? [], [], [], [], $body);
             return (new ConfigManagerController())->exportConfig($request);
         },
         'public' => false,
@@ -190,5 +193,100 @@ return [
         'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
         'html' => true,
         'admin' => false
+    ],
+    '/fb-organic-reports' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new PageController())->facebookOrganicReports(),
+        'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
+        'html' => true,
+        'admin' => false
+    ],
+    '/gsc-reports' => [
+        'httpMethod' => 'GET',
+        'callable' => fn (...$args) => (new PageController())->gscReports(),
+        'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
+        'html' => true,
+        'admin' => false
+    ],
+    '/api/management/update-credentials' => [
+        'httpMethod' => 'POST',
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $request = Request::create('', 'POST', $params ?? [], [], [], [], $body);
+            return (new ManagementController())->updateCredentials($request);
+        },
+        'public' => false,
+        'html' => false,
+        'admin' => true
+    ],
+    '/api/management/redeploy' => [
+        'httpMethod' => 'POST',
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $request = Request::create('', 'POST', $params ?? [], [], [], [], $body);
+            return (new ManagementController())->triggerRedeploy($request);
+        },
+        'public' => false,
+        'html' => false,
+        'admin' => true
+    ],
+    '/api/management/reset-channel' => [
+        'httpMethod' => 'POST',
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $request = Request::create('', 'POST', $params ?? [], [], [], [], $body);
+            return (new ManagementController())->resetChannel($request);
+        },
+        'public' => false,
+        'html' => false,
+        'admin' => true
+    ],
+    '/api/management/status' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            return (new ManagementController())->getStatus();
+        },
+        'public' => false,
+        'html' => false,
+        'admin' => true
+    ],
+    '/api/management/container/action' => [
+        'httpMethod' => 'POST',
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $request = Request::create('', 'POST', $params ?? [], [], [], [], $body);
+            return (new ManagementController())->containerAction($request);
+        },
+        'public' => false,
+        'html' => false,
+        'admin' => true
+    ],
+
+    '/api/heartbeat' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            return (new ManagementController())->getHeartbeat();
+        },
+        'public' => false,
+        'html' => false,
+        'admin' => true
+    ],
+
+    // --- Public API v1 (Phase 6) ---
+
+    '/api/v1/public/facebook/campaigns' => [
+        'httpMethod' => 'GET',
+        'callable' => fn(...$args) => (new PublicDataController())->getFacebookCampaigns(Request::createFromGlobals()),
+        'public' => true,
+        'admin' => false
+    ],
+    '/api/v1/public/facebook/metrics' => [
+        'httpMethod' => 'GET',
+        'callable' => fn(...$args) => (new PublicDataController())->getMetrics(Request::createFromGlobals(), 'facebook'),
+        'public' => true,
+        'admin' => false
+    ],
+    '/api/v1/public/gsc/metrics' => [
+        'httpMethod' => 'GET',
+        'callable' => fn(...$args) => (new PublicDataController())->getMetrics(Request::createFromGlobals(), 'gsc'),
+        'public' => true,
+        'admin' => false
     ]
 ];
+

@@ -17,20 +17,20 @@ class DimensionManager
     {
     }
 
+    public function clearCaches(): void
+    {
+        $this->keyCache = [];
+        $this->valueCache = [];
+        $this->setCache = [];
+    }
+
     /**
      * @param array $dimensions Array of ['dimensionKey' => '...', 'dimensionValue' => '...']
      * @return DimensionSet
      */
     public function resolveDimensionSet(array $dimensions): DimensionSet
     {
-        // 1. Sort and Generate Hash
-        usort($dimensions, fn($a, $b) => strcmp($a['dimensionKey'], $b['dimensionKey']));
-        
-        $hashString = "";
-        foreach ($dimensions as $d) {
-            $hashString .= $d['dimensionKey'] . ":" . ($d['dimensionValue'] ?? '') . "|";
-        }
-        $hash = md5(rtrim($hashString, "|"));
+        $hash = KeyGenerator::generateDimensionsHash($dimensions);
 
         // 2. Check Cache
         if (isset($this->setCache[$hash])) {

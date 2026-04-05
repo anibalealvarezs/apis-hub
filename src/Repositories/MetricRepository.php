@@ -84,8 +84,8 @@ class MetricRepository extends BaseRepository
     {
         $query = $this->_em->createQueryBuilder();
         match ($type) {
-            QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('partial e.{id, value, metadata}')
-                ->addSelect('partial mc.{id, channel, name, period, metricDate}'),
+            QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('partial e.{id, value, metricDate, metadata}')
+                ->addSelect('partial mc.{id, channel, name, period}'),
             QueryBuilderType::COUNT => $query->select('count(e.id)'),
             QueryBuilderType::CUSTOM => throw new Exception('To be implemented'),
         };
@@ -243,14 +243,15 @@ class MetricRepository extends BaseRepository
      */
     protected function getFieldAlias(string $field): string
     {
-        return in_array($field, ['id', 'value', 'dimensionsHash', 'metadata', 'channeledMetrics', 'metricConfig']) ? 'e' : 'mc';
+        return in_array($field, ['id', 'value', 'metricDate', 'dimensionsHash', 'metadata', 'channeledMetrics', 'metricConfig']) ? 'e' : 'mc';
     }
 
     public function getMaxMetricDateForChannelAndChanneledAccount(int $channel, int $channeledAccountId): ?string
     {
         $query = $this->_em->createQueryBuilder()
-            ->select('MAX(mc.metricDate)')
-            ->from(\Entities\Analytics\MetricConfig::class, 'mc')
+            ->select('MAX(e.metricDate)')
+            ->from(Metric::class, 'e')
+            ->join('e.metricConfig', 'mc')
             ->where('mc.channel = :channel')
             ->andWhere('IDENTITY(mc.channeledAccount) = :channeledAccount')
             ->setParameters([
@@ -260,8 +261,12 @@ class MetricRepository extends BaseRepository
             ->getQuery();
 
         try {
-            return $query->getSingleScalarResult();
-        } catch (NoResultException $e) {
+            $res = $query->getSingleScalarResult();
+            if ($res instanceof \DateTimeInterface) {
+                return $res->format('Y-m-d');
+            }
+            return is_string($res) ? $res : null;
+        } catch (NoResultException|NonUniqueResultException $e) {
             return null;
         }
     }
@@ -269,8 +274,9 @@ class MetricRepository extends BaseRepository
     public function getMaxMetricDateForChannelAndPage(int $channel, int $pageId): ?string
     {
         $query = $this->_em->createQueryBuilder()
-            ->select('MAX(mc.metricDate)')
-            ->from(\Entities\Analytics\MetricConfig::class, 'mc')
+            ->select('MAX(e.metricDate)')
+            ->from(\Entities\Analytics\Metric::class, 'e')
+            ->join('e.metricConfig', 'mc')
             ->where('mc.channel = :channel')
             ->andWhere('IDENTITY(mc.page) = :page')
             ->setParameters([
@@ -280,20 +286,26 @@ class MetricRepository extends BaseRepository
             ->getQuery();
 
         try {
-            return $query->getSingleScalarResult();
-        } catch (NoResultException $e) {
+            $res = $query->getSingleScalarResult();
+            if ($res instanceof \DateTimeInterface) {
+                return $res->format('Y-m-d');
+            }
+            return is_string($res) ? $res : null;
+        } catch (NoResultException|NonUniqueResultException $e) {
             return null;
         }
     }
 
     public function existsByChannelAndName(int $channel, string $name, Period $period, DateTime $metricDate): bool
     {
-        $query = $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
+        $query = $this->_em->createQueryBuilder()
+            ->select('COUNT(e.id)')
+            ->from(\Entities\Analytics\Metric::class, 'e')
             ->join('e.metricConfig', 'mc')
             ->where('mc.channel = :channel')
             ->andWhere('mc.name = :name')
             ->andWhere('mc.period = :period')
-            ->andWhere('mc.metricDate = :metricDate')
+            ->andWhere('e.metricDate = :metricDate')
             ->setParameters([
                 'channel' => $channel,
                 'name' => $name,
@@ -303,17 +315,18 @@ class MetricRepository extends BaseRepository
             ->getQuery();
 
         try {
-            return $query->getSingleScalarResult() > 0;
-        } catch (NoResultException $e) {
+            return (int)$query->getSingleScalarResult() > 0;
+        } catch (NoResultException|NonUniqueResultException $e) {
             return false;
         }
     }
 
-    public function getMinDate(?object $filters = null): ?string
+    public function getMinDate(object|array $filters = []): ?string
     {
         $query = $this->_em->createQueryBuilder()
-            ->select('MIN(mc.metricDate)')
-            ->from(\Entities\Analytics\MetricConfig::class, 'mc');
+            ->select('MIN(e.metricDate)')
+            ->from(\Entities\Analytics\Metric::class, 'e')
+            ->join('e.metricConfig', 'mc');
 
         if ($filters) {
             foreach ($filters as $key => $value) {
@@ -333,11 +346,12 @@ class MetricRepository extends BaseRepository
         }
     }
 
-    public function getMaxDate(?object $filters = null): ?string
+    public function getMaxDate(object|array $filters = []): ?string
     {
         $query = $this->_em->createQueryBuilder()
-            ->select('MAX(mc.metricDate)')
-            ->from(\Entities\Analytics\MetricConfig::class, 'mc');
+            ->select('MAX(e.metricDate)')
+            ->from(\Entities\Analytics\Metric::class, 'e')
+            ->join('e.metricConfig', 'mc');
 
         if ($filters) {
             foreach ($filters as $key => $value) {
@@ -368,7 +382,7 @@ class MetricRepository extends BaseRepository
             ->where('mc.channel = :channel')
             ->andWhere('mc.name = :name')
             ->andWhere('mc.period = :period')
-            ->andWhere('mc.metricDate = :metricDate')
+            ->andWhere('m.metricDate = :metricDate')
             ->setParameters([
                 'channel' => $channel,
                 'name' => $name,
@@ -387,7 +401,7 @@ class MetricRepository extends BaseRepository
             ->where('mc.channel = :channel')
             ->andWhere('mc.name = :name')
             ->andWhere('mc.period = :period')
-            ->andWhere('mc.metricDate BETWEEN :start AND :end')
+            ->andWhere('m.metricDate BETWEEN :start AND :end')
             ->setParameters([
                 'channel' => $channel,
                 'name' => $name,
@@ -418,7 +432,6 @@ class MetricRepository extends BaseRepository
                 channel: $channel,
                 name: $name,
                 period: $period,
-                metricDate: $metricDate,
                 query: $queryEntity,
                 page: $page,
                 country: $country,
@@ -431,7 +444,7 @@ class MetricRepository extends BaseRepository
                 ->where('mc.channel = :channel')
                 ->andWhere('mc.name = :name')
                 ->andWhere('mc.period = :period')
-                ->andWhere('mc.metricDate = :metricDate')
+                ->andWhere('m.metricDate = :metricDate')
                 ->setParameters([
                     'channel' => $channel,
                     'name' => $name,
@@ -523,7 +536,7 @@ class MetricRepository extends BaseRepository
             ->where('mc.channel = :channel')
             ->andWhere('mc.name = :name')
             ->andWhere('mc.period = :period')
-            ->andWhere('mc.metricDate BETWEEN :start AND :end')
+            ->andWhere('m.metricDate BETWEEN :start AND :end')
             ->setParameters([
                 'channel' => $channel,
                 'name' => $name,
@@ -563,11 +576,11 @@ class MetricRepository extends BaseRepository
         }
 
         if ($startDate) {
-            $query->andWhere("mc.metricDate >= :startDate")
+            $query->andWhere("e.metricDate >= :startDate")
                 ->setParameter('startDate', $startDate);
         }
         if ($endDate) {
-            $query->andWhere("mc.metricDate <= :endDate")
+            $query->andWhere("e.metricDate <= :endDate")
                 ->setParameter('endDate', $endDate);
         }
     }

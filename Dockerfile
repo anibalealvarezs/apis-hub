@@ -6,6 +6,10 @@ RUN apt-get update && apt-get install -y \
     git \
     cron \
     curl \
+    gnupg \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && apt-get update && apt-get install -y docker-ce-cli \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -15,7 +19,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 
 # Instalar extensiones PHP (maneja automáticamente dependencias complejas como IMAP)
-RUN install-php-extensions pdo_mysql pdo_pgsql zip imap redis
+RUN install-php-extensions pdo_mysql pdo_pgsql zip imap redis xdebug
 
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -32,7 +36,7 @@ RUN php -r '$j=json_decode(file_get_contents("composer.json"), true); if(isset($
     && rm -f composer.lock
 
 # Instalar dependencias PHP
-RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader --verbose
+RUN composer install --no-scripts --no-interaction --prefer-dist --optimize-autoloader --verbose
 
 # Copiar el resto de la aplicación
 COPY . /app

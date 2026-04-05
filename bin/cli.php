@@ -13,6 +13,7 @@ use Commands\Analytics\InspectJobsCommand;
 use Commands\Analytics\AnalyzeLogsCommand;
 use Commands\Analytics\ResetMetricsCommand;
 use Commands\Analytics\ResetEntitiesCommand;
+use Commands\Analytics\ResetChannelCommand;
 use Commands\HealthCheckCommand;
 use Commands\Crud\AggregateEntityCommand;
 use Commands\Crud\CreateEntityCommand;
@@ -76,8 +77,11 @@ try {
         new SeedDemoDataCommand(Helpers::getManager()),
         new ResetMetricsCommand(),
         new ResetEntitiesCommand(),
+        new ResetChannelCommand(),
+        new \Commands\Analytics\ScaleDownCommand($entityManager),
         new MigratePagesCanonicalCommand(Helpers::getManager()),
     ]);
+
 
     // Runs console application
     $cli->run();

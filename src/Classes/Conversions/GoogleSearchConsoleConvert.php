@@ -75,46 +75,53 @@ class GoogleSearchConsoleConvert
                 }
                 $dimensionValues[$dimension] = $row['keys'][$flippedDimensions[$dimension]];
             }
+            $dimensions = [
+                ['dimensionKey' => 'page', 'dimensionValue' => $dimensionValues['page'] ?? null],
+                ['dimensionKey' => 'query', 'dimensionValue' => $dimensionValues['query'] ?? null],
+                ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $searchAppearance],
+            ];
+            $dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
+
             $metricConfigKeys = [
                 'impressions' => KeyGenerator::generateMetricConfigKey(
                     channel: Channel::google_search_console->value,
                     name: 'impressions',
                     period: Period::Daily->value,
-                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
                     page:  $pageEntity?->getUrl() ?? $siteUrl,
-                    query: $dimensionValues['query'],
+                    query: null, // Universal Query is now NULL for generic GSC metrics
                     country: $dimensionValues['country'],
                     device: $dimensionValues['device'],
+                    dimensionSet: $dimensionsHash
                 ),
                 'clicks' => KeyGenerator::generateMetricConfigKey(
                     channel: Channel::google_search_console->value,
                     name: 'clicks',
                     period: Period::Daily->value,
-                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
                     page:  $pageEntity?->getUrl() ?? $siteUrl,
-                    query: $dimensionValues['query'],
+                    query: null,
                     country: $dimensionValues['country'],
                     device: $dimensionValues['device'],
+                    dimensionSet: $dimensionsHash
                 ),
                 'position' => KeyGenerator::generateMetricConfigKey(
                     channel: Channel::google_search_console->value,
                     name: 'position',
                     period: Period::Daily->value,
-                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
                     page:  $pageEntity?->getUrl() ?? $siteUrl,
-                    query: $dimensionValues['query'],
+                    query: null,
                     country: $dimensionValues['country'],
                     device: $dimensionValues['device'],
+                    dimensionSet: $dimensionsHash
                 ),
                 'ctr' => KeyGenerator::generateMetricConfigKey(
                     channel: Channel::google_search_console->value,
                     name: 'ctr',
                     period: Period::Daily->value,
-                    metricDate: Carbon::parse($dimensionValues['date'])->toDateString(),
                     page:  $pageEntity?->getUrl() ?? $siteUrl,
-                    query: $dimensionValues['query'],
+                    query: null,
                     country: $dimensionValues['country'],
                     device: $dimensionValues['device'],
+                    dimensionSet: $dimensionsHash
                 )
             ];
 
@@ -166,18 +173,12 @@ class GoogleSearchConsoleConvert
                 $channeledMetric->metricDate = Carbon::parse($row['keys'][$flippedDimensions['date']])->toDateString();
                 $channeledMetric->platformId = $platformId;
                 $channeledMetric->platformCreatedAt = Carbon::parse($row['keys'][$flippedDimensions['date']])->toDateTimeString();
-                $channeledMetric->query = $row['keys'][$flippedDimensions['query']] ?? 'unknown';
+                $channeledMetric->query = $dimensionValues['query'] ?? null; // Unbound from Universal Query entity
                 $channeledMetric->countryCode = $row['keys'][$flippedDimensions['country']] ?? Country::UNK->value;
                 $channeledMetric->deviceType = $row['keys'][$flippedDimensions['device']] ?? Device::UNKNOWN->value;
                 $channeledMetric->page = $pageEntity;
-                $channeledMetric->dimensions = [
-                    ['dimensionKey' => 'page', 'dimensionValue' => $row['keys'][$flippedDimensions['page']] ?? null],
-                    ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $searchAppearance],
-                ];
-                $channeledMetric->dimensionsHash = KeyGenerator::generateDimensionsHash([
-                    ['dimensionKey' => 'page', 'dimensionValue' => $row['keys'][$flippedDimensions['page']] ?? null],
-                    ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $searchAppearance],
-                ]);
+                $channeledMetric->dimensions = $dimensions;
+                $channeledMetric->dimensionsHash = $dimensionsHash;
                 $channeledMetric->metricConfigKey = $metricConfigKeys[$metricName]; // Pass the actual metricConfigKey
                 $channeledMetric->metadata = $aggregatedMetadata[$metricConfigKeys['impressions']];
                 $channeledMetric->data = [

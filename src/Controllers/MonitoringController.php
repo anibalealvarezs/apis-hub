@@ -183,9 +183,13 @@ class MonitoringController extends BaseController
                     'updated_at' => $updatedAt ? $updatedAt->format('Y-m-d H:i:s') : 'N/A',
                     'message' => $job->getMessage(),
                     'group' => $targetId,
+                    'instance_name' => $targetId,
                     'instance_label' => $instanceLabel,
+                    'container_stats' => $containerStats[$targetId] ?? ['total' => 0],
                     'history' => []
                 ];
+
+
             } else {
                 if (count($pipelines[$pipelineKey]['history']) < 10) {
                     $pipelines[$pipelineKey]['history'][] = [
@@ -415,9 +419,10 @@ class MonitoringController extends BaseController
                     return new JsonResponse(['success' => true, 'message' => "Job #$id triggered in background. Once it starts, status will change to 'Processing'."]);
 
                 case 'cancel':
-                    $job->addStatus(JobStatus::cancelled->value);
-                    $job->addMessage('Manually cancelled via Monitoring Dashboard');
-                    $this->em->flush();
+                    $jobRepo->update($id, (object)[
+                        'status' => JobStatus::cancelled->value,
+                        'message' => 'Manually cancelled via Monitoring Dashboard'
+                    ]);
                     return new JsonResponse(['success' => true, 'message' => "Job #$id manually cancelled/deactivated"]);
 
                 default: return new JsonResponse(['error' => "Action '$action' not supported"], 400);

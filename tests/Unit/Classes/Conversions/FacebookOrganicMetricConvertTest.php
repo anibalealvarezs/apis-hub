@@ -123,6 +123,7 @@ class FacebookOrganicMetricConvertTest extends BaseUnitTestCase
 
         $result = FacebookOrganicMetricConvert::igMediaMetrics(
             $rows,
+            $this->faker->date(),
             $this->page,
             $this->post,
             $this->account,
@@ -154,7 +155,7 @@ class FacebookOrganicMetricConvertTest extends BaseUnitTestCase
 
         // 3. IG media metrics with empty 'values'
         $rows = [['name' => 'likes', 'values' => []]];
-        $result = FacebookOrganicMetricConvert::igMediaMetrics($rows, $this->page, $this->post, $this->account, $this->channeledAccount);
+        $result = FacebookOrganicMetricConvert::igMediaMetrics($rows, '2023-01-01', $this->page, $this->post, $this->account, $this->channeledAccount);
         $this->assertCount(1, $result);
         $this->assertEquals(0, $result->first()->value);
     }

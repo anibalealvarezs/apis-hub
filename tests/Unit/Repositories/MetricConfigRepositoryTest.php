@@ -65,7 +65,7 @@ class MetricConfigRepositoryTest extends TestCase
     {
         $this->queryBuilder->expects($this->once())
             ->method('select')
-            ->with('partial e.{id, channel, name, period, metricDate}')
+            ->with('partial e.{id, channel, name, period}')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(13))
             ->method('addSelect')
@@ -105,7 +105,7 @@ class MetricConfigRepositoryTest extends TestCase
         $date = new \DateTime();
         $this->query->method('getSingleScalarResult')->willReturn(1);
 
-        $result = $this->repository->existsByChannelAndName(1, 'test', Period::Daily, $date);
+        $result = $this->repository->existsByChannelAndName(1, 'test', Period::Daily);
         $this->assertTrue($result);
     }
 

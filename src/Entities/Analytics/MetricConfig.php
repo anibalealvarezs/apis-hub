@@ -15,22 +15,24 @@ use Repositories\MetricConfigRepository;
 
 #[ORM\Entity(repositoryClass: MetricConfigRepository::class)]
 #[ORM\Table(name: 'metric_configs')]
-#[ORM\Index(columns: ['channel', 'name', 'period', 'metric_date'], name: 'idx_metric_configs_metricDate_period_idx')]
-#[ORM\Index(columns: ['channel', 'name', 'metric_date'], name: 'idx_metric_configs_metricDate_base_idx')]
+#[ORM\Index(columns: ['channel', 'name', 'period'], name: 'idx_metric_configs_base_idx')]
 #[ORM\Index(
-    columns: ['channel', 'name', 'period', 'metric_date', 'query_id', 'page_id', 'country_id', 'device_id'],
+    columns: ['channel', 'name', 'period', 'query_id', 'page_id', 'country_id', 'device_id', 'dimension_set_id'],
     name: 'idx_metric_configs_lookup_full_idx'
 )]
 #[ORM\Index(
-    columns: ['channel', 'name', 'period', 'metric_date', 'channeled_account_id'],
+    columns: ['channel', 'name', 'period', 'channeled_account_id'],
     name: 'idx_metric_configs_lookup_channeled_idx'
 )]
 #[ORM\Index(
-    columns: ['channel', 'name', 'period', 'metric_date', 'account_id'],
+    columns: ['channel', 'name', 'period', 'account_id'],
     name: 'idx_metric_configs_lookup_account_idx'
 )]
+#[ORM\Index(
+    columns: ['channel', 'name', 'period', 'post_id'],
+    name: 'idx_metric_configs_lookup_post_idx'
+)]
 #[ORM\UniqueConstraint(name: 'metric_config_signature_unique', columns: ['config_signature'])]
-#[ORM\HasLifecycleCallbacks]
 class MetricConfig extends Entity
 {
     #[ORM\Column(type: 'integer')]
@@ -41,9 +43,6 @@ class MetricConfig extends Entity
 
     #[ORM\Column(type: 'string')]
     protected string $period;
-
-    #[ORM\Column(name: 'metric_date', type: 'date')]
-    protected DateTimeInterface $metricDate;
 
     #[ORM\OneToMany(mappedBy: 'metricConfig', targetEntity: Metric::class, orphanRemoval: true)]
     protected Collection $metrics;
@@ -107,6 +106,10 @@ class MetricConfig extends Entity
     #[ORM\ManyToOne(targetEntity: Device::class)]
     #[ORM\JoinColumn(name: 'device_id', onDelete: 'SET NULL')]
     protected ?Device $device = null;
+
+    #[ORM\ManyToOne(targetEntity: \Entities\Analytics\Channeled\DimensionSet::class)]
+    #[ORM\JoinColumn(name: 'dimension_set_id', onDelete: 'SET NULL')]
+    protected ?\Entities\Analytics\Channeled\DimensionSet $dimensionSet = null;
 
     #[ORM\Column(name: 'config_signature', type: 'string', length: 32, unique: true)]
     protected string $configSignature;
@@ -173,23 +176,6 @@ class MetricConfig extends Entity
         return $this;
     }
 
-    /**
-     * @return DateTimeInterface
-     */
-    public function getMetricDate(): DateTimeInterface
-    {
-        return $this->metricDate;
-    }
-
-    /**
-     * @param DateTimeInterface $metricDate
-     * @return self
-     */
-    public function addMetricDate(DateTimeInterface $metricDate): self
-    {
-        $this->metricDate = $metricDate;
-        return $this;
-    }
 
     /**
      * @return Account|null
@@ -505,28 +491,21 @@ class MetricConfig extends Entity
 
     #[ORM\PrePersist]
     #[ORM\PreUpdate]
-    public function updateSignature(): void
+    /**
+     * @return \Entities\Analytics\Channeled\DimensionSet|null
+     */
+    public function getDimensionSet(): ?\Entities\Analytics\Channeled\DimensionSet
     {
-        $this->configSignature = \Classes\KeyGenerator::generateMetricConfigKey(
-            channel: $this->channel,
-            name: $this->name,
-            period: $this->period,
-            metricDate: $this->metricDate,
-            account: $this->account,
-            channeledAccount: $this->channeledAccount,
-            campaign: $this->campaign,
-            channeledCampaign: $this->channeledCampaign,
-            channeledAdGroup: $this->channeledAdGroup,
-            channeledAd: $this->channeledAd,
-            creative: $this->creative?->getCreativeId(),
-            page: $this->page,
-            query: $this->query,
-            post: $this->post,
-            product: $this->product,
-            customer: $this->customer,
-            order: $this->order,
-            country: $this->country,
-            device: $this->device
-        );
+        return $this->dimensionSet;
+    }
+
+    /**
+     * @param \Entities\Analytics\Channeled\DimensionSet|null $dimensionSet
+     * @return self
+     */
+    public function addDimensionSet(?\Entities\Analytics\Channeled\DimensionSet $dimensionSet): self
+    {
+        $this->dimensionSet = $dimensionSet;
+        return $this;
     }
 }

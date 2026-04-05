@@ -41,8 +41,17 @@ class RoutingCore implements HttpKernelInterface
 
         $matcher = new UrlMatcher($this->routes, $context);
 
+        // --- PHASE 4: Intelligent Rate Limiting ---
+        if ($this->shouldRateLimit($request)) {
+            $limitResponse = $this->checkRateLimit($request);
+            if ($limitResponse) return $limitResponse;
+        }
+        // ------------------------------------------
+
+
         try {
-            $attributes = $matcher->match($request->getPathInfo());
+            $trimmedPath = trim(urldecode($request->getPathInfo()), " \t\n\r\0\x0B");
+            $attributes = $matcher->match($trimmedPath);
             $isPublic = $attributes['public'] ?? false;
             $isAdminOnly = $attributes['admin'] ?? false;
             $controller = $attributes['controller'];
@@ -92,7 +101,7 @@ class RoutingCore implements HttpKernelInterface
         }
 
         // 2. Token Check
-        $providedKey = $request->headers->get('X-API-Key');
+        $providedKey = $request->headers->get('X-API-Key') ?: $request->headers->get('X-Admin-API-Key');
         if ($providedKey === null) {
             $authHeader = $request->headers->get('Authorization');
             if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
@@ -135,6 +144,58 @@ class RoutingCore implements HttpKernelInterface
 
         return !empty($validKeys) && in_array($providedKey, $validKeys, true);
     }
+
+    /**
+     * Determine if we should apply rate limiting to this request.
+     */
+    private function shouldRateLimit(Request $request): bool
+    {
+        // Don't rate limit health checks or local dev (if needed)
+        if ($request->getPathInfo() === '/api/heartbeat') return false;
+        if (\Helpers\Helpers::isDemo()) return false;
+        return true;
+    }
+
+    /**
+     * Check the rate limit in Redis and return a 429 response if exceeded.
+     */
+    private function checkRateLimit(Request $request): ?Response
+    {
+        try {
+            $redis = \Helpers\Helpers::getRedisClient();
+            if (!$redis) return null;
+
+            $ip = $request->getClientIp();
+            $isAdmin = $this->isAuthorized($request, true);
+            
+            // Tiered Limits: Admin/Facade gets 200/min, others 60/min
+            $limit = $isAdmin ? 200 : 60;
+            $window = 60; // 1 minute
+            
+            $key = "rate_limit:{$ip}";
+            $current = $redis->get($key);
+
+            if ($current && (int)$current >= $limit) {
+                return new Response(json_encode([
+                    'status' => 'error',
+                    'error' => 'Too Many Requests',
+                    'message' => 'Rate limit exceeded. Please try again later.'
+                ]), Response::HTTP_TOO_MANY_REQUESTS, ['Content-Type' => 'application/json']);
+            }
+
+            if (!$current) {
+                $redis->setex($key, $window, 1);
+            } else {
+                $redis->incr($key);
+            }
+        } catch (Exception $e) {
+            // If Redis fails, we prefer to let the request through but log it
+            error_log("Rate limiting failed: " . $e->getMessage());
+        }
+
+        return null;
+    }
+
 
     public function map(string $path, string $httpMethod, callable $controller, bool $public = false, bool $html = false, bool $admin = false): void
     {

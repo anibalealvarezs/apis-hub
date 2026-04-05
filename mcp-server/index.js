@@ -347,6 +347,8 @@ const MODE = process.env.MCP_MODE || "stdio";
 if (MODE === "sse") {
   const app = express();
   app.use(cors());
+  app.set('trust proxy', true); // Permitir detección correcta tras proxies/docker
+  app.use(express.json()); // Parser para leer sessionId del cuerpo de la petición
   const PORT = process.env.MCP_PORT || 3000;
 
   // Track active sessions and their transports
@@ -356,103 +358,74 @@ if (MODE === "sse") {
     res.send("APIs Hub MCP Server (SSE Mode) is running. Connect to /mcp/sse");
   });
 
-  // EXCLUDE express.json() from /mcp/messages to allow SDK to read raw stream
-  // (SDK needs to read the body directly from the request stream)
-  // Or alternatively, we can use express.json() and re-emit the data,
-  // but simpler to just use it selectively.
-
   // Middleware de logging total para debuggear peticiones de Antigravity
   app.use((req, res, next) => {
-    console.error(`[DEBUG-REQ] ${req.method} ${req.url} | Headers: ${JSON.stringify(req.headers).substring(0, 50)}...`);
+    console.error(`[MSG-IN] ${req.method} ${req.url} | Session: ${req.query.sessionId || 'N/A'} | Body keys: ${Object.keys(req.body || {})}`);
     next();
   });
 
-  // Manejador para el endpoint SSE (GET inicia el stream, otros métodos devolvemos JSON-RPC válido para inicialización)
-  app.all("/mcp/sse", async (req, res) => {
-    if (req.method !== "GET") {
-        console.error(`[DEBUG-REQ] Antigravity probando método ${req.method} en SSE. Enviando Handshake completo.`);
-        return res.status(200).json({ 
-            jsonrpc: "2.0", 
-            id: req.body ? req.body.id : (req.query.id || 1),
-            result: { 
-                protocolVersion: "2024-11-05",
-                capabilities: {
-                    logging: {},
-                    prompts: { listChanged: true },
-                    resources: { subscribe: true, listChanged: true },
-                    tools: { listChanged: true }
-                },
-                serverInfo: {
-                    name: "apis-hub-mcp-server",
-                    version: "1.0.0"
-                }
-            }
-        });
-    }
-
-    console.error(`[SSE] Nueva solicitud de conexión desde ${req.ip}`);
+  // MANEJO DE DISCOVERY: Si Antigravity explora cualquier GET en la raíz o .well-known,
+  // iniciamos el flujo SSE para que tenga una sesión activa.
+  app.get(/.*/, async (req, res) => {
+    // Si es un GET al SSE o cualquier ruta de descubrimiento, iniciar stream
+    console.error(`[DISC] Discovery GET detectado en ${req.url}`);
     
-    // Cabeceras CRÍTICAS para evitar que proxies (Nginx/Laragon/Túneles) guarden en buffer la respuesta
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Específico para Nginx
+    res.setHeader('X-Accel-Buffering', 'no');
     
-    // Detección de Host y Protocolo
-    const host = 'localhost:3010'; 
-    const endpoint = `http://localhost:3010/mcp/messages`;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.get('host');
+    const endpoint = `${protocol}://${host}/mcp/messages`;
     
-    console.error(`[SSE] Publicando endpoint ABSOLUTO: ${endpoint}`);
-
-    // Native transport handles the 'endpoint' event automatically using the first argument
     const transport = new SSEServerTransport(endpoint, res);
-    
     sessions.set(transport.sessionId, transport);
-    console.error(`[SSE] Sesión creada: ${transport.sessionId}`);
+    console.error(`[DISC] Sesión iniciada desde descubrimiento: ${transport.sessionId}`);
 
     const server = createMcpServer();
     await server.connect(transport);
     
     res.on("close", () => {
-        console.error(`[SSE] Conexión cerrada para sesión: ${transport.sessionId}`);
-        sessions.delete(transport.sessionId);
+        console.error(`[DISC] Conexión cerrada. Persistiendo ${transport.sessionId} 2min.`);
+        setTimeout(() => sessions.delete(transport.sessionId), 120000); 
     });
   });
 
-  app.post("/mcp/messages", async (req, res) => {
-    // Intentar obtener sessionId de todas las fuentes posibles
+  async function handleIncomingMessage(req, res) {
     let sessionId = req.query.sessionId || 
                     req.headers['x-session-id'] || 
                     req.headers['sse-session-id'] ||
                     (req.body && req.body.sessionId);
 
-    if (Array.isArray(sessionId)) {
-        sessionId = sessionId[0];
+    if (Array.isArray(sessionId)) sessionId = sessionId[0];
+
+    // FALLBACK INTELIGENTE: Si no hay ID pero hay una sesión activa reciente, usarla.
+    if (!sessionId && sessions.size > 0) {
+        sessionId = Array.from(sessions.keys())[sessions.size - 1];
+        console.error(`[MSG] Usando sesión de descubrimiento más reciente: ${sessionId}`);
     }
 
-    console.error(`[POST] Request URL: ${req.url}`);
-    console.error(`[POST] Session ID: ${sessionId || 'MISSING'}`);
-    
     if (!sessionId) {
-        console.error("[POST] Error: No se pudo encontrar sessionId en Query, Headers o Body");
-        return res.status(400).send("Session ID is required and was not found in any source.");
+        console.error(`[MSG] Error: Sin sesiones activas para responder al POST.`);
+        return res.status(401).send("No active session. Please initiate a GET request first.");
     }
 
     const transport = sessions.get(sessionId);
-    
     if (transport) {
-      const bodyPreview = req.body ? JSON.stringify(req.body).substring(0, 100) : "Raw Stream";
-      console.error(`[POST] Procesando mensaje para sesión ${sessionId}. Body: ${bodyPreview}...`);
       try {
         await transport.handlePostMessage(req, res);
       } catch (err) {
-        console.error(`[POST] Error en handlePostMessage: ${err.message}`);
+        console.error(`[MSG] Error SDK: ${err.message}`);
         res.status(500).send(err.message);
       }
     } else {
-      console.error(`[POST] Sesión no encontrada: ${sessionId}. Sesiones activas: ${Array.from(sessions.keys()).join(", ")}`);
-      res.status(404).send(`Session not found: ${sessionId}`);
+      res.status(404).send("Session expired. Please reconnect.");
     }
+  }
+
+  app.post(/.*/, async (req, res) => {
+    await handleIncomingMessage(req, res);
   });
 
   // Wait for PHP server to be ready before starting MCP (useful in Docker)

@@ -25,6 +25,83 @@ class BaseRepository extends EntityRepository
     private array $hideFields = [];
     protected bool $isChanneledMetric = false;
     private array $activeAggregateJoins = [];
+    private bool $needsImpressionsJoin = false;
+    protected static array $relationMap = [
+        'query'    => ['table' => 'queries', 'fk' => 'query_id', 'field' => 'query', 'alias' => 'rq'],
+        'channeledAccount'  => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
+        'account'           => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
+        'page'              => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rpa'],
+        'campaign'          => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'data', 'alias' => 'rcc', 'isJSON' => true, 'jsonPath' => 'name'],
+        'channeled_account_id' => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'id', 'alias' => 'rca'],
+        'channeledCampaign' => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'data', 'alias' => 'rcc', 'isJSON' => true, 'jsonPath' => 'name'],
+        'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeled_ad_group_id', 'field' => 'name', 'alias' => 'rag'],
+        'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'name', 'alias' => 'rad'],
+        'creative' => ['table' => 'creatives', 'fk' => 'creative_id', 'field' => 'name', 'alias' => 'rcre'],
+        'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
+        'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'type', 'alias' => 'rd'],
+        'page_title' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'title', 'alias' => 'rp_t', 'isAttribute' => true],
+        'page_platform_id' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rp_p', 'isAttribute' => true],
+        'linked_fb_page_id' => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'data', 'alias' => 'rca', 'isJSON' => true, 'jsonPath' => 'facebook_page_id', 'isAttribute' => true],
+        'post'              => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo'],
+        'post_id'   => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'post_id', 'alias' => 'rpo_id'],
+        'permalink_url' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pu', 'isJSON' => true, 'jsonPath' => 'permalink_url', 'isAttribute' => true],
+        'permalink' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_pl', 'isJSON' => true, 'jsonPath' => 'permalink', 'isAttribute' => true],
+        'timestamp' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ts', 'isJSON' => true, 'jsonPath' => 'timestamp', 'isAttribute' => true],
+        'created_time' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_ct', 'isJSON' => true, 'jsonPath' => 'created_time', 'isAttribute' => true],
+        'media_type' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_mt', 'isJSON' => true, 'jsonPath' => 'media_type', 'isAttribute' => true],
+        'message' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_msg', 'isJSON' => true, 'jsonPath' => 'message', 'isAttribute' => true],
+        'caption' => ['table' => 'posts', 'fk' => 'post_id', 'field' => 'data', 'alias' => 'rpo_cap', 'isJSON' => true, 'jsonPath' => 'caption', 'isAttribute' => true],
+    ];
+
+    /**
+     * Get the minimum date available for these metrics.
+     */
+    public function getMinDate(array|\stdClass $filters = []): ?string
+    {
+        $dateField = $this->getDateFieldName();
+        $qb = $this->createQueryBuilder('e')
+            ->select("MIN(e.$dateField)");
+        
+        foreach ($filters as $key => $value) {
+            if ($this->_class->hasField($key)) {
+                $qb->andWhere("e.$key = :$key")
+                   ->setParameter($key, $value);
+            }
+        }
+
+        return $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Get the maximum date available for these metrics.
+     */
+    public function getMaxDate(array|\stdClass $filters = []): ?string
+    {
+        $dateField = $this->getDateFieldName();
+        $qb = $this->createQueryBuilder('e')
+            ->select("MAX(e.$dateField)");
+        
+        foreach ($filters as $key => $value) {
+            if ($this->_class->hasField($key)) {
+                $qb->andWhere("e.$key = :$key")
+                   ->setParameter($key, $value);
+            }
+        }
+
+        return $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Get the date field name for the current entity.
+     */
+    protected function getDateFieldName(): string
+    {
+        $entityClass = $this->getEntityName();
+        if (str_contains($entityClass, 'Channeled')) {
+            return 'platformCreatedAt';
+        }
+        return 'metricDate';
+    }
 
     /**
      * Set the list of fields to hide from the result.
@@ -103,17 +180,37 @@ class BaseRepository extends EntityRepository
         $tableName = $this->_class->getTableName();
         $qb->from($tableName, 'e');
 
-        // Specialized logic for ChanneledMetric to support deep joins in aggregation
+        // Specialized logic for Metric entities (Metric or ChanneledMetric) to support deep joins
         $this->activeAggregateJoins = [];
-        $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
+        $entityName = $this->getEntityName();
+        $this->isChanneledMetric = str_ends_with($entityName, 'ChanneledMetric');
+        $isMetric = str_ends_with($entityName, 'Analytics\Metric');
+        $isPostgres = Helpers::isPostgres();
+
         if ($this->isChanneledMetric) {
             $qb->join('e', 'metrics', 'm', 'e.metric_id = m.id')
                ->join('m', 'metric_configs', 'mc', 'm.metric_config_id = mc.id');
+            
             $this->activeAggregateJoins['m'] = true;
+            $this->activeAggregateJoins['mc'] = true;
+        } elseif ($isMetric) {
+            $qb->join('e', 'metric_configs', 'mc', 'e.metric_config_id = mc.id');
             $this->activeAggregateJoins['mc'] = true;
         }
 
         // Selects with aggregation functions
+        $this->needsImpressionsJoin = false;
+        foreach ($aggregations as $expr) {
+            if (str_contains(strtolower($expr), 'position')) {
+                $this->needsImpressionsJoin = true;
+                break;
+            }
+        }
+
+        if ($this->needsImpressionsJoin && $this->isChanneledMetric) {
+            // Reverted JOIN due to performance impact on non-indexed tables
+        }
+
         foreach ($aggregations as $alias => $expr) {
             $parsedExpr = $this->mapFieldToSql($expr, true);
             
@@ -130,20 +227,7 @@ class BaseRepository extends EntityRepository
             $qb->addSelect("$parsedExpr AS $alias");
         }
 
-        $relationMap = [
-            'query'    => ['table' => 'queries', 'fk' => 'query_id', 'field' => 'query', 'alias' => 'rq'],
-            'page'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'url', 'alias' => 'rp'],
-            'account'  => ['table' => 'accounts', 'fk' => 'account_id', 'field' => 'name', 'alias' => 'ra'],
-            'campaign' => ['table' => 'campaigns', 'fk' => 'campaign_id', 'field' => 'name', 'alias' => 'rc'],
-            'channeledAccount'  => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
-            'channeledCampaign' => ['table' => 'channeled_campaigns', 'fk' => 'channeled_campaign_id', 'field' => 'platform_id', 'alias' => 'rcc'],
-            'adGroup'  => ['table' => 'channeled_ad_groups', 'fk' => 'channeled_ad_group_id', 'field' => 'name', 'alias' => 'rag'],
-            'ad'       => ['table' => 'channeled_ads', 'fk' => 'channeled_ad_id', 'field' => 'name', 'alias' => 'rad'],
-            'creative' => ['table' => 'creatives', 'fk' => 'creative_id', 'field' => 'name', 'alias' => 'rcre'],
-            'country'  => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
-            'device'   => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'name', 'alias' => 'rd'],
-        ];
-        $standardRelations = array_keys($relationMap);
+        $standardRelations = array_keys(self::$relationMap);
         $dateFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'year', 'month', 'day', 'week', 'quarter', 'dayofweek', 'dayname', 'monthname', 'metricDate', 'platformCreatedAt', 'createdAt', 'date'];
 
         $safeLeftJoin = function(string $from, string $table, string $alias, string $condition) use ($qb) {
@@ -156,131 +240,221 @@ class BaseRepository extends EntityRepository
             $qb->leftJoin($from, $table, $alias, $condition);
         };
 
+        $rootAlias = ($this->isChanneledMetric || $isMetric) ? 'mc' : 'm';
+
+        $joinRelation = function (string $field, bool $enforceExistence = false) use (&$activeAggregateJoins, $safeLeftJoin, $qb, $rootAlias, &$joinRelation) {
+            if (!isset(self::$relationMap[$field])) return;
+            $map = self::$relationMap[$field];
+
+            if (isset($activeAggregateJoins[$map['alias']])) {
+                // If already joined as LEFT, but now we need INNER, we transform it
+                if ($enforceExistence) {
+                    $joins = $qb->getQueryPart('join');
+                    // Logic to upgrade join if necessary can go here, but for now we enforce at first call
+                }
+                return;
+            }
+
+            // Recurse to join source mapping if defined
+            $sourceAlias = $rootAlias;
+            if (isset($map['from'])) {
+                $joinRelation($map['from'], $enforceExistence);
+                $sourceAlias = self::$relationMap[$map['from']]['alias'];
+            }
+
+            // Ensure join only happens once. Use INNER JOIN if we need to filter out orphans (Ghost entities)
+            if ($enforceExistence) {
+                 $qb->innerJoin($sourceAlias, $map['table'], $map['alias'], "$sourceAlias.{$map['fk']} = {$map['alias']}.id");
+            } else {
+                 $safeLeftJoin($sourceAlias, $map['table'], $map['alias'], "$sourceAlias.{$map['fk']} = {$map['alias']}.id");
+            }
+            $activeAggregateJoins[$map['alias']] = true;
+        };
+
         // Grouping and dimension handling
         foreach ($groupBy as $field) {
-            $quotedField = $field;
+            $isPostgres = Helpers::isPostgres();
+            $quoteChar = $isPostgres ? '"' : '`';
+            
+            // Virtual aliases like linked_fb_page_id shouldn't be quoted for result mapping consistency
+            $quotedField = $field; 
+            if (!preg_match('/^[a-zA-Z0-9_]+$/', $field)) {
+                $quotedField = $quoteChar . $field . $quoteChar;
+            }
             $isDimension = str_starts_with($field, 'dimensions.');
             $dimKey = $isDimension ? substr($field, 11) : $field;
 
-            // Automatic dimension detection: if it's a ChanneledMetric and not a standard relation/date/field
-            if ($this->isChanneledMetric && ($isDimension || (!in_array($field, $standardRelations) && !in_array($field, $dateFields) && !$this->_class->hasField($field)))) {
+            // Automatic dimension detection: if it's a ChanneledMetric taxonomy and not a standard relation/date/field
+            if (($isMetric || $this->isChanneledMetric) && ($isDimension || ($field !== 'account_type' && !in_array($field, $standardRelations) && !str_ends_with($field, '_id') && !in_array($field, $dateFields) && !$this->_class->hasField($field)))) {
+                $dimRootAlias = ($this->isChanneledMetric) ? 'e' : 'mc';
                 $dimAlias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
                 $qb->setParameter("key_$dimAlias", $dimKey);
                 
-                // Optimized join strategy to prevent Cartesian product without using junction table ID
-                // Each branch ONLY captures its intended dimension value from the set
-                $dsiCondition = "e.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
+                $safeLeftJoin($dimRootAlias, 'dimension_set_items', "dsi_$dimAlias", "$dimRootAlias.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
                     SELECT sub_dv.id FROM dimension_values sub_dv 
                     JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
                     WHERE sub_dk.name = :key_$dimAlias
-                )";
-                
-                $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", $dsiCondition);
+                )");
                 $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
                 
-                $qb->addSelect("dv_$dimAlias.value AS \"$quotedField\"")
+                $qb->addSelect("dv_$dimAlias.value AS $quotedField")
                    ->addGroupBy("dv_$dimAlias.value");
-            } elseif ($this->isChanneledMetric && in_array($field, ['account', 'campaign'])) {
+            } elseif (in_array($field, $standardRelations) || str_ends_with($field, '_id')) {
+                // Handling Relations and strict FKs
+                $relationKey = $field;
+                $isExplicitId = str_ends_with($field, '_id');
+                if ($isExplicitId && !isset(self::$relationMap[$field])) {
+                    $relationKey = substr($field, 0, -3);
+                    if ($relationKey === 'channeled_account') $relationKey = 'channeledAccount';
+                    if ($relationKey === 'channeled_campaign') $relationKey = 'channeledCampaign';
+                }
+                
+                if (isset(self::$relationMap[$relationKey])) {
+                    // Critical Fix: Enforce existence for primary groupings (page, account) to avoid ghost duplicates
+                    $isPrimaryRelation = in_array($relationKey, ['page', 'account', 'channeledAccount', 'campaign', 'channeledCampaign']);
+                    $joinRelation($relationKey, $isPrimaryRelation);
+                    $map = self::$relationMap[$relationKey];
+                    
+                    if ($isExplicitId || $field === $map['fk']) {
+                        $qb->addSelect("$rootAlias.{$map['fk']} AS $quotedField")
+                           ->addGroupBy("$rootAlias.{$map['fk']}");
+                    } else {
+                        // Use mapFieldToSql to handle JSON extraction or complex fields correctly
+                        $parsedIdField = $this->mapFieldToSql($field);
+                        $qb->addSelect("$parsedIdField AS $quotedField")
+                           ->addGroupBy($parsedIdField);
+                           
+                        // Only add shadow ID for primary relation concepts (post, account, etc.), not for secondary attributes
+                        if ($field === $relationKey && !isset($map['isAttribute'])) {
+                            $shadowId = $quoteChar . $field . "_id" . $quoteChar;
+                            $qb->addSelect("$rootAlias.{$map['fk']} AS $shadowId")
+                               ->addGroupBy("$rootAlias.{$map['fk']}");
+                        }
+                    }
+                } else {
+                    // Raw Column Fallback
+                    $qb->addSelect("$rootAlias.$field AS $quotedField")
+                       ->addGroupBy("$rootAlias.$field");
+                }
+            } elseif (($isMetric || $this->isChanneledMetric) && in_array($field, ['account', 'campaign'])) {
+                // Keep existing legacy account/campaign logic for cross-channel merging
                 $isAccount = $field === 'account';
                 $genericKey = $isAccount ? 'account' : 'campaign';
                 $channeledKey = $isAccount ? 'channeledAccount' : 'channeledCampaign';
-                $genericMap = $relationMap[$genericKey];
-                $channeledMap = $relationMap[$channeledKey];
-                
-                $safeLeftJoin('mc', $genericMap['table'], $genericMap['alias'], "mc.{$genericMap['fk']} = {$genericMap['alias']}.id");
-                $safeLeftJoin('mc', $channeledMap['table'], $channeledMap['alias'], "mc.{$channeledMap['fk']} = {$channeledMap['alias']}.id");
+                $genericMap = self::$relationMap[$genericKey];
+                $channeledMap = self::$relationMap[$channeledKey];
+                $joinRelation($genericKey);
+                $joinRelation($channeledKey);
 
                 if ($isAccount) {
-                    $campaignMap = $relationMap['channeledCampaign'];
-                    $safeLeftJoin('mc', $campaignMap['table'], $campaignMap['alias'], "mc.{$campaignMap['fk']} = {$campaignMap['alias']}.id");
-                    $safeLeftJoin($campaignMap['alias'], 'channeled_accounts', 'rca_fallback', "{$campaignMap['alias']}.channeled_account_id = rca_fallback.id");
+                    $joinRelation('channeledCampaign');
+                    $campaignAlias = self::$relationMap['channeledCampaign']['alias'];
+                    $safeLeftJoin($campaignAlias, 'channeled_accounts', 'rca_fallback', "{$campaignAlias}.channeled_account_id = rca_fallback.id");
                     
                     $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                    $qb->addSelect("COALESCE({$channeledMap['alias']}.{$channeledMap['field']}, rca_fallback.name, {$genericMap['alias']}.{$genericMap['field']}, CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
-                       ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
+                    $quotedFieldId = $quoteChar . $field . "_id" . $quoteChar;
+                    $qb->addSelect("COALESCE(CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST(rca_fallback.name AS $castType), CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), 'Unknown') AS $quotedField")
+                       ->addSelect("mc.{$channeledMap['fk']} AS $quotedFieldId")
                        ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
                        ->addGroupBy("rca_fallback.name")
                        ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
                        ->addGroupBy("{$channeledMap['alias']}.platform_id")
-                       ->addGroupBy("mc.{$channeledMap['fk']}")
-                       ->addGroupBy("mc.{$genericMap['fk']}");
+                       ->addGroupBy("mc.{$channeledMap['fk']}");
                 } else {
-                    $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                    $qb->addSelect("COALESCE({$genericMap['alias']}.{$genericMap['field']}, {$channeledMap['alias']}.{$channeledMap['field']}, CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), CAST(mc.{$genericMap['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
-                       ->addSelect("mc.{$channeledMap['fk']} AS \"{$quotedField}_id\"")
-                       ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
-                       ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
-                       ->addGroupBy("{$channeledMap['alias']}.platform_id")
-                       ->addGroupBy("mc.{$channeledMap['fk']}")
-                       ->addGroupBy("mc.{$genericMap['fk']}");
+                    if (isset($genericMap['isJSON']) && $genericMap['isJSON']) {
+                        $sqlField = $this->mapFieldToSql($field);
+                        $qb->addSelect("COALESCE($sqlField, 'N/A') AS $quotedField")
+                           ->addGroupBy($sqlField);
+                    } else {
+                        $quotedFieldId = $quoteChar . $field . "_id" . $quoteChar;
+                        $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
+                        $qb->addSelect("COALESCE(CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), 'Unknown') AS $quotedField")
+                           ->addSelect("mc.{$channeledMap['fk']} AS $quotedFieldId")
+                           ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
+                           ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
+                           ->addGroupBy("{$channeledMap['alias']}.platform_id")
+                           ->addGroupBy("mc.{$channeledMap['fk']}");
+                    }
                 }
-            } elseif ($this->isChanneledMetric && isset($relationMap[$field])) {
-                $map = $relationMap[$field];
-                $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
+            } elseif (($isMetric || $this->isChanneledMetric) && isset(self::$relationMap[$field])) {
+                $joinRelation($field);
+                $map = self::$relationMap[$field];
                 
                 $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                $qb->addSelect("COALESCE({$map['alias']}.{$map['field']}, CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS \"$quotedField\"")
-                   ->addSelect("mc.{$map['fk']} AS \"{$quotedField}_id\"")
-                   ->addGroupBy("{$map['alias']}.{$map['field']}")
-                   ->addGroupBy("mc.{$map['fk']}");
+                if (isset($map['isJSON']) && $map['isJSON']) {
+                    $sqlField = $this->mapFieldToSql($field);
+                    $qb->addSelect("COALESCE($sqlField, 'N/A') AS $quotedField")
+                       ->addGroupBy($sqlField);
+                } else {
+                    $quotedFieldId = $quoteChar . $field . "_id" . $quoteChar;
+                    $qb->addSelect("COALESCE(CAST({$map['alias']}.{$map['field']} AS $castType), CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS $quotedField")
+                       ->addSelect("mc.{$map['fk']} AS $quotedFieldId")
+                       ->addGroupBy("{$map['alias']}.{$map['field']}")
+                       ->addGroupBy("mc.{$map['fk']}");
+                }
             } else {
                 $sqlField = $this->mapFieldToSql($field);
-                $qb->addSelect("$sqlField AS \"$quotedField\"")->addGroupBy($sqlField);
+                $qb->addSelect("$sqlField AS $quotedField")
+                   ->addGroupBy($sqlField);
             }
         }
 
         // Apply filters
         if ($filters) {
             foreach ($filters as $key => $value) {
+                // Skip technical/debug parameters
+                if ($key === 'debug_sql' || $key === '_') continue;
+
                 $isDimension = str_starts_with($key, 'dimensions.');
                 $dimKey = $isDimension ? substr($key, 11) : $key;
 
-                if ($this->isChanneledMetric && ($isDimension || (!in_array($key, $standardRelations) && !in_array($key, $dateFields) && !$this->_class->hasField($key)))) {
+                if ($this->isChanneledMetric && ($isDimension || ($key !== 'account_type' && !in_array($key, $standardRelations) && !in_array($key, $dateFields) && !$this->_class->hasField($key)))) {
                     $dimAlias = "f_dim_" . preg_replace('/[^a-z0-9]/i', '_', $dimKey);
-                    $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id");
+                    $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
+                        SELECT sub_dv.id FROM dimension_values sub_dv 
+                        JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
+                        WHERE sub_dk.name = :key_$dimAlias
+                    )");
                     $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
-                    $safeLeftJoin("dv_$dimAlias", 'dimension_keys', "dk_$dimAlias", "dv_$dimAlias.dimension_key_id = dk_$dimAlias.id AND dk_$dimAlias.name = :key_$dimAlias");
                     
                     $qb->setParameter("key_$dimAlias", $dimKey)
                        ->andWhere("dv_$dimAlias.value = :val_$dimAlias")
                        ->setParameter("val_$dimAlias", $value);
-                } elseif ($this->isChanneledMetric && isset($relationMap[$key])) {
-                    $map = $relationMap[$key];
-                    // We join the relation to allow filtering by platform_id OR database ID
-                    $safeLeftJoin('mc', $map['table'], $map['alias'], "mc.{$map['fk']} = {$map['alias']}.id");
+                } elseif ((str_ends_with($entityName, 'Metric') || $this->isChanneledMetric) && (isset(self::$relationMap[$key]) || $key === 'account_type')) {
+                    $realKey = ($key === 'account_type') ? 'channeledAccount' : $key;
+                    $joinRelation($realKey);
+                    $map = self::$relationMap[$realKey];
+                    $fk = $map['fk'] ?? null;
                     
-                    // Safety check to prevent integer overflow and type mismatch in PostgreSQL
-                    $isPlatformIdValue = is_numeric($value) && (float)$value > 2147483647;
-                    $isPostgres = Helpers::isPostgres();
-                    
-                    if ($isPlatformIdValue) {
-                        $qb->andWhere("{$map['alias']}.platform_id = :f_$key")
-                           ->setParameter("f_$key", (string)$value);
+                    if ($value === 'N/A' || $value === 'NULL') {
+                        $nullTarget = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
+                        $qb->andWhere("$nullTarget IS NULL");
+                    } elseif ($value === 'NOT_NULL') {
+                        $nullTarget = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
+                        $qb->andWhere("$nullTarget IS NOT NULL");
+                    } elseif ($key === 'account_type') {
+                        $typeFilter = $isPostgres ? "LOWER({$map['alias']}.type) = LOWER(:f_$key)" : "{$map['alias']}.type = :f_$key";
+                        $qb->andWhere($typeFilter)
+                           ->setParameter("f_$key", $value);
                     } else {
-                        if ($isPostgres) {
-                            // On PostgreSQL, we MUST cast the integer FK to text to compare with a parameter 
-                            // that might be a non-numeric string, otherwise it fails with SQLSTATE[22P02]
-                            $qb->andWhere("(CAST(mc.{$map['fk']} AS text) = :f_$key OR {$map['alias']}.platform_id = :f_$key)")
-                               ->setParameter("f_$key", (string)$value);
+                        // Strict Relation Identity Model (Professional ID-only)
+                        $targetCol = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
+                        if (is_numeric($value)) {
+                            $qb->andWhere("$targetCol = :f_$key")
+                               ->setParameter("f_$key", (int)$value);
                         } else {
-                            $qb->andWhere("(mc.{$map['fk']} = :f_$key OR {$map['alias']}.platform_id = :f_$key)")
-                               ->setParameter("f_$key", $value);
+                            // If identifier is not an ID, no results (Correct behavior for relations)
+                            $qb->andWhere('1 = 0');
                         }
                     }
                 } else {
                     $sqlKey = $this->mapFieldToSql($key);
                     $paramName = 'f_' . preg_replace('/[^a-z0-9]/i', '_', $key);
                     
-                    $isPostgres = Helpers::isPostgres();
-                    if ($isPostgres) {
-                        // Cast both sides to text if the input is not numeric to prevent type mismatch
-                        if (!is_numeric($value)) {
-                            $qb->andWhere("CAST($sqlKey AS text) = :$paramName")
-                               ->setParameter($paramName, (string)$value);
-                        } else {
-                            $qb->andWhere("$sqlKey = :$paramName")
-                               ->setParameter($paramName, $value);
-                        }
+                    if ($value === 'N/A') {
+                        $qb->andWhere("$sqlKey IS NULL");
+                    } else if ($value === 'NOT_NULL') {
+                        $qb->andWhere("$sqlKey IS NOT NULL");
                     } else {
                         $qb->andWhere("$sqlKey = :$paramName")
                            ->setParameter($paramName, $value);
@@ -291,11 +465,17 @@ class BaseRepository extends EntityRepository
 
         // Apply date filters using the correctly mapped column names
         if ($startDate || $endDate) {
-            $dateField = 'platformCreatedAt'; // Default for channeled entities
-            if (!$this->_class->hasField($dateField)) {
-                $dateField = $this->_class->hasField('createdAt') ? 'createdAt' : 'date';
+            if ($this->isChanneledMetric) {
+                $sqlDateField = 'm.metric_date';
+            } elseif ($isMetric) {
+                $sqlDateField = 'e.metric_date';
+            } else {
+                $dateField = 'platformCreatedAt';
+                if (!$this->_class->hasField($dateField)) {
+                    $dateField = $this->_class->hasField('createdAt') ? 'createdAt' : 'date';
+                }
+                $sqlDateField = $this->mapFieldToSql($dateField);
             }
-            $sqlDateField = $this->mapFieldToSql($dateField);
 
             if ($startDate) {
                 $qb->andWhere("$sqlDateField >= :startDate")
@@ -313,7 +493,14 @@ class BaseRepository extends EntityRepository
             $qb->orderBy($orderBy, $direction);
         }
 
-        $results = $qb->executeQuery()->fetchAllAssociative();
+        $isPostgres = Helpers::isPostgres();
+        $logger = Helpers::setLogger('api_debug.log');
+        $logger->info("=== REPOSITORY AGGREGATE SQL DEBUG ===");
+        $logger->info("SQL: " . $qb->getSQL());
+        $logger->info("PARAMS: " . json_encode($qb->getParameters()));
+
+        $stmt = $qb->executeQuery();
+        $results = $stmt->fetchAllAssociative();
 
         // 4. Smoothing: Fill temporal gaps for time-series data
         if ($startDate && $endDate) {
@@ -382,7 +569,9 @@ class BaseRepository extends EntityRepository
             foreach ($results as $row) {
                 $combo = [];
                 foreach ($otherGroups as $field) {
-                    $combo[$field] = $row[$field] ?? null;
+                    // Casing defense (PostgreSQL returns lowercase even with quotes in some envs)
+                    $val = $row[$field] ?? $row[strtolower($field)] ?? null;
+                    $combo[$field] = $val;
                 }
                 $comboKey = serialize($combo);
                 $uniqueCombos[$comboKey] = $combo;
@@ -392,9 +581,11 @@ class BaseRepository extends EntityRepository
             foreach ($results as $row) {
                 $combo = [];
                 foreach ($otherGroups as $field) {
-                    $combo[$field] = $row[$field] ?? null;
+                    $val = $row[$field] ?? $row[strtolower($field)] ?? null;
+                    $combo[$field] = $val;
                 }
-                $key = $row[$temporalField] . '|' . serialize($combo);
+                $temporalVal = $row[$temporalField] ?? $row[strtolower($temporalField)] ?? null;
+                $key = $temporalVal . '|' . serialize($combo);
                 $indexedResults[$key] = $row;
             }
 
@@ -419,7 +610,8 @@ class BaseRepository extends EntityRepository
         // Simple case: only temporal grouping
         $indexedResults = [];
         foreach ($results as $row) {
-            $indexedResults[$row[$temporalField]] = $row;
+            $temporalVal = $row[$temporalField] ?? $row[strtolower($temporalField)] ?? null;
+            $indexedResults[$temporalVal] = $row;
         }
 
         $finalResults = [];
@@ -446,39 +638,69 @@ class BaseRepository extends EntityRepository
         $field = trim($expr);            
         $lowerField = strtolower($field);
 
-        // Specialized metric formulas for ChanneledMetric to handle cross-row aggregation
+        // Specialized metric formulas for ChanneledMetric and Metric to handle cross-row aggregation
         $this->isChanneledMetric = str_ends_with($this->getEntityName(), 'ChanneledMetric');
-        if ($this->isChanneledMetric && $isAggregate) {
+        $isMetric = str_ends_with($this->getEntityName(), 'Analytics\Metric');
+        $isPostgres = Helpers::isPostgres();
+        
+        if (($this->isChanneledMetric || $isMetric) && $isAggregate) {
+            $valCol = $this->isChanneledMetric ? 'm.value' : 'e.value';
             $formulas = [
-                'spend'       => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END)",
-                'clicks'      => "SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END)",
-                'impressions' => "SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END)",
-                'reach'       => "SUM(CASE WHEN mc.name = 'reach' THEN m.value ELSE 0 END)",
-                'frequency'   => "SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'reach' THEN m.value ELSE 0 END), 0)",
-                'ctr'         => "SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0)",
-                'cpc'         => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'clicks' THEN m.value ELSE 0 END), 0)",
-                'cpm'         => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / (NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0) / 1000)",
-                'position'    => "SUM(CASE WHEN mc.name = 'position' THEN m.value ELSE 0 END * (
-                    SELECT m2.value 
-                    FROM metrics m2 
-                    JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id 
-                    WHERE mc2.name = 'impressions' 
-                    AND mc2.metric_date = mc.metric_date 
-                    AND mc2.channel = mc.channel
-                    AND (mc2.query_id = mc.query_id OR (mc2.query_id IS NULL AND mc.query_id IS NULL))
-                    AND (mc2.page_id = mc.page_id OR (mc2.page_id IS NULL AND mc.page_id IS NULL))
-                    LIMIT 1
-                )) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0)",
-                'unique_clicks' => "SUM(CASE WHEN mc.name = 'unique_clicks' THEN m.value ELSE 0 END)",
-                'results'       => "SUM(CASE WHEN mc.name = 'results' THEN m.value ELSE 0 END)",
-                'cost_per_result' => "SUM(CASE WHEN mc.name = 'spend' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'results' THEN m.value ELSE 0 END), 0)",
-                'result_rate'     => "SUM(CASE WHEN mc.name = 'results' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name = 'impressions' THEN m.value ELSE 0 END), 0)",
-                'roas'            => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN m.value ELSE NULL END)",
-                'website_roas'    => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN m.value ELSE NULL END)",
-                'actions'         => "SUM(CASE WHEN mc.name = 'actions' THEN m.value ELSE 0 END)",
+                'spend'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'clicks'      => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('clicks', 'clicks_daily')" : "mc.name IN ('clicks', 'clicks_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'impressions' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'impressions_daily', 'post_impressions', 'post_impressions_daily', 'page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily')" : "mc.name IN ('impressions', 'impressions_daily', 'post_impressions', 'post_impressions_daily', 'page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'reach'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')" : "mc.name IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'frequency'   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'impressions_daily')" : "mc.name IN ('impressions', 'impressions_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reach', 'reach_daily')" : "mc.name IN ('reach', 'reach_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0)",
+                'ctr'         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('clicks', 'clicks_daily')" : "mc.name IN ('clicks', 'clicks_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'impressions_daily')" : "mc.name IN ('impressions', 'impressions_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0)",
+                'cpc'         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('clicks', 'clicks_daily')" : "mc.name IN ('clicks', 'clicks_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0)",
+                'cpm'         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / (NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'impressions_daily')" : "mc.name IN ('impressions', 'impressions_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0) / 1000)",
+                'position'    => $this->needsImpressionsJoin ? 
+                    "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'position'" : "mc.name = 'position'")." THEN $valCol * (SELECT m2.value FROM metrics m2 JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id WHERE ".($isPostgres ? "LOWER(mc2.name) IN ('impressions', 'page_media_view', 'post_media_view')" : "mc2.name IN ('impressions', 'page_media_view', 'post_media_view')")." AND m2.metric_date = ".($this->isChanneledMetric ? "m.metric_date" : "e.metric_date")." AND mc2.channel = mc.channel AND (mc2.dimension_set_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.dimension_set_id) AND (mc2.query_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.query_id) AND (mc2.page_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.page_id) LIMIT 1) ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'page_media_view', 'post_media_view')" : "mc.name IN ('impressions', 'page_media_view', 'post_media_view')")." THEN $valCol ELSE 0 END), 0)" :
+                    "NULL",
+                'unique_clicks' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'unique_clicks'" : "mc.name = 'unique_clicks'")." THEN $valCol ELSE 0 END)",
+                'results'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END)",
+                'cost_per_result' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'spend'" : "mc.name = 'spend'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END), 0)",
+                'result_rate'     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'page_media_view', 'post_media_view')" : "mc.name IN ('impressions', 'page_media_view', 'post_media_view')")." THEN $valCol ELSE 0 END), 0)",
+                'roas'            => "AVG(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'purchase_roas'" : "mc.name = 'purchase_roas'")." THEN $valCol ELSE NULL END)",
+                'website_roas'    => "AVG(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'website_purchase_roas'" : "mc.name = 'website_purchase_roas'")." THEN $valCol ELSE NULL END)",
+                'actions'         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'actions'" : "mc.name = 'actions'")." THEN $valCol ELSE 0 END)",
                 'campaign_status' => "MIN(rcc.status)",
-                'purchase_roas'   => "AVG(CASE WHEN mc.name = 'purchase_roas' THEN m.value ELSE NULL END)",
-                'website_purchase_roas' => "AVG(CASE WHEN mc.name = 'website_purchase_roas' THEN m.value ELSE NULL END)",
+                'purchase_roas'   => "AVG(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'purchase_roas'" : "mc.name = 'purchase_roas'")." THEN $valCol ELSE NULL END)",
+                'website_purchase_roas' => "AVG(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'website_purchase_roas'" : "mc.name = 'website_purchase_roas'")." THEN $valCol ELSE NULL END)",
+                // Organic & Shared Metrics - Mapped for Unification
+                // Intelligence: Detect period and apply SUM or DELTA (Current - Previous)
+                'total_interactions' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')" : "mc.name IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'profile_views'      => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_views', 'profile_views_daily')" : "mc.name IN ('profile_views', 'profile_views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'follower_count'     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('follower_count', 'follower_count_daily', 'page_fans', 'page_fans_daily')" : "mc.name IN ('follower_count', 'follower_count_daily', 'page_fans', 'page_fans_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'page_impressions'   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_impressions', 'page_impressions_daily', 'page_media_view', 'page_media_view_daily')" : "mc.name IN ('page_impressions', 'page_impressions_daily', 'page_media_view', 'page_media_view_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'page_post_engagements' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_post_engagements', 'page_post_engagements_daily')" : "mc.name IN ('page_post_engagements', 'page_post_engagements_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'page_views_total'   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_views_total', 'page_views_total_daily')" : "mc.name IN ('page_views_total', 'page_views_total_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'page_fans'          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_fans', 'page_fans_daily')" : "mc.name IN ('page_fans', 'page_fans_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'post_impressions'   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_impressions', 'post_impressions_daily', 'post_media_view', 'post_media_view_daily')" : "mc.name IN ('post_impressions', 'post_impressions_daily', 'post_media_view', 'post_media_view_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'post_engagement'    => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_engagement', 'post_engagement_daily')" : "mc.name IN ('post_engagement', 'post_engagement_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'post_reactions_by_type_total' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_reactions_by_type_total', 'post_reactions_by_type_total_daily')" : "mc.name IN ('post_reactions_by_type_total', 'post_reactions_by_type_total_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'likes'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')" : "mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'comments'           => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')" : "mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'shares'             => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')" : "mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'saves'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'saved'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'plays'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'views'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'replies'            => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('replies', 'replies_daily')" : "mc.name IN ('replies', 'replies_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'accounts_engaged'   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('accounts_engaged', 'accounts_engaged_daily')" : "mc.name IN ('accounts_engaged', 'accounts_engaged_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'website_clicks'     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('website_clicks', 'website_clicks_daily')" : "mc.name IN ('website_clicks', 'website_clicks_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'profile_links_taps' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_links_taps', 'profile_links_taps_daily')" : "mc.name IN ('profile_links_taps', 'profile_links_taps_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'follows_and_unfollows' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('follows_and_unfollows', 'follows_and_unfollows_daily')" : "mc.name IN ('follows_and_unfollows', 'follows_and_unfollows_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                
+                // Mappings for exact _daily metric fields (Post Level Content)
+                'reach_daily'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'reach_daily'" : "mc.name = 'reach_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'impressions_daily' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'impressions_daily'" : "mc.name = 'impressions_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'likes_daily'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'likes_daily'" : "mc.name = 'likes_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'comments_daily'    => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'comments_daily'" : "mc.name = 'comments_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'shares_daily'      => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'shares_daily'" : "mc.name = 'shares_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'saved_daily'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'saved_daily'" : "mc.name = 'saved_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'total_interactions_daily' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'total_interactions_daily'" : "mc.name = 'total_interactions_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'views_daily'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'views_daily'" : "mc.name = 'views_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
             ];
 
             if (isset($formulas[$lowerField])) {
@@ -527,27 +749,66 @@ class BaseRepository extends EntityRepository
             return "JSON_UNQUOTE(JSON_EXTRACT($source, '$.$path'))";
         }
 
+        // Relation metadata extraction (relationName.metadata.field)
+        if (preg_match('/^([a-zA-Z0-9]+)\.(metadata|data)\.([a-zA-Z0-9_]+)$/', $field, $matches)) {
+            $relName = $matches[1];
+            $jsonField = $matches[2];
+            $path = $matches[3];
+            
+            if (isset(self::$relationMap[$relName])) {
+                $map = self::$relationMap[$relName];
+                $source = $map['alias'] . '.' . $jsonField;
+                
+                $isPostgres = Helpers::isPostgres();
+                if ($isPostgres) {
+                    return "($source #>> '{$path}')";
+                } else {
+                    return "JSON_UNQUOTE(JSON_EXTRACT($source, '$.$path'))";
+                }
+            }
+        }
+
+        // Handle generic Relation extraction from relationMap (JSON or standard fields)
+        $normalizedField = isset(self::$relationMap[$field]) ? $field : (isset(self::$relationMap[$lowerField]) ? $lowerField : null);
+        if ($normalizedField) {
+             $map = self::$relationMap[$normalizedField];
+             if (isset($map['isJSON']) && $map['isJSON']) {
+                 $jsonPath = $map['jsonPath'] ?? '';
+                 if (Helpers::isPostgres()) {
+                     $postgresPath = '{' . str_replace('.', ',', $jsonPath) . '}';
+                     return "COALESCE(({$map['alias']}.{$map['field']} #>> '$postgresPath'), 'N/A')";
+                 } else {
+                     return "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT({$map['alias']}.{$map['field']}, '$.$jsonPath')) AS CHAR), 'N/A')";
+                 }
+             }
+             $targetCol = $map['field'] ?? 'name';
+             return "{$map['alias']}.$targetCol";
+        }
+
         // Relation mapping for metrics
         if (str_starts_with($field, 'metric.')) {
             return "m." . substr($field, 7);
         }
         if (str_starts_with($field, 'metricConfig.')) {
             $subField = substr($field, 13);
-            if ($subField === 'metricDate') $subField = 'metric_date';
             return "mc." . $subField;
         }
 
         // Common aliasing for metricDate and name
         if ($field === 'metricDate') {
-            return "mc.metric_date";
+            if ($this->isChanneledMetric) return "m.metric_date";
+            if ($isMetric) return "e.metric_date";
+            return "e.metric_date"; // Fallback to root entity alias
         }
-        if ($field === 'name' || $field === 'period') {
+        if ($field === 'name' || $field === 'period' || $field === 'channel') {
             return "mc.$field";
         }
         
         // Temporal virtual fields
         if ($this->isChanneledMetric) {
-            $baseDate = 'mc.metric_date';
+            $baseDate = 'm.metric_date';
+        } elseif ($isMetric) {
+            $baseDate = 'e.metric_date';
         } else {
             $baseDate = 'e.platform_created_at';
             if (!$this->_class->hasField('platformCreatedAt')) {
