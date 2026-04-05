@@ -242,21 +242,32 @@ class BaseRepository extends EntityRepository
 
         $rootAlias = ($this->isChanneledMetric || $isMetric) ? 'mc' : 'm';
 
-        $joinRelation = function (string $field) use (&$activeAggregateJoins, $safeLeftJoin, $rootAlias, &$joinRelation) {
+        $joinRelation = function (string $field, bool $enforceExistence = false) use (&$activeAggregateJoins, $safeLeftJoin, $qb, $rootAlias, &$joinRelation) {
             if (!isset(self::$relationMap[$field])) return;
             $map = self::$relationMap[$field];
 
-            if (isset($activeAggregateJoins[$map['alias']])) return;
+            if (isset($activeAggregateJoins[$map['alias']])) {
+                // If already joined as LEFT, but now we need INNER, we transform it
+                if ($enforceExistence) {
+                    $joins = $qb->getQueryPart('join');
+                    // Logic to upgrade join if necessary can go here, but for now we enforce at first call
+                }
+                return;
+            }
 
             // Recurse to join source mapping if defined
             $sourceAlias = $rootAlias;
             if (isset($map['from'])) {
-                $joinRelation($map['from']);
+                $joinRelation($map['from'], $enforceExistence);
                 $sourceAlias = self::$relationMap[$map['from']]['alias'];
             }
 
-            // Ensure join only happens once
-            $safeLeftJoin($sourceAlias, $map['table'], $map['alias'], "$sourceAlias.{$map['fk']} = {$map['alias']}.id");
+            // Ensure join only happens once. Use INNER JOIN if we need to filter out orphans (Ghost entities)
+            if ($enforceExistence) {
+                 $qb->innerJoin($sourceAlias, $map['table'], $map['alias'], "$sourceAlias.{$map['fk']} = {$map['alias']}.id");
+            } else {
+                 $safeLeftJoin($sourceAlias, $map['table'], $map['alias'], "$sourceAlias.{$map['fk']} = {$map['alias']}.id");
+            }
             $activeAggregateJoins[$map['alias']] = true;
         };
 
@@ -299,7 +310,9 @@ class BaseRepository extends EntityRepository
                 }
                 
                 if (isset(self::$relationMap[$relationKey])) {
-                    $joinRelation($relationKey);
+                    // Critical Fix: Enforce existence for primary groupings (page, account) to avoid ghost duplicates
+                    $isPrimaryRelation = in_array($relationKey, ['page', 'account', 'channeledAccount', 'campaign', 'channeledCampaign']);
+                    $joinRelation($relationKey, $isPrimaryRelation);
                     $map = self::$relationMap[$relationKey];
                     
                     if ($isExplicitId || $field === $map['fk']) {

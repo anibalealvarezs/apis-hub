@@ -72,7 +72,7 @@ class ResetEntitiesCommand extends Command
 
             if ($isPostgres) {
                 // 1. Clear Metrics and Metric Configs for targeted channels
-                $output->writeln('<info>  Cleaning Metrics Data...</info>');
+                $output->writeln('<info>  Cleaning Metrics and Dimension Data...</info>');
                 
                 // Clear Channeled Metrics first
                 $connection->executeStatement("
@@ -91,6 +91,11 @@ class ResetEntitiesCommand extends Command
                 // Clear Metric Configs
                 $connection->executeStatement("DELETE FROM metric_configs WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
 
+                // Clear Orphaned Dimension Sets and Items (This prevents Ghost IDs in aggregations)
+                $output->writeln('<info>  Cleaning Dimensions...</info>');
+                $connection->executeStatement("DELETE FROM dimension_set_items WHERE dimension_set_id NOT IN (SELECT dimension_set_id FROM metric_configs WHERE dimension_set_id IS NOT NULL) AND dimension_set_id NOT IN (SELECT dimension_set_id FROM channeled_metrics WHERE dimension_set_id IS NOT NULL)");
+                $connection->executeStatement("DELETE FROM dimension_sets WHERE id NOT IN (SELECT dimension_set_id FROM metric_configs WHERE dimension_set_id IS NOT NULL) AND id NOT IN (SELECT dimension_set_id FROM channeled_metrics WHERE dimension_set_id IS NOT NULL)");
+
                 // 2. Clear Jobs
                 $jobChannels = [];
                 foreach ($targetChannelIds as $id) {
@@ -105,10 +110,16 @@ class ResetEntitiesCommand extends Command
 
                 // 3. Conditional Asset Cleanup
                 if (array_intersect([Channel::facebook_marketing->value, Channel::facebook_organic->value, Channel::instagram->value], $targetChannelIds)) {
-                    $output->writeln('<info>  Cleaning Meta Assets...</info>');
+                    $output->writeln('<info>  Cleaning Meta Assets and Pages...</info>');
                     $connection->executeStatement("DELETE FROM channeled_ads WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
                     $connection->executeStatement("DELETE FROM channeled_ad_groups WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
                     $connection->executeStatement("DELETE FROM channeled_campaigns WHERE channel IN (?)", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
+
+                    // FIX: Delete Pages linked to these channels (This was the source of ID 17 surviving)
+                    $connection->executeStatement("
+                        DELETE FROM pages 
+                        WHERE account_id IN (SELECT id FROM channeled_accounts WHERE channel IN (?))
+                    ", [$targetChannelIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
                     
                     if (array_intersect([Channel::facebook_organic->value, Channel::instagram->value], $targetChannelIds)) {
                         $output->writeln('<info>  Cleaning Meta Posts...</info>');
