@@ -161,4 +161,42 @@ class ManagementController extends BaseController
             return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
         }
     }
+
+    /**
+     * Performs a TOTAL reset of a specific channel (Atomic Cleanup).
+     */
+    public function resetChannel(Request $request): Response
+    {
+        try {
+            $logger = Helpers::setLogger('management.log');
+            $data = json_decode($request->getContent(), true);
+            $channel = $data['channel'] ?? null;
+
+            if (!$channel) {
+                return new Response(json_encode(['error' => 'Missing channel parameter']), 400, ['Content-Type' => 'application/json']);
+            }
+
+            $logger->info("Atomic Channel Reset Triggered via API for: {$channel}");
+            
+            // Execute the CLI command synchronously
+            // We use the full path to bin/cli.php for reliability
+            $cliPath = realpath(__DIR__ . '/../../bin/cli.php');
+            $command = "php \"$cliPath\" app:reset-channel --channel=\"$channel\" --no-interaction 2>&1";
+            
+            $output = [];
+            $resultCode = 0;
+            exec($command, $output, $resultCode);
+
+            if ($resultCode !== 0) {
+                return new Response(json_encode([
+                    'success' => false, 
+                    'error' => implode("\n", $output)
+                ]), 500, ['Content-Type' => 'application/json']);
+            }
+
+            return new Response(json_encode(['success' => true, 'message' => "Channel {$channel} reset perfectly"]), 200, ['Content-Type' => 'application/json']);
+        } catch (Exception $e) {
+            return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
+        }
+    }
 }

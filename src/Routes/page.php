@@ -228,6 +228,16 @@ return [
         'html' => false,
         'admin' => true
     ],
+    '/api/management/reset-channel' => [
+        'httpMethod' => 'POST',
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $request = Request::create('', 'POST', $params ?? [], [], [], [], $body);
+            return (new ManagementController())->resetChannel($request);
+        },
+        'public' => false,
+        'html' => false,
+        'admin' => true
+    ],
     '/api/management/status' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
