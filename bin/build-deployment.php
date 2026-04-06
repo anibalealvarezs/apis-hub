@@ -90,7 +90,7 @@ foreach ($instances as $instance) {
         ],
         'restart'     => 'always',
         'environment' => $buildEnv($name, $channel, $entity),
-        'volumes'     => ['./:/app'],
+        'volumes'     => ['./:/app', '/app/vendor', '/app/mcp-server/node_modules'],
         'depends_on'  => ['master', 'redis'],
     ];
 }
