@@ -66,6 +66,7 @@ $services['master'] = [
     ],
     'restart'     => 'always',
     'environment' => $buildEnv($masterName),
+    'networks'    => ['default', 'apis-hub_gateway'],
     'volumes'     => ['./:/app', '/app/vendor', '/app/mcp-server/node_modules', '/var/run/docker.sock:/var/run/docker.sock'],
     'depends_on'  => ['redis'],
     'extra_hosts' => ['host.docker.internal:host-gateway'],
@@ -125,6 +126,9 @@ $compose = [
     'services' => $services,
     'networks' => [
         'default' => [
+            'name' => "{$deploymentName}_internal",
+        ],
+        'apis-hub_gateway' => [
             'name' => 'apis-hub_default',
             'external' => true
         ]
