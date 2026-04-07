@@ -129,6 +129,12 @@ $redisVolumeName = getenv('REDIS_VOLUME_NAME') ?: "{$deploymentName}-redis-data"
 $compose = [
     'name'     => $deploymentName,
     'services' => $services,
+    'networks' => [
+        'default' => [
+            'name' => 'apis-hub_default',
+            'external' => true
+        ]
+    ],
     'volumes'  => [
         'redis_data' => ['name' => $redisVolumeName],
         'db_data'    => ['name' => $dbVolumeName]
