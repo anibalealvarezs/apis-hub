@@ -92,8 +92,8 @@ foreach ($instances as $instance) {
 }
 
 // ─── Phase 3: Infrastructure (DB & Redis) ────────────────────────────────────────
-$dbHost = $db['host'] ?? 'db';
-if (str_contains($dbHost, 'db')) {
+$dbHost = (($env === 'production' || $env === 'testing') ? 'db' : ($db['host'] ?? 'db'));
+if (true) { // Always create DB service in this master/worker architecture
     $dbHostPort = getenv('DB_HOST_PORT') ?: 5432;
     $services['db'] = [
         'container_name' => "{$deploymentName}-db",
