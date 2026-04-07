@@ -39,7 +39,7 @@ $buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($d
         "API_SOURCE={$channel}",
         "API_ENTITY={$entity}",
         "DB_DRIVER=\${DB_DRIVER:-" . ($db['driver'] ?? 'pdo_pgsql') . "}",
-        "DB_HOST=\${DB_HOST:-" . str_replace(['127.0.0.1', 'localhost'], 'host.docker.internal', ($db['host'] ?? 'db')) . "}",
+        "DB_HOST=\${DB_HOST:-" . (($env === 'production' || $env === 'testing') ? 'db' : ($db['host'] ?? 'db')) . "}",
         "DB_PORT=\${DB_PORT:-" . ($db['port'] ?? 5432) . "}",
         "DB_USER=\${DB_USER:-" . ($db['user'] ?? 'postgres') . "}",
         "DB_PASSWORD=\${DB_PASSWORD:-" . ($db['password'] ?? '') . "}",
