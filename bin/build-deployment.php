@@ -66,6 +66,7 @@ $services['master'] = [
     ],
     'restart'     => 'always',
     'environment' => $buildEnv($masterName),
+    'networks'    => ['default', 'apis-hub_gateway'],
     'volumes'     => ['./:/app', '/app/vendor', '/app/mcp-server/node_modules', '/var/run/docker.sock:/var/run/docker.sock'],
     'depends_on'  => ['redis'],
     'extra_hosts' => ['host.docker.internal:host-gateway'],
@@ -100,9 +101,9 @@ if (true) { // Always create DB service in this master/worker architecture
         'image'         => ($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'postgres:16-alpine' : 'mysql:8.0',
         'restart'       => 'always',
         'environment'   => [
-            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_USER' : 'MYSQL_USER') => ($db['user'] ?? 'postgres'),
-            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_PASSWORD' : 'MYSQL_PASSWORD') => ($db['password'] ?? 'postgres'),
-            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_DB' : 'MYSQL_DATABASE') => ($db['name'] ?? 'apis-hub'),
+            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_USER' : 'MYSQL_USER') => "\${DB_USER:-" . ($db['user'] ?? 'postgres') . "}",
+            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_PASSWORD' : 'MYSQL_PASSWORD') => "\${DB_PASSWORD:-" . ($db['password'] ?? 'postgres') . "}",
+            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_DB' : 'MYSQL_DATABASE') => "\${DB_NAME:-" . ($db['name'] ?? 'apis-hub') . "}",
         ],
         'volumes' => ['db_data:/var/lib/postgresql/data'],
     ];
@@ -125,6 +126,9 @@ $compose = [
     'services' => $services,
     'networks' => [
         'default' => [
+            'name' => "{$deploymentName}_internal",
+        ],
+        'apis-hub_gateway' => [
             'name' => 'apis-hub_default',
             'external' => true
         ]
