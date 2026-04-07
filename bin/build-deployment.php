@@ -69,10 +69,6 @@ $services['master'] = [
     'volumes'     => ['./:/app', '/app/vendor', '/app/mcp-server/node_modules', '/var/run/docker.sock:/var/run/docker.sock'],
     'depends_on'  => ['redis'],
     'extra_hosts' => ['host.docker.internal:host-gateway'],
-    'ports'       => [
-        "{$externalPort}:8080",
-        "{$mcpPort}:3000"
-    ]
 ];
 
 // ─── Phase 2: Create Workers from Instances Configuration ───────────────────────
@@ -108,7 +104,6 @@ if (str_contains($dbHost, 'db')) {
             (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_PASSWORD' : 'MYSQL_PASSWORD') => ($db['password'] ?? 'postgres'),
             (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_DB' : 'MYSQL_DATABASE') => ($db['name'] ?? 'apis-hub'),
         ],
-        'ports'   => ["127.0.0.1:{$dbHostPort}:5432"],
         'volumes' => ['db_data:/var/lib/postgresql/data'],
     ];
 }
@@ -118,7 +113,6 @@ $services['redis'] = [
     'container_name' => "{$deploymentName}-redis",
     'image'         => 'redis:alpine',
     'restart'       => 'always',
-    'ports'         => ["{$redisHostPort}:6379"],
     'volumes'       => ['redis_data:/data'],
 ];
 
