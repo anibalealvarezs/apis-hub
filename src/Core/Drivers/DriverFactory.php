@@ -26,12 +26,12 @@ class DriverFactory
         ],
         'facebook_marketing' => [
             'driver' => \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver::class,
-            'auth' => \Core\Auth\FacebookAuthProvider::class,
+            'auth' => \Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider::class,
             'processor' => [\Classes\Requests\MetricRequests::class, 'processFacebookMarketingChunk'],
         ],
         'facebook_organic' => [
             'driver' => \Anibalealvarezs\MetaHubDriver\Drivers\FacebookOrganicDriver::class,
-            'auth' => \Core\Auth\FacebookAuthProvider::class,
+            'auth' => \Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider::class,
             'processor' => [\Classes\Requests\MetricRequests::class, 'processFacebookOrganicChunk'],
         ],
         'shopify' => [

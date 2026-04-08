@@ -1108,7 +1108,7 @@ class MetricRequests
      * @throws \Doctrine\DBAL\Exception
      * @throws Exception
      */
-    private static function processInstagramAccount(
+    public static function processInstagramAccount(
         array $page,
         array $data,
         EntityManager $manager,

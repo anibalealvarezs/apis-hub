@@ -708,9 +708,15 @@ class SeedDemoDataCommand extends Command
                 ];
                 \Classes\Requests\MetricRequests::processInstagramAccount(
                     ['id' => $page->getId(), 'ig_account' => (string)$caIg->getPlatformId()],
-                    new \Anibalealvarezs\FacebookGraphApi\FacebookGraphApi('1', '1', '1', 'https://example.com'),
-                    $this->entityManager, $fbParent, $page, \Helpers\Helpers::setLogger('seed.log'),
-                    ['map' => [$page->getPlatformId() => $page->getId()]], $date, $date, [], 'facebook_organic', $accountPayload
+                    $accountPayload,
+                    $this->entityManager,
+                    $fbParent,
+                    $page,
+                    \Helpers\Helpers::setLogger('seed.log'),
+                    ['map' => [$page->getPlatformId() => $page->getId()]],
+                    $date,
+                    $date,
+                    []
                 );
 
                 // B. IG Media Metrics (Lifetime)
