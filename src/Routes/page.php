@@ -55,6 +55,16 @@ return [
         'public' => true,
         'html' => true
     ],
+    '/api/auth/facebook/import' => [
+        'httpMethod' => 'POST',
+        'callable' => function (?string $body = null, ?array $params = null) {
+            $request = Request::create('', 'POST', $params ?? [], [], [], [], $body);
+            return (new FacebookAuthController())->importCredentials($request);
+        },
+        'public' => true,
+        'html' => false,
+        'admin' => false
+    ],
     '/command-builder' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->commandBuilder(),

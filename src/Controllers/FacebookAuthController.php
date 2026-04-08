@@ -162,6 +162,27 @@ class FacebookAuthController
     }
 
     /**
+     * Permite importar credenciales externamente (vía Fachada)
+     */
+    public function importCredentials(Request $request): Response
+    {
+        $providedToken = $request->headers->get('X-Config-Token');
+        $secretToken = $_ENV['CONFIG_SECRET_TOKEN'] ?? null;
+
+        if (!$secretToken || $providedToken !== $secretToken) {
+            return new Response(json_encode(['error' => 'Unauthorized']), 401, ['Content-Type' => 'application/json']);
+        }
+
+        $data = json_decode($request->getContent(), true);
+        $token = $data['access_token'] ?? null;
+        $userId = $data['user_id'] ?? null;
+
+        $this->saveCredentials((string)$token, $userId);
+
+        return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
+    }
+
+    /**
      * Guarda el token en el archivo de tokens JSON (excluido de Git)
      */
     private function saveCredentials(string $token, ?string $userId = null): void
