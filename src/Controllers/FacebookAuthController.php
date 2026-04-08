@@ -166,8 +166,8 @@ class FacebookAuthController
      */
     public function importCredentials(Request $request): Response
     {
-        $providedToken = $request->headers->get('X-Config-Token');
-        $secretToken = $_ENV['CONFIG_SECRET_TOKEN'] ?? null;
+        $providedToken = $request->headers->get('X-Admin-API-Key');
+        $secretToken = $_ENV['ADMIN_API_KEY'] ?? null;
 
         if (!$secretToken || $providedToken !== $secretToken) {
             return new Response(json_encode(['error' => 'Unauthorized']), 401, ['Content-Type' => 'application/json']);
