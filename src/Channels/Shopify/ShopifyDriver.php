@@ -7,7 +7,6 @@ use Interfaces\AuthProviderInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Psr\Log\LoggerInterface;
 use Helpers\Helpers;
-use Carbon\Carbon;
 use DateTime;
 use Exception;
 use Classes\Conversions\ShopifyConvert;
@@ -47,7 +46,10 @@ class ShopifyDriver implements SyncDriverInterface
             $this->logger = Helpers::setLogger('shopify-driver.log');
         }
 
-        $this->logger->info("Starting ShopifyDriver sync...");
+        $type = $config['type'] ?? 'all';
+        $jobId = $config['jobId'] ?? null;
+
+        $this->logger->info("Starting ShopifyDriver sync...", ['type' => $type]);
 
         try {
             $api = new ShopifyApi(
@@ -57,32 +59,46 @@ class ShopifyDriver implements SyncDriverInterface
             );
 
             // 1. Sync Orders
-            $this->logger->info("Syncing Shopify Orders...");
-            $api->getAllOrdersAndProcess(
-                createdAtMin: $startDate->format('Y-m-d\TH:i:sP'),
-                createdAtMax: $endDate->format('Y-m-d\TH:i:sP'),
-                callback: function ($orders) {
-                    OrderRequests::process(ShopifyConvert::orders($orders));
-                }
-            );
+            if ($type === 'all' || $type === 'orders') {
+                $this->logger->info("Syncing Shopify Orders...");
+                $api->getAllOrdersAndProcess(
+                    createdAtMin: $startDate->format('Y-m-d\TH:i:sP'),
+                    createdAtMax: $endDate->format('Y-m-d\TH:i:sP'),
+                    processedAtMin: $config['processedAtMin'] ?? null,
+                    processedAtMax: $config['processedAtMax'] ?? null,
+                    fields: $config['fields'] ?? null,
+                    callback: function ($orders) use ($jobId) {
+                        Helpers::checkJobStatus($jobId);
+                        OrderRequests::process(ShopifyConvert::orders($orders));
+                    }
+                );
+            }
 
             // 2. Sync Products
-            $this->logger->info("Syncing Shopify Products...");
-            $api->getAllProductsAndProcess(
-                callback: function ($products) {
-                    ProductRequests::process(ShopifyConvert::products($products));
-                }
-            );
+            if ($type === 'all' || $type === 'products') {
+                $this->logger->info("Syncing Shopify Products...");
+                $api->getAllProductsAndProcess(
+                    callback: function ($products) use ($jobId) {
+                        Helpers::checkJobStatus($jobId);
+                        ProductRequests::process(ShopifyConvert::products($products));
+                    }
+                );
+            }
 
             // 3. Sync Customers
-            $this->logger->info("Syncing Shopify Customers...");
-            $api->getAllCustomersAndProcess(
-                callback: function ($customers) {
-                    CustomerRequests::process(ShopifyConvert::customers($customers));
-                }
-            );
+            if ($type === 'all' || $type === 'customers') {
+                $this->logger->info("Syncing Shopify Customers...");
+                $api->getAllCustomersAndProcess(
+                    createdAtMin: $startDate->format('Y-m-d\TH:i:sP'),
+                    createdAtMax: $endDate->format('Y-m-d\TH:i:sP'),
+                    callback: function ($customers) use ($jobId) {
+                        Helpers::checkJobStatus($jobId);
+                        CustomerRequests::process(ShopifyConvert::customers($customers));
+                    }
+                );
+            }
 
-            return new Response(json_encode(['status' => 'success', 'message' => 'Shopify sync completed']));
+            return new Response(json_encode(['status' => 'success', 'message' => "Shopify sync [{$type}] completed"]));
 
         } catch (Exception $e) {
             $this->logger->error("ShopifyDriver error: " . $e->getMessage());

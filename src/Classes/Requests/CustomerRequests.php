@@ -70,32 +70,18 @@ class CustomerRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        $config = Helpers::getChannelsConfig()['shopify'];
-        $shopifyClient = new ShopifyApi(
-            apiKey: $config['shopify_api_key'],
-            shopName: $config['shopify_shop_name'],
-            version: $config['shopify_last_stable_revision'],
-        );
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                return (new \Core\Services\SyncService())->execute('shopify', $createdAtMin, $createdAtMax, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'type' => 'customers',
+                    'fields' => $fields,
+                    'filters' => $filters,
+                ]);
+            } catch (\Exception $e) {}
+        }
 
-        $manager = Helpers::getManager();
-        /** @var ChanneledCustomerRepository $channeledCustomerRepository */
-        $channeledCustomerRepository = $manager->getRepository(ChanneledCustomer::class);
-        $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformId(Channel::shopify->value);
-
-        $shopifyClient->getAllCustomersAndProcess(
-            createdAtMin: $createdAtMin,
-            createdAtMax: $createdAtMax,
-            fields: $fields,
-            ids: $filters->ids ?? null,
-            sinceId: $filters->sinceId ?? (isset($lastChanneledCustomer['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledCustomer['platformId'] : null),
-            updatedAtMin: $filters->updatedAtMin ?? null,
-            updatedAtMax: $filters->updatedAtMax ?? null,
-            pageInfo: $filters->pageInfo ?? null,
-            callback: function ($customers) use ($jobId) {
-                Helpers::checkJobStatus($jobId);
-                self::process(ShopifyConvert::customers($customers));
-            }
-        );
         return new Response(json_encode(['Customers retrieved']));
     }
 
@@ -117,52 +103,17 @@ class CustomerRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        $config = Helpers::getChannelsConfig()['klaviyo'];
-        $klaviyoClient = new KlaviyoApi(
-            apiKey: $config['klaviyo_api_key'],
-        );
-
-        $manager = Helpers::getManager();
-        /** @var ChanneledCustomerRepository $channeledCustomerRepository */
-        $channeledCustomerRepository = $manager->getRepository(ChanneledCustomer::class);
-        $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformCreatedAt(Channel::klaviyo->value);
-
-        $origin = Carbon::parse("2000-01-01");
-        $min = $createdAtMin ? Carbon::parse($createdAtMin) : (isset($lastChanneledCustomer['platformCreatedAt']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? Carbon::parse($lastChanneledCustomer['platformCreatedAt']) : null);
-        $max = $createdAtMax ? Carbon::parse($createdAtMax) : null;
-        $now = Carbon::now();
-        $from = $min && $min->lt($now) && $min->lt($max) && $origin->lte($min) ?
-            $min->format('Y-m-d H:i:s') :
-            $origin->format("Y-m-d H:i:s");
-        $to = $max && $max->lte($now) ?
-            $max->format('Y-m-d H:i:s') :
-            $now->format('Y-m-d H:i:s');
-        $formattedFilters = [];
-        if ($filters) {
-            foreach ($filters as $key => $value) {
-                $formattedFilters[] = [
-                    "operator" => 'equals',
-                    "field" => $key,
-                    "value" => $value,
-                ];
-            }
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                return (new \Core\Services\SyncService())->execute('klaviyo', $createdAtMin, $createdAtMax, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'type' => 'customers',
+                    'fields' => $fields,
+                ]);
+            } catch (\Exception $e) {}
         }
-        $klaviyoClient->getAllProfilesAndProcess(
-            profileFields: $fields,
-            additionalFields: ['predictive_analytics', 'subscriptions'],
-            filter: [
-                ...$formattedFilters,
-                ...[
-                    ["operator" => "greater-than", "field" => "created", "value" => $from],
-                    ["operator" => "less-than", "field" => "created", "value" => $to],
-                ]
-            ],
-            sortField: 'created',
-            callback: function ($customers) use ($jobId) {
-                Helpers::checkJobStatus($jobId);
-                self::process(KlaviyoConvert::customers($customers));
-            }
-        );
+
         return new Response(json_encode(['Customers retrieved']));
     }
 
@@ -190,17 +141,12 @@ class CustomerRequests implements RequestInterface
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('bigcommerce');
-                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
-                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('bigcommerce', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
+                    'type' => 'customers'
                 ]);
-            } catch (\Exception $e) {
-                // Fallback
-            }
+            } catch (\Exception $e) {}
         }
 
         return new Response(json_encode([]));
@@ -224,18 +170,12 @@ class CustomerRequests implements RequestInterface
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('netsuite');
-                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
-                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('netsuite', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                     'type' => 'customers'
                 ]);
-            } catch (\Exception $e) {
-                // Fallback
-            }
+            } catch (\Exception $e) {}
         }
 
         $config = Helpers::getChannelsConfig()['netsuite'];

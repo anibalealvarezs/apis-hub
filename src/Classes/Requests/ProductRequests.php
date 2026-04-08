@@ -78,41 +78,19 @@ class ProductRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        $config = Helpers::getChannelsConfig()['shopify'];
-        $shopifyClient = new ShopifyApi(
-            apiKey: $config['shopify_api_key'],
-            shopName: $config['shopify_shop_name'],
-            version: $config['shopify_last_stable_revision'],
-        );
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                return (new \Core\Services\SyncService())->execute('shopify', $createdAtMin, $createdAtMax, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'type' => 'products',
+                    'collectionId' => $collectionId,
+                    'fields' => $fields,
+                    'filters' => $filters,
+                ]);
+            } catch (\Exception $e) {}
+        }
 
-        $manager = Helpers::getManager();
-        /** @var ChanneledProductRepository $channeledProductRepository */
-        $channeledProductRepository = $manager->getRepository(entityName: ChanneledProduct::class);
-        $lastChanneledProduct = $channeledProductRepository->getLastByPlatformId(channel: Channel::shopify->value);
-
-        $shopifyClient->getAllProductsAndProcess(
-            collectionId: $collectionId,
-            createdAtMin: $createdAtMin,
-            createdAtMax: $createdAtMax,
-            fields: $fields,
-            handle: $filters->handle ?? null,
-            ids: $filters->ids ?? null,
-            presentmentCurrencies: $filters->presentmentCurrencies ?? null,
-            productType: $filters->productType ?? null,
-            publishedAtMin: $filters->publishedAtMin ?? null,
-            publishedAtMax: $filters->publishedAtMax ?? null,
-            sinceId: $filters->sinceId ?? (isset($lastChanneledProduct['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledProduct['platformId'] : null),
-            status: $filters->status ?? null,
-            title: $filters->title ?? null,
-            updatedAtMin: $filters->updatedAtMin ?? null,
-            updatedAtMax: $filters->updatedAtMax ?? null,
-            vendor: $filters->vendor ?? null,
-            pageInfo: $filters->pageInfo ?? null,
-            callback: function ($products) use ($jobId) {
-                Helpers::checkJobStatus($jobId);
-                self::process(ShopifyConvert::products($products));
-            }
-        );
         return new Response(json_encode(['Products retrieved']));
     }
 
@@ -129,30 +107,17 @@ class ProductRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        $config = Helpers::getChannelsConfig()['klaviyo'];
-        $klaviyoClient = new KlaviyoApi(
-            apiKey: $config['klaviyo_api_key'],
-        );
-
-        $formattedFilters = [];
-        if ($filters) {
-            foreach ($filters as $key => $value) {
-                $formattedFilters[] = [
-                    "operator" => 'equals',
-                    "field" => $key,
-                    "value" => $value,
-                ];
-            }
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                return (new \Core\Services\SyncService())->execute('klaviyo', null, null, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'type' => 'products',
+                    'fields' => $fields,
+                    'filters' => $filters,
+                ]);
+            } catch (\Exception $e) {}
         }
-
-        $klaviyoClient->getAllCatalogItemsAndProcess(
-            catalogItemsFields: $fields,
-            filter: $formattedFilters,
-            callback: function ($products) use ($jobId) {
-                Helpers::checkJobStatus($jobId);
-                self::process(KlaviyoConvert::products($products));
-            }
-        );
 
         return new Response(json_encode(['Products retrieved']));
     }
@@ -169,17 +134,12 @@ class ProductRequests implements RequestInterface
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('bigcommerce');
-                $startDate = new \DateTime('-30 days');
-                $endDate = new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('bigcommerce', null, null, [
                     'jobId' => $jobId,
                     'resume' => $resume,
+                    'type' => 'products'
                 ]);
-            } catch (\Exception $e) {
-                // Fallback
-            }
+            } catch (\Exception $e) {}
         }
 
         return new Response(json_encode([]));
@@ -201,140 +161,14 @@ class ProductRequests implements RequestInterface
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('netsuite');
-                $startDate = new \DateTime('-30 days'); // Products usually sync full or relative
-                $endDate = new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('netsuite', null, null, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                     'type' => 'products'
                 ]);
-            } catch (\Exception $e) {
-                // Fallback
-            }
+            } catch (\Exception $e) {}
         }
 
-        $config = Helpers::getChannelsConfig()['netsuite'];
-        $netsuiteClient = new NetSuiteApi(
-            consumerId: $config['netsuite_consumer_id'],
-            consumerSecret: $config['netsuite_consumer_secret'],
-            token: $config['netsuite_token_id'],
-            tokenSecret: $config['netsuite_token_secret'],
-            accountId: $config['netsuite_account_id'],
-        );
-
-        $manager = Helpers::getManager();
-        /** @var ChanneledProductRepository $channeledProductRepository */
-        $channeledProductRepository = $manager->getRepository(entityName: ChanneledProduct::class);
-        $lastChanneledProduct = $channeledProductRepository->getLastByPlatformId(channel: Channel::netsuite->value);
-
-        $query = "SELECT
-                Item.*,
-                CUSTOMLIST_ITEM_STYLE.Id AS StyleID,
-                CUSTOMLIST_ITEM_STYLE.Name AS StyleName,
-                CUSTOMLIST_ITEM_SIZE.Id AS SizeID,
-                CUSTOMLIST_ITEM_SIZE.Name AS SizeName,
-                ItemInventoryBalance.quantityavailable,
-                ItemInventoryBalance.quantityonhand,
-                ItemInventoryBalance.quantitypicked,
-                ItemPrice.price AS itemprice,
-                CommerceCategory.id AS CommerceCategoryId,
-                CUSTOMLIST_ITEM_CATEGORY.Name AS CategoryName,
-                CUSTOMLIST_ITEM_CATEGORY.Id AS CategoryID,
-                CUSTOMLIST_ITEM_COLOR.id AS ColorID,
-                CUSTOMLIST_ITEM_COLOR.name AS ColorName,
-                ItemCollection.id AS CollectionID,
-                ItemCollection.name AS CollectionName,
-                CUSTOMRECORD_WEBSTORES.name as storeName,
-                CUSTOMRECORD_DESIGN.custrecord_deadline_date AS designdeadlinedate,
-                CUSTOMRECORD_DESIGN.custrecord_nssca_cannot_ship_after_date AS designcannotshipafterdate
-            FROM Item
-            LEFT JOIN CUSTOMLIST_ITEM_STYLE
-                ON Item.custitem_item_style = CUSTOMLIST_ITEM_STYLE.id
-            LEFT JOIN CUSTOMLIST_ITEM_SIZE
-                ON item.custitem_item_size = CUSTOMLIST_ITEM_SIZE.id
-            LEFT JOIN ItemInventoryBalance
-                ON Item.id = ItemInventoryBalance.item
-            LEFT JOIN ItemPrice
-                ON Item.id = ItemPrice.item
-            LEFT JOIN CUSTOMLIST_ITEM_CATEGORY
-                ON Item.custitem_item_category = CUSTOMLIST_ITEM_CATEGORY.id
-            LEFT JOIN CUSTOMLIST_ITEM_COLOR
-                ON Item.custitem_item_color = CUSTOMLIST_ITEM_COLOR.id
-            LEFT JOIN ItemCollectionItemSimpleMap
-                ON Item.id = ItemCollectionItemSimpleMap.item
-            LEFT JOIN ItemCollection
-                ON ItemCollectionItemSimpleMap.itemcollection = ItemCollection.id
-            LEFT JOIN CommerceCategoryItemAssociation
-                ON CommerceCategoryItemAssociation.item = Item.id
-            LEFT JOIN CommerceCategory
-                ON CommerceCategoryItemAssociation.category = CommerceCategory.id
-            LEFT JOIN MAP_item_custitem_awa_display_in_webstore
-                ON item.id = MAP_item_custitem_awa_display_in_webstore.mapone
-            LEFT JOIN CUSTOMRECORD_WEBSTORES
-                ON MAP_item_custitem_awa_display_in_webstore.maptwo = CUSTOMRECORD_WEBSTORES.id
-            LEFT JOIN CUSTOMRECORD_DESIGN
-                ON Item.custitem_design_code = CUSTOMRECORD_DESIGN.id
-            WHERE Item.itemtype IN ('NonInvtPart', 'Assembly')
-                AND (CUSTOMRECORD_WEBSTORES.name IS NULL OR CUSTOMRECORD_WEBSTORES.name = '".$config['netsuite_store_name']."')
-                AND Item.createddate >= TO_DATE('01/01/2020', 'mm/dd/yyyy')
-                AND Item.id >= " . (isset($lastChanneledProduct['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledProduct['platformId'] : 0);
-        if ($filters) {
-            foreach ($filters as $key => $value) {
-                $query .= " AND Item.$key = '$value'";
-            }
-        }
-        $query .= " ORDER BY Item.id ASC";
-        $netsuiteClient->getSuiteQLQueryAllAndProcess(
-            query: $query,
-            callback: function ($products) use ($netsuiteClient, $config, $jobId) {
-                Helpers::checkJobStatus($jobId);
-                $convertedProductsArray = NetSuiteConvert::products($products)->toArray();
-                $productsIds = array_map(function ($product) {
-                    return $product->platformId;
-                }, $convertedProductsArray);
-                if (!empty($productsIds)) {
-                    usleep(500000); // Delay to prevent rate limit issues between the `items` and `images` queries
-                    $images = $netsuiteClient->getImagesForProducts(
-                        store: $config['netsuite_store_name'],
-                        productsIds: array_values($productsIds),
-                    );
-                    if ($images['count'] == 0) {
-                        usleep(500000); // Delay to prevent rate limit issues between the `images` and `items` queries
-                    }
-                    $keyedImages = [];
-                    foreach ($images['items'] as $image) {
-                        if (!isset($keyedImages[$image['item']])) {
-                            $keyedImages[$image['item']] = [];
-                        }
-                        $keyedImages[$image['item']][] = [
-                            'name' => $image['name'],
-                            'url' => $config['netsuite_store_base_url'] . (!str_ends_with($config['netsuite_store_base_url'], '/') ? '/' : '') . 'site/images/' . $image['name'],
-                        ];
-                    }
-                    foreach ($convertedProductsArray as &$product) {
-                        $product->data['images'] = array_map(function ($image) {
-                            return $image['url'];
-                        }, $keyedImages[$product->platformId] ?? []);
-                        foreach ($product->variants as &$variant) {
-                            $variant->data['images'] = [];
-                            if (!isset($keyedImages[$product->platformId])) {
-                                continue;
-                            }
-                            foreach ($keyedImages[$product->platformId] as $image) {
-                                $cleanNameArray = explode('.', $image['name']);
-                                if (str_starts_with($variant->sku, $cleanNameArray[0])) {
-                                    $variant->data['images'][] = $image['url'];
-                                }
-                            }
-                        }
-                    }
-                }
-                $convertedProducts = new ArrayCollection($convertedProductsArray);
-                self::process($convertedProducts);
-            }
-        );
         return new Response(json_encode(['Products retrieved']));
     }
 
@@ -345,6 +179,16 @@ class ProductRequests implements RequestInterface
      */
     public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                return (new \Core\Services\SyncService())->execute('amazon', null, null, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'type' => 'products'
+                ]);
+            } catch (\Exception $e) {}
+        }
+
         return new Response(json_encode([]));
     }
 

@@ -70,37 +70,19 @@ class OrderRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        $config = Helpers::getChannelsConfig()['shopify'];
-        $shopifyClient = new ShopifyApi(
-            apiKey: $config['shopify_api_key'],
-            shopName: $config['shopify_shop_name'],
-            version: $config['shopify_last_stable_revision'],
-        );
-
-        $manager = Helpers::getManager();
-        /** @var ChanneledOrderRepository $channeledOrderRepository */
-        $channeledOrderRepository = $manager->getRepository(entityName: ChanneledOrder::class);
-        $lastChanneledOrder = $channeledOrderRepository->getLastByPlatformId(channel: Channel::shopify->value);
-
-        $shopifyClient->getAllOrdersAndProcess(
-            createdAtMin: $filters->createdAtMin ?? null,
-            createdAtMax: $filters->createdAtMax ?? null,
-            fields: $fields, // Example: ["id", "processed_at", "total_price", "total_discounts", "discount_codes", "customer", "line_items"]
-            financialStatus: $filters->financialStatus ?? null,
-            fulfillmentStatus: $filters->fulfillmentStatus ?? null,
-            ids: $filters->ids ?? null,
-            processedAtMin: $processedAtMin,
-            processedAtMax: $processedAtMax,
-            sinceId: $filters->sinceId ?? isset($lastChanneledOrder['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledOrder['platformId'] : null,
-            status: $filters->status ?? null,
-            updatedAtMin: $filters->updatedAtMin ?? null,
-            updatedAtMax: $filters->updatedAtMax ?? null,
-            pageInfo: $filters->pageInfo ?? null,
-            callback: function ($orders) use ($jobId) {
-                Helpers::checkJobStatus($jobId);
-                self::process(ShopifyConvert::orders($orders));
-            }
-        );
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                return (new \Core\Services\SyncService())->execute('shopify', $filters->createdAtMin ?? null, $filters->createdAtMax ?? null, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'processedAtMin' => $processedAtMin,
+                    'processedAtMax' => $processedAtMax,
+                    'fields' => $fields,
+                    'filters' => $filters,
+                ]);
+            } catch (\Exception $e) {}
+        }
+        
         return new Response(json_encode(['Orders retrieved']));
     }
 
@@ -129,17 +111,11 @@ class OrderRequests implements RequestInterface
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('bigcommerce');
-                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
-                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('bigcommerce', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                 ]);
-            } catch (\Exception $e) {
-                // Fallback
-            }
+            } catch (\Exception $e) {}
         }
 
         return new Response(json_encode([]));
@@ -164,18 +140,12 @@ class OrderRequests implements RequestInterface
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('netsuite');
-                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
-                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('netsuite', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                     'type' => 'orders'
                 ]);
-            } catch (\Exception $e) {
-                // Fallback
-            }
+            } catch (\Exception $e) {}
         }
 
         $config = Helpers::getChannelsConfig()['netsuite'];
@@ -299,17 +269,11 @@ class OrderRequests implements RequestInterface
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('amazon');
-                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
-                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('amazon', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                 ]);
-            } catch (\Exception $e) {
-                // Fallback
-            }
+            } catch (\Exception $e) {}
         }
 
         return new Response(json_encode([]));

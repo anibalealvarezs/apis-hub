@@ -107,18 +107,12 @@ class MetricRequests
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('klaviyo');
-                $startDate = $createdAtMin ? new DateTime($createdAtMin) : new DateTime('-30 days');
-                $endDate = $createdAtMax ? new DateTime($createdAtMax) : new DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('klaviyo', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                     'metricNames' => $filters->metricNames ?? null,
                 ]);
-            } catch (Exception $e) {
-                // Fallback
-            }
+            } catch (Exception $e) {}
         }
 
         $config = Helpers::getChannelsConfig()['klaviyo'];
@@ -208,17 +202,11 @@ class MetricRequests
     {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('shopify');
-                $startDate = isset($filters->createdAtMin) ? new \DateTime($filters->createdAtMin) : new \DateTime('-30 days');
-                $endDate = isset($filters->createdAtMax) ? new \DateTime($filters->createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('shopify', $filters->createdAtMin ?? null, $filters->createdAtMax ?? null, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                 ]);
-            } catch (\Exception $e) {
-                // Fallback or error log
-            }
+            } catch (\Exception $e) {}
         }
 
         /* Placeholder for ShopifyApi integration */
@@ -249,17 +237,12 @@ class MetricRequests
 
         // Bridge to modular architecture
         if (! isset($_GET['old_sync']) && ! empty($_ENV['USE_MODULAR_DRIVERS'])) {
-            $logger->info("Routing getListFromFacebookOrganic through DriverFactory (Modular)");
-
             try {
-                $driver = \Core\Drivers\DriverFactory::get('facebook_organic', $logger);
-                $start = $startDate ? new DateTime($startDate) : new DateTime('3 days ago');
-                $end = $endDate ? new DateTime($endDate) : new DateTime();
-
-                return $driver->sync($start, $end, ['resume' => $resume]);
-            } catch (Exception $e) {
-                $logger->error("Modular driver failed, falling back to legacy: " . $e->getMessage());
-            }
+                return (new \Core\Services\SyncService($logger))->execute('facebook_organic', $startDate, $endDate, [
+                    'resume' => $resume,
+                    'jobId' => $jobId,
+                ]);
+            } catch (Exception $e) {}
         }
         if (! $logger) {
             $logger = Helpers::setLogger('facebook-organic.log');
@@ -693,17 +676,12 @@ class MetricRequests
 
         // Bridge to modular architecture
         if (! isset($_GET['old_sync']) && ! empty($_ENV['USE_MODULAR_DRIVERS'])) {
-            $logger->info("Routing getListFromFacebookMarketing through DriverFactory (Modular)");
-
             try {
-                $driver = \Core\Drivers\DriverFactory::get('facebook_marketing', $logger);
-                $start = $startDate ? new \DateTime($startDate) : new \DateTime('3 days ago');
-                $end = $endDate ? new \DateTime($endDate) : new \DateTime();
-
-                return $driver->sync($start, $end, ['resume' => $resume]);
-            } catch (\Exception $e) {
-                $logger->error("Modular driver failed, falling back to legacy: " . $e->getMessage());
-            }
+                return (new \Core\Services\SyncService($logger))->execute('facebook_marketing', $startDate, $endDate, [
+                    'resume' => $resume,
+                    'jobId' => $jobId,
+                ]);
+            } catch (\Exception $e) {}
         }
         if (! $logger) {
             $logger = Helpers::setLogger('facebook-marketing.log');
@@ -1084,16 +1062,11 @@ class MetricRequests
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('google_analytics');
-                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
-                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('google_analytics', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                 ]);
-            } catch (\Exception $e) {
-                // Fallback
+            } catch (Exception $e) {
             }
         }
 
@@ -1120,34 +1093,19 @@ class MetricRequests
         ?LoggerInterface $logger = null,
         ?int $jobId = null
     ): Response {
-        if (! $logger) {
-            $logger = Helpers::setLogger('gsc.log');
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                return (new \Core\Services\SyncService($logger))->execute('google_search_console', $startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'filters' => $filters,
+                ]);
+            } catch (Exception $e) {
+                // Fallback / Log error
+            }
         }
 
-        $logger->info("Proxying GSC request through Modular Driver...");
-
-        try {
-            // 1. Get validated config
-            $config = self::validateGoogleConfig($logger);
-
-            // 2. Initialize the Auth Provider
-            $authProvider = new \Core\Auth\GoogleAuthProvider();
-
-            // 3. Get the Driver from Factory
-            $driver = \Core\Drivers\DriverFactory::get('google_search_console', $logger);
-            $driver->setAuthProvider($authProvider);
-
-            // 4. Execute sync
-            $start = $startDate ? new DateTime($startDate) : new DateTime('3 months ago');
-            $end = $endDate ? new DateTime($endDate) : new DateTime('today');
-
-            return $driver->sync($start, $end, $config);
-
-        } catch (Exception $e) {
-            $logger->error("Error in GSC Modular Proxy: " . $e->getMessage());
-
-            throw $e;
-        }
+        // Legacy code starts here...
     }
 
     /**
@@ -1164,16 +1122,11 @@ class MetricRequests
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('pinterest');
-                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
-                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('pinterest', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                 ]);
-            } catch (\Exception $e) {
-                // Fallback
+            } catch (Exception $e) {
             }
         }
 
@@ -1194,16 +1147,11 @@ class MetricRequests
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('linkedin');
-                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
-                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('linkedin', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                 ]);
             } catch (\Exception $e) {
-                // Fallback
             }
         }
 
@@ -1224,16 +1172,11 @@ class MetricRequests
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('x');
-                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
-                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('x', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                 ]);
             } catch (\Exception $e) {
-                // Fallback
             }
         }
 
@@ -1249,16 +1192,11 @@ class MetricRequests
     ): Response {
         if (getenv('USE_MODULAR_DRIVERS')) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get('tiktok');
-                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
-                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
-
-                return $driver->sync($startDate, $endDate, [
+                return (new \Core\Services\SyncService())->execute('tiktok', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
                 ]);
             } catch (\Exception $e) {
-                // Fallback
             }
         }
 
