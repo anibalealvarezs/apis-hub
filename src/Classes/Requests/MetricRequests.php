@@ -1313,7 +1313,7 @@ class MetricRequests
                     ?? $config['google_search_console']['scopes']
                     ?? $config['google']['scopes']
                     ?? $config['google']['scope']
-                    ?? ["https://www.googleapis.com/auth/webmasters"];
+                    ?? ["https://www.googleapis.com/auth/webmasters.readonly"];
                 if (is_string($scopes)) {
                     // Accept space-separated (OAuth standard) or comma-separated
                     $scopes = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $scopes))));
