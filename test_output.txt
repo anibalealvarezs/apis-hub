@@ -1,0 +1,4 @@
+--- STARTING MODULAR GOOGLE SEARCH CONSOLE SYNC TEST ---
+Response Status Code: 500
+Response Content: {"status":"error","message":"Unauthorized. No refresh token provided."}
+--- TEST FINISHED ---

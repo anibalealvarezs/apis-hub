@@ -1,0 +1,52 @@
+PHPUnit 9.6.34 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.30
+Configuration: /app/phpunit.xml
+
+...............................................................  63 / 558 ( 11%)
+............................................................... 126 / 558 ( 22%)
+............................................................... 189 / 558 ( 33%)
+............................................................... 252 / 558 ( 45%)
+............................................................... 315 / 558 ( 56%)
+............................................................... 378 / 558 ( 67%)
+............................................................... 441 / 558 ( 79%)
+............................................................... 504 / 558 ( 90%)
+...................................FF.FF.............E          558 / 558 (100%)
+
+Time: 00:20.402, Memory: 54.50 MB
+
+There was 1 error:
+
+1) Tests\Integration\Services\HubInstantiationTest::testHubSuccessfullyInstantiatesGoogleSearchConsoleClientUsingMixedConfig
+PHPUnit\Framework\InvalidArgumentException: Argument #1 of PHPUnit\Framework\Assert::assertInstanceOf() must be a class or interface name
+
+/app/tests/Integration/Services/HubInstantiationTest.php:127
+
+--
+
+There were 4 failures:
+
+1) Tests\Integration\Http\ConfigManagerControllerTest::testUpdateConfigModifiesYamlFiles
+Failed asserting that 400 matches expected 200.
+
+/app/tests/Integration/Http/ConfigManagerControllerTest.php:113
+
+2) Tests\Integration\Http\ConfigManagerControllerTest::testUpdateGlobalConfigModifiesAppYaml
+Failed asserting that 400 matches expected 200.
+
+/app/tests/Integration/Http/ConfigManagerControllerTest.php:149
+
+3) Tests\Integration\Http\ManagementControllerTest::testUpdateCredentialsModifiesEnvFile
+Failed asserting that 400 matches expected 200.
+
+/app/tests/Integration/Http/ManagementControllerTest.php:90
+
+4) Tests\Integration\Http\ManagementControllerTest::testUpdateCredentialsRejectsUnallowedKeys
+Failed asserting that 'INITIAL_KEY=initial_value\n
+FACEBOOK_USER_TOKEN=old_token\n
+' contains "FACEBOOK_USER_TOKEN=valid_token".
+
+/app/tests/Integration/Http/ManagementControllerTest.php:126
+
+ERRORS!
+Tests: 558, Assertions: 2051, Errors: 1, Failures: 4.
