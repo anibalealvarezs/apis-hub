@@ -480,9 +480,18 @@ class ConfigManagerController extends BaseController
                     $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $logger);
                     // Test call to 'me'
                     $fbApi->performRequest('GET', 'me', ['fields' => 'id,name']);
-                    $results['facebook'] = ['status' => 'valid', 'message' => 'Facebook token is valid and working.'];
+                    $results['facebook'] = [
+                        'status' => 'valid', 
+                        'message' => 'Facebook token is valid and working.',
+                        'access_token' => $fbConfig['facebook_marketing']['access_token'] ?? null,
+                        'user_id' => $fbConfig['facebook_marketing']['user_id'] ?? null,
+                    ];
                 } catch (Exception $e) {
-                    $results['facebook'] = ['status' => 'error', 'message' => 'Facebook Error: ' . $e->getMessage()];
+                    $results['facebook'] = [
+                        'status' => 'error', 
+                        'message' => 'Facebook Error: ' . $e->getMessage(),
+                        'access_token' => $fbConfig['facebook_marketing']['access_token'] ?? null,
+                    ];
                 }
             }
 
