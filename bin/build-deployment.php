@@ -57,40 +57,72 @@ $buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($d
 $masterName = "{$deploymentName}-master";
 $externalPort = getenv('EXTERNAL_PORT') ?: ($instances[0]['port'] ?? 10000);
 $mcpPort = getenv('MCP_PORT') ?: 3000;
+    $localMounts = [
+        'api-client-skeleton',
+        'facebook-graph-api',
+        'meta-hub-driver',
+        'google-api-anibal',
+        'google-hub-driver',
+        'klaviyo-hub-driver',
+        'shopify-hub-driver',
+        'netsuite-hub-driver',
+        'amazon-hub-driver',
+        'bigcommerce-hub-driver',
+        'pinterest-hub-driver',
+        'linkedin-hub-driver',
+        'tiktok-hub-driver',
+        'x-hub-driver',
+        'triple-whale-hub-driver',
+        'shopify-api-anibal',
+        'klaviyo-api-anibal',
+        'amazon-api-anibal',
+        'netsuite-api-anibal',
+        'shipstation-api-anibal',
+        'triple-whale-api-anibal',
+        'mailchimp-api-anibal',
+        'OAuth-v1'
+    ];
+    $volumes = ['./:/app', '/app/vendor', '/app/mcp-server/node_modules', '/var/run/docker.sock:/var/run/docker.sock'];
+    foreach ($localMounts as $mount) {
+        $localPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . $mount;
+        if (is_dir($localPath)) {
+            $volumes[] = "../{$mount}:/{$mount}";
+        }
+    }
 
-$services['master'] = [
-    'container_name' => $masterName,
-    'build' => [
-        'context'    => '.',
-        'dockerfile' => 'Dockerfile',
-    ],
-    'restart'     => 'always',
-    'environment' => $buildEnv($masterName),
-    'networks'    => ['default', 'apis-hub_gateway'],
-    'volumes'     => ['./:/app', '/app/vendor', '/app/mcp-server/node_modules', '/var/run/docker.sock:/var/run/docker.sock'],
-    'depends_on'  => ['redis'],
-    'extra_hosts' => ['host.docker.internal:host-gateway'],
-];
-
-// ─── Phase 2: Create Workers from Instances Configuration ───────────────────────
-foreach ($instances as $instance) {
-    $name    = $instance['name'];
-    $channel = $instance['channel'];
-    $entity  = $instance['entity'];
-
-    // Worker configuration (No ports exposed)
-    $services[$name] = [
-        'container_name' => "{$deploymentName}-{$name}",
-        'build'          => [
+    $services['master'] = [
+        'container_name' => $masterName,
+        'build' => [
             'context'    => '.',
             'dockerfile' => 'Dockerfile',
         ],
         'restart'     => 'always',
-        'environment' => $buildEnv($name, $channel, $entity),
-        'volumes'     => ['./:/app', '/app/vendor', '/app/mcp-server/node_modules'],
-        'depends_on'  => ['master', 'redis'],
+        'environment' => $buildEnv($masterName),
+        'networks'    => ['default', 'apis-hub_gateway'],
+        'volumes'     => $volumes,
+        'depends_on'  => ['redis'],
+        'extra_hosts' => ['host.docker.internal:host-gateway'],
     ];
-}
+
+    // ─── Phase 2: Create Workers from Instances Configuration ───────────────────────
+    foreach ($instances as $instance) {
+        $name    = $instance['name'];
+        $channel = $instance['channel'];
+        $entity  = $instance['entity'];
+
+        // Worker configuration (No ports exposed)
+        $services[$name] = [
+            'container_name' => "{$deploymentName}-{$name}",
+            'build'          => [
+                'context'    => '.',
+                'dockerfile' => 'Dockerfile',
+            ],
+            'restart'     => 'always',
+            'environment' => $buildEnv($name, $channel, $entity),
+            'volumes'     => $volumes, // Same volumes for workers
+            'depends_on'  => ['master', 'redis'],
+        ];
+    }
 
 // ─── Phase 3: Infrastructure (DB & Redis) ────────────────────────────────────────
 $dbHost = (($env === 'production' || $env === 'testing') ? 'db' : ($db['host'] ?? 'db'));

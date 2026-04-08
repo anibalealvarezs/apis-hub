@@ -12,16 +12,12 @@ use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Dimension;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\GroupType;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Operator;
-use Anibalealvarezs\KlaviyoApi\Enums\AggregatedMeasurement;
+use Anibalealvarezs\GoogleApi\Services\SearchConsole\SearchConsoleApi;
 use Carbon\Carbon;
 use Classes\Conversions\FacebookMarketingMetricConvert;
 use Classes\Conversions\FacebookOrganicMetricConvert;
 use Classes\Conversions\GoogleSearchConsoleConvert;
-use Classes\Conversions\KlaviyoConvert;
 use Classes\MetricsProcessor;
-use Classes\Overrides\GoogleApi\SearchConsoleApi\SearchConsoleApi;
-use Classes\Overrides\KlaviyoApi\KlaviyoApi;
-use Classes\SocialProcessor;
 use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
@@ -38,13 +34,11 @@ use Entities\Analytics\Channeled\ChanneledAd;
 use Entities\Analytics\Channeled\ChanneledAdGroup;
 use Entities\Analytics\Channeled\ChanneledCampaign;
 use Entities\Analytics\Channeled\ChanneledMetric;
-use Entities\Analytics\Channeled\ChanneledSyncError;
 use Entities\Analytics\Creative;
 use Entities\Analytics\Metric;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
 use Entities\Analytics\Query;
-use Enums\Account as AccountEnum;
 use Enums\Channel;
 use Enums\Country as CountryEnum;
 use Enums\Device as DeviceEnum;
@@ -105,90 +99,11 @@ class MetricRequests
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('klaviyo', $createdAtMin, $createdAtMax, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'metricNames' => $filters->metricNames ?? null,
-                ]);
-            } catch (Exception $e) {}
-        }
-
-        $config = Helpers::getChannelsConfig()['klaviyo'];
-        $klaviyoClient = new KlaviyoApi(
-            apiKey: $config['klaviyo_api_key'],
-        );
-
-        $metricNames = $filters->metricNames ?? ($config['metrics'] ?? []);
-        $metricIds = [];
-        $metricMap = [];
-        $klaviyoClient->getAllMetricsAndProcess(
-            metricFields: ['id', 'name'],
-            callback: function ($metrics) use (&$metricIds, &$metricMap, $metricNames, $jobId) {
-                Helpers::checkJobStatus($jobId);
-                foreach ($metrics as $metric) {
-                    if (empty($metricNames) || in_array($metric['attributes']['name'], $metricNames)) {
-                        $metricIds[] = $metric['id'];
-                        $metricMap[$metric['id']] = $metric['attributes']['name'];
-                    }
-                }
-            }
-        );
-
-        $manager = Helpers::getManager();
-        /** @var \Repositories\Channeled\ChanneledMetricRepository $channeledMetricRepository */
-        $channeledMetricRepository = $manager->getRepository(ChanneledMetric::class);
-        $lastChanneledMetric = $channeledMetricRepository->getLastByPlatformCreatedAt(Channel::klaviyo->value);
-
-        $origin = Carbon::parse("2000-01-01");
-        $min = $createdAtMin ? Carbon::parse($createdAtMin) : (isset($lastChanneledMetric['platformCreatedAt']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? Carbon::parse($lastChanneledMetric['platformCreatedAt']) : null);
-        $max = $createdAtMax ? Carbon::parse($createdAtMax) : null;
-        $now = Carbon::now();
-        $from = $min && $min->lt($now) && $min->lt($max) && $origin->lte($min) ?
-            $min->format('Y-m-d H:i:s') :
-            $origin->format("Y-m-d H:i:s");
-        $to = $max && $max->lte($now) ?
-            $max->format('Y-m-d H:i:s') :
-            $now->format('Y-m-d H:i:s');
-        $formattedFilters = [];
-        if ($filters) {
-            foreach ($filters as $key => $value) {
-                if ($key !== 'metricNames') {
-                    $formattedFilters[] = [
-                        "operator" => 'equals',
-                        "field" => $key,
-                        "value" => $value,
-                    ];
-                }
-            }
-        }
-        $formattedFilters[] = [
-            "operator" => "greater-than",
-            "field" => "datetime",
-            "value" => $from,
-        ];
-        $formattedFilters[] = [
-            "operator" => "less-than",
-            "field" => "datetime",
-            "value" => $to,
-        ];
-
-        foreach ($metricIds as $metricId) {
-            $klaviyoClient->getAllMetricAggregatesAndProcess(
-                metricId: $metricId,
-                returnFields: $fields,
-                measurements: [AggregatedMeasurement::count],
-                filter: $formattedFilters,
-                sortField: 'datetime',
-                callback: function ($aggregates) use ($metricId, $metricMap, $jobId) {
-                    Helpers::checkJobStatus($jobId);
-                    self::process(KlaviyoConvert::metricAggregates($aggregates, $metricId, $metricMap));
-                }
-            );
-        }
-
-        return new Response(json_encode(['Metrics retrieved']));
+        return (new \Core\Services\SyncService())->execute('klaviyo', $createdAtMin, $createdAtMax, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'metricNames' => $filters->metricNames ?? null,
+        ]);
     }
 
     /**
@@ -200,17 +115,10 @@ class MetricRequests
      */
     public static function getListFromShopify(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('shopify', $filters->createdAtMin ?? null, $filters->createdAtMax ?? null, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                ]);
-            } catch (\Exception $e) {}
-        }
-
-        /* Placeholder for ShopifyApi integration */
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('shopify', $filters->createdAtMin ?? null, $filters->createdAtMax ?? null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+        ]);
     }
 
     /**
@@ -235,421 +143,205 @@ class MetricRequests
             $logger = Helpers::setLogger('facebook-organic.log');
         }
 
-        // Bridge to modular architecture
-        if (! isset($_GET['old_sync']) && ! empty($_ENV['USE_MODULAR_DRIVERS'])) {
-            try {
-                return (new \Core\Services\SyncService($logger))->execute('facebook_organic', $startDate, $endDate, [
-                    'resume' => $resume,
-                    'jobId' => $jobId,
-                ]);
-            } catch (Exception $e) {}
-        }
-        if (! $logger) {
-            $logger = Helpers::setLogger('facebook-organic.log');
-        }
-
-        $manager = Helpers::getManager();
-
+        // Use modular driver architecture
         try {
-            // Validate configuration
-            $config = self::validateFacebookConfig($logger, 'facebook_organic');
+            return (new \Core\Services\SyncService($logger))->execute('facebook_organic', $startDate, $endDate, [
+                'resume' => $resume,
+                'jobId' => $jobId,
+            ]);
+        } catch (Exception $e) {
+            $logger->error("Facebook Organic Modular Sync Failed: " . $e->getMessage());
 
-            // Apply default dates if missing - Respecting cache_history_range from config
-            if (empty($startDate)) {
-                $days = 3; // Absolute fallback for metrics
-                $window = $config['cache_history_range'] ?? null;
-                if (! empty($window)) {
-                    try {
-                        // Handle both ISO intervals (P3Y) and human readable (3 years)
-                        $intervalStr = (str_starts_with((string)$window, 'P')) ? $window : Helpers::humanToIsoInterval($window);
-                        $interval = new \DateInterval((string)$intervalStr);
-                        $startDate = Carbon::today()->sub($interval)->format('Y-m-d');
-                        $logger->info("Using cache_history_range from config: " . $window . " -> $startDate");
-                    } catch (Exception $e) {
-                        $logger->warning("Invalid cache_history_range in config: " . $window . ". Using default 3 days. Error: " . $e->getMessage());
-                        $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
-                    }
-                } else {
-                    $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
-                    $logger->info("No startDate or cache_history_range provided, defaulting to $startDate");
-                }
-            }
+            return new Response(json_encode(['status' => 'error', 'message' => $e->getMessage()]), 500);
+        }
+    }
 
-            if (empty($endDate)) {
-                $endDate = Carbon::today()->format('Y-m-d');
-            }
+    /**
+     * @throws Exception
+     */
+    public static function processFacebookOrganicChunk(
+        array $data,
+        string $startDate,
+        string $endDate,
+        bool $resume,
+        LoggerInterface $logger,
+        ?int $jobId,
+        array $page,
+        array $config
+    ): array {
+        $manager = Helpers::getManager();
+        $totalMetrics = 0;
+        $totalRows = 0;
+        $totalDuplicates = 0;
 
-            $logger->info("Starting getListFromFacebookOrganic: startDate=$startDate, endDate=$endDate, resume=$resume");
+        $pageRepository = $manager->getRepository(Page::class);
+        $postRepository = $manager->getRepository(Post::class);
+        $accountRepository = $manager->getRepository(Account::class);
+        $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
 
+        // Load global entities
+        $accountEntityName = $config['accounts_group_name'] ?? null;
+        $accountEntity = $accountEntityName ? $accountRepository->findOneBy(['name' => $accountEntityName]) : null;
 
-            // Initialize API client
-            $api = self::initializeFacebookGraphApi($config, $logger);
+        $pageId = (string) ($page['id'] ?? '');
 
-            // Initialize repositories
-            $pageRepository = $manager->getRepository(Page::class);
-            $postRepository = $manager->getRepository(Post::class);
-            $accountRepository = $manager->getRepository(Account::class);
-            $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
+        $pageEntity = $pageRepository->findOneBy(['platformId' => $pageId]);
+        if (! $pageEntity) {
+            $logger->error("Page entity not found for platformId=" . $pageId);
 
-            // Load global entities
-            $accountEntityName = $config['accounts_group_name'] ?? null;
-            $accountEntity = $accountEntityName ? $accountRepository->findOneBy(['name' => $accountEntityName]) : null;
+            return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
+        }
 
-            if (! $accountEntity) {
-                $logger->warning("Account group '{$accountEntityName}' not found. Instagram accounts might not be processed correctly.");
-            }
+        // Initialize PageMap for this site
+        $pageMap = ['map' => [], 'mapReverse' => []];
+        foreach ($pageRepository->findAll() as $p) {
+            $pageMap['map'][$p->getUrl()] = $p->getId();
+            $pageMap['mapReverse'][$p->getId()] = $p->getUrl();
+        }
 
-            // Apply retention range limit to startDate
-            $timezone = $config['timezone'] ?? 'America/Caracas';
-            $retentionLimit = self::getRetentionRange($config, 'facebook_organic', '2 years - 1 day');
-            // Hard limit protection (2 years)
-            $hardLimit = Carbon::now($timezone)->subYears(2)->addDays(2)->startOfDay();
-            if ($retentionLimit->lt($hardLimit)) {
-                $logger->info("Overriding retentionLimit from " . $retentionLimit->format('Y-m-d') . " to " . $hardLimit->format('Y-m-d') . " due to Facebook API hard limit (2 years).");
-                $retentionLimit = $hardLimit;
-            }
+        if ($page['page_metrics'] ?? false) {
+            $res = self::processFacebookPage(
+                page: $page,
+                rows: $data['insights'] ?? [],
+                manager: $manager,
+                pageRepository: $pageRepository,
+                logger: $logger,
+                pageMap: $pageMap,
+                startDate: $startDate,
+                endDate: $endDate
+            );
+            $totalMetrics += $res['metrics'] ?? 0;
+            $totalRows += $res['rows'] ?? 0;
+            $totalDuplicates += $res['duplicates'] ?? 0;
 
-            $requestedStart = Carbon::parse($startDate, $timezone)->startOfDay();
-            if ($requestedStart->lt($hardLimit)) {
-                $logger->warning("Truncating startDate from $startDate to " . $hardLimit->format('Y-m-d') . " due to Facebook API 2-year limit.");
-                $startDate = $hardLimit->format('Y-m-d');
-            }
-
-            if (Carbon::parse($startDate)->gt(Carbon::parse($endDate))) {
-                $logger->info("Job date range ($startDate to $endDate) is entirely before the retention limit (" . $retentionLimit->format('Y-m-d') . "). Skipping.");
-
-                return new Response(json_encode(['message' => 'Job skipped due to retention policy']), 200);
-            }
-
-            // Process Pages
-            Helpers::reconnectIfNeeded($manager);
-            $pagesToProcessRaw = $config['pages'] ?? [];
-            $globalExcludeIds = array_map('strval', $config['exclude_from_caching'] ?? []);
-            $globalPageConfig = $config['PAGE'] ?? [
-                'page_metrics' => true,
-                'posts' => true,
-                'post_metrics' => false,
-                'ig_accounts' => true,
-                'ig_account_metrics' => false,
-                'ig_account_media' => true,
-                'ig_account_media_metrics' => false,
-            ];
-
-            $pagesToProcess = [];
-            if (empty($pagesToProcessRaw)) {
-                $logger->info("No specific pages listed in config. Fetching all available pages from database.");
-                $allPages = $pageRepository->findByDataAttribute('source', 'fb_page');
-                foreach ($allPages as $p) {
-                    $pageId = (string) $p->getPlatformId();
-                    if (in_array($pageId, $globalExcludeIds)) {
-                        continue;
-                    }
-                    $pageName = $p->getTitle();
-                    $includeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_include');
-                    $excludeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_exclude');
-                    if (! Helpers::matchesFilter((string)$pageName, $includeFilter, $excludeFilter) && ! Helpers::matchesFilter((string)$pageId, $includeFilter, $excludeFilter)) {
-                        continue;
-                    }
-
-                    // Auto-discover IG if enabled globally
-                    $igId = $p->getData()['instagram_business_account']['id'] ?? null;
-
-                    $pagesToProcess[] = array_merge($globalPageConfig, [
-                        'id' => $pageId,
-                        'url' => $p->getUrl(),
-                        'title' => $pageName,
-                        'enabled' => true,
-                        'ig_account' => $igId,
-                    ]);
-                }
-            } else {
-                foreach ($pagesToProcessRaw as $p) {
-                    $resolvedPage = array_merge($globalPageConfig, $p);
-
-                    // If IG is enabled but ID is missing, try to resolve from database
-                    if (empty($resolvedPage['ig_account']) && ! empty($resolvedPage['ig_accounts'])) {
-                        $pEntity = $pageRepository->findOneBy(['platformId' => $resolvedPage['id']]);
-                        if ($pEntity && isset($pEntity->getData()['instagram_business_account']['id'])) {
-                            $resolvedPage['ig_account'] = $pEntity->getData()['instagram_business_account']['id'];
-                        }
-                    }
-
-                    $pagesToProcess[] = $resolvedPage;
-                }
-            }
-
-            $logger->info("Processing " . count($pagesToProcess) . " Facebook pages");
-
-            // Create a map for active pages
-            $pageMap = [
-                'map' => [],
-                'mapReverse' => [],
-            ];
-            foreach ($pageRepository->findAll() as $p) {
-                $pageMap['map'][$p->getUrl()] = $p->getId();
-                $pageMap['mapReverse'][$p->getId()] = $p->getUrl();
-            }
-
-            $totalMetrics = 0;
-            $totalRows = 0;
-            $totalDuplicates = 0;
-
-            // Process Pages & Instagram
-            Helpers::reconnectIfNeeded($manager);
-            foreach ($pagesToProcess as $page) {
-                Helpers::checkJobStatus($jobId);
-
-                $api->setPageId(trim((string) ($page['id'] ?? '')));
-                $api->setLongLivedPageAccesstoken(null);
-
-                $pageId = (string) ($page['id'] ?? '');
-                $pageTitle = $page['title'] ?? '';
-                $includeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_include');
-                $excludeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_exclude');
-                if (! Helpers::matchesFilter((string)$pageTitle, $includeFilter, $excludeFilter) && ! Helpers::matchesFilter((string)$pageId, $includeFilter, $excludeFilter)) {
-                    continue;
-                }
-
-                if (! $page['enabled'] || (! empty($page['exclude_from_caching']) && $page['exclude_from_caching'])) {
-                    $logger->info("Skipping page: " . $page['id'] . ($page['enabled'] ? " (excluded from caching)" : " (disabled)"));
-
-                    continue;
-                }
-
-                $pageEntity = $pageRepository->findOneBy(['platformId' => $page['id']]);
-                if (! $pageEntity) {
-                    $logger->error("Page entity not found for platformId=" . $page['id'] . ". Skipping.");
-
-                    continue;
-                }
-
+            // Sync Instagram Media
+            if (! empty($page['ig_account']) && ! empty($data['ig_media']['data'])) {
                 try {
-                    $cacheChunkSize = $config['cache_chunk_size'] ?? '1 week';
-                    $pageStartDate = $startDate;
-
-                    if (filter_var($resume, FILTER_VALIDATE_BOOLEAN)) {
-                        /** @var \Repositories\MetricRepository $metricRepo */
-                        $metricRepo = $manager->getRepository(Metric::class);
-                        $maxDate = $metricRepo->getMaxMetricDateForChannelAndPage(Channel::facebook_organic->value, $pageEntity->getId());
-                        if ($maxDate) {
-                            $latestFetchedDate = Carbon::parse($maxDate);
-                            $jobStart = Carbon::parse($startDate);
-                            if ($latestFetchedDate->gt($jobStart) && $latestFetchedDate->lt(Carbon::parse($endDate))) {
-                                $pageStartDate = $latestFetchedDate->format('Y-m-d');
-                                $logger->info("Smart resume: Starting {$pageId} from {$pageStartDate} based on latest cached metric date");
-                            }
-                        }
-                    }
-
-                    $chunks = Helpers::getDateChunks($pageStartDate, $endDate, $cacheChunkSize);
-                    foreach ($chunks as $chunk) {
-                        Helpers::checkJobStatus($jobId);
-                        $cStart = $chunk['start'];
-                        $cEnd = $chunk['end'];
-                        $logger->info("Processing page chunk: $cStart to $cEnd");
-
-                        if ($page['page_metrics']) {
-                            $res = self::processFacebookPage(
-                                page: $page,
-                                startDate: $cStart,
-                                endDate: $cEnd,
-                                api: $api,
-                                manager: $manager,
-                                pageRepository: $pageRepository,
-                                logger: $logger,
-                                pageMap: $pageMap,
-                            );
-                            $totalMetrics += $res['metrics'] ?? 0;
-                            $totalRows += $res['rows'] ?? 0;
-                            $totalDuplicates += $res['duplicates'] ?? 0;
-
-                            // 1. Sync Instagram Media first to claim posts
-                            try {
-                                $logger->info("Syncing media for Instagram Account {$page['ig_account']}");
-                                $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
-                                $channeledAccountEntity = $channeledAccountRepository->findOneBy([
-                                    'platformId' => (string) $page['ig_account'],
-                                    'channel' => Channel::facebook_organic->value,
-                                    'type' => AccountEnum::INSTAGRAM->value,
-                                ]);
-
-                                if ($channeledAccountEntity) {
-                                    $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
-                                    $rawMedia = $api->getInstagramMedia(igUserId: (string) $page['ig_account'], additionalParams: ['since' => $syncSince]);
-                                    if (! empty($rawMedia['data'])) {
-                                        $mediaCollection = FacebookOrganicMetricConvert::toInstagramMediaCollection($rawMedia['data'], $pageEntity, $accountEntity, $channeledAccountEntity);
-                                        SocialProcessor::processPosts($mediaCollection, $manager);
-                                        $logger->info("Synced " . count($rawMedia['data']) . " media items for Instagram Account {$page['ig_account']}");
-                                    }
-                                }
-                            } catch (Exception $e) {
-                                $logger->warning("Failed to sync media for Instagram Account {$page['ig_account']}: " . $e->getMessage());
-                            }
-
-                            // 2. Sync Facebook Page Posts second
-                            if ($page['posts']) {
-                                try {
-                                    $logger->info("Syncing posts for Facebook Page {$pageId}");
-                                    $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
-                                    $rawPosts = $api->getFacebookPosts(pageId: (string) $pageId, additionalParams: ['since' => $syncSince]);
-                                    if (! empty($rawPosts['data'])) {
-                                        $fbChanneledAccount = $channeledAccountRepository->findOneBy([
-                                            'platformId' => (string) $pageId,
-                                            'channel' => Channel::facebook_organic->value,
-                                            'type' => AccountEnum::FACEBOOK_PAGE->value,
-                                        ]);
-                                        $postsCollection = FacebookOrganicMetricConvert::toPostsCollection(
-                                            $rawPosts['data'],
-                                            $pageEntity,
-                                            $accountEntity,
-                                            $fbChanneledAccount?->getId()
-                                        );
-                                        SocialProcessor::processPosts($postsCollection, $manager);
-                                        $logger->info("Synced " . count($rawPosts['data']) . " posts for Facebook Page {$pageId}");
-                                    }
-                                } catch (Exception $e) {
-                                    $logger->warning("Failed to sync posts for Facebook Page {$pageId}: " . $e->getMessage());
-                                }
-                                $postMap = self::getPostMap($manager, $pageEntity);
-                            }
-                        }
-
-                        // Process Account Metrics
-                        if (! empty($page['ig_account']) && ! empty($page['ig_accounts']) && ! empty($page['ig_account_metrics'])) {
-                            if ($accountEntity) {
-                                $res = self::processInstagramAccount(
-                                    page: $page,
-                                    api: $api,
-                                    manager: $manager,
-                                    accountEntity: $accountEntity,
-                                    pageEntity: $pageEntity,
-                                    logger: $logger,
-                                    pageMap: $pageMap,
-                                    startDate: $cStart,
-                                    endDate: $cEnd,
-                                    config: $config,
-                                    channel: 'facebook_organic'
-                                );
-                                $totalMetrics += $res['metrics'] ?? 0;
-                                $totalRows += $res['rows'] ?? 0;
-                                $totalDuplicates += $res['duplicates'] ?? 0;
-                            }
-                        }
-
-                        // Process Media Metrics
-                        if (! empty($page['ig_account']) && ! empty($page['ig_accounts']) && ! empty($page['ig_account_media'])) {
-                            $channeledAccountEntity = $channeledAccountRepository->findOneBy([
-                                'platformId' => (string) $page['ig_account'],
-                                'channel' => Channel::facebook_organic->value,
-                                'type' => AccountEnum::INSTAGRAM->value,
-                            ]);
-
-                            if ($channeledAccountEntity) {
-                                $mediaMap = self::getInstagramMediaMap($manager, $pageEntity, $channeledAccountEntity);
-                                if ($page['ig_account_media_metrics']) {
-                                    $logger->info("Syncing insights for " . count($mediaMap['map']) . " Instagram media items in batches of 50...");
-                                    $filteredMediaMap = [];
-                                    foreach ($mediaMap['map'] as $mediaId => $idInDb) {
-                                        $mediaEntity = $postRepository->find($idInDb);
-                                        if ($mediaEntity) {
-                                            $filteredMediaMap[$mediaId] = $mediaEntity;
-                                        }
-                                    }
-
-                                    $mediaChunks = array_chunk($filteredMediaMap, 50, true);
-                                    foreach ($mediaChunks as $chunk) {
-                                        Helpers::checkJobStatus($jobId);
-                                        $urls = [];
-                                        foreach ($chunk as $mediaPlatformId => $mediaEntity) {
-                                            $mType = $mediaMap['mapData'][$mediaPlatformId] ?? 'IMAGE';
-                                            $mMetrics = MediaType::from($mType)->insightsFields();
-                                            $urls[] = "/{$mediaPlatformId}/insights?metric={$mMetrics}";
-                                        }
-
-                                        $batchResults = $api->getBatch($urls, \Anibalealvarezs\FacebookGraphApi\Enums\TokenSample::PAGE);
-                                        foreach ($batchResults as $resIndex => $batchRes) {
-                                            $mediaPlatformId = array_keys($chunk)[$resIndex];
-                                            $mediaEntity = array_values($chunk)[$resIndex];
-                                            $providedData = ($batchRes['code'] ?? 0) === 200 ? json_decode($batchRes['body'], true) : null;
-
-                                            $res = self::processInstagramMedia(
-                                                pageEntity: $pageEntity,
-                                                postEntity: $mediaEntity,
-                                                accountEntity: $accountEntity,
-                                                channeledAccountEntity: $channeledAccountEntity,
-                                                api: $api,
-                                                manager: $manager,
-                                                logger: $logger,
-                                                mediaMap: $mediaMap,
-                                                pageMap: $pageMap,
-                                                providedData: $providedData,
-                                                startDate: $cEnd
-                                            );
-                                            $totalMetrics += $res['metrics'] ?? 0;
-                                            $totalRows += $res['rows'] ?? 0;
-                                            $totalDuplicates += $res['duplicates'] ?? 0;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Process FB Post Metrics
-                        if ($page['post_metrics'] && isset($postMap)) {
-                            $filteredPostMap = [];
-                            foreach ($postMap['map'] as $postPlatformId => $idInDb) {
-                                $postEntity = $postRepository->find($idInDb);
-                                if ($postEntity) {
-                                    $filteredPostMap[$postPlatformId] = $postEntity;
-                                }
-                            }
-
-                            $postChunks = array_chunk($filteredPostMap, 50, true);
-                            foreach ($postChunks as $chunk) {
-                                Helpers::checkJobStatus($jobId);
-                                $urls = [];
-                                foreach ($chunk as $postPlatformId => $postEntity) {
-                                    $postType = $postMap['mapData'][$postPlatformId] ?? 'status';
-                                    $pMetrics = 'post_reactions_by_type_total';
-                                    if ($postType === 'video') {
-                                        $pMetrics .= ',post_media_view';
-                                    }
-                                    $urls[] = "/{$postPlatformId}/insights?metric={$pMetrics}&period=lifetime&fields=name,period,values";
-                                }
-
-                                $batchResults = $api->getBatch($urls, \Anibalealvarezs\FacebookGraphApi\Enums\TokenSample::PAGE);
-                                foreach ($batchResults as $resIndex => $batchRes) {
-                                    $postEntity = array_values($chunk)[$resIndex];
-                                    $providedData = ($batchRes['code'] ?? 0) === 200 ? json_decode($batchRes['body'] ?? '{}', true) : null;
-
-                                    $res = self::processFacebookPagePost(
-                                        postEntity: $postEntity,
-                                        pageEntity: $pageEntity,
-                                        api: $api,
-                                        manager: $manager,
-                                        logger: $logger,
-                                        postMap: $postMap,
-                                        pageMap: $pageMap,
-                                        providedData: $providedData
-                                    );
-                                    $totalMetrics += $res['metrics'] ?? 0;
-                                    $totalRows += $res['rows'] ?? 0;
-                                    $totalDuplicates += $res['duplicates'] ?? 0;
-                                }
-                            }
-                        }
+                    $channeledAccountEntity = $channeledAccountRepository->findOneBy([
+                        'platformId' => (string) $page['ig_account'],
+                        'channel' => Channel::facebook_organic->value,
+                        'type' => \Enums\Account::INSTAGRAM->value,
+                    ]);
+                    if ($channeledAccountEntity) {
+                        $mediaCollection = \Classes\Conversions\FacebookOrganicMetricConvert::toInstagramMediaCollection($data['ig_media']['data'], $pageEntity, $accountEntity, $channeledAccountEntity);
+                        \Classes\SocialProcessor::processPosts($mediaCollection, $manager);
                     }
                 } catch (Exception $e) {
-                    $logger->error("Error processing page " . ($page['id'] ?? 'unknown') . ": " . $e->getMessage());
+                    $logger->warning("IG Media sync failed: " . $e->getMessage());
                 }
             }
 
-            return self::finalizeTransaction($totalMetrics, $totalRows, $totalDuplicates, $logger, $startDate, $endDate);
-        } catch (Exception $e) {
-            $logger->error("Unexpected error in getListFromFacebookOrganic: " . $e->getMessage());
-
-            throw $e;
+            // Sync FB Posts
+            if (($page['posts'] ?? false) && ! empty($data['fb_posts']['data'])) {
+                try {
+                    $fbChanneledAccount = $channeledAccountRepository->findOneBy([
+                        'platformId' => $pageId,
+                        'channel' => Channel::facebook_organic->value,
+                        'type' => \Enums\Account::FACEBOOK_PAGE->value,
+                    ]);
+                    $postsCollection = \Classes\Conversions\FacebookOrganicMetricConvert::toPostsCollection($data['fb_posts']['data'], $pageEntity, $accountEntity, $fbChanneledAccount?->getId());
+                    \Classes\SocialProcessor::processPosts($postsCollection, $manager);
+                } catch (Exception $e) {
+                    $logger->warning("FB Posts sync failed: " . $e->getMessage());
+                }
+            }
         }
+
+        return ['metrics' => $totalMetrics, 'rows' => $totalRows, 'duplicates' => $totalDuplicates];
+    }
+
+    public static function processFacebookMarketingChunk(
+        array $data,
+        string $startDate,
+        string $endDate,
+        array $account,
+        array $config
+    ): array {
+        $logger = Helpers::setLogger('facebook-marketing.log');
+        $manager = Helpers::getManager();
+        $totalMetrics = 0;
+        $totalRows = 0;
+        $totalDuplicates = 0;
+
+        $accountRepository = $manager->getRepository(Account::class);
+        $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
+
+        // Load global entities
+        $accountEntityName = $config['accounts_group_name'] ?? null;
+        $accountEntity = $accountEntityName ? $accountRepository->findOneBy(['name' => $accountEntityName]) : null;
+
+        if (! $accountEntity) {
+            $logger->error("Account group '{$accountEntityName}' not found.");
+
+            return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
+        }
+
+        $channeledAccount = $channeledAccountRepository->findOneBy([
+            'platformId' => $account['id'],
+            'channel' => Channel::facebook_marketing->value,
+            'type' => \Enums\Account::META_AD_ACCOUNT->value,
+        ]);
+
+        if (! $channeledAccount) {
+            $logger->error("ChanneledAccount not found for ad account platformId=" . $account['id']);
+
+            return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
+        }
+
+        return self::processAdAccount(
+            rows: $data,
+            adAccount: $account,
+            manager: $manager,
+            accountEntity: $accountEntity,
+            channeledAccountEntity: $channeledAccount,
+            logger: $logger,
+            startDate: $startDate,
+            endDate: $endDate,
+            config: $config
+        );
+
+        return $res;
+    }
+
+    public static function processKlaviyoChunk(
+        array $data,
+        string $type,
+        array $config,
+        ?string $metricId = null,
+        array $metricMap = []
+    ): array {
+        return match ($type) {
+            'metrics' => self::process(\Classes\Conversions\KlaviyoConvert::metricAggregates($data, $metricId, $metricMap)),
+            'customers' => \Classes\Requests\CustomerRequests::process(\Classes\Conversions\KlaviyoConvert::customers($data)),
+            'products' => \Classes\Requests\ProductRequests::process(\Classes\Conversions\KlaviyoConvert::products($data)),
+            default => ['metrics' => 0, 'rows' => 0, 'duplicates' => 0],
+        };
+    }
+
+    public static function processShopifyChunk(
+        array $data,
+        string $type,
+        array $config
+    ): array {
+        return match ($type) {
+            'orders' => \Classes\Requests\OrderRequests::process(\Classes\Conversions\ShopifyConvert::orders($data)),
+            'products' => \Classes\Requests\ProductRequests::process(\Classes\Conversions\ShopifyConvert::products($data)),
+            'customers' => \Classes\Requests\CustomerRequests::process(\Classes\Conversions\ShopifyConvert::customers($data)),
+            default => ['metrics' => 0, 'rows' => 0, 'duplicates' => 0],
+        };
+    }
+
+    public static function processNetSuiteChunk(
+        array $data,
+        string $type,
+        array $config
+    ): array {
+        return match ($type) {
+            'orders' => \Classes\Requests\OrderRequests::process(\Classes\Conversions\NetSuiteConvert::orders($data)),
+            'products' => \Classes\Requests\ProductRequests::process(\Classes\Conversions\NetSuiteConvert::products($data)),
+            'customers' => \Classes\Requests\CustomerRequests::process(\Classes\Conversions\NetSuiteConvert::customers($data)),
+            default => ['metrics' => 0, 'rows' => 0, 'duplicates' => 0],
+        };
     }
 
     /**
@@ -675,336 +367,15 @@ class MetricRequests
         }
 
         // Bridge to modular architecture
-        if (! isset($_GET['old_sync']) && ! empty($_ENV['USE_MODULAR_DRIVERS'])) {
-            try {
-                return (new \Core\Services\SyncService($logger))->execute('facebook_marketing', $startDate, $endDate, [
-                    'resume' => $resume,
-                    'jobId' => $jobId,
-                ]);
-            } catch (\Exception $e) {}
-        }
-        if (! $logger) {
-            $logger = Helpers::setLogger('facebook-marketing.log');
-        }
-
-        $manager = Helpers::getManager();
-
         try {
-            // Validate configuration
-            $config = self::validateFacebookConfig($logger, 'facebook_marketing');
-
-            // Apply default dates if missing - Respecting cache_history_range from config
-            if (empty($startDate)) {
-                $days = 3; // Absolute fallback for metrics
-                $window = $config['cache_history_range'] ?? null;
-                if (! empty($window)) {
-                    try {
-                        // Handle both ISO intervals (P3Y) and human readable (3 years)
-                        $intervalStr = (str_starts_with((string)$window, 'P')) ? $window : Helpers::humanToIsoInterval($window);
-                        $interval = new \DateInterval((string)$intervalStr);
-                        $startDate = Carbon::today()->sub($interval)->format('Y-m-d');
-                        $logger->info("Using cache_history_range from config: " . $window . " -> $startDate");
-                    } catch (\Exception $e) {
-                        $logger->warning("Invalid cache_history_range in config: " . $window . ". Using default 3 days. Error: " . $e->getMessage());
-                        $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
-                    }
-                } else {
-                    $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
-                    $logger->info("No startDate or cache_history_range provided, defaulting to $startDate");
-                }
-            }
-
-            if (empty($endDate)) {
-                $endDate = Carbon::today()->format('Y-m-d');
-            }
-
-            $logger->info("Starting getListFromFacebookMarketing: startDate=$startDate, endDate=$endDate, resume=$resume");
-
-
-            // Initialize API client
-            $api = self::initializeFacebookGraphApi($config, $logger);
-
-            // Initialize repositories
-            $accountRepository = $manager->getRepository(Account::class);
-            $channeledAccountRepository = $manager->getRepository(ChanneledAccount::class);
-
-            // Load global entities
-            $accountEntityName = $config['accounts_group_name'] ?? null;
-            $accountEntity = $accountEntityName ? $accountRepository->findOneBy(['name' => $accountEntityName]) : null;
-
-            if (! $accountEntity) {
-                $logger->error("Account group '{$accountEntityName}' not found. Facebook Marketing cannot be processed.");
-
-                throw new Exception("Account group '{$accountEntityName}' not found.");
-            }
-
-            // Apply retention range limit to startDate
-            $retentionLimit = self::getRetentionRange($config, 'facebook_marketing', '2 years');
-            $requestedStart = Carbon::parse($startDate);
-            if ($requestedStart->lt($retentionLimit)) {
-                $logger->info("Truncating startDate from $startDate to " . $retentionLimit->format('Y-m-d') . " due to cache_history_range");
-                $startDate = $retentionLimit->format('Y-m-d');
-            }
-
-            if (Carbon::parse($startDate)->gt(Carbon::parse($endDate))) {
-                $logger->info("Job date range ($startDate to $endDate) is entirely before the retention limit (" . $retentionLimit->format('Y-m-d') . "). Skipping.");
-
-                return new Response(json_encode(['message' => 'Job skipped due to retention policy']), 200);
-            }
-
-            $totalMetrics = 0;
-            $totalRows = 0;
-            $totalDuplicates = 0;
-            $hasErrors = false;
-
-            // Process Ad Accounts
-            Helpers::reconnectIfNeeded($manager);
-            $adAccountsToProcessRaw = $config['ad_accounts'] ?? [];
-            $globalExcludeIds = array_map('strval', $config['exclude_from_caching'] ?? []);
-            $globalAdAccountConfig = $config['AD_ACCOUNT'] ?? [
-                'ad_account_metrics' => true,
-                'campaigns' => true,
-                'campaign_metrics' => true,
-                'adsets' => false,
-                'adset_metrics' => false,
-                'ads' => false,
-                'ad_metrics' => false,
-                'creatives' => false,
-                'creative_metrics' => false,
-            ];
-
-            $adAccountsToProcess = [];
-            /** @var \Repositories\Channeled\ChanneledSyncErrorRepository $syncErrorRepo */
-            $syncErrorRepo = $manager->getRepository(ChanneledSyncError::class);
-
-            if (empty($adAccountsToProcessRaw)) {
-                $logger->info("No specific ad accounts listed in config. Fetching all available ad accounts for channel from database.");
-                $allChanneledAccounts = $channeledAccountRepository->findBy([
-                    'channel' => Channel::facebook_marketing->value,
-                    'type' => AccountEnum::META_AD_ACCOUNT->value,
-                ]);
-                foreach ($allChanneledAccounts as $ca) {
-                    $accId = (string) $ca->getPlatformId();
-                    if (in_array($accId, $globalExcludeIds)) {
-                        continue;
-                    }
-                    $accName = $ca->getName();
-                    $includeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_include');
-                    $excludeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_exclude');
-                    if (! Helpers::matchesFilter((string)$accName, $includeFilter, $excludeFilter) && ! Helpers::matchesFilter((string)$accId, $includeFilter, $excludeFilter)) {
-                        continue;
-                    }
-                    $adAccountsToProcess[] = array_merge($globalAdAccountConfig, [
-                        'id' => $accId,
-                        'name' => $accName,
-                        'enabled' => true,
-                    ]);
-                }
-            } else {
-                foreach ($adAccountsToProcessRaw as $a) {
-                    $adAccountsToProcess[] = array_merge($globalAdAccountConfig, $a);
-                }
-            }
-
-            foreach ($adAccountsToProcess as $adAccount) {
-                Helpers::checkJobStatus($jobId);
-
-                $adAccId = (string) ($adAccount['id'] ?? '');
-                $adAccName = $adAccount['name'] ?? '';
-                $includeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_include');
-                $excludeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_exclude');
-                if (! Helpers::matchesFilter((string)$adAccName, $includeFilter, $excludeFilter) && ! Helpers::matchesFilter((string)$adAccId, $includeFilter, $excludeFilter)) {
-                    continue;
-                }
-
-                $channeledAccountEntity = $channeledAccountRepository->findOneBy([
-                    'platformId' => $adAccount['id'],
-                    'account' => $accountEntity,
-                ]);
-
-                if (! $channeledAccountEntity) {
-                    $logger->error("ChanneledAccount entity not found for adAccount=" . $adAccount['id'] . ". Skipping.");
-
-                    continue;
-                }
-
-                if (! $adAccount['enabled'] || (! empty($adAccount['exclude_from_caching']) && $adAccount['exclude_from_caching'])) {
-                    $logger->info("Skipping ad account: " . $adAccount['id'] . ($adAccount['enabled'] ? " (excluded from caching)" : " (disabled)"));
-
-                    continue;
-                }
-
-                try {
-                    $cacheChunkSize = $config['cache_chunk_size'] ?? '1 week';
-                    $accStartDate = $startDate;
-
-                    if (filter_var($resume, FILTER_VALIDATE_BOOLEAN)) {
-                        /** @var \Repositories\MetricRepository $metricRepo */
-                        $metricRepo = $manager->getRepository(Metric::class);
-                        $maxDate = $metricRepo->getMaxMetricDateForChannelAndChanneledAccount(Channel::facebook_marketing->value, $channeledAccountEntity->getId());
-                        if ($maxDate) {
-                            $latestFetchedDate = Carbon::parse($maxDate);
-                            $jobStart = Carbon::parse($startDate);
-                            if ($latestFetchedDate->gt($jobStart) && $latestFetchedDate->lt(Carbon::parse($endDate))) {
-                                $accStartDate = $latestFetchedDate->format('Y-m-d');
-                                $logger->info("Smart resume: Starting {$adAccId} from {$accStartDate} based on latest cached metric date");
-                            }
-                        }
-                    }
-
-                    $chunks = Helpers::getDateChunks($accStartDate, $endDate, $cacheChunkSize);
-                    foreach ($chunks as $chunk) {
-                        Helpers::checkJobStatus($jobId);
-                        $cStart = $chunk['start'];
-                        $cEnd = $chunk['end'];
-                        $logger->info("Processing ad account chunk: $cStart to $cEnd");
-
-                        if ($adAccount['ad_account_metrics']) {
-                            $res = self::processAdAccount(
-                                adAccount: $adAccount,
-                                api: $api,
-                                manager: $manager,
-                                accountEntity: $accountEntity,
-                                channeledAccountEntity: $channeledAccountEntity,
-                                logger: $logger,
-                                startDate: $cStart,
-                                endDate: $cEnd,
-                                config: $config,
-                            );
-                            $totalMetrics += $res['metrics'] ?? 0;
-                            $totalRows += $res['rows'] ?? 0;
-                        }
-
-                        if ($adAccount['campaigns']) {
-                            $campaignsMultiMap = self::getCampaignMaps($manager, $channeledAccountEntity);
-                            $campaignMap = $campaignsMultiMap['campaignMap'];
-                            $channeledCampaignMap = $campaignsMultiMap['channeledCampaignMap'];
-
-                            if ($adAccount['campaign_metrics']) {
-                                $res = self::processCampaignsBulk(
-                                    api: $api,
-                                    manager: $manager,
-                                    channeledAccountEntity: $channeledAccountEntity,
-                                    logger: $logger,
-                                    startDate: $cStart,
-                                    endDate: $cEnd,
-                                    channeledCampaignMap: $channeledCampaignMap,
-                                    campaignMap: $campaignMap,
-                                    jobId: $jobId,
-                                    cacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
-                                    cacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
-                                    config: $config,
-                                );
-                                $totalMetrics += $res['metrics'] ?? 0;
-                                $totalRows += $res['rows'] ?? 0;
-                            }
-
-                            if ($adAccount['adsets']) {
-                                $channeledAdGroupMap = self::getAdGroupMap($manager, $channeledAccountEntity);
-
-                                if ($adAccount['adset_metrics']) {
-                                    $res = self::processAdsetsBulk(
-                                        api: $api,
-                                        manager: $manager,
-                                        channeledAccountEntity: $channeledAccountEntity,
-                                        logger: $logger,
-                                        startDate: $cStart,
-                                        endDate: $cEnd,
-                                        campaignMap: $campaignMap,
-                                        channeledCampaignMap: $channeledCampaignMap,
-                                        channeledAdGroupMap: $channeledAdGroupMap,
-                                        jobId: $jobId,
-                                        cacheInclude: self::getFacebookFilter($config, 'ADSET', 'cache_include'),
-                                        cacheExclude: self::getFacebookFilter($config, 'ADSET', 'cache_exclude'),
-                                        config: $config,
-                                        campaignCacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
-                                        campaignCacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
-                                    );
-                                    $totalMetrics += $res['metrics'] ?? 0;
-                                    $totalRows += $res['rows'] ?? 0;
-                                }
-
-                                if ($adAccount['ads']) {
-                                    $channeledAdMap = self::getAdMap($manager, $channeledAccountEntity);
-
-                                    if ($adAccount['ad_metrics']) {
-                                        $res = self::processAdsBulk(
-                                            api: $api,
-                                            manager: $manager,
-                                            channeledAccountEntity: $channeledAccountEntity,
-                                            logger: $logger,
-                                            startDate: $cStart,
-                                            endDate: $cEnd,
-                                            campaignMap: $campaignMap,
-                                            channeledCampaignMap: $channeledCampaignMap,
-                                            channeledAdGroupMap: $channeledAdGroupMap,
-                                            channeledAdMap: $channeledAdMap,
-                                            jobId: $jobId,
-                                            cacheInclude: self::getFacebookFilter($config, 'AD', 'cache_include'),
-                                            cacheExclude: self::getFacebookFilter($config, 'AD', 'cache_exclude'),
-                                            config: $config,
-                                            campaignCacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
-                                            campaignCacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
-                                        );
-                                        $totalMetrics += $res['metrics'] ?? 0;
-                                        $totalRows += $res['rows'] ?? 0;
-                                    }
-                                }
-                            }
-
-                            if (! empty($adAccount['creatives']) && ! empty($adAccount['creative_metrics'])) {
-                                $res = self::processCreativesBulk(
-                                    api: $api,
-                                    manager: $manager,
-                                    channeledAccountEntity: $channeledAccountEntity,
-                                    logger: $logger,
-                                    startDate: $cStart,
-                                    endDate: $cEnd,
-                                    jobId: $jobId,
-                                    cacheInclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_include'),
-                                    cacheExclude: self::getFacebookFilter($config, 'CREATIVE', 'cache_exclude'),
-                                    config: $config,
-                                    campaignCacheInclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'),
-                                    campaignCacheExclude: self::getFacebookFilter($config, 'CAMPAIGN', 'cache_exclude'),
-                                );
-                                $totalMetrics += $res['metrics'] ?? 0;
-                                $totalRows += $res['rows'] ?? 0;
-                            }
-                        }
-                    }
-                } catch (FacebookRateLimitException $e) {
-                    throw $e;
-                } catch (Exception $e) {
-                    $hasErrors = true;
-                    $logger->error("Error processing ad account " . $adAccount['id'] . ": " . $e->getMessage());
-                    $syncErrorRepo->logError([
-                        'platformId' => $adAccount['id'],
-                        'channel' => Channel::facebook_marketing->value,
-                        'syncType' => 'metric',
-                        'entityType' => 'ad_account',
-                        'errorMessage' => $e->getMessage(),
-                        'extraData' => [
-                            'startDate' => $startDate,
-                            'endDate' => $endDate,
-                            'account_id' => $adAccount['id'],
-                        ],
-                    ]);
-                }
-            }
-
-            if ($hasErrors) {
-                throw new Exception("Finished with partial errors. Check channeled_sync_errors table or logs for details.");
-            }
-
-            return self::finalizeTransaction($totalMetrics, $totalRows, $totalDuplicates, $logger, $startDate, $endDate);
-        } catch (FacebookRateLimitException $e) {
-            $logger->error("Facebook API Rate Limit Reach: " . $e->getMessage());
-
-            return new Response(json_encode(['error' => 'Rate limit reached: ' . $e->getMessage()]), 429);
+            return (new \Core\Services\SyncService($logger))->execute('facebook_marketing', $startDate, $endDate, [
+                'resume' => $resume,
+                'jobId' => $jobId,
+            ]);
         } catch (Exception $e) {
-            $logger->error("Unexpected error in getListFromFacebookMarketing: " . $e->getMessage());
+            $logger->error("Facebook Marketing Modular Sync Failed: " . $e->getMessage());
 
-            throw $e;
+            return new Response(json_encode(['status' => 'error', 'message' => $e->getMessage()]), 500);
         }
     }
 
@@ -1025,7 +396,10 @@ class MetricRequests
      */
     public static function getListFromNetSuite(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('netsuite', $filters->startDate ?? null, $filters->endDate ?? null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+        ]);
     }
 
     /**
@@ -1093,19 +467,20 @@ class MetricRequests
         ?LoggerInterface $logger = null,
         ?int $jobId = null
     ): Response {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService($logger))->execute('google_search_console', $startDate, $endDate, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'filters' => $filters,
-                ]);
-            } catch (Exception $e) {
-                // Fallback / Log error
-            }
+        if (! $logger) {
+            $logger = Helpers::setLogger('gsc.log');
         }
 
-        // Legacy code starts here...
+        try {
+            return (new \Core\Services\SyncService($logger))->execute('google_search_console', $startDate, $endDate, [
+                'resume' => $resume,
+                'jobId' => $jobId,
+            ]);
+        } catch (Exception $e) {
+            $logger->error("Google Search Console Modular Sync Failed: " . $e->getMessage());
+
+            return new Response(json_encode(['status' => 'error', 'message' => $e->getMessage()]), 500);
+        }
     }
 
     /**
@@ -1381,21 +756,20 @@ class MetricRequests
      * @throws Exception
      */
     public static function processGSCSite(
+        array $data,
         array $site,
-        ?string $startDate,
-        ?string $endDate,
-        string|bool $resume,
-        SearchConsoleApi $api,
-        EntityManager $manager,
-        ChanneledMetricRepository $channeledMetricRepository,
-        EntityRepository $pageRepository,
-        array $metricNames,
-        ?object $filters,
-        LoggerInterface $logger,
-        array $deviceMap,
-        array $countryMap,
-        array $pageMap,
+        string $dayStr,
+        array $config
     ): array {
+        $logger = Helpers::setLogger('google-search-console.log');
+        $manager = Helpers::getManager();
+        $channeledMetricRepository = $manager->getRepository(ChanneledMetric::class);
+        $pageRepository = $manager->getRepository(Page::class);
+        $metricNames = $config['google_search_console']['metrics'] ?? ['clicks', 'impressions', 'ctr', 'position'];
+        $filters = $config['google_search_console']['filters'] ?? null;
+        $deviceMap = []; // Will be lazy loaded if needed
+        $countryMap = [];
+        $pageMap = [];
         $siteUrl = $site['url'];
         $siteKey = str_replace(['https://', 'sc-domain:', '/'], '', $siteUrl);
         $normalizedSiteUrl = rtrim($siteUrl, '/');
@@ -1415,45 +789,60 @@ class MetricRequests
         }
         $logger->info("Found Page: ID=" . $pageEntity->getId() . ", URL=$normalizedSiteUrl");
 
-        // Get last channeled metric
-        $lastChanneledMetric = $channeledMetricRepository->getLastByPlatformCreatedAtForSite(
-            Channel::google_search_console->value,
-            $siteKey
-        );
-        $logger->info("Last channeled metric: " . ($lastChanneledMetric ? json_encode($lastChanneledMetric) : 'none'));
-
-        // Determine date range
-        list($from, $to) = self::determineDateRange($startDate, $lastChanneledMetric, $resume, $endDate, $logger);
-
-        // Initialize daily processing
+        // Initialize processing
         $startTime = microtime(true);
         $siteMetrics = 0;
         $siteRows = 0;
         $siteDuplicates = 0;
-        $period = Carbon::parse($from)->toPeriod($to, '1 day');
-        foreach ($period as $day) {
-            $dayStr = $day->format('Y-m-d');
-            $result = self::fetchGSCDailyData(
-                $dayStr,
-                $site,
-                $api,
-                $manager,
-                $pageEntity,
-                $metricNames,
-                $targetKeywords,
-                $targetCountries,
-                $dimensionFilterGroups,
-                $logger,
-                $deviceMap,
-                $countryMap,
-                $pageMap,
-            );
-            $siteMetrics += $result['metrics'];
-            $siteRows += $result['rows'];
-            $siteDuplicates += $result['duplicates'];
 
-            self::updateGSCMetricsValues($manager, $siteUrl, $dayStr, $logger);
+        // Ensure maps are present if not passed
+        if (empty($deviceMap)) {
+            $deviceRepository = $manager->getRepository(\Entities\Analytics\Device::class);
+            $devices = $deviceRepository->findAll();
+            $deviceMap = ['map' => [], 'mapReverse' => []];
+            foreach ($devices as $device) {
+                $deviceMap['map'][$device->getType()->value] = $device;
+                $deviceMap['mapReverse'][$device->getId()] = $device;
+            }
         }
+        if (empty($countryMap)) {
+            $countryRepository = $manager->getRepository(\Entities\Analytics\Country::class);
+            $countries = $countryRepository->findAll();
+            $countryMap = ['map' => [], 'mapReverse' => []];
+            foreach ($countries as $country) {
+                $countryMap['map'][$country->getCode()->value] = $country;
+                $countryMap['mapReverse'][$country->getId()] = $country;
+            }
+        }
+        if (empty($pageMap)) {
+            $pages = $pageRepository->findAll();
+            $pageMap = ['map' => [], 'mapReverse' => []];
+            foreach ($pages as $page) {
+                $pageMap['map'][$page->getUrl()] = $page;
+                $pageMap['mapReverse'][$page->getId()] = $page;
+            }
+        }
+
+        $result = self::fetchGSCDailyData(
+            dayStr: $dayStr,
+            site: $site,
+            rawRows: $data,
+            manager: $manager,
+            pageEntity: $pageEntity,
+            metricNames: $metricNames,
+            targetKeywords: $targetKeywords,
+            targetCountries: $targetCountries,
+            dimensionFilterGroups: $dimensionFilterGroups,
+            logger: $logger,
+            deviceMap: $deviceMap,
+            countryMap: $countryMap,
+            pageMap: $pageMap,
+        );
+        $siteMetrics = $result['metrics'];
+        $siteRows = $result['rows'];
+        $siteDuplicates = $result['duplicates'];
+
+        self::updateGSCMetricsValues($manager, $siteUrl, $dayStr, $logger);
 
         $totalTime = microtime(true) - $startTime;
         $logger->info("Processed site $siteUrl: metrics=$siteMetrics, rows=$siteRows, duplicates=$siteDuplicates, took $totalTime seconds");
@@ -1476,71 +865,40 @@ class MetricRequests
      * @param EntityRepository $pageRepository
      * @param LoggerInterface $logger
      * @param array $pageMap
-     * @return void
+     * @param array $rows
+     * @param EntityManager $manager
+     * @param EntityRepository $pageRepository
+     * @param LoggerInterface $logger
+     * @param array $pageMap
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @return array
      * @throws GuzzleException
      * @throws \Doctrine\DBAL\Exception
      * @throws Exception
      */
-    public static function processFacebookPage(
+    private static function processFacebookPage(
         array $page,
-        ?string $startDate,
-        ?string $endDate,
-        FacebookGraphApi $api,
+        array $rows,
         EntityManager $manager,
         EntityRepository $pageRepository,
         LoggerInterface $logger,
         array $pageMap,
+        ?string $startDate = null,
+        ?string $endDate = null
     ): array {
-
         // Get page entity
         $pageEntity = $pageRepository->findOneBy(['platformId' => $page['id']]);
         if (! $pageEntity) {
-            $logger->error("Page entity not found for platformId=". $page['id']. ". Run app:initialize-entities command.");
+            $logger->error("Page entity not found for platformId=". $page['id']);
 
             throw new Exception("Page entity not found for platformId=". $page['id']);
         }
-        $logger->info("Found Page: ID=" . $pageEntity->getId() . ", platformId=". $page['id']);
-
-        $api->setPageId((string) $page['id']);
 
         $allMetrics = new ArrayCollection();
         $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
 
         try {
-            $maxRetries = 5;
-            $retryCount = 0;
-            $fetched = false;
-            $rows = ['data' => []];
-
-            while ($retryCount < $maxRetries && ! $fetched) {
-                try {
-                    $logger->info("Using Page Access Token for FB insights page " . $page['id'] . ": " . ($api->getLongLivedPageAccesstoken() ? substr($api->getLongLivedPageAccesstoken(), 0, 10) . "..." : "NONE FOUND"));
-
-                    $rows = $api->getFacebookPageInsights(
-                        pageId: (string) $page['id'],
-                        since: $startDate ?: Carbon::today()->subMonths(3)->format('Y-m-d'),
-                        until: $endDate ?: Carbon::today()->format('Y-m-d'),
-                    );
-                    $fetched = true;
-                } catch (Exception $e) {
-                    $msg = $e->getMessage();
-                    $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'valid insights metric') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
-
-                    $retryCount++;
-                    if ($retryCount >= $maxRetries || $isFatal) {
-                        $logger->error(($isFatal ? "FATAL INSIGHTS ERROR" : "Failed") . " to retrieve insights for page " . $page['id'] . ": " . $msg);
-                        $fetched = true; // Break loop
-                        if (! $isFatal) {
-                            throw $e;
-                        }
-
-                        return $stats; // Continue to next page
-                    }
-                    $logger->warning("Retry $retryCount/$maxRetries for FB page insights " . $page['id'] . ": " . $msg);
-                    usleep(1000000 * $retryCount);
-                }
-            }
-
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for page " . $page['id']);
 
@@ -1627,9 +985,9 @@ class MetricRequests
      * @throws GuzzleException
      * @throws \Doctrine\DBAL\Exception
      */
-    private static function processAdAccount(
+    public static function processAdAccount(
+        array $rows,
         array $adAccount,
-        FacebookGraphApi $api,
         EntityManager $manager,
         Account $accountEntity,
         ChanneledAccount $channeledAccountEntity,
@@ -1659,47 +1017,6 @@ class MetricRequests
 
         try {
             $metricConfig = self::getFacebookMarketingMetricsFields($config, 'AD_ACCOUNT');
-            $additionalParams = [];
-            if (isset($metricConfig['fields'])) {
-                $additionalParams['fields'] = $metricConfig['fields'];
-            }
-            if ($startDate && $endDate) {
-                $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
-            }
-
-            $maxRetries = 3;
-            $retryCount = 0;
-            $fetched = false;
-            $rows = ['data' => []];
-
-            while ($retryCount < $maxRetries && ! $fetched) {
-                try {
-                    $rows = $api->getAdAccountInsights(
-                        adAccountId: (string) $adAccount['id'],
-                        metricBreakdown: $metricConfig['breakdowns'],
-                        additionalParams: $additionalParams,
-                        metricSet: $metricConfig['metricSet'],
-                        customMetrics: $metricConfig['metrics'] ?? []
-                    );
-                    $fetched = true;
-                } catch (Exception $e) {
-                    $msg = $e->getMessage();
-                    $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'valid insights metric') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
-
-                    $retryCount++;
-                    if ($retryCount >= $maxRetries || $isFatal) {
-                        $logger->error(($isFatal ? "FATAL MARKETING ERROR" : "Failed") . " to retrieve ad account insights " . $adAccount['id'] . ": " . $msg);
-                        $fetched = true; // Break loop
-                        if (! $isFatal) {
-                            throw $e;
-                        }
-
-                        return ['metrics' => 0, 'rows' => 0];
-                    }
-                    $logger->warning("Retry $retryCount/$maxRetries for Meta ad account insights " . $adAccount['id'] . ": " . $msg);
-                    usleep(200000 * $retryCount);
-                }
-            }
 
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for ad account " . $adAccount['id']);
@@ -1791,9 +1108,9 @@ class MetricRequests
      * @throws \Doctrine\DBAL\Exception
      * @throws Exception
      */
-    public static function processInstagramAccount(
+    private static function processInstagramAccount(
         array $page,
-        FacebookGraphApi $api,
+        array $data,
         EntityManager $manager,
         Account $accountEntity,
         Page $pageEntity,
@@ -1801,34 +1118,10 @@ class MetricRequests
         array $pageMap,
         ?string $startDate = null,
         ?string $endDate = null,
-        array $config = [],
-        string $channel = 'facebook_organic',
-        ?array $providedData = null
+        array $config = []
     ): array {
 
-        if (! $startDate) {
-            $startDate = self::getRetentionRange($config, $channel, '2 years - 1 day');
-            // Hard limit protection for Instagram (2 years)
-            $timezone = $config['timezone'] ?? 'America/Caracas';
-            $hardLimit = Carbon::now($timezone)->subYears(2)->addDays(2)->startOfDay();
-            if ($startDate->lt($hardLimit)) {
-                $startDate = $hardLimit;
-            }
-            $startDate = $startDate->endOfDay();
-        } else {
-            $startDate = Carbon::parse($startDate)->startOfDay(); // Ensure start date is at the beginning of the day
-        }
-        if (! $endDate) {
-            $endDate = Carbon::today()->endOfDay()->subDays(2); // Default to 2 days ago at the end of the day
-        } else {
-            $endDate = Carbon::parse($endDate)->startOfDay()->addDay(); // Ensure end date is at the beginning of the following day
-        }
-
-        if (! $startDate->isBefore(Carbon::parse($endDate))) {
-            $logger->error("Start date must be before end date. startDate=$startDate, endDate=$endDate");
-
-            throw new Exception("Start date must be before end date. startDate=$startDate, endDate=$endDate");
-        }
+        $startDateStr = $startDate ?: 'now';
 
         $allMetrics = new ArrayCollection();
         $accountMap = [
@@ -1850,96 +1143,41 @@ class MetricRequests
         $channeledAccountEntity = $channeledAccountRepository->findOneBy([
             'platformId' => (string) $page['ig_account'],
             'channel' => Channel::facebook_organic->value,
-            'type' => AccountEnum::INSTAGRAM->value,
+            'type' => \Enums\Account::INSTAGRAM->value,
         ]);
+        if (! $channeledAccountEntity) {
+            return $stats;
+        }
+
         $channeledAccountMap['map'][(string) $page['ig_account']] = $channeledAccountEntity->getId();
         $channeledAccountMap['mapReverse'][$channeledAccountEntity->getId()] = (string) $page['ig_account'];
 
-        $api->setPageId((string) $pageEntity->getPlatformId());
-
-        $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
-
         try {
-            if ($providedData !== null) {
-                $rows = $providedData;
-                $metrics = FacebookOrganicMetricConvert::igAccountMetrics($rows['data'] ?? $rows, $startDate->toDateString(), $pageEntity, $accountEntity, $channeledAccountEntity, $logger);
-                foreach ($metrics as $metric) {
-                    $allMetrics->add($metric);
+            $rowsData = [];
+            foreach ($data as $optionResult) {
+                if (! empty($optionResult['data'])) {
+                    $rowsData = array_merge($rowsData, $optionResult['data']);
                 }
-            } else {
-                do {
-                    $rows = [
-                        'data' => [],
-                    ];
-                    $option = 1;
-                    while ($option <= 5) {
-                        // OPTIONS LIST:
-                        // 1. Get REACH and VIEWS broken by FOLLOW_TYPE and MEDIA_PRODUCT_TYPE (Default)
-                        // 2. Get FOLLOWS_AND_UNFOLLOWS broken by FOLLOW_TYPE
-                        // 3. Get COMMENTS, LIKES, SAVES, SHARES and TOTAL_INTERACTIONS broken by MEDIA_PRODUCT_TYPE
-                        // 4. Get PROFILE_LINK_TAPS broken by CONTACT_BUTTON_TYPE
-                        // 5. Get WEBSITE_CLICKS, PROFILE_VIEWS, ACCOUNTS_ENGAGED, REPLIES and CONTENT_VIEWS with no breakdowns
-                        $logger->info("Fetching Instagram account insights for page " . $page['id'] . ", option: $option");
+            }
 
-                        $maxRetries = 5;
-                        $retryCount = 0;
-                        $fetched = false;
-                        $insights = ['data' => []];
+            if (empty($rowsData)) {
+                return $stats;
+            }
 
-                        while ($retryCount < $maxRetries && ! $fetched) {
-                            try {
-                                $insights = $api->getDailyInstagramAccountTotalValueInsights(
-                                    instagramAccountId: (string) $page['ig_account'],
-                                    since: $startDate->format('Y-m-d'),
-                                    option: $option,
-                                );
-                                $fetched = true;
-                            } catch (Exception $e) {
-                                $msg = $e->getMessage();
-                                $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'valid insights metric') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
+            $metrics = FacebookOrganicMetricConvert::igAccountMetrics(
+                rows: $rowsData,
+                date: $startDateStr,
+                pageEntity: $pageEntity,
+                accountEntity: $accountEntity,
+                channeledAccountEntity: $channeledAccountEntity,
+                logger: $logger,
+            );
 
-                                $retryCount++;
-                                if ($retryCount >= $maxRetries || $isFatal) {
-                                    $logger->error(($isFatal ? "FATAL IG INSIGHTS ERROR" : "Failed") . " to retrieve IG insights (option $option) for page " . $page['id'] . ": " . $msg);
-                                    $fetched = true; // Break loop
-                                    if (! $isFatal) {
-                                        $option = 6; // Stop options loop
-
-                                        throw $e;
-                                    }
-
-                                    continue;
-                                }
-                                $logger->warning("Retry $retryCount/$maxRetries for IG account insights " . $page['ig_account'] . " (option $option): " . $msg);
-                                usleep(1000000 * $retryCount);
-                            }
-                        }
-
-                        if (isset($insights['data']) && count($insights['data']) > 0) {
-                            $rows['data'] = [
-                                ...$rows['data'],
-                                ...$insights['data'],
-                            ];
-                        }
-                        $option++;
-                    }
-                    $metrics = FacebookOrganicMetricConvert::igAccountMetrics(
-                        rows: $rows['data'],
-                        date: $startDate->format('Y-m-d'),
-                        pageEntity: $pageEntity,
-                        accountEntity: $accountEntity,
-                        channeledAccountEntity: $channeledAccountEntity,
-                        logger: $logger,
-                    );
-
-                    foreach ($metrics as $metric) {
-                        $metric->page = $pageEntity;
-                        $metric->account = $accountEntity;
-                        $metric->channeledAccount = $channeledAccountEntity;
-                        $allMetrics->add($metric);
-                    }
-                    $startDate->addDay();
-                } while ($startDate->isBefore(Carbon::now()->endOfDay()->subDays(2)) && $startDate->isBefore(Carbon::parse($endDate))); // Continue until 2 days ago
+            foreach ($metrics as $metric) {
+                $metric->page = $pageEntity;
+                $metric->account = $accountEntity;
+                $metric->channeledAccount = $channeledAccountEntity;
+                $allMetrics->add($metric);
             }
 
             if (count($allMetrics) === 0) {
@@ -2925,7 +2163,7 @@ class MetricRequests
     private static function fetchGSCDailyData(
         string $dayStr,
         array $site,
-        SearchConsoleApi $api,
+        array $rawRows,
         EntityManager $manager,
         Page $pageEntity,
         array $metricNames,
@@ -2939,98 +2177,34 @@ class MetricRequests
     ): array {
         $siteUrl = $site['url'];
         $siteKey = str_replace(['https://', 'sc-domain:', '/'], '', $siteUrl);
-        $rowLimit = $site['rowLimit'] ?? 25000;
-        // $logger->info("Processing GSC data for site $siteUrl, date $dayStr");
 
         // Initialize counters
         $totalMetrics = 0;
         $totalRows = 0;
         $totalDuplicates = 0;
         $allMetrics = new ArrayCollection();
-        $allRows = [];
-        $subsetRows = [];
 
         try {
-            $dimensionsSubsets = Helpers::getAllSubsets(GoogleSearchConsoleHelpers::$optionalDimensions);
-            // $dimensionsSubsets = [GoogleSearchConsoleConvert::$optionalDimensions];
-            foreach ($dimensionsSubsets as $dimensionsSubset) {
-                $actualDimensionsSubset = array_merge(array_diff(GoogleSearchConsoleHelpers::$allDimensions, GoogleSearchConsoleHelpers::$optionalDimensions), $dimensionsSubset);
+            // Data is already fetched by the Driver
+            if (empty($rawRows)) {
+                $logger->info("No rows provided by driver for site $siteUrl, date $dayStr");
 
-                $maxRetries = 3;
-                $retryCount = 0;
-                $fetched = false;
-                $rows = ['rows' => []];
-
-                while ($retryCount < $maxRetries && ! $fetched) {
-                    try {
-                        $rows = $api->getAllSearchQueryResults(
-                            siteUrl: $siteUrl,
-                            startDate: $dayStr,
-                            endDate: $dayStr,
-                            rowLimit: $rowLimit,
-                            dimensions: $actualDimensionsSubset,
-                            dimensionFilterGroups: $dimensionFilterGroups,
-                        );
-                        $fetched = true;
-                    } catch (Exception $e) {
-                        $retryCount++;
-                        if ($retryCount >= $maxRetries) {
-                            throw $e;
-                        }
-                        $logger->warning("Retry $retryCount/$maxRetries for GSC site $siteUrl insights: " . $e->getMessage());
-                        usleep(200000 * $retryCount);
-                    }
-                }
-
-                $subsetRows[] = [
-                    'rows' => $rows['rows'],
-                    'subset' => $actualDimensionsSubset,
-                ];
+                return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
             }
 
-            if (count($subsetRows) === 0) {
-                $logger->info("No rows found for site $siteUrl, date $dayStr");
+            // Reconcile data using Helpers
+            $finalRecords = GoogleSearchConsoleHelpers::getFinalRecords($rawRows, $targetKeywords, $targetCountries);
 
-                return [
-                    'metrics' => 0,
-                    'rows' => 0,
-                    'duplicates' => 0,
-                ];
+            if (empty($finalRecords)) {
+                $logger->info("No rows to process after reconciliation for site $siteUrl, date $dayStr");
+
+                return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
             }
-
-            foreach ($subsetRows as $rows) {
-                foreach ($rows as $row) {
-                    foreach ($row as $element) {
-                        if (is_string($element)) {
-                            continue;
-                        }
-                        $element['subset'] = $rows['subset'];
-                        $allRows[] = $element;
-                    }
-                }
-            }
-
-            if (count($allRows) === 0) {
-                $logger->info("No rows found for site $siteUrl, date $dayStr");
-
-                return [
-                    'metrics' => 0,
-                    'rows' => 0,
-                    'duplicates' => 0,
-                ];
-            }
-
-            $finalRecords = GoogleSearchConsoleHelpers::getFinalRecords($allRows, $targetKeywords, $targetCountries);
-
-            // Helpers::dumpDebugJson($finalRecords);
 
             $metrics = GoogleSearchConsoleConvert::metrics($finalRecords, $siteUrl, $siteKey, $logger, $pageEntity, $manager);
-            // $logger->info("Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, first metric: " . (count($pageMetrics) > 0 ? json_encode(['name' => $pageMetrics[0]->name, 'query' => is_string($pageMetrics[0]->query) ? $pageMetrics[0]->query : ($pageMetrics[0]->query instanceof Query ? $pageMetrics[0]->query->getQuery() : 'none')]) : 'none'));
 
             foreach ($metrics as $metric) {
                 if ($metricNames && ! in_array($metric->name, $metricNames)) {
-                    $logger->warning("Skipped metric: =$metric->name, not in allowed names: " . json_encode($metricNames));
-
                     continue;
                 }
 
@@ -3044,19 +2218,12 @@ class MetricRequests
             }
 
             if (count($allMetrics) === 0) {
-                $logger->info("No metrics found for site $siteUrl, date $dayStr");
-
-                return [
-                    'metrics' => 0,
-                    'rows' => 0,
-                    'duplicates' => 0,
-                ];
+                return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
             }
 
             try {
                 $manager->getConnection()->beginTransaction();
 
-                // Map metrics configs
                 $metricConfigMap = MetricsProcessor::processMetricConfigs(
                     processDimensions: true,
                     metrics: $allMetrics,
@@ -3067,14 +2234,12 @@ class MetricRequests
                     pageMap: $pageMap,
                 );
 
-                // Map metrics
                 $metricMap = MetricsProcessor::processMetrics(
                     metrics: $allMetrics,
                     manager: $manager,
                     metricConfigMap: $metricConfigMap,
                 );
 
-                // Map channeled metrics
                 $channeledMetricMap = MetricsProcessor::processChanneledMetrics(
                     metrics: $allMetrics,
                     manager: $manager,
@@ -3082,7 +2247,6 @@ class MetricRequests
                     logger: $logger,
                 );
 
-                // Map dimensions
                 $manager->getConnection()->commit();
             } catch (Exception $e) {
                 if ($manager->getConnection()->isTransactionActive()) {
@@ -3092,7 +2256,8 @@ class MetricRequests
                 throw $e;
             }
 
-            $logger->info("Completed API query for date=$dayStr, duplicates=$totalDuplicates");
+            $totalMetrics = count($allMetrics);
+            $totalRows = count($finalRecords);
 
             return [
                 'metrics' => $totalMetrics,
@@ -3100,7 +2265,7 @@ class MetricRequests
                 'duplicates' => $totalDuplicates,
             ];
         } catch (Exception $e) {
-            $logger->error("Error during GSC API query for site $siteUrl, date $dayStr: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+            $logger->error("Error in fetchGSCDailyData for site $siteUrl, date $dayStr: " . $e->getMessage());
 
             throw $e;
         }
@@ -3585,9 +2750,6 @@ class MetricRequests
         $channeledMetricCache = [];
         $dimensionCache = [];
 
-        if (! $logger) {
-            $logger = Helpers::setLogger('gsc.log');
-        }
         $logger->info("Starting process with " . $channeledCollection->count() . " metrics");
 
         $manager->beginTransaction();

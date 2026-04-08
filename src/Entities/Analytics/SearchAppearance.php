@@ -4,7 +4,7 @@ namespace Entities\Analytics;
 
 use Doctrine\ORM\Mapping as ORM;
 use Entities\Entity;
-use Classes\Overrides\GoogleApi\SearchConsoleApi\Enums\SearchAppearance as SearchAppearanceEnum;
+use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\SearchAppearance as SearchAppearanceEnum;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'search_appearances')]

@@ -6,6 +6,10 @@ mkdir -p /app/logs /app/storage
 
 # Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
 if [[ "$INSTANCE_NAME" == *"master"* ]]; then
+    # Ensure modular dependencies are registered (especially during refactoring with local paths)
+    echo "Master Instance ($INSTANCE_NAME): Updating modular dependencies..."
+    composer update --no-scripts --no-interaction --ignore-platform-reqs || echo "Modular update failed, continuing..."
+
     # Use mkdir for atomic lock
     if mkdir "/app/storage/db_lock" 2>/dev/null; then
         echo "Master Instance ($INSTANCE_NAME): Acquired lock. Initializing database and entities..."

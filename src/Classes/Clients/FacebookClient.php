@@ -2,26 +2,26 @@
 
 namespace Classes\Clients;
 
-use Classes\Overrides\FacebookGraphApiOverride;
+use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
 use Exception;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 
 class FacebookClient
 {
-    private static ?FacebookGraphApiOverride $instance = null;
+    private static ?FacebookGraphApi $instance = null;
     private static ?array $config = null;
 
     /**
-     * Retrieves the Singleton instance of FacebookGraphApiOverride.
+     * Retrieves the Singleton instance of FacebookGraphApi.
      * Allows optional injection of specific config, but ideally uses the unified config.
      *
      * @param LoggerInterface|null $logger
      * @param array|null $overrideConfig
-     * @return FacebookGraphApiOverride
+     * @return FacebookGraphApi
      * @throws Exception
      */
-    public static function getInstance(?LoggerInterface $logger = null, ?array $overrideConfig = null): FacebookGraphApiOverride
+    public static function getInstance(?LoggerInterface $logger = null, ?array $overrideConfig = null): FacebookGraphApi
     {
         if (self::$instance !== null && $overrideConfig === null) {
             return self::$instance;
@@ -65,7 +65,7 @@ class FacebookClient
                     throw new Exception("Facebook app_secret is missing or null.");
                 }
 
-                $apiInstance = new FacebookGraphApiOverride(
+                $apiInstance = new FacebookGraphApi(
                     userId: (string) ($config['user_id'] ?? ''),
                     appId: (string) ($config['app_id'] ?? ''),
                     appSecret: (string) $appSecret,

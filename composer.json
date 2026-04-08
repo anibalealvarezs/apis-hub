@@ -17,14 +17,8 @@
         "php": ">=8.1",
         "ext-json": "*",
         "anibalealvarezs/api-client-skeleton": "dev-main",
-        "anibalealvarezs/amazon-api": "dev-main",
         "anibalealvarezs/facebook-graph-api": "dev-main",
         "anibalealvarezs/google-api": "dev-develop",
-        "anibalealvarezs/klaviyo-api": "dev-main",
-        "anibalealvarezs/mailchimp-api": "dev-main",
-        "anibalealvarezs/netsuite-api": "dev-main",
-        "anibalealvarezs/shopify-api": "dev-main",
-        "anibalealvarezs/triple-whale-api": "dev-main",
         "doctrine/orm": "^2.12.3",
         "doctrine/dbal": "^3.3.7",
         "fakerphp/faker": "^1.20",
@@ -38,7 +32,19 @@
         "symfony/console": "^6.0",
         "symfony/redis-messenger": "^5.4",
         "symfony/cache-contracts": "^3.0",
-        "predis/predis": "dev-main"
+        "predis/predis": "dev-main",
+        "anibalealvarezs/google-hub-driver": "dev-main",
+        "anibalealvarezs/meta-hub-driver": "dev-main",
+        "anibalealvarezs/klaviyo-hub-driver": "dev-main",
+        "anibalealvarezs/shopify-hub-driver": "dev-main",
+        "anibalealvarezs/netsuite-hub-driver": "dev-main",
+        "anibalealvarezs/amazon-hub-driver": "dev-main",
+        "anibalealvarezs/bigcommerce-hub-driver": "dev-main",
+        "anibalealvarezs/pinterest-hub-driver": "dev-main",
+        "anibalealvarezs/linkedin-hub-driver": "dev-main",
+        "anibalealvarezs/tiktok-hub-driver": "dev-main",
+        "anibalealvarezs/x-hub-driver": "dev-main",
+        "anibalealvarezs/triple-whale-hub-driver": "dev-main"
     },
     "autoload": {
         "psr-4": {
@@ -80,7 +86,7 @@
     "prefer-stable": false,
     "config": {
         "platform": {
-            "php": "8.1.99"
+            "php": "8.3.0"
         }
     }
 }

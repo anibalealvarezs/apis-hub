@@ -125,7 +125,7 @@ return [
     '/api/monitoring/jobs/action' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new MonitoringController())->jobAction($request);
         },
         'public' => false,
@@ -135,7 +135,7 @@ return [
     '/api/monitoring/logs' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new MonitoringController())->logs($request);
         },
         'public' => false,
@@ -161,7 +161,7 @@ return [
     '/api/config-manager/assets' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ConfigManagerController())->fetchAssets($request);
         },
         'public' => false,
@@ -171,7 +171,7 @@ return [
     '/api/config-manager/update' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ConfigManagerController())->updateConfig($request);
         },
         'public' => false,
@@ -181,7 +181,7 @@ return [
     '/api/config-manager/validate-tokens' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ConfigManagerController())->validateTokens($request);
         },
         'public' => false,
@@ -191,7 +191,7 @@ return [
     '/api/config-manager/export' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ConfigManagerController())->exportConfig($request);
         },
         'public' => false,
@@ -201,7 +201,7 @@ return [
     '/api/config-manager/flush-cache' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ConfigManagerController())->flushCache($request);
         },
         'public' => false,
@@ -232,7 +232,7 @@ return [
     '/api/management/update-credentials' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ManagementController())->updateCredentials($request);
         },
         'public' => false,
@@ -242,7 +242,7 @@ return [
     '/api/management/redeploy' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ManagementController())->triggerRedeploy($request);
         },
         'public' => false,
@@ -252,7 +252,7 @@ return [
     '/api/management/reset-channel' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ManagementController())->resetChannel($request);
         },
         'public' => false,
@@ -271,7 +271,7 @@ return [
     '/api/management/container/action' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ManagementController())->containerAction($request);
         },
         'public' => false,

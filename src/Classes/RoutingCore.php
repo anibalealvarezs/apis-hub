@@ -69,6 +69,7 @@ class RoutingCore implements HttpKernelInterface
             unset($attributes['controller'], $attributes['_route'], $attributes['html'], $attributes['public'], $attributes['admin']);
             $attributes['body'] = $request->getContent() ?: null;
             $attributes['params'] = $request->query->all() ?: null;
+            $attributes['request'] = $request;
 
             $response = call_user_func_array($controller, $attributes);
 
@@ -78,6 +79,12 @@ class RoutingCore implements HttpKernelInterface
         } catch (ResourceNotFoundException) {
             $html = file_get_contents(__DIR__ . '/../views/404.html');
             $response = new Response($html, Response::HTTP_NOT_FOUND, ['Content-Type' => 'text/html']);
+        } catch (\Symfony\Component\Routing\Exception\MethodNotAllowedException $e) {
+            $response = new Response(json_encode([
+                'status' => 'error',
+                'error' => 'Method Not Allowed',
+                'message' => 'The ' . $request->getMethod() . ' method is not supported for this route. Supported methods: ' . implode(', ', $e->getAllowedMethods())
+            ]), Response::HTTP_METHOD_NOT_ALLOWED, ['Content-Type' => 'application/json']);
         } catch (Exception $e) {
             $response = new Response(json_encode([
                 'status' => 'error',

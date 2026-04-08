@@ -5,7 +5,7 @@ namespace Tests\Unit\Core\Services;
 use Tests\Unit\BaseUnitTestCase;
 use Core\Services\SyncService;
 use Core\Drivers\DriverFactory;
-use Interfaces\SyncDriverInterface;
+use Anibalealvarezs\ApiSkeleton\Interfaces\SyncDriverInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Psr\Log\LoggerInterface;
 use DateTime;

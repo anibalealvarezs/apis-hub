@@ -25,8 +25,8 @@ class DriverFactoryTest extends TestCase
         return [
             ['google_search_console', \Channels\Google\SearchConsole\SearchConsoleDriver::class],
             ['google_analytics', \Channels\Google\Analytics\GoogleAnalyticsDriver::class],
-            ['facebook_marketing', \Channels\Meta\Marketing\FacebookMarketingDriver::class],
-            ['facebook_organic', \Channels\Meta\Organic\FacebookOrganicDriver::class],
+            ['facebook_marketing', \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver::class],
+            ['facebook_organic', \Anibalealvarezs\MetaHubDriver\Drivers\FacebookOrganicDriver::class],
             ['shopify', \Channels\Shopify\ShopifyDriver::class],
             ['klaviyo', \Channels\Klaviyo\KlaviyoDriver::class],
             ['netsuite', \Channels\NetSuite\NetSuiteDriver::class],

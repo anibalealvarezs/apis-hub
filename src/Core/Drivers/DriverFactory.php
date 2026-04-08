@@ -2,7 +2,7 @@
 
 namespace Core\Drivers;
 
-use Interfaces\SyncDriverInterface;
+use Anibalealvarezs\ApiSkeleton\Interfaces\SyncDriverInterface;
 use Psr\Log\LoggerInterface;
 use Exception;
 
@@ -16,56 +16,66 @@ class DriverFactory
      */
     private static array $registry = [
         'google_search_console' => [
-            'driver' => \Channels\Google\SearchConsole\SearchConsoleDriver::class,
-            'auth' => \Core\Auth\GoogleAuthProvider::class,
+            'driver' => \Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver::class,
+            'auth' => \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider::class,
+            'processor' => [\Classes\Requests\MetricRequests::class, 'processGSCSite'],
         ],
         'google_analytics' => [
-            'driver' => \Channels\Google\Analytics\GoogleAnalyticsDriver::class,
-            'auth' => \Core\Auth\GoogleAuthProvider::class,
+            'driver' => \Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAnalyticsDriver::class,
+            'auth' => \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider::class,
         ],
         'facebook_marketing' => [
-            'driver' => \Channels\Meta\Marketing\FacebookMarketingDriver::class,
+            'driver' => \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver::class,
             'auth' => \Core\Auth\FacebookAuthProvider::class,
+            'processor' => [\Classes\Requests\MetricRequests::class, 'processFacebookMarketingChunk'],
         ],
         'facebook_organic' => [
-            'driver' => \Channels\Meta\Organic\FacebookOrganicDriver::class,
+            'driver' => \Anibalealvarezs\MetaHubDriver\Drivers\FacebookOrganicDriver::class,
             'auth' => \Core\Auth\FacebookAuthProvider::class,
+            'processor' => [\Classes\Requests\MetricRequests::class, 'processFacebookOrganicChunk'],
         ],
         'shopify' => [
-            'driver' => \Channels\Shopify\ShopifyDriver::class,
-            'auth' => \Core\Auth\ShopifyAuthProvider::class,
+            'driver' => \Anibalealvarezs\ShopifyHubDriver\Drivers\ShopifyDriver::class,
+            'auth' => \Anibalealvarezs\ShopifyHubDriver\Auth\ShopifyAuthProvider::class,
+            'processor' => [\Classes\Requests\MetricRequests::class, 'processShopifyChunk'],
         ],
         'klaviyo' => [
-            'driver' => \Channels\Klaviyo\KlaviyoDriver::class,
-            'auth' => \Core\Auth\KlaviyoAuthProvider::class,
+            'driver' => \Anibalealvarezs\KlaviyoHubDriver\Drivers\KlaviyoDriver::class,
+            'auth' => \Anibalealvarezs\KlaviyoHubDriver\Auth\KlaviyoAuthProvider::class,
+            'processor' => [\Classes\Requests\MetricRequests::class, 'processKlaviyoChunk'],
         ],
         'netsuite' => [
-            'driver' => \Channels\NetSuite\NetSuiteDriver::class,
-            'auth' => \Core\Auth\NetSuiteAuthProvider::class,
+            'driver' => \Anibalealvarezs\NetSuiteHubDriver\Drivers\NetSuiteDriver::class,
+            'auth' => \Anibalealvarezs\NetSuiteHubDriver\Auth\NetSuiteAuthProvider::class,
+            'processor' => [\Classes\Requests\MetricRequests::class, 'processNetSuiteChunk'],
         ],
         'amazon' => [
-            'driver' => \Channels\Amazon\AmazonDriver::class,
-            'auth' => \Core\Auth\AmazonAuthProvider::class,
+            'driver' => \Anibalealvarezs\AmazonHubDriver\Drivers\AmazonDriver::class,
+            'auth' => \Anibalealvarezs\AmazonHubDriver\Auth\AmazonAuthProvider::class,
         ],
         'bigcommerce' => [
-            'driver' => \Channels\BigCommerce\BigCommerceDriver::class,
-            'auth' => \Core\Auth\BigCommerceAuthProvider::class,
+            'driver' => \Anibalealvarezs\BigCommerceHubDriver\Drivers\BigCommerceDriver::class,
+            'auth' => \Anibalealvarezs\BigCommerceHubDriver\Auth\BigCommerceAuthProvider::class,
         ],
         'pinterest' => [
-            'driver' => \Channels\Pinterest\PinterestDriver::class,
-            'auth' => \Core\Auth\PinterestAuthProvider::class,
+            'driver' => \Anibalealvarezs\PinterestHubDriver\Drivers\PinterestDriver::class,
+            'auth' => \Anibalealvarezs\PinterestHubDriver\Auth\PinterestAuthProvider::class,
         ],
         'linkedin' => [
-            'driver' => \Channels\LinkedIn\LinkedInDriver::class,
-            'auth' => \Core\Auth\LinkedInAuthProvider::class,
+            'driver' => \Anibalealvarezs\LinkedInHubDriver\Drivers\LinkedInDriver::class,
+            'auth' => \Anibalealvarezs\LinkedInHubDriver\Auth\LinkedInAuthProvider::class,
         ],
         'x' => [
-            'driver' => \Channels\X\XDriver::class,
-            'auth' => \Core\Auth\XAuthProvider::class,
+            'driver' => \Anibalealvarezs\XHubDriver\Drivers\XDriver::class,
+            'auth' => \Anibalealvarezs\XHubDriver\Auth\XAuthProvider::class,
         ],
         'tiktok' => [
-            'driver' => \Channels\TikTok\TikTokDriver::class,
-            'auth' => \Core\Auth\TikTokAuthProvider::class,
+            'driver' => \Anibalealvarezs\TikTokHubDriver\Drivers\TikTokDriver::class,
+            'auth' => \Anibalealvarezs\TikTokHubDriver\Auth\TikTokAuthProvider::class,
+        ],
+        'triplewhale' => [
+            'driver' => \Anibalealvarezs\TripleWhaleHubDriver\Drivers\TripleWhaleDriver::class,
+            'auth' => \Anibalealvarezs\TripleWhaleHubDriver\Auth\TripleWhaleAuthProvider::class,
         ],
     ];
 
@@ -96,8 +106,14 @@ class DriverFactory
         }
 
         // Instanciación dinámica
-        $authProvider = new $authClass();
+        $channelConfig = \Helpers\Helpers::getChannelsConfig()[$channel] ?? [];
+        $authProvider = new $authClass(null, $channelConfig);
         $driver = new $driverClass($authProvider, $logger);
+
+        // Inject data processor if defined and supported by driver
+        if (isset($config['processor']) && method_exists($driver, 'setDataProcessor')) {
+            $driver->setDataProcessor($config['processor']);
+        }
 
         self::$instances[$channel] = $driver;
         return $driver;
@@ -129,3 +145,6 @@ class DriverFactory
         self::$instances[$channel] = $instance;
     }
 }
+
+
+
