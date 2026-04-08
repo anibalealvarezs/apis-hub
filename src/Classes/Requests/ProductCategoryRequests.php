@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Classes\Conversions\NetSuiteConvert;
-use Classes\Overrides\NetSuiteApi\NetSuiteApi;
-use Classes\Overrides\ShopifyApi\ShopifyApi;
+use Anibalealvarezs\NetSuiteApi\NetSuiteApi;
+use Anibalealvarezs\ShopifyApi\ShopifyApi;
 use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;

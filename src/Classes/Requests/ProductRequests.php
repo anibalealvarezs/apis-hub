@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Classes\Conversions\NetSuiteConvert;
-use Classes\Overrides\KlaviyoApi\KlaviyoApi;
-use Classes\Overrides\NetSuiteApi\NetSuiteApi;
-use Classes\Overrides\ShopifyApi\ShopifyApi;
+use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
+use Anibalealvarezs\NetSuiteApi\NetSuiteApi;
+use Anibalealvarezs\ShopifyApi\ShopifyApi;
 use Classes\Conversions\KlaviyoConvert;
 use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;

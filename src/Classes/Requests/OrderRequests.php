@@ -6,8 +6,8 @@ namespace Classes\Requests;
 
 use Carbon\Carbon;
 use Classes\Conversions\NetSuiteConvert;
-use Classes\Overrides\NetSuiteApi\NetSuiteApi;
-use Classes\Overrides\ShopifyApi\ShopifyApi;
+use Anibalealvarezs\NetSuiteApi\NetSuiteApi;
+use Anibalealvarezs\ShopifyApi\ShopifyApi;
 use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
