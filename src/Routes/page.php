@@ -7,6 +7,7 @@ use Controllers\FacebookAuthController;
 use Controllers\PrivacyController;
 use Controllers\ManagementController;
 use Controllers\PublicDataController;
+use Controllers\SocialAuthController;
 use Symfony\Component\HttpFoundation\Request;
 
 
@@ -57,9 +58,19 @@ return [
     ],
     '/api/auth/facebook/import' => [
         'httpMethod' => 'POST',
-        'callable' => function (?string $body = null, ?array $params = null) {
+        'callable' => function (...$args) {
             $request = Request::createFromGlobals();
-            return (new FacebookAuthController())->importCredentials($request);
+            return (new SocialAuthController())->importCredentials($request, 'facebook');
+        },
+        'public' => true,
+        'html' => false,
+        'admin' => false
+    ],
+    '/api/auth/google/import' => [
+        'httpMethod' => 'POST',
+        'callable' => function (...$args) {
+            $request = Request::createFromGlobals();
+            return (new SocialAuthController())->importCredentials($request, 'google');
         },
         'public' => true,
         'html' => false,
