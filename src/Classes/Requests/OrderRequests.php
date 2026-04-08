@@ -120,8 +120,28 @@ class OrderRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
+    public static function getListFromBigCommerce(
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?object $filters = null,
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('bigcommerce');
+                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
+                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         return new Response(json_encode([]));
     }
 
@@ -136,11 +156,28 @@ class OrderRequests implements RequestInterface
      * @throws ORMException
      */
     public static function getListFromNetsuite(
-        string $fromDate = '01/01/1999',
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
         ?object $filters = null,
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('netsuite');
+                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
+                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'type' => 'orders'
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
             consumerId: $config['netsuite_consumer_id'],
@@ -229,7 +266,7 @@ class OrderRequests implements RequestInterface
                 ON transaction.custbody_shared_order_type = CUSTOMLIST_SOS_TYPE.id
             WHERE transaction.Type = 'SalesOrd'
                 AND (TransactionLine.itemtype IN ('Discount', 'ShipItem', 'TaxItem', 'Assembly', 'NonInvtPart'))
-                AND transaction.trandate >= TO_DATE('".Carbon::parse($fromDate)->format('m/d/Y')."', 'mm/dd/yyyy')
+                AND transaction.trandate >= TO_DATE('".($createdAtMin ? Carbon::parse($createdAtMin)->format('m/d/Y') : '01/01/1989')."', 'mm/dd/yyyy')
                 AND transaction.custbody_division_domain = '".Helpers::getDomain($config['netsuite_store_base_url'])."'
                 AND transaction.id >= " . (isset($lastChanneledOrder['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledOrder['platformId'] : 0);
         if ($filters) {
@@ -253,8 +290,28 @@ class OrderRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
+    public static function getListFromAmazon(
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?object $filters = null,
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('amazon');
+                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
+                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         return new Response(json_encode([]));
     }
 

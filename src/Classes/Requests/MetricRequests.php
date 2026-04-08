@@ -7,18 +7,11 @@ namespace Classes\Requests;
 use Anibalealvarezs\FacebookGraphApi\Enums\MediaType;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricBreakdown;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
+use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
-use Classes\Overrides\FacebookGraphApiOverride;
-use Anibalealvarezs\FacebookGraphApi\Enums\AdAccountPermission;
-use Anibalealvarezs\FacebookGraphApi\Enums\AdPermission;
-use Anibalealvarezs\FacebookGraphApi\Enums\AdsetPermission;
-use Anibalealvarezs\FacebookGraphApi\Enums\CampaignPermission;
-use Anibalealvarezs\FacebookGraphApi\Enums\FacebookPostPermission;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Dimension;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\GroupType;
 use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\Operator;
-use Anibalealvarezs\GoogleApi\Google\Exceptions\GoogleQuotaExceededException;
-use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
 use Anibalealvarezs\KlaviyoApi\Enums\AggregatedMeasurement;
 use Carbon\Carbon;
 use Classes\Conversions\FacebookMarketingMetricConvert;
@@ -28,6 +21,7 @@ use Classes\Conversions\KlaviyoConvert;
 use Classes\MetricsProcessor;
 use Classes\Overrides\GoogleApi\SearchConsoleApi\SearchConsoleApi;
 use Classes\Overrides\KlaviyoApi\KlaviyoApi;
+use Classes\SocialProcessor;
 use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
@@ -43,32 +37,29 @@ use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledAd;
 use Entities\Analytics\Channeled\ChanneledAdGroup;
 use Entities\Analytics\Channeled\ChanneledCampaign;
-use Entities\Analytics\Creative;
 use Entities\Analytics\Channeled\ChanneledMetric;
 use Entities\Analytics\Channeled\ChanneledSyncError;
-use Entities\Analytics\Country;
-use Entities\Analytics\Device;
+use Entities\Analytics\Creative;
 use Entities\Analytics\Metric;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
 use Entities\Analytics\Query;
+use Enums\Account as AccountEnum;
 use Enums\Channel;
 use Enums\Country as CountryEnum;
 use Enums\Device as DeviceEnum;
 use Enums\Period;
-use Enums\Account as AccountEnum;
+use Exception;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\GoogleSearchConsoleHelpers;
 use Helpers\Helpers;
-use Repositories\Channeled\ChanneledMetricRepository;
-use Repositories\QueryRepository;
-use Repositories\MetricRepository;
 use Psr\Log\LoggerInterface;
+use Repositories\Channeled\ChanneledMetricRepository;
+use Repositories\MetricRepository;
+use Repositories\QueryRepository;
 use RuntimeException;
 use Services\CacheService;
-use Classes\SocialProcessor;
 use Symfony\Component\HttpFoundation\Response;
-use Exception;
 
 class MetricRequests
 {
@@ -114,6 +105,22 @@ class MetricRequests
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('klaviyo');
+                $startDate = $createdAtMin ? new DateTime($createdAtMin) : new DateTime('-30 days');
+                $endDate = $createdAtMax ? new DateTime($createdAtMax) : new DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'metricNames' => $filters->metricNames ?? null,
+                ]);
+            } catch (Exception $e) {
+                // Fallback
+            }
+        }
+
         $config = Helpers::getChannelsConfig()['klaviyo'];
         $klaviyoClient = new KlaviyoApi(
             apiKey: $config['klaviyo_api_key'],
@@ -199,6 +206,21 @@ class MetricRequests
      */
     public static function getListFromShopify(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('shopify');
+                $startDate = isset($filters->createdAtMin) ? new \DateTime($filters->createdAtMin) : new \DateTime('-30 days');
+                $endDate = isset($filters->createdAtMax) ? new \DateTime($filters->createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                ]);
+            } catch (\Exception $e) {
+                // Fallback or error log
+            }
+        }
+
         /* Placeholder for ShopifyApi integration */
         return new Response(json_encode([]));
     }
@@ -221,11 +243,30 @@ class MetricRequests
         ?LoggerInterface $logger = null,
         ?int $jobId = null
     ): Response {
-        if (!$logger) {
+        if (! $logger) {
+            $logger = Helpers::setLogger('facebook-organic.log');
+        }
+
+        // Bridge to modular architecture
+        if (! isset($_GET['old_sync']) && ! empty($_ENV['USE_MODULAR_DRIVERS'])) {
+            $logger->info("Routing getListFromFacebookOrganic through DriverFactory (Modular)");
+
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('facebook_organic', $logger);
+                $start = $startDate ? new DateTime($startDate) : new DateTime('3 days ago');
+                $end = $endDate ? new DateTime($endDate) : new DateTime();
+
+                return $driver->sync($start, $end, ['resume' => $resume]);
+            } catch (Exception $e) {
+                $logger->error("Modular driver failed, falling back to legacy: " . $e->getMessage());
+            }
+        }
+        if (! $logger) {
             $logger = Helpers::setLogger('facebook-organic.log');
         }
 
         $manager = Helpers::getManager();
+
         try {
             // Validate configuration
             $config = self::validateFacebookConfig($logger, 'facebook_organic');
@@ -234,14 +275,14 @@ class MetricRequests
             if (empty($startDate)) {
                 $days = 3; // Absolute fallback for metrics
                 $window = $config['cache_history_range'] ?? null;
-                if (!empty($window)) {
+                if (! empty($window)) {
                     try {
                         // Handle both ISO intervals (P3Y) and human readable (3 years)
                         $intervalStr = (str_starts_with((string)$window, 'P')) ? $window : Helpers::humanToIsoInterval($window);
                         $interval = new \DateInterval((string)$intervalStr);
                         $startDate = Carbon::today()->sub($interval)->format('Y-m-d');
                         $logger->info("Using cache_history_range from config: " . $window . " -> $startDate");
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         $logger->warning("Invalid cache_history_range in config: " . $window . ". Using default 3 days. Error: " . $e->getMessage());
                         $startDate = Carbon::today()->subDays($days)->format('Y-m-d');
                     }
@@ -271,7 +312,7 @@ class MetricRequests
             $accountEntityName = $config['accounts_group_name'] ?? null;
             $accountEntity = $accountEntityName ? $accountRepository->findOneBy(['name' => $accountEntityName]) : null;
 
-            if (!$accountEntity) {
+            if (! $accountEntity) {
                 $logger->warning("Account group '{$accountEntityName}' not found. Instagram accounts might not be processed correctly.");
             }
 
@@ -293,6 +334,7 @@ class MetricRequests
 
             if (Carbon::parse($startDate)->gt(Carbon::parse($endDate))) {
                 $logger->info("Job date range ($startDate to $endDate) is entirely before the retention limit (" . $retentionLimit->format('Y-m-d') . "). Skipping.");
+
                 return new Response(json_encode(['message' => 'Job skipped due to retention policy']), 200);
             }
 
@@ -322,7 +364,7 @@ class MetricRequests
                     $pageName = $p->getTitle();
                     $includeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_include');
                     $excludeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_exclude');
-                    if (!Helpers::matchesFilter((string)$pageName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter((string)$pageId, $includeFilter, $excludeFilter)) {
+                    if (! Helpers::matchesFilter((string)$pageName, $includeFilter, $excludeFilter) && ! Helpers::matchesFilter((string)$pageId, $includeFilter, $excludeFilter)) {
                         continue;
                     }
 
@@ -334,21 +376,21 @@ class MetricRequests
                         'url' => $p->getUrl(),
                         'title' => $pageName,
                         'enabled' => true,
-                        'ig_account' => $igId
+                        'ig_account' => $igId,
                     ]);
                 }
             } else {
                 foreach ($pagesToProcessRaw as $p) {
                     $resolvedPage = array_merge($globalPageConfig, $p);
-                    
+
                     // If IG is enabled but ID is missing, try to resolve from database
-                    if (empty($resolvedPage['ig_account']) && !empty($resolvedPage['ig_accounts'])) {
+                    if (empty($resolvedPage['ig_account']) && ! empty($resolvedPage['ig_accounts'])) {
                         $pEntity = $pageRepository->findOneBy(['platformId' => $resolvedPage['id']]);
                         if ($pEntity && isset($pEntity->getData()['instagram_business_account']['id'])) {
                             $resolvedPage['ig_account'] = $pEntity->getData()['instagram_business_account']['id'];
                         }
                     }
-                    
+
                     $pagesToProcess[] = $resolvedPage;
                 }
             }
@@ -381,18 +423,20 @@ class MetricRequests
                 $pageTitle = $page['title'] ?? '';
                 $includeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_include');
                 $excludeFilter = self::getFacebookFilter($config, 'PAGE', 'cache_exclude');
-                if (!Helpers::matchesFilter((string)$pageTitle, $includeFilter, $excludeFilter) && !Helpers::matchesFilter((string)$pageId, $includeFilter, $excludeFilter)) {
+                if (! Helpers::matchesFilter((string)$pageTitle, $includeFilter, $excludeFilter) && ! Helpers::matchesFilter((string)$pageId, $includeFilter, $excludeFilter)) {
                     continue;
                 }
 
-                if (!$page['enabled'] || (!empty($page['exclude_from_caching']) && $page['exclude_from_caching'])) {
+                if (! $page['enabled'] || (! empty($page['exclude_from_caching']) && $page['exclude_from_caching'])) {
                     $logger->info("Skipping page: " . $page['id'] . ($page['enabled'] ? " (excluded from caching)" : " (disabled)"));
+
                     continue;
                 }
 
                 $pageEntity = $pageRepository->findOneBy(['platformId' => $page['id']]);
-                if (!$pageEntity) {
+                if (! $pageEntity) {
                     $logger->error("Page entity not found for platformId=" . $page['id'] . ". Skipping.");
+
                     continue;
                 }
 
@@ -449,7 +493,7 @@ class MetricRequests
                                 if ($channeledAccountEntity) {
                                     $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
                                     $rawMedia = $api->getInstagramMedia(igUserId: (string) $page['ig_account'], additionalParams: ['since' => $syncSince]);
-                                    if (!empty($rawMedia['data'])) {
+                                    if (! empty($rawMedia['data'])) {
                                         $mediaCollection = FacebookOrganicMetricConvert::toInstagramMediaCollection($rawMedia['data'], $pageEntity, $accountEntity, $channeledAccountEntity);
                                         SocialProcessor::processPosts($mediaCollection, $manager);
                                         $logger->info("Synced " . count($rawMedia['data']) . " media items for Instagram Account {$page['ig_account']}");
@@ -465,7 +509,7 @@ class MetricRequests
                                     $logger->info("Syncing posts for Facebook Page {$pageId}");
                                     $syncSince = Carbon::parse($pageStartDate)->startOfYear()->timestamp;
                                     $rawPosts = $api->getFacebookPosts(pageId: (string) $pageId, additionalParams: ['since' => $syncSince]);
-                                    if (!empty($rawPosts['data'])) {
+                                    if (! empty($rawPosts['data'])) {
                                         $fbChanneledAccount = $channeledAccountRepository->findOneBy([
                                             'platformId' => (string) $pageId,
                                             'channel' => Channel::facebook_organic->value,
@@ -488,7 +532,7 @@ class MetricRequests
                         }
 
                         // Process Account Metrics
-                        if (!empty($page['ig_account']) && !empty($page['ig_accounts']) && !empty($page['ig_account_metrics'])) {
+                        if (! empty($page['ig_account']) && ! empty($page['ig_accounts']) && ! empty($page['ig_account_metrics'])) {
                             if ($accountEntity) {
                                 $res = self::processInstagramAccount(
                                     page: $page,
@@ -510,7 +554,7 @@ class MetricRequests
                         }
 
                         // Process Media Metrics
-                        if (!empty($page['ig_account']) && !empty($page['ig_accounts']) && !empty($page['ig_account_media'])) {
+                        if (! empty($page['ig_account']) && ! empty($page['ig_accounts']) && ! empty($page['ig_account_media'])) {
                             $channeledAccountEntity = $channeledAccountRepository->findOneBy([
                                 'platformId' => (string) $page['ig_account'],
                                 'channel' => Channel::facebook_organic->value,
@@ -584,7 +628,9 @@ class MetricRequests
                                 foreach ($chunk as $postPlatformId => $postEntity) {
                                     $postType = $postMap['mapData'][$postPlatformId] ?? 'status';
                                     $pMetrics = 'post_reactions_by_type_total';
-                                    if ($postType === 'video') { $pMetrics .= ',post_media_view'; }
+                                    if ($postType === 'video') {
+                                        $pMetrics .= ',post_media_view';
+                                    }
                                     $urls[] = "/{$postPlatformId}/insights?metric={$pMetrics}&period=lifetime&fields=name,period,values";
                                 }
 
@@ -618,6 +664,7 @@ class MetricRequests
             return self::finalizeTransaction($totalMetrics, $totalRows, $totalDuplicates, $logger, $startDate, $endDate);
         } catch (Exception $e) {
             $logger->error("Unexpected error in getListFromFacebookOrganic: " . $e->getMessage());
+
             throw $e;
         }
     }
@@ -640,11 +687,30 @@ class MetricRequests
         ?LoggerInterface $logger = null,
         ?int $jobId = null
     ): Response {
-        if (!$logger) {
+        if (! $logger) {
+            $logger = Helpers::setLogger('facebook-marketing.log');
+        }
+
+        // Bridge to modular architecture
+        if (! isset($_GET['old_sync']) && ! empty($_ENV['USE_MODULAR_DRIVERS'])) {
+            $logger->info("Routing getListFromFacebookMarketing through DriverFactory (Modular)");
+
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('facebook_marketing', $logger);
+                $start = $startDate ? new \DateTime($startDate) : new \DateTime('3 days ago');
+                $end = $endDate ? new \DateTime($endDate) : new \DateTime();
+
+                return $driver->sync($start, $end, ['resume' => $resume]);
+            } catch (\Exception $e) {
+                $logger->error("Modular driver failed, falling back to legacy: " . $e->getMessage());
+            }
+        }
+        if (! $logger) {
             $logger = Helpers::setLogger('facebook-marketing.log');
         }
 
         $manager = Helpers::getManager();
+
         try {
             // Validate configuration
             $config = self::validateFacebookConfig($logger, 'facebook_marketing');
@@ -653,7 +719,7 @@ class MetricRequests
             if (empty($startDate)) {
                 $days = 3; // Absolute fallback for metrics
                 $window = $config['cache_history_range'] ?? null;
-                if (!empty($window)) {
+                if (! empty($window)) {
                     try {
                         // Handle both ISO intervals (P3Y) and human readable (3 years)
                         $intervalStr = (str_starts_with((string)$window, 'P')) ? $window : Helpers::humanToIsoInterval($window);
@@ -688,8 +754,9 @@ class MetricRequests
             $accountEntityName = $config['accounts_group_name'] ?? null;
             $accountEntity = $accountEntityName ? $accountRepository->findOneBy(['name' => $accountEntityName]) : null;
 
-            if (!$accountEntity) {
+            if (! $accountEntity) {
                 $logger->error("Account group '{$accountEntityName}' not found. Facebook Marketing cannot be processed.");
+
                 throw new Exception("Account group '{$accountEntityName}' not found.");
             }
 
@@ -703,6 +770,7 @@ class MetricRequests
 
             if (Carbon::parse($startDate)->gt(Carbon::parse($endDate))) {
                 $logger->info("Job date range ($startDate to $endDate) is entirely before the retention limit (" . $retentionLimit->format('Y-m-d') . "). Skipping.");
+
                 return new Response(json_encode(['message' => 'Job skipped due to retention policy']), 200);
             }
 
@@ -735,7 +803,7 @@ class MetricRequests
                 $logger->info("No specific ad accounts listed in config. Fetching all available ad accounts for channel from database.");
                 $allChanneledAccounts = $channeledAccountRepository->findBy([
                     'channel' => Channel::facebook_marketing->value,
-                    'type' => AccountEnum::META_AD_ACCOUNT->value
+                    'type' => AccountEnum::META_AD_ACCOUNT->value,
                 ]);
                 foreach ($allChanneledAccounts as $ca) {
                     $accId = (string) $ca->getPlatformId();
@@ -745,13 +813,13 @@ class MetricRequests
                     $accName = $ca->getName();
                     $includeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_include');
                     $excludeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_exclude');
-                    if (!Helpers::matchesFilter((string)$accName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter((string)$accId, $includeFilter, $excludeFilter)) {
+                    if (! Helpers::matchesFilter((string)$accName, $includeFilter, $excludeFilter) && ! Helpers::matchesFilter((string)$accId, $includeFilter, $excludeFilter)) {
                         continue;
                     }
                     $adAccountsToProcess[] = array_merge($globalAdAccountConfig, [
                         'id' => $accId,
                         'name' => $accName,
-                        'enabled' => true
+                        'enabled' => true,
                     ]);
                 }
             } else {
@@ -767,7 +835,7 @@ class MetricRequests
                 $adAccName = $adAccount['name'] ?? '';
                 $includeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_include');
                 $excludeFilter = self::getFacebookFilter($config, 'AD_ACCOUNT', 'cache_exclude');
-                if (!Helpers::matchesFilter((string)$adAccName, $includeFilter, $excludeFilter) && !Helpers::matchesFilter((string)$adAccId, $includeFilter, $excludeFilter)) {
+                if (! Helpers::matchesFilter((string)$adAccName, $includeFilter, $excludeFilter) && ! Helpers::matchesFilter((string)$adAccId, $includeFilter, $excludeFilter)) {
                     continue;
                 }
 
@@ -776,13 +844,15 @@ class MetricRequests
                     'account' => $accountEntity,
                 ]);
 
-                if (!$channeledAccountEntity) {
+                if (! $channeledAccountEntity) {
                     $logger->error("ChanneledAccount entity not found for adAccount=" . $adAccount['id'] . ". Skipping.");
+
                     continue;
                 }
 
-                if (!$adAccount['enabled'] || (!empty($adAccount['exclude_from_caching']) && $adAccount['exclude_from_caching'])) {
+                if (! $adAccount['enabled'] || (! empty($adAccount['exclude_from_caching']) && $adAccount['exclude_from_caching'])) {
                     $logger->info("Skipping ad account: " . $adAccount['id'] . ($adAccount['enabled'] ? " (excluded from caching)" : " (disabled)"));
+
                     continue;
                 }
 
@@ -904,7 +974,7 @@ class MetricRequests
                                 }
                             }
 
-                            if (!empty($adAccount['creatives']) && !empty($adAccount['creative_metrics'])) {
+                            if (! empty($adAccount['creatives']) && ! empty($adAccount['creative_metrics'])) {
                                 $res = self::processCreativesBulk(
                                     api: $api,
                                     manager: $manager,
@@ -938,8 +1008,8 @@ class MetricRequests
                         'extraData' => [
                             'startDate' => $startDate,
                             'endDate' => $endDate,
-                            'account_id' => $adAccount['id']
-                        ]
+                            'account_id' => $adAccount['id'],
+                        ],
                     ]);
                 }
             }
@@ -951,9 +1021,11 @@ class MetricRequests
             return self::finalizeTransaction($totalMetrics, $totalRows, $totalDuplicates, $logger, $startDate, $endDate);
         } catch (FacebookRateLimitException $e) {
             $logger->error("Facebook API Rate Limit Reach: " . $e->getMessage());
+
             return new Response(json_encode(['error' => 'Rate limit reached: ' . $e->getMessage()]), 429);
         } catch (Exception $e) {
             $logger->error("Unexpected error in getListFromFacebookMarketing: " . $e->getMessage());
+
             throw $e;
         }
     }
@@ -1003,8 +1075,28 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromGoogleAnalytics(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
+    public static function getListFromGoogleAnalytics(
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?object $filters = null,
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('google_analytics');
+                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
+                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         return new Response(json_encode([]));
     }
 
@@ -1028,161 +1120,33 @@ class MetricRequests
         ?LoggerInterface $logger = null,
         ?int $jobId = null
     ): Response {
-        if (!$logger) {
+        if (! $logger) {
             $logger = Helpers::setLogger('gsc.log');
         }
 
-        $logger->info("Starting getListFromGoogleSearchConsole: startDate=$startDate, endDate=$endDate, resume=$resume");
-        $manager = Helpers::getManager();
+        $logger->info("Proxying GSC request through Modular Driver...");
+
         try {
-            // Validate configuration
+            // 1. Get validated config
             $config = self::validateGoogleConfig($logger);
 
-            // Initialize API client
-            $api = self::initializeSearchConsoleApi($config, $logger);
+            // 2. Initialize the Auth Provider
+            $authProvider = new \Core\Auth\GoogleAuthProvider();
 
-            // Initialize repositories and settings
-            /** @var ChanneledMetricRepository $channeledMetricRepository */
-            $channeledMetricRepository = $manager->getRepository(ChanneledMetric::class);
-            $pageRepository = $manager->getRepository(Page::class);
-            $countryRepository = $manager->getRepository(Country::class);
-            $deviceRepository = $manager->getRepository(Device::class);
-            $metricNames = $filters->metricNames ?? ($config['google_search_console']['metrics'] ?? ['clicks', 'impressions', 'ctr', 'position']);
-            // $dimensions = $filters->dimensions ?? ['date', 'query', 'page', 'country', 'device'];
-            // Custom filter for dimensions disabled for GSC given the strict structure. Config dimensions used instead
+            // 3. Get the Driver from Factory
+            $driver = \Core\Drivers\DriverFactory::get('google_search_console', $logger);
+            $driver->setAuthProvider($authProvider);
 
-            $logger->info("Initialized repositories, dimensions=" . implode(',', GoogleSearchConsoleHelpers::$allDimensions) . ", metricNames=" . json_encode($metricNames));
-            $logger->warning("Note: 'searchAppearance' is not included in dimensions due to GSC API restrictions; defaulting to 'WEB' in normalized dimensions");
+            // 4. Execute sync
+            $start = $startDate ? new DateTime($startDate) : new DateTime('3 months ago');
+            $end = $endDate ? new DateTime($endDate) : new DateTime('today');
 
-            // Load countries and create a map
-            /** @var Country[] $countries */
-            $countries = $countryRepository->findAll();
-            $countryMap = [
-                'map' => [],
-                'mapReverse' => [],
-            ];
-            foreach ($countries as $country) {
-                $countryMap['map'][$country->getCode()->value] = $country;
-                $countryMap['mapReverse'][$country->getId()] = $country;
-            }
+            return $driver->sync($start, $end, $config);
 
-            // Load devices and create a map
-            /** @var Device[] $devices */
-            $devices = $deviceRepository->findAll();
-            $deviceMap = [
-                'map' => [],
-                'mapReverse' => [],
-            ];
-            foreach ($devices as $device) {
-                $deviceMap['map'][$device->getType()->value] = $device;
-                $deviceMap['mapReverse'][$device->getId()] = $device;
-            }
-
-            // Load pages and create a map
-            /** @var Page[] $pages */
-            $pages = $pageRepository->findAll();
-            $pageMap = [
-                'map' => [],
-                'mapReverse' => [],
-            ];
-            foreach ($pages as $page) {
-                $pageMap['map'][$page->getUrl()] = $page;
-                $pageMap['mapReverse'][$page->getId()] = $page;
-            }
-
-            $totalMetrics = 0;
-            $totalRows = 0;
-            $totalDuplicates = 0;
-
-            // Process each site
-            $sitesToProcess = $config['google_search_console']['sites'] ?? [];
-            if (empty($sitesToProcess)) {
-                $logger->info("No specific sites listed in config. Fetching all available sites from database.");
-                $allPages = $pageRepository->findByDataAttribute('source', 'gsc_site');
-                foreach ($allPages as $p) {
-                    $siteUrl = $p->getUrl();
-                    $siteTitle = $p->getTitle();
-                    if (!Helpers::matchesFilter($siteUrl, $config['google_search_console']['cache_include'] ?? null, $config['google_search_console']['cache_exclude'] ?? null) && !Helpers::matchesFilter($siteTitle, $config['google_search_console']['cache_include'] ?? null, $config['google_search_console']['cache_exclude'] ?? null)) {
-                        continue;
-                    }
-                    $sitesToProcess[] = [
-                        'url' => $siteUrl,
-                        'title' => $siteTitle,
-                        'enabled' => true,
-                        // Defaults for GSC sites if not in config
-                        'target_keywords' => [],
-                        'target_countries' => [],
-                    ];
-                }
-            }
-
-            foreach ($sitesToProcess as $site) {
-                Helpers::checkJobStatus($jobId);
-
-                $siteUrl = $site['url'];
-                $siteTitle = $site['title'] ?? $siteUrl;
-                if (!Helpers::matchesFilter($siteUrl, $config['google_search_console']['cache_include'] ?? null, $config['google_search_console']['cache_exclude'] ?? null) && !Helpers::matchesFilter($siteTitle, $config['google_search_console']['cache_include'] ?? null, $config['google_search_console']['cache_exclude'] ?? null)) {
-                    continue;
-                }
-
-                if (!$site['enabled']) {
-                    $logger->info("Skipping disabled site: " . $site['url']);
-                    continue;
-                }
-                $result = self::processGSCSite(
-                    $site,
-                    $startDate,
-                    $endDate,
-                    $resume,
-                    $api,
-                    $manager,
-                    $channeledMetricRepository,
-                    $pageRepository,
-                    $metricNames,
-                    $filters,
-                    $logger,
-                    $deviceMap,
-                    $countryMap,
-                    $pageMap,
-                );
-                $totalMetrics += $result['metrics'];
-                $totalRows += $result['rows'];
-                $totalDuplicates += $result['duplicates'];
-            }
-
-            // Finalize transaction and cache
-            return self::finalizeTransaction(
-                $totalMetrics,
-                $totalRows,
-                $totalDuplicates,
-                $logger,
-                $startDate,
-                $endDate
-            );
-        } catch (GoogleQuotaExceededException $e) {
-            $logger->error("Google API Quota Exceeded: " . $e->getMessage());
-            try {
-                if ($manager->getConnection()->isTransactionActive()) {
-                    $manager->getConnection()->rollback();
-                }
-            } catch (Exception $rollbackException) {
-                $logger->error("Error during transaction rollback: " . $rollbackException->getMessage());
-            }
-            return new Response(json_encode(['error' => 'Quota exceeded: ' . $e->getMessage()]), 429);
         } catch (Exception $e) {
-            try {
-                if ($manager->getConnection()->isTransactionActive()) {
-                    $manager->getConnection()->rollback();
-                    $logger->info("Rolled back transaction");
-                }
-            } catch (Exception $rollbackException) {
-                $logger->error("Error during transaction rollback: " . $rollbackException->getMessage());
-            }
-            $logger->error("Unexpected error in getListFromGoogleSearchConsole: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+            $logger->error("Error in GSC Modular Proxy: " . $e->getMessage());
+
             throw $e;
-        } catch (GuzzleException $e) {
-            $logger->error("GuzzleException in getListFromGoogleSearchConsole: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
-            throw new Exception("GuzzleException in getListFromGoogleSearchConsole: " . $e->getMessage());
         }
     }
 
@@ -1191,8 +1155,28 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromPinterest(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
+    public static function getListFromPinterest(
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?object $filters = null,
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('pinterest');
+                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
+                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         return new Response(json_encode([]));
     }
 
@@ -1201,8 +1185,28 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromLinkedIn(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
+    public static function getListFromLinkedIn(
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?object $filters = null,
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('linkedin');
+                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
+                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         return new Response(json_encode([]));
     }
 
@@ -1211,8 +1215,53 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromX(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
+    public static function getListFromX(
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?object $filters = null,
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('x');
+                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
+                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
+        return new Response(json_encode([]));
+    }
+
+    public static function getListFromTikTok(
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?object $filters = null,
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('tiktok');
+                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
+                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         return new Response(json_encode([]));
     }
 
@@ -1255,14 +1304,14 @@ class MetricRequests
         if ($strategy === 'default') {
             return [
                 'metricSet' => MetricSet::KEY,
-                'breakdowns' => $defaultBreakdowns
+                'breakdowns' => $defaultBreakdowns,
             ];
         }
 
         $metricsConfig = $config['metrics_config'] ?? [];
         $enabledMetrics = [];
         foreach ($metricsConfig as $mName => $mSetting) {
-            if (!isset($mSetting['enabled']) || $mSetting['enabled'] === true) {
+            if (! isset($mSetting['enabled']) || $mSetting['enabled'] === true) {
                 $enabledMetrics[] = $mName;
             }
         }
@@ -1270,7 +1319,7 @@ class MetricRequests
         if (empty($enabledMetrics)) {
             return [
                 'metricSet' => MetricSet::KEY,
-                'breakdowns' => $defaultBreakdowns
+                'breakdowns' => $defaultBreakdowns,
             ]; // Fallback if no custom enabled
         }
 
@@ -1290,10 +1339,10 @@ class MetricRequests
             'metrics' => array_unique(array_filter($enabledMetrics)),
             'dimensions' => array_unique(array_filter($idFields)),
             'breakdowns' => $breakdowns,
-            'fields' => implode(',', $allFields)
+            'fields' => implode(',', $allFields),
         ];
     }
-    
+
     /**
      * Initializes the SearchConsoleApi client with retry logic.
      *
@@ -1323,7 +1372,7 @@ class MetricRequests
                 $clientId = $config['google_search_console']['client_id'] ?? ($config['google']['client_id'] ?? null);
                 $clientSecret = $config['google_search_console']['client_secret'] ?? ($config['google']['client_secret'] ?? null);
 
-                if (!$clientId || !$clientSecret) {
+                if (! $clientId || ! $clientSecret) {
                     throw new Exception("Google Search Console credentials (client_id/client_secret) are missing. Please check your .env file.");
                 }
 
@@ -1338,17 +1387,20 @@ class MetricRequests
                     tokenPath: $config['google_search_console']['token_path'] ?? ($config['google']['token_path'] ?? "")
                 );
                 $logger->info("Initialized SearchConsoleApi");
+
                 return $apiInstance;
             } catch (Exception $e) {
                 $apiRetryCount++;
                 if ($apiRetryCount >= $maxApiRetries) {
                     $logger->error("Failed to initialize SearchConsoleApi after $maxApiRetries retries: " . $e->getMessage());
+
                     throw new Exception("Failed to initialize SearchConsoleApi after $maxApiRetries retries: " . $e->getMessage());
                 }
                 $logger->warning("SearchConsoleApi initialization failed, retry $apiRetryCount/$maxApiRetries: " . $e->getMessage());
                 usleep(100000 * $apiRetryCount);
             }
         }
+
         throw new Exception("Failed to initialize SearchConsoleApi");
     }
 
@@ -1390,7 +1442,7 @@ class MetricRequests
      * @throws \Doctrine\DBAL\Exception
      * @throws Exception
      */
-    private static function processGSCSite(
+    public static function processGSCSite(
         array $site,
         ?string $startDate,
         ?string $endDate,
@@ -1418,8 +1470,9 @@ class MetricRequests
 
         // Get page entity
         $pageEntity = $pageRepository->getByUrl($normalizedSiteUrl);
-        if (!$pageEntity) {
+        if (! $pageEntity) {
             $logger->error("Page entity not found for URL=$normalizedSiteUrl. Run app:initialize-entities command.");
+
             throw new Exception("Page entity not found for URL=$normalizedSiteUrl");
         }
         $logger->info("Found Page: ID=" . $pageEntity->getId() . ", URL=$normalizedSiteUrl");
@@ -1470,7 +1523,7 @@ class MetricRequests
         return [
             'metrics' => $siteMetrics,
             'rows' => $siteRows,
-            'duplicates' => $siteDuplicates
+            'duplicates' => $siteDuplicates,
         ];
     }
 
@@ -1503,8 +1556,9 @@ class MetricRequests
 
         // Get page entity
         $pageEntity = $pageRepository->findOneBy(['platformId' => $page['id']]);
-        if (!$pageEntity) {
+        if (! $pageEntity) {
             $logger->error("Page entity not found for platformId=". $page['id']. ". Run app:initialize-entities command.");
+
             throw new Exception("Page entity not found for platformId=". $page['id']);
         }
         $logger->info("Found Page: ID=" . $pageEntity->getId() . ", platformId=". $page['id']);
@@ -1520,7 +1574,7 @@ class MetricRequests
             $fetched = false;
             $rows = ['data' => []];
 
-            while ($retryCount < $maxRetries && !$fetched) {
+            while ($retryCount < $maxRetries && ! $fetched) {
                 try {
                     $logger->info("Using Page Access Token for FB insights page " . $page['id'] . ": " . ($api->getLongLivedPageAccesstoken() ? substr($api->getLongLivedPageAccesstoken(), 0, 10) . "..." : "NONE FOUND"));
 
@@ -1533,12 +1587,15 @@ class MetricRequests
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
                     $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'valid insights metric') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
-                    
+
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {
                         $logger->error(($isFatal ? "FATAL INSIGHTS ERROR" : "Failed") . " to retrieve insights for page " . $page['id'] . ": " . $msg);
                         $fetched = true; // Break loop
-                        if (!$isFatal) throw $e;
+                        if (! $isFatal) {
+                            throw $e;
+                        }
+
                         return $stats; // Continue to next page
                     }
                     $logger->warning("Retry $retryCount/$maxRetries for FB page insights " . $page['id'] . ": " . $msg);
@@ -1548,6 +1605,7 @@ class MetricRequests
 
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for page " . $page['id']);
+
                 return $stats;
             }
             $stats['rows'] = count($rows['data']);
@@ -1566,6 +1624,7 @@ class MetricRequests
 
             if (count($allMetrics) === 0) {
                 $logger->info("No metrics found for page " . $page['id']);
+
                 return $stats;
             }
             $stats['metrics'] = count($allMetrics);
@@ -1574,7 +1633,8 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    processDimensions: true,
                     metrics: $allMetrics,
                     manager: $manager,
                     pageMap: $pageMap,
@@ -1602,6 +1662,7 @@ class MetricRequests
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                 }
+
                 throw $e;
             }
 
@@ -1610,6 +1671,7 @@ class MetricRequests
             return $stats;
         } catch (Exception $e) {
             $logger->error("Error during FB page insights request for page " . $page['id'] . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+
             throw $e;
         }
     }
@@ -1672,7 +1734,7 @@ class MetricRequests
             $fetched = false;
             $rows = ['data' => []];
 
-            while ($retryCount < $maxRetries && !$fetched) {
+            while ($retryCount < $maxRetries && ! $fetched) {
                 try {
                     $rows = $api->getAdAccountInsights(
                         adAccountId: (string) $adAccount['id'],
@@ -1685,12 +1747,15 @@ class MetricRequests
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
                     $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'valid insights metric') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
-                    
+
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {
                         $logger->error(($isFatal ? "FATAL MARKETING ERROR" : "Failed") . " to retrieve ad account insights " . $adAccount['id'] . ": " . $msg);
                         $fetched = true; // Break loop
-                        if (!$isFatal) throw $e;
+                        if (! $isFatal) {
+                            throw $e;
+                        }
+
                         return ['metrics' => 0, 'rows' => 0];
                     }
                     $logger->warning("Retry $retryCount/$maxRetries for Meta ad account insights " . $adAccount['id'] . ": " . $msg);
@@ -1700,6 +1765,7 @@ class MetricRequests
 
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for ad account " . $adAccount['id']);
+
                 return ['metrics' => 0, 'rows' => 0];
             }
 
@@ -1720,6 +1786,7 @@ class MetricRequests
 
             if (count($allMetrics) === 0) {
                 $logger->info("No metrics found for ad account " . $adAccount['id']);
+
                 return ['metrics' => 0, 'rows' => count($rows['data'])];
             }
 
@@ -1727,7 +1794,8 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    processDimensions: true,
                     metrics: $allMetrics,
                     manager: $manager,
                     accountMap: $accountMap,
@@ -1755,12 +1823,14 @@ class MetricRequests
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                 }
+
                 throw $e;
             }
 
             return ['metrics' => count($allMetrics), 'rows' => count($rows['data'])];
         } catch (Exception $e) {
             $logger->error("Error during Meta account insights request for ad account " . $adAccount['id'] . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+
             throw $e;
         }
     }
@@ -1798,7 +1868,7 @@ class MetricRequests
         ?array $providedData = null
     ): array {
 
-        if (!$startDate) {
+        if (! $startDate) {
             $startDate = self::getRetentionRange($config, $channel, '2 years - 1 day');
             // Hard limit protection for Instagram (2 years)
             $timezone = $config['timezone'] ?? 'America/Caracas';
@@ -1810,14 +1880,15 @@ class MetricRequests
         } else {
             $startDate = Carbon::parse($startDate)->startOfDay(); // Ensure start date is at the beginning of the day
         }
-        if (!$endDate) {
+        if (! $endDate) {
             $endDate = Carbon::today()->endOfDay()->subDays(2); // Default to 2 days ago at the end of the day
         } else {
             $endDate = Carbon::parse($endDate)->startOfDay()->addDay(); // Ensure end date is at the beginning of the following day
         }
 
-        if (!$startDate->isBefore(Carbon::parse($endDate))) {
+        if (! $startDate->isBefore(Carbon::parse($endDate))) {
             $logger->error("Start date must be before end date. startDate=$startDate, endDate=$endDate");
+
             throw new Exception("Start date must be before end date. startDate=$startDate, endDate=$endDate");
         }
 
@@ -1845,7 +1916,7 @@ class MetricRequests
         ]);
         $channeledAccountMap['map'][(string) $page['ig_account']] = $channeledAccountEntity->getId();
         $channeledAccountMap['mapReverse'][$channeledAccountEntity->getId()] = (string) $page['ig_account'];
- 
+
         $api->setPageId((string) $pageEntity->getPlatformId());
 
         $stats = ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
@@ -1863,76 +1934,79 @@ class MetricRequests
                         'data' => [],
                     ];
                     $option = 1;
-                while ($option <= 5) {
-                    // OPTIONS LIST:
-                    // 1. Get REACH and VIEWS broken by FOLLOW_TYPE and MEDIA_PRODUCT_TYPE (Default)
-                    // 2. Get FOLLOWS_AND_UNFOLLOWS broken by FOLLOW_TYPE
-                    // 3. Get COMMENTS, LIKES, SAVES, SHARES and TOTAL_INTERACTIONS broken by MEDIA_PRODUCT_TYPE
-                    // 4. Get PROFILE_LINK_TAPS broken by CONTACT_BUTTON_TYPE
-                    // 5. Get WEBSITE_CLICKS, PROFILE_VIEWS, ACCOUNTS_ENGAGED, REPLIES and CONTENT_VIEWS with no breakdowns
-                    $logger->info("Fetching Instagram account insights for page " . $page['id'] . ", option: $option");
-                    
-                    $maxRetries = 5;
-                    $retryCount = 0;
-                    $fetched = false;
-                    $insights = ['data' => []];
+                    while ($option <= 5) {
+                        // OPTIONS LIST:
+                        // 1. Get REACH and VIEWS broken by FOLLOW_TYPE and MEDIA_PRODUCT_TYPE (Default)
+                        // 2. Get FOLLOWS_AND_UNFOLLOWS broken by FOLLOW_TYPE
+                        // 3. Get COMMENTS, LIKES, SAVES, SHARES and TOTAL_INTERACTIONS broken by MEDIA_PRODUCT_TYPE
+                        // 4. Get PROFILE_LINK_TAPS broken by CONTACT_BUTTON_TYPE
+                        // 5. Get WEBSITE_CLICKS, PROFILE_VIEWS, ACCOUNTS_ENGAGED, REPLIES and CONTENT_VIEWS with no breakdowns
+                        $logger->info("Fetching Instagram account insights for page " . $page['id'] . ", option: $option");
 
-                    while ($retryCount < $maxRetries && !$fetched) {
-                        try {
-                            $insights = $api->getDailyInstagramAccountTotalValueInsights(
-                                instagramAccountId: (string) $page['ig_account'],
-                                since: $startDate->format('Y-m-d'),
-                                option: $option,
-                            );
-                            $fetched = true;
-                        } catch (Exception $e) {
-                            $msg = $e->getMessage();
-                            $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'valid insights metric') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
-                            
-                            $retryCount++;
-                            if ($retryCount >= $maxRetries || $isFatal) {
-                                $logger->error(($isFatal ? "FATAL IG INSIGHTS ERROR" : "Failed") . " to retrieve IG insights (option $option) for page " . $page['id'] . ": " . $msg);
-                                $fetched = true; // Break loop
-                                if (!$isFatal) {
-                                    $option = 6; // Stop options loop
-                                    throw $e;
+                        $maxRetries = 5;
+                        $retryCount = 0;
+                        $fetched = false;
+                        $insights = ['data' => []];
+
+                        while ($retryCount < $maxRetries && ! $fetched) {
+                            try {
+                                $insights = $api->getDailyInstagramAccountTotalValueInsights(
+                                    instagramAccountId: (string) $page['ig_account'],
+                                    since: $startDate->format('Y-m-d'),
+                                    option: $option,
+                                );
+                                $fetched = true;
+                            } catch (Exception $e) {
+                                $msg = $e->getMessage();
+                                $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'valid insights metric') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
+
+                                $retryCount++;
+                                if ($retryCount >= $maxRetries || $isFatal) {
+                                    $logger->error(($isFatal ? "FATAL IG INSIGHTS ERROR" : "Failed") . " to retrieve IG insights (option $option) for page " . $page['id'] . ": " . $msg);
+                                    $fetched = true; // Break loop
+                                    if (! $isFatal) {
+                                        $option = 6; // Stop options loop
+
+                                        throw $e;
+                                    }
+
+                                    continue;
                                 }
-                                continue;
+                                $logger->warning("Retry $retryCount/$maxRetries for IG account insights " . $page['ig_account'] . " (option $option): " . $msg);
+                                usleep(1000000 * $retryCount);
                             }
-                            $logger->warning("Retry $retryCount/$maxRetries for IG account insights " . $page['ig_account'] . " (option $option): " . $msg);
-                            usleep(1000000 * $retryCount);
                         }
-                    }
 
-                    if (isset($insights['data']) && count($insights['data']) > 0) {
-                        $rows['data'] = [
-                            ...$rows['data'],
-                            ...$insights['data']
-                        ];
+                        if (isset($insights['data']) && count($insights['data']) > 0) {
+                            $rows['data'] = [
+                                ...$rows['data'],
+                                ...$insights['data'],
+                            ];
+                        }
+                        $option++;
                     }
-                    $option++;
-                }
-                $metrics = FacebookOrganicMetricConvert::igAccountMetrics(
-                    rows: $rows['data'],
-                    date: $startDate->format('Y-m-d'),
-                    pageEntity: $pageEntity,
-                    accountEntity: $accountEntity,
-                    channeledAccountEntity: $channeledAccountEntity,
-                    logger: $logger,
-                );
+                    $metrics = FacebookOrganicMetricConvert::igAccountMetrics(
+                        rows: $rows['data'],
+                        date: $startDate->format('Y-m-d'),
+                        pageEntity: $pageEntity,
+                        accountEntity: $accountEntity,
+                        channeledAccountEntity: $channeledAccountEntity,
+                        logger: $logger,
+                    );
 
-                foreach ($metrics as $metric) {
-                    $metric->page = $pageEntity;
-                    $metric->account = $accountEntity;
-                    $metric->channeledAccount = $channeledAccountEntity;
-                    $allMetrics->add($metric);
-                }
-                $startDate->addDay();
-            } while ($startDate->isBefore(Carbon::now()->endOfDay()->subDays(2)) && $startDate->isBefore(Carbon::parse($endDate))); // Continue until 2 days ago
-        }
+                    foreach ($metrics as $metric) {
+                        $metric->page = $pageEntity;
+                        $metric->account = $accountEntity;
+                        $metric->channeledAccount = $channeledAccountEntity;
+                        $allMetrics->add($metric);
+                    }
+                    $startDate->addDay();
+                } while ($startDate->isBefore(Carbon::now()->endOfDay()->subDays(2)) && $startDate->isBefore(Carbon::parse($endDate))); // Continue until 2 days ago
+            }
 
             if (count($allMetrics) === 0) {
                 $logger->info("No metrics found for page " . $page['id']);
+
                 return $stats;
             }
             $stats['metrics'] = count($allMetrics);
@@ -1942,7 +2016,8 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    processDimensions: true,
                     metrics: $allMetrics,
                     manager: $manager,
                     pageMap: $pageMap,
@@ -1971,6 +2046,7 @@ class MetricRequests
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                 }
+
                 throw $e;
             }
 
@@ -1979,6 +2055,7 @@ class MetricRequests
             return $stats;
         } catch (Exception $e) {
             $logger->error("Error during FB page insights request for page " . $page['id'] . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+
             throw $e;
         }
     }
@@ -2045,7 +2122,7 @@ class MetricRequests
                 $insights = $providedData;
                 $fetched = true;
             } else {
-                while ($retryCount < $maxRetries && !$fetched) {
+                while ($retryCount < $maxRetries && ! $fetched) {
                     try {
                         $insights = $api->getInstagramMediaInsights(
                             mediaId: $postEntity->getPostId(),
@@ -2055,12 +2132,15 @@ class MetricRequests
                     } catch (Exception $e) {
                         $msg = $e->getMessage();
                         $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
-                        
+
                         $retryCount++;
                         if ($retryCount >= $maxRetries || $isFatal) {
                             $logger->error(($isFatal ? "FATAL IG MEDIA ERROR" : "Failed") . " to retrieve IG media insights " . $postEntity->getPostId() . ": " . $msg);
                             $fetched = true; // Break loop
-                            if (!$isFatal) throw $e;
+                            if (! $isFatal) {
+                                throw $e;
+                            }
+
                             return $stats;
                         }
                         $logger->warning("Retry $retryCount/$maxRetries for IG media insights " . $postEntity->getPostId() . ": " . $msg);
@@ -2071,6 +2151,7 @@ class MetricRequests
 
             if (count($insights['data']) === 0) {
                 $logger->info("No insights found for post " . $postEntity->getPostId());
+
                 return $stats;
             }
             $stats['rows'] = count($insights['data']);
@@ -2097,7 +2178,8 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    processDimensions: true,
                     metrics: $allMetrics,
                     manager: $manager,
                     pageMap: $pageMap,
@@ -2127,6 +2209,7 @@ class MetricRequests
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                 }
+
                 throw $e;
             }
 
@@ -2136,6 +2219,7 @@ class MetricRequests
             return $stats;
         } catch (Exception $e) {
             $logger->error("Error during IG Media insights request for post " . $postEntity->getPostId() . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+
             throw $e;
         }
     }
@@ -2184,7 +2268,7 @@ class MetricRequests
             $fetched = false;
             $rows = ['data' => []];
 
-            while ($retryCount < $maxRetries && !$fetched) {
+            while ($retryCount < $maxRetries && ! $fetched) {
                 try {
                     $rows = $api->getCampaignInsights(
                         campaignId: $campaignPlatformId,
@@ -2193,12 +2277,15 @@ class MetricRequests
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
                     $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
-                    
+
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {
                         $logger->error(($isFatal ? "FATAL CAMPAIGN ERROR" : "Failed") . " to retrieve campaign insights $campaignPlatformId: " . $msg);
                         $fetched = true; // Break loop
-                        if (!$isFatal) throw $e;
+                        if (! $isFatal) {
+                            throw $e;
+                        }
+
                         return false;
                     }
                     $logger->warning("Retry $retryCount/$maxRetries for campaign insights $campaignPlatformId: " . $msg);
@@ -2208,6 +2295,7 @@ class MetricRequests
 
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for campaign " . $campaignPlatformId);
+
                 return false;
             }
 
@@ -2233,7 +2321,8 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    processDimensions: true,
                     metrics: $allMetrics,
                     manager: $manager,
                     channeledAccountMap: $channeledAccountMap,
@@ -2264,6 +2353,7 @@ class MetricRequests
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                 }
+
                 throw $e;
             }
 
@@ -2272,6 +2362,7 @@ class MetricRequests
             return true;
         } catch (Exception $e) {
             $logger->error("Error during Meta account's campaign insights request for campaign " . $campaignEntity->getCampaignId() . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+
             throw $e;
         }
     }
@@ -2317,13 +2408,14 @@ class MetricRequests
         ];
 
         $adsetPlatformId = $channeledAdGroupEntity->getPlatformId();
+
         try {
             $maxRetries = 3;
             $retryCount = 0;
             $fetched = false;
             $rows = ['data' => []];
 
-            while ($retryCount < $maxRetries && !$fetched) {
+            while ($retryCount < $maxRetries && ! $fetched) {
                 try {
                     $rows = $api->getAdsetInsights(
                         adsetId: $adsetPlatformId,
@@ -2332,12 +2424,15 @@ class MetricRequests
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
                     $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
-                    
+
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {
                         $logger->error(($isFatal ? "FATAL ADSET ERROR" : "Failed") . " to retrieve adset insights $adsetPlatformId: " . $msg);
                         $fetched = true; // Break loop
-                        if (!$isFatal) throw $e;
+                        if (! $isFatal) {
+                            throw $e;
+                        }
+
                         return false;
                     }
                     $logger->warning("Retry $retryCount/$maxRetries for adset insights $adsetPlatformId: " . $msg);
@@ -2347,6 +2442,7 @@ class MetricRequests
 
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for adset " . $adsetPlatformId);
+
                 return false;
             }
 
@@ -2374,7 +2470,8 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    processDimensions: true,
                     metrics: $allMetrics,
                     manager: $manager,
                     channeledAccountMap: $channeledAccountMap,
@@ -2406,6 +2503,7 @@ class MetricRequests
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                 }
+
                 throw $e;
             }
 
@@ -2414,6 +2512,7 @@ class MetricRequests
             return true;
         } catch (Exception $e) {
             $logger->error("Error during Meta account's campaign's adset insights request for adset " . $channeledAdGroupEntity->getPlatformId() . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+
             throw $e;
         }
     }
@@ -2463,13 +2562,14 @@ class MetricRequests
         ];
 
         $adPlatformId = $channeledAdEntity->getPlatformId();
+
         try {
             $maxRetries = 3;
             $retryCount = 0;
             $fetched = false;
             $rows = ['data' => []];
 
-            while ($retryCount < $maxRetries && !$fetched) {
+            while ($retryCount < $maxRetries && ! $fetched) {
                 try {
                     $rows = $api->getAdInsights(
                         adId: $adPlatformId,
@@ -2478,12 +2578,15 @@ class MetricRequests
                 } catch (Exception $e) {
                     $msg = $e->getMessage();
                     $isFatal = (stripos($msg, '(#100)') !== false || stripos($msg, 'permissions') !== false || stripos($msg, 'Unsupported get request') !== false || stripos($msg, 'Object with ID') !== false);
-                    
+
                     $retryCount++;
                     if ($retryCount >= $maxRetries || $isFatal) {
                         $logger->error(($isFatal ? "FATAL AD ERROR" : "Failed") . " to retrieve ad insights $adPlatformId: " . $msg);
                         $fetched = true; // Break loop
-                        if (!$isFatal) throw $e;
+                        if (! $isFatal) {
+                            throw $e;
+                        }
+
                         return false;
                     }
                     $logger->warning("Retry $retryCount/$maxRetries for ad insights $adPlatformId: " . $msg);
@@ -2493,6 +2596,7 @@ class MetricRequests
 
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for ad " . $adPlatformId);
+
                 return false;
             }
 
@@ -2522,7 +2626,8 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metric configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    processDimensions: true,
                     metrics: $allMetrics,
                     manager: $manager,
                     channeledAccountMap: $channeledAccountMap,
@@ -2555,6 +2660,7 @@ class MetricRequests
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                 }
+
                 throw $e;
             }
 
@@ -2563,6 +2669,7 @@ class MetricRequests
             return true;
         } catch (Exception $e) {
             $logger->error("Error during Meta ad account's campaign's adset's ad insights request for ad " . $channeledAdEntity->getPlatformId() . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+
             throw $e;
         }
     }
@@ -2595,6 +2702,7 @@ class MetricRequests
             $data = json_decode($row['data'] ?? '{}', true) ?? [];
             $mapData[$postId] = $data['type'] ?? ($data['status_type'] ?? 'status');
         }
+
         return [
             'map' => $map,
             'mapReverse' => array_flip($map),
@@ -2607,8 +2715,8 @@ class MetricRequests
         Page $pageEntity,
         ?ChanneledAccount $channeledAccountEntity = null,
     ): array {
-        if (!$channeledAccountEntity) {
-             return ['map' => [], 'mapReverse' => []];
+        if (! $channeledAccountEntity) {
+            return ['map' => [], 'mapReverse' => []];
         }
         $sql = "SELECT id, post_id, data FROM posts WHERE page_id = ? AND channeled_account_id = ?";
         $fetched = $manager->getConnection()->executeQuery($sql, [$pageEntity->getId(), $channeledAccountEntity->getId()])->fetchAllAssociative();
@@ -2620,12 +2728,14 @@ class MetricRequests
             $data = json_decode($row['data'], true) ?? [];
             $mapData[$postId] = $data['media_type'] ?? 'IMAGE'; // Default to IMAGE if unknown
         }
+
         return [
             'map' => $map,
             'mapReverse' => array_flip($map),
             'mapData' => $mapData,
         ];
     }
+
     private static function getCampaignMaps(
         EntityManager $manager,
         ChanneledAccount $channeledAccountEntity,
@@ -2675,6 +2785,7 @@ class MetricRequests
             $map[$row['platform_id']] = (int)$row['id'];
             $mapCampaign[$row['platform_id']] = $row['campaign_platform_id'];
         }
+
         return [
             'map' => $map,
             'mapReverse' => array_flip($map),
@@ -2697,6 +2808,7 @@ class MetricRequests
             $map[$row['platform_id']] = (int)$row['id'];
             $mapAdGroup[$row['platform_id']] = $row['ad_group_platform_id'];
         }
+
         return [
             'map' => $map,
             'mapReverse' => array_flip($map),
@@ -2717,12 +2829,12 @@ class MetricRequests
         foreach ($fetched as $row) {
             $map[$row['creative_id']] = (int)$row['id'];
         }
+
         return [
             'map' => $map,
             'mapReverse' => array_flip($map),
         ];
     }
-
 
     /**
      * Processes a single site, including page lookup and data fetching.
@@ -2762,7 +2874,7 @@ class MetricRequests
                 $rows = $providedData;
                 $fetched = true;
             } else {
-                while ($retryCount < $maxRetries && !$fetched) {
+                while ($retryCount < $maxRetries && ! $fetched) {
                     try {
                         $rows = $api->getFacebookPostInsights(
                             postId: $postEntity->getPostId(),
@@ -2773,6 +2885,7 @@ class MetricRequests
                         if ($retryCount >= $maxRetries) {
                             $logger->error("Failed to retrieve insights for post " . $postEntity->getPostId() . " after $maxRetries retries: " . $e->getMessage());
                             $fetched = true; // Break loop
+
                             throw $e;
                         }
                         $logger->warning("Retry $retryCount/$maxRetries for FB post insights " . $postEntity->getPostId() . ": " . $e->getMessage());
@@ -2783,6 +2896,7 @@ class MetricRequests
 
             if (count($rows['data']) === 0) {
                 $logger->info("No rows found for post " . $postEntity->getPostId());
+
                 return $stats;
             }
             $stats['rows'] = count($rows['data']);
@@ -2806,7 +2920,8 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metrics
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    processDimensions: true,
                     metrics: $allMetrics,
                     manager: $manager,
                     pageMap: $pageMap,
@@ -2834,6 +2949,7 @@ class MetricRequests
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                 }
+
                 throw $e;
             }
 
@@ -2843,6 +2959,7 @@ class MetricRequests
             return $stats;
         } catch (Exception $e) {
             $logger->error("Error during FB page post insights request for post " . $postEntity->getPostId() . ": " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+
             throw $e;
         }
     }
@@ -2900,13 +3017,13 @@ class MetricRequests
             // $dimensionsSubsets = [GoogleSearchConsoleConvert::$optionalDimensions];
             foreach ($dimensionsSubsets as $dimensionsSubset) {
                 $actualDimensionsSubset = array_merge(array_diff(GoogleSearchConsoleHelpers::$allDimensions, GoogleSearchConsoleHelpers::$optionalDimensions), $dimensionsSubset);
-                
+
                 $maxRetries = 3;
                 $retryCount = 0;
                 $fetched = false;
                 $rows = ['rows' => []];
 
-                while ($retryCount < $maxRetries && !$fetched) {
+                while ($retryCount < $maxRetries && ! $fetched) {
                     try {
                         $rows = $api->getAllSearchQueryResults(
                             siteUrl: $siteUrl,
@@ -2935,10 +3052,11 @@ class MetricRequests
 
             if (count($subsetRows) === 0) {
                 $logger->info("No rows found for site $siteUrl, date $dayStr");
+
                 return [
                     'metrics' => 0,
                     'rows' => 0,
-                    'duplicates' => 0
+                    'duplicates' => 0,
                 ];
             }
 
@@ -2956,10 +3074,11 @@ class MetricRequests
 
             if (count($allRows) === 0) {
                 $logger->info("No rows found for site $siteUrl, date $dayStr");
+
                 return [
                     'metrics' => 0,
                     'rows' => 0,
-                    'duplicates' => 0
+                    'duplicates' => 0,
                 ];
             }
 
@@ -2971,8 +3090,9 @@ class MetricRequests
             // $logger->info("Converted " . count($rows) . " rows to " . count($pageMetrics) . " metrics, first metric: " . (count($pageMetrics) > 0 ? json_encode(['name' => $pageMetrics[0]->name, 'query' => is_string($pageMetrics[0]->query) ? $pageMetrics[0]->query : ($pageMetrics[0]->query instanceof Query ? $pageMetrics[0]->query->getQuery() : 'none')]) : 'none'));
 
             foreach ($metrics as $metric) {
-                if ($metricNames && !in_array($metric->name, $metricNames)) {
+                if ($metricNames && ! in_array($metric->name, $metricNames)) {
                     $logger->warning("Skipped metric: =$metric->name, not in allowed names: " . json_encode($metricNames));
+
                     continue;
                 }
 
@@ -2987,10 +3107,11 @@ class MetricRequests
 
             if (count($allMetrics) === 0) {
                 $logger->info("No metrics found for site $siteUrl, date $dayStr");
+
                 return [
                     'metrics' => 0,
                     'rows' => 0,
-                    'duplicates' => 0
+                    'duplicates' => 0,
                 ];
             }
 
@@ -2998,7 +3119,8 @@ class MetricRequests
                 $manager->getConnection()->beginTransaction();
 
                 // Map metrics configs
-                $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                    processDimensions: true,
                     metrics: $allMetrics,
                     manager: $manager,
                     processQueries: true,
@@ -3028,6 +3150,7 @@ class MetricRequests
                 if ($manager->getConnection()->isTransactionActive()) {
                     $manager->getConnection()->rollback();
                 }
+
                 throw $e;
             }
 
@@ -3036,10 +3159,11 @@ class MetricRequests
             return [
                 'metrics' => $totalMetrics,
                 'rows' => $totalRows,
-                'duplicates' => $totalDuplicates
+                'duplicates' => $totalDuplicates,
             ];
         } catch (Exception $e) {
             $logger->error("Error during GSC API query for site $siteUrl, date $dayStr: " . $e->getMessage() . ", trace: " . $e->getTraceAsString());
+
             throw $e;
         }
     }
@@ -3118,10 +3242,11 @@ class MetricRequests
             }
             $connection->executeStatement($sql, [
                 'channel' => Channel::google_search_console->value,
-                'date' => $dayStr . '%'
+                'date' => $dayStr . '%',
             ]);
         } catch (\Doctrine\DBAL\Exception $e) {
             $logger->error("Error updating metrics values for $objectReference, date $dayStr: " . $e->getMessage());
+
             throw $e;
         }
     }
@@ -3149,10 +3274,10 @@ class MetricRequests
     ): Response {
         $logger->info("Completed: metrics=$totalMetrics, rows=$totalRows, duplicates=$totalDuplicates");
 
-        if (!empty($entitiesToInvalidate)) {
+        if (! empty($entitiesToInvalidate)) {
             $cacheService = CacheService::getInstance(Helpers::getRedisClient());
             foreach ($entitiesToInvalidate as $entity => $ids) {
-                if (!empty($ids)) {
+                if (! empty($ids)) {
                     $cacheService->invalidateEntityCache(
                         entity: $entity,
                         ids: array_unique($ids),
@@ -3216,6 +3341,7 @@ class MetricRequests
                     if (empty($metric->name)) {
                         $logger->warning("Skipping metric at index $index: missing name");
                         $skippedMetrics++;
+
                         continue;
                     }
 
@@ -3261,18 +3387,20 @@ class MetricRequests
      */
     private static function persistPageEntity(EntityManager $manager, ?Page $pageEntity, LoggerInterface $logger): void
     {
-        if (!$manager->isOpen()) {
+        if (! $manager->isOpen()) {
             $logger->error("EntityManager closed in processBatch");
+
             throw new RuntimeException("EntityManager closed in processBatch");
         }
 
         if ($pageEntity && $pageEntity->getId()) {
-            if (!$manager->contains($pageEntity)) {
+            if (! $manager->contains($pageEntity)) {
                 $pageId = $pageEntity->getId();
                 $logger->warning("Page entity detached: ID=" . $pageId . ", URL=" . $pageEntity->getUrl());
                 $pageEntity = $manager->find(Page::class, $pageId);
-                if (!$pageEntity) {
+                if (! $pageEntity) {
                     $logger->error("Failed to reattach Page entity: ID=" . $pageId);
+
                     throw new RuntimeException("Failed to reattach Page entity");
                 }
             }
@@ -3339,12 +3467,13 @@ class MetricRequests
             );
 
             // Check if the metric entity is managed
-            if (!$manager->contains($metricEntity)) {
+            if (! $manager->contains($metricEntity)) {
                 $metricId = $metricEntity->getId();
                 $logger->warning("Metric entity detached: ID=" . $metricId . ", name={$metric->name}");
                 $metricEntity = $manager->find(Metric::class, $metricId);
-                if (!$metricEntity) {
+                if (! $metricEntity) {
                     $logger->error("Failed to reattach Metric entity: ID=" . $metricId);
+
                     throw new RuntimeException("Failed to reattach Metric entity");
                 }
             }
@@ -3367,12 +3496,13 @@ class MetricRequests
             );
 
             // Check if the channeled metric entity is managed
-            if (!$manager->contains($channeledMetricEntity)) {
+            if (! $manager->contains($channeledMetricEntity)) {
                 $channeledMetricId = $channeledMetricEntity->getId();
                 $logger->warning("ChanneledMetric entity detached: ID=" . $channeledMetricId);
                 $channeledMetricEntity = $manager->find(ChanneledMetric::class, $channeledMetricId);
-                if (!$channeledMetricEntity) {
+                if (! $channeledMetricEntity) {
                     $logger->error("Failed to reattach ChanneledMetric entity: ID=" . $channeledMetricId);
+
                     throw new RuntimeException("Failed to reattach ChanneledMetric entity");
                 }
             }
@@ -3388,7 +3518,7 @@ class MetricRequests
                 foreach ($metric->dimensions as $dimension) {
                     if (isset($dimension['dimensionKey'], $dimension['dimensionValue'])) {
                         $dimCacheKey = md5($channeledMetricEntity->getId() . $dimension['dimensionKey'] . $dimension['dimensionValue']);
-                        if (!isset($dimensionCache[$dimCacheKey])) {
+                        if (! isset($dimensionCache[$dimCacheKey])) {
                             $entitiesToPersist['dimensions'][] = $dimension;
                             $dimensionsCount++;
                         }
@@ -3401,12 +3531,13 @@ class MetricRequests
             $entitiesToInvalidate['channeledMetric'][] = $channeledMetricEntity->getId();
             if ($metricEntity->getMetricConfig()->getQuery()) {
                 $query = $metricEntity->getMetricConfig()->getQuery();
-                if (!$manager->contains($query)) {
+                if (! $manager->contains($query)) {
                     $queryId = $query->getId();
                     $logger->warning("Query entity detached: ID=" . $queryId);
                     $query = $manager->find(Query::class, $queryId);
-                    if (!$query) {
+                    if (! $query) {
                         $logger->error("Failed to reattach Query entity: ID=" . $queryId);
+
                         throw new RuntimeException("Failed to reattach Query entity");
                     }
                     $metricEntity->getMetricConfig()->addQuery($query);
@@ -3415,9 +3546,11 @@ class MetricRequests
             }
         } catch (ORMException $e) {
             $logger->error("Database error processing metric at index $index, query=$queryString: " . $e->getMessage());
+
             throw $e;
         } catch (Exception $e) {
             $logger->error("Error processing metric at index $index, query=$queryString: " . $e->getMessage());
+
             throw $e;
         }
     }
@@ -3456,6 +3589,7 @@ class MetricRequests
             $logger->info("Committed batch with $metricsCount metrics");
         } catch (ORMException $e) {
             $logger->error("Flush failed: metrics=$metricsCount, channeledMetrics=$channeledMetricsCount, dimensions=$dimensionsCount, error=" . $e->getMessage());
+
             throw $e;
         }
     }
@@ -3480,9 +3614,11 @@ class MetricRequests
             $retryCount++;
             $logger->error("Processing retry $retryCount/$maxRetries: " . $e->getMessage());
             usleep(100000 * $retryCount);
+
             return $retryCount;
         }
         $logger->error("Failed after $maxRetries retries: " . $e->getMessage());
+
         throw $e;
     }
 
@@ -3511,12 +3647,13 @@ class MetricRequests
         $channeledMetricCache = [];
         $dimensionCache = [];
 
-        if (!$logger) {
+        if (! $logger) {
             $logger = Helpers::setLogger('gsc.log');
         }
         $logger->info("Starting process with " . $channeledCollection->count() . " metrics");
 
         $manager->beginTransaction();
+
         try {
             $batchCount = 0;
             foreach ($channeledCollection as $channeledMetric) {
@@ -3538,7 +3675,7 @@ class MetricRequests
                 }
             }
 
-            if (!empty($batch)) {
+            if (! empty($batch)) {
                 $batchCount++;
                 $batchStart = microtime(true);
                 $logger->info("Processing final batch " . $batchCount . " (" . count($batch) . " records)");
@@ -3615,7 +3752,7 @@ class MetricRequests
 
             $logger->info("Invalidating cache for " . count($entitiesToInvalidate['metric']) . " metrics, " . count($entitiesToInvalidate['channeledMetric']) . " channeled metrics, " . count($entitiesToInvalidate['query']) . " queries");
             foreach ($entitiesToInvalidate as $entity => $ids) {
-                if (!empty($ids)) {
+                if (! empty($ids)) {
                     $cacheService->invalidateEntityCache(
                         entity: $entity,
                         ids: array_unique($ids),
@@ -3629,10 +3766,12 @@ class MetricRequests
         } catch (ORMException | \Doctrine\DBAL\Exception $e) {
             $manager->rollback();
             $logger->error("Database error in process: " . $e->getMessage());
+
             throw $e;
         } catch (Exception $e) {
             $manager->rollback();
             $logger->error("Error in process: " . $e->getMessage());
+
             throw $e;
         }
 
@@ -3692,7 +3831,7 @@ class MetricRequests
         }
 
         // Validate metric value
-        if (!isset($metric->value)) {
+        if (! isset($metric->value)) {
             $logger->warning("Metric value is NULL or unset for name=$metric->name, query=$queryString, defaulting to 0.0");
             $metric->value = 0.0;
         }
@@ -3723,7 +3862,7 @@ class MetricRequests
                         'pageId' => $pageEntity?->getId(),
                         'queryId' => $queryEntity ? $queryEntity->getId() : null,
                         'countryId' => $metric->country ? $metric->country->getId() : null,
-                        'deviceId' => $metric->device ? $metric->device->getId() : null
+                        'deviceId' => $metric->device ? $metric->device->getId() : null,
                     ], JSON_UNESCAPED_UNICODE));
 
                 // Create a unique key for the metric
@@ -3737,11 +3876,12 @@ class MetricRequests
                     'countryId' => $metric->country ? $metric->country->getId() : null,
                     'deviceId' => $metric->device ? $metric->device->getId() : null,
                     'queryString' => $queryString,
-                    'dimensions' => $normalizedDimensions
+                    'dimensions' => $normalizedDimensions,
                 ], JSON_UNESCAPED_UNICODE));
                 // Log the metric key for debugging
                 if (isset($metricCache[$metricKey])) {
                     $logger->info("Metric found in cache: ID=" . $metricCache[$metricKey]->getId() . ", name=$metric->name, query=$queryString");
+
                     return $metricCache[$metricKey];
                 }
 
@@ -3764,28 +3904,31 @@ class MetricRequests
                     'post' => null,
                     'product' => null,
                     'customer' => null,
-                    'order' => null
+                    'order' => null,
                 ];
                 /** @var Metric|null $metricEntity */
                 $metricEntity = $repository->findOneBy($criteria);
                 if ($metricEntity) {
                     $logger->info("Existing Metric found in database: ID=" . $metricEntity->getId() . ", name=$metric->name, query=$queryString");
-                    if ($em && !$em->contains($metricEntity)) {
+                    if ($em && ! $em->contains($metricEntity)) {
                         $metricId = $metricEntity->getId();
                         $logger->warning("Metric entity detached: ID=" . $metricId . ", name=$metric->name");
                         $metricEntity = $em->find(Metric::class, $metricId);
-                        if (!$metricEntity) {
+                        if (! $metricEntity) {
                             $logger->error("Failed to reattach Metric: ID=" . $metricId . ", name=$metric->name");
+
                             throw new Exception("Failed to reattach Metric ID=" . $metricId);
                         }
                     }
                     $metricCache[$metricKey] = $metricEntity;
+
                     return $metricEntity;
                 }
 
                 // If not found, create a new Metric entity
                 $logger->info("Creating new Metric for $metric->name, query=$queryString");
                 $metric->query = $queryEntity;
+
                 try {
                     /** @var Metric $metricEntity */
                     $metricEntity = $repository->create(
@@ -3799,24 +3942,26 @@ class MetricRequests
                             'country' => $metric->country,
                             'device' => $metric->device,
                             'value' => $metric->value ?: 0.0, // Ensure non-NULL
-                            'metadata' => $metric->metadata ?? []
+                            'metadata' => $metric->metadata ?? [],
                         ],
                         true
                     );
-                    if (!$metricEntity->getId()) {
+                    if (! $metricEntity->getId()) {
                         $logger->error("Metric entity created but has no ID: name=$metric->name, query=$queryString");
                     }
-                    if ($em && !$em->contains($metricEntity)) {
+                    if ($em && ! $em->contains($metricEntity)) {
                         $metricId = $metricEntity->getId();
                         $logger->warning("Metric entity detached after creation: ID=" . $metricId . ", name=$metric->name");
                         $metricEntity = $em->find(Metric::class, $metricId);
-                        if (!$metricEntity) {
+                        if (! $metricEntity) {
                             $logger->error("Failed to reattach Metric after creation: ID=" . $metricId . ", name=$metric->name");
+
                             throw new Exception("Failed to reattach Metric ID=" . $metricId);
                         }
                     }
                     $logger->info("Created new Metric: id={$metricEntity->getId()}, queryId=" . ($queryEntity ? $queryEntity->getId() : 'none'));
                     $metricCache[$metricKey] = $metricEntity;
+
                     return $metricEntity;
                 } catch (ORMException $e) {
                     if (str_contains($e->getMessage(), 'SQLSTATE[23000]')) {
@@ -3825,22 +3970,26 @@ class MetricRequests
                         $metricEntity = $repository->findOneBy($criteria);
                         if ($metricEntity) {
                             $logger->info("Existing Metric found on retry: id={$metricEntity->getId()}");
-                            if ($em && !$em->contains($metricEntity)) {
+                            if ($em && ! $em->contains($metricEntity)) {
                                 $metricId = $metricEntity->getId();
                                 $logger->warning("Metric entity detached on retry: ID=" . $metricId . ", name=$metric->name");
                                 $metricEntity = $em->find(Metric::class, $metricId);
-                                if (!$metricEntity) {
+                                if (! $metricEntity) {
                                     $logger->error("Failed to reattach Metric on retry: ID=" . $metricId . ", name=$metric->name");
+
                                     throw new Exception("Failed to reattach Metric ID=" . $metricId);
                                 }
                             }
                             $metricCache[$metricKey] = $metricEntity;
+
                             return $metricEntity;
                         }
                         $logger->error("Failed to find or create Metric for $metric->name, query=$queryString: " . $e->getMessage());
+
                         throw new Exception("Failed to find or create Metric for $metric->name, query=$queryString");
                     }
                     $logger->error("Database error creating Metric for $metric->name, query=$queryString: " . $e->getMessage());
+
                     throw $e;
                 }
             } catch (OptimisticLockException $e) {
@@ -3848,25 +3997,31 @@ class MetricRequests
                     $retryCount++;
                     usleep(100000 * $retryCount);
                     $logger->error("getOrCreateMetric retry $retryCount/$maxRetries due to OptimisticLockException: " . $e->getMessage());
+
                     continue;
                 }
                 $logger->error("getOrCreateMetric failed after $maxRetries retries due to OptimisticLockException: " . $e->getMessage());
+
                 throw $e;
             } catch (ORMException $e) {
                 if (str_contains($e->getMessage(), 'SQLSTATE[23000]') && $retryCount < $maxRetries - 1) {
                     $retryCount++;
                     usleep(100000 * $retryCount);
                     $logger->error("getOrCreateMetric retry $retryCount/$maxRetries due to duplicate key: " . $e->getMessage());
+
                     continue;
                 }
                 $logger->error("getOrCreateMetric failed after $maxRetries retries due to ORMException: " . $e->getMessage());
+
                 throw $e;
             } catch (Exception $e) {
                 $logger->error("getOrCreateMetric error for query: $queryString: " . $e->getMessage());
+
                 throw $e;
             }
         }
         $logger->error("getOrCreateMetric failed after $maxRetries retries for query: $queryString");
+
         throw new Exception("getOrCreateMetric failed after $maxRetries retries for query: $queryString");
     }
 
@@ -3908,7 +4063,7 @@ class MetricRequests
             'platformId' => $channeledMetric->platformId ?? 'none', // Fallback for null
             'channel' => $channeledMetric->channel ?? 8, // Default to GSC channel
             'metricId' => $metricEntity->getId(),
-            'platformCreatedAt' => $platformCreatedAt->format('Y-m-d')
+            'platformCreatedAt' => $platformCreatedAt->format('Y-m-d'),
         ], JSON_UNESCAPED_UNICODE));
         $logger->info("Computed cacheKey: $cacheKey");
 
@@ -3942,31 +4097,38 @@ class MetricRequests
                 );
 
                 $logger->info("Exiting getOrCreateChanneledMetric: channeledMetricId={$channeledMetricEntity->getId()}");
+
                 return $channeledMetricEntity;
             } catch (OptimisticLockException $e) {
                 if ($retryCount < $maxRetries - 1) {
                     $retryCount++;
                     usleep(100000 * $retryCount);
                     $logger->error("getOrCreateChanneledMetric retry $retryCount/$maxRetries due to OptimisticLockException: " . $e->getMessage());
+
                     continue;
                 }
                 $logger->error("getOrCreateChanneledMetric failed after $maxRetries retries due to OptimisticLockException: " . $e->getMessage());
+
                 throw $e;
             } catch (ORMException $e) {
                 if (str_contains($e->getMessage(), 'SQLSTATE[23000]') && $retryCount < $maxRetries - 1) {
                     $retryCount++;
                     usleep(100000 * $retryCount);
                     $logger->error("getOrCreateChanneledMetric retry $retryCount/$maxRetries due to duplicate key: " . $e->getMessage());
+
                     continue;
                 }
                 $logger->error("getOrCreateChanneledMetric failed after $maxRetries retries due to ORMException: " . $e->getMessage());
+
                 throw $e;
             } catch (Exception $e) {
                 $logger->error("getOrCreateChanneledMetric error: " . $e->getMessage());
+
                 throw $e;
             }
         }
         $logger->error("getOrCreateChanneledMetric failed after $maxRetries retries");
+
         throw new Exception("getOrCreateChanneledMetric failed after $maxRetries retries");
     }
 
@@ -3994,12 +4156,13 @@ class MetricRequests
         );
         $max = $endDate ? Carbon::parse($endDate) : null;
         $from = $origin->format('Y-m-d');
-        if ($min->lte($now) && $min->gte($origin) && (!$max || $min->lte($max))) {
+        if ($min->lte($now) && $min->gte($origin) && (! $max || $min->lte($max))) {
             $from = $min->format('Y-m-d');
         }
         $to = $max && $max->lte($now) ? $max->format('Y-m-d') : $now->format('Y-m-d');
         $logger->info("Date range: from=$from, to=$to");
-        return array($from, $to);
+
+        return [$from, $to];
     }
 
     /**
@@ -4019,7 +4182,7 @@ class MetricRequests
         EntityManager $manager
     ): array {
         // Process dimensions using normalized system
-        if (isset($channeledMetric->dimensions) && !empty($channeledMetric->dimensions)) {
+        if (isset($channeledMetric->dimensions) && ! empty($channeledMetric->dimensions)) {
             try {
                 $dimManager = new \Classes\DimensionManager($manager);
                 $dimensionSet = $dimManager->resolveDimensionSet((array) $channeledMetric->dimensions);
@@ -4028,12 +4191,12 @@ class MetricRequests
                 $logger->info("Assigned DimensionSet (hash: {$dimensionSet->getHash()}) to ChanneledMetric ID={$channeledMetricEntity->getId()}");
             } catch (\Exception $e) {
                 $logger->error("Error resolving DimensionSet for ChanneledMetric ID={$channeledMetricEntity->getId()}: " . $e->getMessage());
-                // We don't throw here to follow the "No Block" policy if possible, 
+                // We don't throw here to follow the "No Block" policy if possible,
                 // but DimensionSet is quite important. However, let's keep it robust.
             }
         }
 
-        return array($dimensionCache);
+        return [$dimensionCache];
     }
 
     /**
@@ -4071,7 +4234,7 @@ class MetricRequests
                 'platformId' => $channeledMetric->platformId ?? null,
                 'channel' => $channeledMetric->channel ?? 8,
                 'metric' => $metricEntity,
-                'platformCreatedAt' => $platformCreatedAt
+                'platformCreatedAt' => $platformCreatedAt,
             ])) {
                 // Update existing entity
                 $channeledMetricData = $channeledMetricEntity->getData() ?? [];
@@ -4083,7 +4246,7 @@ class MetricRequests
                         $channeledMetricData['position_weighted'] ?? 0,
                         $newData['position_weighted'] ?? 0
                     ),
-                    'ctr' => max($channeledMetricData['ctr'] ?? 0, $newData['ctr'] ?? 0)
+                    'ctr' => max($channeledMetricData['ctr'] ?? 0, $newData['ctr'] ?? 0),
                 ];
 
                 $channeledMetricEntity->addData($updatedData);
@@ -4092,12 +4255,13 @@ class MetricRequests
                 $manager->persist($channeledMetricEntity);
 
                 // Check if entity is managed
-                if (!$manager->contains($channeledMetricEntity)) {
+                if (! $manager->contains($channeledMetricEntity)) {
                     $cmId = $channeledMetricEntity->getId();
                     $logger->error("ChanneledMetric entity detached after update: ID=" . $cmId . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
                     $channeledMetricEntity = $manager->find(ChanneledMetric::class, $cmId);
-                    if (!$channeledMetricEntity) {
+                    if (! $channeledMetricEntity) {
                         $logger->error("Failed to reattach ChanneledMetric: ID=" . $cmId . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+
                         throw new Exception("Failed to reattach ChanneledMetric ID=" . $cmId);
                     }
                     // Reapply updates
@@ -4112,15 +4276,16 @@ class MetricRequests
                 // Create new entity
                 $channeledMetric->data = (array)($channeledMetric->data ?? []);
                 $channeledMetricEntity = $repository->create($channeledMetric, true);
-                if (!$channeledMetricEntity->getId()) {
+                if (! $channeledMetricEntity->getId()) {
                     $logger->error("ChanneledMetric entity created but has no ID: platformId=" . ($channeledMetric->platformId ?? 'null'));
                 }
-                if (!$manager->contains($channeledMetricEntity)) {
+                if (! $manager->contains($channeledMetricEntity)) {
                     $cmId = $channeledMetricEntity->getId();
                     $logger->error("ChanneledMetric entity detached after creation: ID=" . $cmId . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
                     $channeledMetricEntity = $manager->find(ChanneledMetric::class, $cmId);
-                    if (!$channeledMetricEntity) {
+                    if (! $channeledMetricEntity) {
                         $logger->error("Failed to reattach ChanneledMetric after creation: ID=" . $cmId . ", platformId=" . ($channeledMetric->platformId ?? 'null'));
+
                         throw new Exception("Failed to reattach ChanneledMetric ID=" . $cmId);
                     }
                 }
@@ -4129,7 +4294,8 @@ class MetricRequests
                 $logger->info("Created new ChanneledMetric: id={$channeledMetricEntity->getId()}, platformId=" . ($channeledMetric->platformId ?? 'null') . ", data=" . json_encode($channeledMetric->data));
             }
         }
-        return array($channeledMetricCache, $channeledMetricEntity);
+
+        return [$channeledMetricCache, $channeledMetricEntity];
     }
 
     /**
@@ -4153,13 +4319,13 @@ class MetricRequests
     ): array {
         $queryEntity = null;
         if ($metric->channel === Channel::google_search_console->value && isset($metric->query)) {
-            if (!is_string($queryString) || empty(trim($queryString))) {
+            if (! is_string($queryString) || empty(trim($queryString))) {
                 $logger->warning("Invalid query: " . print_r($queryString, true));
                 $queryString = 'unknown';
             }
             $queryKey = md5($queryString);
-            if (!isset($queryCache[$queryKey])) {
-                if (!$queryEntity = $queryRepository->findOneBy(['query' => $queryString])) {
+            if (! isset($queryCache[$queryKey])) {
+                if (! $queryEntity = $queryRepository->findOneBy(['query' => $queryString])) {
                     try {
                         $queryEntity = $queryRepository->create((object)['query' => $queryString], true);
                         if ($em) {
@@ -4170,12 +4336,14 @@ class MetricRequests
                         if (str_contains($e->getMessage(), 'SQLSTATE[23000]')) {
                             $logger->warning("Duplicate query '$queryString', retrying lookup");
                             $queryEntity = $queryRepository->findOneBy(['query' => $queryString]);
-                            if (!$queryEntity) {
+                            if (! $queryEntity) {
                                 $logger->error("Failed to find or create Query for '$queryString': " . $e->getMessage());
+
                                 throw new Exception("Failed to find or create Query for '$queryString'");
                             }
                         } else {
                             $logger->error("Database error creating Query for '$queryString': " . $e->getMessage());
+
                             throw $e;
                         }
                     }
@@ -4186,7 +4354,8 @@ class MetricRequests
                 $logger->info("Query found in cache: '$queryString', ID=" . $queryEntity->getId());
             }
         }
-        return array($queryEntity, $queryString, $queryCache);
+
+        return [$queryEntity, $queryString, $queryCache];
     }
 
     /**
@@ -4207,6 +4376,7 @@ class MetricRequests
         if (isset($metric->metricDate)) {
             $normalizedDimensions['date'] = $metric->metricDate->format('Y-m-d');
         }
+
         return $normalizedDimensions;
     }
 
@@ -4229,18 +4399,18 @@ class MetricRequests
                 'filters' => array_map(fn ($kw) => [
                     'dimension' => Dimension::QUERY,
                     'operator' => Operator::CONTAINS,
-                    'expression' => $kw
+                    'expression' => $kw,
                 ], $includeKeywords),
-                'groupType' => GroupType::AND->value
+                'groupType' => GroupType::AND->value,
             ];
         } elseif ($excludeKeywords) {
             $dimensionFilterGroups[] = [
                 'filters' => array_map(fn ($kw) => [
                     'dimension' => Dimension::QUERY,
                     'operator' => Operator::NOT_CONTAINS,
-                    'expression' => $kw
+                    'expression' => $kw,
                 ], $excludeKeywords),
-                'groupType' => GroupType::AND->value
+                'groupType' => GroupType::AND->value,
             ];
         }
         if ($includeCountries) {
@@ -4248,18 +4418,18 @@ class MetricRequests
                 'filters' => array_map(fn ($country) => [
                     'dimension' => Dimension::COUNTRY,
                     'operator' => Operator::EQUALS,
-                    'expression' => $country
+                    'expression' => $country,
                 ], $includeCountries),
-                'groupType' => GroupType::AND->value
+                'groupType' => GroupType::AND->value,
             ];
         } elseif ($excludeCountries) {
             $dimensionFilterGroups[] = [
                 'filters' => array_map(fn ($country) => [
                     'dimension' => Dimension::COUNTRY,
                     'operator' => Operator::NOT_EQUALS,
-                    'expression' => $country
+                    'expression' => $country,
                 ], $excludeCountries),
-                'groupType' => GroupType::AND->value
+                'groupType' => GroupType::AND->value,
             ];
         }
         if ($includePages) {
@@ -4267,20 +4437,21 @@ class MetricRequests
                 'filters' => array_map(fn ($page) => [
                     'dimension' => Dimension::PAGE,
                     'operator' => Operator::CONTAINS,
-                    'expression' => $page
+                    'expression' => $page,
                 ], $includePages),
-                'groupType' => GroupType::AND->value
+                'groupType' => GroupType::AND->value,
             ];
         } elseif ($excludePages) {
             $dimensionFilterGroups[] = [
                 'filters' => array_map(fn ($page) => [
                     'dimension' => Dimension::PAGE,
                     'operator' => Operator::NOT_CONTAINS,
-                    'expression' => $page
+                    'expression' => $page,
                 ], $excludePages),
-                'groupType' => GroupType::AND->value
+                'groupType' => GroupType::AND->value,
             ];
         }
+
         return $dimensionFilterGroups;
     }
 
@@ -4321,7 +4492,7 @@ class MetricRequests
                 $fetched = false;
                 $rows = ['data' => []];
 
-                while ($retryCount < $maxRetries && !$fetched) {
+                while ($retryCount < $maxRetries && ! $fetched) {
                     try {
                         $rows = $api->getCampaignInsightsFromAdAccount(
                             adAccountId: $channeledAccountEntity->getPlatformId(),
@@ -4339,6 +4510,7 @@ class MetricRequests
                             if (str_contains($e->getMessage(), 'request limit reached')) {
                                 throw new FacebookRateLimitException($e->getMessage());
                             }
+
                             throw $e;
                         }
                         $logger->warning("Retry $retryCount/$maxRetries for campaign insights bulk AdAccount " . $channeledAccountEntity->getPlatformId() . ": " . $e->getMessage());
@@ -4355,6 +4527,7 @@ class MetricRequests
 
             if (count($allRows) === 0) {
                 $logger->info("No bulk rows found for campaigns in Ad Account " . $channeledAccountEntity->getPlatformId());
+
                 return ['metrics' => 0, 'rows' => 0];
             }
 
@@ -4372,21 +4545,25 @@ class MetricRequests
             $channeledCampaigns = $channeledCampaignRepository->findBy(['platformId' => $campaignPlatformIdsToFetch]);
 
             $campaignEntityMap = [];
-            foreach ($campaigns as $e) $campaignEntityMap[$e->getCampaignId()] = $e;
+            foreach ($campaigns as $e) {
+                $campaignEntityMap[$e->getCampaignId()] = $e;
+            }
             $channeledCampaignEntityMap = [];
-            foreach ($channeledCampaigns as $e) $channeledCampaignEntityMap[$e->getPlatformId()] = $e;
+            foreach ($channeledCampaigns as $e) {
+                $channeledCampaignEntityMap[$e->getPlatformId()] = $e;
+            }
 
             foreach ($groupedRows as $campaignPlatformId => $campaignRows) {
                 Helpers::checkJobStatus($jobId);
                 $campaignEntity = $campaignEntityMap[$campaignPlatformId] ?? null;
                 $channeledCampaignEntity = $channeledCampaignEntityMap[$campaignPlatformId] ?? null;
 
-                if (!$campaignEntity || !$channeledCampaignEntity) {
+                if (! $campaignEntity || ! $channeledCampaignEntity) {
                     continue;
                 }
 
                 $campaignName = $campaignEntity->getName();
-                if (!Helpers::matchesFilter((string)$campaignName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter((string)$campaignPlatformId, $cacheInclude, $cacheExclude)) {
+                if (! Helpers::matchesFilter((string)$campaignName, $cacheInclude, $cacheExclude) && ! Helpers::matchesFilter((string)$campaignPlatformId, $cacheInclude, $cacheExclude)) {
                     continue;
                 }
 
@@ -4411,13 +4588,13 @@ class MetricRequests
             if (count($globalAllMetrics) > 0) {
                 try {
                     $manager->getConnection()->beginTransaction();
-                    $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                        processDimensions: true,
                         metrics: $globalAllMetrics,
                         manager: $manager,
                         channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
                         campaignMap: $campaignMap,
                         channeledCampaignMap: $channeledCampaignMap,
-                        
                     );
                     $metricMap = MetricsProcessor::processMetrics(
                         metrics: $globalAllMetrics,
@@ -4435,13 +4612,16 @@ class MetricRequests
                     if ($manager->getConnection()->isTransactionActive()) {
                         $manager->getConnection()->rollback();
                     }
+
                     throw $e;
                 }
             }
             $logger->info("Completed bulk Meta ad account's campaign insights request");
+
             return ['metrics' => count($globalAllMetrics), 'rows' => count($allRows)];
         } catch (Exception $e) {
             $logger->error("Error during bulk Meta account's campaign insights request: " . $e->getMessage());
+
             throw $e;
         }
     }
@@ -4488,7 +4668,7 @@ class MetricRequests
                 $fetched = false;
                 $rows = ['data' => []];
 
-                while ($retryCount < $maxRetries && !$fetched) {
+                while ($retryCount < $maxRetries && ! $fetched) {
                     try {
                         $rows = $api->getAdsetInsightsFromAdAccount(
                             adAccountId: $channeledAccountEntity->getPlatformId(),
@@ -4506,6 +4686,7 @@ class MetricRequests
                             if (str_contains($e->getMessage(), 'request limit reached')) {
                                 throw new FacebookRateLimitException($e->getMessage());
                             }
+
                             throw $e;
                         }
                         $logger->warning("Retry $retryCount/$maxRetries for adset insights bulk AdAccount " . $channeledAccountEntity->getPlatformId() . ": " . $e->getMessage());
@@ -4522,6 +4703,7 @@ class MetricRequests
 
             if (count($allRows) === 0) {
                 $logger->info("No bulk rows found for adsets in Ad Account " . $channeledAccountEntity->getPlatformId());
+
                 return ['metrics' => 0, 'rows' => 0];
             }
 
@@ -4549,33 +4731,39 @@ class MetricRequests
             $channeledAdGroups = $channeledAdGroupRepository->findBy(['platformId' => $adsetPlatformIdsToFetch]);
 
             $campaignEntityMap = [];
-            foreach ($campaigns as $e) $campaignEntityMap[$e->getCampaignId()] = $e;
+            foreach ($campaigns as $e) {
+                $campaignEntityMap[$e->getCampaignId()] = $e;
+            }
             $channeledCampaignEntityMap = [];
-            foreach ($channeledCampaigns as $e) $channeledCampaignEntityMap[$e->getPlatformId()] = $e;
+            foreach ($channeledCampaigns as $e) {
+                $channeledCampaignEntityMap[$e->getPlatformId()] = $e;
+            }
             $channeledAdGroupEntityMap = [];
-            foreach ($channeledAdGroups as $e) $channeledAdGroupEntityMap[$e->getPlatformId()] = $e;
+            foreach ($channeledAdGroups as $e) {
+                $channeledAdGroupEntityMap[$e->getPlatformId()] = $e;
+            }
 
             foreach ($groupedRows as $adsetPlatformId => $adsetRows) {
                 Helpers::checkJobStatus($jobId);
                 $campaignId = $channeledAdGroupMap['mapCampaign'][$adsetPlatformId];
-                
+
                 $campaignEntity = $campaignEntityMap[$campaignId] ?? null;
                 $channeledCampaignEntity = $channeledCampaignEntityMap[$campaignId] ?? null;
                 $channeledAdGroupEntity = $channeledAdGroupEntityMap[$adsetPlatformId] ?? null;
 
-                if (!$campaignEntity || !$channeledCampaignEntity || !$channeledAdGroupEntity) {
+                if (! $campaignEntity || ! $channeledCampaignEntity || ! $channeledAdGroupEntity) {
                     continue;
                 }
 
                 // Parent Filter check
                 $campaignName = $campaignEntity->getName();
-                if (!Helpers::matchesFilter((string)$campaignName, $campaignCacheInclude, $campaignCacheExclude) && !Helpers::matchesFilter((string)$campaignId, $campaignCacheInclude, $campaignCacheExclude)) {
+                if (! Helpers::matchesFilter((string)$campaignName, $campaignCacheInclude, $campaignCacheExclude) && ! Helpers::matchesFilter((string)$campaignId, $campaignCacheInclude, $campaignCacheExclude)) {
                     continue;
                 }
 
                 // Own Filter check
                 $adsetName = $channeledAdGroupEntity->getName();
-                if (!Helpers::matchesFilter((string)$adsetName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter((string)$adsetPlatformId, $cacheInclude, $cacheExclude)) {
+                if (! Helpers::matchesFilter((string)$adsetName, $cacheInclude, $cacheExclude) && ! Helpers::matchesFilter((string)$adsetPlatformId, $cacheInclude, $cacheExclude)) {
                     continue;
                 }
 
@@ -4602,14 +4790,14 @@ class MetricRequests
             if (count($globalAllMetrics) > 0) {
                 try {
                     $manager->getConnection()->beginTransaction();
-                    $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                        processDimensions: true,
                         metrics: $globalAllMetrics,
                         manager: $manager,
                         channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
                         campaignMap: $campaignMap,
                         channeledCampaignMap: $channeledCampaignMap,
                         channeledAdGroupMap: $channeledAdGroupMap,
-                        
                     );
                     $metricMap = MetricsProcessor::processMetrics(
                         metrics: $globalAllMetrics,
@@ -4627,13 +4815,16 @@ class MetricRequests
                     if ($manager->getConnection()->isTransactionActive()) {
                         $manager->getConnection()->rollback();
                     }
+
                     throw $e;
                 }
             }
             $logger->info("Completed bulk Meta ad account's adset insights request");
+
             return ['metrics' => count($globalAllMetrics), 'rows' => count($allRows)];
         } catch (Exception $e) {
             $logger->error("Error during bulk Meta account's adset insights request: " . $e->getMessage());
+
             throw $e;
         }
     }
@@ -4680,7 +4871,7 @@ class MetricRequests
             $fetched = false;
             $rows = ['data' => []];
 
-            while ($retryCount < $maxRetries && !$fetched) {
+            while ($retryCount < $maxRetries && ! $fetched) {
                 try {
                     $rows = $api->getAdInsightsFromAdAccount(
                         adAccountId: $channeledAccountEntity->getPlatformId(),
@@ -4698,6 +4889,7 @@ class MetricRequests
                         if (str_contains($e->getMessage(), 'request limit reached')) {
                             throw new FacebookRateLimitException($e->getMessage());
                         }
+
                         throw $e;
                     }
                     $logger->warning("Retry $retryCount/$maxRetries for ad insights bulk AdAccount " . $channeledAccountEntity->getPlatformId() . ": " . $e->getMessage());
@@ -4718,6 +4910,7 @@ class MetricRequests
 
         if (count($allRows) === 0) {
             $logger->info("No bulk rows found for ads in Ad Account " . $channeledAccountEntity->getPlatformId());
+
             return ['metrics' => 0, 'rows' => 0];
         }
 
@@ -4732,7 +4925,7 @@ class MetricRequests
             $channeledAdGroupRepository = $manager->getRepository(ChanneledAdGroup::class);
             $channeledAdRepository = $manager->getRepository(ChanneledAd::class);
             $globalAllMetrics = new ArrayCollection();
-            
+
             $projectConfig = Helpers::getProjectConfig();
             $marketingDebug = filter_var($projectConfig['analytics']['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
@@ -4744,7 +4937,7 @@ class MetricRequests
                 }
             }
             $adgroupIdsToFetch = array_unique($adgroupIdsToFetch);
-            
+
             $campaignIdsToFetch = [];
             foreach ($adgroupIdsToFetch as $agid) {
                 if (isset($channeledAdGroupMap['mapCampaign'][$agid])) {
@@ -4759,26 +4952,40 @@ class MetricRequests
             $channeledAds = $channeledAdRepository->findBy(['platformId' => $adPlatformIdsToFetch]);
 
             $campaignEntityMap = [];
-            foreach ($campaigns as $e) $campaignEntityMap[$e->getCampaignId()] = $e;
+            foreach ($campaigns as $e) {
+                $campaignEntityMap[$e->getCampaignId()] = $e;
+            }
             $channeledCampaignEntityMap = [];
-            foreach ($channeledCampaigns as $e) $channeledCampaignEntityMap[$e->getPlatformId()] = $e;
+            foreach ($channeledCampaigns as $e) {
+                $channeledCampaignEntityMap[$e->getPlatformId()] = $e;
+            }
             $channeledAdGroupEntityMap = [];
-            foreach ($channeledAdGroups as $e) $channeledAdGroupEntityMap[$e->getPlatformId()] = $e;
+            foreach ($channeledAdGroups as $e) {
+                $channeledAdGroupEntityMap[$e->getPlatformId()] = $e;
+            }
             $channeledAdEntityMap = [];
-            foreach ($channeledAds as $e) $channeledAdEntityMap[$e->getPlatformId()] = $e;
+            foreach ($channeledAds as $e) {
+                $channeledAdEntityMap[$e->getPlatformId()] = $e;
+            }
 
             foreach ($groupedRows as $adPlatformId => $adRows) {
                 Helpers::checkJobStatus($jobId);
-                
-                if (!isset($channeledAdMap['mapAdGroup'][$adPlatformId])) {
-                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: Ad mapping to AdGroup not found in memory");
+
+                if (! isset($channeledAdMap['mapAdGroup'][$adPlatformId])) {
+                    if ($marketingDebug) {
+                        $logger->info("Skipping ad $adPlatformId: Ad mapping to AdGroup not found in memory");
+                    }
+
                     continue;
                 }
-                
+
                 $adgroupId = $channeledAdMap['mapAdGroup'][$adPlatformId];
-                
-                if (!isset($channeledAdGroupMap['mapCampaign'][$adgroupId])) {
-                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: AdGroup mapping to Campaign not found in memory for AdGroup $adgroupId");
+
+                if (! isset($channeledAdGroupMap['mapCampaign'][$adgroupId])) {
+                    if ($marketingDebug) {
+                        $logger->info("Skipping ad $adPlatformId: AdGroup mapping to Campaign not found in memory for AdGroup $adgroupId");
+                    }
+
                     continue;
                 }
                 $campaignId = $channeledAdGroupMap['mapCampaign'][$adgroupId];
@@ -4787,34 +4994,52 @@ class MetricRequests
                 $channeledAdGroupEntity = $channeledAdGroupEntityMap[$adgroupId] ?? null;
                 $channeledAdEntity = $channeledAdEntityMap[$adPlatformId] ?? null;
 
-                if (!$campaignEntity) {
-                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: Campaign entity '" . ($campaignId ?: 'EMPTY') . "' not found in DB");
+                if (! $campaignEntity) {
+                    if ($marketingDebug) {
+                        $logger->info("Skipping ad $adPlatformId: Campaign entity '" . ($campaignId ?: 'EMPTY') . "' not found in DB");
+                    }
+
                     continue;
                 }
-                if (!$channeledCampaignEntity) {
-                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: ChanneledCampaign entity $campaignId not found in DB");
+                if (! $channeledCampaignEntity) {
+                    if ($marketingDebug) {
+                        $logger->info("Skipping ad $adPlatformId: ChanneledCampaign entity $campaignId not found in DB");
+                    }
+
                     continue;
                 }
-                if (!$channeledAdGroupEntity) {
-                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: ChanneledAdGroup entity $adgroupId not found in DB");
+                if (! $channeledAdGroupEntity) {
+                    if ($marketingDebug) {
+                        $logger->info("Skipping ad $adPlatformId: ChanneledAdGroup entity $adgroupId not found in DB");
+                    }
+
                     continue;
                 }
-                if (!$channeledAdEntity) {
-                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: ChanneledAd entity not found in DB");
+                if (! $channeledAdEntity) {
+                    if ($marketingDebug) {
+                        $logger->info("Skipping ad $adPlatformId: ChanneledAd entity not found in DB");
+                    }
+
                     continue;
                 }
 
                 // Parent Filter check (Campaign level)
                 $campaignName = $campaignEntity->getName();
-                if (!Helpers::matchesFilter((string)$campaignName, $campaignCacheInclude, $campaignCacheExclude) && !Helpers::matchesFilter((string)$campaignId, $campaignCacheInclude, $campaignCacheExclude)) {
-                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId: Parent Campaign $campaignId ($campaignName) filtered out");
+                if (! Helpers::matchesFilter((string)$campaignName, $campaignCacheInclude, $campaignCacheExclude) && ! Helpers::matchesFilter((string)$campaignId, $campaignCacheInclude, $campaignCacheExclude)) {
+                    if ($marketingDebug) {
+                        $logger->info("Skipping ad $adPlatformId: Parent Campaign $campaignId ($campaignName) filtered out");
+                    }
+
                     continue;
                 }
 
                 // Own Filter check
                 $adName = $channeledAdEntity->getName();
-                if (!Helpers::matchesFilter((string)$adName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter((string)$adPlatformId, $cacheInclude, $cacheExclude)) {
-                    if ($marketingDebug) $logger->info("Skipping ad $adPlatformId ($adName) due to ads filters");
+                if (! Helpers::matchesFilter((string)$adName, $cacheInclude, $cacheExclude) && ! Helpers::matchesFilter((string)$adPlatformId, $cacheInclude, $cacheExclude)) {
+                    if ($marketingDebug) {
+                        $logger->info("Skipping ad $adPlatformId ($adName) due to ads filters");
+                    }
+
                     continue;
                 }
 
@@ -4842,11 +5067,13 @@ class MetricRequests
 
             if (count($globalAllMetrics) > 0) {
                 $creativeMap = self::getCreativeMap($manager, $channeledAccountEntity);
+
                 try {
                     $manager->getConnection()->beginTransaction();
-                    
+
                     $logger->info("Starting processMetricConfigs for " . count($globalAllMetrics) . " metrics...");
-                    $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                    $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                        processDimensions: true,
                         metrics: $globalAllMetrics,
                         manager: $manager,
                         channeledAccountMap: ['map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()], 'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]],
@@ -4855,10 +5082,9 @@ class MetricRequests
                         channeledAdGroupMap: $channeledAdGroupMap,
                         channeledAdMap: $channeledAdMap,
                         creativeMap: $creativeMap,
-                        
                     );
                     $logger->info("Completed processMetricConfigs. Starting processMetrics...");
-                    
+
                     $metricMap = MetricsProcessor::processMetrics(
                         metrics: $globalAllMetrics,
                         manager: $manager,
@@ -4871,7 +5097,7 @@ class MetricRequests
                         metricMap: $metricMap,
                         logger: $logger,
                     );
-                    
+
                     $logger->info("Completed all processing steps. Committing transaction...");
                     $manager->getConnection()->commit();
                     $logger->info("Transaction committed successfully for Account: " . $channeledAccountEntity->getPlatformId());
@@ -4881,13 +5107,16 @@ class MetricRequests
                         $manager->getConnection()->rollback();
                     }
                     $logger->error("Error during metric processing for Account " . $channeledAccountEntity->getPlatformId() . ": " . $e->getMessage());
+
                     throw $e;
                 }
             }
             $logger->info("Completed bulk Meta ad account's ad insights request");
+
             return ['metrics' => count($globalAllMetrics), 'rows' => count($allRows)];
         } catch (Exception $e) {
             $logger->error("Error during bulk Meta account's ad insights request: " . $e->getMessage());
+
             throw $e;
         }
     }
@@ -4918,19 +5147,20 @@ class MetricRequests
         $campaignCacheExclude = null,
     ): array {
         $logger->info("Starting processCreativesBulk for ad account: " . $channeledAccountEntity->getPlatformId());
+
         try {
             $adAccountId = $channeledAccountEntity->getPlatformId();
-            
+
             /** @var \Repositories\CreativeRepository $creativeRepository */
             $creativeRepository = $manager->getRepository(Creative::class);
-            
+
             $qb = $manager->createQueryBuilder();
             $qb->select('DISTINCT c')
                 ->from(Creative::class, 'c')
                 ->join('c.channeledAds', 'ca')
                 ->where('ca.channeledAccount = :channeledAccount')
                 ->setParameter('channeledAccount', $channeledAccountEntity);
-                
+
             $creatives = $qb->getQuery()->getResult();
             $logger->info("Found " . count($creatives) . " creatives for account in DB");
             $creativesMap = [];
@@ -4949,13 +5179,13 @@ class MetricRequests
             if ($startDate) {
                 $additionalParams['time_range'] = json_encode(['since' => $startDate, 'until' => $endDate]);
             }
-            
+
             $maxRetries = 3;
             $retryCount = 0;
             $fetched = false;
             $insights = ['data' => []];
 
-            while ($retryCount < $maxRetries && !$fetched) {
+            while ($retryCount < $maxRetries && ! $fetched) {
                 try {
                     $insights = $api->getAdAccountInsights(
                         adAccountId: $adAccountId,
@@ -4979,11 +5209,11 @@ class MetricRequests
             foreach ($insights['data'] as $row) {
                 // Hierarchical Filter check (Campaign)
                 if (isset($row['campaign_id'])) {
-                    if (!Helpers::matchesFilter((string)$row['campaign_name'] ?? '', $campaignCacheInclude, $campaignCacheExclude) && !Helpers::matchesFilter((string)$row['campaign_id'], $campaignCacheInclude, $campaignCacheExclude)) {
+                    if (! Helpers::matchesFilter((string)$row['campaign_name'] ?? '', $campaignCacheInclude, $campaignCacheExclude) && ! Helpers::matchesFilter((string)$row['campaign_id'], $campaignCacheInclude, $campaignCacheExclude)) {
                         continue;
                     }
                 }
-                
+
                 if (isset($row['ad_creative_id'])) {
                     $groupedRows[$row['ad_creative_id']][] = $row;
                     $filteredInsightsCount++;
@@ -4994,14 +5224,14 @@ class MetricRequests
             $totalMetricsCount = 0;
             foreach ($groupedRows as $creativePlatformId => $rows) {
                 Helpers::checkJobStatus($jobId);
-                
+
                 $creative = $creativesMap[$creativePlatformId] ?? null;
-                if (!$creative) {
+                if (! $creative) {
                     continue;
                 }
 
                 $creativeName = $creative->getName();
-                if (!Helpers::matchesFilter($creativeName, $cacheInclude, $cacheExclude) && !Helpers::matchesFilter($creativePlatformId, $cacheInclude, $cacheExclude)) {
+                if (! Helpers::matchesFilter($creativeName, $cacheInclude, $cacheExclude) && ! Helpers::matchesFilter($creativePlatformId, $cacheInclude, $cacheExclude)) {
                     continue;
                 }
 
@@ -5013,22 +5243,22 @@ class MetricRequests
                     metricSet: $metricConfig['metricSet'],
                     metricsToProcess: $metricConfig['metrics'] ?? [],
                 );
-                
+
                 if ($metrics->count() > 0) {
                     try {
                         $manager->getConnection()->beginTransaction();
-                        $metricConfigMap = MetricsProcessor::processMetricConfigs(processDimensions: true,  
+                        $metricConfigMap = MetricsProcessor::processMetricConfigs(
+                            processDimensions: true,
                             metrics: $metrics,
                             manager: $manager,
                             channeledAccountMap: [
                                 'map' => [$channeledAccountEntity->getPlatformId() => $channeledAccountEntity->getId()],
-                                'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()]
+                                'mapReverse' => [$channeledAccountEntity->getId() => $channeledAccountEntity->getPlatformId()],
                             ],
                             creativeMap: [
                                 'map' => [$creative->getCreativeId() => $creative->getId()],
-                                'mapReverse' => [$creative->getId() => $creative->getCreativeId()]
+                                'mapReverse' => [$creative->getId() => $creative->getCreativeId()],
                             ],
-                            
                         );
                         $metricMap = MetricsProcessor::processMetrics(
                             metrics: $metrics,
@@ -5046,18 +5276,22 @@ class MetricRequests
                         if ($manager->getConnection()->isTransactionActive()) {
                             $manager->getConnection()->rollback();
                         }
+
                         throw $e;
                     }
                     $totalMetricsCount += $metrics->count();
                 }
             }
             $logger->info("Completed bulk Meta account's creative insights request: $totalMetricsCount metrics");
+
             return ['metrics' => $totalMetricsCount, 'rows' => count($insights['data'])];
         } catch (Exception $e) {
             $logger->error("Error during bulk Meta account's creative insights request: " . $e->getMessage());
+
             throw $e;
         }
     }
+
     /**
      * Helper to get entity-specific or global Facebook filter.
      *
@@ -5072,7 +5306,7 @@ class MetricRequests
         // We look for the entity config directly in the flattened array.
         $fbConfig = $config[$entityKey] ?? [];
 
-        // To satisfy "other entities shouldn't get filtered if you don't define a string for them", 
+        // To satisfy "other entities shouldn't get filtered if you don't define a string for them",
         // we skip global fallback if entityKey is present.
         if ($entityKey) {
             return $fbConfig[$filterType] ?? null;
@@ -5097,15 +5331,17 @@ class MetricRequests
 
         try {
             $range = trim($range);
-            if (!str_starts_with($range, '-') && !str_starts_with($range, 'last')) {
+            if (! str_starts_with($range, '-') && ! str_starts_with($range, 'last')) {
                 $range = '-' . $range;
             }
+
             return Carbon::now()->modify($range)->startOfDay();
         } catch (Exception $e) {
             $default = trim($default);
-            if (!str_starts_with($default, '-') && !str_starts_with($default, 'last')) {
+            if (! str_starts_with($default, '-') && ! str_starts_with($default, 'last')) {
                 $default = '-' . $default;
             }
+
             return Carbon::now()->modify($default)->startOfDay();
         }
     }

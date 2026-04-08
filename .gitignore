@@ -53,3 +53,9 @@ unit_coverage.txt
 .agent/workflows/manual-deployment.md
 
 security_hardening_plan.md
+MODULAR_ARCHITECTURE_PLAN.md
+PHASE_1_GOOGLE_EXTRACTION_PLAN.md
+
+PHASE_2_META_EXTRACTION_PLAN.md
+
+PHASE_3_SHOPIFY_EXTRACTION_PLAN.md

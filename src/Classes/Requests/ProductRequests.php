@@ -162,8 +162,26 @@ class ProductRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
+    public static function getListFromBigCommerce(
+        ?object $filters = null,
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('bigcommerce');
+                $startDate = new \DateTime('-30 days');
+                $endDate = new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         return new Response(json_encode([]));
     }
 
@@ -176,8 +194,27 @@ class ProductRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
+    public static function getListFromNetsuite(
+        ?object $filters = null,
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('netsuite');
+                $startDate = new \DateTime('-30 days'); // Products usually sync full or relative
+                $endDate = new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'type' => 'products'
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
             consumerId: $config['netsuite_consumer_id'],

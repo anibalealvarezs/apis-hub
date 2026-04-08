@@ -47,11 +47,11 @@ class SocialAuthController
         $providerMap = [
             'facebook' => [
                 'path' => $_ENV['FACEBOOK_TOKEN_PATH'] ?? $projectDir . '/storage/tokens/facebook_tokens.json',
-                'key' => 'facebook_marketing'
+                'key' => 'facebook_auth'
             ],
             'google' => [
                 'path' => $_ENV['GOOGLE_TOKEN_PATH'] ?? $projectDir . '/storage/tokens/google_tokens.json',
-                'key' => 'google_search_console'
+                'key' => 'google_auth'
             ]
         ];
 

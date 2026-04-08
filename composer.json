@@ -45,6 +45,8 @@
             "Classes\\": "src/Classes/",
             "Commands\\": "src/Commands/",
             "Controllers\\": "src/Controllers/",
+            "Core\\": "src/Core/",
+            "Channels\\": "src/Channels/",
             "Entities\\": "src/Entities/",
             "Enums\\": "src/Enums/",
             "Exceptions\\": "src/Exceptions/",

@@ -181,8 +181,28 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
+    public static function getListFromBigCommerce(
+        ?string $createdAtMin = null,
+        ?string $createdAtMax = null,
+        ?object $filters = null,
+        string|bool $resume = true,
+        ?int $jobId = null
+    ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('bigcommerce');
+                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
+                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         return new Response(json_encode([]));
     }
 
@@ -202,6 +222,22 @@ class CustomerRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
+        if (getenv('USE_MODULAR_DRIVERS')) {
+            try {
+                $driver = \Core\Drivers\DriverFactory::get('netsuite');
+                $startDate = $createdAtMin ? new \DateTime($createdAtMin) : new \DateTime('-30 days');
+                $endDate = $createdAtMax ? new \DateTime($createdAtMax) : new \DateTime();
+
+                return $driver->sync($startDate, $endDate, [
+                    'jobId' => $jobId,
+                    'resume' => $resume,
+                    'type' => 'customers'
+                ]);
+            } catch (\Exception $e) {
+                // Fallback
+            }
+        }
+
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
             consumerId: $config['netsuite_consumer_id'],
