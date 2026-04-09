@@ -56,7 +56,7 @@ class InitializeEntitiesCacheAllTest extends BaseIntegrationTestCase
 
         // Create a mock command that overrides API methods
         $command = new class($this->entityManager) extends InitializeEntitiesCommand {
-            protected function fetchGscSites(array $configRaw): array
+            protected function fetchGscSites(array $configRaw, \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider $authProvider): array
             {
                 return [
                     'siteEntry' => [
@@ -154,7 +154,7 @@ class InitializeEntitiesCacheAllTest extends BaseIntegrationTestCase
 
         // Create a mock command that overrides API methods
         $command = new class($this->entityManager) extends InitializeEntitiesCommand {
-            protected function fetchGscSites(array $configRaw): array
+            protected function fetchGscSites(array $configRaw, \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider $authProvider): array
             {
                 return [
                     'siteEntry' => [
