@@ -3,13 +3,13 @@
 namespace Core\Drivers;
 
 use Anibalealvarezs\ApiSkeleton\Interfaces\SyncDriverInterface;
-use Psr\Log\LoggerInterface;
 use Exception;
+use Psr\Log\LoggerInterface;
 
 class DriverFactory
 {
     private static array $instances = [];
-    
+
     /**
      * Mapeo de canales a sus respectivas clases de Driver y AuthProvider.
      */
@@ -20,7 +20,7 @@ class DriverFactory
      */
     private static function loadRegistry(): void
     {
-        if (!empty(self::$registry)) {
+        if (! empty(self::$registry)) {
             return;
         }
 
@@ -46,38 +46,48 @@ class DriverFactory
     public static function get(string $channel, ?LoggerInterface $logger = null): SyncDriverInterface
     {
         self::loadRegistry();
-        
+
         if (isset(self::$instances[$channel])) {
             return self::$instances[$channel];
         }
 
-        if (!isset(self::$registry[$channel])) {
+        if (! isset(self::$registry[$channel])) {
             throw new Exception("Driver not found for channel: $channel");
         }
 
         $config = self::$registry[$channel];
         $driverClass = $config['driver'];
-        $authClass = $config['auth'];
+        $authProviderClass = $config['auth'];
 
-        if (!class_exists($driverClass)) {
+        if (! class_exists($driverClass)) {
             throw new Exception("Driver class not found: $driverClass");
         }
 
         // Resilient construction for legacy and modular providers
-        $channelConfig = \Helpers\Helpers::getChannelsConfig()[$channel] ?? [];
-        $reflection = new \ReflectionClass($authClass);
+        $allConfigs = \Helpers\Helpers::getChannelsConfig();
+        $channelConfig = $allConfigs[$channel] ?? [];
+        
+        // Merge common configurations for Google and Facebook
+        if (str_starts_with($channel, 'google_') && isset($allConfigs['google'])) {
+            $channelConfig = array_merge($allConfigs['google'], $channelConfig);
+        }
+        if (str_starts_with($channel, 'facebook_') && isset($allConfigs['facebook'])) {
+            $channelConfig = array_merge($allConfigs['facebook'], $channelConfig);
+        }
+
+        $reflection = new \ReflectionClass($authProviderClass);
         $constructor = $reflection->getConstructor();
         
         if ($constructor && isset($constructor->getParameters()[0])) {
             $firstParam = $constructor->getParameters()[0];
             $type = $firstParam->getType();
             if ($type instanceof \ReflectionNamedType && $type->getName() === 'string') {
-                $authProvider = new $authClass($channelConfig['token_path'] ?? "");
+                $authProvider = new $authProviderClass($channelConfig['token_path'] ?? "");
             } else {
-                $authProvider = new $authClass($channelConfig);
+                $authProvider = new $authProviderClass($channelConfig);
             }
         } else {
-            $authProvider = new $authClass($channelConfig);
+            $authProvider = new $authProviderClass($channelConfig);
         }
         $driver = new $driverClass($authProvider, $logger);
 
@@ -87,6 +97,7 @@ class DriverFactory
         }
 
         self::$instances[$channel] = $driver;
+
         return $driver;
     }
 
@@ -100,7 +111,7 @@ class DriverFactory
     public static function register(string $channel, string $driverClass, string $authClass): void
     {
         self::loadRegistry();
-        
+
         self::$registry[$channel] = [
             'driver' => $driverClass,
             'auth' => $authClass,
@@ -126,9 +137,7 @@ class DriverFactory
     public static function getAvailableChannels(): array
     {
         self::loadRegistry();
+
         return array_keys(self::$registry);
     }
 }
-
-
-

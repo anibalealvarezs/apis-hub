@@ -8,10 +8,9 @@ use Classes\Requests\MetricRequests;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledMetric;
 use Enums\Channel;
-use Enums\Account as AccountEnum;
 use Tests\Integration\BaseIntegrationTestCase;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiSkeleton\Classes\ChanneledMetric as ModularMetric;
+use stdClass;
 
 class ModularMetricRequestsTest extends BaseIntegrationTestCase
 {
@@ -24,20 +23,26 @@ class ModularMetricRequestsTest extends BaseIntegrationTestCase
         $manager = $this->entityManager;
         
         $account = new Account();
-        $account->addName('Modular Store')
-            ->addIdentifier('modular-store-id');
+        $account->addName('Modular Store');
         $manager->persist($account);
         $manager->flush();
 
-        // Simulate a modular metric collection from ANY driver
+        // Simulate a modular metric collection from ANY driver (using stdClass as per SDK)
         $metrics = new ArrayCollection();
         
-        $m1 = new ModularMetric();
+        $m1 = new stdClass();
         $m1->name = 'Total Revenue';
         $m1->value = 1500.50;
         $m1->channel = Channel::shopify->value;
-        $m1->account = 'modular-store-id';
+        $m1->account = 'Modular Store';
         $m1->platformCreatedAt = new \DateTime('2023-01-01 10:00:00');
+        $m1->metricDate = '2023-01-01';
+        $m1->platformId = 'test_p_id';
+        $m1->period = \Enums\Period::Daily->value;
+        $m1->dimensions = [];
+        $m1->dimensionsHash = md5('[]');
+        $m1->metricConfigKey = 'shop_revenue_mod';
+        $m1->metadata = []; // Added required metadata field
         
         $metrics->add($m1);
 

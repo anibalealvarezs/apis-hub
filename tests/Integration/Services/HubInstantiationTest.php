@@ -115,11 +115,11 @@ class HubInstantiationTest extends BaseIntegrationTestCase
         
         // Verify cross-platform fallback logic in GoogleAuthProvider
         $authReflection = new \ReflectionClass($authProvider);
-        $configProp = $authReflection->getProperty('config');
-        $configProp->setAccessible(true);
-        $resolvedConfig = $configProp->getValue($authProvider);
+        $dataProp = $authReflection->getParentClass()->getProperty('data');
+        $dataProp->setAccessible(true);
+        $resolvedData = $dataProp->getValue($authProvider);
 
-        $this->assertEquals($specificClientId, $resolvedConfig['client_id']);
-        $this->assertEquals($globalRefToken, $resolvedConfig['refresh_token'] ?? $resolvedConfig['token'] ?? '');
+        $this->assertEquals($specificClientId, $resolvedData['client_id']);
+        $this->assertEquals($globalRefToken, $resolvedData['refresh_token'] ?? $resolvedData['token'] ?? '');
     }
 }
