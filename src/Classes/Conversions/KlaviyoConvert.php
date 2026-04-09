@@ -91,12 +91,21 @@ class KlaviyoConvert
             $channeledMetric->channel = Channel::klaviyo->value;
             $channeledMetric->name = $metricName;
             $channeledMetric->value = $dataPoint['measurements']['count'] ?? 0;
-            $channeledMetric->period = Period::Daily; // Assumes Interval::day
+            $channeledMetric->period = Period::Daily->value; // Assumes Interval::day
             $channeledMetric->metricDate = $metricDate;
             $channeledMetric->data = $dataPoint['dimensions'] ?? [];
+            $dimensions = [];
+            foreach (($dataPoint['dimensions'] ?? []) as $key => $val) {
+                $dimensions[] = [
+                    'dimensionKey' => $key,
+                    'dimensionValue' => $val,
+                ];
+            }
+            $channeledMetric->dimensions = $dimensions;
+            $channeledMetric->dimensionsHash = \Classes\KeyGenerator::generateDimensionsHash($dimensions);
             $channeledMetric->metadata = [
                 'metricId' => $metricId,
-                'dimensions' => $dataPoint['dimensions'] ?? [],
+                'dimensions' => $dimensions,
             ];
             $channeledMetric->platformCreatedAt = $metricDate;
 

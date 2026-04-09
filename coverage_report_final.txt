@@ -1,0 +1,391 @@
+PHPUnit 9.6.34 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.30 with Xdebug 3.5.1
+Configuration: /app/phpunit.xml
+
+...............................................................  63 / 593 ( 10%)
+............................................................... 126 / 593 ( 21%)
+............................................................... 189 / 593 ( 31%)
+............................................................... 252 / 593 ( 42%)
+............................................................... 315 / 593 ( 53%)
+............................................................... 378 / 593 ( 63%)
+............................................................... 441 / 593 ( 74%)
+............................................................... 504 / 593 ( 84%)
+............................................................... 567 / 593 ( 95%)
+..........................                                      593 / 593 (100%)
+
+Time: 00:36.841, Memory: 68.50 MB
+
+OK (593 tests, 2149 assertions)
+
+
+[1;37;40mCode Coverage Report:         [0m
+[1;37;40m  2026-04-09 03:26:25         [0m
+[1;37;40m                              [0m
+[1;37;40m Summary:                     [0m
+[37;41m  Classes: 18.18% (32/176)    [0m
+[37;41m  Methods: 27.74% (354/1276)  [0m
+[37;41m  Lines:   39.52% (6320/15993)[0m
+
+Classes\Clients\FacebookClient
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [30;43mLines:  61.05% ( 58/ 95)[0m
+Classes\Conversions\AmazonConvert
+  [30;42mMethods:  ( 0/ 0)[0m   [30;42mLines:  (  0/  0)[0m
+Classes\Conversions\BigCommerceConvert
+  [30;42mMethods:  ( 0/ 0)[0m   [30;42mLines:  (  0/  0)[0m
+Classes\Conversions\FacebookMarketingConvert
+  [30;43mMethods:  75.00% ( 3/ 4)[0m   [30;43mLines:  83.02% ( 44/ 53)[0m
+Classes\Conversions\FacebookMarketingMetricConvert
+  [37;41mMethods:  20.00% ( 1/ 5)[0m   [30;43mLines:  77.45% (261/337)[0m
+Classes\Conversions\FacebookOrganicConvert
+  [30;42mMethods: 100.00% ( 2/ 2)[0m   [30;42mLines: 100.00% ( 20/ 20)[0m
+Classes\Conversions\FacebookOrganicMetricConvert
+  [37;41mMethods:  20.00% ( 1/ 5)[0m   [30;43mLines:  85.64% (155/181)[0m
+Classes\Conversions\GoogleSearchConsoleConvert
+  [37;41mMethods:  50.00% ( 1/ 2)[0m   [30;42mLines:  99.35% (152/153)[0m
+Classes\Conversions\KlaviyoConvert
+  [30;43mMethods:  80.00% ( 4/ 5)[0m   [30;42mLines:  98.55% ( 68/ 69)[0m
+Classes\Conversions\NetSuiteConvert
+  [30;43mMethods:  75.00% ( 6/ 8)[0m   [30;42mLines:  90.80% (237/261)[0m
+Classes\Conversions\ShopifyConvert
+  [30;42mMethods: 100.00% ( 8/ 8)[0m   [30;42mLines: 100.00% ( 74/ 74)[0m
+Classes\CustomerProcessor
+  [37;41mMethods:   0.00% ( 0/ 1)[0m   [37;41mLines:   0.00% (  0/157)[0m
+Classes\DimensionManager
+  [37;41mMethods:  20.00% ( 1/ 5)[0m   [30;43mLines:  86.96% ( 40/ 46)[0m
+Classes\KeyGenerator
+  [37;41mMethods:  13.64% ( 3/22)[0m   [30;43mLines:  59.05% ( 62/105)[0m
+Classes\MapGenerator
+  [37;41mMethods:   0.00% ( 0/25)[0m   [37;41mLines:   9.14% ( 18/197)[0m
+Classes\MarketingProcessor
+  [37;41mMethods:  20.00% ( 1/ 5)[0m   [30;43mLines:  84.15% (154/183)[0m
+Classes\MetricsProcessor
+  [37;41mMethods:  33.33% ( 6/18)[0m   [30;43mLines:  79.11% (481/608)[0m
+Classes\OrderProcessor
+  [37;41mMethods:   0.00% ( 0/ 6)[0m   [37;41mLines:   0.00% (  0/436)[0m
+Classes\PriceRuleProcessor
+  [37;41mMethods:   0.00% ( 0/ 6)[0m   [37;41mLines:   0.00% (  0/215)[0m
+Classes\ProductCategoryProcessor
+  [37;41mMethods:   0.00% ( 0/ 5)[0m   [37;41mLines:   0.00% (  0/198)[0m
+Classes\ProductProcessor
+  [37;41mMethods:   0.00% ( 0/ 5)[0m   [37;41mLines:   0.00% (  0/396)[0m
+Classes\Requests\AdGroupRequests
+  [37;41mMethods:  33.33% ( 1/ 3)[0m   [30;43mLines:  52.17% ( 48/ 92)[0m
+Classes\Requests\AdRequests
+  [37;41mMethods:  33.33% ( 1/ 3)[0m   [30;43mLines:  52.17% ( 48/ 92)[0m
+Classes\Requests\CampaignRequests
+  [37;41mMethods:  33.33% ( 1/ 3)[0m   [30;43mLines:  54.65% ( 47/ 86)[0m
+Classes\Requests\CreativeRequests
+  [37;41mMethods:   0.00% ( 0/ 3)[0m   [37;41mLines:   0.00% (  0/ 85)[0m
+Classes\Requests\CustomerRequests
+  [37;41mMethods:   7.69% ( 1/13)[0m   [37;41mLines:  13.00% ( 13/100)[0m
+Classes\Requests\DiscountRequests
+  [30;42mMethods: 100.00% ( 6/ 6)[0m   [30;42mLines: 100.00% ( 12/ 12)[0m
+Classes\Requests\FacebookEntityRequests
+  [37;41mMethods:  25.00% ( 1/ 4)[0m   [37;41mLines:   7.02% (  4/ 57)[0m
+Classes\Requests\MetricRequests
+  [37;41mMethods:  28.12% ( 9/32)[0m   [37;41mLines:  48.97% (119/243)[0m
+Classes\Requests\OrderRequests
+  [37;41mMethods:   0.00% ( 0/ 7)[0m   [37;41mLines:   0.00% (  0/ 60)[0m
+Classes\Requests\PageRequests
+  [37;41mMethods:  33.33% ( 1/ 3)[0m   [37;41mLines:   9.38% (  3/ 32)[0m
+Classes\Requests\PostRequests
+  [37;41mMethods:  33.33% ( 1/ 3)[0m   [37;41mLines:   1.92% (  3/156)[0m
+Classes\Requests\PriceRuleRequests
+  [37;41mMethods:   0.00% ( 0/ 7)[0m   [37;41mLines:   0.00% (  0/ 83)[0m
+Classes\Requests\ProductCategoryRequests
+  [37;41mMethods:   0.00% ( 0/ 7)[0m   [37;41mLines:   0.00% (  0/ 88)[0m
+Classes\Requests\ProductRequests
+  [37;41mMethods:   0.00% ( 0/ 7)[0m   [37;41mLines:   0.00% (  0/ 63)[0m
+Classes\Requests\ProductVariantRequests
+  [30;43mMethods:  85.71% ( 6/ 7)[0m   [37;41mLines:  41.38% ( 12/ 29)[0m
+Classes\Requests\VendorRequests
+  [30;42mMethods: 100.00% ( 6/ 6)[0m   [30;42mLines: 100.00% ( 11/ 11)[0m
+Classes\RoutingCore
+  [30;43mMethods:  57.14% ( 4/ 7)[0m   [30;43mLines:  72.22% ( 78/108)[0m
+Classes\Services\GoogleSearchConsoleClient
+  [37;41mMethods:   0.00% ( 0/ 4)[0m   [37;41mLines:   0.00% (  0/ 77)[0m
+Classes\Services\GoogleSearchConsoleProcessor
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 13)[0m
+Classes\SocialProcessor
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [30;42mLines:  95.83% ( 46/ 48)[0m
+Commands\Analytics\AnalyzeLogsCommand
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 31)[0m
+Commands\Analytics\CacheEntityCommand
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [30;42mLines:  94.74% ( 36/ 38)[0m
+Commands\Analytics\CheckCoverageCommand
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 39)[0m
+Commands\Analytics\ClearCacheCommand
+  [37;41mMethods:   0.00% ( 0/ 3)[0m   [37;41mLines:   0.00% (  0/ 45)[0m
+Commands\Analytics\InspectJobsCommand
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 36)[0m
+Commands\Analytics\ProcessJobsCommand
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [30;43mLines:  62.18% (120/193)[0m
+Commands\Analytics\ResetChannelCommand
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 63)[0m
+Commands\Analytics\ResetEntitiesCommand
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 79)[0m
+Commands\Analytics\ResetMetricsCommand
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 89)[0m
+Commands\Analytics\ScaleDownCommand
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 45)[0m
+Commands\Analytics\ScheduleInitialJobsCommand
+  [37;41mMethods:   0.00% ( 0/ 3)[0m   [37;41mLines:   0.00% (  0/108)[0m
+Commands\CacheFacebookEntitiesCommand
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [37;41mLines:  16.13% (  5/ 31)[0m
+Commands\Crud\AggregateEntityCommand
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [30;43mLines:  87.69% ( 57/ 65)[0m
+Commands\Crud\CreateEntityCommand
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [30;43mLines:  86.36% ( 19/ 22)[0m
+Commands\Crud\DeleteEntityCommand
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [30;43mLines:  86.36% ( 19/ 22)[0m
+Commands\Crud\ReadEntityCommand
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [30;43mLines:  66.07% ( 37/ 56)[0m
+Commands\Crud\UpdateEntityCommand
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [30;43mLines:  87.50% ( 21/ 24)[0m
+Commands\GenerateEntitiesConfigCommand
+  [37;41mMethods:  25.00% ( 3/12)[0m   [30;43mLines:  65.52% ( 95/145)[0m
+Commands\HealthCheckCommand
+  [37;41mMethods:   0.00% ( 0/ 1)[0m   [37;41mLines:   0.00% (  0/118)[0m
+Commands\InitializeEntitiesCommand
+  [37;41mMethods:  20.00% ( 1/ 5)[0m   [30;43mLines:  80.78% (248/307)[0m
+Commands\MigratePagesCanonicalCommand
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 55)[0m
+Commands\RefreshInstancesCommand
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 20)[0m
+Commands\SeedDemoDataCommand
+  [37;41mMethods:   0.00% ( 0/15)[0m   [37;41mLines:   0.00% (  0/717)[0m
+Commands\SetupDatabaseCommand
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 30)[0m
+Controllers\BaseController
+  [37;41mMethods:  25.00% ( 2/ 8)[0m   [30;43mLines:  68.92% ( 51/ 74)[0m
+Controllers\CacheController
+  [37;41mMethods:  14.29% ( 1/ 7)[0m   [30;43mLines:  50.66% (115/227)[0m
+Controllers\ChanneledCrudController
+  [37;41mMethods:   8.33% ( 1/12)[0m   [37;41mLines:   3.31% ( 14/423)[0m
+Controllers\ConfigManagerController
+  [37;41mMethods:  18.75% ( 3/16)[0m   [30;43mLines:  54.36% (343/631)[0m
+Controllers\CrudController
+  [37;41mMethods:   8.33% ( 1/12)[0m   [37;41mLines:  27.30% ( 83/304)[0m
+Controllers\FacebookAuthController
+  [37;41mMethods:   0.00% ( 0/ 5)[0m   [37;41mLines:   0.00% (  0/ 89)[0m
+Controllers\ManagementController
+  [37;41mMethods:   0.00% ( 0/ 6)[0m   [37;41mLines:  45.74% ( 43/ 94)[0m
+Controllers\MonitoringController
+  [37;41mMethods:  22.22% ( 2/ 9)[0m   [30;43mLines:  52.50% (210/400)[0m
+Controllers\PageController
+  [37;41mMethods:   0.00% ( 0/11)[0m   [37;41mLines:   0.00% (  0/ 40)[0m
+Controllers\PrivacyController
+  [37;41mMethods:   0.00% ( 0/ 4)[0m   [37;41mLines:   0.00% (  0/ 30)[0m
+Controllers\PublicDataController
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 24)[0m
+Controllers\SocialAuthController
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 43)[0m
+Core\Auth\BaseAuthProvider
+  [37;41mMethods:  50.00% ( 3/ 6)[0m   [30;43mLines:  78.57% ( 11/ 14)[0m
+Core\Auth\FacebookAuthProvider
+  [30;42mMethods: 100.00% ( 4/ 4)[0m   [30;42mLines: 100.00% ( 13/ 13)[0m
+Core\Auth\GoogleAuthProvider
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [30;43mLines:  83.33% (  5/  6)[0m
+Core\Auth\KlaviyoAuthProvider
+  [30;42mMethods: 100.00% ( 2/ 2)[0m   [30;42mLines: 100.00% (  5/  5)[0m
+Core\Auth\NetSuiteAuthProvider
+  [30;42mMethods: 100.00% ( 3/ 3)[0m   [30;42mLines: 100.00% (  4/  4)[0m
+Core\Auth\ShopifyAuthProvider
+  [30;42mMethods: 100.00% ( 4/ 4)[0m   [30;42mLines: 100.00% ( 11/ 11)[0m
+Core\Drivers\DriverFactory
+  [37;41mMethods:  33.33% ( 1/ 3)[0m   [30;43mLines:  76.19% ( 16/ 21)[0m
+Core\Services\SyncService
+  [37;41mMethods:  50.00% ( 1/ 2)[0m   [30;43mLines:  80.00% ( 12/ 15)[0m
+Entities\Analytics\Account
+  [37;41mMethods:  17.65% ( 3/17)[0m   [37;41mLines:  12.50% (  7/ 56)[0m
+Entities\Analytics\Campaign
+  [37;41mMethods:  22.22% ( 4/18)[0m   [37;41mLines:  17.78% (  8/ 45)[0m
+Entities\Analytics\Channeled\ChanneledAccount
+  [37;41mMethods:  22.73% ( 5/22)[0m   [37;41mLines:  18.75% ( 12/ 64)[0m
+Entities\Analytics\Channeled\ChanneledAd
+  [37;41mMethods:  25.00% ( 4/16)[0m   [37;41mLines:  24.14% (  7/ 29)[0m
+Entities\Analytics\Channeled\ChanneledAdGroup
+  [37;41mMethods:  18.52% ( 5/27)[0m   [37;41mLines:  19.23% ( 10/ 52)[0m
+Entities\Analytics\Channeled\ChanneledCampaign
+  [37;41mMethods:  18.18% ( 4/22)[0m   [37;41mLines:  17.65% (  9/ 51)[0m
+Entities\Analytics\Channeled\ChanneledCustomer
+  [37;41mMethods:   0.00% ( 0/10)[0m   [37;41mLines:   0.00% (  0/ 26)[0m
+Entities\Analytics\Channeled\ChanneledDiscount
+  [37;41mMethods:   8.33% ( 1/12)[0m   [37;41mLines:   4.00% (  1/ 25)[0m
+Entities\Analytics\Channeled\ChanneledEntity
+  [30;43mMethods:  62.50% ( 5/ 8)[0m   [30;43mLines:  75.00% (  9/ 12)[0m
+Entities\Analytics\Channeled\ChanneledMetric
+  [37;41mMethods:  20.00% ( 1/ 5)[0m   [37;41mLines:  14.29% (  1/  7)[0m
+Entities\Analytics\Channeled\ChanneledOrder
+  [37;41mMethods:   0.00% ( 0/20)[0m   [37;41mLines:   0.00% (  0/ 66)[0m
+Entities\Analytics\Channeled\ChanneledPriceRule
+  [37;41mMethods:  12.50% ( 1/ 8)[0m   [37;41mLines:   4.35% (  1/ 23)[0m
+Entities\Analytics\Channeled\ChanneledProduct
+  [37;41mMethods:   0.00% ( 0/22)[0m   [37;41mLines:   0.00% (  0/ 61)[0m
+Entities\Analytics\Channeled\ChanneledProductCategory
+  [37;41mMethods:   0.00% ( 0/10)[0m   [37;41mLines:   0.00% (  0/ 26)[0m
+Entities\Analytics\Channeled\ChanneledProductVariant
+  [37;41mMethods:   0.00% ( 0/12)[0m   [37;41mLines:   0.00% (  0/ 25)[0m
+Entities\Analytics\Channeled\ChanneledSyncError
+  [37;41mMethods:   0.00% ( 0/ 8)[0m   [37;41mLines:   0.00% (  0/ 12)[0m
+Entities\Analytics\Channeled\ChanneledVendor
+  [37;41mMethods:   0.00% ( 0/10)[0m   [37;41mLines:   0.00% (  0/ 26)[0m
+Entities\Analytics\Channeled\DimensionKey
+  [37;41mMethods:  50.00% ( 2/ 4)[0m   [30;43mLines:  60.00% (  3/  5)[0m
+Entities\Analytics\Channeled\DimensionSet
+  [37;41mMethods:  50.00% ( 3/ 6)[0m   [30;43mLines:  70.00% (  7/ 10)[0m
+Entities\Analytics\Channeled\DimensionValue
+  [37;41mMethods:  50.00% ( 2/ 4)[0m   [30;43mLines:  66.67% (  4/  6)[0m
+Entities\Analytics\Country
+  [30;43mMethods:  60.00% ( 3/ 5)[0m   [30;43mLines:  71.43% (  5/  7)[0m
+Entities\Analytics\Creative
+  [37;41mMethods:   0.00% ( 0/10)[0m   [37;41mLines:   0.00% (  0/ 21)[0m
+Entities\Analytics\Customer
+  [37;41mMethods:   0.00% ( 0/11)[0m   [37;41mLines:   0.00% (  0/ 34)[0m
+Entities\Analytics\Device
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [30;43mLines:  75.00% (  3/  4)[0m
+Entities\Analytics\Discount
+  [37;41mMethods:   0.00% ( 0/ 8)[0m   [37;41mLines:   0.00% (  0/ 23)[0m
+Entities\Analytics\Metric
+  [37;41mMethods:  20.00% ( 2/10)[0m   [37;41mLines:  13.33% (  2/ 15)[0m
+Entities\Analytics\MetricConfig
+  [37;41mMethods:   2.33% ( 1/43)[0m   [37;41mLines:   1.52% (  1/ 66)[0m
+Entities\Analytics\Order
+  [37;41mMethods:   0.00% ( 0/11)[0m   [37;41mLines:   0.00% (  0/ 34)[0m
+Entities\Analytics\Page
+  [37;41mMethods:  47.62% (10/21)[0m   [37;41mLines:  41.86% ( 18/ 43)[0m
+Entities\Analytics\Post
+  [37;41mMethods:   0.00% ( 0/14)[0m   [37;41mLines:   0.00% (  0/ 26)[0m
+Entities\Analytics\PriceRule
+  [37;41mMethods:   0.00% ( 0/ 8)[0m   [37;41mLines:   0.00% (  0/ 23)[0m
+Entities\Analytics\Product
+  [37;41mMethods:   0.00% ( 0/13)[0m   [37;41mLines:   0.00% (  0/ 37)[0m
+Entities\Analytics\ProductCategory
+  [37;41mMethods:   0.00% ( 0/10)[0m   [37;41mLines:   0.00% (  0/ 26)[0m
+Entities\Analytics\ProductVariant
+  [37;41mMethods:   0.00% ( 0/10)[0m   [37;41mLines:   0.00% (  0/ 26)[0m
+Entities\Analytics\Query
+  [37;41mMethods:   0.00% ( 0/ 8)[0m   [37;41mLines:   0.00% (  0/ 17)[0m
+Entities\Analytics\SearchAppearance
+  [30;42mMethods: 100.00% ( 2/ 2)[0m   [30;42mLines: 100.00% (  3/  3)[0m
+Entities\Analytics\Vendor
+  [37;41mMethods:   0.00% ( 0/ 8)[0m   [37;41mLines:   0.00% (  0/ 23)[0m
+Entities\Entity
+  [37;41mMethods:  50.00% ( 4/ 8)[0m   [30;43mLines:  63.64% (  7/ 11)[0m
+Entities\Job
+  [30;42mMethods:  91.67% (11/12)[0m   [30;42mLines:  91.67% ( 11/ 12)[0m
+Enums\AnalyticsEntity
+  [30;42mMethods: 100.00% ( 1/ 1)[0m   [30;42mLines: 100.00% ( 19/ 19)[0m
+Enums\Channel
+  [30;43mMethods:  75.00% ( 3/ 4)[0m   [30;42mLines:  90.00% ( 36/ 40)[0m
+Enums\Country
+  [30;42mMethods: 100.00% ( 1/ 1)[0m   [30;42mLines: 100.00% (253/253)[0m
+Enums\JobStatus
+  [30;42mMethods: 100.00% ( 1/ 1)[0m   [30;42mLines: 100.00% (  1/  1)[0m
+Enums\PageType
+  [30;42mMethods: 100.00% ( 1/ 1)[0m   [30;42mLines: 100.00% (  8/  8)[0m
+Exceptions\ConfigurationException
+  [30;42mMethods:  ( 0/ 0)[0m   [30;42mLines:  (  0/  0)[0m
+Exceptions\JobCancelledException
+  [30;42mMethods:  ( 0/ 0)[0m   [30;42mLines:  (  0/  0)[0m
+Fixtures\DataLoaderFixture
+  [37;41mMethods:   0.00% ( 0/ 4)[0m   [37;41mLines:   0.00% (  0/ 16)[0m
+Helpers\FacebookGraphHelpers
+  [37;41mMethods:   0.00% ( 0/19)[0m   [37;41mLines:   0.00% (  0/268)[0m
+Helpers\GoogleSearchConsoleHelpers
+  [37;41mMethods:  22.22% ( 4/18)[0m   [37;41mLines:  38.87% (103/265)[0m
+Helpers\Helpers
+  [37;41mMethods:  36.17% (17/47)[0m   [30;43mLines:  68.15% (368/540)[0m
+Repositories\AccountRepository
+  [30;43mMethods:  80.00% ( 4/ 5)[0m   [30;42mLines:  92.31% ( 24/ 26)[0m
+Repositories\BaseRepository
+  [37;41mMethods:  43.48% (10/23)[0m   [37;41mLines:  19.22% (123/640)[0m
+Repositories\CampaignRepository
+  [30;43mMethods:  66.67% ( 4/ 6)[0m   [30;43mLines:  81.08% ( 30/ 37)[0m
+Repositories\Channeled\ChanneledAccountRepository
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:   0.00% (  0/ 20)[0m
+Repositories\Channeled\ChanneledAdGroupRepository
+  [37;41mMethods:   0.00% ( 0/ 1)[0m   [37;41mLines:   0.00% (  0/  6)[0m
+Repositories\Channeled\ChanneledAdRepository
+  [37;41mMethods:   0.00% ( 0/ 1)[0m   [37;41mLines:   0.00% (  0/  6)[0m
+Repositories\Channeled\ChanneledBaseRepository
+  [30;43mMethods:  81.82% ( 9/11)[0m   [30;42mLines:  96.00% ( 72/ 75)[0m
+Repositories\Channeled\ChanneledCampaignRepository
+  [37;41mMethods:   0.00% ( 0/ 1)[0m   [37;41mLines:   0.00% (  0/  5)[0m
+Repositories\Channeled\ChanneledCustomerRepository
+  [30;42mMethods: 100.00% ( 2/ 2)[0m   [30;42mLines: 100.00% ( 17/ 17)[0m
+Repositories\Channeled\ChanneledDiscountRepository
+  [30;42mMethods: 100.00% ( 2/ 2)[0m   [30;42mLines: 100.00% ( 16/ 16)[0m
+Repositories\Channeled\ChanneledMetricRepository
+  [30;43mMethods:  57.14% ( 4/ 7)[0m   [37;41mLines:  47.00% ( 47/100)[0m
+Repositories\Channeled\ChanneledOrderRepository
+  [30;42mMethods: 100.00% ( 2/ 2)[0m   [30;42mLines: 100.00% ( 26/ 26)[0m
+Repositories\Channeled\ChanneledPriceRuleRepository
+  [30;42mMethods: 100.00% ( 2/ 2)[0m   [30;42mLines: 100.00% ( 19/ 19)[0m
+Repositories\Channeled\ChanneledProductCategoryRepository
+  [30;42mMethods:  ( 0/ 0)[0m   [30;42mLines:  (  0/  0)[0m
+Repositories\Channeled\ChanneledProductRepository
+  [30;42mMethods: 100.00% ( 4/ 4)[0m   [30;42mLines: 100.00% ( 42/ 42)[0m
+Repositories\Channeled\ChanneledProductVariantRepository
+  [30;42mMethods: 100.00% ( 4/ 4)[0m   [30;42mLines: 100.00% ( 39/ 39)[0m
+Repositories\Channeled\ChanneledSyncErrorRepository
+  [37;41mMethods:   0.00% ( 0/ 1)[0m   [37;41mLines:   0.00% (  0/ 14)[0m
+Repositories\Channeled\ChanneledVendorRepository
+  [30;42mMethods: 100.00% ( 4/ 4)[0m   [30;42mLines: 100.00% ( 33/ 33)[0m
+Repositories\Channeled\DimensionKeyRepository
+  [37;41mMethods:   0.00% ( 0/ 1)[0m   [37;41mLines:   0.00% (  0/  1)[0m
+Repositories\Channeled\DimensionSetRepository
+  [37;41mMethods:   0.00% ( 0/ 1)[0m   [37;41mLines:   0.00% (  0/  1)[0m
+Repositories\Channeled\DimensionValueRepository
+  [37;41mMethods:   0.00% ( 0/ 1)[0m   [37;41mLines:   0.00% (  0/  4)[0m
+Repositories\CountryRepository
+  [30;42mMethods: 100.00% ( 1/ 1)[0m   [30;42mLines: 100.00% (  5/  5)[0m
+Repositories\CreativeRepository
+  [37;41mMethods:   0.00% ( 0/ 6)[0m   [37;41mLines:   0.00% (  0/ 47)[0m
+Repositories\CustomerRepository
+  [30;42mMethods: 100.00% ( 6/ 6)[0m   [30;42mLines: 100.00% ( 29/ 29)[0m
+Repositories\DeviceRepository
+  [30;42mMethods: 100.00% ( 1/ 1)[0m   [30;42mLines: 100.00% (  5/  5)[0m
+Repositories\DiscountRepository
+  [30;42mMethods: 100.00% ( 5/ 5)[0m   [30;42mLines: 100.00% ( 30/ 30)[0m
+Repositories\JobRepository
+  [37;41mMethods:  44.44% ( 8/18)[0m   [37;41mLines:  40.74% (121/297)[0m
+Repositories\MetricConfigRepository
+  [37;41mMethods:  33.33% ( 4/12)[0m   [37;41mLines:  29.53% ( 57/193)[0m
+Repositories\MetricRepository
+  [37;41mMethods:  14.29% ( 3/21)[0m   [37;41mLines:  18.26% ( 63/345)[0m
+Repositories\OrderRepository
+  [30;42mMethods: 100.00% ( 5/ 5)[0m   [30;42mLines: 100.00% ( 41/ 41)[0m
+Repositories\PageRepository
+  [37;41mMethods:  12.50% ( 1/ 8)[0m   [37;41mLines:   7.94% (  5/ 63)[0m
+Repositories\PostRepository
+  [37;41mMethods:   0.00% ( 0/ 4)[0m   [37;41mLines:   0.00% (  0/ 37)[0m
+Repositories\PriceRuleRepository
+  [30;42mMethods: 100.00% ( 3/ 3)[0m   [30;42mLines: 100.00% ( 22/ 22)[0m
+Repositories\ProductCategoryRepository
+  [30;42mMethods: 100.00% ( 5/ 5)[0m   [30;42mLines: 100.00% ( 26/ 26)[0m
+Repositories\ProductRepository
+  [30;42mMethods: 100.00% ( 7/ 7)[0m   [30;42mLines: 100.00% ( 51/ 51)[0m
+Repositories\ProductVariantRepository
+  [30;42mMethods: 100.00% ( 7/ 7)[0m   [30;42mLines: 100.00% ( 50/ 50)[0m
+Repositories\QueryRepository
+  [37;41mMethods:   0.00% ( 0/ 6)[0m   [37;41mLines:   0.00% (  0/ 49)[0m
+Repositories\VendorRepository
+  [30;42mMethods: 100.00% ( 5/ 5)[0m   [30;42mLines: 100.00% ( 32/ 32)[0m
+Services\CacheKeyGenerator
+  [30;42mMethods: 100.00% ( 2/ 2)[0m   [30;42mLines: 100.00% (  2/  2)[0m
+Services\CacheService
+  [30;43mMethods:  70.00% ( 7/10)[0m   [30;43mLines:  56.18% ( 50/ 89)[0m
+Services\CacheStrategyService
+  [37;41mMethods:   0.00% ( 0/ 8)[0m   [37;41mLines:   0.00% (  0/ 34)[0m
+Services\ConfigSchemaRegistryService
+  [30;43mMethods:  66.67% ( 2/ 3)[0m   [30;42mLines:  92.31% ( 12/ 13)[0m
+Services\DateResolver
+  [37;41mMethods:   0.00% ( 0/ 2)[0m   [37;41mLines:  20.00% (  3/ 15)[0m
+Services\HealthService
+  [37;41mMethods:  50.00% ( 1/ 2)[0m   [37;41mLines:  19.61% ( 10/ 51)[0m
+Services\InstanceGeneratorService
+  [37;41mMethods:  33.33% ( 1/ 3)[0m   [30;43mLines:  80.91% ( 89/110)[0m
+Traits\CalculatesMetricDeltas
+  [30;42mMethods: 100.00% ( 1/ 1)[0m   [30;42mLines: 100.00% ( 79/ 79)[0m

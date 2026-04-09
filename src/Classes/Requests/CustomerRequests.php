@@ -4,20 +4,15 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Anibalealvarezs\NetSuiteApi\NetSuiteApi;
-use Carbon\Carbon;
-use Classes\Conversions\NetSuiteConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
-use Entities\Analytics\Channeled\ChanneledCustomer;
 use Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
-use Repositories\Channeled\ChanneledCustomerRepository;
 use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -61,20 +56,13 @@ class CustomerRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('shopify', $createdAtMin, $createdAtMax, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'type' => 'customers',
-                    'fields' => $fields,
-                    'filters' => $filters,
-                ]);
-            } catch (\Exception $e) {
-            }
-        }
-
-        return new Response(json_encode(['Customers retrieved']));
+        return (new \Core\Services\SyncService())->execute('shopify', $createdAtMin, $createdAtMax, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'fields' => $fields,
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -84,8 +72,6 @@ class CustomerRequests implements RequestInterface
      * @param object|null $filters
      * @param string|bool $resume
      * @return Response
-     * @throws GuzzleException
-     * @throws NotSupported
      */
     public static function getListFromKlaviyo(
         ?string $createdAtMin = null,
@@ -95,19 +81,13 @@ class CustomerRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('klaviyo', $createdAtMin, $createdAtMax, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'type' => 'customers',
-                    'fields' => $fields,
-                ]);
-            } catch (\Exception $e) {
-            }
-        }
-
-        return new Response(json_encode(['Customers retrieved']));
+        return (new \Core\Services\SyncService())->execute('klaviyo', $createdAtMin, $createdAtMax, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'fields' => $fields,
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -117,7 +97,12 @@ class CustomerRequests implements RequestInterface
      */
     public static function getListFromFacebookMarketing(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('facebook_marketing', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -132,18 +117,12 @@ class CustomerRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('bigcommerce', $createdAtMin, $createdAtMax, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'type' => 'customers',
-                ]);
-            } catch (\Exception $e) {
-            }
-        }
-
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('bigcommerce', $createdAtMin, $createdAtMax, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -152,8 +131,6 @@ class CustomerRequests implements RequestInterface
      * @param object|null $filters
      * @param string|bool $resume
      * @return Response
-     * @throws GuzzleException
-     * @throws NotSupported
      */
     public static function getListFromNetSuite(
         ?string $createdAtMin = null,
@@ -162,89 +139,12 @@ class CustomerRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('netsuite', $createdAtMin, $createdAtMax, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'type' => 'customers',
-                ]);
-            } catch (\Exception $e) {
-            }
-        }
-
-        $config = Helpers::getChannelsConfig()['netsuite'];
-        $netsuiteClient = new NetSuiteApi(
-            consumerId: $config['netsuite_consumer_id'],
-            consumerSecret: $config['netsuite_consumer_secret'],
-            token: $config['netsuite_token_id'],
-            tokenSecret: $config['netsuite_token_secret'],
-            accountId: $config['netsuite_account_id'],
-        );
-
-        $manager = Helpers::getManager();
-        /** @var ChanneledCustomerRepository $channeledCustomerRepository */
-        $channeledCustomerRepository = $manager->getRepository(ChanneledCustomer::class);
-        $lastChanneledCustomer = $channeledCustomerRepository->getLastByPlatformId(Channel::netsuite->value);
-
-        $query = "SELECT
-                Customer.email,
-                Customer.entityid,
-                Customer.firstname,
-                Customer.id AS customerid,
-                Customer.lastname,
-                customerAddressbookEntityAddress.addr1 as AddressAddr1,
-                customerAddressbookEntityAddress.addr2 as AddressAddr2,
-                customerAddressbookEntityAddress.city as AddressCity,
-                customerAddressbookEntityAddress.country as AddressCountry,
-                customerAddressbookEntityAddress.state as AddressState,
-                customerAddressbookEntityAddress.dropdownstate as AddressDropdownState,
-                customerAddressbookEntityAddress.zip as AddressZip,
-                customerAddressbookEntityAddress.addressee as AddressAddressee,
-                customerAddressbookEntityAddress.addrphone as AddressPhone,
-                customerAddressbookEntityAddress.addrtext as AddressText,
-                customerAddressbookEntityAddress.attention as AddressAttention,
-                customerAddressbookEntityAddress.override as AddressOverride,
-                customerAddressbookEntityAddress.recordowner as AddressRecordOwner,
-                Entity.altname,
-                Entity.contact,
-                Entity.datecreated,
-                Entity.entitytitle,
-                Entity.group,
-                Entity.id AS entityid,
-                Entity.isinactive,
-                Entity.isperson,
-                Entity.lastmodifieddate,
-                Entity.parent,
-                Entity.phone,
-                Entity.title,
-                Entity.toplevelparent,
-                Entity.type
-            FROM Customer
-            INNER JOIN Entity
-                ON Entity.customer = Customer.id
-            INNER JOIN customerAddressbook
-                ON Customer.id = customerAddressbook.entity
-            LEFT JOIN customerAddressbookEntityAddress
-                ON customerAddressbook.addressbookaddress = customerAddressbookEntityAddress.nkey
-            WHERE Entity.datecreated >= TO_DATE('". ($createdAtMin ? Carbon::parse($createdAtMin)->format('m/d/Y') : '01/01/1989') ."', 'mm/dd/yyyy')
-                AND Entity.datecreated <= TO_DATE('". ($createdAtMax ? Carbon::parse($createdAtMax)->format('m/d/Y') : '01/01/2099') ."', 'mm/dd/yyyy')
-                AND Entity.id > " . (isset($lastChanneledCustomer['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledCustomer['platformId'] : 0);
-        if ($filters) {
-            foreach ($filters as $key => $value) {
-                $query .= " AND Entity.$key = '$value'";
-            }
-        }
-        $query .= " ORDER BY Entity.id ASC";
-        $netsuiteClient->getSuiteQLQueryAllAndProcess(
-            query: $query,
-            callback: function ($customers) use ($jobId) {
-                Helpers::checkJobStatus($jobId);
-                self::process(NetSuiteConvert::customers($customers));
-            }
-        );
-
-        return new Response(json_encode(['Customers retrieved']));
+        return (new \Core\Services\SyncService())->execute('netsuite', $createdAtMin, $createdAtMax, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -254,7 +154,12 @@ class CustomerRequests implements RequestInterface
      */
     public static function getListFromAmazon(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('amazon', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -264,7 +169,12 @@ class CustomerRequests implements RequestInterface
      */
     public static function getListFromInstagram(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('facebook_organic', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -274,7 +184,12 @@ class CustomerRequests implements RequestInterface
      */
     public static function getListFromGoogleAnalytics(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('google_analytics', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -284,7 +199,12 @@ class CustomerRequests implements RequestInterface
      */
     public static function getListFromPinterest(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('pinterest', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -294,12 +214,22 @@ class CustomerRequests implements RequestInterface
      */
     public static function getListFromLinkedIn(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('linkedin', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'filters' => $filters,
+        ]);
     }
 
     public static function getListFromX(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('x', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'customers',
+            'filters' => $filters,
+        ]);
     }
 
     /**

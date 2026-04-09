@@ -27,7 +27,8 @@ class MetricsProcessor
     {
         // Extract queries from metrics
         $queries = array_filter(array_map(function ($metric) {
-            return is_object($metric->query) ? $metric->query->getQuery() : $metric->query;
+            $queryValue = (isset($metric->query) || (is_object($metric) && property_exists($metric, 'query'))) ? $metric->query : null;
+            return is_object($queryValue) && method_exists($queryValue, 'getQuery') ? $queryValue->getQuery() : $queryValue;
         }, $metrics->toArray()));
 
         // Remove duplicates

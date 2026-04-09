@@ -53,20 +53,14 @@ class ProductRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('shopify', $createdAtMin, $createdAtMax, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'type' => 'products',
-                    'collectionId' => $collectionId,
-                    'fields' => $fields,
-                    'filters' => $filters,
-                ]);
-            } catch (\Exception $e) {}
-        }
-
-        return new Response(json_encode(['Products retrieved']));
+        return (new \Core\Services\SyncService())->execute('shopify', $createdAtMin, $createdAtMax, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'products',
+            'collectionId' => $collectionId,
+            'fields' => $fields,
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -74,7 +68,6 @@ class ProductRequests implements RequestInterface
      * @param object|null $filters
      * @param string|bool $resume
      * @return Response
-     * @throws GuzzleException
      */
     public static function getListFromKlaviyo(
         ?array $fields = null,
@@ -82,19 +75,13 @@ class ProductRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('klaviyo', null, null, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'type' => 'products',
-                    'fields' => $fields,
-                    'filters' => $filters,
-                ]);
-            } catch (\Exception $e) {}
-        }
-
-        return new Response(json_encode(['Products retrieved']));
+        return (new \Core\Services\SyncService())->execute('klaviyo', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'products',
+            'fields' => $fields,
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -107,44 +94,30 @@ class ProductRequests implements RequestInterface
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('bigcommerce', null, null, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'type' => 'products'
-                ]);
-            } catch (\Exception $e) {}
-        }
-
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('bigcommerce', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'products',
+            'filters' => $filters,
+        ]);
     }
 
     /**
      * @param object|null $filters
      * @param string|bool $resume
      * @return Response
-     * @throws Exception
-     * @throws GuzzleException
-     * @throws NotSupported
-     * @throws ORMException
      */
     public static function getListFromNetsuite(
         ?object $filters = null,
         string|bool $resume = true,
         ?int $jobId = null
     ): Response {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('netsuite', null, null, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'type' => 'products'
-                ]);
-            } catch (\Exception $e) {}
-        }
-
-        return new Response(json_encode(['Products retrieved']));
+        return (new \Core\Services\SyncService())->execute('netsuite', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'products',
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -152,19 +125,14 @@ class ProductRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromAmazon(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
-        if (getenv('USE_MODULAR_DRIVERS')) {
-            try {
-                return (new \Core\Services\SyncService())->execute('amazon', null, null, [
-                    'jobId' => $jobId,
-                    'resume' => $resume,
-                    'type' => 'products'
-                ]);
-            } catch (\Exception $e) {}
-        }
-
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute('amazon', null, null, [
+            'jobId' => $jobId,
+            'resume' => $resume,
+            'type' => 'products',
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -179,7 +147,7 @@ class ProductRequests implements RequestInterface
 
             $result = \Classes\ProductProcessor::processProducts($channeledCollection, $manager);
 
-            if (!empty($result)) {
+            if (! empty($result)) {
                 $cacheService = CacheService::getInstance(redisClient: Helpers::getRedisClient());
                 $entities = [
                     'Product' => $result['products'],
@@ -195,7 +163,7 @@ class ProductRequests implements RequestInterface
                 $channelName = Channel::from(reset($result['channels']))->getName();
 
                 $cacheService->invalidateMultipleEntities(
-                    entities: array_filter($entities, fn ($value) => !empty($value)),
+                    entities: array_filter($entities, fn ($value) => ! empty($value)),
                     channel: $channelName
                 );
             }

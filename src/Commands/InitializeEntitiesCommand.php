@@ -128,13 +128,15 @@ class InitializeEntitiesCommand extends Command
                 $this->logger->info("Google Search Console channel is disabled. Skipping entity initialization for GSC.");
             } else {
                 $this->logger->info("Initializing Entities for GSC...");
-                $gscConfig = MetricRequests::validateGoogleConfig($this->logger);
-                $sitesToProcess = $gscConfig['google_search_console']['sites'] ?? [];
+                
+                // Use modular GoogleAuthProvider
+                $authProvider = new \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider(null, $channelsConfig);
+                $sitesToProcess = $channelsConfig['google_search_console']['sites'] ?? [];
 
-                if ($gscConfig['google_search_console']['cache_all'] ?? false) {
+                if ($channelsConfig['google_search_console']['cache_all'] ?? false) {
                     $this->logger->info("GSC 'cache_all' enabled. Fetching all sites from API.");
                     try {
-                        $apiSites = $this->fetchGscSites($channelsConfig);
+                        $apiSites = $this->fetchGscSites($channelsConfig, $authProvider);
                         if (isset($apiSites['siteEntry']) && is_array($apiSites['siteEntry'])) {
                             foreach ($apiSites['siteEntry'] as $apiSite) {
                                 $siteUrl = $apiSite['siteUrl'];
@@ -147,8 +149,8 @@ class InitializeEntitiesCommand extends Command
                                     }
                                 }
                                 if (!$alreadyInConfig) {
-                                    $include = $gscConfig['google_search_console']['cache_include'] ?? null;
-                                    $exclude = $gscConfig['google_search_console']['cache_exclude'] ?? null;
+                                    $include = $gscConfig['cache_include'] ?? null;
+                                    $exclude = $gscConfig['cache_exclude'] ?? null;
                                     if (Helpers::matchesFilter($siteUrl, $include, $exclude)) {
                                         $sitesToProcess[] = [
                                             'url' => $siteUrl,
@@ -462,9 +464,18 @@ class InitializeEntitiesCommand extends Command
         }
     }
 
-    protected function fetchGscSites(array $configRaw): array
+    protected function fetchGscSites(array $configRaw, \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider $authProvider): array
     {
-        $gscApi = MetricRequests::initializeSearchConsoleApi($configRaw, $this->logger);
+        $gscApi = new \Anibalealvarezs\GoogleApi\Services\SearchConsole\SearchConsoleApi(
+            redirectUrl: $configRaw['google_search_console']['redirect_uri'] ?? $configRaw['google']['redirect_uri'] ?? '',
+            clientId: $configRaw['google_search_console']['client_id'] ?? $configRaw['google']['client_id'] ?? $_ENV['GOOGLE_CLIENT_ID'] ?? '',
+            clientSecret: $configRaw['google_search_console']['client_secret'] ?? $configRaw['google']['client_secret'] ?? $_ENV['GOOGLE_CLIENT_SECRET'] ?? '',
+            refreshToken: $configRaw['google_search_console']['refresh_token'] ?? $configRaw['google']['refresh_token'] ?? '',
+            userId: $configRaw['google_search_console']['user_id'] ?? $configRaw['google']['user_id'] ?? '',
+            scopes: $authProvider->getScopes(),
+            token: $authProvider->getAccessToken(),
+            tokenPath: $configRaw['google_search_console']['token_path'] ?? $configRaw['google']['token_path'] ?? ""
+        );
         return $gscApi->getSites();
     }
 

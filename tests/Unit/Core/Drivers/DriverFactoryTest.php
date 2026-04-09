@@ -23,19 +23,19 @@ class DriverFactoryTest extends TestCase
     public function driverProvider(): array
     {
         return [
-            ['google_search_console', \Channels\Google\SearchConsole\SearchConsoleDriver::class],
-            ['google_analytics', \Channels\Google\Analytics\GoogleAnalyticsDriver::class],
+            ['google_search_console', \Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver::class],
+            ['google_analytics', \Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAnalyticsDriver::class],
             ['facebook_marketing', \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver::class],
             ['facebook_organic', \Anibalealvarezs\MetaHubDriver\Drivers\FacebookOrganicDriver::class],
-            ['shopify', \Channels\Shopify\ShopifyDriver::class],
-            ['klaviyo', \Channels\Klaviyo\KlaviyoDriver::class],
-            ['netsuite', \Channels\NetSuite\NetSuiteDriver::class],
-            ['amazon', \Channels\Amazon\AmazonDriver::class],
-            ['bigcommerce', \Channels\BigCommerce\BigCommerceDriver::class],
-            ['pinterest', \Channels\Pinterest\PinterestDriver::class],
-            ['linkedin', \Channels\LinkedIn\LinkedInDriver::class],
-            ['x', \Channels\X\XDriver::class],
-            ['tiktok', \Channels\TikTok\TikTokDriver::class],
+            ['shopify', \Anibalealvarezs\ShopifyHubDriver\Drivers\ShopifyDriver::class],
+            ['klaviyo', \Anibalealvarezs\KlaviyoHubDriver\Drivers\KlaviyoDriver::class],
+            ['netsuite', \Anibalealvarezs\NetSuiteHubDriver\Drivers\NetSuiteDriver::class],
+            ['amazon', \Anibalealvarezs\AmazonHubDriver\Drivers\AmazonDriver::class],
+            ['bigcommerce', \Anibalealvarezs\BigCommerceHubDriver\Drivers\BigCommerceDriver::class],
+            ['pinterest', \Anibalealvarezs\PinterestHubDriver\Drivers\PinterestDriver::class],
+            ['linkedin', \Anibalealvarezs\LinkedInHubDriver\Drivers\LinkedInDriver::class],
+            ['x', \Anibalealvarezs\XHubDriver\Drivers\XDriver::class],
+            ['tiktok', \Anibalealvarezs\TikTokHubDriver\Drivers\TikTokDriver::class],
         ];
     }
 

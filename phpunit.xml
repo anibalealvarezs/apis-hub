@@ -25,11 +25,19 @@
         <testsuite name="Integration Tests">
             <directory>tests/Integration</directory>
         </testsuite>
+        <testsuite name="Core Tests">
+            <directory>tests/Unit/Core</directory>
+        </testsuite>
     </testsuites>
     <coverage processUncoveredFiles="true">
         <include>
             <directory suffix=".php">src</directory>
         </include>
+        <exclude>
+            <file>src/Helpers/.php-cs-fixer.dist.php</file>
+            <file>src/Repositories/.php-cs-fixer.dist.php</file>
+            <file>src/Routes/.php-cs-fixer.dist.php</file>
+        </exclude>
     </coverage>
 
     <php>

@@ -177,8 +177,18 @@ class ConfigManagerController extends BaseController
 
             if ($needsGscRefresh) {
                 try {
-                    $gscConfig = MetricRequests::validateGoogleConfig($logger);
-                    $gscApi = MetricRequests::initializeSearchConsoleApi($gscConfig, $logger);
+                    $channelsConfig = Helpers::getChannelsConfig();
+                    $authProvider = new \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider(null, $channelsConfig);
+                    $gscApi = new \Anibalealvarezs\GoogleApi\Services\SearchConsole\SearchConsoleApi(
+                        redirectUrl: $channelsConfig['google_search_console']['redirect_uri'] ?? $channelsConfig['google']['redirect_uri'] ?? '',
+                        clientId: $channelsConfig['google_search_console']['client_id'] ?? $channelsConfig['google']['client_id'] ?? $_ENV['GOOGLE_CLIENT_ID'] ?? '',
+                        clientSecret: $channelsConfig['google_search_console']['client_secret'] ?? $channelsConfig['google']['client_secret'] ?? $_ENV['GOOGLE_CLIENT_SECRET'] ?? '',
+                        refreshToken: $channelsConfig['google_search_console']['refresh_token'] ?? $channelsConfig['google']['refresh_token'] ?? '',
+                        userId: $channelsConfig['google_search_console']['user_id'] ?? $channelsConfig['google']['user_id'] ?? '',
+                        scopes: $authProvider->getScopes(),
+                        token: $authProvider->getAccessToken(),
+                        tokenPath: $channelsConfig['google_search_console']['token_path'] ?? $channelsConfig['google']['token_path'] ?? ""
+                    );
                     $sitesResponse = $gscApi->getSites();
                     if (isset($sitesResponse['siteEntry'])) {
                         $allAssets['gsc'] = [];
@@ -458,11 +468,21 @@ class ConfigManagerController extends BaseController
 
             if ($type === 'gsc' || $type === 'all') {
                 try {
-                    $gscConfig = MetricRequests::validateGoogleConfig($logger);
-                    $isEnabled = $gscConfig['google_search_console']['enabled'] ?? false;
+                    $channelsConfig = Helpers::getChannelsConfig();
+                    $isEnabled = $channelsConfig['google_search_console']['enabled'] ?? false;
                     
                     if ($isEnabled) {
-                        $gscApi = MetricRequests::initializeSearchConsoleApi($gscConfig, $logger);
+                        $authProvider = new \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider(null, $channelsConfig);
+                        $gscApi = new \Anibalealvarezs\GoogleApi\Services\SearchConsole\SearchConsoleApi(
+                            redirectUrl: $channelsConfig['google_search_console']['redirect_uri'] ?? $channelsConfig['google']['redirect_uri'] ?? '',
+                            clientId: $channelsConfig['google_search_console']['client_id'] ?? $channelsConfig['google']['client_id'] ?? $_ENV['GOOGLE_CLIENT_ID'] ?? '',
+                            clientSecret: $channelsConfig['google_search_console']['client_secret'] ?? $channelsConfig['google']['client_secret'] ?? $_ENV['GOOGLE_CLIENT_SECRET'] ?? '',
+                            refreshToken: $channelsConfig['google_search_console']['refresh_token'] ?? $channelsConfig['google']['refresh_token'] ?? '',
+                            userId: $channelsConfig['google_search_console']['user_id'] ?? $channelsConfig['google']['user_id'] ?? '',
+                            scopes: $authProvider->getScopes(),
+                            token: $authProvider->getAccessToken(),
+                            tokenPath: $channelsConfig['google_search_console']['token_path'] ?? $channelsConfig['google']['token_path'] ?? ""
+                        );
                         // This call will trigger a token refresh if the current one is expired
                         $gscApi->getSites();
                         $results['gsc'] = ['status' => 'valid', 'message' => 'GSC token is valid and working.'];
