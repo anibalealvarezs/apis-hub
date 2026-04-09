@@ -10,6 +10,7 @@ use Doctrine\ORM\EntityManager;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
+use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
 use Entities\Analytics\Channeled\DimensionSet;
 use Entities\Analytics\Channeled\DimensionKey;
 use Entities\Analytics\Channeled\DimensionValue;

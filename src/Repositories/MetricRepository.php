@@ -20,6 +20,7 @@ use Enums\QueryBuilderType;
 use Exception;
 use Helpers\Helpers;
 use ReflectionException;
+use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
 
 class MetricRepository extends BaseRepository
 {
@@ -428,10 +429,10 @@ class MetricRepository extends BaseRepository
         ?Device $device = null
     ): ?Metric {
         try {
-            $configSignature = \Classes\KeyGenerator::generateMetricConfigKey(
+            $configSignature = KeyGenerator::generateMetricConfigKey(
                 channel: $channel,
                 name: $name,
-                period: $period,
+                period: $period->value,
                 query: $queryEntity,
                 page: $page,
                 country: $country,

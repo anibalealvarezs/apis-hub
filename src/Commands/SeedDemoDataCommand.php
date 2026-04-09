@@ -22,6 +22,7 @@ use Enums\Country as CountryEnum;
 use Enums\Device as DeviceType;
 use Enums\Period;
 use Faker\Factory;
+use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\ProgressBar;
@@ -211,7 +212,7 @@ class SeedDemoDataCommand extends Command
                     ['dimensionKey' => 'age', 'dimensionValue' => $age],
                     ['dimensionKey' => 'gender', 'dimensionValue' => $gen]
                 ];
-                $h = \Classes\KeyGenerator::generateDimensionsHash($dimensions);
+                $h = KeyGenerator::generateDimensionsHash($dimensions);
                 $setId = $this->conn->fetchOne("SELECT id FROM dimension_sets WHERE hash = ?", [$h]);
                 if (!$setId) {
                     $this->conn->insert('dimension_sets', ['hash' => $h, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
@@ -858,7 +859,7 @@ class SeedDemoDataCommand extends Command
         ?string $data = null,
         ?string $setHash = null
     ): void {
-        $sig = \Classes\KeyGenerator::generateMetricConfigKey(
+        $sig = KeyGenerator::generateMetricConfigKey(
             channel: $channel,
             name: $name,
             period: 'daily',
