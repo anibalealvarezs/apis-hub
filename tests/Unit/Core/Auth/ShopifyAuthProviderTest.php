@@ -3,7 +3,7 @@
 namespace Tests\Unit\Core\Auth;
 
 use PHPUnit\Framework\TestCase;
-use Core\Auth\ShopifyAuthProvider;
+use Anibalealvarezs\ShopifyHubDriver\Auth\ShopifyAuthProvider;
 
 class ShopifyAuthProviderTest extends TestCase
 {

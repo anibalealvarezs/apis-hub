@@ -63,9 +63,22 @@ class DriverFactory
             throw new Exception("Driver class not found: $driverClass");
         }
 
-        // Instanciación dinámica
+        // Resilient construction for legacy and modular providers
         $channelConfig = \Helpers\Helpers::getChannelsConfig()[$channel] ?? [];
-        $authProvider = new $authClass(null, $channelConfig);
+        $reflection = new \ReflectionClass($authClass);
+        $constructor = $reflection->getConstructor();
+        
+        if ($constructor && isset($constructor->getParameters()[0])) {
+            $firstParam = $constructor->getParameters()[0];
+            $type = $firstParam->getType();
+            if ($type instanceof \ReflectionNamedType && $type->getName() === 'string') {
+                $authProvider = new $authClass($channelConfig['token_path'] ?? "");
+            } else {
+                $authProvider = new $authClass($channelConfig);
+            }
+        } else {
+            $authProvider = new $authClass($channelConfig);
+        }
         $driver = new $driverClass($authProvider, $logger);
 
         // Inject data processor if defined and supported by driver

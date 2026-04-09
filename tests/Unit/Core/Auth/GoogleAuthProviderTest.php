@@ -3,7 +3,7 @@
 namespace Tests\Unit\Core\Auth;
 
 use PHPUnit\Framework\TestCase;
-use Core\Auth\GoogleAuthProvider;
+use Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider;
 
 class GoogleAuthProviderTest extends TestCase
 {

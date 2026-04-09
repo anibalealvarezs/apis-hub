@@ -130,7 +130,7 @@ class InitializeEntitiesCommand extends Command
                 $this->logger->info("Initializing Entities for GSC...");
                 
                 // Use modular GoogleAuthProvider
-                $authProvider = new \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider(null, $channelsConfig);
+                $authProvider = new \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider($channelsConfig['google_search_console']['token_path'] ?? "");
                 $sitesToProcess = $channelsConfig['google_search_console']['sites'] ?? [];
 
                 if ($channelsConfig['google_search_console']['cache_all'] ?? false) {

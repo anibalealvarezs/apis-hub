@@ -3,7 +3,7 @@
 namespace Tests\Unit\Core\Auth;
 
 use PHPUnit\Framework\TestCase;
-use Core\Auth\NetSuiteAuthProvider;
+use Anibalealvarezs\NetSuiteHubDriver\Auth\NetSuiteAuthProvider;
 
 class NetSuiteAuthProviderTest extends TestCase
 {

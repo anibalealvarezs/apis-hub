@@ -8243,23 +8243,23 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
+        "anibalealvarezs/amazon-hub-driver": 20,
         "anibalealvarezs/api-client-skeleton": 20,
+        "anibalealvarezs/bigcommerce-hub-driver": 20,
         "anibalealvarezs/facebook-graph-api": 20,
         "anibalealvarezs/google-api": 20,
-        "predis/predis": 20,
         "anibalealvarezs/google-hub-driver": 20,
-        "anibalealvarezs/meta-hub-driver": 20,
         "anibalealvarezs/klaviyo-hub-driver": 20,
-        "anibalealvarezs/shopify-hub-driver": 20,
-        "anibalealvarezs/netsuite-hub-driver": 20,
-        "anibalealvarezs/amazon-hub-driver": 20,
-        "anibalealvarezs/bigcommerce-hub-driver": 20,
-        "anibalealvarezs/pinterest-hub-driver": 20,
         "anibalealvarezs/linkedin-hub-driver": 20,
+        "anibalealvarezs/meta-hub-driver": 20,
+        "anibalealvarezs/netsuite-hub-driver": 20,
+        "anibalealvarezs/pinterest-hub-driver": 20,
+        "anibalealvarezs/shopify-hub-driver": 20,
         "anibalealvarezs/tiktok-hub-driver": 20,
-        "anibalealvarezs/x-hub-driver": 20,
         "anibalealvarezs/triple-whale-hub-driver": 20,
-        "mikey179/vfsstream": 20
+        "anibalealvarezs/x-hub-driver": 20,
+        "mikey179/vfsstream": 20,
+        "predis/predis": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
@@ -8267,9 +8267,9 @@
         "php": ">=8.1",
         "ext-json": "*"
     },
-    "platform-dev": [],
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.3.0"
     },
-    "plugin-api-version": "2.3.0"
+    "plugin-api-version": "2.9.0"
 }

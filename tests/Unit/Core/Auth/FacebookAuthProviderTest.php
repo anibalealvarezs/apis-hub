@@ -3,7 +3,7 @@
 namespace Tests\Unit\Core\Auth;
 
 use PHPUnit\Framework\TestCase;
-use Core\Auth\FacebookAuthProvider;
+use Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider;
 
 class FacebookAuthProviderTest extends TestCase
 {

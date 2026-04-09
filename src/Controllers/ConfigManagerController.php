@@ -194,7 +194,7 @@ class ConfigManagerController extends BaseController
             if ($needsGscRefresh) {
                 try {
                     $channelsConfig = Helpers::getChannelsConfig();
-                    $authProvider = new \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider(null, $channelsConfig);
+                    $authProvider = new \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider($channelsConfig['google_search_console']['token_path'] ?? "");
                     $gscApi = new \Anibalealvarezs\GoogleApi\Services\SearchConsole\SearchConsoleApi(
                         redirectUrl: $channelsConfig['google_search_console']['redirect_uri'] ?? $channelsConfig['google']['redirect_uri'] ?? '',
                         clientId: $channelsConfig['google_search_console']['client_id'] ?? $channelsConfig['google']['client_id'] ?? $_ENV['GOOGLE_CLIENT_ID'] ?? '',
@@ -491,7 +491,7 @@ class ConfigManagerController extends BaseController
                     $isEnabled = $channelsConfig['google_search_console']['enabled'] ?? false;
                     
                     if ($isEnabled) {
-                        $authProvider = new \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider(null, $channelsConfig);
+                        $authProvider = new \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider($channelsConfig['google_search_console']['token_path'] ?? "");
                         $gscApi = new \Anibalealvarezs\GoogleApi\Services\SearchConsole\SearchConsoleApi(
                             redirectUrl: $channelsConfig['google_search_console']['redirect_uri'] ?? $channelsConfig['google']['redirect_uri'] ?? '',
                             clientId: $channelsConfig['google_search_console']['client_id'] ?? $channelsConfig['google']['client_id'] ?? $_ENV['GOOGLE_CLIENT_ID'] ?? '',

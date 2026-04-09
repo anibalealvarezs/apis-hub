@@ -3,7 +3,7 @@
 namespace Tests\Unit\Core\Auth;
 
 use PHPUnit\Framework\TestCase;
-use Core\Auth\KlaviyoAuthProvider;
+use Anibalealvarezs\KlaviyoHubDriver\Auth\KlaviyoAuthProvider;
 
 class KlaviyoAuthProviderTest extends TestCase
 {
