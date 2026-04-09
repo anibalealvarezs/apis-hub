@@ -2,29 +2,27 @@
 
 namespace Commands;
 
+use Classes\DriverInitializer;
+use Classes\Requests\MetricRequests;
 use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Country;
-use Entities\Analytics\Device;
-use Entities\Analytics\Page; // Add Page entity
+use Entities\Analytics\Device; // Add Page entity
+use Entities\Analytics\Page;
 use Enums\Account as AccountEnum;
-use Enums\PageType;
 use Enums\Channel;
 use Enums\Country as CountryEnum;
 use Enums\Device as DeviceEnum;
+use Enums\PageType;
 use Exception;
 use Helpers\Helpers;
-use Monolog\Handler\StreamHandler;
-use Monolog\Level;
-use Monolog\Logger;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Classes\Requests\MetricRequests;
 
 #[AsCommand(
     name: 'app:initialize-entities',
@@ -55,7 +53,7 @@ class InitializeEntitiesCommand extends Command
 
             foreach (CountryEnum::cases() as $countryEnum) {
                 $country = $countryRepository->getByCode($countryEnum->value);
-                if (!$country) {
+                if (! $country) {
                     $country = new Country();
                     $country->addCode($countryEnum)
                         ->addName($countryEnum->getFullName());
@@ -85,7 +83,7 @@ class InitializeEntitiesCommand extends Command
 
             foreach ($devices as $data) {
                 $device = $deviceRepository->getByType($data['type']->value);
-                if (!$device) {
+                if (! $device) {
                     $device = new Device();
                     $device->addType($data['type']);
                     $this->entityManager->persist($device);
@@ -106,10 +104,10 @@ class InitializeEntitiesCommand extends Command
             $channeledAccountRepository = $this->entityManager->getRepository(ChanneledAccount::class);
             $channelsConfig = Helpers::getChannelsConfig();
             $gscConfig = $channelsConfig['google_search_console'] ?? null;
-            if (!$gscConfig) {
+            if (! $gscConfig) {
                 $gscConfig = $channelsConfig['gsc'] ?? null;
             }
-            if (!$gscConfig) {
+            if (! $gscConfig) {
                 throw new Exception("Missing 'google_search_console' or 'gsc' configuration in channels config");
             }
             $pagesInitialized = 0;
@@ -123,18 +121,19 @@ class InitializeEntitiesCommand extends Command
             // GSC Section: Only validate and process if explicitly enabled
             $gscEnabled = $channelsConfig['google_search_console']['enabled'] ?? false;
             $sitesToProcess = [];
-            
-            if (!$gscEnabled) {
+
+            if (! $gscEnabled) {
                 $this->logger->info("Google Search Console channel is disabled. Skipping entity initialization for GSC.");
             } else {
                 $this->logger->info("Initializing Entities for GSC...");
-                
+
                 // Use modular GoogleAuthProvider
                 $authProvider = new \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider($channelsConfig['google_search_console']['token_path'] ?? "");
                 $sitesToProcess = $channelsConfig['google_search_console']['sites'] ?? [];
 
                 if ($channelsConfig['google_search_console']['cache_all'] ?? false) {
                     $this->logger->info("GSC 'cache_all' enabled. Fetching all sites from API.");
+
                     try {
                         $apiSites = $this->fetchGscSites($channelsConfig, $authProvider);
                         if (isset($apiSites['siteEntry']) && is_array($apiSites['siteEntry'])) {
@@ -145,17 +144,18 @@ class InitializeEntitiesCommand extends Command
                                 foreach ($sitesToProcess as $s) {
                                     if (rtrim($s['url'], '/') === rtrim($siteUrl, '/')) {
                                         $alreadyInConfig = true;
+
                                         break;
                                     }
                                 }
-                                if (!$alreadyInConfig) {
+                                if (! $alreadyInConfig) {
                                     $include = $gscConfig['cache_include'] ?? null;
                                     $exclude = $gscConfig['cache_exclude'] ?? null;
                                     if (Helpers::matchesFilter($siteUrl, $include, $exclude)) {
                                         $sitesToProcess[] = [
                                             'url' => $siteUrl,
                                             'title' => $siteUrl,
-                                            'enabled' => true
+                                            'enabled' => true,
                                         ];
                                     }
                                 }
@@ -166,44 +166,44 @@ class InitializeEntitiesCommand extends Command
                     }
                 }
 
-            foreach ($sitesToProcess as $site) {
-                $siteUrl = $site['url'];
-                $normalizedSiteUrl = rtrim($siteUrl, '/');
-                $title = $site['title'] ?? $siteUrl;
-                $hostname = $site['hostname'] ?? parse_url($siteUrl, PHP_URL_HOST) ?? str_replace('sc-domain:', '', $siteUrl);
+                foreach ($sitesToProcess as $site) {
+                    $siteUrl = $site['url'];
+                    $normalizedSiteUrl = rtrim($siteUrl, '/');
+                    $title = $site['title'] ?? $siteUrl;
+                    $hostname = $site['hostname'] ?? parse_url($siteUrl, PHP_URL_HOST) ?? str_replace('sc-domain:', '', $siteUrl);
 
-                $canonicalId = Helpers::getCanonicalPageId($normalizedSiteUrl, null, PageType::WEBSITE);
-                $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
-                if (!$pageEntity) {
-                    $pageEntity = new Page();
-                    $pageEntity->addCanonicalId($canonicalId);
-                    $this->logger->info("Initializing new GSC Page: URL=$normalizedSiteUrl");
+                    $canonicalId = Helpers::getCanonicalPageId($normalizedSiteUrl, null, PageType::WEBSITE);
+                    $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
+                    if (! $pageEntity) {
+                        $pageEntity = new Page();
+                        $pageEntity->addCanonicalId($canonicalId);
+                        $this->logger->info("Initializing new GSC Page: URL=$normalizedSiteUrl");
+                    }
+
+                    $pageEntity->addUrl($normalizedSiteUrl)
+                        ->addTitle($title)
+                        ->addHostname($hostname)
+                        ->addPlatformId(md5($normalizedSiteUrl))
+                        ->addData(['source' => 'gsc_site'])
+                        ->addUpdatedAt(new DateTime());
+
+                    $this->entityManager->persist($pageEntity);
+                    $pagesInitialized++;
                 }
-
-                $pageEntity->addUrl($normalizedSiteUrl)
-                    ->addTitle($title)
-                    ->addHostname($hostname)
-                    ->addPlatformId(md5($normalizedSiteUrl))
-                    ->addData(['source' => 'gsc_site'])
-                    ->addUpdatedAt(new DateTime());
-                
-                $this->entityManager->persist($pageEntity);
-                $pagesInitialized++;
+                $this->entityManager->flush();
+                $this->logger->info("Flushed GSC pages");
             }
-            $this->entityManager->flush();
-            $this->logger->info("Flushed GSC pages");
-        }
 
-        // Initialize Pages from facebook config
+            // Initialize Pages from facebook config
             /** @var \Repositories\PageRepository $pageRepository */
             $pageRepository = $this->entityManager->getRepository(Page::class);
             $channelsConfig = Helpers::getChannelsConfig();
             $fbConfig = $channelsConfig['facebook'] ?? [];
             $fbMarketingConfig = $channelsConfig['facebook_marketing'] ?? [];
             $fbOrganicConfig = $channelsConfig['facebook_organic'] ?? [];
-            
+
             $fbGroupName = $fbConfig['accounts_group_name'] ?? $fbMarketingConfig['accounts_group_name'] ?? $fbOrganicConfig['accounts_group_name'] ?? null;
-            if (!$fbGroupName) {
+            if (! $fbGroupName) {
                 throw new Exception("Missing 'accounts_group_name' in facebook configurations");
             }
 
@@ -211,7 +211,7 @@ class InitializeEntitiesCommand extends Command
             $accountRepository = $this->entityManager->getRepository(Account::class);
             /** @var Account|null $accountEntity */
             $accountEntity = $accountRepository->getByName($fbGroupName);
-            if (!$accountEntity) {
+            if (! $accountEntity) {
                 $accountEntity = new Account();
                 $accountEntity->addName($fbGroupName);
                 $this->entityManager->persist($accountEntity);
@@ -221,8 +221,8 @@ class InitializeEntitiesCommand extends Command
             $this->logger->info("Flushed Facebook account");
 
             $fbEnabled = ($fbConfig['enabled'] ?? false) || ($fbMarketingConfig['enabled'] ?? false) || ($fbOrganicConfig['enabled'] ?? false);
-            
-            if (!$fbEnabled) {
+
+            if (! $fbEnabled) {
                 $this->logger->info("All Meta channels (Organic/Marketing/General) are disabled. Skipping Facebook entity initialization.");
                 $pagesToProcess = [];
                 $apiPagesMap = [];
@@ -230,28 +230,30 @@ class InitializeEntitiesCommand extends Command
                 $mergedFbConfig = array_merge($fbConfig, $fbMarketingConfig, $fbOrganicConfig);
                 $pagesToProcess = $mergedFbConfig['pages'] ?? [];
                 $apiPagesMap = [];
-                
+
                 $this->logger->info("Fetching actual pages details from Meta API to enrich configurations...");
+
                 try {
                     $apiPages = $this->fetchFbPages($mergedFbConfig);
-                     if (isset($apiPages['data']) && is_array($apiPages['data'])) {
+                    if (isset($apiPages['data']) && is_array($apiPages['data'])) {
                         foreach ($apiPages['data'] as $apiPage) {
                             $pageId = (string)$apiPage['id'];
                             $apiPagesMap[$pageId] = $apiPage;
-                            
+
                             // Only add newly discovered pages if 'cache_all' is enabled
                             if ($mergedFbConfig['cache_all'] ?? false) {
                                 $alreadyInConfig = false;
                                 foreach ($pagesToProcess as $p) {
                                     if ((string)$p['id'] === $pageId) {
                                         $alreadyInConfig = true;
+
                                         break;
                                     }
                                 }
-                                if (!$alreadyInConfig) {
+                                if (! $alreadyInConfig) {
                                     $pageName = $apiPage['name'] ?? "Page " . $pageId;
-                                    $includeFilter = MetricRequests::getFacebookFilter($mergedFbConfig, 'PAGE', 'cache_include');
-                                    $excludeFilter = MetricRequests::getFacebookFilter($mergedFbConfig, 'PAGE', 'cache_exclude');
+                                    $includeFilter = \Classes\Services\Sync\Facebook\FacebookEntitySync::getFacebookFilter($mergedFbConfig, 'PAGE', 'cache_include');
+                                    $excludeFilter = \Classes\Services\Sync\Facebook\FacebookEntitySync::getFacebookFilter($mergedFbConfig, 'PAGE', 'cache_exclude');
                                     if (Helpers::matchesFilter($pageName, $includeFilter, $excludeFilter) || Helpers::matchesFilter($pageId, $includeFilter, $excludeFilter)) {
                                         $pagesToProcess[] = [
                                             'id' => $pageId,
@@ -261,7 +263,7 @@ class InitializeEntitiesCommand extends Command
                                             'ig_account' => $apiPage['instagram_business_account']['id'] ?? null,
                                             'access_token' => $apiPage['access_token'] ?? null,
                                             'enabled' => true,
-                                            'instagram_business_account' => $apiPage['instagram_business_account'] ?? null
+                                            'instagram_business_account' => $apiPage['instagram_business_account'] ?? null,
                                         ];
                                     }
                                 }
@@ -279,32 +281,32 @@ class InitializeEntitiesCommand extends Command
                 $apiPageData = $apiPagesMap[$platformId] ?? null;
                 $title = $apiPageData['name'] ?? $page['title'] ?? "Page " . $platformId;
                 $pageUrl = $page['url'] ?? "https://www.facebook.com/" . $platformId;
-                if (!str_starts_with($pageUrl, 'http')) {
+                if (! str_starts_with($pageUrl, 'http')) {
                     $pageUrl = "https://www.facebook.com/" . $platformId;
                 }
                 $hostname = $page['hostname'] ?? 'www.facebook.com';
 
                 $canonicalId = Helpers::getCanonicalPageId($pageUrl, $platformId, PageType::FACEBOOK_PAGE);
-                
+
                 // Construct full Page data: Prioritize API data and avoid injecting internal config flags
                 $pageData = $apiPageData ?? [];
                 $pageData['source'] = 'fb_page';
-                
+
                 // Add specific metadata that might be in config but isn't in main API response
-                if (!empty($page['access_token'])) {
+                if (! empty($page['access_token'])) {
                     $pageData['access_token'] = $page['access_token'];
                 }
-                if (!empty($apiPageData['access_token'])) {
+                if (! empty($apiPageData['access_token'])) {
                     $pageData['access_token'] = $apiPageData['access_token'];
                 }
-                
+
                 $igId = $page['ig_account'] ?? $apiPageData['instagram_business_account']['id'] ?? null;
                 if ($igId) {
                     $pageData['instagram_business_account_id'] = $igId;
                 }
 
                 $pageEntity = $pageRepository->getByCanonicalId($canonicalId);
-                if (!$pageEntity) {
+                if (! $pageEntity) {
                     $pageEntity = new Page();
                     $pageEntity->addCanonicalId($canonicalId)
                         ->addPlatformId($platformId)
@@ -322,18 +324,18 @@ class InitializeEntitiesCommand extends Command
                 $pagesInitialized++;
 
                 // Initialize Instagram Account from facebook config
-                if (!empty($page['ig_account'])) {
+                if (! empty($page['ig_account'])) {
                     /** @var ChanneledAccount|null $channeledAccountEntity */
                     $channeledAccountEntity = $channeledAccountRepository->getByPlatformId($page['ig_account'], Channel::facebook_organic->value);
-                    
+
                     // Extract IG-specific name and data from raw API data if available
                     $igData = $apiPageData['instagram_business_account'] ?? $page['instagram_business_account'] ?? [];
-                    if (empty($igData) && !empty($page['ig_account'])) {
+                    if (empty($igData) && ! empty($page['ig_account'])) {
                         $igData = ['id' => $page['ig_account']];
                     }
                     $igName = $igData['name'] ?? $igData['username'] ?? $title;
 
-                    if (!$channeledAccountEntity) {
+                    if (! $channeledAccountEntity) {
                         $channeledAccount = new ChanneledAccount();
                         $channeledAccount->addPlatformId($page['ig_account'])
                             ->addAccount($accountEntity)
@@ -357,7 +359,7 @@ class InitializeEntitiesCommand extends Command
                 // Initialize Facebook Page ChanneledAccount
                 /** @var ChanneledAccount|null $fbChanneledAccount */
                 $fbChanneledAccount = $channeledAccountRepository->getByPlatformId((string)$platformId, Channel::facebook_organic->value);
-                if (!$fbChanneledAccount) {
+                if (! $fbChanneledAccount) {
                     $fbChanneledAccount = new ChanneledAccount();
                     $fbChanneledAccount->addPlatformId((string)$platformId)
                         ->addAccount($accountEntity)
@@ -377,33 +379,35 @@ class InitializeEntitiesCommand extends Command
             $this->logger->info("Flushed Facebook pages and Instagram accounts");
             $adAccountsToProcess = $mergedFbConfig['ad_accounts'] ?? [];
             $apiAdAccsMap = [];
-            
+
             $this->logger->info("Fetching actual ad accounts details from Meta API...");
+
             try {
                 $apiAdAccs = $this->fetchFbAdAccounts($mergedFbConfig);
                 if (isset($apiAdAccs['data']) && is_array($apiAdAccs['data'])) {
                     foreach ($apiAdAccs['data'] as $apiAdAcc) {
                         $adAccId = (string)$apiAdAcc['id'];
                         $apiAdAccsMap[$adAccId] = $apiAdAcc;
-                        
+
                         if ($mergedFbConfig['cache_all'] ?? false) {
                             $alreadyInConfig = false;
                             foreach ($adAccountsToProcess as $aac) {
                                 if ((string)$aac['id'] === $adAccId) {
                                     $alreadyInConfig = true;
+
                                     break;
                                 }
                             }
-                            if (!$alreadyInConfig) {
+                            if (! $alreadyInConfig) {
                                 $adAccName = $apiAdAcc['name'] ?? "Ad Account " . $adAccId;
-                                $includeFilter = MetricRequests::getFacebookFilter($mergedFbConfig, 'AD_ACCOUNT', 'cache_include');
-                                $excludeFilter = MetricRequests::getFacebookFilter($mergedFbConfig, 'AD_ACCOUNT', 'cache_exclude');
+                                $includeFilter = \Classes\Services\Sync\Facebook\FacebookEntitySync::getFacebookFilter($mergedFbConfig, 'AD_ACCOUNT', 'cache_include');
+                                $excludeFilter = \Classes\Services\Sync\Facebook\FacebookEntitySync::getFacebookFilter($mergedFbConfig, 'AD_ACCOUNT', 'cache_exclude');
                                 if (Helpers::matchesFilter($adAccName, $includeFilter, $excludeFilter) || Helpers::matchesFilter($adAccId, $includeFilter, $excludeFilter)) {
                                     $adAccountsToProcess[] = [
                                         'id' => $adAccId,
                                         'name' => $adAccName,
                                         'data' => $apiAdAcc,
-                                        'enabled' => true
+                                        'enabled' => true,
                                     ];
                                 }
                             }
@@ -417,12 +421,12 @@ class InitializeEntitiesCommand extends Command
             foreach ($adAccountsToProcess as $adAccount) {
                 /** @var ChanneledAccount|null $adAccountEntity */
                 $adAccountEntity = $channeledAccountRepository->getByPlatformId($adAccount['id'], Channel::facebook_marketing->value);
-                
+
                 $apiAdAccData = $apiAdAccsMap[$adAccount['id']] ?? null;
                 $rawData = array_merge($apiAdAccData ?? [], $adAccount['data'] ?? [], $adAccount);
                 $channeledAccountName = $apiAdAccData['name'] ?? $adAccount['name'] ?? $fbGroupName ?? ("Ad Account " . $adAccount['id']);
-                
-                if (!$adAccountEntity) {
+
+                if (! $adAccountEntity) {
                     $channeledAccount = new ChanneledAccount();
                     $channeledAccount->addPlatformId($adAccount['id'])
                         ->addAccount($accountEntity)
@@ -460,34 +464,32 @@ class InitializeEntitiesCommand extends Command
         } catch (Exception $e) {
             $this->logger->error("Error during initialization: {$e->getMessage()}\nStack trace: {$e->getTraceAsString()}");
             $output->writeln("<error>Error during initialization: {$e->getMessage()}</error>");
+
             return Command::FAILURE;
         }
     }
 
     protected function fetchGscSites(array $configRaw, \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider $authProvider): array
     {
-        $gscApi = new \Anibalealvarezs\GoogleApi\Services\SearchConsole\SearchConsoleApi(
-            redirectUrl: $configRaw['google_search_console']['redirect_uri'] ?? $configRaw['google']['redirect_uri'] ?? '',
-            clientId: $configRaw['google_search_console']['client_id'] ?? $configRaw['google']['client_id'] ?? $_ENV['GOOGLE_CLIENT_ID'] ?? '',
-            clientSecret: $configRaw['google_search_console']['client_secret'] ?? $configRaw['google']['client_secret'] ?? $_ENV['GOOGLE_CLIENT_SECRET'] ?? '',
-            refreshToken: $configRaw['google_search_console']['refresh_token'] ?? $configRaw['google']['refresh_token'] ?? '',
-            userId: $configRaw['google_search_console']['user_id'] ?? $configRaw['google']['user_id'] ?? '',
-            scopes: $authProvider->getScopes(),
-            token: $authProvider->getAccessToken(),
-            tokenPath: $configRaw['google_search_console']['token_path'] ?? $configRaw['google']['token_path'] ?? ""
-        );
+        $gscConfig = DriverInitializer::validateConfig('google_search_console', $this->logger);
+        $gscApi = DriverInitializer::initializeApi('google_search_console', $gscConfig, $this->logger);
+
         return $gscApi->getSites();
     }
 
     protected function fetchFbPages(array $fbConfig): array
     {
-        $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $this->logger);
+        $config = DriverInitializer::validateConfig('facebook_marketing', $this->logger);
+        $fbApi = DriverInitializer::initializeApi('facebook_marketing', $config, $this->logger);
+
         return $fbApi->getMyPages(fields: 'id,name,username,access_token,instagram_business_account{id,name,username}');
     }
 
     protected function fetchFbAdAccounts(array $fbConfig): array
     {
-        $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $this->logger);
+        $config = DriverInitializer::validateConfig('facebook_marketing', $this->logger);
+        $fbApi = DriverInitializer::initializeApi('facebook_marketing', $config, $this->logger);
+
         return $fbApi->getMyAdAccounts(fields: 'id,account_id,name,currency,timezone_name');
     }
 }

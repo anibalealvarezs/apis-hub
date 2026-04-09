@@ -20,6 +20,7 @@ use Entities\Analytics\Page;
 use Entities\Analytics\Post;
 use Entities\Analytics\Product;
 use Entities\Analytics\Query;
+use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
 use Helpers\Helpers;
 use RuntimeException;
 

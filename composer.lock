@@ -63,13 +63,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/amazon-hub-driver.git",
-                "reference": "b8c3ae64acf7f9cc7d912a6186e9e0624b90a685"
+                "reference": "4652aa702cc7a5681e046d4dc54402e68834b08c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/amazon-hub-driver/anibalealvarezs-amazon-hub-driver-b8c3ae64acf7f9cc7d912a6186e9e0624b90a685-zip-eda4ee.zip",
-                "reference": "b8c3ae64acf7f9cc7d912a6186e9e0624b90a685",
-                "shasum": "fc7608c3dbea78942721f29a50621b1fcec0efdd"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/amazon-hub-driver/anibalealvarezs-amazon-hub-driver-4652aa702cc7a5681e046d4dc54402e68834b08c-zip-dc074c.zip",
+                "reference": "4652aa702cc7a5681e046d4dc54402e68834b08c",
+                "shasum": "b169b0b18f54ffdb87b905abf62cd74759bc0d8a"
             },
             "require": {
                 "anibalealvarezs/amazon-api": "dev-main",
@@ -95,7 +95,7 @@
                 }
             ],
             "description": "Amazon driver for the Hub ecosystem",
-            "time": "2026-04-09T01:11:10+00:00"
+            "time": "2026-04-09T14:41:17+00:00"
         },
         {
             "name": "anibalealvarezs/api-client-skeleton",
@@ -341,13 +341,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "aa4164825b9b47bb11354f94a0ed12f4daf3cfc4"
+                "reference": "d7e0f839003177331c2e88cc7235a36ec155c32e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-aa4164825b9b47bb11354f94a0ed12f4daf3cfc4-zip-fc82ce.zip",
-                "reference": "aa4164825b9b47bb11354f94a0ed12f4daf3cfc4",
-                "shasum": "3d238a430c527a3471f0dac0a4d04077a50da7af"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-d7e0f839003177331c2e88cc7235a36ec155c32e-zip-a72e16.zip",
+                "reference": "d7e0f839003177331c2e88cc7235a36ec155c32e",
+                "shasum": "b3a473ee130dfde347898f9c49fdf903e8946ee5"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -368,7 +368,7 @@
                 "MIT"
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-04-09T14:23:01+00:00"
+            "time": "2026-04-09T14:33:31+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -376,13 +376,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/klaviyo-api.git",
-                "reference": "978a87316559f64cbf7151cb3fe7d5ba6fe4557c"
+                "reference": "dcdb4253e4645acfba41eb0d3861615f2624bc44"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/klaviyo-api/anibalealvarezs-klaviyo-api-978a87316559f64cbf7151cb3fe7d5ba6fe4557c-zip-4e4834.zip",
-                "reference": "978a87316559f64cbf7151cb3fe7d5ba6fe4557c",
-                "shasum": "2cfaa4d0ba555f6229db074fb12c3fe9d38ee7d9"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/klaviyo-api/anibalealvarezs-klaviyo-api-dcdb4253e4645acfba41eb0d3861615f2624bc44-zip-0c6a28.zip",
+                "reference": "dcdb4253e4645acfba41eb0d3861615f2624bc44",
+                "shasum": "a711faabef7dbf658ce6c4bc7b96fee66fabdb4b"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "@dev",
@@ -418,7 +418,7 @@
                 }
             ],
             "description": "description",
-            "time": "2026-04-09T13:52:35+00:00"
+            "time": "2026-04-09T14:36:33+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-hub-driver",
@@ -505,13 +505,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "497564274b1a96567d04831e1b0c0d73ca28665e"
+                "reference": "778a9190dc1ee68bfe1d03f9727117d8661482f1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-497564274b1a96567d04831e1b0c0d73ca28665e-zip-a59dae.zip",
-                "reference": "497564274b1a96567d04831e1b0c0d73ca28665e",
-                "shasum": "42c3f0721c9541e7b04e5804e4bc5d85ac354ef3"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-778a9190dc1ee68bfe1d03f9727117d8661482f1-zip-7dac7d.zip",
+                "reference": "778a9190dc1ee68bfe1d03f9727117d8661482f1",
+                "shasum": "5660fedd7b78787d1d787509fdfb9b1f76821d1a"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -532,7 +532,7 @@
                 "MIT"
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-04-09T14:23:02+00:00"
+            "time": "2026-04-09T14:32:33+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
@@ -1931,12 +1931,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/persistence.git",
-                "reference": "5785dc79a0553ba41b0dda8a7ee792053e6186c8"
+                "reference": "3d72e06bf35b97184a7c9054ea22c1bd67b6f28e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/persistence/zipball/5785dc79a0553ba41b0dda8a7ee792053e6186c8",
-                "reference": "5785dc79a0553ba41b0dda8a7ee792053e6186c8",
+                "url": "https://api.github.com/repos/doctrine/persistence/zipball/3d72e06bf35b97184a7c9054ea22c1bd67b6f28e",
+                "reference": "3d72e06bf35b97184a7c9054ea22c1bd67b6f28e",
                 "shasum": ""
             },
             "require": {
@@ -2019,7 +2019,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-04T19:40:43+00:00"
+            "time": "2026-03-18T10:17:26+00:00"
         },
         {
             "name": "fakerphp/faker",
@@ -8243,23 +8243,23 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
+        "anibalealvarezs/amazon-hub-driver": 20,
         "anibalealvarezs/api-client-skeleton": 20,
+        "anibalealvarezs/bigcommerce-hub-driver": 20,
         "anibalealvarezs/facebook-graph-api": 20,
         "anibalealvarezs/google-api": 20,
-        "predis/predis": 20,
         "anibalealvarezs/google-hub-driver": 20,
-        "anibalealvarezs/meta-hub-driver": 20,
         "anibalealvarezs/klaviyo-hub-driver": 20,
-        "anibalealvarezs/shopify-hub-driver": 20,
-        "anibalealvarezs/netsuite-hub-driver": 20,
-        "anibalealvarezs/amazon-hub-driver": 20,
-        "anibalealvarezs/bigcommerce-hub-driver": 20,
-        "anibalealvarezs/pinterest-hub-driver": 20,
         "anibalealvarezs/linkedin-hub-driver": 20,
+        "anibalealvarezs/meta-hub-driver": 20,
+        "anibalealvarezs/netsuite-hub-driver": 20,
+        "anibalealvarezs/pinterest-hub-driver": 20,
+        "anibalealvarezs/shopify-hub-driver": 20,
         "anibalealvarezs/tiktok-hub-driver": 20,
-        "anibalealvarezs/x-hub-driver": 20,
         "anibalealvarezs/triple-whale-hub-driver": 20,
-        "mikey179/vfsstream": 20
+        "anibalealvarezs/x-hub-driver": 20,
+        "mikey179/vfsstream": 20,
+        "predis/predis": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
@@ -8267,9 +8267,9 @@
         "php": ">=8.1",
         "ext-json": "*"
     },
-    "platform-dev": [],
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.3.0"
     },
-    "plugin-api-version": "2.3.0"
+    "plugin-api-version": "2.9.0"
 }

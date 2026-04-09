@@ -10,223 +10,47 @@ use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
 use Enums\Channel;
-use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
+use Psr\Log\LoggerInterface;
 use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
 class CustomerRequests implements RequestInterface
 {
+    
     /**
-     * @return \Enums\Channel[]
-     */
-    public static function supportedChannels(): array
-    {
-        return [
-            Channel::shopify,
-            Channel::klaviyo,
-            Channel::facebook_marketing,
-            Channel::bigcommerce,
-            Channel::netsuite,
-            Channel::amazon,
-            Channel::instagram,
-            Channel::google_analytics,
-            Channel::pinterest,
-            Channel::linkedin,
-            Channel::x,
-        ];
-    }
-
-    /**
-     * @param string|null $createdAtMin
-     * @param string|null $createdAtMax
-     * @param array|null $fields
+     * @param \Enums\Channel|string $channel
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param \Psr\Log\LoggerInterface|null $logger
+     * @param int|null $jobId
      * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     * @throws GuzzleException
-     * @throws NotSupported
+     * @return \Symfony\Component\HttpFoundation\Response
+     * @throws \Exception
      */
-    public static function getListFromShopify(
-        ?string $createdAtMin = null,
-        ?string $createdAtMax = null,
-        ?array $fields = null,
-        ?object $filters = null,
-        string|bool $resume = true,
-        ?int $jobId = null
-    ): Response {
-        return (new \Core\Services\SyncService())->execute('shopify', $createdAtMin, $createdAtMax, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'customers',
-            'fields' => $fields,
-            'filters' => $filters,
-        ]);
-    }
+    public static function getList(
+        \Enums\Channel|string $channel,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?int $jobId = null,
+        ?object $filters = null
+    ): \Symfony\Component\HttpFoundation\Response {
+        $chanEnum = ($channel instanceof \Enums\Channel) ? $channel : \Enums\Channel::tryFromName((string)$channel);
+        $chanKey = $chanEnum?->name ?? (string)$channel;
 
-    /**
-     * @param string|null $createdAtMin
-     * @param string|null $createdAtMax
-     * @param array|null $fields
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromKlaviyo(
-        ?string $createdAtMin = null,
-        ?string $createdAtMax = null,
-        ?array $fields = null,
-        ?object $filters = null,
-        string|bool $resume = true,
-        ?int $jobId = null
-    ): Response {
-        return (new \Core\Services\SyncService())->execute('klaviyo', $createdAtMin, $createdAtMax, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'customers',
-            'fields' => $fields,
-            'filters' => $filters,
-        ]);
-    }
+        // Intelligent date resolution
+        $start = $startDate;
+        $end = $endDate;
+        if (in_array($chanKey, ['shopify', 'klaviyo', 'bigcommerce', 'netsuite'])) {
+            $start = $filters->createdAtMin ?? $startDate;
+            $end = $filters->createdAtMax ?? $endDate;
+        }
 
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromFacebookMarketing(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return (new \Core\Services\SyncService())->execute('facebook_marketing', null, null, [
+        return (new \Core\Services\SyncService())->execute($chanKey, $start, $end, [
             'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'customers',
-            'filters' => $filters,
-        ]);
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromBigCommerce(
-        ?string $createdAtMin = null,
-        ?string $createdAtMax = null,
-        ?object $filters = null,
-        string|bool $resume = true,
-        ?int $jobId = null
-    ): Response {
-        return (new \Core\Services\SyncService())->execute('bigcommerce', $createdAtMin, $createdAtMax, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'customers',
-            'filters' => $filters,
-        ]);
-    }
-
-    /**
-     * @param string|null $createdAtMin
-     * @param string|null $createdAtMax
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromNetSuite(
-        ?string $createdAtMin = null,
-        ?string $createdAtMax = null,
-        ?object $filters = null,
-        string|bool $resume = true,
-        ?int $jobId = null
-    ): Response {
-        return (new \Core\Services\SyncService())->execute('netsuite', $createdAtMin, $createdAtMax, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'customers',
-            'filters' => $filters,
-        ]);
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromAmazon(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return (new \Core\Services\SyncService())->execute('amazon', null, null, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'customers',
-            'filters' => $filters,
-        ]);
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromInstagram(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return (new \Core\Services\SyncService())->execute('facebook_organic', null, null, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'customers',
-            'filters' => $filters,
-        ]);
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromGoogleAnalytics(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return (new \Core\Services\SyncService())->execute('google_analytics', null, null, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'customers',
-            'filters' => $filters,
-        ]);
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromPinterest(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return (new \Core\Services\SyncService())->execute('pinterest', null, null, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'customers',
-            'filters' => $filters,
-        ]);
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromLinkedIn(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return (new \Core\Services\SyncService())->execute('linkedin', null, null, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'customers',
-            'filters' => $filters,
-        ]);
-    }
-
-    public static function getListFromX(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return (new \Core\Services\SyncService())->execute('x', null, null, [
-            'jobId' => $jobId,
-            'resume' => $resume,
+            'resume' => $filters->resume ?? true,
             'type' => 'customers',
             'filters' => $filters,
         ]);

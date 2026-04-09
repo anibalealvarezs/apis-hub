@@ -2,6 +2,7 @@
 
 namespace Commands;
 
+use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
 use DateTime;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,9 +21,7 @@ use Enums\Account as AccountType;
 use Enums\Channel;
 use Enums\Country as CountryEnum;
 use Enums\Device as DeviceType;
-use Enums\Period;
 use Faker\Factory;
-use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\ProgressBar;
@@ -41,7 +40,7 @@ class SeedDemoDataCommand extends Command
     private Connection $conn;
     private array $bufferConfigs = [];
     private const BULK_SIZE = 2000;
-    
+
     private array $ages = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+'];
     private array $genders = ['Female', 'Male', 'Unknown'];
     private array $dimensionSetCache = [];
@@ -65,7 +64,7 @@ class SeedDemoDataCommand extends Command
         $allChannels = ['google_search_console', 'facebook_marketing', 'facebook_organic'];
         $channelsInput = $input->getOption('channels');
         $channels = $channelsInput ? explode(',', $channelsInput) : $allChannels;
-        $isFresh = $input->getOption('fresh') || !$channelsInput;
+        $isFresh = $input->getOption('fresh') || ! $channelsInput;
 
         $output->writeln("<info>🚀 Seeding Realistic Demo Data...</info>");
         if ($isFresh) {
@@ -87,7 +86,7 @@ class SeedDemoDataCommand extends Command
 
         $platform = $this->conn->getDatabasePlatform();
         $isPostgres = str_contains(strtolower(get_class($platform)), 'postgre');
-        
+
         if ($isPostgres) {
             $this->conn->executeStatement("SET session_replication_role = 'replica'");
         } else {
@@ -97,11 +96,11 @@ class SeedDemoDataCommand extends Command
         if ($isFresh) {
             $output->writeln("🧹 Wiping tables...");
             $tables = ['channeled_metrics', 'metrics', 'metric_configs', 'dimension_set_items', 'dimension_sets', 'dimension_values', 'dimension_keys', 'channeled_ads', 'channeled_ad_groups', 'channeled_campaigns', 'campaigns', 'channeled_accounts', 'accounts', 'pages', 'queries', 'posts', 'countries', 'devices'];
-            foreach ($tables as $table) { 
+            foreach ($tables as $table) {
                 try {
                     $output->write("   - Truncating $table... ");
                     $truncateSql = $isPostgres ? "TRUNCATE TABLE $table RESTART IDENTITY CASCADE" : "TRUNCATE TABLE $table";
-                    $this->conn->executeStatement($truncateSql); 
+                    $this->conn->executeStatement($truncateSql);
                     $output->writeln("<info>OK</info>");
                 } catch (\Throwable $e) {
                     $output->writeln("<comment>⚠️ Skipped: " . $e->getMessage() . "</comment>");
@@ -111,13 +110,14 @@ class SeedDemoDataCommand extends Command
             $output->writeln("🧹 Cleaning existing data for selected channels...");
             foreach ($channels as $chanName) {
                 $chan = Channel::tryFromName($chanName);
-                if (!$chan) {
+                if (! $chan) {
                     $output->writeln("<comment>⚠️ Channel '$chanName' unknown, skipping cleanup.</comment>");
+
                     continue;
                 }
                 $chanId = $chan->value;
                 $output->writeln("🧹 Cleaning existing data for channel: $chanName ($chanId)...");
-                
+
                 $this->conn->executeStatement("DELETE FROM channeled_metrics WHERE channel = ?", [$chanId]);
                 $this->conn->executeStatement("DELETE FROM metrics WHERE metric_config_id IN (SELECT id FROM metric_configs WHERE channel = ?)", [$chanId]);
                 $this->conn->executeStatement("DELETE FROM metric_configs WHERE channel = ?", [$chanId]);
@@ -131,17 +131,23 @@ class SeedDemoDataCommand extends Command
 
         $output->writeln("🛠️ Ensuring Basic Entities (Countries)...");
         $this->seedBasicEntities();
-        
+
         $output->writeln("🛠️ Ensuring Dimension Hierarchy...");
         $this->seedDimensionHierarchy($output);
 
-        if (in_array('google_search_console', $channels)) { $this->seedGscData($output); }
-        if (in_array('facebook_marketing', $channels)) { $this->seedFacebookMarketingRealistic($output); }
-        if (in_array('facebook_organic', $channels)) { $this->seedFacebookOrganicDataUnified($output); }
+        if (in_array('google_search_console', $channels)) {
+            $this->seedGscData($output);
+        }
+        if (in_array('facebook_marketing', $channels)) {
+            $this->seedFacebookMarketingRealistic($output);
+        }
+        if (in_array('facebook_organic', $channels)) {
+            $this->seedFacebookOrganicDataUnified($output);
+        }
 
         $output->writeln("💾 Final flushing and synchronization...");
         $this->flushAll();
-        
+
         if ($isPostgres) {
             $this->conn->executeStatement("SET session_replication_role = 'origin'");
         } else {
@@ -149,6 +155,7 @@ class SeedDemoDataCommand extends Command
         }
 
         $output->writeln("\n<info>✅ Seeding Completed!</info>");
+
         return Command::SUCCESS;
     }
 
@@ -161,9 +168,13 @@ class SeedDemoDataCommand extends Command
     {
         foreach ([CountryEnum::USA, CountryEnum::ESP, CountryEnum::MEX, CountryEnum::COL] as $c) {
             $existing = $this->conn->fetchOne("SELECT id FROM countries WHERE name = ?", [$c->getFullName()]);
-            if ($existing) continue;
-            
-            $country = new Country(); $country->addCode($c)->addName($c->getFullName()); $this->entityManager->persist($country);
+            if ($existing) {
+                continue;
+            }
+
+            $country = new Country();
+            $country->addCode($c)->addName($c->getFullName());
+            $this->entityManager->persist($country);
         }
         $this->entityManager->flush();
     }
@@ -171,50 +182,50 @@ class SeedDemoDataCommand extends Command
     private function seedDimensionHierarchy(OutputInterface $output): void
     {
         $output->writeln("🛠️ Ensuring Dimensions...");
-        
+
         // Age Key
         $ageK = $this->conn->fetchOne("SELECT id FROM dimension_keys WHERE name = 'age'");
-        if (!$ageK) {
+        if (! $ageK) {
             $this->conn->insert('dimension_keys', ['name' => 'age', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
             $ageK = $this->conn->lastInsertId();
         }
-        
+
         // Gender Key
         $genK = $this->conn->fetchOne("SELECT id FROM dimension_keys WHERE name = 'gender'");
-        if (!$genK) {
+        if (! $genK) {
             $this->conn->insert('dimension_keys', ['name' => 'gender', 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
             $genK = $this->conn->lastInsertId();
         }
-        
+
         $ageValIds = [];
         foreach ($this->ages as $age) {
             $id = $this->conn->fetchOne("SELECT id FROM dimension_values WHERE dimension_key_id = ? AND value = ?", [$ageK, $age]);
-            if (!$id) {
+            if (! $id) {
                 $this->conn->insert('dimension_values', ['dimension_key_id' => $ageK, 'value' => $age, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
                 $id = $this->conn->lastInsertId();
             }
             $ageValIds[$age] = $id;
         }
-        
+
         $genValIds = [];
         foreach ($this->genders as $gen) {
             $id = $this->conn->fetchOne("SELECT id FROM dimension_values WHERE dimension_key_id = ? AND value = ?", [$genK, $gen]);
-            if (!$id) {
+            if (! $id) {
                 $this->conn->insert('dimension_values', ['dimension_key_id' => $genK, 'value' => $gen, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
                 $id = $this->conn->lastInsertId();
             }
             $genValIds[$gen] = $id;
         }
-        
+
         foreach ($this->ages as $age) {
             foreach ($this->genders as $gen) {
                 $dimensions = [
                     ['dimensionKey' => 'age', 'dimensionValue' => $age],
-                    ['dimensionKey' => 'gender', 'dimensionValue' => $gen]
+                    ['dimensionKey' => 'gender', 'dimensionValue' => $gen],
                 ];
                 $h = KeyGenerator::generateDimensionsHash($dimensions);
                 $setId = $this->conn->fetchOne("SELECT id FROM dimension_sets WHERE hash = ?", [$h]);
-                if (!$setId) {
+                if (! $setId) {
                     $this->conn->insert('dimension_sets', ['hash' => $h, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')]);
                     $setId = $this->conn->lastInsertId();
                     $this->conn->insert('dimension_set_items', ['dimension_set_id' => $setId, 'dimension_value_id' => $ageValIds[$age]]);
@@ -228,13 +239,13 @@ class SeedDemoDataCommand extends Command
     private function seedGscData(OutputInterface $output): void
     {
         $output->writeln("🔍 GSC (10 Sites, 6 Months, Correct Universal SEO Domain Model)...");
-        
+
         $gscChan = Channel::google_search_console;
-        $dates = $this->getDates(180); 
+        $dates = $this->getDates(180);
         $countryEnumValues = ['USA', 'ESP', 'MEX', 'COL'];
         $deviceEnumValues = ['desktop', 'mobile', 'tablet'];
         $appearances = ['AMP_TOP_STORIES', 'PRODUCT_SNIPPETS', 'REVIEW_SNIPPET', 'VIDEO', 'ORGANIC_SHOPPING'];
-        
+
         $dimManager = new \Classes\DimensionManager($this->entityManager);
 
         // Pre-fetch Universal Entities
@@ -242,7 +253,7 @@ class SeedDemoDataCommand extends Command
         foreach ($countryEnumValues as $code) {
             $enum = CountryEnum::from($code);
             $c = $this->entityManager->getRepository(Country::class)->findOneBy(['code' => $enum]);
-            if (!$c) {
+            if (! $c) {
                 $c = (new Country())->addCode($enum)->addName($code);
                 $this->entityManager->persist($c);
             }
@@ -252,7 +263,7 @@ class SeedDemoDataCommand extends Command
         foreach ($deviceEnumValues as $type) {
             $enum = DeviceType::from($type);
             $d = $this->entityManager->getRepository(Device::class)->findOneBy(['type' => $enum]);
-            if (!$d) {
+            if (! $d) {
                 $d = (new Device())->addType($enum);
                 $this->entityManager->persist($d);
             }
@@ -263,19 +274,23 @@ class SeedDemoDataCommand extends Command
         for ($s = 1; $s <= 10; $s++) {
             $hostname = "blog" . $s . ".demo-agency.com";
             $siteName = "Brand Blog $s ($hostname)";
-            
+
             $property = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $hostname]);
-            if (!$property) {
+            if (! $property) {
                 $property = (new Page())->addUrl("https://$hostname")->addTitle($siteName)->addHostname($hostname)->addPlatformId($hostname)->addCanonicalId($hostname);
                 $this->entityManager->persist($property);
                 $this->entityManager->flush();
             }
 
             $childUrls = [];
-            for($i=0; $i<20; $i++) $childUrls[] = "https://$hostname/article-" . $this->faker->slug();
-            
+            for ($i = 0; $i < 20; $i++) {
+                $childUrls[] = "https://$hostname/article-" . $this->faker->slug();
+            }
+
             $queries = [];
-            for($i=0; $i<30; $i++) $queries[] = $this->faker->words(rand(1, 4), true);
+            for ($i = 0; $i < 30; $i++) {
+                $queries[] = $this->faker->words(rand(1, 4), true);
+            }
 
             foreach ($dates as $date) {
                 for ($j = 0; $j < 8; $j++) {
@@ -283,26 +298,32 @@ class SeedDemoDataCommand extends Command
                     $qStr = $queries[array_rand($queries)];
                     $code = $countryEnumValues[array_rand($countryEnumValues)];
                     $type = $deviceEnumValues[array_rand($deviceEnumValues)];
-                    
-                    $country = $countries[$code]; $device = $devices[$type];
+
+                    $country = $countries[$code];
+                    $device = $devices[$type];
                     $appearance = $appearances[array_rand($appearances)];
 
                     // Resolve Dimensions (Universal values are OUT, but Page and Query are dimensions!)
                     $dimensionSet = $dimManager->resolveDimensionSet([
                         ['dimensionKey' => 'page', 'dimensionValue' => $url],
                         ['dimensionKey' => 'query', 'dimensionValue' => $qStr],
-                        ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $appearance]
+                        ['dimensionKey' => 'searchAppearance', 'dimensionValue' => $appearance],
                     ]);
                     $setId = $dimensionSet->getId();
 
-                    $imps = rand(10, 200); $clicks = (int)($imps * rand(1, 10) / 100); $pos = (float)rand(10, 80) / 10;
+                    $imps = rand(10, 200);
+                    $clicks = (int)($imps * rand(1, 10) / 100);
+                    $pos = (float)rand(10, 80) / 10;
                     $data = ['impressions' => $imps, 'clicks' => $clicks, 'ctr' => $imps > 0 ? $clicks / $imps : 0, 'position' => $pos, 'keys' => [$url, $qStr, $code, $type, $appearance]];
 
                     foreach (['impressions', 'clicks', 'ctr', 'position'] as $name) {
                         $this->queueMetric(
-                            channel: $gscChan, name: $name, date: $date, value: $data[$name], 
+                            channel: $gscChan,
+                            name: $name,
+                            date: $date,
+                            value: $data[$name],
                             setId: $setId,
-                            pageId: $property->getId(), 
+                            pageId: $property->getId(),
                             queryId: null, // Strategic Only
                             countryId: $country->getId(),
                             deviceId: $device->getId(),
@@ -317,7 +338,7 @@ class SeedDemoDataCommand extends Command
                     }
                 }
             }
-            $this->entityManager->clear(); 
+            $this->entityManager->clear();
             $dimManager->clearCaches();
             $output->writeln("   - Site $hostname complete.");
         }
@@ -327,18 +348,18 @@ class SeedDemoDataCommand extends Command
     private function seedFacebookMarketingRealistic(OutputInterface $output): void
     {
         $output->writeln("📊 FB Marketing (Massive Simulation, JSON Source Logic)...");
-        
+
         $fbChan = Channel::facebook_marketing;
         $accCount = 30; // 30 Ad Accounts as requested
-        $dates = $this->getDates(30); 
+        $dates = $this->getDates(30);
         $statuses = ['ACTIVE', 'PAUSED', 'ARCHIVED'];
         $objectives = ['OUTCOME_SALES', 'OUTCOME_AWARENESS', 'OUTCOME_LEADS', 'OUTCOME_TRAFFIC'];
 
         // Parent Account (Client)
         $fbParent = $this->entityManager->getRepository(Account::class)->findOneBy(['name' => "Marketing Demo Client"]);
-        if (!$fbParent) {
+        if (! $fbParent) {
             $fbParent = (new Account())->addName("Marketing Demo Client");
-            $this->entityManager->persist($fbParent); 
+            $this->entityManager->persist($fbParent);
             $this->entityManager->flush();
         }
         $gId = $fbParent->getId();
@@ -360,18 +381,18 @@ class SeedDemoDataCommand extends Command
                     'account_status' => 1,
                     'currency' => 'USD',
                     'timezone_name' => 'America/New_York',
-                    'business_name' => $this->faker->company()
+                    'business_name' => $this->faker->company(),
                 ]);
-            $this->entityManager->persist($ca); 
+            $this->entityManager->persist($ca);
             $this->entityManager->flush();
 
             // 2. Campaigns
             $campCount = rand(5, 10);
             for ($c = 0; $c < $campCount; $c++) {
                 $gCpPId = $this->generatePlatformId();
-                $campG = (new Campaign())->addCampaignId($gCpPId)->addName($this->faker->catchPhrase()); 
+                $campG = (new Campaign())->addCampaignId($gCpPId)->addName($this->faker->catchPhrase());
                 $this->entityManager->persist($campG);
-                
+
                 $cp = (new ChanneledCampaign())
                     ->addPlatformId($gCpPId)
                     ->addChanneledAccount($ca)
@@ -384,7 +405,7 @@ class SeedDemoDataCommand extends Command
                         'objective' => $objectives[array_rand($objectives)],
                         'status' => $statuses[array_rand($statuses)],
                         'buying_type' => 'AUCTION',
-                        'daily_budget' => rand(5000, 20000) // cents
+                        'daily_budget' => rand(5000, 20000), // cents
                     ]);
                 $this->entityManager->persist($cp);
                 $this->entityManager->flush();
@@ -406,7 +427,7 @@ class SeedDemoDataCommand extends Command
                             'status' => $statuses[array_rand($statuses)],
                             'billing_event' => 'IMPRESSIONS',
                             'optimization_goal' => 'REACH',
-                            'targeting' => ['geo_locations' => ['countries' => ['US']]]
+                            'targeting' => ['geo_locations' => ['countries' => ['US']]],
                         ]);
                     $this->entityManager->persist($ag);
                     $this->entityManager->flush();
@@ -427,7 +448,7 @@ class SeedDemoDataCommand extends Command
                                 'name' => $adName,
                                 'status' => $statuses[array_rand($statuses)],
                                 'creative' => ['id' => 'cre_' . rand(1000, 9999)],
-                                'preview_shareable_link' => "https://fb.com/ads/preview/$adPId"
+                                'preview_shareable_link' => "https://fb.com/ads/preview/$adPId",
                             ]);
                         $this->entityManager->persist($ad);
                         $this->entityManager->flush();
@@ -441,7 +462,8 @@ class SeedDemoDataCommand extends Command
             $this->entityManager->clear();
             $fbParent = $this->entityManager->getRepository(Account::class)->findOneBy(['id' => $gId]);
         }
-        $progress->finish(); $output->writeln("");
+        $progress->finish();
+        $output->writeln("");
     }
 
     private function seedRealisticAdDaily($dates, $gId, $caId, $gCpId, $cpId, $agId, $adId, $accName, $caPId, $gCpPId, $cpPId, $agPId, $adPId): void
@@ -450,40 +472,43 @@ class SeedDemoDataCommand extends Command
         foreach ($dates as $date) {
             $used = [];
             for ($b = 0; $b < rand(1, 2); $b++) { // Reduced dimensions for performance
-                $age = $this->ages[array_rand($this->ages)]; $gen = $this->genders[array_rand($this->genders)];
-                if (isset($used["$age|$gen"])) continue; $used["$age|$gen"] = true;
+                $age = $this->ages[array_rand($this->ages)];
+                $gen = $this->genders[array_rand($this->genders)];
+                if (isset($used["$age|$gen"])) {
+                    continue;
+                } $used["$age|$gen"] = true;
                 $setInfo = $this->dimensionSetCache["$age|$gen"];
                 $setId = $setInfo['id'];
                 $setHash = $setInfo['hash'];
-                
-                $imps = rand(100, 2000); 
+
+                $imps = rand(100, 2000);
                 $reach = (int)($imps * rand(70, 95) / 100);
                 $spend = (float)($imps * rand(5, 15) / 1000);
                 $clicks = (int)($imps * rand(1, 5) / 100);
-                
+
                 $data = [
-                    'impressions' => $imps, 
-                    'spend' => $spend, 
-                    'reach' => $reach, 
+                    'impressions' => $imps,
+                    'spend' => $spend,
+                    'reach' => $reach,
                     'clicks' => $clicks,
                     'ctr' => $imps > 0 ? $clicks / $imps : 0,
                     'cpc' => $clicks > 0 ? $spend / $clicks : 0,
-                    'results' => (int)($clicks * rand(5, 15) / 100)
+                    'results' => (int)($clicks * rand(5, 15) / 100),
                 ];
 
-                foreach ($data as $name => $val) { 
+                foreach ($data as $name => $val) {
                     $this->queueMetric(
-                        channel: $fbChan, 
-                        name: $name, 
-                        date: $date, 
-                        value: $val, 
-                        setId: $setId, 
+                        channel: $fbChan,
+                        name: $name,
+                        date: $date,
+                        value: $val,
+                        setId: $setId,
                         setHash: $setHash,
-                        caId: $caId, 
-                        gAccId: $gId, 
-                        gCpId: $gCpId, 
-                        cpId: $cpId, 
-                        agId: $agId, 
+                        caId: $caId,
+                        gAccId: $gId,
+                        gCpId: $gCpId,
+                        cpId: $cpId,
+                        agId: $agId,
                         adId: $adId,
                         accName: $accName,
                         caPId: $caPId,
@@ -492,7 +517,7 @@ class SeedDemoDataCommand extends Command
                         agPId: $agPId,
                         adPId: $adPId,
                         data: json_encode($data) // Here we store the "API Like" JSON source
-                    ); 
+                    );
                 }
             }
         }
@@ -501,11 +526,11 @@ class SeedDemoDataCommand extends Command
     private function seedFacebookOrganicDataUnified(OutputInterface $output): void
     {
         $output->writeln("🚀 Seeding High-Volume Realistic Demo Data...");
-        
+
         $fbChan = Channel::facebook_organic;
         $igMediaTypes = ['IMAGE', 'VIDEO', 'CAROUSEL_ALBUM', 'REEL'];
         $igProductTypes = ['FEED', 'REELS', 'STORY'];
-        $dates = $this->getDates(30); 
+        $dates = $this->getDates(30);
 
         // 1. Ensure 3 Demo Pages & Accounts exist (Dimensions)
         $pagesToSeed = 3;
@@ -513,27 +538,27 @@ class SeedDemoDataCommand extends Command
         for ($i = 1; $i <= $pagesToSeed; $i++) {
             $name = "Demo Brand $i";
             $fbAcc = $this->entityManager->getRepository(Account::class)->findOneBy(['name' => "$name (FB)"]);
-            if (!$fbAcc) {
+            if (! $fbAcc) {
                 $fbAcc = (new Account())->addName("$name (FB)");
                 $this->entityManager->persist($fbAcc);
             }
-            
+
             $fbPId = "fb_page_$i";
             $page = $this->entityManager->getRepository(Page::class)->findOneBy(['platformId' => $fbPId]);
-            if (!$page) {
+            if (! $page) {
                 $page = (new Page())->addPlatformId($fbPId)->addAccount($fbAcc)->addTitle("$name FB Page")->addUrl("https://fb.com/$fbPId")->addCanonicalId($fbPId);
                 $this->entityManager->persist($page);
             }
 
             $caFb = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $fbPId]);
-            if (!$caFb) {
+            if (! $caFb) {
                 $caFb = (new ChanneledAccount())->addPlatformId($fbPId)->addAccount($fbAcc)->addType(AccountType::FACEBOOK_PAGE)->addChannel($fbChan->value)->addName("$name FB Page");
                 $this->entityManager->persist($caFb);
             }
 
             $igPId = "ig_acc_$i";
             $caIg = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $igPId]);
-            if (!$caIg) {
+            if (! $caIg) {
                 $caIg = (new ChanneledAccount())->addPlatformId($igPId)->addAccount($fbAcc)->addType(AccountType::INSTAGRAM)->addChannel($fbChan->value)->addName("$name IG Account");
                 $caIg->addData(['instagram_id' => $igPId, 'facebook_page_id' => $fbPId]); // Store it for lookup
                 $this->entityManager->persist($caIg);
@@ -555,14 +580,14 @@ class SeedDemoDataCommand extends Command
             $mediaEntities = [];
             $currentLifetimeValues = [];
             $igMediaCount = rand(100, 200);
-            
+
             $postParams = [];
             $now = date('Y-m-d H:i:s');
-            
+
             for ($m = 0; $m < $igMediaCount; $m++) {
                 $mediaPId = 'ig_media_' . $page->getId() . '_' . $m;
                 $itemDate = $dates[array_rand($dates)];
-                
+
                 $postParams[] = [
                     'post_id' => $mediaPId,
                     'account_id' => $fbParent->getId(),
@@ -574,19 +599,19 @@ class SeedDemoDataCommand extends Command
                         'media_type' => $igMediaTypes[array_rand($igMediaTypes)],
                         'media_product_type' => $igProductTypes[array_rand($igProductTypes)],
                         'permalink' => "https://www.instagram.com/p/demo_" . $mediaPId,
-                        'timestamp' => $itemDate . 'T07:00:00+0000'
+                        'timestamp' => $itemDate . 'T07:00:00+0000',
                     ]),
                     'created_at' => $now,
-                    'updated_at' => $now
+                    'updated_at' => $now,
                 ];
 
                 $postIg = new Post();
                 $postIg->addPostId($mediaPId)->addAccount($fbParent)->addPage($page)->addChanneledAccount($caIg);
                 $mediaEntities[] = $postIg;
-                
+
                 $currentLifetimeValues[$mediaPId] = [
                     'reach' => rand(10, 50), 'impressions' => rand(15, 60), 'likes' => 0, 'comments' => 0,
-                    'saved' => 0, 'shares' => 0, 'views' => 0, 'total_interactions' => 0
+                    'saved' => 0, 'shares' => 0, 'views' => 0, 'total_interactions' => 0,
                 ];
             }
 
@@ -595,7 +620,7 @@ class SeedDemoDataCommand extends Command
             for ($p = 0; $p < $fbPostCount; $p++) {
                 $postPId = 'fb_post_' . $page->getId() . '_' . $p;
                 $itemDate = $dates[array_rand($dates)];
-                
+
                 $postParams[] = [
                     'post_id' => $postPId,
                     'account_id' => $fbParent->getId(),
@@ -605,25 +630,25 @@ class SeedDemoDataCommand extends Command
                         'id' => $postPId,
                         'message' => $this->faker->sentence(),
                         'created_time' => $itemDate . 'T07:00:00+0000',
-                        'permalink_url' => "https://www.facebook.com/posts/demo_" . $postPId
+                        'permalink_url' => "https://www.facebook.com/posts/demo_" . $postPId,
                     ]),
                     'created_at' => $now,
-                    'updated_at' => $now
+                    'updated_at' => $now,
                 ];
             }
-            
+
             // Ultra-fast batch insert
-            if (!empty($postParams)) {
+            if (! empty($postParams)) {
                 $output->writeln(" \n➤ Creating $fbPostCount FB posts and $igMediaCount IG Media items for '{$page->getTitle()}'...");
                 $cols = array_keys($postParams[0]);
-                
+
                 $plat = $this->conn->getDatabasePlatform();
                 $isP = str_contains(strtolower(get_class($plat)), 'postgre');
                 $ignore = $isP ? "" : "IGNORE";
                 $suffix = $isP ? " ON CONFLICT DO NOTHING" : "";
-                
+
                 $sql = "INSERT $ignore INTO posts (" . implode(', ', $cols) . ") VALUES ";
-                
+
                 $values = [];
                 $params = [];
                 foreach ($postParams as $row) {
@@ -636,19 +661,19 @@ class SeedDemoDataCommand extends Command
                 $sql .= implode(', ', $values) . $suffix;
                 $this->entityManager->getConnection()->executeStatement($sql, $params);
             }
-            
+
             $output->writeln("  - Re-fetching post IDs from DB...");
             // Re-fetch posts for IDs
             $allPosts = $this->entityManager->getRepository(Post::class)->findBy(['page' => $page]);
             $fbPostEntities = [];
             $mediaMap = ['map' => []]; // We will populate this with real DB ids for IG media
-            
+
             foreach ($allPosts as $pst) {
                 if (str_starts_with($pst->getPostId(), 'fb_post_')) {
                     $fbPostEntities[] = $pst;
                 } elseif (str_starts_with($pst->getPostId(), 'ig_media_')) {
                     $mediaMap['map'][$pst->getPostId()] = $pst->getId();
-                    
+
                     // Update our IG Media objects with real IDs if needed
                     foreach ($mediaEntities as $mediaEntity) {
                         if ($mediaEntity->getPostId() === $pst->getPostId()) {
@@ -666,19 +691,19 @@ class SeedDemoDataCommand extends Command
             $pId = $page->getId();
             $pageUrl = $page->getUrl();
             $caFbId = $caFb->getId();
-            
+
             $fbPageMetrics = [
                 'page_fans' => [0, 10, 'trend'],
                 'page_impressions' => [50, 500],
                 'page_post_engagements' => [10, 100],
-                'page_views_total' => [5, 40]
+                'page_views_total' => [5, 40],
             ];
             $this->seedDailyMetrics($dates, $fbChan, $fbPageMetrics, $gId, $caFbId, null, null, null, $pId, $gAccName, (string)$caFb->getPlatformId(), null, null, null, $pageUrl, null);
 
             $fbPostMetrics = [
                 'post_impressions' => [10, 100],
                 'post_engagement' => [2, 20],
-                'post_reactions_by_type_total' => [1, 10]
+                'post_reactions_by_type_total' => [1, 10],
             ];
             foreach ($fbPostEntities as $fbPostEntity) {
                 $this->seedDailyMetrics($dates, $fbChan, $fbPostMetrics, $gId, $caFbId, null, null, $fbPostEntity->getId(), $pId, $gAccName, (string)$caFb->getPlatformId(), null, null, null, $pageUrl, $fbPostEntity->getPostId());
@@ -704,21 +729,20 @@ class SeedDemoDataCommand extends Command
                         ['name' => 'profile_links_taps', 'total_value' => ['value' => rand(0, 5)]],
                         ['name' => 'follows_and_unfollows', 'total_value' => ['value' => rand(-2, 5)]],
                         ['name' => 'replies', 'total_value' => ['value' => rand(0, 5)]],
-                        ['name' => 'accounts_engaged', 'total_value' => ['value' => rand(5, 40)]]
-                    ]
+                        ['name' => 'accounts_engaged', 'total_value' => ['value' => rand(5, 40)]],
+                    ],
                 ];
-                \Classes\Requests\MetricRequests::processInstagramAccount(
-                    ['id' => $page->getId(), 'ig_account' => (string)$caIg->getPlatformId()],
-                    $accountPayload,
-                    $this->entityManager,
-                    $fbParent,
+                $accountMetrics = \Anibalealvarezs\FacebookGraphApi\Conversions\FacebookOrganicMetricConvert::igAccountMetrics(
+                    $accountPayload['data'],
+                    $date,
                     $page,
-                    \Helpers\Helpers::setLogger('seed.log'),
-                    ['map' => [$page->getPlatformId() => $page->getId()]],
-                    $date,
-                    $date,
-                    []
+                    $fbParent,
+                    $caIg
                 );
+                foreach ($accountMetrics as $m) {
+                    $m->date = new DateTime($date);
+                    $allIgMediaMetrics->add($m);
+                }
 
                 // B. IG Media Metrics (Lifetime)
                 foreach ($mediaEntities as $media) {
@@ -730,10 +754,10 @@ class SeedDemoDataCommand extends Command
                     $currentLifetimeValues[$mId]['saved'] += rand(0, 3);
                     $currentLifetimeValues[$mId]['shares'] += rand(0, 2);
                     $currentLifetimeValues[$mId]['views'] += rand(10, 40);
-                    $currentLifetimeValues[$mId]['total_interactions'] = 
-                    $currentLifetimeValues[$mId]['likes'] + 
-                    $currentLifetimeValues[$mId]['comments'] + 
-                    $currentLifetimeValues[$mId]['saved'] + 
+                    $currentLifetimeValues[$mId]['total_interactions'] =
+                    $currentLifetimeValues[$mId]['likes'] +
+                    $currentLifetimeValues[$mId]['comments'] +
+                    $currentLifetimeValues[$mId]['saved'] +
                     $currentLifetimeValues[$mId]['shares'];
 
                     $mediaPayload = [];
@@ -741,8 +765,14 @@ class SeedDemoDataCommand extends Command
                         $mediaPayload[] = ['name' => $n, 'values' => [['value' => $v, 'end_time' => $date . 'T07:00:00+0000']]];
                     }
 
-                    $metrics = \Classes\Conversions\FacebookOrganicMetricConvert::igMediaMetrics(
-                        $mediaPayload, $date, $page, $media, $fbParent, $caIg, \Helpers\Helpers::setLogger('seed.log')
+                    $metrics = \Anibalealvarezs\FacebookGraphApi\Conversions\FacebookOrganicMetricConvert::igMediaMetrics(
+                        $mediaPayload,
+                        $date,
+                        $page,
+                        $media,
+                        $fbParent,
+                        $caIg,
+                        \Helpers\Helpers::setLogger('seed.log')
                     );
 
                     foreach ($metrics as $metric) {
@@ -758,7 +788,7 @@ class SeedDemoDataCommand extends Command
 
             $output->writeln("  - Running MetricsProcessor massive batch upsert (transactional) for IG Media...");
             // Execute Batch Processing for IG Media Metrics
-            if (!$allIgMediaMetrics->isEmpty()) {
+            if (! $allIgMediaMetrics->isEmpty()) {
                 try {
                     $this->entityManager->getConnection()->beginTransaction();
 
@@ -789,10 +819,11 @@ class SeedDemoDataCommand extends Command
                     if ($this->entityManager->getConnection()->isTransactionActive()) {
                         $this->entityManager->getConnection()->rollBack();
                     }
+
                     throw $e;
                 }
             }
-            
+
             $progress->advance();
         }
         $progress->finish();
@@ -807,29 +838,33 @@ class SeedDemoDataCommand extends Command
                 $min = $range[0];
                 $max = $range[1];
                 $isTrend = isset($range[2]) && $range[2] === 'trend';
-                
+
                 if ($isTrend) {
-                    if (!isset($trendValues[$name])) $trendValues[$name] = $min;
+                    if (! isset($trendValues[$name])) {
+                        $trendValues[$name] = $min;
+                    }
                     $trendValues[$name] += rand(-5, 15);
-                    if ($trendValues[$name] < $min) $trendValues[$name] = $min;
+                    if ($trendValues[$name] < $min) {
+                        $trendValues[$name] = $min;
+                    }
                     $val = $trendValues[$name];
                 } else {
                     $val = rand($min, $max);
                 }
-                
+
                 $this->queueMetric(
-                    channel: $channel, 
-                    name: $name, 
-                    date: $date, 
-                    value: $val, 
-                    setId: null, 
-                    pageId: $pageId, 
-                    adId: null, 
-                    agId: null, 
-                    cpId: $cpId, 
-                    caId: $caId, 
-                    gAccId: $gAccId, 
-                    gCpId: $gCpId, 
+                    channel: $channel,
+                    name: $name,
+                    date: $date,
+                    value: $val,
+                    setId: null,
+                    pageId: $pageId,
+                    adId: null,
+                    agId: null,
+                    cpId: $cpId,
+                    caId: $caId,
+                    gAccId: $gAccId,
+                    gCpId: $gCpId,
                     postId: $postId,
                     accName: $accName,
                     caPId: $caPId,
@@ -846,16 +881,52 @@ class SeedDemoDataCommand extends Command
 
     private function getDates($days): array
     {
-        $dates = []; $d = new DateTime("-$days days");
-        for ($i = 0; $i < $days; $i++) { $dates[] = $d->format('Y-m-d'); $d->modify('+1 day'); }
+        $dates = [];
+        $d = new DateTime("-$days days");
+        for ($i = 0; $i < $days; $i++) {
+            $dates[] = $d->format('Y-m-d');
+            $d->modify('+1 day');
+        }
+
         return $dates;
     }
 
     private function queueMetric(
-        Channel $channel, $name, $date, $value, $setId = null, $pageId = null, $adId = null, $agId = null, $cpId = null, $caId = null, $gAccId = null, $gCpId = null, $postId = null,
-        $queryId = null, $countryId = null, $deviceId = null, $productId = null, $customerId = null, $orderId = null, $creativeId = null,
-        ?string $accName = null, ?string $caPId = null, ?string $gCpPId = null, ?string $cpPId = null, ?string $agPId = null, ?string $adPId = null, ?string $pageUrl = null, ?string $postPId = null,
-        ?string $queryPId = null, ?string $countryPId = null, ?string $devicePId = null, ?string $productPId = null, ?string $customerPId = null, ?string $orderPId = null, ?string $creativePId = null,
+        Channel $channel,
+        $name,
+        $date,
+        $value,
+        $setId = null,
+        $pageId = null,
+        $adId = null,
+        $agId = null,
+        $cpId = null,
+        $caId = null,
+        $gAccId = null,
+        $gCpId = null,
+        $postId = null,
+        $queryId = null,
+        $countryId = null,
+        $deviceId = null,
+        $productId = null,
+        $customerId = null,
+        $orderId = null,
+        $creativeId = null,
+        ?string $accName = null,
+        ?string $caPId = null,
+        ?string $gCpPId = null,
+        ?string $cpPId = null,
+        ?string $agPId = null,
+        ?string $adPId = null,
+        ?string $pageUrl = null,
+        ?string $postPId = null,
+        ?string $queryPId = null,
+        ?string $countryPId = null,
+        ?string $devicePId = null,
+        ?string $productPId = null,
+        ?string $customerPId = null,
+        ?string $orderPId = null,
+        ?string $creativePId = null,
         ?string $data = null,
         ?string $setHash = null
     ): void {
@@ -881,17 +952,17 @@ class SeedDemoDataCommand extends Command
             dimensionSet: $setHash ?: $setId
         );
         $this->bufferConfigs[] = [
-            'channel' => $channel->value, 
-            'name' => $name, 
-            'period' => 'daily', 
-            'metric_date' => $date, 
-            'page_id' => $pageId, 
-            'channeled_ad_id' => $adId, 
-            'channeled_ad_group_id' => $agId, 
-            'channeled_campaign_id' => $cpId, 
-            'campaign_id' => $gCpId, 
-            'channeled_account_id' => $caId, 
-            'account_id' => $gAccId, 
+            'channel' => $channel->value,
+            'name' => $name,
+            'period' => 'daily',
+            'metric_date' => $date,
+            'page_id' => $pageId,
+            'channeled_ad_id' => $adId,
+            'channeled_ad_group_id' => $agId,
+            'channeled_campaign_id' => $cpId,
+            'campaign_id' => $gCpId,
+            'channeled_account_id' => $caId,
+            'account_id' => $gAccId,
             'post_id' => $postId,
             'query_id' => $queryId,
             'country_id' => $countryId,
@@ -900,33 +971,37 @@ class SeedDemoDataCommand extends Command
             'product_id' => $productId,
             'customer_id' => $customerId,
             'order_id' => $orderId,
-            'config_signature' => $sig, 
-            'value' => (float)$value, 
+            'config_signature' => $sig,
+            'value' => (float)$value,
             'dimension_set_id' => $setId,
-            'dimension_set_hash' => $setHash ?: ( $setId ? null : KeyGenerator::generateDimensionsHash([]) ), // Default unsegmented hash for null ID
-            'data' => $data
+            'dimension_set_hash' => $setHash ?: ($setId ? null : KeyGenerator::generateDimensionsHash([])), // Default unsegmented hash for null ID
+            'data' => $data,
         ];
-        if (count($this->bufferConfigs) >= self::BULK_SIZE) { $this->flushAll(); }
+        if (count($this->bufferConfigs) >= self::BULK_SIZE) {
+            $this->flushAll();
+        }
     }
 
     private function flushAll(): void
     {
-        if (empty($this->bufferConfigs)) return;
+        if (empty($this->bufferConfigs)) {
+            return;
+        }
         $now = date('Y-m-d H:i:s');
         $configsToInsert = [];
-        foreach ($this->bufferConfigs as $row) { 
+        foreach ($this->bufferConfigs as $row) {
             $configsToInsert[$row['config_signature']] = [
-                'channel' => $row['channel'], 
-                'name' => $row['name'], 
-                'period' => 'daily', 
-                'page_id' => $row['page_id'], 
+                'channel' => $row['channel'],
+                'name' => $row['name'],
+                'period' => 'daily',
+                'page_id' => $row['page_id'],
                 'post_id' => $row['post_id'],
-                'channeled_ad_id' => $row['channeled_ad_id'], 
-                'channeled_ad_group_id' => $row['channeled_ad_group_id'], 
-                'channeled_campaign_id' => $row['channeled_campaign_id'], 
-                'campaign_id' => $row['campaign_id'], 
-                'channeled_account_id' => $row['channeled_account_id'], 
-                'account_id' => $row['account_id'], 
+                'channeled_ad_id' => $row['channeled_ad_id'],
+                'channeled_ad_group_id' => $row['channeled_ad_group_id'],
+                'channeled_campaign_id' => $row['channeled_campaign_id'],
+                'campaign_id' => $row['campaign_id'],
+                'channeled_account_id' => $row['channeled_account_id'],
+                'account_id' => $row['account_id'],
                 'query_id' => $row['query_id'],
                 'country_id' => $row['country_id'],
                 'device_id' => $row['device_id'],
@@ -935,39 +1010,43 @@ class SeedDemoDataCommand extends Command
                 'customer_id' => $row['customer_id'],
                 'order_id' => $row['order_id'],
                 'dimension_set_id' => $row['dimension_set_id'],
-                'config_signature' => $row['config_signature'], 
-                'created_at' => $now, 
-                'updated_at' => $now
-            ]; 
+                'config_signature' => $row['config_signature'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
-        
+
         $this->bulkInsert('metric_configs', array_values($configsToInsert), ['dimension_set_id']);
-        
-        $quotedSigs = array_map(fn($c) => $this->conn->quote($c['config_signature']), $this->bufferConfigs);
+
+        $quotedSigs = array_map(fn ($c) => $this->conn->quote($c['config_signature']), $this->bufferConfigs);
         $idMap = $this->conn->fetchAllKeyValue("SELECT config_signature, id FROM metric_configs WHERE config_signature IN (" . implode(',', $quotedSigs) . ")");
-        
+
         $metricsToInsert = [];
         foreach ($this->bufferConfigs as $c) {
             $cfgId = $idMap[$c['config_signature']] ?? null;
-            if (!$cfgId) continue;
-            
+            if (! $cfgId) {
+                continue;
+            }
+
             $dimHash = $c['dimension_set_hash'] ?? md5((string)$c['dimension_set_id']);
             $mKey = $cfgId . '|' . $dimHash . '|' . $c['metric_date'];
-            
+
             $metricsToInsert[$mKey] = [
-                'metric_config_id' => $cfgId, 
-                'dimensions_hash' => $dimHash, 
-                'value' => $c['value'], 
+                'metric_config_id' => $cfgId,
+                'dimensions_hash' => $dimHash,
+                'value' => $c['value'],
                 'metric_date' => $c['metric_date'],
-                'created_at' => $now, 
-                'updated_at' => $now
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
         }
         $this->bulkInsert('metrics', array_values($metricsToInsert), ['value']);
-        
+
         $quotedConfigIds = array_map('intval', array_values($idMap));
-        if (empty($quotedConfigIds)) return;
-        
+        if (empty($quotedConfigIds)) {
+            return;
+        }
+
         $isPostgres = $this->conn->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
         $mMap = [];
         $mRows = $this->conn->fetchAllAssociative("SELECT id, metric_config_id, dimensions_hash, metric_date FROM metrics WHERE metric_config_id IN (" . implode(',', $quotedConfigIds) . ")");
@@ -975,21 +1054,23 @@ class SeedDemoDataCommand extends Command
             $k = $mRow['metric_config_id'] . '|' . $mRow['dimensions_hash'] . '|' . $mRow['metric_date'];
             $mMap[$k] = $mRow['id'];
         }
-        
+
         $chanToInsert = [];
         foreach ($this->bufferConfigs as $c) {
             $mKey = ($idMap[$c['config_signature']] ?? 0) . '|' . ($c['dimension_set_hash'] ?? md5((string)$c['dimension_set_id'])) . '|' . $c['metric_date'];
             $mId = $mMap[$mKey] ?? null;
-            if ($mId) $chanToInsert[] = [
-                'platform_id' => $this->generatePlatformId(), 
-                'channel' => $c['channel'], 
-                'metric_id' => $mId, 
-                'dimension_set_id' => $c['dimension_set_id'], 
-                'platform_created_at' => $c['metric_date'] . ' 00:00:00',
-                'data' => $c['data'],
-                'created_at' => $now, 
-                'updated_at' => $now
-            ];
+            if ($mId) {
+                $chanToInsert[] = [
+                    'platform_id' => $this->generatePlatformId(),
+                    'channel' => $c['channel'],
+                    'metric_id' => $mId,
+                    'dimension_set_id' => $c['dimension_set_id'],
+                    'platform_created_at' => $c['metric_date'] . ' 00:00:00',
+                    'data' => $c['data'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
         }
         $this->bulkInsert('channeled_metrics', $chanToInsert);
         $this->bufferConfigs = [];
@@ -997,17 +1078,22 @@ class SeedDemoDataCommand extends Command
 
     private function bulkInsert(string $table, array $rows, array $updateCols = []): void
     {
-        if (empty($rows)) return;
-        
+        if (empty($rows)) {
+            return;
+        }
+
         if (empty($updateCols)) {
             $columns = array_keys($rows[0]);
             $vals = [];
-            foreach ($rows as $row) { $vals[] = "(" . implode(',', array_map(fn($v) => is_null($v) ? 'NULL' : $this->conn->quote((string)$v), array_values($row))) . ")"; }
-            
+            foreach ($rows as $row) {
+                $vals[] = "(" . implode(',', array_map(fn ($v) => is_null($v) ? 'NULL' : $this->conn->quote((string)$v), array_values($row))) . ")";
+            }
+
             $isPostgres = $this->conn->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
             $insertSql = $isPostgres ? "INSERT INTO $table (" . implode(',', $columns) . ") VALUES " . implode(',', $vals) . " ON CONFLICT DO NOTHING" : "INSERT IGNORE INTO $table (" . implode(',', $columns) . ") VALUES " . implode(',', $vals);
-            
+
             $this->conn->executeStatement($insertSql);
+
             return;
         }
 

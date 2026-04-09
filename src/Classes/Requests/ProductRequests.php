@@ -6,130 +6,47 @@ namespace Classes\Requests;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
-use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Enums\Channel;
-use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
+use Psr\Log\LoggerInterface;
 use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
 class ProductRequests implements RequestInterface
 {
+    
     /**
-     * @return \Enums\Channel[]
-     */
-    public static function supportedChannels(): array
-    {
-        return [
-            Channel::shopify,
-            Channel::klaviyo,
-            Channel::bigcommerce,
-            Channel::netsuite,
-            Channel::amazon,
-        ];
-    }
-
-    /**
-     * @param string|null $createdAtMin
-     * @param string|null $createdAtMax
-     * @param string|int|null $collectionId
-     * @param array|null $fields
+     * @param \Enums\Channel|string $channel
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param \Psr\Log\LoggerInterface|null $logger
+     * @param int|null $jobId
      * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     * @throws Exception
-     * @throws GuzzleException
-     * @throws NotSupported
-     * @throws ORMException
+     * @return \Symfony\Component\HttpFoundation\Response
      */
-    public static function getListFromShopify(
-        ?string $createdAtMin = null,
-        ?string $createdAtMax = null,
-        string|int|null $collectionId = null,
-        ?array $fields = null,
-        ?object $filters = null,
-        string|bool $resume = true,
-        ?int $jobId = null
-    ): Response {
-        return (new \Core\Services\SyncService())->execute('shopify', $createdAtMin, $createdAtMax, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'products',
-            'collectionId' => $collectionId,
-            'fields' => $fields,
-            'filters' => $filters,
-        ]);
-    }
+    public static function getList(
+        \Enums\Channel|string $channel,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?int $jobId = null,
+        ?object $filters = null
+    ): \Symfony\Component\HttpFoundation\Response {
+        $chanKey = ($channel instanceof \Enums\Channel) ? $channel->name : (string)$channel;
 
-    /**
-     * @param array|null $fields
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromKlaviyo(
-        ?array $fields = null,
-        ?object $filters = null,
-        string|bool $resume = true,
-        ?int $jobId = null
-    ): Response {
-        return (new \Core\Services\SyncService())->execute('klaviyo', null, null, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'products',
-            'fields' => $fields,
-            'filters' => $filters,
-        ]);
-    }
+        // Intelligent date resolution
+        $start = $startDate;
+        $end = $endDate;
+        if (in_array($chanKey, ['shopify', 'klaviyo', 'bigcommerce', 'netsuite', 'amazon'])) {
+            $start = $filters->createdAtMin ?? $startDate;
+            $end = $filters->createdAtMax ?? $endDate;
+        }
 
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromBigCommerce(
-        ?object $filters = null,
-        string|bool $resume = true,
-        ?int $jobId = null
-    ): Response {
-        return (new \Core\Services\SyncService())->execute('bigcommerce', null, null, [
+        return (new \Core\Services\SyncService())->execute($chanKey, $start, $end, [
             'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'products',
-            'filters' => $filters,
-        ]);
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromNetsuite(
-        ?object $filters = null,
-        string|bool $resume = true,
-        ?int $jobId = null
-    ): Response {
-        return (new \Core\Services\SyncService())->execute('netsuite', null, null, [
-            'jobId' => $jobId,
-            'resume' => $resume,
-            'type' => 'products',
-            'filters' => $filters,
-        ]);
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromAmazon(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return (new \Core\Services\SyncService())->execute('amazon', null, null, [
-            'jobId' => $jobId,
-            'resume' => $resume,
+            'resume' => $filters->resume ?? true,
             'type' => 'products',
             'filters' => $filters,
         ]);

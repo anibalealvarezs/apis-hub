@@ -7,7 +7,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Helpers\Helpers;
 use Symfony\Component\Yaml\Yaml;
-use Classes\Clients\FacebookClient;
+use Classes\DriverInitializer;
 use Anibalealvarezs\FacebookGraphApi\Enums\UserPermission;
 use Anibalealvarezs\FacebookGraphApi\Enums\PagePermission;
 
@@ -61,7 +61,7 @@ class FacebookAuthController
         }
 
         try {
-            $config = FacebookClient::getConfig();
+            $config = DriverInitializer::validateConfig('facebook_marketing');
         } catch (\Exception $e) {
             $config = [];
         }

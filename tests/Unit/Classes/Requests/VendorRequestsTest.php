@@ -9,16 +9,6 @@ use Tests\Unit\BaseUnitTestCase;
 
 class VendorRequestsTest extends BaseUnitTestCase
 {
-    public function testSupportedChannels(): void
-    {
-        $channels = VendorRequests::supportedChannels();
-        $this->assertIsArray($channels);
-        $this->assertContains(Channel::shopify, $channels);
-        $this->assertContains(Channel::bigcommerce, $channels);
-        $this->assertContains(Channel::netsuite, $channels);
-        $this->assertContains(Channel::amazon, $channels);
-        $this->assertNotContains(Channel::klaviyo, $channels);
-    }
 
     public function testGetListFromShopify(): void
     {

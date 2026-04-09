@@ -6,6 +6,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use Symfony\Component\HttpFoundation\Response;
 
+use Psr\Log\LoggerInterface;
+
 interface RequestInterface
 {
     /**
@@ -15,7 +17,20 @@ interface RequestInterface
     public static function process(ArrayCollection $channeledCollection): Response;
 
     /**
-     * @return Channel[]
+     * @param \Enums\Channel|string $channel
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param \Psr\Log\LoggerInterface|null $logger
+     * @param int|null $jobId
+     * @param object|null $filters
+     * @return \Symfony\Component\HttpFoundation\Response
      */
-    public static function supportedChannels(): array;
+    public static function getList(
+        \Enums\Channel|string $channel,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?int $jobId = null,
+        ?object $filters = null
+    ): \Symfony\Component\HttpFoundation\Response;
 }

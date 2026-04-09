@@ -140,4 +140,54 @@ class DriverFactory
 
         return array_keys(self::$registry);
     }
+
+    /**
+     * Verifica si un canal soporta una entidad específica.
+     *
+     * @param string $channel
+     * @param string $entity
+     * @return bool
+     */
+    public static function supportsEntity(string $channel, string $entity): bool
+    {
+        self::loadRegistry();
+
+        if (! isset(self::$registry[$channel])) {
+            return false;
+        }
+
+        $supportedEntities = self::$registry[$channel]['entities'] ?? [];
+        
+        // Match both 'metric' and 'metrics', 'order' and 'orders', etc.
+        $entity = strtolower($entity);
+        $pluralEntity = $entity . 's';
+        if (!str_ends_with($entity, 's')) {
+             $pluralEntity = $entity . 's';
+        } else {
+             $pluralEntity = $entity;
+             $entity = substr($entity, 0, -1);
+        }
+
+        return in_array($entity, $supportedEntities) || in_array($pluralEntity, $supportedEntities);
+    }
+
+    /**
+     * Obtiene los canales que soportan una entidad.
+     *
+     * @param string $entity
+     * @return string[]
+     */
+    public static function getAvailableChannelsForEntity(string $entity): array
+    {
+        self::loadRegistry();
+        $channels = [];
+
+        foreach (self::$registry as $channel => $config) {
+            if (self::supportsEntity($channel, $entity)) {
+                $channels[] = $channel;
+            }
+        }
+
+        return $channels;
+    }
 }

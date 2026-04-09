@@ -6,6 +6,7 @@ use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
 use Helpers\Helpers;
 
 class OrderProcessor

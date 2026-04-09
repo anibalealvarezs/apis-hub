@@ -2,6 +2,7 @@
 
 namespace Controllers;
 
+use Classes\DriverInitializer;
 use Classes\Requests\MetricRequests;
 use Exception;
 use Helpers\Helpers;
@@ -225,8 +226,8 @@ class ConfigManagerController extends BaseController
 
             if ($needsFbRefresh) {
                 try {
-                    $fbConfig = MetricRequests::validateFacebookConfig($logger);
-                    $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $logger);
+                    $fbConfig = DriverInitializer::validateConfig('facebook_marketing', $logger);
+                    $fbApi = DriverInitializer::initializeApi('facebook_marketing', $fbConfig, $logger);
                     
                     // Get Pages using SDK with explicit User ID and custom fields
                     $userId = $fbApi->getUserId();
@@ -515,8 +516,8 @@ class ConfigManagerController extends BaseController
 
             if ($type === 'facebook' || $type === 'all') {
                 try {
-                    $fbConfig = MetricRequests::validateFacebookConfig($logger);
-                    $fbApi = MetricRequests::initializeFacebookGraphApi($fbConfig, $logger);
+                    $fbConfig = DriverInitializer::validateConfig('facebook_marketing', $logger);
+                    $fbApi = DriverInitializer::initializeApi('facebook_marketing', $fbConfig, $logger);
                     // Test call to 'me'
                     $fbApi->performRequest('GET', 'me', ['fields' => 'id,name']);
                     $results['facebook'] = [

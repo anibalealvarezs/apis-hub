@@ -34,9 +34,6 @@ enum AnalyticsEntity: string
     case channeled_campaigns = 'channeled_campaign';
     case channeled_ad_groups = 'channeled_ad_group';
     case channeled_ads = 'channeled_ad';
-    case facebook_entities = 'facebook_entities';
-    case facebook_marketing_entities = 'facebook_marketing_entities';
-    case facebook_organic_entities = 'facebook_organic_entities';
     case creatives = 'creative';
     case channeled_creatives = 'channeled_creative';
 
@@ -59,7 +56,6 @@ enum AnalyticsEntity: string
             self::channeled_ad_groups => '\Classes\Requests\AdGroupRequests',
             self::channeled_ads => '\Classes\Requests\AdRequests',
             self::creatives, self::channeled_creatives => '\Classes\Requests\CreativeRequests',
-            self::facebook_entities, self::facebook_marketing_entities, self::facebook_organic_entities => '\Classes\Requests\FacebookEntityRequests',
         };
     }
 }

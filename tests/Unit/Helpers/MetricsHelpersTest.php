@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Helpers;
 
-use Helpers\GoogleSearchConsoleHelpers;
+use Helpers\MetricsHelpers;
 use PHPUnit\Framework\TestCase;
 
-class GoogleSearchConsoleHelpersTest extends TestCase
+class MetricsHelpersTest extends TestCase
 {
     public function testIsParentOf()
     {
@@ -20,13 +20,13 @@ class GoogleSearchConsoleHelpersTest extends TestCase
         // Parent dims map to child dims at their respective subset indices:
         // parent 'date' (idx 0) -> child 'date' (idx 0): match
         // parent 'page' (idx 1) -> child 'page' (idx 2): match
-        $this->assertTrue(GoogleSearchConsoleHelpers::isParentOf($parentSubset, $parentDims, $childSubset, $childDims));
+        $this->assertTrue(MetricsHelpers::isParentOf($parentSubset, $parentDims, $childSubset, $childDims));
 
         // Negative cases
-        $this->assertFalse(GoogleSearchConsoleHelpers::isParentOf($childSubset, $childDims, $parentSubset, $parentDims)); // Child is longer
+        $this->assertFalse(MetricsHelpers::isParentOf($childSubset, $childDims, $parentSubset, $parentDims)); // Child is longer
         
         $differentPage = ['2023-01-01', 'https://other.com/'];
-        $this->assertFalse(GoogleSearchConsoleHelpers::isParentOf($parentSubset, $differentPage, $childSubset, $childDims));
+        $this->assertFalse(MetricsHelpers::isParentOf($parentSubset, $differentPage, $childSubset, $childDims));
     }
 
     public function testComputeChildrenSum()
@@ -52,7 +52,7 @@ class GoogleSearchConsoleHelpersTest extends TestCase
             ]
         ];
 
-        $sums = GoogleSearchConsoleHelpers::computeChildrenSum($records);
+        $sums = MetricsHelpers::computeChildrenSum($records);
 
         // Record 0 (parent) should have sum of records 1 and 2
         $this->assertEquals(70, $sums[0]['impressions']);
@@ -74,7 +74,7 @@ class GoogleSearchConsoleHelpersTest extends TestCase
             ['impressions' => 0, 'clicks' => 0]
         ];
 
-        $result = GoogleSearchConsoleHelpers::calculateDifferences($records, $sums);
+        $result = MetricsHelpers::calculateDifferences($records, $sums);
 
         $this->assertEquals(30, $result[0]['impressions_difference']);
         $this->assertEquals(3, $result[0]['clicks_difference']);
@@ -92,7 +92,7 @@ class GoogleSearchConsoleHelpersTest extends TestCase
         ];
         $dims = ['date', 'query', 'page'];
 
-        $result = GoogleSearchConsoleHelpers::allocatePositiveDifferences($records, $dims);
+        $result = MetricsHelpers::allocatePositiveDifferences($records, $dims);
 
         // Should have 2 records: original and synthetic
         $this->assertCount(2, $result);
@@ -113,13 +113,10 @@ class GoogleSearchConsoleHelpersTest extends TestCase
             ]
         ];
 
-        $result = GoogleSearchConsoleHelpers::flagOrScaleNegativeDifferences($records, true);
+        $result = MetricsHelpers::flagOrScaleNegativeDifferences($records, true);
 
         $this->assertTrue($result[0]['scaled']);
         $this->assertEquals(100, $result[0]['original_impressions']);
-        // Scaled values (children * factor where factor = parent/children = 100/120)
-        // Actually the logic is: round($childrenImpressions * $scaleFactorImpr) where factor = impressions / children
-        // round(120 * (100/120)) = 100.
         $this->assertEquals(100, $result[0]['impressions']);
     }
 }

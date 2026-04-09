@@ -19,25 +19,13 @@ use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
 use Repositories\Channeled\ChanneledProductCategoryRepository;
+use Psr\Log\LoggerInterface;
 use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
 class ProductCategoryRequests implements RequestInterface
 {
-    /**
-     * @return \Enums\Channel[]
-     */
-    public static function supportedChannels(): array
-    {
-        return [
-            Channel::shopify,
-            Channel::klaviyo,
-            Channel::bigcommerce,
-            Channel::netsuite,
-            Channel::amazon,
-        ];
-    }
-
+    
     /**
      * @param string|null $publishedAtMin
      * @param string|null $publishedAtMax
@@ -169,6 +157,51 @@ class ProductCategoryRequests implements RequestInterface
     public static function getListFromAmazon(int $limit = 10, int $pagination = 0, ?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
+    }
+
+    /**
+     * @param \Enums\Channel|string $channel
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param \Psr\Log\LoggerInterface|null $logger
+     * @param int|null $jobId
+     * @param object|null $filters
+     * @return \Symfony\Component\HttpFoundation\Response
+     * @throws \Exception
+     */
+    public static function getList(
+        Channel|string $channel,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?LoggerInterface $logger = null,
+        ?int $jobId = null,
+        ?object $filters = null
+    ): Response {
+        $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
+        $method = 'getListFrom' . $chanEnum->getCommonName();
+        if (method_exists(self::class, $method)) {
+            // Map generic arguments to legacy method arguments
+            if ($chanEnum === Channel::shopify) {
+                return self::getListFromShopify(
+                    publishedAtMin: $startDate,
+                    publishedAtMax: $endDate,
+                    fields: $filters->fields ?? null,
+                    filters: $filters,
+                    resume: $filters->resume ?? true,
+                    jobId: $jobId
+                );
+            }
+            if ($chanEnum === Channel::netsuite) {
+                return self::getListFromNetsuite(
+                    filters: $filters,
+                    resume: $filters->resume ?? true,
+                    jobId: $jobId
+                );
+            }
+            return self::$method($filters, $filters->resume ?? true, $jobId);
+        }
+
+        throw new \Exception("Channel " . ($chanEnum?->name ?? (string)$channel) . " not supported for ProductCategory entities");
     }
 
     /**

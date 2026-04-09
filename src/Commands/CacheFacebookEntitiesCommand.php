@@ -54,23 +54,23 @@ class CacheFacebookEntitiesCommand extends Command
         try {
             // 1. Sync Pages
             if (Helpers::isDebug()) $output->writeln('Syncing Pages...');
-            PageRequests::getListFromFacebookOrganic($startDate, $endDate, $this->logger, $jobId);
+            PageRequests::getList(\Enums\Channel::facebook_organic, $startDate, $endDate, $this->logger, $jobId);
 
             // 2. Sync Campaigns
             if (Helpers::isDebug()) $output->writeln('Syncing Campaigns...');
-            CampaignRequests::getListFromFacebookMarketing($startDate, $endDate, $this->logger, $jobId);
+            CampaignRequests::getList(\Enums\Channel::facebook_marketing, $startDate, $endDate, $this->logger, $jobId);
 
             // 3. Sync AdGroups (AdSets)
             if (Helpers::isDebug()) $output->writeln('Syncing AdGroups...');
-            AdGroupRequests::getListFromFacebookMarketing($startDate, $endDate, $this->logger, $jobId);
+            AdGroupRequests::getList(\Enums\Channel::facebook_marketing, $startDate, $endDate, $this->logger, $jobId);
 
             // 4. Sync Ads
             if (Helpers::isDebug()) $output->writeln('Syncing Ads...');
-            AdRequests::getListFromFacebookMarketing($startDate, $endDate, $this->logger, $jobId);
+            AdRequests::getList(\Enums\Channel::facebook_marketing, $startDate, $endDate, $this->logger, $jobId);
 
             // 5. Sync Posts (Facebook & Instagram Media)
             if (Helpers::isDebug()) $output->writeln('Syncing Posts...');
-            PostRequests::getListFromFacebookOrganic($startDate, $endDate, $this->logger, $jobId);
+            PostRequests::getList(\Enums\Channel::facebook_organic, $startDate, $endDate, $this->logger, $jobId);
 
             if (Helpers::isDebug()) {
                 $output->writeln('<info>Facebook entities cache sync completed successfully</info>');

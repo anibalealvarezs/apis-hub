@@ -46,7 +46,7 @@ class CacheController extends BaseController
         }
 
         $requestsClassName = $this->getEntityRequestsClassName($entity);
-        if (method_exists($requestsClassName, 'supportedChannels') && !in_array($channelEnum, $requestsClassName::supportedChannels(), true)) {
+        if (!\Core\Drivers\DriverFactory::supportsEntity($channel, $entity)) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -376,29 +376,23 @@ class CacheController extends BaseController
     {
         try {
             $requestsClassName = $this->getEntityRequestsClassName($entity);
-            $methodName = 'getListFrom' . $channel->getCommonName();
+            
+            $startDate = $params['startDate'] ?? null;
+            $endDate = $params['endDate'] ?? null;
+            $logger = $params['logger'] ?? null;
+            $jobId = isset($params['jobId']) ? (int)$params['jobId'] : null;
 
-            if (!method_exists($requestsClassName, $methodName)) {
-                return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: "Channel " . $channel->getCommonName() . " not supported for entity " . $entity,
-                    httpStatus: Response::HTTP_NOT_FOUND
-                );
-            }
+            /** @var Response $response */
+            $response = $requestsClassName::getList(
+                channel: $channel,
+                startDate: $startDate,
+                endDate: $endDate,
+                logger: $logger,
+                jobId: $jobId,
+                filters: (object)$params
+            );
 
-            $parameters = $this->prepareAnalyticsParams($params, $body, $requestsClassName, $methodName);
-
-            /* if (!$this->validateParams(array_keys($parameters), $requestsClassName, $methodName)) {
-                return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: 'Invalid parameters',
-                    httpStatus: Response::HTTP_BAD_REQUEST
-                );
-            } */
-
-            return $requestsClassName::$methodName(...$parameters) ?: [];
+            return json_decode($response->getContent(), true) ?: [];
         } catch (InvalidArgumentException $e) {
             return $this->createResponse(
                 data: null,

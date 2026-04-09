@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Anibalealvarezs\ShopifyApi\ShopifyApi;
 use Anibalealvarezs\ShopifyApi\Conversions\ShopifyConvert;
+use Anibalealvarezs\ShopifyApi\ShopifyApi;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
@@ -15,6 +15,7 @@ use Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
+use Psr\Log\LoggerInterface;
 use Repositories\Channeled\ChanneledPriceRuleRepository;
 use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,18 +23,47 @@ use Symfony\Component\HttpFoundation\Response;
 class PriceRuleRequests implements RequestInterface
 {
     /**
-     * @return \Enums\Channel[]
+     * @param \Enums\Channel|string $channel
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param \Psr\Log\LoggerInterface|null $logger
+     * @param int|null $jobId
+     * @param object|null $filters
+     * @return \Symfony\Component\HttpFoundation\Response
+     * @throws \Exception
      */
-    public static function supportedChannels(): array
-    {
-        return [
-            Channel::shopify,
-            Channel::bigcommerce,
-            Channel::netsuite,
-            Channel::amazon,
-        ];
+    public static function getList(
+        Channel|string $channel,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?LoggerInterface $logger = null,
+        ?int $jobId = null,
+        ?object $filters = null
+    ): Response {
+        $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
+        $method = 'getListFrom' . $chanEnum->getCommonName();
+        if (method_exists(self::class, $method)) {
+            if ($chanEnum === Channel::shopify) {
+                return self::getListFromShopify(
+                    createdAtMin: $startDate,
+                    createdAtMax: $endDate,
+                    filters: $filters,
+                    resume: $filters->resume ?? true,
+                    jobId: $jobId
+                );
+            }
+
+            return self::$method(
+                filters: $filters,
+                resume: $filters->resume ?? true,
+                jobId: $jobId
+            );
+        }
+
+        throw new \Exception("Channel " . ($chanEnum?->name ?? (string)$channel) . " not supported for PriceRule entities");
     }
 
+    
     /**
      * @param string|null $createdAtMin
      * @param string|null $createdAtMax
