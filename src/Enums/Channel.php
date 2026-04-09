@@ -21,6 +21,8 @@ enum Channel: int
     case pinterest = 12;
     case linkedin = 13;
     case x = 14;
+    case tiktok = 16;
+    case triplewhale = 17;
 
     public function getName(): string
     {
@@ -45,6 +47,8 @@ enum Channel: int
             self::pinterest => 'Pinterest',
             self::linkedin => 'LinkedIn',
             self::x => 'X',
+            self::tiktok => 'TikTok',
+            self::triplewhale => 'TripleWhale',
         };
     }
 
@@ -66,6 +70,8 @@ enum Channel: int
             'pinterest' => self::pinterest,
             'linkedin' => self::linkedin,
             'x', 'twitter' => self::x,
+            'tiktok' => self::tiktok,
+            'triplewhale' => self::triplewhale,
             default => null,
         };
     }

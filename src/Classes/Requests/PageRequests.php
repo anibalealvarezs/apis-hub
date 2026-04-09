@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Classes\Conversions\FacebookOrganicConvert;
+use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookOrganicConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use Helpers\Helpers;

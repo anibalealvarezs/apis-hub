@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
-use Classes\Conversions\KlaviyoConvert;
+use Anibalealvarezs\KlaviyoApi\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;

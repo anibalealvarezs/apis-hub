@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Carbon\Carbon;
-use Classes\Conversions\FacebookOrganicConvert;
+use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookOrganicConvert;
 use Classes\SocialProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;

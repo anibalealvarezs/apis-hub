@@ -20,19 +20,23 @@ async function initConfig() {
 }
 
 function setupTabSystem() {
-    const tabs = document.querySelectorAll('.tab');
-    const contents = document.querySelectorAll('.tab-content');
+    const nav = document.getElementById('main-tab-nav');
+    if (!nav) return;
 
-    tabs.forEach(tab => {
-        tab.onclick = () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            contents.forEach(c => c.style.display = 'none');
-            
-            tab.classList.add('active');
-            const target = document.getElementById('tab-' + tab.dataset.tab);
-            if (target) target.style.display = 'block';
-        };
-    });
+    nav.onclick = (e) => {
+        const tab = e.target.closest('.tab');
+        if (!tab) return;
+        
+        const tabs = document.querySelectorAll('.tab');
+        const contents = document.querySelectorAll('.tab-content');
+
+        tabs.forEach(t => t.classList.remove('active'));
+        contents.forEach(c => c.style.display = 'none');
+        
+        tab.classList.add('active');
+        const target = document.getElementById('tab-' + tab.dataset.tab);
+        if (target) target.style.display = 'block';
+    };
 }
 
 function getAdminHeaders() {
@@ -68,6 +72,100 @@ function getAdminHeaders() {
     };
 }
 
+function renderDynamicTabs(channels) {
+    const nav = document.getElementById('main-tab-nav');
+    const container = document.getElementById('dynamic-tabs-container');
+    if (!nav || !container) return;
+
+    // Infrastructure is always there static but we clear dynamic ones
+    nav.querySelectorAll('.tab:not([data-tab="infrastructure"])').forEach(t => t.remove());
+    container.innerHTML = '';
+    
+    channels.forEach(chan => {
+        const tab = document.createElement('div');
+        tab.className = 'tab';
+        tab.dataset.tab = (chan === 'google_search_console' ? 'google' : (chan === 'facebook_organic' ? 'facebook' : (chan === 'facebook_marketing' ? 'facebook-marketing' : chan)));
+        
+        let icon = 'layers';
+        let label = chan;
+        
+        const map = {
+            'google_search_console': { icon: 'search', label: 'Google Search Console' },
+            'google_analytics': { icon: 'bar-chart', label: 'Google Analytics' },
+            'facebook_organic': { icon: 'facebook', label: 'Meta Organic' },
+            'facebook_marketing': { icon: 'trending-up', label: 'Meta Marketing' },
+            'shopify': { icon: 'shopping-bag', label: 'Shopify' },
+            'klaviyo': { icon: 'mail', label: 'Klaviyo' },
+            'netsuite': { icon: 'box', label: 'NetSuite' },
+            'amazon': { icon: 'shopping-cart', label: 'Amazon SP-API' },
+            'bigcommerce': { icon: 'shopping-cart', label: 'BigCommerce' },
+            'tiktok': { icon: 'music', label: 'TikTok' },
+            'triplewhale': { icon: 'whale', label: 'TripleWhale' }
+        };
+
+        if (map[chan]) {
+            icon = map[chan].icon;
+            label = map[chan].label;
+        }
+
+        tab.innerHTML = `<i data-lucide="${icon}"></i> ${label}`;
+        nav.appendChild(tab);
+
+        // Specialized tabs are already in HTML, we only add others to dynamic-tabs-container
+        const tabId = 'tab-' + tab.dataset.tab;
+        if (!document.getElementById(tabId)) {
+             const content = document.createElement('div');
+             content.id = tabId;
+             content.className = 'tab-content';
+             content.style.display = 'none';
+             content.innerHTML = renderGenericChannelUI(chan, label, icon);
+             container.appendChild(content);
+        }
+    });
+
+    lucide.createIcons();
+}
+
+function renderGenericChannelUI(chan, label, icon) {
+    return `
+        <div class="settings-horizontal-grid">
+            <div class="card compact-card" style="flex-direction:row; justify-content:space-between; align-items:center;">
+                <div>
+                    <div class="section-title small" style="margin-bottom:5px; border:none; padding:0;"><i data-lucide="power"></i> Channel Status</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim);">Enable ${label} Integration</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="${chan}-channel-enabled">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="card compact-card">
+                <div class="section-title small"><i data-lucide="calendar"></i> History Range</div>
+                <div style="margin-top:auto">
+                    <select id="${chan}-history-range" class="control-select" style="width:100%">
+                        <option value="1 month">Last Month</option>
+                        <option value="3 months">Last 3 Months</option>
+                        <option value="6 months">Last 6 Months</option>
+                        <option value="1 year" selected>Last 12 Months</option>
+                        <option value="2 years">Last 2 Years</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title small" style="display:flex; justify-content:space-between; align-items:center;">
+                <span><i data-lucide="${icon}"></i> ${label} assets</span>
+                <button class="btn btn-mini" onclick="forceRefresh('${chan}')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Provider</button>
+            </div>
+            <div id="${chan}-list" class="asset-grid">
+                 <div class="empty-state">No assets found for ${label}. Click Sync to fetch them.</div>
+            </div>
+        </div>
+        <button class="btn btn-save-fixed" onclick="updateConfig('${chan}')"><i data-lucide="save"></i> Save ${label} Settings</button>
+    `;
+}
+
 async function fetchConfig() {
     try {
         const response = await fetch('/api/config-manager/assets', { headers: getAdminHeaders() });
@@ -86,6 +184,7 @@ async function fetchConfig() {
         
         currentConfig = data.config;
 
+        renderDynamicTabs(data.available_channels);
         populateGlobalFields();
         renderAssets(data.assets);
         validateTokens(false);
@@ -253,6 +352,17 @@ function populateGlobalFields() {
         handleFbOrganicLevelChange();
         handleFbStrategyChange();
         renderCustomMetricsGrid();
+
+        // Dynamic Channel Settings
+        if (currentConfig.available_channels) {
+            currentConfig.available_channels.forEach(chan => {
+                const statusEl = document.getElementById(chan + '-channel-enabled');
+                if (statusEl) statusEl.checked = !!currentConfig[chan + '_enabled'];
+                
+                const rangeEl = document.getElementById(chan + '-history-range');
+                if (rangeEl) rangeEl.value = currentConfig[chan + '_history_range'] || '1 year';
+            });
+        }
         
     } catch (e) {
         console.error("Error in populateGlobalFields:", e);
@@ -935,6 +1045,10 @@ async function updateConfig(typeArg) {
                     }
                 };
             });
+        } else if (typeArg !== 'global') {
+            // Generic Channel Update
+            payload.enabled = document.getElementById(typeArg + '-channel-enabled')?.checked;
+            payload.cache_history_range = document.getElementById(typeArg + '-history-range')?.value;
         }
 
         // Feature Toggles (Organic Tiers - Derived from Selectors)

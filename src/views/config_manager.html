@@ -29,11 +29,9 @@
         </div>
 
         <!-- Global Settings Tabs -->
-        <div class="tab-nav">
+        <div class="tab-nav" id="main-tab-nav">
             <div class="tab active" data-tab="infrastructure"><i data-lucide="server"></i> Infrastructure</div>
-            <div class="tab" data-tab="google"><i data-lucide="search"></i> Google Search Console</div>
-            <div class="tab" data-tab="facebook"><i data-lucide="facebook"></i> Meta Organic</div>
-            <div class="tab" data-tab="facebook-marketing"><i data-lucide="trending-up"></i> Meta Marketing</div>
+            <!-- Dynamic tabs will be injected here -->
         </div>
 
         <!-- Tab Content: Infrastructure -->
@@ -444,6 +442,9 @@
             </div>
             <button class="btn btn-save-fixed" onclick="updateConfig('facebook-marketing')"><i data-lucide="save"></i> Save Strategy</button>
         </div>
+
+        <!-- Dynamic Channel Tabs -->
+        <div id="dynamic-tabs-container"></div>
 
         <!-- Footer JS -->
         <script src="/assets/footer.js"></script>

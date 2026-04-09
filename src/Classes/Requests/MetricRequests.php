@@ -8,11 +8,15 @@ use Anibalealvarezs\FacebookGraphApi\Enums\MediaType;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricBreakdown;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
 use Anibalealvarezs\FacebookGraphApi\FacebookGraphApi;
+use Core\Conversions\UniversalMetricConverter;
+use Core\Conversions\UniversalEntityConverter;
 use Carbon\Carbon;
-use Classes\Conversions\FacebookMarketingMetricConvert;
-use Classes\Conversions\FacebookOrganicMetricConvert;
-use Classes\Conversions\GoogleSearchConsoleConvert;
-use Classes\Conversions\KlaviyoConvert;
+use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookMarketingMetricConvert;
+use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookOrganicMetricConvert;
+use Anibalealvarezs\GoogleApi\Conversions\GoogleSearchConsoleConvert;
+use Anibalealvarezs\KlaviyoApi\Conversions\KlaviyoConvert;
+use Anibalealvarezs\ShopifyApi\Conversions\ShopifyConvert;
+use Anibalealvarezs\NetSuiteApi\Conversions\NetSuiteConvert;
 use Classes\MetricsProcessor;
 use Symfony\Component\HttpFoundation\Response;
 use DateTime;
@@ -239,7 +243,7 @@ class MetricRequests
             return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
         }
 
-        $collection = GoogleSearchConsoleConvert::metrics($data, $site['url'], $site['url'], $logger, $pageEntity, $manager);
+        $collection = GoogleSearchConsoleConvert::metrics($data, $site['url'], $site['url'], $logger, $pageEntity);
         self::process($collection, $logger);
 
         return ['metrics' => $collection->count(), 'rows' => count($data), 'duplicates' => 0];
@@ -259,7 +263,7 @@ class MetricRequests
             rows: $data['insights'] ?? [],
             pagePlatformId: (string)$pageEntity->getPlatformId(),
             logger: $logger,
-            pageEntity: $pageEntity
+            page: $pageEntity
         );
         self::process($collection, $logger);
 
@@ -274,7 +278,7 @@ class MetricRequests
         $collection = FacebookMarketingMetricConvert::adAccountMetrics(
             rows: $data['data'] ?? [],
             logger: $logger,
-            accountEntity: $account,
+            account: $account,
             channeledAccountPlatformId: (string)$adAccount['id'],
             period: Period::Daily,
             metricSet: MetricSet::KEY
@@ -301,9 +305,9 @@ class MetricRequests
         $collection = FacebookOrganicMetricConvert::igAccountMetrics(
             rows: $data['data'] ?? [],
             date: $startDate,
-            pageEntity: $pageEntity,
-            accountEntity: $account,
-            channeledAccountEntity: $channeledAccount,
+            page: $pageEntity,
+            account: $account,
+            channeledAccount: $channeledAccount,
             logger: $logger
         );
         self::process($collection, $logger);
@@ -331,9 +335,9 @@ class MetricRequests
     {
         $logger = Helpers::setLogger('shopify.log');
         $collection = match ($type) {
-            'orders' => \Classes\Conversions\ShopifyConvert::orders($data),
-            'customers' => \Classes\Conversions\ShopifyConvert::customers($data),
-            'products' => \Classes\Conversions\ShopifyConvert::products($data),
+            'orders' => ShopifyConvert::orders($data),
+            'customers' => ShopifyConvert::customers($data),
+            'products' => ShopifyConvert::products($data),
             default => new ArrayCollection(),
         };
         if (($type === 'metrics' || $type === 'aggregates') && $collection->count() > 0) {
@@ -347,9 +351,9 @@ class MetricRequests
     {
         $logger = Helpers::setLogger('netsuite.log');
         $collection = match ($type) {
-            'orders' => \Classes\Conversions\NetSuiteConvert::orders($data),
-            'customers' => \Classes\Conversions\NetSuiteConvert::customers($data),
-            'items' => \Classes\Conversions\NetSuiteConvert::products($data),
+            'orders' => NetSuiteConvert::orders($data),
+            'customers' => NetSuiteConvert::customers($data),
+            'items' => NetSuiteConvert::products($data),
             default => new ArrayCollection(),
         };
         if (($type === 'metrics' || $type === 'aggregates') && $collection->count() > 0) {
@@ -381,7 +385,7 @@ class MetricRequests
         $collection = FacebookMarketingMetricConvert::adAccountMetrics(
             rows: $data['data'] ?? [],
             logger: $logger,
-            accountEntity: $channeledAccount->getAccount(),
+            account: $channeledAccount->getAccount(),
             channeledAccountPlatformId: (string)$channeledAccount->getPlatformId(),
             period: $period ?? Period::Daily
         );
@@ -422,7 +426,7 @@ class MetricRequests
         $collection = FacebookMarketingMetricConvert::adAccountMetrics(
             rows: $data['data'] ?? [],
             logger: $logger,
-            accountEntity: $channeledAccount->getAccount(),
+            account: $channeledAccount->getAccount(),
             channeledAccountPlatformId: (string)$channeledAccount->getPlatformId(),
             period: $period ?? Period::Daily
         );
@@ -456,7 +460,7 @@ class MetricRequests
         $collection = FacebookMarketingMetricConvert::adAccountMetrics(
             rows: $data['data'] ?? [],
             logger: $logger,
-            accountEntity: $channeledAccount->getAccount(),
+            account: $channeledAccount->getAccount(),
             channeledAccountPlatformId: (string)$channeledAccount->getPlatformId(),
             period: $period ?? Period::Daily
         );

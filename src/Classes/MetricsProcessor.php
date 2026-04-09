@@ -183,7 +183,7 @@ class MetricsProcessor
         $ids = [];
         foreach ($metrics as $metric) {
             if (isset($metric->channeledAccount)) {
-                $ids[] = $metric->channeledAccount->getPlatformId();
+                $ids[] = is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount;
             } elseif (isset($metric->channeledAccountPlatformId)) {
                 $ids[] = $metric->channeledAccountPlatformId;
             }
@@ -245,7 +245,9 @@ class MetricsProcessor
         $ids = [];
         foreach ($metrics as $metric) {
             if (isset($metric->channeledCampaign)) {
-                $ids[] = $metric->channeledCampaign->getPlatformId();
+                $ids[] = is_object($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : (string)$metric->channeledCampaign;
+            } elseif (isset($metric->channeledCampaignPlatformId)) {
+                $ids[] = $metric->channeledCampaignPlatformId;
             }
         }
         $ids = array_unique($ids);
@@ -275,7 +277,9 @@ class MetricsProcessor
         $ids = [];
         foreach ($metrics as $metric) {
             if (isset($metric->channeledAdGroup)) {
-                $ids[] = $metric->channeledAdGroup->getPlatformId();
+                $ids[] = is_object($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : (string)$metric->channeledAdGroup;
+            } elseif (isset($metric->channeledAdGroupPlatformId)) {
+                $ids[] = $metric->channeledAdGroupPlatformId;
             }
         }
         $ids = array_unique($ids);
@@ -305,7 +309,9 @@ class MetricsProcessor
         $ids = [];
         foreach ($metrics as $metric) {
             if (isset($metric->channeledAd)) {
-                $ids[] = $metric->channeledAd->getPlatformId();
+                $ids[] = is_object($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : (string)$metric->channeledAd;
+            } elseif (isset($metric->channeledAdPlatformId)) {
+                $ids[] = $metric->channeledAdPlatformId;
             }
         }
         $ids = array_unique($ids);
@@ -526,21 +532,21 @@ class MetricsProcessor
                 channel: $metric->channel,
                 name: $metric->name,
                 period: $metric->period,
-                account: isset($metric->account) ? $metric->account->getName() : null,
-                channeledAccount: isset($metric->channeledAccount) ? (string) $metric->channeledAccount->getPlatformId() : null,
-                campaign: isset($metric->campaign) ? (string) $metric->campaign->getCampaignId() : null,
-                channeledCampaign: isset($metric->channeledCampaign) ? (string) $metric->channeledCampaign->getPlatformId() : null,
-                channeledAdGroup: isset($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : null,
-                channeledAd: isset($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : null,
-                page: isset($metric->page) ? $metric->page->getUrl() : null,
+                account: isset($metric->account) ? (is_object($metric->account) ? $metric->account->getName() : (string)$metric->account) : null,
+                channeledAccount: isset($metric->channeledAccount) ? (is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount) : null,
+                campaign: isset($metric->campaign) ? (is_object($metric->campaign) ? $metric->campaign->getCampaignId() : (string)$metric->campaign) : null,
+                channeledCampaign: isset($metric->channeledCampaign) ? (is_object($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : (string)$metric->channeledCampaign) : null,
+                channeledAdGroup: isset($metric->channeledAdGroup) ? (is_object($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : (string)$metric->channeledAdGroup) : null,
+                channeledAd: isset($metric->channeledAd) ? (is_object($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : (string)$metric->channeledAd) : null,
+                page: isset($metric->page) ? (is_object($metric->page) ? $metric->page->getUrl() : (string)$metric->page) : null,
                 query: $metric->query ?? null,
-                post: isset($metric->post) ? $metric->post->getPostId() : null,
-                product: isset($metric->product) ? $metric->product->getProductId() : null,
-                customer: isset($metric->customer) ? $metric->customer->getEmail() : null,
-                order: isset($metric->order) ? $metric->order->getOrderId() : null,
+                post: isset($metric->post) ? (is_object($metric->post) ? $metric->post->getPostId() : (string)$metric->post) : null,
+                product: isset($metric->product) ? (is_object($metric->product) ? $metric->product->getProductId() : (string)$metric->product) : null,
+                customer: isset($metric->customer) ? (is_object($metric->customer) ? $metric->customer->getEmail() : (string)$metric->customer) : null,
+                order: isset($metric->order) ? (is_object($metric->order) ? $metric->order->getOrderId() : (string)$metric->order) : null,
                 country: $metric->countryCode ?? null,
                 device: $metric->deviceType ?? null,
-                creative: isset($metric->creative) ? $metric->creative->getCreativeId() : null,
+                creative: isset($metric->creative) ? (is_object($metric->creative) ? $metric->creative->getCreativeId() : (string)$metric->creative) : null,
                 dimensionSet: $metric->dimensionsHash ?? (isset($metric->dimensions) ? KeyGenerator::generateDimensionsHash((array)$metric->dimensions) : null)
             );
             $metric->metricConfigKey = $metricConfigKey;
@@ -549,21 +555,21 @@ class MetricsProcessor
                 'channel' => $metric->channel,
                 'name' => $metric->name,
                 'period' => $metric->period,
-                'account_id' => isset($metric->account) ? ($accountMap['map'][$metric->account->getId() ?? 0] ?? null) : null,
-                'channeled_account_id' => isset($metric->channeledAccount) ? ($channeledAccountMap['map'][$metric->channeledAccount->getPlatformId()] ?? null) : (isset($metric->channeledAccountPlatformId) ? ($channeledAccountMap['map'][$metric->channeledAccountPlatformId] ?? null) : null),
-                'campaign_id' => isset($metric->campaign) ? ($campaignMap['map'][$metric->campaign->getCampaignId()] ?? null) : (isset($metric->campaignPlatformId) ? ($campaignMap['map'][$metric->campaignPlatformId] ?? null) : null),
-                'channeled_campaign_id' => isset($metric->channeledCampaign) ? ($channeledCampaignMap['map'][$metric->channeledCampaign->getPlatformId()] ?? null) : (isset($metric->channeledCampaignPlatformId) ? ($channeledCampaignMap['map'][$metric->channeledCampaignPlatformId] ?? null) : null),
-                'channeled_ad_group_id' => isset($metric->channeledAdGroup) ? ($channeledAdGroupMap['map'][$metric->channeledAdGroup->getPlatformId()] ?? null) : (isset($metric->channeledAdGroupPlatformId) ? ($channeledAdGroupMap['map'][$metric->channeledAdGroupPlatformId] ?? null) : null),
-                'channeled_ad_id' => isset($metric->channeledAd) ? ($channeledAdMap['map'][$metric->channeledAd->getPlatformId()] ?? null) : (isset($metric->channeledAdPlatformId) ? ($channeledAdMap['map'][$metric->channeledAdPlatformId] ?? null) : null),
+                'account_id' => isset($metric->account) ? (is_object($metric->account) ? ($accountMap['map'][$metric->account->getId() ?? 0] ?? null) : null) : null,
+                'channeled_account_id' => isset($metric->channeledAccount) ? ($channeledAccountMap['map'][is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount] ?? null) : (isset($metric->channeledAccountPlatformId) ? ($channeledAccountMap['map'][$metric->channeledAccountPlatformId] ?? null) : null),
+                'campaign_id' => isset($metric->campaign) ? ($campaignMap['map'][is_object($metric->campaign) ? $metric->campaign->getCampaignId() : (string)$metric->campaign] ?? null) : (isset($metric->campaignPlatformId) ? ($campaignMap['map'][$metric->campaignPlatformId] ?? null) : null),
+                'channeled_campaign_id' => isset($metric->channeledCampaign) ? ($channeledCampaignMap['map'][is_object($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : (string)$metric->channeledCampaign] ?? null) : (isset($metric->channeledCampaignPlatformId) ? ($channeledCampaignMap['map'][$metric->channeledCampaignPlatformId] ?? null) : null),
+                'channeled_ad_group_id' => isset($metric->channeledAdGroup) ? ($channeledAdGroupMap['map'][is_object($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : (string)$metric->channeledAdGroup] ?? null) : (isset($metric->channeledAdGroupPlatformId) ? ($channeledAdGroupMap['map'][$metric->channeledAdGroupPlatformId] ?? null) : null),
+                'channeled_ad_id' => isset($metric->channeledAd) ? ($channeledAdMap['map'][is_object($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : (string)$metric->channeledAd] ?? null) : (isset($metric->channeledAdPlatformId) ? ($channeledAdMap['map'][$metric->channeledAdPlatformId] ?? null) : null),
                 'query_id' => isset($metric->query) ? ($queryMap['map'][$metric->query] ?? null) : null,
-                'page_id' => isset($metric->page) ? ($pageMap['map'][$metric->page->getPlatformId()] ?? null) : null,
-                'post_id' => isset($metric->post) ? ($postMap['map'][$metric->post->getPostId()] ?? null) : null,
-                'product_id' => isset($metric->product) ? ($productMap['map'][$metric->product->getProductId()] ?? null) : null,
-                'customer_id' => isset($metric->customer) ? ($customerMap['map'][$metric->customer->getEmail()] ?? null) : null,
-                'order_id' => isset($metric->order) ? ($orderMap['map'][$metric->order->getOrderId()] ?? null) : null,
+                'page_id' => isset($metric->page) ? ($pageMap['map'][is_object($metric->page) ? $metric->page->getPlatformId() : (string)$metric->page] ?? null) : null,
+                'post_id' => isset($metric->post) ? ($postMap['map'][is_object($metric->post) ? $metric->post->getPostId() : (string)$metric->post] ?? null) : null,
+                'product_id' => isset($metric->product) ? ($productMap['map'][is_object($metric->product) ? $metric->product->getProductId() : (string)$metric->product] ?? null) : null,
+                'customer_id' => isset($metric->customer) ? ($customerMap['map'][is_object($metric->customer) ? $metric->customer->getEmail() : (string)$metric->customer] ?? null) : null,
+                'order_id' => isset($metric->order) ? ($orderMap['map'][is_object($metric->order) ? $metric->order->getOrderId() : (string)$metric->order] ?? null) : null,
                 'country_id' => isset($metric->countryCode) ? ($countryMap['map'][$metric->countryCode]->getId() ?? null) : (isset($metric->country) ? $metric->country->getId() : null),
                 'device_id' => isset($metric->deviceType) ? ($deviceMap['map'][$metric->deviceType]->getId() ?? null) : (isset($metric->device) ? $metric->device->getId() : null),
-                'creative_id' => isset($metric->creative) ? ($creativeMap['map'][$metric->creative->getCreativeId()] ?? ($creativeMap['map'][$metric->creative->getCreativeId()] ?? null)) : null,
+                'creative_id' => isset($metric->creative) ? ($creativeMap['map'][is_object($metric->creative) ? $metric->creative->getCreativeId() : (string)$metric->creative] ?? null) : null,
                 'dimension_set_id' => $dimensionSetMap['map'][$metric->dimensionsHash ?? KeyGenerator::generateDimensionsHash((array)$metric->dimensions)] ?? ($dimensionSetMap[$metric->dimensionsHash ?? KeyGenerator::generateDimensionsHash((array)$metric->dimensions)] ?? null),
                 'key' => $metricConfigKey,
             ];

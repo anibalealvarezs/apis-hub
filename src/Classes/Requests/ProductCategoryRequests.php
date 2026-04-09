@@ -6,8 +6,8 @@ namespace Classes\Requests;
 
 use Anibalealvarezs\NetSuiteApi\NetSuiteApi;
 use Anibalealvarezs\ShopifyApi\ShopifyApi;
-use Classes\Conversions\NetSuiteConvert;
-use Classes\Conversions\ShopifyConvert;
+use Anibalealvarezs\NetSuiteApi\Conversions\NetSuiteConvert;
+use Anibalealvarezs\ShopifyApi\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;

@@ -49,11 +49,17 @@ class ConfigManagerController extends BaseController
             $requestedType = $request->query->get('type');
             $forceRefresh = $request->query->get('refresh') === '1';
             
+            $availableChannels = \Core\Drivers\DriverFactory::getAvailableChannels();
             $allAssets = [
                 'gsc' => [],
                 'facebook_pages' => [],
                 'facebook_ad_accounts' => [],
             ];
+            foreach ($availableChannels as $chan) {
+                if (!isset($allAssets[$chan])) {
+                    $allAssets[$chan] = [];
+                }
+            }
             $lastUpdated = null;
 
             // STEP 0: Post-Singleton Load
@@ -109,7 +115,17 @@ class ConfigManagerController extends BaseController
                 'fb_marketing_cron_recent_hour' => $fbMarketing['cron_recent_hour'] ?? null,
                 'fb_marketing_cron_recent_minute' => $fbMarketing['cron_recent_minute'] ?? null,
                 'effective_schedules' => $this->getEffectiveCronSchedules(),
+                'available_channels' => $availableChannels,
             ];
+
+            // Initialize configs for all channels
+            foreach ($availableChannels as $chan) {
+                if (!isset($currentConfig[$chan . '_enabled'])) {
+                    $chanConfig = $systemConfig['channels'][$chan] ?? [];
+                    $currentConfig[$chan . '_enabled'] = $chanConfig['enabled'] ?? false;
+                    $currentConfig[$chan . '_history_range'] = $chanConfig['cache_history_range'] ?? '1 year';
+                }
+            }
 
             $logger->info("DEBUG: Project Name detected: " . (getenv('PROJECT_NAME') ?: "NOT SET"));
             $logger->info("DEBUG: FB Marketing Campaign Filter: " . json_encode($fbMarketing['CAMPAIGN'] ?? 'NOT_FOUND'));
@@ -417,6 +433,9 @@ class ConfigManagerController extends BaseController
 
                 file_put_contents($appConfigPath, Yaml::dump($appConf, 10, 2));
                 $logger->info("Global config updated successfully");
+            } elseif (in_array($type, \Core\Drivers\DriverFactory::getAvailableChannels())) {
+                $this->updateGenericConfig($type, $data['enabled'] ?? true, $data['cache_history_range'] ?? null);
+                $logger->info("Generic config updated successfully for channel: " . $type);
             } else {
                 return new Response(json_encode(['error' => 'Invalid type: ' . $type]), 400, ['Content-Type' => 'application/json']);
             }
@@ -1007,5 +1026,26 @@ class ConfigManagerController extends BaseController
             $this->em->flush();
         }
         return $accountEntity;
+    }
+
+    private function updateGenericConfig(string $chan, bool $enabled, ?string $historyRange): void
+    {
+        $configPath = __DIR__ . "/../../config/channels/{$chan}.yaml";
+        $config = file_exists($configPath) ? (\Symfony\Component\Yaml\Yaml::parseFile($configPath) ?: []) : [];
+        if (!isset($config['channels'][$chan])) {
+            $config['channels'][$chan] = [];
+        }
+        $config['channels'][$chan]['enabled'] = $enabled;
+        if ($historyRange) {
+            $config['channels'][$chan]['cache_history_range'] = $historyRange;
+        }
+        
+        // Ensure directory exists
+        $configDir = dirname($configPath);
+        if (!is_dir($configDir)) {
+            mkdir($configDir, 0755, true);
+        }
+
+        file_put_contents($configPath, \Symfony\Component\Yaml\Yaml::dump($config, 10, 2));
     }
 }

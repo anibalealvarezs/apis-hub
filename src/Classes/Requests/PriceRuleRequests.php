@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Anibalealvarezs\ShopifyApi\ShopifyApi;
-use Classes\Conversions\ShopifyConvert;
+use Anibalealvarezs\ShopifyApi\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;

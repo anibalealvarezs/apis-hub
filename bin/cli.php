@@ -78,6 +78,7 @@ try {
         new ResetMetricsCommand(),
         new ResetEntitiesCommand(),
         new ResetChannelCommand(),
+        new \Commands\Analytics\SwooleWorkerCommand($entityManager),
         new \Commands\Analytics\ScaleDownCommand($entityManager),
         new MigratePagesCanonicalCommand(Helpers::getManager()),
     ]);

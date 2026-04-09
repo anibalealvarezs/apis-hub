@@ -113,8 +113,12 @@ if [ $# -gt 0 ]; then
     exec "$@"
 else
     # Run the web server (Default behavior)
-    echo "Starting PHP server on port $PORT with compression..."
-    exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
-
+    if [ "$USE_SWOOLE" = "true" ]; then
+        echo "Starting Swoole HTTP server on port $PORT..."
+        exec php bin/swoole-server.php
+    else
+        echo "Starting PHP server on port $PORT with compression..."
+        exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
+    fi
 fi
 

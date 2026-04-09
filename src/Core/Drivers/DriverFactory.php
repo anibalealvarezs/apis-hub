@@ -12,72 +12,28 @@ class DriverFactory
     
     /**
      * Mapeo de canales a sus respectivas clases de Driver y AuthProvider.
-     * En una fase posterior, este mapa se poblará dinámicamente.
      */
-    private static array $registry = [
-        'google_search_console' => [
-            'driver' => \Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver::class,
-            'auth' => \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider::class,
-            'processor' => [\Classes\Requests\MetricRequests::class, 'processGSCSite'],
-        ],
-        'google_analytics' => [
-            'driver' => \Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAnalyticsDriver::class,
-            'auth' => \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider::class,
-        ],
-        'facebook_marketing' => [
-            'driver' => \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver::class,
-            'auth' => \Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider::class,
-            'processor' => [\Classes\Requests\MetricRequests::class, 'processFacebookMarketingChunk'],
-        ],
-        'facebook_organic' => [
-            'driver' => \Anibalealvarezs\MetaHubDriver\Drivers\FacebookOrganicDriver::class,
-            'auth' => \Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider::class,
-            'processor' => [\Classes\Requests\MetricRequests::class, 'processFacebookOrganicChunk'],
-        ],
-        'shopify' => [
-            'driver' => \Anibalealvarezs\ShopifyHubDriver\Drivers\ShopifyDriver::class,
-            'auth' => \Anibalealvarezs\ShopifyHubDriver\Auth\ShopifyAuthProvider::class,
-            'processor' => [\Classes\Requests\MetricRequests::class, 'processShopifyChunk'],
-        ],
-        'klaviyo' => [
-            'driver' => \Anibalealvarezs\KlaviyoHubDriver\Drivers\KlaviyoDriver::class,
-            'auth' => \Anibalealvarezs\KlaviyoHubDriver\Auth\KlaviyoAuthProvider::class,
-            'processor' => [\Classes\Requests\MetricRequests::class, 'processKlaviyoChunk'],
-        ],
-        'netsuite' => [
-            'driver' => \Anibalealvarezs\NetSuiteHubDriver\Drivers\NetSuiteDriver::class,
-            'auth' => \Anibalealvarezs\NetSuiteHubDriver\Auth\NetSuiteAuthProvider::class,
-            'processor' => [\Classes\Requests\MetricRequests::class, 'processNetSuiteChunk'],
-        ],
-        'amazon' => [
-            'driver' => \Anibalealvarezs\AmazonHubDriver\Drivers\AmazonDriver::class,
-            'auth' => \Anibalealvarezs\AmazonHubDriver\Auth\AmazonAuthProvider::class,
-        ],
-        'bigcommerce' => [
-            'driver' => \Anibalealvarezs\BigCommerceHubDriver\Drivers\BigCommerceDriver::class,
-            'auth' => \Anibalealvarezs\BigCommerceHubDriver\Auth\BigCommerceAuthProvider::class,
-        ],
-        'pinterest' => [
-            'driver' => \Anibalealvarezs\PinterestHubDriver\Drivers\PinterestDriver::class,
-            'auth' => \Anibalealvarezs\PinterestHubDriver\Auth\PinterestAuthProvider::class,
-        ],
-        'linkedin' => [
-            'driver' => \Anibalealvarezs\LinkedInHubDriver\Drivers\LinkedInDriver::class,
-            'auth' => \Anibalealvarezs\LinkedInHubDriver\Auth\LinkedInAuthProvider::class,
-        ],
-        'x' => [
-            'driver' => \Anibalealvarezs\XHubDriver\Drivers\XDriver::class,
-            'auth' => \Anibalealvarezs\XHubDriver\Auth\XAuthProvider::class,
-        ],
-        'tiktok' => [
-            'driver' => \Anibalealvarezs\TikTokHubDriver\Drivers\TikTokDriver::class,
-            'auth' => \Anibalealvarezs\TikTokHubDriver\Auth\TikTokAuthProvider::class,
-        ],
-        'triplewhale' => [
-            'driver' => \Anibalealvarezs\TripleWhaleHubDriver\Drivers\TripleWhaleDriver::class,
-            'auth' => \Anibalealvarezs\TripleWhaleHubDriver\Auth\TripleWhaleAuthProvider::class,
-        ],
-    ];
+    private static array $registry = [];
+
+    /**
+     * Carga el registro de drivers desde el archivo de configuración.
+     */
+    private static function loadRegistry(): void
+    {
+        if (!empty(self::$registry)) {
+            return;
+        }
+
+        $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../../config';
+        $filePath = $configDir . '/drivers.yaml';
+
+        if (file_exists($filePath)) {
+            $yamlConfig = \Symfony\Component\Yaml\Yaml::parseFile($filePath);
+            if (is_array($yamlConfig)) {
+                self::$registry = $yamlConfig;
+            }
+        }
+    }
 
     /**
      * Obtiene una instancia del driver para el canal especificado.
@@ -89,6 +45,8 @@ class DriverFactory
      */
     public static function get(string $channel, ?LoggerInterface $logger = null): SyncDriverInterface
     {
+        self::loadRegistry();
+        
         if (isset(self::$instances[$channel])) {
             return self::$instances[$channel];
         }
@@ -128,6 +86,8 @@ class DriverFactory
      */
     public static function register(string $channel, string $driverClass, string $authClass): void
     {
+        self::loadRegistry();
+        
         self::$registry[$channel] = [
             'driver' => $driverClass,
             'auth' => $authClass,
@@ -143,6 +103,17 @@ class DriverFactory
     public static function setInstance(string $channel, SyncDriverInterface $instance): void
     {
         self::$instances[$channel] = $instance;
+    }
+
+    /**
+     * Obtiene la lista de canales que tienen un driver registrado.
+     *
+     * @return string[]
+     */
+    public static function getAvailableChannels(): array
+    {
+        self::loadRegistry();
+        return array_keys(self::$registry);
     }
 }
 
