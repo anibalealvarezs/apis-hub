@@ -4,26 +4,21 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Classes\Conversions\NetSuiteConvert;
 use Anibalealvarezs\NetSuiteApi\NetSuiteApi;
 use Anibalealvarezs\ShopifyApi\ShopifyApi;
+use Classes\Conversions\NetSuiteConvert;
 use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
-use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
-use Entities\Analytics\Channeled\ChanneledProduct;
 use Entities\Analytics\Channeled\ChanneledProductCategory;
-use Entities\Analytics\ProductCategory;
 use Enums\Channel;
-use Repositories\Channeled\ChanneledProductCategoryRepository;
-use Repositories\Channeled\ChanneledProductRepository;
-use Repositories\ProductCategoryRepository;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
+use Repositories\Channeled\ChanneledProductCategoryRepository;
 use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -92,11 +87,12 @@ class ProductCategoryRequests implements RequestInterface
         $sourceCollects = $shopifyClient->getAllCollects(
             pageInfo: $filters->pageInfo ?? null,
         );
+
         return self::process(
             new ArrayCollection(
                 [
                     ...ShopifyConvert::productCategories(productCategories: $sourceCustomCollections['custom_collections'])->toArray(),
-                    ...ShopifyConvert::productCategories(productCategories: $sourceSmartCollections['smart_collections'], isSmartCollection: true)->toArray()
+                    ...ShopifyConvert::productCategories(productCategories: $sourceSmartCollections['smart_collections'], isSmartCollection: true)->toArray(),
                 ]
             ),
             ShopifyConvert::collects($sourceCollects['collects'])->toArray()
@@ -109,7 +105,7 @@ class ProductCategoryRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromKlaviyo(?array $fields = null, ?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -121,7 +117,7 @@ class ProductCategoryRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, ?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -135,7 +131,7 @@ class ProductCategoryRequests implements RequestInterface
      * @throws NotSupported
      * @throws ORMException
      */
-    public static function getListFromNetsuite(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromNetsuite(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         $config = Helpers::getChannelsConfig()['netsuite'];
         $netsuiteClient = new NetSuiteApi(
@@ -159,6 +155,7 @@ class ProductCategoryRequests implements RequestInterface
                 self::process(NetSuiteConvert::productCategories($productCategories));
             }
         );
+
         return new Response(json_encode(['Product Categories retrieved.']));
     }
 
@@ -169,7 +166,7 @@ class ProductCategoryRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, ?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -187,7 +184,7 @@ class ProductCategoryRequests implements RequestInterface
 
             $result = \Classes\ProductCategoryProcessor::processCategories($channeledCollection, $collects, $manager);
 
-            if (!empty($result)) {
+            if (! empty($result)) {
                 $cacheService = CacheService::getInstance(redisClient: Helpers::getRedisClient());
                 $entities = [
                     'ProductCategory' => $result['productCategories'],
@@ -198,7 +195,7 @@ class ProductCategoryRequests implements RequestInterface
                 $channelName = Channel::from(reset($result['channels']))->getName();
 
                 $cacheService->invalidateMultipleEntities(
-                    entities: array_filter($entities, fn ($value) => !empty($value)),
+                    entities: array_filter($entities, fn ($value) => ! empty($value)),
                     channel: $channelName
                 );
             }

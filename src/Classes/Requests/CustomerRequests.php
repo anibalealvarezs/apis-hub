@@ -4,29 +4,20 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Carbon\Carbon;
-use Classes\Conversions\KlaviyoConvert;
-use Classes\Conversions\NetSuiteConvert;
-use Classes\Conversions\ShopifyConvert;
-use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
-use Anibalealvarezs\ShopifyApi\ShopifyApi;
 use Anibalealvarezs\NetSuiteApi\NetSuiteApi;
+use Carbon\Carbon;
+use Classes\Conversions\NetSuiteConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
 use Entities\Analytics\Channeled\ChanneledCustomer;
-use Entities\Analytics\Customer;
-use Entities\Entity;
 use Enums\Channel;
-use Repositories\CustomerRepository;
-use Repositories\Channeled\ChanneledCustomerRepository;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
+use Repositories\Channeled\ChanneledCustomerRepository;
 use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -79,7 +70,8 @@ class CustomerRequests implements RequestInterface
                     'fields' => $fields,
                     'filters' => $filters,
                 ]);
-            } catch (\Exception $e) {}
+            } catch (\Exception $e) {
+            }
         }
 
         return new Response(json_encode(['Customers retrieved']));
@@ -111,7 +103,8 @@ class CustomerRequests implements RequestInterface
                     'type' => 'customers',
                     'fields' => $fields,
                 ]);
-            } catch (\Exception $e) {}
+            } catch (\Exception $e) {
+            }
         }
 
         return new Response(json_encode(['Customers retrieved']));
@@ -122,7 +115,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromFacebookMarketing(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromFacebookMarketing(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -144,9 +137,10 @@ class CustomerRequests implements RequestInterface
                 return (new \Core\Services\SyncService())->execute('bigcommerce', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
-                    'type' => 'customers'
+                    'type' => 'customers',
                 ]);
-            } catch (\Exception $e) {}
+            } catch (\Exception $e) {
+            }
         }
 
         return new Response(json_encode([]));
@@ -173,9 +167,10 @@ class CustomerRequests implements RequestInterface
                 return (new \Core\Services\SyncService())->execute('netsuite', $createdAtMin, $createdAtMax, [
                     'jobId' => $jobId,
                     'resume' => $resume,
-                    'type' => 'customers'
+                    'type' => 'customers',
                 ]);
-            } catch (\Exception $e) {}
+            } catch (\Exception $e) {
+            }
         }
 
         $config = Helpers::getChannelsConfig()['netsuite'];
@@ -248,6 +243,7 @@ class CustomerRequests implements RequestInterface
                 self::process(NetSuiteConvert::customers($customers));
             }
         );
+
         return new Response(json_encode(['Customers retrieved']));
     }
 
@@ -256,7 +252,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromAmazon(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -266,7 +262,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromInstagram(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromInstagram(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -276,7 +272,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromGoogleAnalytics(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromGoogleAnalytics(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -286,7 +282,7 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromPinterest(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromPinterest(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -296,12 +292,12 @@ class CustomerRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromLinkedIn(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromLinkedIn(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
 
-    public static function getListFromX(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromX(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -320,7 +316,7 @@ class CustomerRequests implements RequestInterface
 
             $result = \Classes\CustomerProcessor::processCustomers($channeledCollection, $manager);
 
-            if (!empty($result)) {
+            if (! empty($result)) {
                 $cacheService = CacheService::getInstance(Helpers::getRedisClient());
                 $entities = [
                     'Customer' => $result['emails'],
@@ -331,7 +327,7 @@ class CustomerRequests implements RequestInterface
                 $channelName = Channel::from(reset($result['channels']))->getName();
 
                 $cacheService->invalidateMultipleEntities(
-                    array_filter($entities, fn ($value) => !empty($value)),
+                    array_filter($entities, fn ($value) => ! empty($value)),
                     $channelName
                 );
             }

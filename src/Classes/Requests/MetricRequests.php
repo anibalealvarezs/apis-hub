@@ -113,7 +113,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromShopify(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromShopify(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return (new \Core\Services\SyncService())->execute('shopify', $filters->createdAtMin ?? null, $filters->createdAtMax ?? null, [
             'jobId' => $jobId,
@@ -250,6 +250,14 @@ class MetricRequests
         return ['metrics' => $totalMetrics, 'rows' => $totalRows, 'duplicates' => $totalDuplicates];
     }
 
+    /**
+     * @param array $data
+     * @param string $startDate
+     * @param string $endDate
+     * @param array $account
+     * @param array $config
+     * @return array
+     */
     public static function processFacebookMarketingChunk(
         array $data,
         string $startDate,
@@ -289,18 +297,16 @@ class MetricRequests
         }
 
         return self::processAdAccount(
-            rows: $data,
-            adAccount: $account,
-            manager: $manager,
-            accountEntity: $accountEntity,
-            channeledAccountEntity: $channeledAccount,
-            logger: $logger,
-            startDate: $startDate,
-            endDate: $endDate,
-            config: $config
+            $data,
+            $account,
+            $manager,
+            $accountEntity,
+            $channeledAccount,
+            $logger,
+            $startDate,
+            $endDate,
+            $config
         );
-
-        return $res;
     }
 
     public static function processKlaviyoChunk(
@@ -384,7 +390,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromBigCommerce(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -394,7 +400,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromNetSuite(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromNetSuite(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return (new \Core\Services\SyncService())->execute('netsuite', $filters->startDate ?? null, $filters->endDate ?? null, [
             'jobId' => $jobId,
@@ -407,7 +413,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromAmazon(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -417,7 +423,7 @@ class MetricRequests
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromInstagram(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromInstagram(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -973,15 +979,16 @@ class MetricRequests
     }
 
     /**
-     * Processes a single site, including page lookup and data fetching.
-     *
+     * @param array $rows
      * @param array $adAccount
-     * @param FacebookGraphApi $api
      * @param EntityManager $manager
      * @param Account $accountEntity
      * @param ChanneledAccount $channeledAccountEntity
      * @param LoggerInterface $logger
-     * @return void
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param array $config
+     * @return array
      * @throws GuzzleException
      * @throws \Doctrine\DBAL\Exception
      */

@@ -7,27 +7,13 @@ namespace Classes\Requests;
 use Carbon\Carbon;
 use Classes\Conversions\NetSuiteConvert;
 use Anibalealvarezs\NetSuiteApi\NetSuiteApi;
-use Anibalealvarezs\ShopifyApi\ShopifyApi;
-use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
-use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
-use Doctrine\ORM\OptimisticLockException;
-use Entities\Analytics\Channeled\ChanneledCustomer;
-use Entities\Analytics\Channeled\ChanneledDiscount;
 use Entities\Analytics\Channeled\ChanneledOrder;
-use Entities\Analytics\Channeled\ChanneledProduct;
-use Entities\Analytics\Channeled\ChanneledProductVariant;
-use Entities\Analytics\Order;
 use Enums\Channel;
-use Repositories\OrderRepository;
 use Repositories\Channeled\ChanneledOrderRepository;
-use Repositories\Channeled\ChanneledDiscountRepository;
-use Repositories\Channeled\ChanneledProductRepository;
-use Repositories\Channeled\ChanneledProductVariantRepository;
-use Repositories\Channeled\ChanneledCustomerRepository;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -92,7 +78,7 @@ class OrderRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromKlaviyo(?array $fields = null, ?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }

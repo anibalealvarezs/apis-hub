@@ -4,27 +4,18 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Classes\Conversions\ShopifyConvert;
 use Anibalealvarezs\ShopifyApi\ShopifyApi;
+use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
-use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
-use Doctrine\ORM\OptimisticLockException;
-use Entities\Analytics\Channeled\ChanneledDiscount;
 use Entities\Analytics\Channeled\ChanneledPriceRule;
-use Entities\Analytics\Discount;
-use Entities\Analytics\PriceRule;
 use Enums\Channel;
-use Repositories\BaseRepository;
-use Repositories\Channeled\ChanneledDiscountRepository;
-use Repositories\Channeled\ChanneledPriceRuleRepository;
-use Repositories\DiscountRepository;
-use Repositories\PriceRuleRepository;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
+use Repositories\Channeled\ChanneledPriceRuleRepository;
 use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -90,6 +81,7 @@ class PriceRuleRequests implements RequestInterface
                 self::process(ShopifyConvert::priceRules($priceRules));
             }
         );
+
         return new Response(json_encode(['Price rules retrieved']));
     }
 
@@ -151,7 +143,7 @@ class PriceRuleRequests implements RequestInterface
 
             $result = \Classes\PriceRuleProcessor::processPriceRules($channeledCollection, $manager);
 
-            if (!empty($result)) {
+            if (! empty($result)) {
                 $cacheService = CacheService::getInstance(redisClient: Helpers::getRedisClient());
                 $channelName = Channel::from(reset($result['channels']))->getName();
 
@@ -197,7 +189,7 @@ class PriceRuleRequests implements RequestInterface
                 ];
 
                 $cacheService->invalidateMultipleEntities(
-                    entities: array_filter($entities, fn ($value) => !empty($value)),
+                    entities: array_filter($entities, fn ($value) => ! empty($value)),
                     channel: $channelName
                 );
             }

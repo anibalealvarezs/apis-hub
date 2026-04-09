@@ -32,7 +32,7 @@ class DiscountRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromShopify(int $limit = 10, int $pagination = 0, ?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode(['Discounts are retrieved along with Price Rules.']));
     }
@@ -44,7 +44,7 @@ class DiscountRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, ?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -56,7 +56,7 @@ class DiscountRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, ?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
@@ -66,7 +66,7 @@ class DiscountRequests implements RequestInterface
      * @param string|bool $resume
      * @return Response
      */
-    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
+    public static function getListFromAmazon(?object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
     {
         return new Response(json_encode([]));
     }
