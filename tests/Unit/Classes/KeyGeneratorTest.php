@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Classes;
 
-use Classes\KeyGenerator;
+use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
 use Enums\Channel;
 use Enums\Period;
 use Tests\Unit\BaseUnitTestCase;

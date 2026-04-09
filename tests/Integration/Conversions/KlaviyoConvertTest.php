@@ -2,7 +2,7 @@
 
 namespace Tests\Integration\Conversions;
 
-use Classes\Conversions\KlaviyoConvert;
+use Anibalealvarezs\KlaviyoApi\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use Tests\Integration\BaseIntegrationTestCase;

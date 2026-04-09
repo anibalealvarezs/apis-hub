@@ -2,7 +2,7 @@
 
 namespace Tests\Integration\Conversions;
 
-use Classes\Conversions\GoogleSearchConsoleConvert;
+use Anibalealvarezs\GoogleApi\Conversions\GoogleSearchConsoleConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Page;
 use Tests\Integration\BaseIntegrationTestCase;
@@ -41,9 +41,9 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
         // Simulate 2 raw rows returned correctly mapped through Helpers layer
         $rows = [
             [
-                // Keys map to: ['date', 'query', 'country', 'page', 'device']
-                'keys' => [$date, $query, $country, $pageUrl, $device],
-                'subset' => ['date', 'query', 'country', 'page', 'device'],
+                // Keys map to: ['date', 'query', 'page', 'country', 'device']
+                'keys' => [$date, $query, $pageUrl, $country, $device],
+                'subset' => ['date', 'query', 'page', 'country', 'device'],
                 'impressions' => $v1['impressions'],
                 'clicks' => $v1['clicks'],
                 'position' => $v1['position'],
@@ -54,8 +54,8 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
             ],
             [
                 // Perfectly matching keys to force an aggregation scenario!
-                'keys' => [$date, $query, $country, $pageUrl, $device],
-                'subset' => ['date', 'query', 'country', 'page', 'device'],
+                'keys' => [$date, $query, $pageUrl, $country, $device],
+                'subset' => ['date', 'query', 'page', 'country', 'device'],
                 'impressions' => $v2['impressions'],
                 'clicks' => $v2['clicks'],
                 'position' => $v2['position'],
@@ -72,8 +72,7 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
             siteUrl: $siteUrl,
             siteKey: $siteKey,
             logger: null,
-            pageEntity: $pageEntity,
-            em: $this->entityManager
+            page: $pageEntity
         );
 
         // 3. Assert
@@ -111,7 +110,7 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
     {
         $siteUrl = 'https://example.com';
         $rows = [['keys' => null, 'impressions' => 10, 'clicks' => 1]]; // Missing query/page/etc keys
-        $collection = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, 'example_com', null, null, $this->entityManager);
+        $collection = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, 'example_com', null, null);
         
         // This should run and result in metrics with default values for dimensions
         $this->assertCount(4, $collection);

@@ -170,7 +170,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
         $metrics = new ArrayCollection([$metric]);
 
         // Signature for the lifetime metric
-        $signature = \Classes\KeyGenerator::generateMetricConfigKey(
+        $signature = \Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator::generateMetricConfigKey(
             channel: 1,
             name: 'clicks',
             period: \Enums\Period::Lifetime->value

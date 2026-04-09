@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Classes\Conversions\KlaviyoConvert;
+use Anibalealvarezs\KlaviyoApi\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use Enums\Period;

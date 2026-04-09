@@ -11,8 +11,9 @@ class HubInstantiationTest extends BaseIntegrationTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // Clear environment variables that might interfere
+        // Clear environment variables
         $envToClear = [
+            'CHANNELS_CONFIG',
             'GOOGLE_CLIENT_ID',
             'GOOGLE_CLIENT_SECRET',
             'GOOGLE_REFRESH_TOKEN',
@@ -44,7 +45,7 @@ class HubInstantiationTest extends BaseIntegrationTestCase
 
     public function testHubSuccessfullyInstantiatesKlaviyoDriverUsingConfig(): void
     {
-        // 1. Arrange: Override the KLAVIYO configuration via Environment variable
+        // 1. Arrange
         $fakeApiKey = 'pk_test_' . $this->faker->uuid;
         $config = ['klaviyo' => ['enabled' => true, 'klaviyo_api_key' => $fakeApiKey]];
         putenv('CHANNELS_CONFIG=' . json_encode($config));
@@ -55,13 +56,12 @@ class HubInstantiationTest extends BaseIntegrationTestCase
         $property->setAccessible(true);
         $property->setValue(null, null);
 
-        // 2. Act: Get the driver via Factory (This is how the system actually uses it now)
+        // 2. Act
         $driver = DriverFactory::get('klaviyo', $this->createMock(\Psr\Log\LoggerInterface::class));
         
         // 3. Assert
         $this->assertInstanceOf(\Anibalealvarezs\KlaviyoHubDriver\Drivers\KlaviyoDriver::class, $driver);
         
-        // Verify the Auth Provider was correctly initialized with the API key via Reflection
         $driverReflection = new \ReflectionClass($driver);
         $authProp = $driverReflection->getProperty('authProvider');
         $authProp->setAccessible(true);
@@ -69,17 +69,13 @@ class HubInstantiationTest extends BaseIntegrationTestCase
         $authProvider = $authProp->getValue($driver);
         
         $this->assertEquals($fakeApiKey, $authProvider->getAccessToken());
-        
-        // Clean up
-        putenv('CHANNELS_CONFIG');
     }
 
-    public function testHubSuccessfullyInstantiatesGoogleSearchConsoleClientUsingMixedConfig(): void
+    public function testHubSuccessfullyInstantiatesGoogleSearchConsoleDriverUsingMixedConfig(): void
     {
-        // 1. Arrange: Setup a mixed configuration
+        // 1. Arrange
         $globalRefToken = 'global_refresh_token_' . $this->faker->uuid;
         $specificClientId = 'specific_client_id_' . $this->faker->uuid;
-        $scopes = 'scope1, scope2, scope3';
         
         $config = [
             'google' => [
@@ -92,7 +88,7 @@ class HubInstantiationTest extends BaseIntegrationTestCase
             'google_search_console' => [
                 'enabled' => true,
                 'client_id' => $specificClientId,
-                'scope' => $scopes,
+                'scope' => 'scope1, scope2',
                 'token_path' => '/tmp/google_tokens.json',
                 'sites' => []
             ]
@@ -105,42 +101,25 @@ class HubInstantiationTest extends BaseIntegrationTestCase
         $property->setAccessible(true);
         $property->setValue(null, null);
 
-        // 2. Act: Use Reflection to call the private initialization method in MetricRequests
-        $metricRequestsReflection = new \ReflectionClass(\Classes\Requests\MetricRequests::class);
-        $method = $metricRequestsReflection->getMethod('initializeSearchConsoleApi');
-        $method->setAccessible(true);
-        
-        // validateGoogleConfig also needs to be bypassed or executed
-        $loadedConfig = \Helpers\GoogleSearchConsoleHelpers::validateGoogleConfig($this->createMock(\Psr\Log\LoggerInterface::class));
-        
-        /** @var \Anibalealvarezs\GoogleApi\Services\SearchConsole\SearchConsoleApi $apiInstance */
-        $apiInstance = $method->invoke(null, $loadedConfig, $this->createMock(\Psr\Log\LoggerInterface::class));
+        // 2. Act
+        $driver = DriverFactory::get('google_search_console', $this->createMock(\Psr\Log\LoggerInterface::class));
 
         // 3. Assert
-        $this->assertInstanceOf(\Anibalealvarezs\GoogleApi\Services\SearchConsole\SearchConsoleApi::class, $apiInstance);
+        $this->assertInstanceOf(\Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver::class, $driver);
         
-        $apiReflection = new \ReflectionClass(\Anibalealvarezs\GoogleApi\Google\GoogleApi::class);
+        $driverReflection = new \ReflectionClass($driver);
+        $authProp = $driverReflection->getProperty('authProvider');
+        $authProp->setAccessible(true);
+        /** @var \Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider $authProvider */
+        $authProvider = $authProp->getValue($driver);
         
-        $clientIdProp = $apiReflection->getProperty('clientId');
-        $clientIdProp->setAccessible(true);
-        // Should have picked up the specific client ID
-        $this->assertEquals($specificClientId, $clientIdProp->getValue($apiInstance));
+        // Verify cross-platform fallback logic in GoogleAuthProvider
+        $authReflection = new \ReflectionClass($authProvider);
+        $configProp = $authReflection->getProperty('config');
+        $configProp->setAccessible(true);
+        $resolvedConfig = $configProp->getValue($authProvider);
 
-        $refreshTokenProp = $apiReflection->getProperty('refreshToken');
-        $refreshTokenProp->setAccessible(true);
-        // Should have picked up the global refresh token as fallback
-        $this->assertEquals($globalRefToken, $refreshTokenProp->getValue($apiInstance));
-
-        $scopesProp = $apiReflection->getProperty('scopes');
-        $scopesProp->setAccessible(true);
-        // Should have parsed the comma-separated string into an array
-        $this->assertEquals(['scope1', 'scope2', 'scope3'], $scopesProp->getValue($apiInstance));
-
-        $tokenPathProp = $apiReflection->getProperty('tokenPath');
-        $tokenPathProp->setAccessible(true);
-        $this->assertEquals('/tmp/google_tokens.json', $tokenPathProp->getValue($apiInstance));
-
-        // Clean up
-        putenv('CHANNELS_CONFIG');
+        $this->assertEquals($specificClientId, $resolvedConfig['client_id']);
+        $this->assertEquals($globalRefToken, $resolvedConfig['refresh_token'] ?? $resolvedConfig['token'] ?? '');
     }
 }

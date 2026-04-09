@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\Conversions;
 
-use Classes\Conversions\FacebookOrganicMetricConvert;
+use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookOrganicMetricConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
@@ -38,8 +38,8 @@ class FacebookOrganicMetricIntegrationTest extends BaseIntegrationTestCase
             pagePlatformId: $pagePlatformId,
             postPlatformId: '',
             logger: null,
-            pageEntity: $pageEntity,
-            postEntity: null,
+            page: $pageEntity,
+            post: null,
             period: Period::Daily
         );
 
@@ -87,13 +87,13 @@ class FacebookOrganicMetricIntegrationTest extends BaseIntegrationTestCase
         $collection = FacebookOrganicMetricConvert::igAccountMetrics(
             rows: $rows,
             date: $this->faker->date(),
-            pageEntity: null,
-            accountEntity: $accountEntity,
-            channeledAccountEntity: $channeledAccount,
+            page: null,
+            account: $accountEntity,
+            channeledAccount: $channeledAccount,
             logger: null,
             period: Period::Daily
         );
 
-        $this->assertCount(3, $collection);
+        $this->assertCount(4, $collection);
     }
 }

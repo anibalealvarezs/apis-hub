@@ -552,8 +552,11 @@ class MetricsProcessor
             );
             $metric->metricConfigKey = $metricConfigKey;
 
+            $channelObj = \Enums\Channel::tryFromName((string) $metric->channel);
+            $channelId = $channelObj ? $channelObj->value : $metric->channel;
+
             $uniqueMetricConfigs[$metricConfigKey] = [
-                'channel' => $metric->channel,
+                'channel' => $channelId,
                 'name' => $metric->name,
                 'period' => $metric->period,
                 'account_id' => isset($metric->account) ? (is_object($metric->account) ? ($accountMap['map'][$metric->account->getId() ?? 0] ?? null) : null) : null,
@@ -887,8 +890,11 @@ class MetricsProcessor
                 platformCreatedAt: Carbon::parse($metric->platform_created_at ?? $metric->platformCreatedAt)->format('Y-m-d'),
             );
 
+            $channelObj = \Enums\Channel::tryFromName((string) $metric->channel);
+            $channelId = $channelObj ? $channelObj->value : $metric->channel;
+
             $uniqueChanneledMetrics[$channeledMetricKey] = [
-                'channel' => $metric->channel,
+                'channel' => $channelId,
                 'platform_id' => $metric->platform_id ?? $metric->platformId,
                 'metric_id' => $metricMap['map'][$metricKey],
                 'platform_created_at' => Carbon::parse($metric->platform_created_at ?? $metric->platformCreatedAt)->format('Y-m-d'),
@@ -903,7 +909,9 @@ class MetricsProcessor
             $tuples = [];
             $isPostgres = Helpers::isPostgres();
             foreach ($chunk as $m) {
-                $selectParams[] = (int)$m['channel'];
+                $mChannelObj = \Enums\Channel::tryFromName((string) $m['channel']);
+                $mChannelId = $mChannelObj ? $mChannelObj->value : (int)$m['channel'];
+                $selectParams[] = $mChannelId;
                 $selectParams[] = (string)$m['platform_id'];
                 $selectParams[] = (int)$m['metric_id'];
                 $selectParams[] = (string)$m['platform_created_at'];

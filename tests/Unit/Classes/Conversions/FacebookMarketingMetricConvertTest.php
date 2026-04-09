@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Classes\Conversions\FacebookMarketingMetricConvert;
+use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookMarketingMetricConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Account;
 use Entities\Analytics\Campaign;

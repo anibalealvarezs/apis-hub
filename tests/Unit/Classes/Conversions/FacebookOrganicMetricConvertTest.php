@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Classes\Conversions\FacebookOrganicMetricConvert;
+use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookOrganicMetricConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;

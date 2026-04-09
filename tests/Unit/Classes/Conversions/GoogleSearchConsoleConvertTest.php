@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Classes\Conversions\GoogleSearchConsoleConvert;
+use Anibalealvarezs\GoogleApi\Conversions\GoogleSearchConsoleConvert;
 use Carbon\Carbon;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
@@ -96,8 +96,7 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
             siteUrl: 'https://example.com',
             siteKey: 'example',
             logger: null,
-            pageEntity: $this->page,
-            em: $this->entityManager
+            page: $this->page
         );
 
         $this->assertInstanceOf(ArrayCollection::class, $result);
@@ -123,8 +122,7 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
             siteUrl: 'https://example.com',
             siteKey: 'example',
             logger: null,
-            pageEntity: $this->page,
-            em: $this->entityManager
+            page: $this->page
         );
 
         $this->assertInstanceOf(ArrayCollection::class, $result);

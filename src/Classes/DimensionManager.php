@@ -5,6 +5,7 @@ namespace Classes;
 use Entities\Analytics\Channeled\DimensionKey;
 use Entities\Analytics\Channeled\DimensionSet;
 use Entities\Analytics\Channeled\DimensionValue;
+use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
 use Doctrine\ORM\EntityManager;
 
 class DimensionManager

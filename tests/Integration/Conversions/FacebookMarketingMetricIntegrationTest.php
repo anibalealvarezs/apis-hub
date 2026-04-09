@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\Conversions;
 
-use Classes\Conversions\FacebookMarketingMetricConvert;
+use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookMarketingMetricConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Account;
 use Entities\Analytics\Campaign;
@@ -57,7 +57,7 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
         $collection = FacebookMarketingMetricConvert::adAccountMetrics(
             rows: $rows,
             logger: null,
-            accountEntity: $accountEntity,
+            account: $accountEntity,
             channeledAccountPlatformId: $channeledAccountPlatformId,
             period: Period::Daily,
             metricSet: MetricSet::FULL,
@@ -66,7 +66,7 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
         // 3. Assert
         $this->assertInstanceOf(ArrayCollection::class, $collection);
         
-        $this->assertCount(8, $collection);
+        $this->assertCount(10, $collection);
 
         $metricsMap = [];
         foreach ($collection as $item) {
@@ -140,9 +140,9 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
         $collection = FacebookMarketingMetricConvert::campaignMetrics(
             rows: $rows,
             logger: null,
-            channeledAccountEntity: $channeledAccount,
-            campaignEntity: $campaignEntity,
-            channeledCampaignEntity: $channeledCampaign,
+            channeledAccount: $channeledAccount,
+            campaign: $campaignEntity,
+            channeledCampaign: $channeledCampaign,
             period: Period::Daily
         );
 

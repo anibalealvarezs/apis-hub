@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Classes\Conversions\NetSuiteConvert;
+use Anibalealvarezs\NetSuiteApi\Conversions\NetSuiteConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use Tests\Unit\BaseUnitTestCase;

@@ -2,7 +2,7 @@
 
 namespace Tests\Integration\Conversions;
 
-use Classes\Conversions\ShopifyConvert;
+use Anibalealvarezs\ShopifyApi\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Enums\Channel;
 use Tests\Integration\BaseIntegrationTestCase;
