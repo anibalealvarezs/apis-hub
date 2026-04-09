@@ -341,7 +341,7 @@ class MetricConfigRepository extends BaseRepository
         $entity->addConfigSignature(KeyGenerator::generateMetricConfigKey(
             channel: $entity->getChannel(),
             name: $entity->getName(),
-            period: $entity->getPeriod()->value,
+            period: $entity->getPeriod(),
             account: $entity->getAccount(),
             channeledAccount: $entity->getChanneledAccount(),
             campaign: $entity->getCampaign(),

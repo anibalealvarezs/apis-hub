@@ -903,7 +903,7 @@ class SeedDemoDataCommand extends Command
             'config_signature' => $sig, 
             'value' => (float)$value, 
             'dimension_set_id' => $setId,
-            'dimension_set_hash' => $setHash ?: ( $setId ? null : \Classes\KeyGenerator::generateDimensionsHash([]) ), // Default unsegmented hash for null ID
+            'dimension_set_hash' => $setHash ?: ( $setId ? null : KeyGenerator::generateDimensionsHash([]) ), // Default unsegmented hash for null ID
             'data' => $data
         ];
         if (count($this->bufferConfigs) >= self::BULK_SIZE) { $this->flushAll(); }
