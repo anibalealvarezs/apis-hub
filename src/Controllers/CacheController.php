@@ -3,7 +3,7 @@
 namespace Controllers;
 
 use Enums\AnalyticsEntity;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Exception;
 use Helpers\Helpers;
 use InvalidArgumentException;

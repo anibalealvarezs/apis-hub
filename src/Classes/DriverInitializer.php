@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes;
 
 use Core\Drivers\DriverFactory;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Exception;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;

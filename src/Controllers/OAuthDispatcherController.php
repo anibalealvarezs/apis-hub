@@ -6,7 +6,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Core\Drivers\DriverFactory;
-use Anibalealvarezs\ApiDriverCore\Interfaces\OAuthProviderInterface;
+use Anibalealvarezs\ApiSkeleton\Interfaces\OAuthProviderInterface;
 use Classes\DriverInitializer;
 
 class OAuthDispatcherController

@@ -19,7 +19,7 @@ use Entities\Analytics\Device;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
 use Entities\Analytics\Query;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\Country as CountryEnum;
 use Faker\Factory;
 use Helpers\Helpers;
@@ -96,7 +96,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
             'account_type' => Account::class,
             'country' => Country::class,
             'device' => Device::class,
-            'period' => \Anibalealvarezs\ApiDriverCore\Enums\Period::class,
+            'period' => \Anibalealvarezs\ApiSkeleton\Enums\Period::class,
             default => throw new \Exception("Unknown enum type: $type")
         };
     }

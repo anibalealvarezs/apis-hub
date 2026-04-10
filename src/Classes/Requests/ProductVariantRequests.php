@@ -7,7 +7,7 @@ namespace Classes\Requests;
 use Anibalealvarezs\KlaviyoHubDriver\Conversions\KlaviyoConvert;
 use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;

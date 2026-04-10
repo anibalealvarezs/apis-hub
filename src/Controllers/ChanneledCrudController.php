@@ -2,7 +2,7 @@
 
 namespace Controllers;
 
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Exception;
 use Helpers\Helpers;
 use InvalidArgumentException;

@@ -3,7 +3,7 @@
 namespace Repositories\Channeled;
 
 use Doctrine\ORM\QueryBuilder;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\QueryBuilderType;
 use Exception;
 use RuntimeException;

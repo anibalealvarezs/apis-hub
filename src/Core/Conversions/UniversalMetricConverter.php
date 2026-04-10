@@ -7,8 +7,8 @@ namespace Core\Conversions;
 use Carbon\Carbon;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
-use Anibalealvarezs\ApiDriverCore\Enums\Period;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Psr\Log\LoggerInterface;
 use stdClass;
 

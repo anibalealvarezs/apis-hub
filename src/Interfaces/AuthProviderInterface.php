@@ -2,7 +2,7 @@
 
 namespace Interfaces;
 
-use Anibalealvarezs\ApiDriverCore\Interfaces\AuthProviderInterface as BaseAuthProviderInterface;
+use Anibalealvarezs\ApiSkeleton\Interfaces\AuthProviderInterface as BaseAuthProviderInterface;
 
 /**
  * Interface AuthProviderInterface

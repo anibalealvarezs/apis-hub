@@ -8,7 +8,7 @@ use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
 use Entities\Job;
 use Enums\AnalyticsEntity;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\JobStatus;
 use Enums\QueryBuilderType;
 use Faker\Factory;

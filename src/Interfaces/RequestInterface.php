@@ -3,7 +3,7 @@
 namespace Interfaces;
 
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Symfony\Component\HttpFoundation\Response;
 
 use Psr\Log\LoggerInterface;
