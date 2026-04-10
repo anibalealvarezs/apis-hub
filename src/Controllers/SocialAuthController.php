@@ -27,11 +27,11 @@ class SocialAuthController
         $scopes = $data['scopes'] ?? [];
 
         $this->saveCredentials(
+            provider: $provider,
             token: (string)$token, 
             userId: $userId, 
             refreshToken: $refreshToken, 
-            scopes: $scopes,
-            provider: $provider
+            scopes: $scopes
         );
 
         return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
@@ -40,7 +40,7 @@ class SocialAuthController
     /**
      * Persist tokens to provider-specific storage via drivers
      */
-    private function saveCredentials(string $token, ?string $userId = null, ?string $refreshToken = null, array $scopes = [], string $provider = 'facebook'): void
+    private function saveCredentials(string $provider, string $token, ?string $userId = null, ?string $refreshToken = null, array $scopes = []): void
     {
         $registry = \Core\Drivers\DriverFactory::getRegistry();
         
