@@ -6,7 +6,7 @@ use Anibalealvarezs\ApiSkeleton\Interfaces\AuthProviderInterface as BaseAuthProv
 
 /**
  * Interface AuthProviderInterface
- * Defines the contract for an Authentication Provider (Google, Facebook, etc.)
+ * Defines the contract for an Authentication Provider
  */
 interface AuthProviderInterface extends BaseAuthProviderInterface
 {

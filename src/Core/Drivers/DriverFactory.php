@@ -100,6 +100,7 @@ class DriverFactory
             $authProvider = new $authProviderClass($channelConfig);
         }
         $driver = new $driverClass($authProvider, $logger);
+        $driver->boot();
 
         // Inject data processor if defined and supported by driver
         if (isset($config['processor']) && method_exists($driver, 'setDataProcessor')) {
