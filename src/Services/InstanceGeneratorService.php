@@ -8,8 +8,6 @@ use Exception;
 
 class InstanceGeneratorService
 {
-    private const FB_CHANNELS = ['facebook_marketing', 'facebook_organic'];
-    private const GSC_CHANNELS = ['gsc'];
     
     /**
      * @param bool $useDependencies
@@ -52,14 +50,13 @@ class InstanceGeneratorService
             $channelInstances = [];
             
             // 0. Get Caching Limits for this channel
-            $channelsConfig = \Helpers\Helpers::getChannelsConfig();
-            $chanKey = $channel;
-            if (!isset($channelsConfig[$chanKey])) {
-                $chanKey = str_replace(['facebook_marketing', 'facebook_organic'], ['facebook', 'facebook'], $channel);
-            }
-            $chanConfig = $channelsConfig[$channel] ?? $channelsConfig[$chanKey] ?? null;
+            $chanConfig = [];
+            try {
+                $chanConfig = \Classes\DriverInitializer::validateConfig($channel);
+            } catch (Exception $e) { /* ignore missing drivers for now */ }
+
             $limitDate = null;
-            if ($chanConfig && !empty($chanConfig['cache_history_range'])) {
+            if (!empty($chanConfig['cache_history_range'])) {
                 try {
                     $limitDate = $today->modify('-' . $chanConfig['cache_history_range']);
                 } catch (Exception $e) { /* ignore malformed ranges */ }
@@ -156,25 +153,26 @@ class InstanceGeneratorService
      */
     private function hasActiveEntities(string $channelName): bool
     {
-        $channelConfig = \Helpers\Helpers::getChannelsConfig();
-        
-        // Map rules channel name (from rules section in instances_rules.yaml) 
-        // to actual configuration keys and their target entity lists.
-        $mapping = [
-            'facebook_marketing' => ['channel' => 'facebook_marketing', 'key' => 'ad_accounts'],
-            'facebook_organic'   => ['channel' => 'facebook_organic', 'key' => 'pages'],
-            'gsc'                => ['channel' => 'google_search_console', 'key' => 'sites'],
-            'google_search_console' => ['channel' => 'google_search_console', 'key' => 'sites'],
-        ];
+        $chanKey = $channelName;
+        // Legacy alias support
+        if ($channelName === 'gsc') {
+            $chanKey = 'google_search_console';
+        }
 
-        // If we don't have a specific mapping for entity-level validation, 
+        $registryConfig = \Core\Drivers\DriverFactory::getChannelConfig($chanKey);
+        $resourceKey = $registryConfig['resource_key'] ?? null;
+
+        // If we don't have a resource key for entity-level validation, 
         // we default to true to allow standard processing based on top-level rules.
-        if (!isset($mapping[$channelName])) {
+        if (!$resourceKey) {
             return true;
         }
 
-        $target = $mapping[$channelName];
-        $config = $channelConfig[$target['channel']] ?? null;
+        try {
+            $config = \Classes\DriverInitializer::validateConfig($chanKey);
+        } catch (Exception $e) {
+            return false;
+        }
 
         // If the configuration for the channel is missing or explicitly disabled
         if (!$config || (isset($config['enabled']) && !$config['enabled'])) {
@@ -186,8 +184,8 @@ class InstanceGeneratorService
             return true;
         }
 
-        // Check the specific list of entities (pages, ad_accounts, or sites)
-        $entities = $config[$target['key']] ?? [];
+        // Check the specific list of entities
+        $entities = $config[$resourceKey] ?? [];
         if (empty($entities)) {
             return false;
         }
