@@ -18,12 +18,15 @@ class PublicDataController extends BaseController
     public function getResourceData(Request $request, string $channel, string $resource): JsonResponse
     {
         try {
+            /**
             // Normalization for legacy channel strings
             $channelId = match(strtolower($channel)) {
                 'facebook' => 'facebook_marketing',
                 'google', 'gsc' => 'google_search_console',
                 default => $channel
             };
+            */
+            $channelId = $channel;
 
             $config = \Core\Drivers\DriverFactory::getChannelConfig($channelId);
             if (empty($config)) {
