@@ -46,6 +46,15 @@ class DriverFactory
     }
 
     /**
+     * Get registry info for a specific channel.
+     */
+    public static function getChannelConfig(string $channel): array
+    {
+        self::loadRegistry();
+        return self::$registry[$channel] ?? [];
+    }
+
+    /**
      * Obtiene una instancia del driver para el canal especificado.
      *
      * @param string $channel

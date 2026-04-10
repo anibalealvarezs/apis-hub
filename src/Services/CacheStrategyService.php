@@ -29,15 +29,12 @@ class CacheStrategyService
      */
     public static function isCacheable(string $channelKey): bool
     {
-        $channelsConfig = Helpers::getChannelsConfig();
-        $chanConfig = $channelsConfig[$channelKey] ?? null;
-
-        if (!$chanConfig) {
-            $baseKey = str_replace(['facebook_marketing', 'facebook_organic'], 'facebook', $channelKey);
-            $chanConfig = $channelsConfig[$baseKey] ?? null;
+        try {
+            $config = \Classes\DriverInitializer::validateConfig($channelKey);
+            return (bool) ($config['cache_aggregations'] ?? false);
+        } catch (\Exception $e) {
+            return false;
         }
-
-        return (bool) ($chanConfig['cache_aggregations'] ?? false);
     }
 
     /**

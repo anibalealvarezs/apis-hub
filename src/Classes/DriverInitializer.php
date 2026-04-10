@@ -30,25 +30,27 @@ class DriverInitializer
         $allConfigs = Helpers::getChannelsConfig();
         $config = $allConfigs[$channel] ?? [];
 
-        // Common merging patterns (google_*, facebook_*)
-        if (str_starts_with($channel, 'google_') && isset($allConfigs['google'])) {
-            $config = array_replace_recursive($allConfigs['google'], $config);
-        }
-        if (str_starts_with($channel, 'facebook_') && isset($allConfigs['facebook'])) {
-            $config = array_replace_recursive($allConfigs['facebook'], $config);
+        // Dynamic merging based on parent key in drivers.yaml
+        $registryConfig = DriverFactory::getChannelConfig($channel);
+        if (isset($registryConfig['parent'])) {
+            $parentKey = $registryConfig['parent'];
+            if (isset($allConfigs[$parentKey])) {
+                $config = array_replace_recursive($allConfigs[$parentKey], $config);
+            }
         }
 
         // Delegate channel-specific validation and normalization to the driver
         try {
             $driver = DriverFactory::get($channel, $logger);
             $config = $driver->validateConfig($config);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             if ($logger) {
                 $logger->warning("Driver validation failed for $channel: " . $e->getMessage());
             }
         }
 
         self::$configs[$channel] = $config;
+
         return $config;
     }
 
@@ -61,15 +63,15 @@ class DriverInitializer
      */
     public static function initializeApi(string $channel, array $config = [], ?LoggerInterface $logger = null): mixed
     {
-        $forceNew = !empty($config['force_new']);
+        $forceNew = ! empty($config['force_new']);
         $cacheKey = $channel;
 
-        if (!$forceNew && isset(self::$instances[$cacheKey])) {
+        if (! $forceNew && isset(self::$instances[$cacheKey])) {
             return self::$instances[$cacheKey];
         }
 
         $driver = DriverFactory::get($channel, $logger);
-        
+
         // Merge config into the driver if needed, but getApi usually takes it
         $api = $driver->getApi($config);
 
@@ -77,7 +79,7 @@ class DriverInitializer
             $api->setLogger($logger);
         }
 
-        if (!$forceNew) {
+        if (! $forceNew) {
             self::$instances[$cacheKey] = $api;
         }
 
@@ -90,6 +92,7 @@ class DriverInitializer
     public static function validateFacebookConfig(?LoggerInterface $logger = null, Channel|string|null $channel = null): array
     {
         $chanKey = ($channel instanceof Channel) ? $channel->name : (string)($channel ?: 'facebook_marketing');
+
         return self::validateConfig($chanKey, $logger);
     }
 
@@ -107,6 +110,7 @@ class DriverInitializer
     public static function validateGoogleConfig(?LoggerInterface $logger = null): array
     {
         $config = self::validateConfig('google_search_console', $logger);
+
         return [
             'google' => $config, // In legacy, it returned this structure
             'google_search_console' => $config,
