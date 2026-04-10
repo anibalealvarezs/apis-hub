@@ -326,19 +326,19 @@ return [
     ],
     '/api/v1/public/facebook/campaigns' => [
         'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getFacebookCampaigns($args['request'] ?? Request::createFromGlobals()),
+        'callable' => fn(...$args) => (new PublicDataController())->getResourceData($args['request'] ?? Request::createFromGlobals(), 'facebook_marketing', 'campaigns'),
         'public' => true,
         'admin' => false
     ],
     '/api/v1/public/facebook/metrics' => [
         'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getMetrics($args['request'] ?? Request::createFromGlobals(), 'facebook'),
+        'callable' => fn(...$args) => (new PublicDataController())->getResourceData($args['request'] ?? Request::createFromGlobals(), 'facebook_marketing', 'metrics'),
         'public' => true,
         'admin' => false
     ],
     '/api/v1/public/gsc/metrics' => [
         'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getMetrics($args['request'] ?? Request::createFromGlobals(), 'gsc'),
+        'callable' => fn(...$args) => (new PublicDataController())->getResourceData($args['request'] ?? Request::createFromGlobals(), 'google_search_console', 'metrics'),
         'public' => true,
         'admin' => false
     ]

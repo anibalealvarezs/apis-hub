@@ -58,28 +58,4 @@ class PublicDataController extends BaseController
             return new JsonResponse(['success' => false, 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
-
-    /**
-     * @deprecated Use getResourceData() instead
-     */
-    public function getData(Request $request, string $channel, string $resource): JsonResponse
-    {
-        return $this->getResourceData($request, $channel, $resource);
-    }
-
-    /**
-     * @deprecated Use getResourceData() instead
-     */
-    public function getFacebookCampaigns(Request $request): JsonResponse
-    {
-        return $this->getResourceData($request, 'facebook', 'campaigns');
-    }
-
-    /**
-     * @deprecated Use getResourceData() instead
-     */
-    public function getMetrics(Request $request, string $channel): JsonResponse
-    {
-        return $this->getResourceData($request, $channel, 'metrics');
-    }
 }
