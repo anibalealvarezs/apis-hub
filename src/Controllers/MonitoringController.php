@@ -516,25 +516,21 @@ class MonitoringController extends BaseController
 
     private function sortInstancesByDependency(array $instances): array
     {
-        // 1. Define channel mapping for grouping
-        $channelMap = [
-            'gsc' => 'GoogleSearchConsole',
-            'google_search_console' => 'GoogleSearchConsole',
-            'google-search-console' => 'GoogleSearchConsole',
-            'fb-ads' => 'FacebookMarketing',
-            'facebook' => 'FacebookOrganic',
-            'facebook-ads' => 'FacebookMarketing',
-            'facebook_marketing' => 'FacebookMarketing',
-            'facebook_organic' => 'FacebookOrganic',
-            'fb-organic' => 'FacebookOrganic',
-        ];
-
-        // 2. Group instances by mapped channel
+        // 1. Group instances by channel display label (dynamic)
         $grouped = [];
         foreach ($instances as $instance) {
-            $rawChan = $instance['channel'] ?? 'Other';
-            $groupKey = $channelMap[$rawChan] ?? ucwords($rawChan);
-            $grouped[$groupKey][] = $instance;
+            $chan = $instance['channel'] ?? 'Other';
+            $config = \Core\Drivers\DriverFactory::getChannelConfig($chan);
+            
+            $groupName = ucwords($chan); // Fallback
+            if (!empty($config) && class_exists($config['driver'])) {
+                $driverClass = $config['driver'];
+                if (method_exists($driverClass, 'getChannelLabel')) {
+                    $groupName = $driverClass::getChannelLabel();
+                }
+            }
+            
+            $grouped[$groupName][] = $instance;
         }
 
         $allSorted = [];
