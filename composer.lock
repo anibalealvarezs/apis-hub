@@ -1983,12 +1983,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/persistence.git",
-                "reference": "5785dc79a0553ba41b0dda8a7ee792053e6186c8"
+                "reference": "3d72e06bf35b97184a7c9054ea22c1bd67b6f28e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/persistence/zipball/5785dc79a0553ba41b0dda8a7ee792053e6186c8",
-                "reference": "5785dc79a0553ba41b0dda8a7ee792053e6186c8",
+                "url": "https://api.github.com/repos/doctrine/persistence/zipball/3d72e06bf35b97184a7c9054ea22c1bd67b6f28e",
+                "reference": "3d72e06bf35b97184a7c9054ea22c1bd67b6f28e",
                 "shasum": ""
             },
             "require": {
@@ -2071,7 +2071,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-04T19:40:43+00:00"
+            "time": "2026-03-18T10:17:26+00:00"
         },
         {
             "name": "fakerphp/faker",
@@ -8295,24 +8295,24 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
+        "anibalealvarezs/amazon-hub-driver": 20,
         "anibalealvarezs/api-client-skeleton": 20,
         "anibalealvarezs/api-driver-core": 20,
+        "anibalealvarezs/bigcommerce-hub-driver": 20,
         "anibalealvarezs/facebook-graph-api": 20,
         "anibalealvarezs/google-api": 20,
-        "predis/predis": 20,
         "anibalealvarezs/google-hub-driver": 20,
-        "anibalealvarezs/meta-hub-driver": 20,
         "anibalealvarezs/klaviyo-hub-driver": 20,
-        "anibalealvarezs/shopify-hub-driver": 20,
-        "anibalealvarezs/netsuite-hub-driver": 20,
-        "anibalealvarezs/amazon-hub-driver": 20,
-        "anibalealvarezs/bigcommerce-hub-driver": 20,
-        "anibalealvarezs/pinterest-hub-driver": 20,
         "anibalealvarezs/linkedin-hub-driver": 20,
+        "anibalealvarezs/meta-hub-driver": 20,
+        "anibalealvarezs/netsuite-hub-driver": 20,
+        "anibalealvarezs/pinterest-hub-driver": 20,
+        "anibalealvarezs/shopify-hub-driver": 20,
         "anibalealvarezs/tiktok-hub-driver": 20,
-        "anibalealvarezs/x-hub-driver": 20,
         "anibalealvarezs/triple-whale-hub-driver": 20,
-        "mikey179/vfsstream": 20
+        "anibalealvarezs/x-hub-driver": 20,
+        "mikey179/vfsstream": 20,
+        "predis/predis": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
@@ -8320,9 +8320,9 @@
         "php": ">=8.1",
         "ext-json": "*"
     },
-    "platform-dev": [],
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.3.0"
     },
-    "plugin-api-version": "2.3.0"
+    "plugin-api-version": "2.9.0"
 }

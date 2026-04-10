@@ -10,7 +10,7 @@ use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
 use Entities\Entity;
 use Enums\AnalyticsEntity;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\JobStatus;
 use Enums\QueryBuilderType;
 use Faker\Factory;

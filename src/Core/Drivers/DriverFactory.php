@@ -95,12 +95,10 @@ class DriverFactory
         $allConfigs = \Helpers\Helpers::getChannelsConfig();
         $channelConfig = $allConfigs[$channel] ?? [];
         
-        // Merge common configurations for Google and Facebook
-        if (str_starts_with($channel, 'google_') && isset($allConfigs['google'])) {
-            $channelConfig = array_merge($allConfigs['google'], $channelConfig);
-        }
-        if (str_starts_with($channel, 'facebook_') && isset($allConfigs['facebook'])) {
-            $channelConfig = array_merge($allConfigs['facebook'], $channelConfig);
+        // Merge common configurations if specified by the driver
+        $commonKey = $driverClass::getCommonConfigKey();
+        if ($commonKey && isset($allConfigs[$commonKey])) {
+            $channelConfig = array_merge($allConfigs[$commonKey], $channelConfig);
         }
 
         $reflection = new \ReflectionClass($authProviderClass);

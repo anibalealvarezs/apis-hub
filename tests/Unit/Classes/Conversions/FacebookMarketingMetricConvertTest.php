@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookMarketingMetricConvert;
+use Anibalealvarezs\MetaHubDriver\Conversions\FacebookMarketingMetricConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Account;
 use Entities\Analytics\Campaign;
@@ -12,7 +12,7 @@ use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledAd;
 use Entities\Analytics\Channeled\ChanneledAdGroup;
 use Entities\Analytics\Channeled\ChanneledCampaign;
-use Anibalealvarezs\ApiDriverCore\Enums\Period;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\Unit\BaseUnitTestCase;
 use Carbon\Carbon;

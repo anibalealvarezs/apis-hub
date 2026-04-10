@@ -2,9 +2,9 @@
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Anibalealvarezs\NetSuiteApi\Conversions\NetSuiteConvert;
+use Anibalealvarezs\NetSuiteHubDriver\Conversions\NetSuiteConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Tests\Unit\BaseUnitTestCase;
 
 class NetSuiteConvertTest extends BaseUnitTestCase

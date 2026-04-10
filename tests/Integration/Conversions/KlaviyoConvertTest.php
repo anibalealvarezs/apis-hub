@@ -2,9 +2,9 @@
 
 namespace Tests\Integration\Conversions;
 
-use Anibalealvarezs\KlaviyoApi\Conversions\KlaviyoConvert;
+use Anibalealvarezs\KlaviyoHubDriver\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Tests\Integration\BaseIntegrationTestCase;
 use Carbon\Carbon;
 

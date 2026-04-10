@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Integration\Conversions;
 
-use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookMarketingMetricConvert;
+use Anibalealvarezs\MetaHubDriver\Conversions\FacebookMarketingMetricConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Account;
 use Entities\Analytics\Campaign;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledCampaign;
-use Anibalealvarezs\ApiDriverCore\Enums\Period;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
 use Tests\Integration\BaseIntegrationTestCase;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 
 class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
 {

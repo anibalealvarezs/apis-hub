@@ -9,7 +9,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Analytics\Channeled\ChanneledPriceRule;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use Faker\Generator;

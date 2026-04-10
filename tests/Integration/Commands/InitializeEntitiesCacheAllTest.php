@@ -9,6 +9,7 @@ use Helpers\Helpers;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
 use Tests\Integration\BaseIntegrationTestCase;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 
 class InitializeEntitiesCacheAllTest extends BaseIntegrationTestCase
 {

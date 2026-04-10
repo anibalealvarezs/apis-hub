@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Traits;
 
 use Carbon\Carbon;
-use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;

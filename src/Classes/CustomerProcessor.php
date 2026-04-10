@@ -2,7 +2,7 @@
 
 namespace Classes;
 
-use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Carbon\Carbon;
 use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;

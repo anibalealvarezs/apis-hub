@@ -4,7 +4,7 @@ namespace Tests\Unit\Classes\Requests;
 
 use Classes\Requests\DiscountRequests;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Tests\Unit\BaseUnitTestCase;
 
 class DiscountRequestsTest extends BaseUnitTestCase

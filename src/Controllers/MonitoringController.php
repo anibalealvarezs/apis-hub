@@ -8,6 +8,7 @@ use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 
 class MonitoringController extends BaseController
 {

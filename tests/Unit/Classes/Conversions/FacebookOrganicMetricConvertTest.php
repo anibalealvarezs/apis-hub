@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookOrganicMetricConvert;
+use Anibalealvarezs\MetaHubDriver\Conversions\FacebookOrganicMetricConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
-use Anibalealvarezs\ApiDriverCore\Enums\Period;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\Unit\BaseUnitTestCase;
 

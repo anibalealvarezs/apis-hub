@@ -6,7 +6,7 @@ use Classes\Requests\MetricRequests;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledMetric;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\Account as AccountEnum;
 use Psr\Log\LoggerInterface;
 use Tests\Integration\BaseIntegrationTestCase;

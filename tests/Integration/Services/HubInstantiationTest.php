@@ -66,7 +66,7 @@ class HubInstantiationTest extends BaseIntegrationTestCase
         $driverReflection = new \ReflectionClass($driver);
         $authProp = $driverReflection->getProperty('authProvider');
         $authProp->setAccessible(true);
-        /** @var \Anibalealvarezs\ApiDriverCore\Interfaces\AuthProviderInterface $authProvider */
+        /** @var \Anibalealvarezs\ApiSkeleton\Interfaces\AuthProviderInterface $authProvider */
         $authProvider = $authProp->getValue($driver);
         
         $this->assertEquals($fakeApiKey, $authProvider->getAccessToken());

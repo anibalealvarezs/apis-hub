@@ -10,6 +10,8 @@ use Doctrine\ORM\EntityManager;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Entities\Analytics\Channeled\DimensionSet;
 use Entities\Analytics\Channeled\DimensionKey;
@@ -18,6 +20,7 @@ use Entities\Analytics\Channeled\DimensionValue;
 class MetricsProcessor
 {
     use \Traits\CalculatesMetricDeltas;
+
 
     /**
      * @param ArrayCollection $metrics

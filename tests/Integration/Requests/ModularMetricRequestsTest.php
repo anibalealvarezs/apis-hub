@@ -7,10 +7,11 @@ namespace Tests\Integration\Requests;
 use Classes\Requests\MetricRequests;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledMetric;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Tests\Integration\BaseIntegrationTestCase;
 use Doctrine\Common\Collections\ArrayCollection;
 use stdClass;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 
 class ModularMetricRequestsTest extends BaseIntegrationTestCase
 {

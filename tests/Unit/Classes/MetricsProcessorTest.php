@@ -12,6 +12,7 @@ use Entities\Analytics\Country;
 use Entities\Analytics\Device;
 use Enums\Country as CountryEnum;
 use Enums\Device as DeviceEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 
 class MetricsProcessorTest extends BaseUnitTestCase
 {
@@ -170,7 +171,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
         $metrics = new ArrayCollection([$metric]);
 
         // Signature for the lifetime metric
-        $signature = \Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator::generateMetricConfigKey(
+        $signature = \Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator::generateMetricConfigKey(
             channel: 1,
             name: 'clicks',
             period: Period::Lifetime->value

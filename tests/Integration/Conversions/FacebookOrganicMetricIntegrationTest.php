@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Integration\Conversions;
 
-use Anibalealvarezs\FacebookGraphApi\Conversions\FacebookOrganicMetricConvert;
+use Anibalealvarezs\MetaHubDriver\Conversions\FacebookOrganicMetricConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Page;
-use Anibalealvarezs\ApiDriverCore\Enums\Period;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Tests\Integration\BaseIntegrationTestCase;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 
 class FacebookOrganicMetricIntegrationTest extends BaseIntegrationTestCase
 {

@@ -5,7 +5,7 @@ namespace Classes;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
-use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Helpers\Helpers;
 
 class ProductCategoryProcessor

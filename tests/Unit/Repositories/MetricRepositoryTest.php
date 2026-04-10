@@ -6,7 +6,7 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\QueryBuilder;
-use Anibalealvarezs\ApiDriverCore\Enums\Period;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Enums\QueryBuilderType;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

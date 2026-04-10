@@ -2,15 +2,15 @@
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Anibalealvarezs\GoogleApi\Conversions\GoogleSearchConsoleConvert;
+use Anibalealvarezs\GoogleHubDriver\Conversions\GoogleSearchConsoleConvert;
 use Carbon\Carbon;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
 use Entities\Analytics\Page;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\Country;
 use Enums\Device;
-use Anibalealvarezs\ApiDriverCore\Enums\Period;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\Unit\BaseUnitTestCase;
 

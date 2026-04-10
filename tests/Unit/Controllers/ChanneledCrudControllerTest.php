@@ -5,7 +5,7 @@ namespace Tests\Unit\Controllers;
 use Controllers\ChanneledCrudController;
 use Doctrine\ORM\EntityManager;
 use Entities\Analytics\Channeled\ChanneledDiscount;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Exception;
 use Helpers\Helpers;
 use InvalidArgumentException;

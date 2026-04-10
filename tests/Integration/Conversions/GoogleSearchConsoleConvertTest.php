@@ -2,10 +2,11 @@
 
 namespace Tests\Integration\Conversions;
 
-use Anibalealvarezs\GoogleApi\Conversions\GoogleSearchConsoleConvert;
+use Anibalealvarezs\GoogleHubDriver\Conversions\GoogleSearchConsoleConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Page;
 use Tests\Integration\BaseIntegrationTestCase;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 
 class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
 {

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Classes;
 
-use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
-use Anibalealvarezs\ApiDriverCore\Enums\Channel;
-use Anibalealvarezs\ApiDriverCore\Enums\Period;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Tests\Unit\BaseUnitTestCase;
 use DateTime;
 

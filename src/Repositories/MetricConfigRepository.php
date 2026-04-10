@@ -21,7 +21,7 @@ use Enums\QueryBuilderType;
 use Exception;
 use Helpers\Helpers;
 use ReflectionException;
-use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 
 class MetricConfigRepository extends BaseRepository
 {
