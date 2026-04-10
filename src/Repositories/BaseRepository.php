@@ -26,7 +26,7 @@ class BaseRepository extends EntityRepository
     protected bool $isChanneledMetric = false;
     private array $activeAggregateJoins = [];
     private bool $needsImpressionsJoin = false;
-    protected static array $relationMap = [
+    protected static array $defaultRelationMap = [
         'query'    => ['table' => 'queries', 'fk' => 'query_id', 'field' => 'query', 'alias' => 'rq'],
         'channeledAccount'  => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
         'account'           => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
@@ -43,38 +43,52 @@ class BaseRepository extends EntityRepository
         'page_platform_id' => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rp_p', 'isAttribute' => true],
     ];
 
-    protected static array $formulas = [];
+    /**
+     * Get relations map (includes defaults and dynamically registered).
+     */
+    protected static function getRelationMap(): array
+    {
+        return array_merge(self::$defaultRelationMap, \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::getRelations());
+    }
 
     /**
-     * Register a custom relation mapping.
+     * Get registered formulas.
+     */
+    protected static function getFormulas(): array
+    {
+        return \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::getFormulas();
+    }
+
+    /**
+     * @deprecated Use RepositoryRegistry::registerRelation()
      */
     public static function registerRelation(string $key, array $mapping): void
     {
-        self::$relationMap[$key] = $mapping;
+        \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::registerRelation($key, $mapping);
     }
 
     /**
-     * Register multiple relation mappings.
+     * @deprecated Use RepositoryRegistry::registerRelations()
      */
     public static function registerRelations(array $relations): void
     {
-        self::$relationMap = array_merge(self::$relationMap, $relations);
+        \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::registerRelations($relations);
     }
 
     /**
-     * Register a custom metric formula.
+     * @deprecated Use RepositoryRegistry::registerFormula()
      */
     public static function registerFormula(string $name, string|callable $formula): void
     {
-        self::$formulas[$name] = $formula;
+        \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::registerFormula($name, $formula);
     }
 
     /**
-     * Register multiple metric formulas.
+     * @deprecated Use RepositoryRegistry::registerFormulas()
      */
     public static function registerFormulas(array $formulas): void
     {
-        self::$formulas = array_merge(self::$formulas, $formulas);
+        \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::registerFormulas($formulas);
     }
 
     /**
@@ -251,7 +265,7 @@ class BaseRepository extends EntityRepository
             $qb->addSelect("$parsedExpr AS $alias");
         }
 
-        $standardRelations = array_keys(self::$relationMap);
+        $standardRelations = array_keys(self::getRelationMap());
         $dateFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'year', 'month', 'day', 'week', 'quarter', 'dayofweek', 'dayname', 'monthname', 'metricDate', 'platformCreatedAt', 'createdAt', 'date'];
 
         $safeLeftJoin = function(string $from, string $table, string $alias, string $condition) use ($qb) {
@@ -267,8 +281,8 @@ class BaseRepository extends EntityRepository
         $rootAlias = ($this->isChanneledMetric || $isMetric) ? 'mc' : 'm';
 
         $joinRelation = function (string $field, bool $enforceExistence = false) use (&$activeAggregateJoins, $safeLeftJoin, $qb, $rootAlias, &$joinRelation) {
-            if (!isset(self::$relationMap[$field])) return;
-            $map = self::$relationMap[$field];
+            if (!isset(self::getRelationMap()[$field])) return;
+            $map = self::getRelationMap()[$field];
 
             if (isset($activeAggregateJoins[$map['alias']])) {
                 // If already joined as LEFT, but now we need INNER, we transform it
@@ -283,7 +297,7 @@ class BaseRepository extends EntityRepository
             $sourceAlias = $rootAlias;
             if (isset($map['from'])) {
                 $joinRelation($map['from'], $enforceExistence);
-                $sourceAlias = self::$relationMap[$map['from']]['alias'];
+                $sourceAlias = self::getRelationMap()[$map['from']]['alias'];
             }
 
             // Ensure join only happens once. Use INNER JOIN if we need to filter out orphans (Ghost entities)
@@ -327,17 +341,17 @@ class BaseRepository extends EntityRepository
                 // Handling Relations and strict FKs
                 $relationKey = $field;
                 $isExplicitId = str_ends_with($field, '_id');
-                if ($isExplicitId && !isset(self::$relationMap[$field])) {
+                if ($isExplicitId && !isset(self::getRelationMap()[$field])) {
                     $relationKey = substr($field, 0, -3);
                     if ($relationKey === 'channeled_account') $relationKey = 'channeledAccount';
                     if ($relationKey === 'channeled_campaign') $relationKey = 'channeledCampaign';
                 }
                 
-                if (isset(self::$relationMap[$relationKey])) {
+                if (isset(self::getRelationMap()[$relationKey])) {
                     // Critical Fix: Enforce existence for primary groupings (page, account) to avoid ghost duplicates
                     $isPrimaryRelation = in_array($relationKey, ['page', 'account', 'channeledAccount', 'campaign', 'channeledCampaign']);
                     $joinRelation($relationKey, $isPrimaryRelation);
-                    $map = self::$relationMap[$relationKey];
+                    $map = self::getRelationMap()[$relationKey];
                     
                     if ($isExplicitId || $field === $map['fk']) {
                         $qb->addSelect("$rootAlias.{$map['fk']} AS $quotedField")
@@ -365,14 +379,14 @@ class BaseRepository extends EntityRepository
                 $isAccount = $field === 'account';
                 $genericKey = $isAccount ? 'account' : 'campaign';
                 $channeledKey = $isAccount ? 'channeledAccount' : 'channeledCampaign';
-                $genericMap = self::$relationMap[$genericKey];
-                $channeledMap = self::$relationMap[$channeledKey];
+                $genericMap = self::getRelationMap()[$genericKey];
+                $channeledMap = self::getRelationMap()[$channeledKey];
                 $joinRelation($genericKey);
                 $joinRelation($channeledKey);
 
                 if ($isAccount) {
                     $joinRelation('channeledCampaign');
-                    $campaignAlias = self::$relationMap['channeledCampaign']['alias'];
+                    $campaignAlias = self::getRelationMap()['channeledCampaign']['alias'];
                     $safeLeftJoin($campaignAlias, 'channeled_accounts', 'rca_fallback', "{$campaignAlias}.channeled_account_id = rca_fallback.id");
                     
                     $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
@@ -400,9 +414,9 @@ class BaseRepository extends EntityRepository
                            ->addGroupBy("mc.{$channeledMap['fk']}");
                     }
                 }
-            } elseif (($isMetric || $this->isChanneledMetric) && isset(self::$relationMap[$field])) {
+            } elseif (($isMetric || $this->isChanneledMetric) && isset(self::getRelationMap()[$field])) {
                 $joinRelation($field);
-                $map = self::$relationMap[$field];
+                $map = self::getRelationMap()[$field];
                 
                 $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
                 if (isset($map['isJSON']) && $map['isJSON']) {
@@ -444,10 +458,10 @@ class BaseRepository extends EntityRepository
                     $qb->setParameter("key_$dimAlias", $dimKey)
                        ->andWhere("dv_$dimAlias.value = :val_$dimAlias")
                        ->setParameter("val_$dimAlias", $value);
-                } elseif ((str_ends_with($entityName, 'Metric') || $this->isChanneledMetric) && (isset(self::$relationMap[$key]) || $key === 'account_type')) {
+                } elseif ((str_ends_with($entityName, 'Metric') || $this->isChanneledMetric) && (isset(self::getRelationMap()[$key]) || $key === 'account_type')) {
                     $realKey = ($key === 'account_type') ? 'channeledAccount' : $key;
                     $joinRelation($realKey);
-                    $map = self::$relationMap[$realKey];
+                    $map = self::getRelationMap()[$realKey];
                     $fk = $map['fk'] ?? null;
                     
                     if ($value === 'N/A' || $value === 'NULL') {
@@ -733,7 +747,7 @@ class BaseRepository extends EntityRepository
         
         if (($this->isChanneledMetric || $isMetric) && $isAggregate) {
             $valCol = $this->isChanneledMetric ? 'm.value' : 'e.value';
-            $allFormulas = array_merge($this->getDefaultFormulas($valCol, $isPostgres), self::$formulas);
+            $allFormulas = array_merge($this->getDefaultFormulas($valCol, $isPostgres), self::getFormulas());
             if (isset($allFormulas[$lowerField])) {
                 $formula = $allFormulas[$lowerField];
                 if (is_callable($formula)) {
@@ -790,8 +804,8 @@ class BaseRepository extends EntityRepository
             $jsonField = $matches[2];
             $path = $matches[3];
             
-            if (isset(self::$relationMap[$relName])) {
-                $map = self::$relationMap[$relName];
+            if (isset(self::getRelationMap()[$relName])) {
+                $map = self::getRelationMap()[$relName];
                 $source = $map['alias'] . '.' . $jsonField;
                 
                 $isPostgres = Helpers::isPostgres();
@@ -804,9 +818,9 @@ class BaseRepository extends EntityRepository
         }
 
         // Handle generic Relation extraction from relationMap (JSON or standard fields)
-        $normalizedField = isset(self::$relationMap[$field]) ? $field : (isset(self::$relationMap[$lowerField]) ? $lowerField : null);
+        $normalizedField = isset(self::getRelationMap()[$field]) ? $field : (isset(self::getRelationMap()[$lowerField]) ? $lowerField : null);
         if ($normalizedField) {
-             $map = self::$relationMap[$normalizedField];
+             $map = self::getRelationMap()[$normalizedField];
              if (isset($map['isJSON']) && $map['isJSON']) {
                  $jsonPath = $map['jsonPath'] ?? '';
                  if (Helpers::isPostgres()) {
@@ -1315,3 +1329,4 @@ class BaseRepository extends EntityRepository
         return true;
     }
 }
+
