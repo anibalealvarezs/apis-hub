@@ -7,7 +7,7 @@ namespace Tests\Integration\Requests;
 use Classes\Requests\MetricRequests;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledMetric;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Tests\Integration\BaseIntegrationTestCase;
 use Doctrine\Common\Collections\ArrayCollection;
 use stdClass;
@@ -38,7 +38,7 @@ class ModularMetricRequestsTest extends BaseIntegrationTestCase
         $m1->platformCreatedAt = new \DateTime('2023-01-01 10:00:00');
         $m1->metricDate = '2023-01-01';
         $m1->platformId = 'test_p_id';
-        $m1->period = \Enums\Period::Daily->value;
+        $m1->period = Period::Daily->value;
         $m1->dimensions = [];
         $m1->dimensionsHash = md5('[]');
         $m1->metricConfigKey = 'shop_revenue_mod';

@@ -5,27 +5,39 @@ namespace Enums;
 /**
  * Constants for the different types of digital assets that can be associated with a Page entity.
  */
-enum PageType: string
+class PageType
 {
-    case FACEBOOK_PAGE = 'facebook_page';
-    case WEBSITE = 'website';
-    case TWITTER_PROFILE = 'twitter_profile';
-    case LINKEDIN_PAGE = 'linkedin_page';
-    case TIKTOK_PROFILE = 'tiktok_profile';
-    case GOOGLE_BUSINESS = 'google_business';
+    public const FACEBOOK_PAGE = 'facebook_page';
+    public const WEBSITE = 'website';
+    public const TWITTER_PROFILE = 'twitter_profile';
+    public const LINKEDIN_PAGE = 'linkedin_page';
+    public const TIKTOK_PROFILE = 'tiktok_profile';
+    public const PINTEREST_PROFILE = 'pinterest_profile';
+    public const GOOGLE_BUSINESS = 'google_business';
+    public const SHOPIFY_STORE = 'shopify_store';
+    public const KLAVIYO_ACCOUNT = 'klaviyo_account';
+    public const BIGCOMMERCE_STORE = 'bigcommerce_store';
 
     /**
-     * @return string
+     * Get the identifying prefix for a given type.
+     * Delegates to AssetRegistry for dynamic lookup.
+     *
+     * @param string $type
+     * @return string|null
      */
-    public function getPrefix(): string
+    public static function getPrefix(string $type): ?string
     {
-        return match ($this) {
-            self::FACEBOOK_PAGE => 'fb:page',
-            self::WEBSITE => 'web:site',
-            self::TWITTER_PROFILE => 'tw:profile',
-            self::LINKEDIN_PAGE => 'li:page',
-            self::TIKTOK_PROFILE => 'tk:profile',
-            self::GOOGLE_BUSINESS => 'gb:location',
-        };
+        $pattern = \Anibalealvarezs\ApiSkeleton\Classes\AssetRegistry::findByType($type);
+        return $pattern['prefix'] ?? null;
+    }
+
+    /**
+     * Get all registered types.
+     *
+     * @return array
+     */
+    public static function getAll(): array
+    {
+        return array_keys(\Anibalealvarezs\ApiSkeleton\Classes\AssetRegistry::getAll());
     }
 }

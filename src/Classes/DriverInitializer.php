@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes;
 
 use Core\Drivers\DriverFactory;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Exception;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
@@ -14,6 +14,15 @@ class DriverInitializer
 {
     private static array $instances = [];
     private static array $configs = [];
+
+    /**
+     * Limpia todas las instancias y configuraciones (útil para testing).
+     */
+    public static function reset(): void
+    {
+        self::$instances = [];
+        self::$configs = [];
+    }
 
     /**
      * @param string $channel
@@ -123,5 +132,36 @@ class DriverInitializer
     public static function initializeGoogleSearchConsoleApi(array $config, ?LoggerInterface $logger = null): mixed
     {
         return self::initializeApi('google_search_console', $config, $logger);
+    }
+
+    /**
+     * Boot all registered drivers.
+     * Registers asset patterns and calls boot() on each driver.
+     *
+     * @param LoggerInterface|null $logger
+     * @return void
+     */
+    public static function bootDrivers(?LoggerInterface $logger = null): void
+    {
+        $registry = DriverFactory::getRegistry();
+        foreach (array_keys($registry) as $channel) {
+            try {
+                $driver = DriverFactory::get($channel, $logger);
+                
+                // 1. Register asset patterns
+                $patterns = $driver->getAssetPatterns();
+                foreach ($patterns as $type => $pConfig) {
+                    \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::register($type, $pConfig);
+                }
+
+                // 2. Call boot sequence
+                $driver->boot();
+
+            } catch (Exception $e) {
+                if ($logger) {
+                    $logger->error("Failed to boot driver for $channel: " . $e->getMessage());
+                }
+            }
+        }
     }
 }

@@ -112,11 +112,11 @@ class InitializeEntitiesCacheAllTest extends BaseIntegrationTestCase
 
         // Verify Facebook Ad Account
         $channeledAccountRepo = $this->entityManager->getRepository(ChanneledAccount::class);
-        $adAccount = $channeledAccountRepo->findOneBy(['platformId' => 'act_123', 'channel' => \Enums\Channel::facebook_marketing->value]);
+        $adAccount = $channeledAccountRepo->findOneBy(['platformId' => 'act_123', 'channel' => Channel::facebook_marketing->value]);
         $this->assertNotNull($adAccount, 'Facebook Ad Account act_123 not found');
 
         // Verify Instagram Account
-        $igAccount = $channeledAccountRepo->findOneBy(['platformId' => 'ig1', 'channel' => \Enums\Channel::facebook_organic->value]);
+        $igAccount = $channeledAccountRepo->findOneBy(['platformId' => 'ig1', 'channel' => Channel::facebook_organic->value]);
         $this->assertNotNull($igAccount, 'Instagram account ig1 not found');
     }
 

@@ -9,7 +9,7 @@ use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\Account;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Enums\QueryBuilderType;
 
 class AccountRepository extends BaseRepository

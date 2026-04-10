@@ -4,7 +4,7 @@ namespace Tests\Unit\Classes\Requests;
 
 use Classes\Requests\ProductVariantRequests;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Tests\Unit\BaseUnitTestCase;
 
 class ProductVariantRequestsTest extends BaseUnitTestCase

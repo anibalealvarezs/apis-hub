@@ -58,7 +58,7 @@ class ScheduleInitialJobsCommand extends Command
             $channel = $instance['channel'] ?? null;
             $entity = $instance['entity'] ?? null;
 
-            if ($channel && ($chanEnum = \Enums\Channel::tryFromName($channel))) {
+            if ($channel && ($chanEnum = Channel::tryFromName($channel))) {
                 $channel = $chanEnum->name;
             }
 

@@ -465,68 +465,6 @@ class Helpers
                     }
                 }
 
-                // Explicit environment variable mappings
-                $envOverrides = [
-                    'GOOGLE_CLIENT_ID' => ['google', 'client_id'],
-                    'GOOGLE_CLIENT_SECRET' => ['google', 'client_secret'],
-                    'GOOGLE_REFRESH_TOKEN' => ['google', 'refresh_token'],
-                    'GOOGLE_REDIRECT_URI' => ['google', 'redirect_uri'],
-                    'GOOGLE_USER_ID' => ['google', 'user_id'],
-                    'GOOGLE_SEARCH_CONSOLE_CLIENT_ID' => ['google_search_console', 'client_id'],
-                    'GOOGLE_SEARCH_CONSOLE_CLIENT_SECRET' => ['google_search_console', 'client_secret'],
-                    'GOOGLE_SEARCH_CONSOLE_REFRESH_TOKEN' => ['google_search_console', 'refresh_token'],
-                    'GOOGLE_SEARCH_CONSOLE_TOKEN' => ['google_search_console', 'token'],
-                    'FACEBOOK_APP_ID' => ['facebook', 'app_id'],
-                    'FACEBOOK_APP_SECRET' => ['facebook', 'app_secret'],
-                    'FACEBOOK_REDIRECT_URI' => ['facebook', 'app_redirect_uri'],
-                    'FACEBOOK_USER_TOKEN' => ['facebook', 'graph_user_access_token'],
-                    'FACEBOOK_PAGE_TOKEN' => ['facebook', 'graph_page_access_token'],
-                    'FACEBOOK_TOKEN_PATH' => ['facebook', 'graph_token_path'],
-                    'FACEBOOK_USER_ID' => ['facebook', 'user_id'],
-                    'FACEBOOK_ACCOUNTS_GROUP' => ['facebook', 'accounts_group_name'],
-                ];
-
-                foreach ($envOverrides as $envKey => $configPath) {
-                    $val = getenv($envKey);
-                    if ($val !== false && $val !== '') {
-                        if (count($configPath) === 2) {
-                            $config[$configPath[0]][$configPath[1]] = $val;
-                        }
-                    }
-                }
-
-                // --- 🛡️ SMART STORAGE AUTH MAPPING ---
-                // If we have a local stored token, prioritize it
-                // Resolve token path
-                $tokenPath = $_ENV['FACEBOOK_TOKEN_PATH'] ?? $config['facebook']['graph_token_path'] ?? './storage/tokens/facebook_tokens.json';
-                if (is_string($tokenPath) && str_starts_with($tokenPath, './')) {
-                    $tokenPath = dirname(__DIR__, 2) . substr($tokenPath, 1);
-                }
-                
-                if (file_exists($tokenPath)) {
-                    $tokens = json_decode(file_get_contents($tokenPath), true);
-                    $marketingToken = $tokens['facebook_marketing']['access_token'] ?? null;
-                    $marketingUserId = $tokens['facebook_marketing']['user_id'] ?? null;
-                    
-                    if ($marketingToken) {
-                        // OVERRIDE ABSOLUTO: Inyectamos el token en todas las claves posibles
-                        $config['facebook']['graph_user_access_token'] = $marketingToken;
-                        $config['facebook_marketing']['graph_user_access_token'] = $marketingToken;
-                        $config['facebook_marketing']['access_token'] = $marketingToken;
-                        
-                        // Inyectamos también en variables de entorno para máxima compatibilidad
-                        $_ENV['FACEBOOK_USER_TOKEN'] = $marketingToken;
-                        putenv("FACEBOOK_USER_TOKEN=" . $marketingToken);
-                    }
-                    if ($marketingUserId) {
-                        $config['facebook']['user_id'] = $marketingUserId;
-                        $config['facebook_marketing']['user_id'] = $marketingUserId;
-                        $_ENV['FACEBOOK_USER_ID'] = $marketingUserId;
-                        putenv("FACEBOOK_USER_ID=" . $marketingUserId);
-                    }
-                }
-                // ---------------------------------
-
                 // Normalize relative paths to project root to avoid CWD issues
                 $rootPath = dirname(__DIR__, 2);
                 $resolvePath = function($path) use ($rootPath) {
@@ -536,21 +474,14 @@ class Helpers
                     return $path;
                 };
 
-                if (isset($config['google']['token_path'])) {
-                    $config['google']['token_path'] = $resolvePath($config['google']['token_path']);
-                }
-                if (isset($config['google_search_console']['token_path'])) {
-                    $config['google_search_console']['token_path'] = $resolvePath($config['google_search_console']['token_path']);
-                }
-                if (isset($config['facebook']['graph_token_path'])) {
-                    $config['facebook']['graph_token_path'] = $resolvePath($config['facebook']['graph_token_path']);
+                foreach ($config as $chan => $chanConfig) {
+                    if (isset($chanConfig['token_path'])) {
+                        $config[$chan]['token_path'] = $resolvePath($chanConfig['token_path']);
+                    }
                 }
 
                 if (getenv('APP_ENV') === 'demo') {
-                    // Smart Clean: Only remove static example placeholders 
-                    // from the .example files, but keep real or seeded data.
-                    $placeholders = ['PAGE_ID', 'IG_ACCOUNT_ID', 'PAGE_URL', 'example.com'];
-                    
+                    $placeholders = ['PAGE_ID', 'IG_ACCOUNT_ID', 'PAGE_URL', 'example.com', 'AD_ACCOUNT_ID'];
                     $cleanEntityList = function($entities) use ($placeholders) {
                         return array_filter($entities, function($item) use ($placeholders) {
                             $asString = json_encode($item);
@@ -561,10 +492,13 @@ class Helpers
                         });
                     };
 
-                    $config['facebook_marketing']['ad_accounts'] = $cleanEntityList($config['facebook_marketing']['ad_accounts'] ?? []);
-                    $config['facebook_organic']['pages'] = $cleanEntityList($config['facebook_organic']['pages'] ?? []);
-                    $config['google_search_console']['sites'] = $cleanEntityList($config['google_search_console']['sites'] ?? []);
-                    $config['shopify']['stores'] = $cleanEntityList($config['shopify']['stores'] ?? []);
+                    $registry = \Core\Drivers\DriverFactory::getRegistry();
+                    foreach ($registry as $chan => $rConfig) {
+                        $resourceKey = $rConfig['resource_key'] ?? null;
+                        if ($resourceKey && isset($config[$chan][$resourceKey])) {
+                            $config[$chan][$resourceKey] = $cleanEntityList($config[$chan][$resourceKey]);
+                        }
+                    }
                 }
 
                 self::$channelsConfig = $config;
@@ -665,29 +599,6 @@ class Helpers
             return implode(',', $keys);
         }
         return $keys;
-    }
-
-    /**
-     * Returns the first available Facebook access token from storage.
-     * Used for system-level background jobs or demo-mode bypass.
-     * 
-     * @return string|null
-     */
-    public static function getSystemFacebookToken(): ?string
-    {
-        $config = self::getChannelsConfig();
-        $tokenPath = $config['facebook']['graph_token_path'] ?? null;
-
-        if ($tokenPath && file_exists($tokenPath)) {
-            $tokens = json_decode(file_get_contents($tokenPath), true);
-            if (!empty($tokens)) {
-                $firstToken = reset($tokens);
-                return $firstToken['access_token'] ?? null;
-            }
-        }
-        
-        // Fallback to legacy ENV if present
-        return getenv('FACEBOOK_USER_TOKEN') ?: null;
     }
 
     /**
@@ -1185,50 +1096,51 @@ class Helpers
      * @param string|null $hostname
      * @return string
      */
-    public static function getCanonicalPageId(string $url, string|int|null $platformId = null, \Enums\PageType|string|null $type = null, string|null $hostname = null): string
+    public static function getCanonicalPageId(string $url, string|int|null $platformId = null, string|null $type = null, string|null $hostname = null): string
     {
-        // 1. Enum based detection or fallback logic
         $prefix = null;
-        if ($type instanceof \Enums\PageType) {
-            $prefix = $type->getPrefix();
-        } else {
-            // Mapping strings for backward compatibility
-            $prefixMap = [
-                'fb_page' => 'fb:page',
-                'facebook_page' => 'fb:page',
-                'website' => 'web:site'
-            ];
-            $prefix = $prefixMap[$type] ?? null;
+        $urlIdRegex = null;
+
+        // 1. Resolve prefix by type if provided
+        if ($type) {
+            $assetPattern = \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::findByType($type);
+            if ($assetPattern) {
+                $prefix = $assetPattern['prefix'];
+                $urlIdRegex = $assetPattern['url_id_regex'] ?? null;
+            }
         }
 
-        // 2. Intelligent social detection if no prefix was forced
-        if (!$prefix) {
-            // IG accounts for now are identified as FB assets in this vision
-            $isFacebook = (isset($hostname) && (str_contains($hostname, 'facebook.com') || str_contains($hostname, 'instagram.com')));
-            if ($isFacebook) $prefix = 'fb:page';
+        if (!$prefix && $hostname) {
+            $assetPattern = \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::findByHostname($hostname);
+            if ($assetPattern) {
+                $prefix = $assetPattern['prefix'];
+                $urlIdRegex = $assetPattern['url_id_regex'] ?? null;
+            }
         }
 
-        // 3. Return canonical with platform ID if we have a prefix and an ID
-        if ($platformId && $prefix) {
-            return "$prefix:$platformId";
-        }
-
-        // 4. Normalize URL for websites or fallback
+        // 3. Normalized URL processing
         $normalizedUrl = preg_replace('~^https?://(?:www\.)?~i', '', $url);
         $normalizedUrl = rtrim($normalizedUrl, '/');
         $normalizedUrl = strtolower($normalizedUrl);
-        
-        // If it's a FB page URL but no platformId was given, try to extract it from URL
-        if (str_contains($normalizedUrl, 'facebook.com/') && preg_match('~(\d+)/?$~', $normalizedUrl, $matches)) {
-            return "fb:page:" . $matches[1];
+
+        // 4. Extract ID from URL if regex is available
+        if (!$platformId && $urlIdRegex) {
+            if (preg_match($urlIdRegex, $normalizedUrl, $matches)) {
+                $platformId = $matches[1];
+            }
         }
 
-        // Fallback for cases where URL is JUST the platform ID but hostname is facebook
-        if ($platformId && (string)$normalizedUrl === (string)$platformId && (isset($hostname) && str_contains($hostname, 'facebook.com'))) {
-            return "fb:page:$platformId";
+        // 5. Build canonical ID
+        if ($platformId && $prefix) {
+            return "{$prefix}:{$platformId}";
         }
 
-        return "site:domain:$normalizedUrl";
+        // 6. Last resort fallback
+        if ($prefix) {
+            return "{$prefix}:" . md5($normalizedUrl);
+        }
+
+        return "site:domain:" . $normalizedUrl;
     }
 
     /**

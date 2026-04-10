@@ -10,8 +10,8 @@ use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
-use Enums\Channel;
-use Enums\Period;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Period;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\Unit\BaseUnitTestCase;
 

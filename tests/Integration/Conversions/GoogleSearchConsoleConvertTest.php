@@ -97,7 +97,7 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
         $this->assertEquals($totalCtr, $metricsMap['ctr']->value);
         $this->assertEquals($weightedPosition, $metricsMap['position']->value);
 
-        $this->assertEquals(\Enums\Channel::google_search_console->value, $metricsMap['impressions']->channel);
+        $this->assertEquals(Channel::google_search_console->value, $metricsMap['impressions']->channel);
         $this->assertStringStartsWith('gsc_' . $siteKey . '_', $metricsMap['impressions']->platformId);
         $this->assertEquals($query, $metricsMap['impressions']->query);
         $this->assertEquals($country, $metricsMap['impressions']->countryCode);

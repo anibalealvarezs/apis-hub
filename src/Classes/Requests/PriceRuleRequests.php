@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Anibalealvarezs\ShopifyApi\Conversions\ShopifyConvert;
+use Anibalealvarezs\ShopifyHubDriver\Conversions\ShopifyConvert;
 use Anibalealvarezs\ShopifyApi\ShopifyApi;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Entities\Analytics\Channeled\ChanneledPriceRule;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\Response;
 class PriceRuleRequests implements RequestInterface
 {
     /**
-     * @param \Enums\Channel|string $channel
+     * @param Channel|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
      * @param \Psr\Log\LoggerInterface|null $logger

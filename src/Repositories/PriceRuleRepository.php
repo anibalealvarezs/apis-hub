@@ -7,7 +7,7 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Enums\QueryBuilderType;
 
 class PriceRuleRepository extends BaseRepository

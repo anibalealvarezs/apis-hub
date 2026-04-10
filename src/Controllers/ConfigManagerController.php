@@ -10,7 +10,7 @@ use Services\CacheStrategyService;
 use Services\ConfigSchemaRegistryService;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Enums\Account as AccountEnum;
 use DateTime;
 use Symfony\Component\HttpFoundation\Request;

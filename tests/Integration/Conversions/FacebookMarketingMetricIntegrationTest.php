@@ -10,7 +10,7 @@ use Entities\Analytics\Account;
 use Entities\Analytics\Campaign;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledCampaign;
-use Enums\Period;
+use Anibalealvarezs\ApiDriverCore\Enums\Period;
 use Anibalealvarezs\FacebookGraphApi\Enums\MetricSet;
 use Tests\Integration\BaseIntegrationTestCase;
 
@@ -86,7 +86,7 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
 
         $this->assertEquals($rows[0]['impressions'], $metricsMap['18-24_male_impressions']->value);
         $this->assertEquals($channeledAccountPlatformId, $metricsMap['18-24_male_impressions']->platformId);
-        $this->assertEquals(\Enums\Channel::facebook_marketing->value, $metricsMap['18-24_male_impressions']->channel);
+        $this->assertEquals(Channel::facebook_marketing->value, $metricsMap['18-24_male_impressions']->channel);
         $this->assertEquals($dateStart, $metricsMap['18-24_male_impressions']->metricDate);
 
         // Ensure metadata extraction captures complex fields like actions natively
@@ -109,7 +109,7 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
         $channeledCampaign = new ChanneledCampaign();
         $channeledCampaign->addPlatformId($this->faker->uuid);
         $channeledCampaign->addBudget((float) $this->faker->numberBetween(50, 5000));
-        $channeledCampaign->addChannel(\Enums\Channel::facebook_marketing->value);
+        $channeledCampaign->addChannel(Channel::facebook_marketing->value);
         $channeledCampaign->addCampaign($campaignEntity);
         
         $accountEntity = new Account();
@@ -120,7 +120,7 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
         $channeledAccount->addPlatformId('act_' . $this->faker->numerify('#########'));
         $channeledAccount->addName($this->faker->company);
         $channeledAccount->addType(\Enums\Account::META_AD_ACCOUNT);
-        $channeledAccount->addChannel(\Enums\Channel::facebook_marketing->value);
+        $channeledAccount->addChannel(Channel::facebook_marketing->value);
         $channeledAccount->addAccount($accountEntity);
         
         $this->entityManager->persist($channeledAccount);

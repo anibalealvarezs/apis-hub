@@ -6,15 +6,15 @@ namespace Classes\Requests;
 
 use Anibalealvarezs\NetSuiteApi\NetSuiteApi;
 use Anibalealvarezs\ShopifyApi\ShopifyApi;
-use Anibalealvarezs\NetSuiteApi\Conversions\NetSuiteConvert;
-use Anibalealvarezs\ShopifyApi\Conversions\ShopifyConvert;
+use Anibalealvarezs\NetSuiteHubDriver\Conversions\NetSuiteConvert;
+use Anibalealvarezs\ShopifyHubDriver\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
 use Entities\Analytics\Channeled\ChanneledProductCategory;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -160,7 +160,7 @@ class ProductCategoryRequests implements RequestInterface
     }
 
     /**
-     * @param \Enums\Channel|string $channel
+     * @param Channel|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
      * @param \Psr\Log\LoggerInterface|null $logger

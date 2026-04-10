@@ -159,7 +159,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
         $metric = (object)[
             'channel' => 1,
             'name' => 'clicks',
-            'period' => \Enums\Period::Lifetime->value,
+            'period' => Period::Lifetime->value,
             'metricDate' => $metricDate,
             'value' => 100,
             'dimensions' => [],
@@ -173,7 +173,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
         $signature = \Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator::generateMetricConfigKey(
             channel: 1,
             name: 'clicks',
-            period: \Enums\Period::Lifetime->value
+            period: Period::Lifetime->value
         );
 
         $resultMock = $this->createMock(Result::class);
@@ -192,7 +192,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
         $this->assertCount(2, $metrics);
         $daily = $metrics->get(1);
         $this->assertEquals('clicks_daily', $daily->name);
-        $this->assertEquals(\Enums\Period::Daily->value, $daily->period);
+        $this->assertEquals(Period::Daily->value, $daily->period);
         $this->assertEquals(20, $daily->value); // 100 - 80
     }
 }

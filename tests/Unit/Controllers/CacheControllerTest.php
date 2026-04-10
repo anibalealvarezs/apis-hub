@@ -4,7 +4,7 @@ namespace Tests\Unit\Controllers;
 
 use Controllers\CacheController;
 use Doctrine\ORM\EntityManager;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Exception;
 use Tests\Unit\BaseUnitTestCase;
 use ReflectionException;

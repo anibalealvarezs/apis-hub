@@ -8,7 +8,7 @@ use Carbon\Carbon;
 use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
-use Enums\Period;
+use Anibalealvarezs\ApiDriverCore\Enums\Period;
 use stdClass;
 
 trait CalculatesMetricDeltas

@@ -9,7 +9,7 @@ use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;
@@ -20,7 +20,7 @@ class CustomerRequests implements RequestInterface
 {
     
     /**
-     * @param \Enums\Channel|string $channel
+     * @param Channel|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
      * @param \Psr\Log\LoggerInterface|null $logger
@@ -30,14 +30,14 @@ class CustomerRequests implements RequestInterface
      * @throws \Exception
      */
     public static function getList(
-        \Enums\Channel|string $channel,
+        Channel|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
     ): \Symfony\Component\HttpFoundation\Response {
-        $chanEnum = ($channel instanceof \Enums\Channel) ? $channel : \Enums\Channel::tryFromName((string)$channel);
+        $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
         $chanKey = $chanEnum?->name ?? (string)$channel;
 
         // Intelligent date resolution

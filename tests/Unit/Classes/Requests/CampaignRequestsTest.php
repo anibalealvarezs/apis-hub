@@ -6,7 +6,7 @@ namespace Tests\Unit\Classes\Requests;
 
 use Classes\Requests\CampaignRequests;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Tests\Unit\BaseUnitTestCase;
 
 class CampaignRequestsTest extends BaseUnitTestCase

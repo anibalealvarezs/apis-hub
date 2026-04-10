@@ -7,7 +7,7 @@ namespace Classes\Requests;
 use Carbon\Carbon;
 use Classes\MetricsProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Exception;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -19,7 +19,7 @@ class MetricRequests implements RequestInterface
     
 
     /**
-     * @param \Enums\Channel|string $channel
+     * @param Channel|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
      * @param \Psr\Log\LoggerInterface|null $logger
@@ -28,14 +28,14 @@ class MetricRequests implements RequestInterface
      * @return \Symfony\Component\HttpFoundation\Response
      */
     public static function getList(
-        \Enums\Channel|string $channel,
+        Channel|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
     ): \Symfony\Component\HttpFoundation\Response {
-        $chanEnum = ($channel instanceof \Enums\Channel) ? $channel : \Enums\Channel::tryFromName((string)$channel);
+        $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
         $chanKey = $chanEnum?->name ?? (string)$channel;
 
         // Intelligent date resolution for Shopify/NetSuite

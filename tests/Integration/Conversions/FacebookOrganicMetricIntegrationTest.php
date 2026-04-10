@@ -9,7 +9,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Page;
-use Enums\Period;
+use Anibalealvarezs\ApiDriverCore\Enums\Period;
 use Tests\Integration\BaseIntegrationTestCase;
 
 class FacebookOrganicMetricIntegrationTest extends BaseIntegrationTestCase
@@ -58,7 +58,7 @@ class FacebookOrganicMetricIntegrationTest extends BaseIntegrationTestCase
         $channeledAccount->addPlatformId($igPlatformId);
         $channeledAccount->addName($this->faker->userName);
         $channeledAccount->addType(\Enums\Account::INSTAGRAM);
-        $channeledAccount->addChannel(\Enums\Channel::facebook_organic->value);
+        $channeledAccount->addChannel(Channel::facebook_organic->value);
         $channeledAccount->addAccount($accountEntity);
         $this->entityManager->persist($channeledAccount);
         $this->entityManager->flush();

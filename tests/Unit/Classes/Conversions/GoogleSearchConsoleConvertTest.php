@@ -7,10 +7,10 @@ use Carbon\Carbon;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
 use Entities\Analytics\Page;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Enums\Country;
 use Enums\Device;
-use Enums\Period;
+use Anibalealvarezs\ApiDriverCore\Enums\Period;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\Unit\BaseUnitTestCase;
 

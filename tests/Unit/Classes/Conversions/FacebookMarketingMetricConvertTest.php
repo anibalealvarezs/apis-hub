@@ -12,7 +12,7 @@ use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Channeled\ChanneledAd;
 use Entities\Analytics\Channeled\ChanneledAdGroup;
 use Entities\Analytics\Channeled\ChanneledCampaign;
-use Enums\Period;
+use Anibalealvarezs\ApiDriverCore\Enums\Period;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\Unit\BaseUnitTestCase;
 use Carbon\Carbon;

@@ -10,7 +10,7 @@ use Doctrine\ORM\EntityManager;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
-use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Entities\Analytics\Channeled\DimensionSet;
 use Entities\Analytics\Channeled\DimensionKey;
 use Entities\Analytics\Channeled\DimensionValue;
@@ -556,7 +556,7 @@ class MetricsProcessor
             );
             $metric->metricConfigKey = $metricConfigKey;
 
-            $channelObj = \Enums\Channel::tryFromName((string) $metric->channel);
+            $channelObj = Channel::tryFromName((string) $metric->channel);
             $channelId = $channelObj ? $channelObj->value : $metric->channel;
 
             $uniqueMetricConfigs[$metricConfigKey] = [
@@ -898,7 +898,7 @@ class MetricsProcessor
                 platformCreatedAt: Carbon::parse($metric->platform_created_at ?? $metric->platformCreatedAt)->format('Y-m-d'),
             );
 
-            $channelObj = \Enums\Channel::tryFromName((string) $metric->channel);
+            $channelObj = Channel::tryFromName((string) $metric->channel);
             $channelId = $channelObj ? $channelObj->value : $metric->channel;
 
             $uniqueChanneledMetrics[$channeledMetricKey] = [
@@ -917,7 +917,7 @@ class MetricsProcessor
             $tuples = [];
             $isPostgres = Helpers::isPostgres();
             foreach ($chunk as $m) {
-                $mChannelObj = \Enums\Channel::tryFromName((string) $m['channel']);
+                $mChannelObj = Channel::tryFromName((string) $m['channel']);
                 $mChannelId = $mChannelObj ? $mChannelObj->value : (int)$m['channel'];
                 $selectParams[] = $mChannelId;
                 $selectParams[] = (string)$m['platform_id'];

@@ -2,7 +2,7 @@
 
 namespace Core\Drivers;
 
-use Anibalealvarezs\ApiSkeleton\Interfaces\SyncDriverInterface;
+use Anibalealvarezs\ApiDriverCore\Interfaces\SyncDriverInterface;
 use Exception;
 use Psr\Log\LoggerInterface;
 
@@ -43,6 +43,15 @@ class DriverFactory
                 self::$registry = $yamlConfig;
             }
         }
+    }
+
+    /**
+     * Get the full driver registry.
+     */
+    public static function getRegistry(): array
+    {
+        self::loadRegistry();
+        return self::$registry;
     }
 
     /**

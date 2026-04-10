@@ -8,7 +8,7 @@ use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\ORM\NonUniqueResultException;
 use Entities\Job;
 use Enums\AnalyticsEntity;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Enums\JobStatus;
 use Enums\QueryBuilderType;
 use Faker\Factory;
@@ -312,7 +312,7 @@ class JobRepository extends BaseRepository
 
         $filters = ['status' => $status];
         if ($channel) {
-            if ($chanEnum = \Enums\Channel::tryFromName($channel)) {
+            if ($chanEnum = Channel::tryFromName($channel)) {
                 $channel = $chanEnum->name;
             }
             $filters['channel'] = $channel;

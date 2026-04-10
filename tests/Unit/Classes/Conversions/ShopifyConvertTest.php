@@ -4,7 +4,7 @@ namespace Tests\Unit\Classes\Conversions;
 
 use Anibalealvarezs\ShopifyApi\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Tests\Unit\BaseUnitTestCase;
 
 class ShopifyConvertTest extends BaseUnitTestCase

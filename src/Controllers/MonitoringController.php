@@ -30,9 +30,9 @@ class MonitoringController extends BaseController
         // Canonical Channel Name (always lowercase string)
         $chan = null;
         if (is_numeric($chanRaw)) {
-            $chan = strtolower(\Enums\Channel::tryFrom((int)$chanRaw)?->name ?? (string)$chanRaw);
+            $chan = strtolower(Channel::tryFrom((int)$chanRaw)?->name ?? (string)$chanRaw);
         } else {
-            $chan = strtolower(\Enums\Channel::tryFromName((string)$chanRaw)?->name ?? (string)$chanRaw);
+            $chan = strtolower(Channel::tryFromName((string)$chanRaw)?->name ?? (string)$chanRaw);
         }
 
         $ent = strtolower(trim($job instanceof Job ? $job->getEntity() : $job['entity']));
@@ -47,7 +47,7 @@ class MonitoringController extends BaseController
         // 2. Fallback to channel/entity/date match
         foreach ($instances as $instance) {
             $instChanRaw = $instance['channel'] ?? '';
-            $instChan = strtolower(\Enums\Channel::tryFromName($instChanRaw)?->name ?? $instChanRaw);
+            $instChan = strtolower(Channel::tryFromName($instChanRaw)?->name ?? $instChanRaw);
             $instEnt = strtolower($instance['entity'] ?? '');
             
             if ($chan === $instChan && $ent === $instEnt) {
@@ -306,7 +306,7 @@ class MonitoringController extends BaseController
                                 $results = $conn->fetchAllAssociative($sql);
                                 foreach ($results as $res) {
                                     $channelId = (int)($res['channel'] ?? 0);
-                                    $channelLabel = $channelId ? (\Enums\Channel::tryFrom($channelId)?->getCommonName() ?? "Ch $channelId") : "Unidentified Channel";
+                                    $channelLabel = $channelId ? (Channel::tryFrom($channelId)?->getCommonName() ?? "Ch $channelId") : "Unidentified Channel";
                                     $typeValue = $res['type'] ?? '';
                                     $typeName = $typeValue;
                                     if ($typeValue && class_exists('\Enums\Account')) {
@@ -328,7 +328,7 @@ class MonitoringController extends BaseController
                                     $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
                                     foreach ($results as $res) {
                                         $resItems[] = [
-                                            'name' => \Enums\Channel::tryFrom((int)$res['channel'])?->getCommonName() ?? "Channel " . $res['channel'],
+                                            'name' => Channel::tryFrom((int)$res['channel'])?->getCommonName() ?? "Channel " . $res['channel'],
                                             'count' => (int)$res['count']
                                         ];
                                     }

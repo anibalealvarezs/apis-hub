@@ -7,7 +7,7 @@ namespace Classes\Requests;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\ORMException;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;
@@ -19,7 +19,7 @@ class OrderRequests implements RequestInterface
     
 
     /**
-     * @param \Enums\Channel|string $channel
+     * @param Channel|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
      * @param \Psr\Log\LoggerInterface|null $logger
@@ -28,14 +28,14 @@ class OrderRequests implements RequestInterface
      * @return \Symfony\Component\HttpFoundation\Response
      */
     public static function getList(
-        \Enums\Channel|string $channel,
+        Channel|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
     ): \Symfony\Component\HttpFoundation\Response {
-        $chanKey = ($channel instanceof \Enums\Channel) ? $channel->name : (string)$channel;
+        $chanKey = ($channel instanceof Channel) ? $channel->name : (string)$channel;
 
         // Intelligent date resolution
         $start = $startDate;

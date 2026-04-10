@@ -2,7 +2,7 @@
 
 namespace Interfaces;
 
-use Anibalealvarezs\ApiSkeleton\Interfaces\SyncDriverInterface as BaseSyncDriverInterface;
+use Anibalealvarezs\ApiDriverCore\Interfaces\SyncDriverInterface as BaseSyncDriverInterface;
 
 /**
  * Interface SyncDriverInterface

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,7 +15,7 @@ class VendorRequests implements RequestInterface
     
 
     /**
-     * @param \Enums\Channel|string $channel
+     * @param Channel|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
      * @param \Psr\Log\LoggerInterface|null $logger

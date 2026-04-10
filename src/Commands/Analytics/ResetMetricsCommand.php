@@ -2,7 +2,7 @@
 
 namespace Commands\Analytics;
 
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Helpers\Helpers;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

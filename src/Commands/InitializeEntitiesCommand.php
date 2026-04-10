@@ -11,7 +11,7 @@ use Entities\Analytics\Country;
 use Entities\Analytics\Device; // Add Page entity
 use Entities\Analytics\Page;
 use Enums\Account as AccountEnum;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Enums\Country as CountryEnum;
 use Enums\Device as DeviceEnum;
 use Enums\PageType;

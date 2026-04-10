@@ -5,7 +5,7 @@ namespace Commands\Analytics;
 use Controllers\CacheController;
 use Doctrine\ORM\EntityManager;
 use Entities\Job;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Enums\JobStatus;
 use Helpers\Helpers;
 use Services\CacheStrategyService;

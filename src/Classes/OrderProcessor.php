@@ -74,7 +74,7 @@ class OrderProcessor
                 ];
             } else {
                 // Specific logic for netsuite line items append based on OrderRequests
-                if ((int)$chan === \Enums\Channel::netsuite->value) {
+                if ((int)$chan === Channel::netsuite->value) {
                     $existingData = (array)$uCOrd[$coKey]['data'];
                     $newData = (array)$co->data;
                     if (isset($existingData['line_items']) && isset($newData['line_items'])) {

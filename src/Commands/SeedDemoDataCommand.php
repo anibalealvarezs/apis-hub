@@ -2,9 +2,9 @@
 
 namespace Commands;
 
-use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
-use Anibalealvarezs\ApiSkeleton\Interfaces\DimensionManagerInterface;
-use Anibalealvarezs\ApiSkeleton\Interfaces\SeederInterface;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
+use Anibalealvarezs\ApiDriverCore\Interfaces\DimensionManagerInterface;
+use Anibalealvarezs\ApiDriverCore\Interfaces\SeederInterface;
 use Classes\DimensionManager;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -19,7 +19,7 @@ use Entities\Analytics\Device;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
 use Entities\Analytics\Query;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use Enums\Country as CountryEnum;
 use Faker\Factory;
 use Helpers\Helpers;
@@ -96,7 +96,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
             'account_type' => Account::class,
             'country' => Country::class,
             'device' => Device::class,
-            'period' => \Anibalealvarezs\ApiSkeleton\Enums\Period::class,
+            'period' => \Anibalealvarezs\ApiDriverCore\Enums\Period::class,
             default => throw new \Exception("Unknown enum type: $type")
         };
     }
@@ -227,7 +227,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
         foreach ($channels as $chanName) {
             try {
                 $driver = \Core\Drivers\DriverFactory::get($chanName);
-                if ($driver instanceof \Anibalealvarezs\ApiSkeleton\Interfaces\SyncDriverInterface) {
+                if ($driver instanceof \Anibalealvarezs\ApiDriverCore\Interfaces\SyncDriverInterface) {
                     $output->writeln("🚀 Seeding channel: $chanName via Driver...");
                     $driver->seedDemoData($this, [
                         'output' => $output,

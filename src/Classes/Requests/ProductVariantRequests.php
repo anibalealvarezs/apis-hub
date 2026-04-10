@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Anibalealvarezs\KlaviyoApi\Conversions\KlaviyoConvert;
+use Anibalealvarezs\KlaviyoHubDriver\Conversions\KlaviyoConvert;
 use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Anibalealvarezs\ApiDriverCore\Enums\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -19,7 +19,7 @@ class ProductVariantRequests implements RequestInterface
     
 
     /**
-     * @param \Enums\Channel|string $channel
+     * @param Channel|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
      * @param \Psr\Log\LoggerInterface|null $logger

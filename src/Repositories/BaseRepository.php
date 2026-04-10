@@ -48,7 +48,7 @@ class BaseRepository extends EntityRepository
      */
     protected static function getRelationMap(): array
     {
-        return array_merge(self::$defaultRelationMap, \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::getRelations());
+        return array_merge(self::$defaultRelationMap, \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::getRelations());
     }
 
     /**
@@ -56,7 +56,7 @@ class BaseRepository extends EntityRepository
      */
     protected static function getFormulas(): array
     {
-        return \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::getFormulas();
+        return \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::getFormulas();
     }
 
     /**
@@ -64,7 +64,7 @@ class BaseRepository extends EntityRepository
      */
     public static function registerRelation(string $key, array $mapping): void
     {
-        \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::registerRelation($key, $mapping);
+        \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::registerRelation($key, $mapping);
     }
 
     /**
@@ -72,7 +72,7 @@ class BaseRepository extends EntityRepository
      */
     public static function registerRelations(array $relations): void
     {
-        \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::registerRelations($relations);
+        \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::registerRelations($relations);
     }
 
     /**
@@ -80,7 +80,7 @@ class BaseRepository extends EntityRepository
      */
     public static function registerFormula(string $name, string|callable $formula): void
     {
-        \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::registerFormula($name, $formula);
+        \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::registerFormula($name, $formula);
     }
 
     /**
@@ -88,7 +88,7 @@ class BaseRepository extends EntityRepository
      */
     public static function registerFormulas(array $formulas): void
     {
-        \Anibalealvarezs\ApiSkeleton\Classes\RepositoryRegistry::registerFormulas($formulas);
+        \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::registerFormulas($formulas);
     }
 
     /**
