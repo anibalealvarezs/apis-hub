@@ -40,9 +40,9 @@ class ManagementController extends BaseController
             ];
 
             // Merge with channel-specific credentials from drivers
-            foreach (\Core\Drivers\DriverFactory::getAvailableChannels() as $channel) {
+            foreach (\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels() as $channel) {
                 try {
-                    $driver = \Core\Drivers\DriverFactory::get($channel);
+                    $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
                     $allowedKeys = array_merge($allowedKeys, $driver->getUpdatableCredentials());
                 } catch (Exception $e) {
                     $logger->warning("Could not load credentials for channel $channel: " . $e->getMessage());

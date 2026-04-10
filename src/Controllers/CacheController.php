@@ -46,7 +46,7 @@ class CacheController extends BaseController
         }
 
         $requestsClassName = $this->getEntityRequestsClassName($entity);
-        if (!\Core\Drivers\DriverFactory::supportsEntity($channel, $entity)) {
+        if (!\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::supportsEntity($channel, $entity)) {
             return $this->createResponse(
                 data: null,
                 status: 'error',

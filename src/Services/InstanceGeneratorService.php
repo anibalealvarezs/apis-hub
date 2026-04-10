@@ -159,7 +159,7 @@ class InstanceGeneratorService
             $chanKey = 'google_search_console';
         }
 
-        $registryConfig = \Core\Drivers\DriverFactory::getChannelConfig($chanKey);
+        $registryConfig = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chanKey);
         $resourceKey = $registryConfig['resource_key'] ?? null;
 
         // If we don't have a resource key for entity-level validation, 

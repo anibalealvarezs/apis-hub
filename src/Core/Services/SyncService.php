@@ -2,7 +2,7 @@
 
 namespace Core\Services;
 
-use Core\Drivers\DriverFactory;
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Symfony\Component\HttpFoundation\Response;
 use Psr\Log\LoggerInterface;
 use Helpers\Helpers;

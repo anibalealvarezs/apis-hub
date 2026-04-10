@@ -3,7 +3,7 @@
 namespace Tests\Unit\Core\Drivers;
 
 use PHPUnit\Framework\TestCase;
-use Core\Drivers\DriverFactory;
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Psr\Log\LoggerInterface;
 
 class DriverFactoryTest extends TestCase

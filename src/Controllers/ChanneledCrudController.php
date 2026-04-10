@@ -10,7 +10,7 @@ use ReflectionEnum;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
-use Services\CacheStrategyService;
+use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -415,9 +415,8 @@ class ChanneledCrudController extends BaseController
                 );
             }
 
-            // --- Redis Caching Logic ---
-            // Force skip cache for organic in development/demo to prevent stale results during dashboard tuning
-            $isCacheable = $endDate && CacheStrategyService::isCacheable($channelKey) && $channelKey !== 'facebook_organic';
+            // Force skip cache for certain channels can be done via YAML config (cache_aggregations: false)
+            $isCacheable = $endDate && CacheStrategyService::isCacheable($channelKey);
             $cacheType = $isCacheable ? CacheStrategyService::getTargetCacheType($endDate) : null;
             $cacheKey = $cacheType ? CacheStrategyService::generateKey($channelKey, [
                 'entity' => $entity,

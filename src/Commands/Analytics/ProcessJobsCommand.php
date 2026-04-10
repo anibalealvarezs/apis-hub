@@ -8,13 +8,13 @@ use Entities\Job;
 use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\JobStatus;
 use Helpers\Helpers;
-use Services\CacheStrategyService;
+use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
 use Services\DateResolver;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\HttpFoundation\Response;
-use Anibalealvarezs\FacebookGraphApi\Exceptions\FacebookRateLimitException;
+use Anibalealvarezs\ApiDriverCore\Exceptions\RateLimitException;
 use Doctrine\DBAL\Exception\LockWaitTimeoutException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputOption;
@@ -220,9 +220,14 @@ class ProcessJobsCommand extends Command
                     // Check if channel is enabled
                     $channelsConfig = Helpers::getChannelsConfig();
                     $chanKey = $job->getChannel();
-                    if (!isset($channelsConfig[$chanKey])) {
-                        $chanKey = str_replace(['facebook_marketing', 'facebook_organic'], ['facebook', 'facebook'], $chanKey);
-                    }
+                    try {
+                        $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
+                        $commonKey = $driver::getCommonConfigKey();
+                        if ($commonKey && !isset($channelsConfig[$chanKey])) {
+                            $chanKey = $commonKey;
+                        }
+                    } catch (\Exception $e) {}
+
                     $chanConfig = $channelsConfig[$job->getChannel()] ?? $channelsConfig[$chanKey] ?? null;
                     if ($chanConfig && isset($chanConfig['enabled']) && !$chanConfig['enabled']) {
                         $jobRepo->update($job->getId(), (object)[
@@ -270,9 +275,9 @@ class ProcessJobsCommand extends Command
                     if ($result instanceof Response && $result->getStatusCode() >= 400) {
                         $content = json_decode($result->getContent(), true);
                         $errorMsg = $content['error'] ?? 'Unknown error from fetchData';
-                        if ($result->getStatusCode() === 429) {
-                            throw new FacebookRateLimitException($errorMsg);
-                        }
+                        // Handle Rate Limits in a generic way
+                        // The driver should throw RateLimitException 
+                        // but if we have specific legacy exceptions we can handle them here for now
                         throw new \Exception($errorMsg);
                     }
 
@@ -291,7 +296,7 @@ class ProcessJobsCommand extends Command
                     $stats['completed']++;
                     $progressMade = true;
 
-                } catch (FacebookRateLimitException $e) {
+                } catch (RateLimitException $e) {
                     if (Helpers::isDebug()) {
                         $output->writeln("<comment>Rate limit reached for job {$job->getUuid()}. Job delayed for cooldown.</comment>");
                     }

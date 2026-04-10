@@ -1,6 +1,6 @@
 <?php
 
-use Core\Drivers\DriverFactory;
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Helpers\Helpers;
 use Tests\Integration\BaseIntegrationTestCase;
 
@@ -29,6 +29,9 @@ class HubInstantiationTest extends BaseIntegrationTestCase
             putenv($envKey);
         }
         DriverFactory::reset();
+        if (class_exists(\Anibalealvarezs\ApiDriverCore\Helpers\Helpers::class)) {
+            \Anibalealvarezs\ApiDriverCore\Helpers\Helpers::resetConfigs();
+        }
     }
 
     protected function tearDown(): void
@@ -56,6 +59,9 @@ class HubInstantiationTest extends BaseIntegrationTestCase
         $property = $reflection->getProperty('channelsConfig');
         $property->setAccessible(true);
         $property->setValue(null, null);
+        if (class_exists(\Anibalealvarezs\ApiDriverCore\Helpers\Helpers::class)) {
+            \Anibalealvarezs\ApiDriverCore\Helpers\Helpers::resetConfigs();
+        }
 
         // 2. Act
         $driver = DriverFactory::get('klaviyo', $this->createMock(\Psr\Log\LoggerInterface::class));
@@ -101,6 +107,9 @@ class HubInstantiationTest extends BaseIntegrationTestCase
         $property = $reflection->getProperty('channelsConfig');
         $property->setAccessible(true);
         $property->setValue(null, null);
+        if (class_exists(\Anibalealvarezs\ApiDriverCore\Helpers\Helpers::class)) {
+            \Anibalealvarezs\ApiDriverCore\Helpers\Helpers::resetConfigs();
+        }
 
         // 2. Act
         $driver = DriverFactory::get('google_search_console', $this->createMock(\Psr\Log\LoggerInterface::class));

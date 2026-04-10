@@ -520,7 +520,7 @@ class MonitoringController extends BaseController
         $grouped = [];
         foreach ($instances as $instance) {
             $chan = $instance['channel'] ?? 'Other';
-            $config = \Core\Drivers\DriverFactory::getChannelConfig($chan);
+            $config = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chan);
             
             $groupName = ucwords($chan); // Fallback
             if (!empty($config) && class_exists($config['driver'])) {

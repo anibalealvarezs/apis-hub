@@ -118,8 +118,8 @@ class KeyGeneratorTest extends BaseUnitTestCase
             channel: Channel::google_search_console,
             name: 'clicks',
             period: Period::Daily,
-            country: \Enums\Country::USA,
-            device: \Enums\Device::MOBILE
+            country: \Anibalealvarezs\ApiSkeleton\Enums\Country::USA,
+            device: \Anibalealvarezs\ApiSkeleton\Enums\Device::MOBILE
         );
 
         $key2 = KeyGenerator::generateMetricConfigKey(

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Classes;
 
-use Core\Drivers\DriverFactory;
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Exception;
 use Helpers\Helpers;
@@ -39,12 +39,23 @@ class DriverInitializer
         $allConfigs = Helpers::getChannelsConfig();
         $config = $allConfigs[$channel] ?? [];
 
-        // Dynamic merging based on parent key in drivers.yaml
-        $registryConfig = DriverFactory::getChannelConfig($channel);
-        if (isset($registryConfig['parent'])) {
-            $parentKey = $registryConfig['parent'];
-            if (isset($allConfigs[$parentKey])) {
-                $config = array_replace_recursive($allConfigs[$parentKey], $config);
+        // Dynamic merging based on driver-defined common key
+        try {
+            $registryConfig = DriverFactory::getChannelConfig($channel);
+            $driverClass = $registryConfig['driver'] ?? null;
+            if ($driverClass && class_exists($driverClass)) {
+                $commonKey = $driverClass::getCommonConfigKey();
+                if ($commonKey && isset($allConfigs[$commonKey])) {
+                    $config = array_replace_recursive($allConfigs[$commonKey], $config);
+                }
+            }
+        } catch (Exception $e) {
+            // Fallback to parent key if driver discovery fails
+            if (isset($registryConfig['parent'])) {
+                $parentKey = $registryConfig['parent'];
+                if (isset($allConfigs[$parentKey])) {
+                    $config = array_replace_recursive($allConfigs[$parentKey], $config);
+                }
             }
         }
 
@@ -95,44 +106,6 @@ class DriverInitializer
         return $api;
     }
 
-    /**
-     * @deprecated Use validateConfig('facebook_marketing') or similar
-     */
-    public static function validateFacebookConfig(?LoggerInterface $logger = null, Channel|string|null $channel = null): array
-    {
-        $chanKey = ($channel instanceof Channel) ? $channel->name : (string)($channel ?: 'facebook_marketing');
-
-        return self::validateConfig($chanKey, $logger);
-    }
-
-    /**
-     * @deprecated Use initializeApi('facebook_marketing', $config)
-     */
-    public static function initializeFacebookGraphApi(array $config, ?LoggerInterface $logger = null): mixed
-    {
-        return self::initializeApi('facebook_marketing', $config, $logger);
-    }
-
-    /**
-     * @deprecated Use validateConfig('google_search_console')
-     */
-    public static function validateGoogleConfig(?LoggerInterface $logger = null): array
-    {
-        $config = self::validateConfig('google_search_console', $logger);
-
-        return [
-            'google' => $config, // In legacy, it returned this structure
-            'google_search_console' => $config,
-        ];
-    }
-
-    /**
-     * @deprecated Use initializeApi('google_search_console', $config)
-     */
-    public static function initializeGoogleSearchConsoleApi(array $config, ?LoggerInterface $logger = null): mixed
-    {
-        return self::initializeApi('google_search_console', $config, $logger);
-    }
 
     /**
      * Boot all registered drivers.
@@ -144,7 +117,8 @@ class DriverInitializer
     public static function bootDrivers(?LoggerInterface $logger = null): void
     {
         $registry = DriverFactory::getRegistry();
-        foreach (array_keys($registry) as $channel) {
+        foreach ($registry as $channel => $config) {
+            if (!isset($config['driver'])) continue;
             try {
                 $driver = DriverFactory::get($channel, $logger);
                 

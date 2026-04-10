@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\Request;
 
 
 $driverRoutes = (function() {
-    $registry = \Core\Drivers\DriverFactory::getRegistry();
+    $registry = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry();
     $routes = [];
     foreach ($registry as $config) {
         $driver = $config['driver'] ?? '';

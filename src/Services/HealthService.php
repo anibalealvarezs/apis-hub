@@ -48,10 +48,10 @@ class HealthService
         // 4. Channels
         $channelsHealth = [];
         try {
-            $availableChannels = \Core\Drivers\DriverFactory::getAvailableChannels();
+            $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
             foreach ($availableChannels as $channel) {
                 try {
-                    $driver = \Core\Drivers\DriverFactory::get($channel);
+                    $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
                     $authProvider = $driver->getAuthProvider();
                     $channelsHealth[$channel] = $authProvider ? $authProvider->isValid() : false;
                 } catch (Throwable $e) {

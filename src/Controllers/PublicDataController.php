@@ -28,7 +28,7 @@ class PublicDataController extends BaseController
             */
             $channelId = $channel;
 
-            $config = \Core\Drivers\DriverFactory::getChannelConfig($channelId);
+            $config = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($channelId);
             if (empty($config)) {
                 return new JsonResponse(['success' => false, 'error' => "Channel $channelId not found"], Response::HTTP_NOT_FOUND);
             }

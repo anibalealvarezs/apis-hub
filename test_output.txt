@@ -1,4 +1,164 @@
---- STARTING MODULAR GOOGLE SEARCH CONSOLE SYNC TEST ---
-Response Status Code: 500
-Response Content: {"status":"error","message":"Unauthorized. No refresh token provided."}
---- TEST FINISHED ---
+PHPUnit 9.6.34 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.30
+Configuration: /app/phpunit.xml
+
+.................F.............................................  63 / 562 ( 11%)
+............................................................... 126 / 562 ( 22%)
+............................................................... 189 / 562 ( 33%)
+............................................................... 252 / 562 ( 44%)
+............................................................... 315 / 562 ( 56%)
+............................................................... 378 / 562 ( 67%)
+............................................................... 441 / 562 ( 78%)
+...............................................FF.............. 504 / 562 ( 89%)
+................FEF..FF......EE...........EEEEEEEEEEEEE...      562 / 562 (100%)
+
+Time: 00:15.641, Memory: 50.00 MB
+
+There were 16 errors:
+
+1) Tests\Integration\Http\ConfigManagerControllerTest::testFetchAssetsReturnsConfig
+Undefined array key "fb_cache_chunk_size"
+
+/app/tests/Integration/Http/ConfigManagerControllerTest.php:80
+
+2) HubInstantiationTest::testHubSuccessfullyInstantiatesKlaviyoDriverUsingConfig
+Exception: Driver not found for channel: klaviyo
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Integration/Services/HubInstantiationTest.php:61
+
+3) HubInstantiationTest::testHubSuccessfullyInstantiatesGoogleSearchConsoleDriverUsingMixedConfig
+Exception: Driver not found for channel: google_search_console
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Integration/Services/HubInstantiationTest.php:106
+
+4) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #0 ('google_search_console', 'Anibalealvarezs\GoogleHubDriv...Driver')
+Exception: Driver not found for channel: google_search_console
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+5) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #1 ('google_analytics', 'Anibalealvarezs\GoogleHubDriv...Driver')
+Exception: Driver not found for channel: google_analytics
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+6) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #2 ('facebook_marketing', 'Anibalealvarezs\MetaHubDriver...Driver')
+Exception: Driver not found for channel: facebook_marketing
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+7) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #3 ('facebook_organic', 'Anibalealvarezs\MetaHubDriver...Driver')
+Exception: Driver not found for channel: facebook_organic
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+8) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #4 ('shopify', 'Anibalealvarezs\ShopifyHubDri...Driver')
+Exception: Driver not found for channel: shopify
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+9) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #5 ('klaviyo', 'Anibalealvarezs\KlaviyoHubDri...Driver')
+Exception: Driver not found for channel: klaviyo
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+10) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #6 ('netsuite', 'Anibalealvarezs\NetSuiteHubDr...Driver')
+Exception: Driver not found for channel: netsuite
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+11) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #7 ('amazon', 'Anibalealvarezs\AmazonHubDriv...Driver')
+Exception: Driver not found for channel: amazon
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+12) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #8 ('bigcommerce', 'Anibalealvarezs\BigCommerceHu...Driver')
+Exception: Driver not found for channel: bigcommerce
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+13) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #9 ('pinterest', 'Anibalealvarezs\PinterestHubD...Driver')
+Exception: Driver not found for channel: pinterest
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+14) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #10 ('linkedin', 'Anibalealvarezs\LinkedInHubDr...Driver')
+Exception: Driver not found for channel: linkedin
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+15) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #11 ('x', 'Anibalealvarezs\XHubDriver\Dr...Driver')
+Exception: Driver not found for channel: x
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+16) Tests\Unit\Core\Drivers\DriverFactoryTest::test_it_can_create_drivers with data set #12 ('tiktok', 'Anibalealvarezs\TikTokHubDriv...Driver')
+Exception: Driver not found for channel: tiktok
+
+/app/vendor/anibalealvarezs/api-driver-core/src/Drivers/DriverFactory.php:84
+/app/tests/Unit/Core/Drivers/DriverFactoryTest.php:17
+
+--
+
+There were 7 failures:
+
+1) Tests\Unit\Services\InstanceGeneratorCacheAllTest::testHasActiveEntitiesWithoutCacheAllAndEmptyList
+Facebook Marketing should be inactive without cache_all and empty list
+Failed asserting that true is false.
+
+/app/tests/Unit/Services/InstanceGeneratorCacheAllTest.php:131
+
+2) Tests\Integration\Commands\InitializeEntitiesCacheAllTest::testExecuteWithCacheAllDiscoversEntities
+GSC site example-test1.com not found
+Failed asserting that null is not null.
+
+/app/tests/Integration/Commands/InitializeEntitiesCacheAllTest.php:108
+
+3) Tests\Integration\Commands\InitializeEntitiesCacheAllTest::testExecuteWithCacheAllAndFilters
+Included GSC site not found
+Failed asserting that null is not null.
+
+/app/tests/Integration/Commands/InitializeEntitiesCacheAllTest.php:206
+
+4) Tests\Integration\Http\CacheControllerTest::testValidRequestSchedulesJob
+{"data":null,"status":"error","error":"Channel FacebookMarketing not supported for entity customer"}
+Failed asserting that 404 matches expected 200.
+
+/app/tests/Integration/Http/CacheControllerTest.php:66
+
+5) Tests\Integration\Http\ConfigManagerControllerTest::testUpdateConfigModifiesYamlFiles
+Failed asserting that 500 matches expected 200.
+
+/app/tests/Integration/Http/ConfigManagerControllerTest.php:113
+
+6) Tests\Integration\Http\ManagementControllerTest::testUpdateCredentialsModifiesEnvFile
+Failed asserting that 'INITIAL_KEY=initial_value\n
+FACEBOOK_USER_TOKEN=old_token\n
+\n
+MONITOR_FACADE_URL=https://facade.example.com' contains "FACEBOOK_USER_TOKEN=new_fb_token_c8b5a6d177a7f8533662063010bbfc4a".
+
+/app/tests/Integration/Http/ManagementControllerTest.php:95
+
+7) Tests\Integration\Http\ManagementControllerTest::testUpdateCredentialsRejectsUnallowedKeys
+Failed asserting that 'INITIAL_KEY=initial_value\n
+FACEBOOK_USER_TOKEN=old_token\n
+' contains "FACEBOOK_USER_TOKEN=valid_token".
+
+/app/tests/Integration/Http/ManagementControllerTest.php:126
+
+ERRORS!
+Tests: 562, Assertions: 1992, Errors: 16, Failures: 7.

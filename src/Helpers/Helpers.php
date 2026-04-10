@@ -459,9 +459,11 @@ class Helpers
 
                 // Override with environment variables if present
                 if ($envChannelsJson = getenv('CHANNELS_CONFIG')) {
+                    var_dump("CHANNELS_CONFIG found", $envChannelsJson);
                     $envChannels = json_decode($envChannelsJson, true);
                     if (is_array($envChannels)) {
                         $config = array_replace_recursive($config, $envChannels);
+                    var_dump("Merged config for klaviyo", $config["klaviyo"] ?? "not set");
                     }
                 }
 
@@ -492,7 +494,7 @@ class Helpers
                         });
                     };
 
-                    $registry = \Core\Drivers\DriverFactory::getRegistry();
+                    $registry = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry();
                     foreach ($registry as $chan => $rConfig) {
                         $resourceKey = $rConfig['resource_key'] ?? null;
                         if ($resourceKey && isset($config[$chan][$resourceKey])) {

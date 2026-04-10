@@ -2,15 +2,12 @@
 
 namespace Tests\Unit\Classes\Conversions;
 
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Country;
 use Anibalealvarezs\GoogleHubDriver\Conversions\GoogleSearchConsoleConvert;
-use Carbon\Carbon;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
 use Entities\Analytics\Page;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
-use Enums\Country;
-use Enums\Device;
-use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\Unit\BaseUnitTestCase;
 
@@ -79,7 +76,7 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
                     'test_query',
                     'https://example.com/test',
                     'ESP',
-                    'DESKTOP'
+                    'DESKTOP',
                 ],
                 'clicks' => 5,
                 'impressions' => 100,
@@ -87,8 +84,8 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
                 'position' => 3.5,
                 'subset' => 'subset1',
                 'impressions_difference' => 10,
-                'clicks_difference' => 2
-            ]
+                'clicks_difference' => 2,
+            ],
         ];
 
         $result = GoogleSearchConsoleConvert::metrics(
@@ -114,7 +111,7 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
                 'position' => 3.5,
                 // 'keys' is missing here
                 'subset' => 'subset1',
-            ]
+            ],
         ];
 
         $result = GoogleSearchConsoleConvert::metrics(

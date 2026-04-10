@@ -74,7 +74,7 @@ class UniversalMetricConverter
             $rawDate = self::getValueByPath($row, $dateField);
             $metricDate = $rawDate ? Carbon::parse((string) $rawDate)->toDateString() : Carbon::now()->toDateString();
 
-            // 3. Nested Row Support (e.g. Facebook Organic values array)
+            // 3. Nested Row Support
             $nestedRows = [$row];
             if (isset($config['row_path'])) {
                 $nestedRows = self::getValueByPath($row, $config['row_path']) ?: [];
@@ -193,7 +193,7 @@ class UniversalMetricConverter
         }
 
         if (is_array($value)) {
-            // Handle Facebook-style action results or value objects
+            // Handle Meta-style action results or value objects
             return (float) ($value[0]['value'] ?? ($value[0]['amount'] ?? ($value['value'] ?? 0)));
         }
 

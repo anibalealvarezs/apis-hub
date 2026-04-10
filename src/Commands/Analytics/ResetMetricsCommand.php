@@ -3,138 +3,81 @@
 namespace Commands\Analytics;
 
 use Anibalealvarezs\ApiSkeleton\Enums\Channel;
-use Helpers\Helpers;
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Question\ConfirmationQuestion;
 
 class ResetMetricsCommand extends Command
 {
     protected static $defaultName = 'app:reset-metrics';
+    private EntityManagerInterface $entityManager;
+
+    public function __construct(EntityManagerInterface $entityManager)
+    {
+        parent::__construct();
+        $this->entityManager = $entityManager;
+    }
 
     protected function configure()
     {
         $this
-            ->setDescription('Clears metrics, configurations, dimensions, and metric-syncing jobs from the database.')
-            ->addOption('channel', 'c', InputOption::VALUE_REQUIRED, 'Target channel to clear (e.g. facebook, facebook_marketing)');
+            ->setDescription('Reset metrics for selected channels or ALL')
+            ->addArgument('channel', InputArgument::OPTIONAL, 'Channel name (e.g. facebook, all. Default: all)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $channelName = $input->getOption('channel');
-        /** @var \Symfony\Component\Console\Helper\QuestionHelper $questionHelper */
-        $questionHelper = $this->getHelper('question');
-        
-        $confirmMsg = $channelName 
-            ? "This will PERMANENTLY delete all metrics and metric-syncing jobs for channel '$channelName'. Entity caching history will be preserved. Are you sure? [y/N] "
-            : 'This will PERMANENTLY delete ALL metrics, dimension data, and metric-syncing jobs across all channels. Are you sure? [y/N] ';
-        
-        $question = new ConfirmationQuestion($confirmMsg, false);
-
-        if (!$questionHelper->ask($input, $output, $question)) {
-            $output->writeln('<comment>Operation cancelled.</comment>');
-            return Command::SUCCESS;
-        }
-
-        $output->writeln($channelName 
-            ? "<info>🗑  Cleaning metrics and metric-syncing jobs for channel: $channelName...</info>" 
-            : '<info>🗑  Cleaning ALL metrics and metric-syncing jobs...</info>'
-        );
+        $channelName = $input->getArgument('channel');
+        $manager = $this->entityManager;
+        $connection = $manager->getConnection();
+        $isPostgres = strpos($connection->getDatabasePlatform()->getName(), 'postgresql') !== false;
 
         try {
-            $manager = Helpers::getManager();
-            $connection = $manager->getConnection();
-            $isPostgres = Helpers::isPostgres();
-
             if ($channelName) {
-                // Determine target channel IDs and names for job matching
-                $targetIds = [];
+                // Determine target channel names for job matching
                 $jobChannels = [];
 
                 if (strtolower($channelName) === 'all') {
-                    $targetIds = [Channel::facebook_marketing->value, Channel::facebook_organic->value, Channel::google_search_console->value];
-                    $jobChannels = ['facebook_marketing', 'facebook_organic', 'google_search_console'];
+                    $jobChannels = DriverFactory::getAvailableChannels();
                 } elseif (strtolower($channelName) === 'facebook') {
-                    $targetIds = [Channel::facebook_marketing->value, Channel::facebook_organic->value];
                     $jobChannels = ['facebook_marketing', 'facebook_organic'];
                 } else {
                     $enum = Channel::tryFromName($channelName);
                     if (!$enum) {
-                        throw new \Exception("Unknown channel: $channelName. Use all, facebook, facebook_marketing, or google_search_console.");
+                        throw new \Exception("Unknown channel: $channelName. Use all, facebook, or any specific channel name.");
                     }
-                    $targetIds = [$enum->value];
                     $jobChannels = [$enum->name];
                 }
 
-                // Targeted DELETE
-                if ($isPostgres) {
-                    // 1. Delete Jobs first
-                    $connection->executeStatement(
-                        "DELETE FROM jobs WHERE channel IN (?) AND entity = 'metric'",
-                        [$jobChannels],
-                        [\Doctrine\DBAL\ArrayParameterType::STRING]
-                    );
-
-                    // 2. Delete Channeled Metrics
-                    $connection->executeStatement("
-                        DELETE FROM channeled_metrics WHERE metric_id IN (
-                            SELECT m.id FROM metrics m 
-                            JOIN metric_configs mc ON m.metric_config_id = mc.id 
-                            WHERE mc.channel IN (?)
-                        )", [$targetIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
-                    
-                    // 3. Delete Metrics
-                    $connection->executeStatement("
-                        DELETE FROM metrics WHERE metric_config_id IN (
-                            SELECT id FROM metric_configs WHERE channel IN (?)
-                        )", [$targetIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
-                    
-                    // 4. Delete Configs
-                    $connection->executeStatement("DELETE FROM metric_configs WHERE channel IN (?)", [$targetIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
-                } else {
-                    $connection->executeStatement("SET FOREIGN_KEY_CHECKS = 0");
-                    
-                    $connection->executeStatement(
-                        "DELETE FROM jobs WHERE channel IN (?) AND entity = 'metric'",
-                        [$jobChannels],
-                        [\Doctrine\DBAL\ArrayParameterType::STRING]
-                    );
-
-                    $connection->executeStatement("
-                        DELETE cm FROM channeled_metrics cm
-                        JOIN metrics m ON cm.id = m.id
-                        JOIN metric_configs mc ON m.metric_config_id = mc.id
-                        WHERE mc.channel IN (?)
-                    ", [$targetIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
-                    
-                    $connection->executeStatement("
-                        DELETE m FROM metrics m
-                        JOIN metric_configs mc ON m.metric_config_id = mc.id
-                        WHERE mc.channel IN (?)
-                    ", [$targetIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
-                    
-                    $connection->executeStatement("DELETE FROM metric_configs WHERE channel IN (?)", [$targetIds], [\Doctrine\DBAL\ArrayParameterType::INTEGER]);
-                    $connection->executeStatement("SET FOREIGN_KEY_CHECKS = 1");
+                $output->writeln('<info>  Performing modular metrics reset for each channel...</info>');
+                foreach ($jobChannels as $chanSlug) {
+                    $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanSlug);
+                    if ($driver) {
+                        $output->writeln("<info>    - Resetting metrics for $chanSlug...</info>");
+                        $driver->reset($manager, 'metrics');
+                    }
                 }
 
                 // Cleanup orphaned dimension sets and items
-                $output->writeln('<info>  Cleaning orphaned dimension sets and items...</info>');
-                $connection->executeStatement("
-                    DELETE FROM dimension_set_items 
-                    WHERE dimension_set_id NOT IN (SELECT DISTINCT dimension_set_id FROM channeled_metrics WHERE dimension_set_id IS NOT NULL)
-                    AND dimension_set_id NOT IN (SELECT DISTINCT dimension_set_id FROM metric_configs WHERE dimension_set_id IS NOT NULL)
-                ");
-                $connection->executeStatement("
-                    DELETE FROM dimension_sets 
-                    WHERE id NOT IN (SELECT DISTINCT dimension_set_id FROM channeled_metrics WHERE dimension_set_id IS NOT NULL)
-                    AND id NOT IN (SELECT DISTINCT dimension_set_id FROM metric_configs WHERE dimension_set_id IS NOT NULL)
-                ");
+                if ($isPostgres) {
+                    $output->writeln('<info>  Cleaning orphaned dimension sets and items...</info>');
+                    $connection->executeStatement("
+                        DELETE FROM dimension_set_items 
+                        WHERE dimension_set_id NOT IN (SELECT DISTINCT dimension_set_id FROM channeled_metrics WHERE dimension_set_id IS NOT NULL)
+                        AND dimension_set_id NOT IN (SELECT DISTINCT dimension_set_id FROM metric_configs WHERE dimension_set_id IS NOT NULL)
+                    ");
+                    $connection->executeStatement("
+                        DELETE FROM dimension_sets 
+                        WHERE id NOT IN (SELECT DISTINCT dimension_set_id FROM channeled_metrics WHERE dimension_set_id IS NOT NULL)
+                        AND id NOT IN (SELECT DISTINCT dimension_set_id FROM metric_configs WHERE dimension_set_id IS NOT NULL)
+                    ");
 
-                // Optional: Prune unused dimension values and keys to ensure absolute reset
-                $connection->executeStatement("DELETE FROM dimension_values WHERE id NOT IN (SELECT dimension_value_id FROM dimension_set_items)");
-                $connection->executeStatement("DELETE FROM dimension_keys WHERE id NOT IN (SELECT dimension_key_id FROM dimension_values)");
+                    $connection->executeStatement("DELETE FROM dimension_values WHERE id NOT IN (SELECT dimension_value_id FROM dimension_set_items)");
+                    $connection->executeStatement("DELETE FROM dimension_keys WHERE id NOT IN (SELECT dimension_key_id FROM dimension_values)");
+                }
                 
             } else {
                 // Global TRUNCATE
@@ -162,12 +105,7 @@ class ResetMetricsCommand extends Command
                 }
             }
 
-            // Always clear cache
-            $output->writeln('<info>🧹 Clearing analytics cache...</info>');
-            $clearCacheCommand = $this->getApplication()->find('app:cache:clear');
-            $clearCacheCommand->run($input, $output);
-
-            $output->writeln('<info>✅ Success: Metrics have been cleared.</info>');
+            $output->writeln("<info>✅ Metrics were successfully reset for: $channelName</info>");
             return Command::SUCCESS;
 
         } catch (\Exception $e) {

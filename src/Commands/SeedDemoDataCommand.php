@@ -20,7 +20,7 @@ use Entities\Analytics\Page;
 use Entities\Analytics\Post;
 use Entities\Analytics\Query;
 use Anibalealvarezs\ApiSkeleton\Enums\Channel;
-use Enums\Country as CountryEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
 use Faker\Factory;
 use Helpers\Helpers;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -150,7 +150,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $allChannels = \Core\Drivers\DriverFactory::getAvailableChannels();
+        $allChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
         $channelsInput = $input->getOption('channels');
         $channels = $channelsInput ? explode(',', $channelsInput) : $allChannels;
         $isFresh = $input->getOption('fresh') || ! $channelsInput;
@@ -226,7 +226,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
 
         foreach ($channels as $chanName) {
             try {
-                $driver = \Core\Drivers\DriverFactory::get($chanName);
+                $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanName);
                 if ($driver instanceof \Anibalealvarezs\ApiDriverCore\Interfaces\SyncDriverInterface) {
                     $output->writeln("🚀 Seeding channel: $chanName via Driver...");
                     $driver->seedDemoData($this, [

@@ -14,9 +14,11 @@ class ConfigManagerControllerTest extends BaseIntegrationTestCase
     private RoutingCore $router;
     private string $adminKey;
     private string $tempConfigDir;
+    private ?string $originalConfigDir = null;
 
     protected function setUp(): void
     {
+        $this->originalConfigDir = getenv('CONFIG_DIR') ?: null;
         parent::setUp();
         
         $this->router = new RoutingCore();
@@ -51,7 +53,11 @@ class ConfigManagerControllerTest extends BaseIntegrationTestCase
     {
         $this->removeDirectory($this->tempConfigDir);
         putenv('ADMIN_API_KEY');
-        putenv('CONFIG_DIR');
+        if ($this->originalConfigDir) {
+            putenv('CONFIG_DIR=' . $this->originalConfigDir);
+        } else {
+            putenv('CONFIG_DIR');
+        }
         Helpers::resetConfigs();
         parent::tearDown();
     }

@@ -38,7 +38,7 @@ class InstanceGeneratorCacheAllTest extends TestCase
         putenv('PROJECT_NAME=testing');
         Helpers::resetConfigs();
         \Classes\DriverInitializer::reset();
-        \Core\Drivers\DriverFactory::reset();
+        \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::reset();
         $this->setMockProjectConfig(['name' => 'testing', 'mode' => 'testing', 'project' => 'testing']);
     }
 
@@ -48,7 +48,7 @@ class InstanceGeneratorCacheAllTest extends TestCase
         putenv("APP_ENV=" . ($this->originalAppEnv ?: ''));
         Helpers::resetConfigs();
         \Classes\DriverInitializer::reset();
-        \Core\Drivers\DriverFactory::reset();
+        \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::reset();
         // Restore original configs
         $reflection = new ReflectionClass(Helpers::class);
         

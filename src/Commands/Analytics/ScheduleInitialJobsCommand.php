@@ -71,10 +71,16 @@ class ScheduleInitialJobsCommand extends Command
             // Check if channel is enabled and history range
             $channelsConfig = Helpers::getChannelsConfig();
             $chanKey = $channel;
-            if (!isset($channelsConfig[$chanKey])) {
-                $chanKey = str_replace(['facebook_marketing', 'facebook_organic'], ['facebook', 'facebook'], $channel);
+            try {
+                $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
+                $commonKey = $driver::getCommonConfigKey();
+                if ($commonKey && !isset($channelsConfig[$channel])) {
+                    $chanKey = $commonKey;
+                }
+            } catch (\Exception $e) {
+                // If no driver found, fall back to literal channel name
             }
-            // Specific check for split facebook configs
+            
             $chanConfig = $channelsConfig[$channel] ?? $channelsConfig[$chanKey] ?? null;
 
             if ($chanConfig) {

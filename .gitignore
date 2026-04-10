@@ -53,4 +53,8 @@ PHASE_2_META_EXTRACTION_PLAN.md
 PHASE_3_SHOPIFY_EXTRACTION_PLAN.md
 HANDOVER_RESTART.md
 .agent
+**/.php-cs-fixer.dist.php
 .php-cs-fixer.dist.php
+STATUS-SUMMARY.md
+**/*.txt
+*.txt

@@ -75,7 +75,7 @@ class Post extends Entity
     }
 
     /**
-     * Gets the post-specific data (e.g., caption, media_url, facebook_post_type).
+     * Gets the post-specific data (e.g., caption, media_url, post_type).
      * @return array
      */
     public function getData(): array

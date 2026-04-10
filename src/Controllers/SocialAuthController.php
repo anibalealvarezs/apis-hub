@@ -42,7 +42,7 @@ class SocialAuthController
      */
     private function saveCredentials(string $provider, string $token, ?string $userId = null, ?string $refreshToken = null, array $scopes = []): void
     {
-        $registry = \Core\Drivers\DriverFactory::getRegistry();
+        $registry = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry();
         
         foreach ($registry as $channel => $config) {
             $driverClass = $config['driver'];

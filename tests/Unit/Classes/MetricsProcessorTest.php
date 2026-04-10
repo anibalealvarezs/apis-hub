@@ -10,8 +10,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Tests\Unit\BaseUnitTestCase;
 use Entities\Analytics\Country;
 use Entities\Analytics\Device;
-use Enums\Country as CountryEnum;
-use Enums\Device as DeviceEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Device as DeviceEnum;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
 
 class MetricsProcessorTest extends BaseUnitTestCase
