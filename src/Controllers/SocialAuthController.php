@@ -38,42 +38,28 @@ class SocialAuthController
     }
 
     /**
-     * Persist tokens to provider-specific JSON files
+     * Persist tokens to provider-specific storage via drivers
      */
     private function saveCredentials(string $token, ?string $userId = null, ?string $refreshToken = null, array $scopes = [], string $provider = 'facebook'): void
     {
-        $projectDir = dirname(__DIR__, 2);
-        
-        $providerMap = [
-            'facebook' => [
-                'path' => $_ENV['FACEBOOK_TOKEN_PATH'] ?? $projectDir . '/storage/tokens/facebook_tokens.json',
-                'key' => 'facebook_auth'
-            ],
-            'google' => [
-                'path' => $_ENV['GOOGLE_TOKEN_PATH'] ?? $projectDir . '/storage/tokens/google_tokens.json',
-                'key' => 'google_auth'
-            ]
-        ];
+        $channel = match ($provider) {
+            'google' => 'google_search_console',
+            default => 'facebook_marketing'
+        };
 
-        $config = $providerMap[$provider] ?? $providerMap['facebook'];
-        $tokenPath = $config['path'];
-        $tokenKey = $config['key'];
-        
-        if (!is_dir(dirname($tokenPath))) {
-            mkdir(dirname($tokenPath), 0755, true);
+        $config = \Core\Drivers\DriverFactory::getChannelConfig($channel);
+        if (empty($config)) {
+            return;
         }
 
-        $tokens = file_exists($tokenPath) ? (json_decode(file_get_contents($tokenPath), true) ?? []) : [];
-        
-        $tokens[$tokenKey] = [
-            'access_token' => $token,
-            'refresh_token' => $refreshToken,
-            'user_id' => $userId,
-            'scopes' => $scopes,
-            'updated_at' => date('Y-m-d H:i:s'),
-            'expires_at' => date('Y-m-d H:i:s', strtotime($provider === 'google' ? '+3600 seconds' : '+60 days'))
-        ];
-        
-        file_put_contents($tokenPath, json_encode($tokens, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $driverClass = $config['driver'];
+        if (class_exists($driverClass)) {
+            $driverClass::storeCredentials([
+                'access_token' => $token,
+                'refresh_token' => $refreshToken,
+                'user_id' => $userId,
+                'scopes' => $scopes
+            ]);
+        }
     }
 }
