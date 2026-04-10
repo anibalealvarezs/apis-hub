@@ -3,7 +3,6 @@
 use Controllers\ConfigManagerController;
 use Controllers\MonitoringController;
 use Controllers\PageController;
-use Controllers\FacebookAuthController;
 use Controllers\PrivacyController;
 use Controllers\ManagementController;
 use Controllers\PublicDataController;
@@ -314,21 +313,32 @@ return [
 
     // --- Public API v1 (Phase 6) ---
 
+    '/api/v1/public/{channel}/{resource}' => [
+        'httpMethod' => 'GET',
+        'callable' => function(...$args) {
+            $request = $args['request'] ?? Request::createFromGlobals();
+            $channel = $args['channel'] ?? '';
+            $resource = $args['resource'] ?? '';
+            return (new PublicDataController())->getData($request, $channel, $resource);
+        },
+        'public' => true,
+        'admin' => false
+    ],
     '/api/v1/public/facebook/campaigns' => [
         'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getFacebookCampaigns(Request::createFromGlobals()),
+        'callable' => fn(...$args) => (new PublicDataController())->getFacebookCampaigns($args['request'] ?? Request::createFromGlobals()),
         'public' => true,
         'admin' => false
     ],
     '/api/v1/public/facebook/metrics' => [
         'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getMetrics(Request::createFromGlobals(), 'facebook'),
+        'callable' => fn(...$args) => (new PublicDataController())->getMetrics($args['request'] ?? Request::createFromGlobals(), 'facebook'),
         'public' => true,
         'admin' => false
     ],
     '/api/v1/public/gsc/metrics' => [
         'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getMetrics(Request::createFromGlobals(), 'gsc'),
+        'callable' => fn(...$args) => (new PublicDataController())->getMetrics($args['request'] ?? Request::createFromGlobals(), 'gsc'),
         'public' => true,
         'admin' => false
     ]

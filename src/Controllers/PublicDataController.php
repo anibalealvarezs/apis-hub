@@ -13,26 +13,34 @@ use Symfony\Component\HttpFoundation\Response;
 class PublicDataController extends BaseController
 {
     /**
-     * Get aggregate data for a specific channel and resource.
+     * Entry point for all public data requests.
      */
-    public function getFacebookCampaigns(Request $request): JsonResponse
+    public function getData(Request $request, string $channel, string $resource): JsonResponse
     {
-        return $this->getResourceData($request, 'facebook_marketing', 'campaigns');
-    }
-
-    /**
-     * Get raw metrics for a specific channel.
-     */
-    public function getMetrics(Request $request, string $channel): JsonResponse
-    {
-        // For backward compatibility with 'facebook', 'google', 'gsc' strings
+        // For backward compatibility with legacy channel strings
         $channelId = match(strtolower($channel)) {
             'facebook' => 'facebook_marketing',
             'google', 'gsc' => 'google_search_console',
             default => $channel
         };
 
-        return $this->getResourceData($request, $channelId, 'metrics');
+        return $this->getResourceData($request, $channelId, $resource);
+    }
+
+    /**
+     * @deprecated Use getData() instead
+     */
+    public function getFacebookCampaigns(Request $request): JsonResponse
+    {
+        return $this->getData($request, 'facebook', 'campaigns');
+    }
+
+    /**
+     * @deprecated Use getData() instead
+     */
+    public function getMetrics(Request $request, string $channel): JsonResponse
+    {
+        return $this->getData($request, $channel, 'metrics');
     }
 
     /**
