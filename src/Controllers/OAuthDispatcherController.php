@@ -94,7 +94,6 @@ class OAuthDispatcherController
 
         $host = $request->getHttpHost();
 
-        // Facebook usually requires HTTPS outside localhost
         if (!str_contains($host, 'localhost') && !str_contains($host, '127.0.0.1')) {
             $protocol = 'https';
         }
