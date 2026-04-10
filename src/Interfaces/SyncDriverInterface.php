@@ -10,4 +10,9 @@ use Anibalealvarezs\ApiSkeleton\Interfaces\SyncDriverInterface as BaseSyncDriver
  */
 interface SyncDriverInterface extends BaseSyncDriverInterface
 {
+    /**
+     * @param array $config
+     * @return mixed
+     */
+    public function getApi(array $config = []): mixed;
 }

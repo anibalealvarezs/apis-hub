@@ -446,7 +446,11 @@ class MetricsProcessor
         ?array $channeledAdGroupMap = null,
         ?array $channeledAdMap = null,
         ?array $creativeMap = null,
+        ?LoggerInterface $logger = null,
+        ?string $channel = null,
     ): array {
+        $logger = self::resolveLogger($logger, $channel);
+
         // Inject virtual DAILY metrics from LIFETIME ones (Channel Agnostic Delta Engine)
         self::injectVirtualDailyMetrics($metrics, $manager);
 
@@ -666,7 +670,7 @@ class MetricsProcessor
                     count($chunk)
                 );
                 $affected = $manager->getConnection()->executeStatement($sql, $insertParams);
-                Helpers::setLogger('facebook-marketing.log')->info("[MetricsProcessor] Inserted " . count($chunk) . " metric_configs (Ignore on duplicate). Affected: $affected rows.");
+                $logger->info("[MetricsProcessor] Inserted " . count($chunk) . " metric_configs (Ignore on duplicate). Affected: $affected rows.");
             }
         }
 
@@ -698,8 +702,12 @@ class MetricsProcessor
     public static function processMetrics(
         \Doctrine\Common\Collections\Collection|array $metrics,
         EntityManager $manager,
-        array $metricConfigMap
+        array $metricConfigMap,
+        ?LoggerInterface $logger = null,
+        ?string $channel = null,
     ): array {
+        $logger = self::resolveLogger($logger, $channel);
+
         $config = Helpers::getProjectConfig();
         $cacheRawMetrics = filter_var($config['analytics']['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
@@ -716,7 +724,7 @@ class MetricsProcessor
             );
 
             if (!isset($metricConfigMap['map'][$metric->metricConfigKey])) {
-                Helpers::setLogger('metrics-error.log')->warning("Missing metric_config_id for key: " . $metric->metricConfigKey . " (Metric: " . $metric->name . ")");
+                $logger->warning("Missing metric_config_id for key: " . $metric->metricConfigKey . " (Metric: " . $metric->name . ")");
                 continue;
             }
 
@@ -755,7 +763,7 @@ class MetricsProcessor
                 }
             }
         }
-        Helpers::setLogger('facebook-marketing.log')->info("Metrics mapping complete: " . count($metricMap) . " existing global metrics found in DB.");
+        $logger->info("Metrics mapping complete: " . count($metricMap) . " existing global metrics found in DB.");
 
         $metricsToInsert = [];
         $metricsToUpdate = [];
@@ -777,7 +785,7 @@ class MetricsProcessor
             }
         }
 
-        Helpers::setLogger('facebook-marketing.log')->info("Metrics analysis: " . count($metricsToInsert) . " new metrics to insert, " . count($metricsToUpdate) . " existing metrics to update.");
+        $logger->info("Metrics analysis: " . count($metricsToInsert) . " new metrics to insert, " . count($metricsToUpdate) . " existing metrics to update.");
 
         if (!empty($metricsToInsert)) {
             $cols = ['value', 'metadata', 'dimensions_hash', 'metric_config_id', 'metric_date'];
@@ -801,7 +809,7 @@ class MetricsProcessor
                     count($chunk)
                 );
                 $affected = $manager->getConnection()->executeStatement($sql, $insertParams);
-                Helpers::setLogger('facebook-marketing.log')->info("Inserted metrics chunk: $affected rows affected.");
+                $logger->info("Inserted metrics chunk: $affected rows affected.");
             }
 
             foreach (array_chunk($metricsToInsert, 1000) as $chunk) {
@@ -930,7 +938,7 @@ class MetricsProcessor
                 }
             }
         }
-        Helpers::setLogger('facebook-marketing.log')->info("Channeled mapping complete: " . count($channeledMetricMap) . " existing channeled metrics found in DB.");
+        $logger->info("Channeled mapping complete: " . count($channeledMetricMap) . " existing channeled metrics found in DB.");
 
         $dimManager = new \Classes\DimensionManager($manager);
         $channeledMetricsToInsert = [];
@@ -970,7 +978,7 @@ class MetricsProcessor
             }
         }
 
-        Helpers::setLogger('facebook-marketing.log')->info("Channeled metrics analysis: " . count($channeledMetricsToInsert) . " new, " . count($channeledMetricsToUpdate) . " to update.");
+        $logger->info("Channeled metrics analysis: " . count($channeledMetricsToInsert) . " new, " . count($channeledMetricsToUpdate) . " to update.");
 
         if (!empty($channeledMetricsToInsert)) {
             $cols = ['channel', 'platform_id', 'metric_id', 'platform_created_at', 'data', 'dimension_set_id'];
@@ -995,7 +1003,7 @@ class MetricsProcessor
                     count($chunk)
                 );
                 $affected = $manager->getConnection()->executeStatement($sql, $params);
-                Helpers::setLogger('facebook-marketing.log')->info("Inserted channeled metrics chunk: $affected rows affected.");
+                $logger->info("Inserted channeled metrics chunk: $affected rows affected.");
             }
         }
 
@@ -1038,6 +1046,17 @@ class MetricsProcessor
         }
 
         return ['map' => $channeledMetricMap, 'mapReverse' => $flipped];
+    }
+
+    private static function resolveLogger(?LoggerInterface $logger = null, ?string $channel = null): LoggerInterface
+    {
+        if ($logger) {
+            return $logger;
+        }
+        if ($channel) {
+            return Helpers::setLogger($channel . '.log');
+        }
+        return Helpers::setLogger('metrics-processor.log');
     }
 
 }

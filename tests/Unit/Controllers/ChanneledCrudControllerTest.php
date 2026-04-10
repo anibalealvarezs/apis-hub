@@ -10,12 +10,12 @@ use Exception;
 use Helpers\Helpers;
 use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
-use Tests\Unit\BaseUnitTestCase;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Unit\BaseUnitTestCase;
 
 class ChanneledCrudControllerTest extends BaseUnitTestCase
 {
@@ -51,7 +51,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $method = 'read';
         $this->controller->setMockCrudEntities([]);
         $this->controller->setMockChannelsConfig([
-            Channel::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method);
@@ -102,12 +102,12 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            Channel::shopify->value => ['enabled' => false]
+            Channel::shopify->value => ['enabled' => false],
         ]);
 
         // Set channel config override
         $this->controller->setMockChannelsConfigOverride([
-            Channel::shopify->value => ['enabled' => false]
+            Channel::shopify->value => ['enabled' => false],
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method);
@@ -166,12 +166,12 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            Channel::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true],
         ]);
 
         // Set channel config override
         $this->controller->setMockChannelsConfigOverride([
-            Channel::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method, $id);
@@ -198,12 +198,12 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            Channel::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true],
         ]);
 
         // Set channel config override
         $this->controller->setMockChannelsConfigOverride([
-            Channel::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method);
@@ -229,16 +229,16 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
             'extra' => 'param',
             'filters' => $filters,
             'limit' => 100,
-            'pagination' => 0
+            'pagination' => 0,
         ];
 
         $this->controller->setMockEntitiesConfig([
             'customer' => [
                 'channeled_class' => 'Entities\\Channeled\\customer',
                 'repository_methods' => [
-                    'readMultiple' => ['parameters' => ['extra', 'filters']]
-                ]
-            ]
+                    'readMultiple' => ['parameters' => ['extra', 'filters']],
+                ],
+            ],
         ]);
 
         $result = $this->controller->prepareChanneledReadMultipleParams($repositoryClass, $params, $repositoryClass, $body, $channel);
@@ -256,9 +256,9 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
             'customer' => [
                 'channeled_class' => 'Entities\\Channeled\\customer',
                 'repository_methods' => [
-                    'readMultiple' => ['parameters' => ['valid', 'filters']]
-                ]
-            ]
+                    'readMultiple' => ['parameters' => ['valid', 'filters']],
+                ],
+            ],
         ]);
 
         $this->expectException(InvalidArgumentException::class);
@@ -310,7 +310,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->read($entity, $channel, $id);
@@ -368,7 +368,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->read($entity, $channel, $id);
@@ -423,12 +423,12 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
                 'channeled_class' => 'Entities\\Channeled\\' . $entity,
                 'repository_methods' => [
                     'readMultiple' => ['parameters' => ['filters']],
-                    'countElements' => ['parameters' => ['filters']]
-                ]
-            ]
+                    'countElements' => ['parameters' => ['filters']],
+                ],
+            ],
         ]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->count($entity, $channel, $body, $params);
@@ -450,7 +450,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $body = json_encode(['filters' => ['status' => 'active']]);
         $params = [
             'aggregations' => ['total' => 'SUM(value)'],
-            'groupBy' => ['metricDate']
+            'groupBy' => ['metricDate'],
         ];
         $expectedData = [['total' => 500, 'metricDate' => '2024-01-01']];
 
@@ -463,7 +463,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
             ->with(
                 ['total' => 'SUM(value)'],
                 ['metricDate'],
-                $this->callback(fn($filters) => $filters->status === 'active' && $filters->channel === $channel->value)
+                $this->callback(fn ($filters) => $filters->status === 'active' && $filters->channel === $channel->value)
             )
             ->willReturn($expectedData);
 
@@ -477,12 +477,12 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
             strtolower($entity) => [
                 'channeled_class' => 'Entities\\Channeled\\' . $entity,
                 'repository_methods' => [
-                    'aggregate' => ['parameters' => ['filters', 'aggregations', 'groupBy']]
-                ]
-            ]
+                    'aggregate' => ['parameters' => ['filters', 'aggregations', 'groupBy']],
+                ],
+            ],
         ]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->aggregate($entity, $channel, $body, $params);
@@ -509,10 +509,12 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $result = new class ($data) {
             private array $data;
+
             public function __construct(array $data)
             {
                 $this->data = $data;
             }
+
             public function toArray(): array
             {
                 return $this->data;
@@ -545,12 +547,12 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
             strtolower($entity) => [
                 'channeled_class' => 'Entities\\Channeled\\' . $entity,
                 'repository_methods' => [
-                    'readMultiple' => ['parameters' => ['filters', 'extra']]
-                ]
-            ]
+                    'readMultiple' => ['parameters' => ['filters', 'extra']],
+                ],
+            ],
         ]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->list($entity, $channel, $body, $params);
@@ -578,14 +580,17 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $result = new class ($data) {
             private array $data;
+
             public function __construct(array $data)
             {
                 $this->data = $data;
             }
+
             public function toArray(): array
             {
                 return $this->data;
             }
+
             public function getId()
             {
                 return $this->data['id'];
@@ -613,7 +618,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->create($entity, $channel, $body);
@@ -656,7 +661,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->create($entity, $channel, $body);
@@ -684,14 +689,17 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $result = new class ($data) {
             private array $data;
+
             public function __construct(array $data)
             {
                 $this->data = $data;
             }
+
             public function toArray(): array
             {
                 return $this->data;
             }
+
             public function getId()
             {
                 return $this->data['id'];
@@ -719,7 +727,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->update($entity, $channel, $id, $body);
@@ -745,7 +753,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->update($entity, $channel, null, $body);
@@ -789,7 +797,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->delete($entity, $channel, $id);
@@ -814,7 +822,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            $channel->value => ['enabled' => true]
+            $channel->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->delete($entity, $channel);
@@ -834,10 +842,12 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $id = $this->faker->randomNumber();
         $result = new class ($id) {
             private int $id;
+
             public function __construct(int $id)
             {
                 $this->id = $id;
             }
+
             public function getId(): int
             {
                 return $this->id;
@@ -854,10 +864,12 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $id = $this->faker->randomNumber();
         $result = new class ($id) {
             private int $id;
+
             public function __construct(int $id)
             {
                 $this->id = $id;
             }
+
             public function getPlatformId(): int
             {
                 return $this->id;
@@ -874,15 +886,18 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $code = $this->faker->word;
         $result = new class ($code) extends ChanneledDiscount {
             protected string $code;
+
             public function __construct(string $code)
             {
                 parent::__construct();
                 $this->code = $code;
             }
+
             public function getCode(): string
             {
                 return $this->code;
             }
+
             public function getId(): ?int
             {
                 return null; // Override to prevent Entity::$id access
@@ -907,12 +922,12 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockCrudEntities([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['channeled_class' => 'Entities\\Channeled\\' . $entity]]);
         $this->controller->setMockChannelsConfig([
-            Channel::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true],
         ]);
 
         // Set channel config override
         $this->controller->setMockChannelsConfigOverride([
-            Channel::shopify->value => ['enabled' => true]
+            Channel::shopify->value => ['enabled' => true],
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method, $id);
@@ -973,10 +988,10 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         CacheService $cacheService,
         CacheKeyGenerator $cacheKeyGenerator
     ) {
+        parent::__construct();
         $this->entityManager = $entityManager;
         $this->cacheService = $cacheService;
         $this->cacheKeyGenerator = $cacheKeyGenerator;
-        parent::__construct();
     }
 
     // Test methods to set mock data
@@ -1010,7 +1025,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
     {
         $config = $this->mockEntitiesConfig;
         $entityKey = strtolower($entity);
-        if (!isset($config[$entityKey][$configKey])) {
+        if (! isset($config[$entityKey][$configKey])) {
             throw new Exception("Entity configuration for '$entity' with key '$configKey' not found");
         }
         $repository = $this->entityManager->getRepository(
@@ -1023,11 +1038,12 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
     public function validateParams(array $params, string $entity, string $method): bool
     {
         $config = $this->mockEntitiesConfig[strtolower($entity)] ?? null;
-        if (!$config || empty($config['repository_methods'][$method]['parameters'])) {
+        if (! $config || empty($config['repository_methods'][$method]['parameters'])) {
             return false;
         }
 
         $validParams = $config['repository_methods'][$method]['parameters'];
+
         return empty(array_diff($params, $validParams));
     }
 
@@ -1043,11 +1059,11 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         ?string $body,
         Channel $channel
     ): array {
-        if (!empty($params) && !$this->validateParams(array_keys($params), $repositoryClass, 'readMultiple')) {
+        if (! empty($params) && ! $this->validateParams(array_keys($params), $repositoryClass, 'readMultiple')) {
             throw new InvalidArgumentException('Invalid parameters');
         }
         $params = $this->prepareCrudParams($params, $body);
-        if (!isset($params['filters']->channel)) {
+        if (! isset($params['filters']->channel)) {
             $params['filters']->channel = $channel->value;
         }
 
@@ -1055,7 +1071,6 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
     }
 
     public function read(string $entity, Channel $channel, int|string|null $id = null, bool $rawData = false, array $hideFields = []): Response
-
     {
         try {
             if ($id === null) {
@@ -1176,13 +1191,13 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
     {
         try {
             $data = Helpers::bodyToObject($body);
-            if (!isset($data->channel)) {
+            if (! isset($data->channel)) {
                 $data->channel = $channel->value;
             }
             $repository = $this->getRepository($entity);
             $result = $repository->create($data);
 
-            if (!$result) {
+            if (! $result) {
                 return $this->createResponse(
                     data: null,
                     status: 'error',
@@ -1215,10 +1230,9 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
     }
 
     public function update(string $entity, Channel $channel, int|string|null $id = null, ?string $body = null): Response
-
     {
         try {
-            if (!$id) {
+            if (! $id) {
                 return $this->createResponse(
                     data: null,
                     status: 'error',
@@ -1228,13 +1242,13 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
             }
 
             $data = Helpers::bodyToObject($body);
-            if (!isset($data->channel)) {
+            if (! isset($data->channel)) {
                 $data->channel = $channel->value;
             }
             $repository = $this->getRepository($entity);
             $result = $repository->update($id, $data);
 
-            if (!$result) {
+            if (! $result) {
                 return $this->createResponse(
                     data: null,
                     status: 'error',
@@ -1267,7 +1281,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         try {
             $repository = $this->getRepository($entity);
             $params = $this->prepareCrudParams($params, $body);
-            if (!isset($params['filters']->channel)) {
+            if (! isset($params['filters']->channel)) {
                 $params['filters']->channel = $channel->value;
             }
 
@@ -1306,10 +1320,9 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
     }
 
     public function delete(string $entity, Channel $channel, int|string|null $id = null): Response
-
     {
         try {
-            if (!$id) {
+            if (! $id) {
                 return $this->createResponse(
                     data: null,
                     status: 'error',
@@ -1321,7 +1334,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
             $repository = $this->getRepository($entity);
             $success = $repository->delete($id);
 
-            if (!$success) {
+            if (! $success) {
                 return $this->createResponse(
                     data: null,
                     status: 'error',
@@ -1356,6 +1369,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
                 return $result->getCode();
             }
         }
+
         return parent::extractId($result);
     }
 
@@ -1378,7 +1392,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         $channelsConfig = $this->getChannelsConfig();
         $validChannels = ['shopify', 'klaviyo', 'facebook', 'bigcommerce', 'netsuite', 'amazon'];
         $channelEnum = Channel::tryFromName($channel);
-        if (!in_array($channel, $validChannels) || !$channelEnum || !isset($channelsConfig[$channelEnum->value])) {
+        if (! in_array($channel, $validChannels) || ! $channelEnum || ! isset($channelsConfig[$channelEnum->value])) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -1396,7 +1410,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
             );
         }
 
-        if (!$this->isValidCrudableEntity($entity)) {
+        if (! $this->isValidCrudableEntity($entity)) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -1417,7 +1431,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
 
         $channelEnum = Channel::tryFrom($channelMap[$channel]);
 
-        if (!method_exists($this, $method)) {
+        if (! method_exists($this, $method)) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -1434,7 +1448,6 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
                 'create' => $this->create($entity, $channelEnum, $body),
                 'aggregate', 'count', 'list' => $this->$method($entity, $channelEnum, $body, $params),
                 default => $this->createResponse(
-
                     data: null,
                     status: 'error',
                     error: 'Unsupported method',

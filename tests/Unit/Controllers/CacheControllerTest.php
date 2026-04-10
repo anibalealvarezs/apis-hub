@@ -77,17 +77,17 @@ class CacheControllerTest extends BaseUnitTestCase
             'filters' => (object) ['key' => 'value', 'other' => 'data', 'extra' => 'param']
         ];
 
-        $result = $this->controller->prepareAnalyticsParams($params, $body, \Classes\Requests\MetricRequests::class, 'getListFromKlaviyo');
+                $result = $this->controller->prepareAnalyticsParams($params, $body, \Classes\Requests\MetricRequests::class, 'getList');
 
         $this->assertEquals($expected, $result);
     }
 
     public function testPrepareAnalyticsParamsHandlesEmptyInputs(): void
     {
-        $result = $this->controller->prepareAnalyticsParams(null, null, \Classes\Requests\MetricRequests::class, 'getListFromKlaviyo');
+                $result = $this->controller->prepareAnalyticsParams(null, null, \Classes\Requests\MetricRequests::class, 'getList');
         $this->assertEquals(['filters' => (object) []], $result);
 
-        $result = $this->controller->prepareAnalyticsParams([], '', \Classes\Requests\MetricRequests::class, 'getListFromKlaviyo');
+                $result = $this->controller->prepareAnalyticsParams([], '', \Classes\Requests\MetricRequests::class, 'getList');
         $this->assertEquals(['filters' => (object) []], $result);
     }
 
@@ -169,7 +169,7 @@ class CacheControllerTest extends BaseUnitTestCase
         $body = json_encode(['filters' => ['a' => 'b']]);
         $data = ['result' => $this->faker->word];
         $requestsClassName = \Classes\Requests\MetricRequests::class;
-        $methodName = 'getListFrom' . $channel->getCommonName();
+                $methodName = 'getList';
 
         $this->controller->setMockEntitiesConfig([
             strtolower($entity) => [
@@ -194,7 +194,7 @@ class CacheControllerTest extends BaseUnitTestCase
         $entity = $this->faker->word;
         $channel = Channel::shopify;
         $requestsClassName = \Classes\Requests\MetricRequests::class;
-        $methodName = 'getListFrom' . $channel->getCommonName();
+                $methodName = 'getList';
 
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
         $this->controller->setMockFetchData($requestsClassName, $methodName, null);
@@ -218,7 +218,7 @@ class CacheControllerTest extends BaseUnitTestCase
         $channel = Channel::shopify;
         $params = ['invalid' => 'param'];
         $requestsClassName = \Classes\Requests\MetricRequests::class;
-        $methodName = 'getListFrom' . $channel->getCommonName();
+                $methodName = 'getList';
         $data = ['result' => 'ok']; // Expected data
 
         $this->controller->setMockEntitiesConfig([
@@ -245,7 +245,7 @@ class CacheControllerTest extends BaseUnitTestCase
         $channel = Channel::shopify;
         $params = ['extra' => 'param'];
         $requestsClassName = \Classes\Requests\MetricRequests::class;
-        $methodName = 'getListFrom' . $channel->getCommonName();
+                $methodName = 'getList';
         $data = ['result' => 'ok'];
 
         $this->controller->setMockEntitiesConfig([
@@ -343,7 +343,7 @@ class ConcreteCacheController extends CacheController
         return parent::createResponse($data, $status, $error, $httpStatus, $meta);
     }
 
-    public function prepareAnalyticsParams(?array $params, ?string $body, string $className = \Classes\Requests\MetricRequests::class, string $methodName = 'getListFromKlaviyo'): array
+        public function prepareAnalyticsParams(?array $params, ?string $body, string $className = \Classes\Requests\MetricRequests::class, string $methodName = 'getList'): array
     {
         return parent::prepareAnalyticsParams($params, $body, $className, $methodName);
     }

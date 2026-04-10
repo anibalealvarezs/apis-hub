@@ -78,6 +78,8 @@ class MetricRequests implements RequestInterface
         try {
             $manager->getConnection()->beginTransaction();
 
+            $channel = $collection->first()?->channel ?? null;
+
             // 1. Process Configurations (Ensures metric_configs exist)
             $metricConfigMap = MetricsProcessor::processMetricConfigs(
                 metrics: $collection,
@@ -85,14 +87,18 @@ class MetricRequests implements RequestInterface
                 processQueries: true,
                 processAccounts: true,
                 processChanneledAccounts: true,
-                processDimensions: true
+                processDimensions: true,
+                logger: $logger,
+                channel: (string)$channel
             );
 
             // 2. Process Global Metrics
             $metricMap = MetricsProcessor::processMetrics(
                 metrics: $collection,
                 manager: $manager,
-                metricConfigMap: $metricConfigMap
+                metricConfigMap: $metricConfigMap,
+                logger: $logger,
+                channel: (string)$channel
             );
 
             // 3. Process Channeled Metrics

@@ -237,6 +237,29 @@ class CacheController extends BaseController
                     $existingJobsInner = $this->em->getConnection()->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
                     $countInner = count($existingJobsInner);
                 } else {
+                    $qb = $jobRepo->createQueryBuilder('j');
+                    $qb->where('j.entity IN (:entities)')
+                       ->andWhere('j.channel = :channel')
+                       ->andWhere('j.status IN (:statuses)')
+                       ->setParameter('entities', array_unique($equivalents))
+                       ->setParameter('channel', $channel->name)
+                       ->setParameter('statuses', $statuses);
+
+                    $payloadField = 'j.payload';
+                    if ($params && isset($params['startDate'])) {
+                        $qb->andWhere("({$payloadField} LIKE :start_pattern1 OR {$payloadField} LIKE :start_pattern2)")
+                            ->setParameter('start_pattern1', '%startDate%' . $params['startDate'] . '%')
+                            ->setParameter('start_pattern2', '%start_date%' . $params['startDate'] . '%');
+                    }
+                    if ($params && isset($params['endDate'])) {
+                        $qb->andWhere("({$payloadField} LIKE :end_pattern1 OR {$payloadField} LIKE :end_pattern2)")
+                            ->setParameter('end_pattern1', '%endDate%' . $params['endDate'] . '%')
+                            ->setParameter('end_pattern2', '%end_date%' . $params['endDate'] . '%');
+                    }
+                    if ($params && isset($params['instance_name'])) {
+                        $qb->andWhere("{$payloadField} LIKE :instance_pattern")
+                           ->setParameter('instance_pattern', '%instance_name%' . $params['instance_name'] . '%');
+                    }
                     $existingJobsInner = $qb->getQuery()->getResult();
                     $countInner = count($existingJobsInner);
                 }

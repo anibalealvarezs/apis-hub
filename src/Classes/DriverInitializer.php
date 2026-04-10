@@ -34,39 +34,17 @@ class DriverInitializer
         if (str_starts_with($channel, 'google_') && isset($allConfigs['google'])) {
             $config = array_replace_recursive($allConfigs['google'], $config);
         }
-
         if (str_starts_with($channel, 'facebook_') && isset($allConfigs['facebook'])) {
             $config = array_replace_recursive($allConfigs['facebook'], $config);
-            
-            // Legacy Facebook defaults logic
-            $config['organic_enabled'] = (bool) ($allConfigs['facebook_organic']['enabled'] ?? false);
-            $config['marketing_enabled'] = (bool) ($allConfigs['facebook_marketing']['enabled'] ?? false);
+        }
 
-            $globalExclude = $config['exclude_from_caching'] ?? [];
-            if (!is_array($globalExclude)) {
-                $globalExclude = [$globalExclude];
-            }
-
-            if (isset($config['PAGE'])) {
-                $globalPageDefaults = $config['PAGE'];
-                $config['pages'] = array_map(function ($page) use ($globalPageDefaults, $globalExclude) {
-                    $merged = array_merge($globalPageDefaults, $page);
-                    if (in_array((string)($merged['id'] ?? ''), array_map('strval', $globalExclude))) {
-                        $merged['exclude_from_caching'] = true;
-                    }
-                    return $merged;
-                }, $config['pages'] ?? []);
-            }
-
-            if (isset($config['AD_ACCOUNT'])) {
-                $globalAdAccountDefaults = $config['AD_ACCOUNT'];
-                $config['ad_accounts'] = array_map(function ($adAccount) use ($globalAdAccountDefaults, $globalExclude) {
-                    $merged = array_merge($globalAdAccountDefaults, $adAccount);
-                    if (in_array((string)($merged['id'] ?? ''), array_map('strval', $globalExclude))) {
-                        $merged['exclude_from_caching'] = true;
-                    }
-                    return $merged;
-                }, $config['ad_accounts'] ?? []);
+        // Delegate channel-specific validation and normalization to the driver
+        try {
+            $driver = DriverFactory::get($channel, $logger);
+            $config = $driver->validateConfig($config);
+        } catch (\Exception $e) {
+            if ($logger) {
+                $logger->warning("Driver validation failed for $channel: " . $e->getMessage());
             }
         }
 

@@ -32,21 +32,24 @@ class ManagementController extends BaseController
             $currentEnv = file_get_contents($envPath);
             $updatedEnv = $currentEnv;
 
-            // List of allowed credential updates from Facade
+            // List of system-level allowed credential updates
             $allowedKeys = [
-                'FACEBOOK_USER_TOKEN',
-                'FACEBOOK_USER_ID',
-                'FACEBOOK_ACCOUNTS_GROUP',
-                'FACEBOOK_APP_ID',
-                'FACEBOOK_APP_SECRET',
-                'GOOGLE_REFRESH_TOKEN',
-                'GOOGLE_USER_ID',
-                'GOOGLE_CLIENT_ID',
-                'GOOGLE_CLIENT_SECRET',
                 'APP_API_KEY',
                 'MONITOR_FACADE_URL',
                 'MONITOR_TOKEN'
             ];
+
+            // Merge with channel-specific credentials from drivers
+            foreach (\Core\Drivers\DriverFactory::getAvailableChannels() as $channel) {
+                try {
+                    $driver = \Core\Drivers\DriverFactory::get($channel);
+                    $allowedKeys = array_merge($allowedKeys, $driver->getUpdatableCredentials());
+                } catch (Exception $e) {
+                    $logger->warning("Could not load credentials for channel $channel: " . $e->getMessage());
+                }
+            }
+
+            $allowedKeys = array_unique($allowedKeys);
 
             foreach ($data as $key => $value) {
                 if (in_array($key, $allowedKeys)) {

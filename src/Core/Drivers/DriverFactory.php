@@ -11,6 +11,16 @@ class DriverFactory
     private static array $instances = [];
 
     /**
+     * Limpia todas las instancias y el registro (útil para testing).
+     */
+    public static function reset(): void
+    {
+        self::$instances = [];
+        self::$registry = [];
+    }
+
+
+    /**
      * Mapeo de canales a sus respectivas clases de Driver y AuthProvider.
      */
     private static array $registry = [];

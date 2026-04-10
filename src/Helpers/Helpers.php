@@ -95,7 +95,9 @@ class Helpers
         };
 
         // First pass: Load the primary env file
-        $loadEnvFile($envFileName);
+        if (!defined('PHPUNIT_COMPOSER_INSTALL') && !defined('__PHPUNIT_PHAR__')) {
+            $loadEnvFile($envFileName);
+        }
 
         // Second pass: Smart Chain Load for Demo
         // If we just loaded .env and discovered it's a demo, load .env.demo over it if it exists.

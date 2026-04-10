@@ -28,6 +28,7 @@ class HubInstantiationTest extends BaseIntegrationTestCase
             $this->originalEnv[$envKey] = getenv($envKey);
             putenv($envKey);
         }
+        DriverFactory::reset();
     }
 
     protected function tearDown(): void

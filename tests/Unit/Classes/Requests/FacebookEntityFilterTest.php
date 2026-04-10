@@ -19,8 +19,8 @@ class FacebookEntityFilterTest extends TestCase
             'cache_include' => 'GLOBAL-' // Old global filter
         ];
 
-        $this->assertEquals('CAMP-', MetricRequests::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'));
-        $this->assertEquals('SET-', MetricRequests::getFacebookFilter($config, 'ADSET', 'cache_include'));
+                $this->assertEquals('CAMP-', \Anibalealvarezs\MetaHubDriver\Services\FacebookEntitySync::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'));
+        $this->assertEquals('SET-', \Anibalealvarezs\MetaHubDriver\Services\FacebookEntitySync::getFacebookFilter($config, 'ADSET', 'cache_include'));
     }
 
     public function testGetFacebookFilterDoesNotFallBackToGlobalWhenSpecificMissing(): void
@@ -33,8 +33,8 @@ class FacebookEntityFilterTest extends TestCase
             'cache_include' => 'GLOBAL-'
         ];
 
-        $this->assertEquals('CAMP-', MetricRequests::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'));
-        $this->assertNull(MetricRequests::getFacebookFilter($config, 'ADSET', 'cache_include'));
+                $this->assertEquals('CAMP-', \Anibalealvarezs\MetaHubDriver\Services\FacebookEntitySync::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'));
+        $this->assertNull(\Anibalealvarezs\MetaHubDriver\Services\FacebookEntitySync::getFacebookFilter($config, 'ADSET', 'cache_include'));
     }
 
     public function testGetFacebookFilterReturnsNullWhenNothingMatches(): void
@@ -45,8 +45,8 @@ class FacebookEntityFilterTest extends TestCase
             ]
         ];
 
-        $this->assertNull(MetricRequests::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'));
-        $this->assertNull(MetricRequests::getFacebookFilter($config, 'ADSET', 'cache_include'));
+                $this->assertNull(\Anibalealvarezs\MetaHubDriver\Services\FacebookEntitySync::getFacebookFilter($config, 'CAMPAIGN', 'cache_include'));
+        $this->assertNull(\Anibalealvarezs\MetaHubDriver\Services\FacebookEntitySync::getFacebookFilter($config, 'ADSET', 'cache_include'));
     }
 
     public function testGetFacebookFilterWorksForOrganicEntities(): void
@@ -60,7 +60,7 @@ class FacebookEntityFilterTest extends TestCase
             ]
         ];
 
-        $this->assertEquals('PAGE-', MetricRequests::getFacebookFilter($config, 'PAGE', 'cache_include'));
-        $this->assertEquals('POST-', MetricRequests::getFacebookFilter($config, 'POST', 'cache_include'));
+                $this->assertEquals('PAGE-', \Anibalealvarezs\MetaHubDriver\Services\FacebookEntitySync::getFacebookFilter($config, 'PAGE', 'cache_include'));
+        $this->assertEquals('POST-', \Anibalealvarezs\MetaHubDriver\Services\FacebookEntitySync::getFacebookFilter($config, 'POST', 'cache_include'));
     }
 }

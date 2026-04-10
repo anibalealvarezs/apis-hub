@@ -8,6 +8,7 @@ use Controllers\PrivacyController;
 use Controllers\ManagementController;
 use Controllers\PublicDataController;
 use Controllers\SocialAuthController;
+use Controllers\OAuthDispatcherController;
 use Symfony\Component\HttpFoundation\Request;
 
 
@@ -38,20 +39,42 @@ return [
     ],
     '/fb-login' => [
         'httpMethod' => 'GET',
-        'callable' => fn (...$args) => (new FacebookAuthController())->login(),
+        'callable' => fn (...$args) => (new PageController())->authLogin('facebook_marketing'),
         'public' => true,
         'html' => true
     ],
     '/fb-auth-start' => [
         'httpMethod' => 'GET',
-        'callable' => fn (...$args) => (new FacebookAuthController())->start(),
+        'callable' => function (...$args) {
+             return (new OAuthDispatcherController())->start(Request::createFromGlobals(), 'facebook_marketing');
+        },
+        'public' => true,
+        'html' => true
+    ],
+    '/auth/start/{channel}' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            $request = Request::createFromGlobals();
+            $channel = $args['channel'] ?? '';
+            return (new OAuthDispatcherController())->start($request, $channel);
+        },
         'public' => true,
         'html' => true
     ],
     '/fb-callback' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
-            return (new FacebookAuthController())->callback(Request::createFromGlobals());
+            return (new OAuthDispatcherController())->callback(Request::createFromGlobals(), 'facebook_marketing');
+        },
+        'public' => true,
+        'html' => true
+    ],
+    '/auth/callback/{channel}' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            $request = Request::createFromGlobals();
+            $channel = $args['channel'] ?? '';
+            return (new OAuthDispatcherController())->callback($request, $channel);
         },
         'public' => true,
         'html' => true

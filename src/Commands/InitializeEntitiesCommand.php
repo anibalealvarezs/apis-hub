@@ -3,7 +3,6 @@
 namespace Commands;
 
 use Classes\DriverInitializer;
-use Classes\Requests\MetricRequests;
 use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
 use Entities\Analytics\Account;
@@ -222,6 +221,8 @@ class InitializeEntitiesCommand extends Command
 
             $fbEnabled = ($fbConfig['enabled'] ?? false) || ($fbMarketingConfig['enabled'] ?? false) || ($fbOrganicConfig['enabled'] ?? false);
 
+            $mergedFbConfig = [];
+
             if (! $fbEnabled) {
                 $this->logger->info("All Meta channels (Organic/Marketing/General) are disabled. Skipping Facebook entity initialization.");
                 $pagesToProcess = [];
@@ -252,8 +253,8 @@ class InitializeEntitiesCommand extends Command
                                 }
                                 if (! $alreadyInConfig) {
                                     $pageName = $apiPage['name'] ?? "Page " . $pageId;
-                                    $includeFilter = \Classes\Services\Sync\Facebook\FacebookEntitySync::getFacebookFilter($mergedFbConfig, 'PAGE', 'cache_include');
-                                    $excludeFilter = \Classes\Services\Sync\Facebook\FacebookEntitySync::getFacebookFilter($mergedFbConfig, 'PAGE', 'cache_exclude');
+                                    $includeFilter = $mergedFbConfig['PAGE']['cache_include'] ?? null;
+                                    $excludeFilter = $mergedFbConfig['PAGE']['cache_exclude'] ?? null;
                                     if (Helpers::matchesFilter($pageName, $includeFilter, $excludeFilter) || Helpers::matchesFilter($pageId, $includeFilter, $excludeFilter)) {
                                         $pagesToProcess[] = [
                                             'id' => $pageId,
@@ -400,8 +401,8 @@ class InitializeEntitiesCommand extends Command
                             }
                             if (! $alreadyInConfig) {
                                 $adAccName = $apiAdAcc['name'] ?? "Ad Account " . $adAccId;
-                                $includeFilter = \Classes\Services\Sync\Facebook\FacebookEntitySync::getFacebookFilter($mergedFbConfig, 'AD_ACCOUNT', 'cache_include');
-                                $excludeFilter = \Classes\Services\Sync\Facebook\FacebookEntitySync::getFacebookFilter($mergedFbConfig, 'AD_ACCOUNT', 'cache_exclude');
+                                $includeFilter = \Anibalealvarezs\MetaHubDriver\Services\FacebookEntitySync::getFacebookFilter($mergedFbConfig, 'AD_ACCOUNT', 'cache_include');
+                                $excludeFilter = \Anibalealvarezs\MetaHubDriver\Services\FacebookEntitySync::getFacebookFilter($mergedFbConfig, 'AD_ACCOUNT', 'cache_exclude');
                                 if (Helpers::matchesFilter($adAccName, $includeFilter, $excludeFilter) || Helpers::matchesFilter($adAccId, $includeFilter, $excludeFilter)) {
                                     $adAccountsToProcess[] = [
                                         'id' => $adAccId,

@@ -15,7 +15,6 @@ class HealthService
         $dbStatus = true;
         $redisStatus = true;
         $catalogStats = [];
-        $channelsHealth = ['facebook' => true, 'google' => true];
 
         // 1. DB
         try {
@@ -47,14 +46,20 @@ class HealthService
         } catch (Throwable $e) {}
 
         // 4. Channels
+        $channelsHealth = [];
         try {
-            $channels = Helpers::getChannelsConfig();
-            if (empty($channels['facebook']['graph_user_access_token'])) $channelsHealth['facebook'] = false;
-            if (empty($channels['google_search_console']['token'])) $channelsHealth['google'] = false;
-        } catch (Throwable $e) {
-            $channelsHealth['facebook'] = false;
-            $channelsHealth['google'] = false;
-        }
+            $availableChannels = \Core\Drivers\DriverFactory::getAvailableChannels();
+            foreach ($availableChannels as $channel) {
+                try {
+                    $driver = \Core\Drivers\DriverFactory::get($channel);
+                    $authProvider = $driver->getAuthProvider();
+                    $channelsHealth[$channel] = $authProvider ? $authProvider->isValid() : false;
+                } catch (Throwable $e) {
+                    $channelsHealth[$channel] = false;
+                }
+            }
+
+        } catch (Throwable $e) {}
 
         return [
             'status' => ($dbStatus && $redisStatus) ? 'online' : 'error',

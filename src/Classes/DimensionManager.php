@@ -6,9 +6,10 @@ use Entities\Analytics\Channeled\DimensionKey;
 use Entities\Analytics\Channeled\DimensionSet;
 use Entities\Analytics\Channeled\DimensionValue;
 use Anibalealvarezs\ApiSkeleton\Classes\KeyGenerator;
+use Anibalealvarezs\ApiSkeleton\Interfaces\DimensionManagerInterface;
 use Doctrine\ORM\EntityManager;
 
-class DimensionManager
+class DimensionManager implements DimensionManagerInterface
 {
     private array $keyCache = [];
     private array $valueCache = [];
