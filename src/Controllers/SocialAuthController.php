@@ -42,24 +42,19 @@ class SocialAuthController
      */
     private function saveCredentials(string $token, ?string $userId = null, ?string $refreshToken = null, array $scopes = [], string $provider = 'facebook'): void
     {
-        $channel = match ($provider) {
-            'google' => 'google_search_console',
-            default => 'facebook_marketing'
-        };
-
-        $config = \Core\Drivers\DriverFactory::getChannelConfig($channel);
-        if (empty($config)) {
-            return;
-        }
-
-        $driverClass = $config['driver'];
-        if (class_exists($driverClass)) {
-            $driverClass::storeCredentials([
-                'access_token' => $token,
-                'refresh_token' => $refreshToken,
-                'user_id' => $userId,
-                'scopes' => $scopes
-            ]);
+        $registry = \Core\Drivers\DriverFactory::getRegistry();
+        
+        foreach ($registry as $channel => $config) {
+            $driverClass = $config['driver'];
+            if (class_exists($driverClass) && $driverClass::getCommonConfigKey() === $provider) {
+                $driverClass::storeCredentials([
+                    'access_token' => $token,
+                    'refresh_token' => $refreshToken,
+                    'user_id' => $userId,
+                    'scopes' => $scopes
+                ]);
+                return;
+            }
         }
     }
 }
