@@ -93,9 +93,9 @@ class SeedDemoDataCommand extends Command implements SeederInterface
     {
         return match($type) {
             'channel' => Channel::class,
-            'account_type' => Account::class,
-            'country' => Country::class,
-            'device' => Device::class,
+            'account_type' => \Enums\Account::class,
+            'country' => \Anibalealvarezs\ApiSkeleton\Enums\Country::class,
+            'device' => \Anibalealvarezs\ApiSkeleton\Enums\Device::class,
             'period' => \Anibalealvarezs\ApiSkeleton\Enums\Period::class,
             default => throw new \Exception("Unknown enum type: $type")
         };

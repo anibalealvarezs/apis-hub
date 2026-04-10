@@ -100,8 +100,8 @@ class InitializeEntitiesCommand extends Command
             // Determine if specifically enabled for this channel
             $chanConfig = $channelsConfig[$channel] ?? [];
             
-            $driverClass = $driverCfg['driver'];
-            if (!class_exists($driverClass)) {
+            $driverClass = $driverCfg['driver'] ?? null;
+            if (!$driverClass || !class_exists($driverClass)) {
                 $this->logger->error("Driver class '$driverClass' not found for channel: $channel");
                 continue;
             }

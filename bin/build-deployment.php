@@ -47,6 +47,7 @@ $buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($d
         "REDIS_HOST=\${REDIS_HOST:-" . $redis['host'] . "}",
         "REDIS_PORT=\${REDIS_PORT:-" . $redis['port'] . "}",
         "PROJECT_CONFIG_FILE=/app/config/" . ($config['project'] ?? 'apis-hub') . ".yaml",
+        "CONFIG_DIR=/app/config",
         "INSTANCE_NAME={$instanceName}",
         "SKIP_SEED=\${SKIP_SEED:-0}",
         "ENV_FILE=\${ENV_FILE:-.env}",
@@ -99,6 +100,10 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         'restart'     => 'always',
         'environment' => $buildEnv($masterName),
         'networks'    => ['default', 'apis-hub_gateway'],
+        'ports'       => [
+            "{$externalPort}:8080",
+            "{$mcpPort}:3000"
+        ],
         'volumes'     => $volumes,
         'depends_on'  => ['redis'],
         'extra_hosts' => ['host.docker.internal:host-gateway'],
@@ -137,6 +142,7 @@ if (true) { // Always create DB service in this master/worker architecture
             (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_PASSWORD' : 'MYSQL_PASSWORD') => "\${DB_PASSWORD:-" . ($db['password'] ?? 'postgres') . "}",
             (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_DB' : 'MYSQL_DATABASE') => "\${DB_NAME:-" . ($db['name'] ?? 'apis-hub') . "}",
         ],
+        'ports'   => ["{$dbHostPort}:5432"],
         'volumes' => ['db_data:/var/lib/postgresql/data'],
     ];
 }
@@ -146,6 +152,7 @@ $services['redis'] = [
     'container_name' => "{$deploymentName}-redis",
     'image'         => 'redis:alpine',
     'restart'       => 'always',
+    'ports'         => ["{$redisHostPort}:6379"],
     'volumes'       => ['redis_data:/data'],
 ];
 
