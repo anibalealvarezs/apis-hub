@@ -15,55 +15,31 @@ class PublicDataController extends BaseController
     /**
      * Entry point for all public data requests.
      */
-    public function getData(Request $request, string $channel, string $resource): JsonResponse
-    {
-        // For backward compatibility with legacy channel strings
-        $channelId = match(strtolower($channel)) {
-            'facebook' => 'facebook_marketing',
-            'google', 'gsc' => 'google_search_console',
-            default => $channel
-        };
-
-        return $this->getResourceData($request, $channelId, $resource);
-    }
-
-    /**
-     * @deprecated Use getData() instead
-     */
-    public function getFacebookCampaigns(Request $request): JsonResponse
-    {
-        return $this->getData($request, 'facebook', 'campaigns');
-    }
-
-    /**
-     * @deprecated Use getData() instead
-     */
-    public function getMetrics(Request $request, string $channel): JsonResponse
-    {
-        return $this->getData($request, $channel, 'metrics');
-    }
-
-    /**
-     * Generic resource data retriever via drivers
-     */
-    private function getResourceData(Request $request, string $channel, string $resource): JsonResponse
+    public function getResourceData(Request $request, string $channel, string $resource): JsonResponse
     {
         try {
-            $config = \Core\Drivers\DriverFactory::getChannelConfig($channel);
+            // Normalization for legacy channel strings
+            $channelId = match(strtolower($channel)) {
+                'facebook' => 'facebook_marketing',
+                'google', 'gsc' => 'google_search_console',
+                default => $channel
+            };
+
+            $config = \Core\Drivers\DriverFactory::getChannelConfig($channelId);
             if (empty($config)) {
-                return new JsonResponse(['success' => false, 'error' => "Channel $channel not found"], Response::HTTP_NOT_FOUND);
+                return new JsonResponse(['success' => false, 'error' => "Channel $channelId not found"], Response::HTTP_NOT_FOUND);
             }
 
             $driverClass = $config['driver'];
             if (!class_exists($driverClass)) {
-                return new JsonResponse(['success' => false, 'error' => "Driver class for $channel not found"], Response::HTTP_INTERNAL_SERVER_ERROR);
+                return new JsonResponse(['success' => false, 'error' => "Driver class for $channelId not found"], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
             $resources = $driverClass::getPublicResources();
             $table = $resources[$resource] ?? null;
 
             if (!$table) {
-                return new JsonResponse(['success' => false, 'error' => "Resource $resource not supported for channel $channel"], Response::HTTP_BAD_REQUEST);
+                return new JsonResponse(['success' => false, 'error' => "Resource $resource not supported for channel $channelId"], Response::HTTP_BAD_REQUEST);
             }
 
             $conn = $this->em->getConnection();
@@ -71,12 +47,36 @@ class PublicDataController extends BaseController
             
             return new JsonResponse([
                 'success' => true,
-                'channel' => $channel,
+                'channel' => $channelId,
                 'resource' => $resource,
                 'data' => $data
             ]);
         } catch (\Exception $e) {
             return new JsonResponse(['success' => false, 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * @deprecated Use getResourceData() instead
+     */
+    public function getData(Request $request, string $channel, string $resource): JsonResponse
+    {
+        return $this->getResourceData($request, $channel, $resource);
+    }
+
+    /**
+     * @deprecated Use getResourceData() instead
+     */
+    public function getFacebookCampaigns(Request $request): JsonResponse
+    {
+        return $this->getResourceData($request, 'facebook', 'campaigns');
+    }
+
+    /**
+     * @deprecated Use getResourceData() instead
+     */
+    public function getMetrics(Request $request, string $channel): JsonResponse
+    {
+        return $this->getResourceData($request, $channel, 'metrics');
     }
 }

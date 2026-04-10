@@ -319,7 +319,7 @@ return [
             $request = $args['request'] ?? Request::createFromGlobals();
             $channel = $args['channel'] ?? '';
             $resource = $args['resource'] ?? '';
-            return (new PublicDataController())->getData($request, $channel, $resource);
+            return (new PublicDataController())->getResourceData($request, $channel, $resource);
         },
         'public' => true,
         'admin' => false
