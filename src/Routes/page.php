@@ -211,27 +211,6 @@ return array_merge($driverRoutes, [
         'html' => false,
         'admin' => true
     ],
-    '/fb-reports' => [
-        'httpMethod' => 'GET',
-        'callable' => fn (...$args) => (new PageController())->facebookReports(),
-        'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
-        'html' => true,
-        'admin' => false
-    ],
-    '/fb-organic-reports' => [
-        'httpMethod' => 'GET',
-        'callable' => fn (...$args) => (new PageController())->facebookOrganicReports(),
-        'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
-        'html' => true,
-        'admin' => false
-    ],
-    '/gsc-reports' => [
-        'httpMethod' => 'GET',
-        'callable' => fn (...$args) => (new PageController())->gscReports(),
-        'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
-        'html' => true,
-        'admin' => false
-    ],
     '/api/management/update-credentials' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
