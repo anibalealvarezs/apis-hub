@@ -25,7 +25,7 @@ class ResetMetricsCommand extends Command
     {
         $this
             ->setDescription('Reset metrics for selected channels or ALL')
-            ->addArgument('channel', InputArgument::OPTIONAL, 'Channel name (e.g. facebook, all. Default: all)');
+            ->addArgument('channel', InputArgument::OPTIONAL, 'Channel name or all. Default: all');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -42,12 +42,22 @@ class ResetMetricsCommand extends Command
 
                 if (strtolower($channelName) === 'all') {
                     $jobChannels = DriverFactory::getAvailableChannels();
-                } elseif (strtolower($channelName) === 'facebook') {
-                    $jobChannels = ['facebook_marketing', 'facebook_organic'];
+                } elseif (str_starts_with(strtolower($channelName), 'all_')) {
+                    $group = substr(strtolower($channelName), 4);
+                    $jobChannels = [];
+                    foreach (DriverFactory::getRegistry() as $slug => $config) {
+                        $driverClass = $config['driver'] ?? null;
+                        if ($driverClass && class_exists($driverClass) && $driverClass::getCommonConfigKey() === $group) {
+                            $jobChannels[] = $slug;
+                        }
+                    }
+                    if (empty($jobChannels)) {
+                        throw new \Exception("No channels found for group: $group");
+                    }
                 } else {
                     $enum = Channel::tryFromName($channelName);
                     if (!$enum) {
-                        throw new \Exception("Unknown channel: $channelName. Use all, facebook, or any specific channel name.");
+                        throw new \Exception("Unknown channel: $channelName. Use all or any specific channel name.");
                     }
                     $jobChannels = [$enum->name];
                 }

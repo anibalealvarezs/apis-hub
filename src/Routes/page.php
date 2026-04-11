@@ -68,21 +68,12 @@ return array_merge($driverRoutes, [
         'public' => true,
         'html' => true
     ],
-    '/api/auth/facebook/import' => [
+    '/api/auth/{channel}/import' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
-            return (new SocialAuthController())->importCredentials($request, 'facebook');
-        },
-        'public' => true,
-        'html' => false,
-        'admin' => false
-    ],
-    '/api/auth/google/import' => [
-        'httpMethod' => 'POST',
-        'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
-            return (new SocialAuthController())->importCredentials($request, 'google');
+            $request = $args['request'] ?? Request::createFromGlobals();
+            $channel = $args['channel'] ?? '';
+            return (new SocialAuthController())->importCredentials($request, $channel);
         },
         'public' => true,
         'html' => false,
@@ -314,23 +305,5 @@ return array_merge($driverRoutes, [
         'public' => true,
         'admin' => false
     ],
-    '/api/v1/public/facebook/campaigns' => [
-        'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getResourceData($args['request'] ?? Request::createFromGlobals(), 'facebook_marketing', 'campaigns'),
-        'public' => true,
-        'admin' => false
-    ],
-    '/api/v1/public/facebook/metrics' => [
-        'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getResourceData($args['request'] ?? Request::createFromGlobals(), 'facebook_marketing', 'metrics'),
-        'public' => true,
-        'admin' => false
-    ],
-    '/api/v1/public/gsc/metrics' => [
-        'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getResourceData($args['request'] ?? Request::createFromGlobals(), 'google_search_console', 'metrics'),
-        'public' => true,
-        'admin' => false
-    ]
 ]);
 

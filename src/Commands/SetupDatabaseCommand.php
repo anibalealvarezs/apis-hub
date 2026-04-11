@@ -2,6 +2,7 @@
 
 namespace Commands;
 
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
 use Helpers\Helpers;
@@ -57,11 +58,10 @@ class SetupDatabaseCommand extends Command
             // 4. Auto-Seed for Demo (Smart Zero-Touch)
             $skipSeed = (string)getenv('SKIP_SEED');
             if (getenv('APP_ENV') === 'demo' && $skipSeed !== '1' && $skipSeed !== 'true') {
-                $output->writeln("<info>🎁 Environment is 'demo'. Filling with sample data (Marketing & Organic)...</info>");
+                $output->writeln("<info>🎁 Environment is 'demo'. Filling with sample data...</info>");
                 $seedDemoCommand = $this->getApplication()->find('app:seed-demo-data');
-                // By default, SeedDemoDataCommand now seeds all channels if no --channels is provided, 
-                // but we pass them explicitly here to be clear and follow the request.
-                $seedDemoCommand->run(new ArrayInput(['--channels' => 'facebook_marketing,facebook_organic,google_search_console']), $output);
+                $channels = implode(',', DriverFactory::getAvailableChannels());
+                $seedDemoCommand->run(new ArrayInput(['--channels' => $channels]), $output);
             }
 
             $output->writeln("<info>✅ Database setup complete!</info>");

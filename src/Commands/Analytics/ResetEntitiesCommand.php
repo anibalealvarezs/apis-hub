@@ -25,7 +25,7 @@ class ResetEntitiesCommand extends Command
     {
         $this
             ->setDescription('Reset entities for a specific channel or all channels')
-            ->addArgument('channel', InputArgument::OPTIONAL, 'The channel name (e.g. facebook_marketing, all_facebook or all)');
+            ->addArgument('channel', InputArgument::OPTIONAL, 'The channel name or all');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -38,12 +38,22 @@ class ResetEntitiesCommand extends Command
         try {
             if (strtolower($channelName) === 'all') {
                 $targetChannelSlugs = DriverFactory::getAvailableChannels();
-            } elseif (strtolower($channelName) === 'all_facebook') {
-                $targetChannelSlugs = ['facebook_marketing', 'facebook_organic', 'instagram'];
+            } elseif (str_starts_with(strtolower($channelName), 'all_')) {
+                $group = substr(strtolower($channelName), 4);
+                $targetChannelSlugs = [];
+                foreach (DriverFactory::getRegistry() as $slug => $config) {
+                    $driverClass = $config['driver'] ?? null;
+                    if ($driverClass && class_exists($driverClass) && $driverClass::getCommonConfigKey() === $group) {
+                        $targetChannelSlugs[] = $slug;
+                    }
+                }
+                if (empty($targetChannelSlugs)) {
+                    throw new \Exception("No channels found for group: $group");
+                }
             } else {
                 $enum = Channel::tryFromName($channelName);
                 if (!$enum) {
-                    throw new \Exception("Unknown channel: $channelName. Use all, all_facebook or any specific channel name.");
+                    throw new \Exception("Unknown channel: $channelName. Use all or any specific channel name.");
                 }
                 $targetChannelSlugs = [$enum->name];
             }
