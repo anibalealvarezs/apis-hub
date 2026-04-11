@@ -181,6 +181,21 @@ class ChanneledCrudController extends BaseController
             $params['filters']->channel = $channel->value;
         }
 
+        // Logic for global entities (like Page) that don't have a 'channel' field but are linked via Account
+        if (!$metadata->hasField('channel') && !isset($params['filters']->channel)) {
+            if ($entity === 'page' && $metadata->hasAssociation('account') && !isset($params['filters']->account)) {
+                $chanAccRepo = $this->em->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class);
+                $chanAccs = $chanAccRepo->findBy(['channel' => $channel->value]);
+                $accIds = array_map(fn($ca) => $ca->getAccount()->getId(), $chanAccs);
+                if (!empty($accIds)) {
+                    $params['filters']->account = $accIds;
+                } else {
+                    // Force no results if no accounts exist for this channel
+                    $params['filters']->id = 0;
+                }
+            }
+        }
+
         return $params;
     }
 
