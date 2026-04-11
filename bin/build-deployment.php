@@ -169,7 +169,7 @@ $compose = [
         ],
         'apis-hub_gateway' => [
             'name' => 'apis-hub_default',
-            'external' => true
+            'external' => ($env !== 'demo')
         ]
     ],
     'volumes'  => [

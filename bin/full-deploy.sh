@@ -64,7 +64,7 @@ echo -e "${GREEN}✔ Environment ready ($ENV_FILE).${NC}"
 
 # ── Step 1: Install Composer dependencies ────────────────────────────────────
 echo ""
-if [ ! -d "vendor" ] || [ "$1" == "--update" ]; then
+if [ ! -d "vendor" ] || [ "$1" = "--update" ]; then
     echo -e "${YELLOW}📦 [1/5] Installing/Updating dependencies...${NC}"
     MSYS_NO_PATHCONV=1 docker run --rm \
         -v "$(pwd):/app" \
@@ -78,20 +78,18 @@ fi
 
 # ── Step 1b: Fetch Remote Configuration (Optional) ──────────────────────────
 echo ""
-echo -e "${YELLOW}📡 [1.5/5] Checking for remote configuration...${NC}"
-# Use local PHP if available, otherwise skip (this runs before containers are up)
-if command -v php &> /dev/null; then
+# Use docker run to avoid local PHP issues
+MSYS_NO_PATHCONV=1 docker run --rm \
+    -v "$(pwd):/app" \
+    -w /app \
+    php:8.3-cli \
     php bin/fetch-remote-config.php || echo "  ⚠️ Remote config fetch failed, continuing with local config..."
-else
-    echo "  ⚠️ php-cli not found locally, skipping remote config fetch."
-fi
 
 # ── Step 2: Refresh Instances from rules ──────────────────────────────────────
 echo ""
 echo -e "${YELLOW}🔄 [2/5] Calculating instance nodes and splits...${NC}"
 MSYS_NO_PATHCONV=1 docker run --rm \
     -v "$(pwd):/app" \
-    -v "$(pwd)/..:/parent" \
     -e "ENV_FILE=$ENV_FILE" \
     -e "SKIP_SEED=$SKIP_SEED" \
     --env-file "$ENV_FILE" \
@@ -105,7 +103,6 @@ echo ""
 echo -e "${YELLOW}📂 [3/5] Building Docker Compose manifest...${NC}"
 MSYS_NO_PATHCONV=1 docker run --rm \
     -v "$(pwd):/app" \
-    -v "$(pwd)/..:/parent" \
     -e "ENV_FILE=$ENV_FILE" \
     -e "SKIP_SEED=$SKIP_SEED" \
     --env-file "$ENV_FILE" \

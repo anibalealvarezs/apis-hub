@@ -121,4 +121,3 @@ else
         exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
     fi
 fi
-
