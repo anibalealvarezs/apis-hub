@@ -82,7 +82,7 @@ class ResetChannelCommand extends Command
             // Flush Redis Cache
             $output->writeln('<info>🧹 Purgando Caché de Aplicación...</info>');
             $clearCacheCommand = $this->getApplication()->find('app:cache:clear');
-            $clearCacheCommand->run($input, $output);
+            $clearCacheCommand->run(new \Symfony\Component\Console\Input\ArrayInput([]), $output);
 
             $output->writeln("<info>✅ EXCELENTE: El canal '$channelName' ha sido reseteado de forma atómica y está listo para re-sync.</info>");
             return Command::SUCCESS;
