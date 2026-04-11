@@ -59,6 +59,7 @@ $masterName = "{$deploymentName}-master";
 $externalPort = getenv('EXTERNAL_PORT') ?: ($instances[0]['port'] ?? 10000);
 $mcpPort = getenv('MCP_PORT') ?: 3000;
     $localMounts = [
+        'api-driver-core',
         'api-client-skeleton',
         'facebook-graph-api',
         'meta-hub-driver',
