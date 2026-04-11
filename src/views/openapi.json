@@ -101,7 +101,7 @@
             "in": "path",
             "required": true,
             "schema": { "type": "string" },
-            "description": "Integration channel (e.g., shopify, facebook)"
+            "description": "Integration channel"
           },
           {
             "name": "entity",
@@ -162,7 +162,7 @@
           {
             "name": "limit",
             "in": "query",
-            "schema": { 
+            "schema": {
               "type": "integer",
               "default": 10,
               "enum": [10]
@@ -172,7 +172,7 @@
           {
             "name": "pagination",
             "in": "query",
-            "schema": { 
+            "schema": {
               "type": "integer",
               "default": 0
             },
@@ -357,7 +357,7 @@
           {
             "name": "limit",
             "in": "query",
-            "schema": { 
+            "schema": {
               "type": "integer",
               "default": 10,
               "enum": [10]
@@ -367,7 +367,7 @@
           {
             "name": "pagination",
             "in": "query",
-            "schema": { 
+            "schema": {
               "type": "integer",
               "default": 0
             },
@@ -416,10 +416,13 @@
                 "type": "object",
                 "required": ["id", "action"],
                 "properties": {
-                  "id": { "type": "integer", "description": "numerical Job ID" },
-                  "action": { 
-                    "type": "string", 
-                    "enum": ["process", "retry", "cancel"] 
+                  "id": {
+                    "type": "integer",
+                    "description": "numerical Job ID"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": ["process", "retry", "cancel"]
                   }
                 }
               }

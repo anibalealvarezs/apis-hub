@@ -204,12 +204,21 @@ class RoutingCore implements HttpKernelInterface
     }
 
 
-    public function map(string $path, string $httpMethod, callable $controller, bool $public = false, bool $html = false, bool $admin = false): void
-    {
+    public function map(
+        string $path,
+        string $httpMethod,
+        callable $controller,
+        bool $public = false,
+        bool $html = false,
+        bool $admin = false,
+        array $requirements = [],
+        array $defaults = []
+    ): void {
         $routes = new RouteCollection();
         $routes->add($path, new Route(
             $path,
-            array('controller' => $controller, 'public' => $public, 'html' => $html, 'admin' => $admin)
+            array_merge(['controller' => $controller, 'public' => $public, 'html' => $html, 'admin' => $admin], $defaults),
+            $requirements
         ));
         $routes->setMethods($httpMethod);
         $this->routes->addCollection($routes);
@@ -227,7 +236,9 @@ class RoutingCore implements HttpKernelInterface
                 $data['callable'], 
                 $data['public'] ?? false, 
                 $data['html'] ?? false,
-                $data['admin'] ?? false
+                $data['admin'] ?? false,
+                $data['requirements'] ?? [],
+                $data['defaults'] ?? []
             );
         }
     }
