@@ -25,7 +25,7 @@ class ResetChannelCommand extends Command
     {
         $this
             ->setDescription('Reset a specific channel (Atómico)')
-            ->addArgument('channel', InputArgument::REQUIRED, 'The channel name (e.g. facebook_marketing)');
+            ->addArgument('channel', InputArgument::REQUIRED, 'The channel name');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -38,7 +38,7 @@ class ResetChannelCommand extends Command
         try {
             $enum = Channel::tryFromName($channelName);
             if (!$enum) {
-                throw new \Exception("Unknown channel: $channelName. Use facebook_marketing, facebook_organic, instagram, google_search_console, etc.");
+                throw new \Exception("Unknown channel: $channelName.");
             }
 
             $channelId = $enum->value;

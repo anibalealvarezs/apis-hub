@@ -70,6 +70,8 @@ class RoutingCore implements HttpKernelInterface
             $attributes['body'] = $request->getContent() ?: null;
             $attributes['params'] = $request->query->all() ?: null;
             $attributes['request'] = $request;
+            $attributes['isDemo'] = \Helpers\Helpers::isDemo();
+            $attributes['channelsConfig'] = \Helpers\Helpers::getChannelsConfig();
 
             $response = call_user_func_array($controller, $attributes);
 

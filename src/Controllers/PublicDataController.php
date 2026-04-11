@@ -2,7 +2,6 @@
 
 namespace Controllers;
 
-use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,14 +17,6 @@ class PublicDataController extends BaseController
     public function getResourceData(Request $request, string $channel, string $resource): JsonResponse
     {
         try {
-            /**
-            // Normalization for legacy channel strings
-            $channelId = match(strtolower($channel)) {
-                'facebook' => 'facebook_marketing',
-                'google', 'gsc' => 'google_search_console',
-                default => $channel
-            };
-            */
             $channelId = $channel;
 
             $config = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($channelId);
@@ -34,25 +25,25 @@ class PublicDataController extends BaseController
             }
 
             $driverClass = $config['driver'];
-            if (!class_exists($driverClass)) {
+            if (! class_exists($driverClass)) {
                 return new JsonResponse(['success' => false, 'error' => "Driver class for $channelId not found"], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
             $resources = $driverClass::getPublicResources();
             $table = $resources[$resource] ?? null;
 
-            if (!$table) {
+            if (! $table) {
                 return new JsonResponse(['success' => false, 'error' => "Resource $resource not supported for channel $channelId"], Response::HTTP_BAD_REQUEST);
             }
 
             $conn = $this->em->getConnection();
             $data = $conn->fetchAllAssociative("SELECT * FROM {$table} ORDER BY id DESC LIMIT 500");
-            
+
             return new JsonResponse([
                 'success' => true,
                 'channel' => $channelId,
                 'resource' => $resource,
-                'data' => $data
+                'data' => $data,
             ]);
         } catch (\Exception $e) {
             return new JsonResponse(['success' => false, 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);

@@ -5,6 +5,8 @@ namespace Commands;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Anibalealvarezs\ApiDriverCore\Interfaces\DimensionManagerInterface;
 use Anibalealvarezs\ApiDriverCore\Interfaces\SeederInterface;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
 use Classes\DimensionManager;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -19,8 +21,6 @@ use Entities\Analytics\Device;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
 use Entities\Analytics\Query;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
-use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
 use Faker\Factory;
 use Helpers\Helpers;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -122,11 +122,15 @@ class SeedDemoDataCommand extends Command implements SeederInterface
 
             $pageRows = $this->conn->fetchAllAssociative("SELECT id, platform_id FROM pages");
             $pageMap = ['map' => []];
-            foreach ($pageRows as $r) $pageMap['map'][$r['platform_id']] = (int)$r['id'];
+            foreach ($pageRows as $r) {
+                $pageMap['map'][$r['platform_id']] = (int)$r['id'];
+            }
 
             $postRows = $this->conn->fetchAllAssociative("SELECT id, post_id FROM posts");
             $postMap = ['map' => []];
-            foreach ($postRows as $r) $postMap['map'][$r['post_id']] = (int)$r['id'];
+            foreach ($postRows as $r) {
+                $postMap['map'][$r['post_id']] = (int)$r['id'];
+            }
 
             $accountMap = ['map' => [], 'mapReverse' => []];
 
@@ -188,7 +192,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
 
     protected function configure(): void
     {
-        $this->addOption('channels', 'c', InputOption::VALUE_OPTIONAL, 'Channels to seed (comma separated: facebook_marketing,facebook_organic,google_search_console)');
+        $this->addOption('channels', 'c', InputOption::VALUE_OPTIONAL, 'Comma-separated list of channels to seed');
         $this->addOption('fresh', 'f', InputOption::VALUE_NONE, 'Wipe the entire database before seeding');
     }
 

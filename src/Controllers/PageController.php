@@ -154,18 +154,13 @@ class PageController extends BaseController
 
     private function getChannelIcon(string $channel): string
     {
-        if (str_contains($channel, 'facebook') || str_contains($channel, 'meta')) {
-            return 'M'; // Meta
+        $registry = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry();
+        $driverClass = $registry[$channel]['driver'] ?? null;
+
+        if ($driverClass && method_exists($driverClass, 'getChannelIcon')) {
+            return $driverClass::getChannelIcon();
         }
-        if (str_contains($channel, 'google')) {
-            return 'G'; // Google
-        }
-        if (str_contains($channel, 'amazon')) {
-            return 'A'; // Amazon
-        }
-        if (str_contains($channel, 'shopify')) {
-            return 'S'; // Shopify
-        }
+
         return substr(ucfirst($channel), 0, 1);
     }
 }

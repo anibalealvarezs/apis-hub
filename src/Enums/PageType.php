@@ -27,7 +27,8 @@ class PageType
      */
     public static function getPrefix(string $type): ?string
     {
-        $pattern = \Anibalealvarezs\ApiSkeleton\Classes\AssetRegistry::findByType($type);
+        $pattern = \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::findByType($type);
+
         return $pattern['prefix'] ?? null;
     }
 
@@ -38,6 +39,6 @@ class PageType
      */
     public static function getAll(): array
     {
-        return array_keys(\Anibalealvarezs\ApiSkeleton\Classes\AssetRegistry::getAll());
+        return array_keys(\Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::getAll());
     }
 }

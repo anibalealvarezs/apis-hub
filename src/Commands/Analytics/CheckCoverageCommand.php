@@ -2,13 +2,13 @@
 
 namespace Commands\Analytics;
 
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Helpers\Helpers;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputOption;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
 #[AsCommand(
@@ -19,7 +19,7 @@ class CheckCoverageCommand extends Command
 {
     protected function configure(): void
     {
-        $this->addOption('channel', 'c', InputOption::VALUE_REQUIRED, 'The channel name (e.g. gsc, facebook_marketing)')
+        $this->addOption('channel', 'c', InputOption::VALUE_REQUIRED, 'The channel name')
              ->addOption('days', 'd', InputOption::VALUE_OPTIONAL, 'Number of days to look back', 30);
     }
 
@@ -28,14 +28,16 @@ class CheckCoverageCommand extends Command
         $channelName = $input->getOption('channel');
         $days = (int) $input->getOption('days');
 
-        if (!$channelName) {
+        if (! $channelName) {
             $output->writeln("<error>Error: --channel option is required.</error>");
+
             return Command::FAILURE;
         }
 
         $channel = Channel::tryFromName($channelName);
-        if (!$channel) {
+        if (! $channel) {
             $output->writeln("<error>Error: Invalid channel name '$channelName'.</error>");
+
             return Command::FAILURE;
         }
 
@@ -66,10 +68,10 @@ class CheckCoverageCommand extends Command
             }
 
             $missingDates = array_diff($expectedDates, $datesFound);
-            
+
             // Exclude today since it might be in progress
             $today = (new \DateTime())->format('Y-m-d');
-            $missingDates = array_values(array_filter($missingDates, fn($d) => $d !== $today));
+            $missingDates = array_values(array_filter($missingDates, fn ($d) => $d !== $today));
 
             if (empty($missingDates)) {
                 $output->writeln("✅ <info>No gaps found! 100% coverage in the requested window.</info>");
@@ -85,6 +87,7 @@ class CheckCoverageCommand extends Command
             return Command::SUCCESS;
         } catch (Throwable $e) {
             $output->writeln("<error>Error: " . $e->getMessage() . "</error>");
+
             return Command::FAILURE;
         }
     }
