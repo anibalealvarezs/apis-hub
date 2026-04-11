@@ -365,6 +365,14 @@ class MetricsProcessor
         return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
+    public static function processPages(ArrayCollection $metrics, EntityManager $manager): array
+    {
+        return [
+            'map' => [],
+            'mapReverse' => [],
+        ];
+    }
+
     /**
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
@@ -468,6 +476,11 @@ class MetricsProcessor
             $queryMap = self::processQueries($metrics, $manager);
         }
 
+        // Map pages
+        if (!$pageMap) {
+            $pageMap = self::processPages($metrics, $manager);
+        }
+
         // Map countries
         if ($processCountries && !$countryMap) {
             $countryMap = self::processCountries($metrics, $manager);
@@ -484,52 +497,52 @@ class MetricsProcessor
         }
 
         // Map accounts
-        if ($processAccounts) {
+        if ($processAccounts && !$accountMap) {
             $accountMap = self::processAccounts($metrics, $manager);
         }
-
+    
         // Map channeled accounts
-        if ($processChanneledAccounts) {
+        if ($processChanneledAccounts && !$channeledAccountMap) {
             $channeledAccountMap = self::processChanneledAccounts($metrics, $manager);
         }
-
+    
         // Map campaigns
-        if ($processCampaigns) {
+        if ($processCampaigns && !$campaignMap) {
             $campaignMap = self::processCampaigns($metrics, $manager);
         }
-
+    
         // Map channeled campaigns
-        if ($processChanneledCampaigns) {
+        if ($processChanneledCampaigns && !$channeledCampaignMap) {
             $channeledCampaignMap = self::processChanneledCampaigns($metrics, $manager);
         }
-
+    
         // Map channeled campaigns
-        if ($processChanneledAdGroups) {
+        if ($processChanneledAdGroups && !$channeledAdGroupMap) {
             $channeledAdGroupMap = self::processChanneledAdGroups($metrics, $manager);
         }
-
+    
         // Map channeled ads
-        if ($processChanneledAds) {
+        if ($processChanneledAds && !$channeledAdMap) {
             $channeledAdMap = self::processChanneledAds($metrics, $manager);
         }
-
+    
         // Map posts
-        if ($processPosts) {
+        if ($processPosts && !$postMap) {
             $postMap = self::processPosts($metrics, $manager);
         }
-
+    
         // Map products
-        if ($processProducts) {
+        if ($processProducts && !$productMap) {
             $productMap = self::processProducts($metrics, $manager);
         }
-
+    
         // Map customers
-        if ($processCustomers) {
+        if ($processCustomers && !$customerMap) {
             $customerMap = self::processCustomers($metrics, $manager);
         }
-
+    
         // Map orders
-        if ($processOrders) {
+        if ($processOrders && !$orderMap) {
             $orderMap = self::processOrders($metrics, $manager);
         }
 

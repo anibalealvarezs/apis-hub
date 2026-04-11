@@ -348,8 +348,9 @@ class BaseRepository extends EntityRepository
                 }
                 
                 if (isset(self::getRelationMap()[$relationKey])) {
-                    // Critical Fix: Enforce existence for primary groupings (page, account) to avoid ghost duplicates
-                    $isPrimaryRelation = in_array($relationKey, ['page', 'account', 'channeledAccount', 'campaign', 'channeledCampaign']);
+                    // Critical Fix: Enforce existence for primary groupings (channeledAccount, campaign, channeledCampaign) to avoid ghost duplicates
+                    // Removed 'page' and 'account' to allow records with NULL links (e.g. IG accounts) to appear in results
+                    $isPrimaryRelation = in_array($relationKey, ['channeledAccount', 'campaign', 'channeledCampaign']);
                     $joinRelation($relationKey, $isPrimaryRelation);
                     $map = self::getRelationMap()[$relationKey];
                     

@@ -58,6 +58,7 @@ trait CalculatesMetricDeltas
                 country: $metric->countryCode ?? null,
                 device: $metric->deviceType ?? null,
                 creative: isset($metric->creative) ? $metric->creative->getCreativeId() : null,
+                dimensionSet: $metric->dimensionsHash ?? null,
             );
             
             $metric->atemporalSignature = $signature;
@@ -124,6 +125,7 @@ trait CalculatesMetricDeltas
                 country: $virtual->countryCode ?? null,
                 device: $virtual->deviceType ?? null,
                 creative: isset($virtual->creative) ? $virtual->creative->getCreativeId() : null,
+                dimensionSet: $virtual->dimensionsHash ?? null,
             );
 
             $metrics->add($virtual);

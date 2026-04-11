@@ -56,6 +56,16 @@ class SeedDemoDataCommand extends Command implements SeederInterface
         return new DimensionManager(Helpers::getManager());
     }
 
+    public function getAges(): array
+    {
+        return $this->ages;
+    }
+
+    public function getGenders(): array
+    {
+        return $this->genders;
+    }
+
     public function getDates(int $days = 180): array
     {
         $dates = [];
@@ -110,11 +120,17 @@ class SeedDemoDataCommand extends Command implements SeederInterface
         try {
             $this->conn->beginTransaction();
 
+            $pageRows = $this->conn->fetchAllAssociative("SELECT id, platform_id FROM pages");
             $pageMap = ['map' => []];
+            foreach ($pageRows as $r) $pageMap['map'][$r['platform_id']] = (int)$r['id'];
+
+            $postRows = $this->conn->fetchAllAssociative("SELECT id, post_id FROM posts");
             $postMap = ['map' => []];
+            foreach ($postRows as $r) $postMap['map'][$r['post_id']] = (int)$r['id'];
+
             $accountMap = ['map' => [], 'mapReverse' => []];
 
-            \Classes\MetricsProcessor::processMetricConfigs(
+            $metricConfigMap = \Classes\MetricsProcessor::processMetricConfigs(
                 metrics: $metrics,
                 manager: $this->entityManager,
                 processQueries: true,
@@ -135,6 +151,20 @@ class SeedDemoDataCommand extends Command implements SeederInterface
                 postMap: $postMap,
                 accountMap: $accountMap,
                 logger: null
+            );
+
+            $metricMap = \Classes\MetricsProcessor::processMetrics(
+                metrics: $metrics,
+                manager: $this->entityManager,
+                metricConfigMap: $metricConfigMap,
+                logger: null
+            );
+
+            \Classes\MetricsProcessor::processChanneledMetrics(
+                metrics: $metrics,
+                manager: $this->entityManager,
+                metricMap: $metricMap,
+                logger: \Helpers\Helpers::setLogger('metrics.log')
             );
 
             $this->entityManager->flush();
