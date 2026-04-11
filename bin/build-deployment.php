@@ -33,7 +33,7 @@ echo "⚒  Building standardized Master/Worker deployment for: " . strtoupper($e
 $services = [];
 
 // Helper to build environment block
-$buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($db, $redis, $config, $env) {
+$buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($db, $redis, $config, $env, $deploymentName) {
     return [
         "PORT=8080",
         "API_SOURCE={$channel}",
@@ -41,16 +41,16 @@ $buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($d
         "DB_DRIVER=\${DB_DRIVER:-" . ($db['driver'] ?? 'pdo_pgsql') . "}",
         "DB_HOST=\${DB_HOST:-" . (($env === 'production' || $env === 'testing') ? 'db' : ($db['host'] ?? 'db')) . "}",
         "DB_PORT=\${DB_PORT:-" . ($db['port'] ?? 5432) . "}",
-        "DB_USER=\${DB_USER:-" . ($db['user'] ?? 'postgres') . "}",
-        "DB_PASSWORD=\${DB_PASSWORD:-" . ($db['password'] ?? '') . "}",
-        "DB_NAME=\${DB_NAME:-" . ($db['name'] ?? 'apis-hub') . "}",
+        "DB_USER=\${DB_USER_".strtoupper(str_replace('-','_',$deploymentName)).":-" . ($db['user'] ?? 'postgres') . "}",
+        "DB_PASSWORD=\${DB_PASSWORD_".strtoupper(str_replace('-','_',$deploymentName)).":-" . ($db['password'] ?? '') . "}",
+        "DB_NAME=\${DB_NAME_".strtoupper(str_replace('-','_',$deploymentName)).":-" . ($db['name'] ?? 'apis-hub') . "}",
         "REDIS_HOST=\${REDIS_HOST:-" . $redis['host'] . "}",
         "REDIS_PORT=\${REDIS_PORT:-" . $redis['port'] . "}",
         "PROJECT_CONFIG_FILE=/app/config/" . ($config['project'] ?? 'apis-hub') . ".yaml",
         "CONFIG_DIR=/app/config",
         "INSTANCE_NAME={$instanceName}",
         "SKIP_SEED=\${SKIP_SEED:-0}",
-        "ENV_FILE=\${ENV_FILE:-.env}",
+        "ENV_FILE=\${ENV_FILE:-" . (getenv('ENV_FILE') ?: '.env') . "}",
     ];
 };
 
@@ -138,12 +138,12 @@ if (true) { // Always create DB service in this master/worker architecture
         'image'         => ($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'postgres:16-alpine' : 'mysql:8.0',
         'restart'       => 'always',
         'environment'   => [
-            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_USER' : 'MYSQL_USER') => "\${DB_USER:-" . ($db['user'] ?? 'postgres') . "}",
-            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_PASSWORD' : 'MYSQL_PASSWORD') => "\${DB_PASSWORD:-" . ($db['password'] ?? 'postgres') . "}",
-            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_DB' : 'MYSQL_DATABASE') => "\${DB_NAME:-" . ($db['name'] ?? 'apis-hub') . "}",
+            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_USER' : 'MYSQL_USER') => "\${DB_USER_".strtoupper(str_replace('-','_',$deploymentName)).":-" . ($db['user'] ?? 'postgres') . "}",
+            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_PASSWORD' : 'MYSQL_PASSWORD') => "\${DB_PASSWORD_".strtoupper(str_replace('-','_',$deploymentName)).":-" . ($db['password'] ?? 'postgres') . "}",
+            (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_DB' : 'MYSQL_DATABASE') => "\${DB_NAME_".strtoupper(str_replace('-','_',$deploymentName)).":-" . ($db['name'] ?? 'apis-hub') . "}",
         ],
         'ports'   => ["{$dbHostPort}:5432"],
-        'volumes' => ['db_data:/var/lib/postgresql/data'],
+        'volumes' => ["db_data:/var/lib/postgresql/data"],
     ];
 }
 

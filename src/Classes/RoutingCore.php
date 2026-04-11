@@ -51,7 +51,9 @@ class RoutingCore implements HttpKernelInterface
 
         try {
             $trimmedPath = trim(urldecode($request->getPathInfo()), " \t\n\r\0\x0B");
+            error_log("RoutingCore::handle - matching path: $trimmedPath");
             $attributes = $matcher->match($trimmedPath);
+            error_log("RoutingCore::handle - matched route: " . ($attributes['_route'] ?? 'none'));
             $isPublic = $attributes['public'] ?? false;
             $isAdminOnly = $attributes['admin'] ?? false;
             $controller = $attributes['controller'];

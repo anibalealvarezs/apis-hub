@@ -29,6 +29,7 @@ $server->set([
     'worker_num' => swoole_cpu_num() * 2,
     'enable_static_handler' => true,
     'document_root' => __DIR__ . '/..',
+    'static_handler_locations' => ['/assets'],
     'max_request' => 1000, // Restart worker after 1000 requests to prevent leaks
     'dispatch_mode' => 1,
 ]);

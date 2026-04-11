@@ -23,7 +23,9 @@ $driverRoutes = (function() {
     return $routes;
 })();
 
-return array_merge($driverRoutes, [
+$assetRoutes = \Anibalealvarezs\ApiDriverCore\Routes\AssetRoutes::get();
+
+return array_merge($driverRoutes, $assetRoutes, [
     '/' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->home(),
