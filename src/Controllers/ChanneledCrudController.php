@@ -182,16 +182,21 @@ class ChanneledCrudController extends BaseController
         }
 
         // Logic for global entities (like Page) that don't have a 'channel' field but are linked via Account
-        if (!$metadata->hasField('channel') && !isset($params['filters']->channel)) {
-            if ($entity === 'page' && $metadata->hasAssociation('account') && !isset($params['filters']->account)) {
-                $chanAccRepo = $this->em->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class);
-                $chanAccs = $chanAccRepo->findBy(['channel' => $channel->value]);
+        if ($entity === 'page' && !isset($params['filters']->channel) && !isset($params['filters']->account)) {
+            $config = Helpers::getEntitiesConfig();
+            $chaClass = $config['channeled_account']['class'] ?? \Entities\Analytics\Channeled\ChanneledAccount::class;
+            $chanAccRepo = $this->em->getRepository($chaClass);
+            $chanAccs = $chanAccRepo->findBy(['channel' => $channel->value]);
+            if (!empty($chanAccs)) {
                 $accIds = array_map(fn($ca) => $ca->getAccount()->getId(), $chanAccs);
-                if (!empty($accIds)) {
-                    $params['filters']->account = $accIds;
+                $params['filters']->account = array_unique($accIds);
+            } else {
+                // If no accounts found for this channel, we only filter if it's explicitly a channeled request
+                // In aggregated metric queries, we don't want to break the join unless necessary
+                if (str_contains($_SERVER['REQUEST_URI'] ?? '', 'aggregate')) {
+                    // Do nothing, let the channel filter on mc handle it
                 } else {
-                    // Force no results if no accounts exist for this channel
-                    $params['filters']->id = 0;
+                    $params['filters']->id = 0; 
                 }
             }
         }
