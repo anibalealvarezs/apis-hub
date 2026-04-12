@@ -535,6 +535,26 @@ class Helpers
                     }
                 }
 
+                // Inject common credentials into specific channels for backward compatibility
+                $commonMappings = [
+                    'google' => ['google_search_console', 'google_analytics', 'gsc'],
+                    'facebook' => ['facebook_marketing', 'facebook_organic', 'instagram_insights'],
+                ];
+
+                foreach ($commonMappings as $commonKey => $specificChannels) {
+                    if (!empty($config[$commonKey])) {
+                        foreach ($specificChannels as $chan) {
+                            if (isset($config[$chan])) {
+                                // Merge nested: $config['google_search_console']['google']['client_id']
+                                $config[$chan][$commonKey] = array_merge($config[$commonKey], $config[$chan][$commonKey] ?? []);
+                                // Also merge flat: $config['google_search_console']['client_id']
+                                // (This covers both styles of driver implementation)
+                                $config[$chan] = array_merge($config[$commonKey], $config[$chan]);
+                            }
+                        }
+                    }
+                }
+
                 if (getenv('APP_ENV') === 'demo') {
                     $placeholders = ['PAGE_ID', 'IG_ACCOUNT_ID', 'PAGE_URL', 'example.com', 'AD_ACCOUNT_ID'];
                     $cleanEntityList = function ($entities) use ($placeholders) {
