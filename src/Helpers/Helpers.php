@@ -531,14 +531,16 @@ class Helpers
                         }
                     } elseif (is_string($item) && preg_match('/\${([^}]+)}/', $item, $matches)) {
                         $envValue = getenv($matches[1]);
-                        if ($envValue !== false) {
+                        if ($envValue !== false && $envValue !== '') {
                             $item = $envValue;
+                        } else {
+                            $item = ''; // Clear unresolved placeholders
                         }
                     }
                 };
                 $resolvePlaceholders($config);
 
-                // Inject credentials from environment variables if missing or still placeholders
+                // Inject credentials from environment variables if missing or empty
                 $credentialMapping = [
                     'google' => [
                         'GOOGLE_CLIENT_ID' => 'client_id',
@@ -563,7 +565,7 @@ class Helpers
                     }
                     foreach ($mapping as $envKey => $configKey) {
                         $val = getenv($envKey);
-                        if ($val && (empty($config[$chan][$configKey]) || str_contains((string)$config[$chan][$configKey], '${'))) {
+                        if ($val && empty($config[$chan][$configKey])) {
                             $config[$chan][$configKey] = $val;
                         }
                     }
@@ -579,10 +581,14 @@ class Helpers
                     if (!empty($config[$commonKey])) {
                         foreach ($specificChannels as $chan) {
                             if (isset($config[$chan])) {
-                                // Merge nested: $config['google_search_console']['google']['client_id']
-                                $config[$chan][$commonKey] = array_merge($config[$commonKey], $config[$chan][$commonKey] ?? []);
-                                // Also merge flat: $config['google_search_console']['client_id']
-                                $config[$chan] = array_merge($config[$commonKey], $config[$chan]);
+                                // Important: Merge common into specific but only for missing/empty values in specific
+                                $config[$chan] = array_replace_recursive($config[$commonKey], array_filter($config[$chan]));
+                                // Maintain nested structure too
+                                if (!isset($config[$chan][$commonKey])) {
+                                    $config[$chan][$commonKey] = $config[$commonKey];
+                                } else {
+                                    $config[$chan][$commonKey] = array_merge($config[$commonKey], array_filter($config[$chan][$commonKey]));
+                                }
                             }
                         }
                     }
