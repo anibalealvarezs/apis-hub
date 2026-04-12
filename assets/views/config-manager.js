@@ -964,19 +964,19 @@ async function updateConfig(typeArg) {
             });
         });
 
-        if (typeArg === 'gsc') {
+        if (typeArg === 'google_search_console') {
             payload.enabled = document.getElementById('gsc-channel-enabled')?.checked;
             payload.cache_history_range = document.getElementById('gsc-history-range')?.value;
             payload.feature_toggles.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
             payload.feature_toggles.cron_recent_minute = document.getElementById('gsc-cron-minute')?.value;
-        } else if (typeArg === 'facebook-organic') {
+        } else if (typeArg === 'facebook_organic') {
             payload.enabled = document.getElementById('fb-organic-enabled').checked;
             payload.organic_history_range = document.getElementById('fb-organic-history-range').value;
             payload.feature_toggles.cron_entities_hour = document.getElementById('fb-organic-entities-cron-hour')?.value;
             payload.feature_toggles.cron_entities_minute = document.getElementById('fb-organic-entities-cron-minute')?.value;
             payload.feature_toggles.cron_recent_hour = document.getElementById('fb-organic-recent-cron-hour')?.value;
             payload.feature_toggles.cron_recent_minute = document.getElementById('fb-organic-recent-cron-minute')?.value;
-        } else if (typeArg === 'facebook-marketing') {
+        } else if (typeArg === 'facebook_marketing') {
             payload.enabled = document.getElementById('fb-marketing-enabled').checked;
             payload.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
             payload.feature_toggles.cron_entities_hour = document.getElementById('fb-marketing-entities-cron-hour')?.value;
@@ -1052,7 +1052,7 @@ async function updateConfig(typeArg) {
         }
 
         // Feature Toggles (Organic Tiers - Derived from Selectors)
-        if (typeArg === 'facebook-organic' || typeArg === 'global') {
+        if (typeArg === 'facebook_organic' || typeArg === 'global') {
             const fbLvl = document.getElementById('fb-organic-level')?.value || 'page';
             const igLvl = document.getElementById('fb-ig-level')?.value || 'accounts';
 

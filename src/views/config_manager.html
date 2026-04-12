@@ -166,12 +166,12 @@
             <div class="card">
                 <div class="section-title small" style="display:flex; justify-content:space-between; align-items:center;">
                     <span><i data-lucide="layers"></i> Search Console properties</span>
-                    <button class="btn btn-mini" onclick="forceRefresh('gsc')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Google</button>
+                    <button class="btn btn-mini" onclick="forceRefresh('google_search_console')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Google</button>
                     <button class="btn btn-mini disabled-btn" disabled style="background:rgba(255,255,255,0.05); color:var(--text-dim); cursor:not-allowed;" title="Force Sync (Feature disabled for now. This will allow triggering a full historical sync for all Google Search Console assets in future updates.)"><i data-lucide="zap" size="14" style="opacity:0.3"></i> Force Data Sync</button>
                 </div>
                 <div id="gsc-list" class="asset-grid"></div>
             </div>
-            <button class="btn btn-save-fixed" onclick="updateConfig('gsc')"><i data-lucide="save"></i> Save GSC Settings</button>
+            <button class="btn btn-save-fixed" onclick="updateConfig('google_search_console')"><i data-lucide="save"></i> Save GSC Settings</button>
         </div>
 
         <!-- Tab Content: Meta Organic -->
@@ -268,12 +268,12 @@
             <div class="card">
                 <div class="section-title small"><i data-lucide="layout"></i> Connected Pages</div>
                 <div style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:15px; gap:8px;">
-                    <button class="btn btn-mini" onclick="forceRefresh('facebook')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Meta</button>
+                    <button class="btn btn-mini" onclick="forceRefresh('facebook_organic')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Meta</button>
                     <button class="btn btn-mini disabled-btn" disabled style="background:rgba(255,255,255,0.05); color:var(--text-dim); cursor:not-allowed;" title="Force Sync (Feature disabled for now. This will allow triggering a full historical sync for all Meta Organic pages in future updates.)"><i data-lucide="zap" size="14" style="opacity:0.3"></i> Force Data Sync</button>
                 </div>
                 <div id="fb-pages-list" class="asset-grid"></div>
             </div>
-            <button class="btn btn-save-fixed" onclick="updateConfig('facebook-organic')"><i data-lucide="save"></i> Save Organic Settings</button>
+            <button class="btn btn-save-fixed" onclick="updateConfig('facebook_organic')"><i data-lucide="save"></i> Save Organic Settings</button>
         </div>
 
         <!-- Tab Content: Meta Marketing -->
@@ -440,7 +440,7 @@
                     </div>
                 </div>
             </div>
-            <button class="btn btn-save-fixed" onclick="updateConfig('facebook-marketing')"><i data-lucide="save"></i> Save Strategy</button>
+            <button class="btn btn-save-fixed" onclick="updateConfig('facebook_marketing')"><i data-lucide="save"></i> Save Strategy</button>
         </div>
 
         <!-- Dynamic Channel Tabs -->
