@@ -48,10 +48,11 @@ class MetricRequests implements RequestInterface
             $end = $filters->{$mapping['end']} ?? $endDate;
         }
 
-        return (new \Core\Services\SyncService())->execute($chanKey, $start, $end, [
+        return (new \Core\Services\SyncService($logger))->execute($chanKey, $start, $end, [
             'jobId' => $jobId,
             'resume' => $filters->resume ?? true,
             'filters' => $filters,
+            'entity' => $filters->entity ?? 'metrics',
         ]);
     }
 

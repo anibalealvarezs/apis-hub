@@ -2,8 +2,8 @@
 
 namespace Controllers;
 
-use Enums\AnalyticsEntity;
 use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Enums\AnalyticsEntity;
 use Exception;
 use Helpers\Helpers;
 use InvalidArgumentException;
@@ -27,7 +27,7 @@ class CacheController extends BaseController
         ?array $params = null
     ): Response {
         $channelEnum = Channel::tryFromName($channel);
-        if (!$channelEnum) {
+        if (! $channelEnum) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -36,7 +36,7 @@ class CacheController extends BaseController
             );
         }
 
-        if (!$this->isValidEntity(entity: $entity)) {
+        if (! $this->isValidEntity(entity: $entity)) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -46,7 +46,7 @@ class CacheController extends BaseController
         }
 
         $requestsClassName = $this->getEntityRequestsClassName($entity);
-        if (!\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::supportsEntity($channel, $entity)) {
+        if (! \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::supportsEntity($channel, $entity)) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -97,10 +97,11 @@ class CacheController extends BaseController
                 if ($methodParam->getName() === $key) {
                     $finalParams[$key] = $value;
                     $isKnownParam = true;
+
                     break;
                 }
             }
-            if (!$isKnownParam) {
+            if (! $isKnownParam) {
                 $extraParams[$key] = $value;
             }
         }
@@ -110,6 +111,7 @@ class CacheController extends BaseController
             if ($methodParam->getName() === 'filters') {
                 $currentFilters = (array) ($finalParams['filters'] ?? []);
                 $finalParams['filters'] = (object) array_merge($currentFilters, $extraParams);
+
                 break;
             }
         }
@@ -145,9 +147,9 @@ class CacheController extends BaseController
                 $sqlParams = [
                     'entities' => $equivalents,
                     'channel' => $channel->name,
-                    'statuses' => $statuses
+                    'statuses' => $statuses,
                 ];
-                
+
                 $payloadField = 'CAST(payload AS TEXT)';
                 if ($params && isset($params['startDate'])) {
                     $sql .= " AND ({$payloadField} LIKE :start_pattern1 OR {$payloadField} LIKE :start_pattern2)";
@@ -166,7 +168,7 @@ class CacheController extends BaseController
 
                 $sqlTypes = [
                     'entities' => \Doctrine\DBAL\Connection::PARAM_STR_ARRAY,
-                    'statuses' => \Doctrine\DBAL\Connection::PARAM_INT_ARRAY
+                    'statuses' => \Doctrine\DBAL\Connection::PARAM_INT_ARRAY,
                 ];
                 $existingJobs = $this->em->getConnection()->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
             } else {
@@ -207,9 +209,9 @@ class CacheController extends BaseController
 
             $payload = [
                 'body' => $body,
-                'params' => $params
+                'params' => $params,
             ];
-            
+
             if (isset($params['instance_name'])) {
                 $payload['instance_name'] = $params['instance_name'];
                 unset($params['instance_name']);
@@ -219,9 +221,9 @@ class CacheController extends BaseController
             // --- ATOMIC LOCK START ---
             $redis = Helpers::getRedisClient();
             $lockKey = 'lock:schedule:' . sha1($channel->name . $entity . json_encode($payload));
-            
+
             // Try to acquire lock for 30 seconds
-            if (!$redis->set($lockKey, 'locked', 'EX', 30, 'NX')) {
+            if (! $redis->set($lockKey, 'locked', 'EX', 30, 'NX')) {
                 return $this->createResponse(
                     data: null,
                     status: 'error',
@@ -265,6 +267,7 @@ class CacheController extends BaseController
                 }
                 if ($countInner > 0) {
                     $redis->del($lockKey);
+
                     return $this->createResponse(
                         data: null,
                         status: 'error',
@@ -277,7 +280,7 @@ class CacheController extends BaseController
                     'entity' => $entity,
                     'channel' => $channel->name,
                     'status' => \Enums\JobStatus::scheduled->value,
-                    'payload' => $payload
+                    'payload' => $payload,
                 ];
                 $jobRepo->create($jobData);
             } finally {
@@ -379,10 +382,11 @@ class CacheController extends BaseController
     protected function getEntityRequestsClassName(string $entity): string
     {
         $enum = AnalyticsEntity::tryFrom($entity);
-        if (!$enum) {
-            throw new InvalidArgumentException("Invalid entity: " . $entity);
+        if ($enum) {
+            return $enum->getRequestsClassName();
         }
-        return $enum->getRequestsClassName();
+
+        throw new InvalidArgumentException("Invalid entity: " . $entity);
     }
 
     /**
@@ -398,15 +402,18 @@ class CacheController extends BaseController
     public function fetchData(string $entity, Channel $channel, ?array $params = null, ?string $body = null): mixed
     {
         try {
-            $requestsClassName = $this->getEntityRequestsClassName($entity);
-            
-            $startDate = $params['startDate'] ?? null;
-            $endDate = $params['endDate'] ?? null;
+            $resolvedClassName = $this->getEntityRequestsClassName($entity);
+            $params = $params ?? [];
+            if (!isset($params['entity'])) {
+                $params['entity'] = $entity;
+            }
+
+            $startDate = $params['startDate'] ?? $params['start_date'] ?? null;
+            $endDate = $params['endDate'] ?? $params['end_date'] ?? null;
             $logger = $params['logger'] ?? null;
             $jobId = isset($params['jobId']) ? (int)$params['jobId'] : null;
 
-            /** @var Response $response */
-            $response = $requestsClassName::getList(
+            return $resolvedClassName::getList(
                 channel: $channel,
                 startDate: $startDate,
                 endDate: $endDate,

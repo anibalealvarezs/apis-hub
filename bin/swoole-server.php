@@ -22,20 +22,36 @@ require_once __DIR__ . "/../vendor/autoload.php";
 
 $host = '0.0.0.0';
 $port = (int) (getenv('PORT') ?: 8080);
+$useSsl = (getenv('USE_SSL') === 'true');
 
-$server = new Server($host, $port);
+$mode = SWOOLE_PROCESS;
+$sockType = SWOOLE_SOCK_TCP;
 
-$server->set([
+if ($useSsl) {
+    $sockType |= SWOOLE_SSL;
+}
+
+$server = new Server($host, $port, $mode, $sockType);
+
+$serverSettings = [
     'worker_num' => swoole_cpu_num() * 2,
     'enable_static_handler' => true,
     'document_root' => __DIR__ . '/..',
     'static_handler_locations' => ['/assets'],
     'max_request' => 1000, // Restart worker after 1000 requests to prevent leaks
     'dispatch_mode' => 1,
-]);
+];
 
-$server->on("Start", function (Server $server) use ($host, $port) {
-    echo "Swoole HTTP server is started at http://{$host}:{$port}\n";
+if ($useSsl) {
+    $serverSettings['ssl_cert_file'] = __DIR__ . '/../storage/certs/cert.pem';
+    $serverSettings['ssl_key_file'] = __DIR__ . '/../storage/certs/key.pem';
+}
+
+$server->set($serverSettings);
+
+$server->on("Start", function (Server $server) use ($host, $port, $useSsl) {
+    $protocol = $useSsl ? 'https' : 'http';
+    echo "Swoole HTTP server is started at {$protocol}://{$host}:{$port}\n";
 });
 
 $server->on("Request", function (SwooleRequest $swooleRequest, SwooleResponse $swooleResponse) {

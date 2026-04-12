@@ -49,6 +49,13 @@ class Helpers
         self::$dbConfig = null;
         self::$cacheConfig = null;
         self::$appMode = null;
+        self::$entityManager = null;
+        self::$redisClient = null;
+
+        // Reset DriverFactory instances to ensure they pick up new config
+        if (class_exists('\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory')) {
+            \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::reset();
+        }
     }
 
     /**

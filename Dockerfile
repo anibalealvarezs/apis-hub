@@ -54,5 +54,4 @@ ENV PORT=8080
 ENTRYPOINT ["bash", "/app/entrypoint.sh"]
 
 # El servidor PHP se ejecuta en el entrypoint.sh final.
-# El servidor PHP se ejecuta en el entrypoint.sh final, pero por consistencia el CMD default será este:
-CMD ["php", "-S", "0.0.0.0:8080", "-t", ".", "bin/index.php"]
+CMD []

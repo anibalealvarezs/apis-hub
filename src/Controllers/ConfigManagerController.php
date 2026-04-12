@@ -59,6 +59,9 @@ class ConfigManagerController extends BaseController
 
     public function fetchAssets(Request $request): Response
     {
+        // Force refresh of configuration cache (critical for Swoole/Long-lived environments)
+        Helpers::resetConfigs();
+        
         try {
             $logger = Helpers::setLogger('config-manager.log');
             $requestedType = $request->query->get('type');
@@ -239,6 +242,9 @@ class ConfigManagerController extends BaseController
 
             // Auto-trigger entity synchronization to ensure database reflects new config
             $this->triggerEntitySync($logger);
+
+            // Reset cached configs within the current process (critical for Swoole/Long-lived environments)
+            Helpers::resetConfigs();
 
             return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
         } catch (Exception $e) {

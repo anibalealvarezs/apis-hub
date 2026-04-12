@@ -38,6 +38,7 @@ $buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($d
         "PORT=8080",
         "API_SOURCE={$channel}",
         "API_ENTITY={$entity}",
+        "USE_SWOOLE=true",
         "DB_DRIVER=\${DB_DRIVER:-" . ($db['driver'] ?? 'pdo_pgsql') . "}",
         "DB_HOST=\${DB_HOST:-" . (($env === 'production' || $env === 'testing') ? 'db' : ($db['host'] ?? 'db')) . "}",
         "DB_PORT=\${DB_PORT:-" . ($db['port'] ?? 5432) . "}",
@@ -99,6 +100,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
             'dockerfile' => 'Dockerfile',
         ],
         'restart'     => 'always',
+        'command'     => null,
         'environment' => $buildEnv($masterName),
         'networks'    => ['default', 'apis-hub_gateway'],
         'ports'       => [
@@ -124,6 +126,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
                 'dockerfile' => 'Dockerfile',
             ],
             'restart'     => 'always',
+            'command'     => null,
             'environment' => $buildEnv($name, $channel, $entity),
             'volumes'     => $volumes, // Same volumes for workers
             'depends_on'  => ['master', 'redis'],

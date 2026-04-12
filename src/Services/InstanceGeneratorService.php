@@ -33,16 +33,32 @@ class InstanceGeneratorService
         }
 
         $projectConfig = \Helpers\Helpers::getProjectConfig();
-        $channels = $projectConfig['rules'] ?? [];
-
-        if (empty($channels)) {
-            throw new Exception("No instance generation rules found in configuration (instances_rules.yaml)");
-        }
+        $overrides = $projectConfig['rules'] ?? [];
+        $registry = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry();
 
         $currentPort = $basePort;
 
-        foreach ($channels as $channelName => $rules) {
-            if (isset($rules['enabled']) && !$rules['enabled']) {
+        foreach ($registry as $channelName => $config) {
+            $driverClass = $config['driver'] ?? null;
+            if (!$driverClass || !class_exists($driverClass)) {
+                continue;
+            }
+
+            // Get default rules from driver
+            $rules = [];
+            if (method_exists($driverClass, 'getInstanceRules')) {
+                $rules = $driverClass::getInstanceRules();
+            }
+
+            // Merge with local overrides
+            if (isset($overrides[$channelName])) {
+                if (isset($overrides[$channelName]['enabled']) && !$overrides[$channelName]['enabled']) {
+                    continue;
+                }
+                $rules = array_merge($rules, $overrides[$channelName]);
+            }
+
+            if (empty($rules)) {
                 continue;
             }
 

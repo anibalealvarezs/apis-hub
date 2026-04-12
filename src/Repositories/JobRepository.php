@@ -2,18 +2,18 @@
 
 namespace Repositories;
 
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
-use Doctrine\ORM\NonUniqueResultException;
 use Entities\Job;
 use Enums\AnalyticsEntity;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\JobStatus;
 use Enums\QueryBuilderType;
 use Faker\Factory;
-use InvalidArgumentException;
 use Helpers\Helpers;
+use InvalidArgumentException;
 
 class JobRepository extends BaseRepository
 {
@@ -21,7 +21,7 @@ class JobRepository extends BaseRepository
     {
         parent::__construct($em, $class);
     }
-    
+
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
@@ -62,24 +62,25 @@ class JobRepository extends BaseRepository
                 if (strtolower($case->name) === strtolower($status)) {
                     $data['status'] = $case->value;
                     $matched = true;
+
                     break;
                 }
             }
-            if (!$matched) {
+            if (! $matched) {
                 $data['status'] = JobStatus::scheduled->value;
             }
         } else {
             $data['status'] = JobStatus::scheduled->value;
         }
 
-        if (!isset($data['entity']) || !$data['entity']) {
+        if (! isset($data['entity']) || ! $data['entity']) {
             throw new InvalidArgumentException('Entity is required');
         }
-        if (!AnalyticsEntity::tryFrom($data['entity'])) {
-            throw new InvalidArgumentException('Invalid entity');
+        if (! AnalyticsEntity::tryFrom($data['entity'])) {
+            throw new InvalidArgumentException('Invalid entity: ' . $data['entity']);
         }
 
-        if (!isset($data['channel'])) {
+        if (! isset($data['channel'])) {
             throw new InvalidArgumentException('Channel is required');
         }
         if ($chanEnum = Channel::tryFromName($data['channel'])) {
@@ -88,7 +89,7 @@ class JobRepository extends BaseRepository
             throw new InvalidArgumentException('Invalid channel');
         }
 
-        if (!isset($data['uuid'])) {
+        if (! isset($data['uuid'])) {
             $data['uuid'] = Factory::create()->uuid;
         }
 
@@ -129,6 +130,7 @@ class JobRepository extends BaseRepository
             foreach ($filters as $key => $value) {
                 if ($key === 'global' && $value) {
                     $isGlobal = true;
+
                     continue;
                 }
                 if ($key === 'status') {
@@ -139,6 +141,7 @@ class JobRepository extends BaseRepository
                         foreach (JobStatus::cases() as $case) {
                             if (strtolower($case->name) === strtolower($value)) {
                                 $value = $case->value;
+
                                 break;
                             }
                         }
@@ -155,19 +158,19 @@ class JobRepository extends BaseRepository
         }
 
         // Apply Smart Context (localized filters) if not global and not explicitly overridden
-        if (!$isGlobal) {
+        if (! $isGlobal) {
             $envChannel = getenv('API_SOURCE');
             $envEntity = getenv('API_ENTITY');
             $envStart = getenv('START_DATE');
             $envEnd = getenv('END_DATE');
 
-            if ($envChannel && (!is_object($filters) || !isset($filters->channel))) {
+            if ($envChannel && (! is_object($filters) || ! isset($filters->channel))) {
                 if ($chanEnum = Channel::tryFromName($envChannel)) {
                     $envChannel = $chanEnum->name;
                 }
                 $query->andWhere('e.channel = :ctx_channel')->setParameter('ctx_channel', $envChannel);
             }
-            if ($envEntity && (!is_object($filters) || !isset($filters->entity))) {
+            if ($envEntity && (! is_object($filters) || ! isset($filters->entity))) {
                 $equivalents = [$envEntity];
                 if (strpos($envEntity, 'channeled_') === 0) {
                     $equivalents[] = str_replace('channeled_', '', $envEntity);
@@ -180,14 +183,14 @@ class JobRepository extends BaseRepository
             // Differentiate by Date Range in payload (e.g. gsc-jan vs gsc-feb)
             // We use a loose LIKE pattern to be compatible with MySQL JSON columns.
             // In PostgreSQL, this is handled via Native SQL in the calling methods to avoid DQL parsing issues.
-            if (!Helpers::isPostgres()) {
+            if (! Helpers::isPostgres()) {
                 $payloadField = 'e.payload';
-                if ($envStart && (!is_object($filters) || !isset($filters->startDate))) {
+                if ($envStart && (! is_object($filters) || ! isset($filters->startDate))) {
                     $query->andWhere("({$payloadField} LIKE :ctx_start_pattern1 OR {$payloadField} LIKE :ctx_start_pattern2)")
                         ->setParameter('ctx_start_pattern1', '%startDate%' . $envStart . '%')
                         ->setParameter('ctx_start_pattern2', '%start_date%' . $envStart . '%');
                 }
-                if ($envEnd && (!is_object($filters) || !isset($filters->endDate))) {
+                if ($envEnd && (! is_object($filters) || ! isset($filters->endDate))) {
                     $query->andWhere("({$payloadField} LIKE :ctx_end_pattern1 OR {$payloadField} LIKE :ctx_end_pattern2)")
                         ->setParameter('ctx_end_pattern1', '%endDate%' . $envEnd . '%')
                         ->setParameter('ctx_end_pattern2', '%end_date%' . $envEnd . '%');
@@ -220,6 +223,7 @@ class JobRepository extends BaseRepository
             foreach ($filters as $key => $value) {
                 if ($key === 'global' && $value) {
                     $isGlobal = true;
+
                     continue;
                 }
                 if ($key === 'status') {
@@ -229,6 +233,7 @@ class JobRepository extends BaseRepository
                         foreach (JobStatus::cases() as $case) {
                             if (strtolower($case->name) === strtolower($value)) {
                                 $value = $case->value;
+
                                 break;
                             }
                         }
@@ -244,9 +249,9 @@ class JobRepository extends BaseRepository
             }
         }
 
-        if (!$isGlobal) {
+        if (! $isGlobal) {
             $envChannel = getenv('API_SOURCE');
-            if ($envChannel && (!is_object($filters) || !isset($filters->channel))) {
+            if ($envChannel && (! is_object($filters) || ! isset($filters->channel))) {
                 if ($chanEnum = Channel::tryFromName($envChannel)) {
                     $envChannel = $chanEnum->name;
                 }
@@ -266,6 +271,7 @@ class JobRepository extends BaseRepository
     protected function processResult(array $result): array
     {
         $result['status'] = $this->getStatusName($result['status']);
+
         return parent::processResult($result);
     }
 
@@ -288,25 +294,25 @@ class JobRepository extends BaseRepository
         if (Helpers::isPostgres()) {
             $sql = "SELECT * FROM jobs WHERE status = :status";
             $params = ['status' => $status];
-            
+
             if ($channel) {
                 $sql .= " AND channel = :channel";
                 $params['channel'] = $channel;
             }
-            
+
             if ($instanceName) {
                 $sql .= " AND CAST(payload AS text) LIKE :instance_name_pattern";
                 $params['instance_name_pattern'] = '%instance_name%' . $instanceName . '%';
             }
-            
+
             $sql .= " ORDER BY id ASC LIMIT 100";
-            
+
             $rsm = new \Doctrine\ORM\Query\ResultSetMappingBuilder($this->_em);
             $rsm->addRootEntityFromClassMetadata($this->getEntityName(), 'j');
-            
+
             $query = $this->_em->createNativeQuery($sql, $rsm);
             $query->setParameters($params);
-            
+
             return $query->getResult();
         }
 
@@ -343,6 +349,7 @@ class JobRepository extends BaseRepository
     public function getJobsByUuid(string $uuid): array
     {
         $list = $this->readMultiple(filters: (object)['uuid' => $uuid])->toArray();
+
         return count($list) > 0 ? $list[0] : [];
     }
 
@@ -366,7 +373,7 @@ class JobRepository extends BaseRepository
     public function update(int $id, ?object $data = null, bool $returnEntity = false): ?array
     {
         $data = (array) ($data ?? []);
-        if (!isset($data['status']) || !$data['status']) {
+        if (! isset($data['status']) || ! $data['status']) {
             return parent::update($id, (object) $data);
         }
 
@@ -379,6 +386,7 @@ class JobRepository extends BaseRepository
             foreach (JobStatus::cases() as $case) {
                 if (strtolower($case->name) === strtolower($statusValue)) {
                     $mappedStatus = $case;
+
                     break;
                 }
             }
@@ -451,7 +459,7 @@ class JobRepository extends BaseRepository
         $qb->update($this->getEntityName(), 'e')
             ->set('e.status', ':delayed')
             ->set('e.updatedAt', ':now');
-        
+
         if ($message) {
             $qb->set('e.message', ':message')
                ->setParameter('message', $message);
@@ -479,14 +487,14 @@ class JobRepository extends BaseRepository
             $since->modify("-$withinHours hours");
 
             $sql = "SELECT count(j.id) FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :completed AND j.updated_at >= :since";
-            
+
             $stmt = $this->_em->getConnection()->prepare($sql);
             $result = $stmt->executeQuery([
                 'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
                 'completed' => JobStatus::completed->value,
-                'since' => $since->format('Y-m-d H:i:s')
+                'since' => $since->format('Y-m-d H:i:s'),
             ]);
-            
+
             return (int)$result->fetchOne() > 0;
         }
 
@@ -518,14 +526,15 @@ class JobRepository extends BaseRepository
     {
         if (Helpers::isPostgres()) {
             $sql = "SELECT j.updated_at FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :completed ORDER BY j.updated_at DESC LIMIT 1";
-            
+
             $stmt = $this->_em->getConnection()->prepare($sql);
             $result = $stmt->executeQuery([
                 'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
-                'completed' => JobStatus::completed->value
+                'completed' => JobStatus::completed->value,
             ]);
-            
+
             $val = $result->fetchOne();
+
             return $val ? new \DateTime($val) : null;
         }
 
@@ -559,15 +568,15 @@ class JobRepository extends BaseRepository
                 'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
                 'processing' => JobStatus::processing->value,
             ];
-            
+
             if ($excludeJobId) {
                 $sql .= " AND j.id != :excludeId";
                 $params['excludeId'] = $excludeJobId;
             }
-            
+
             $stmt = $this->_em->getConnection()->prepare($sql);
             $result = $stmt->executeQuery($params);
-            
+
             return (int)$result->fetchOne() > 0;
         }
 
@@ -599,6 +608,7 @@ class JobRepository extends BaseRepository
         $since->modify("-$hours hours");
 
         $qb = $this->_em->createQueryBuilder();
+
         return $qb->update($this->getEntityName(), 'e')
             ->set('e.status', ':failed')
             ->set('e.message', ':message')

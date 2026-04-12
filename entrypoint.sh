@@ -107,17 +107,15 @@ export MCP_MODE=sse
 export MCP_PORT=3000
 node mcp-server/index.js &
 
-# If arguments are provided to the container (like 'vendor/bin/phpunit'), execute them instead of the web server
-if [ $# -gt 0 ]; then
+# Start the web server
+if [ "$USE_SWOOLE" = "true" ]; then
+    echo "Starting Swoole HTTP server on port $PORT..."
+    exec php bin/swoole-server.php
+elif [ $# -gt 0 ]; then
+    # If arguments are provided to the container (like 'vendor/bin/phpunit'), execute them instead of the web server
     echo "Executing custom command: $@"
     exec "$@"
 else
-    # Run the web server (Default behavior)
-    if [ "$USE_SWOOLE" = "true" ]; then
-        echo "Starting Swoole HTTP server on port $PORT..."
-        exec php bin/swoole-server.php
-    else
-        echo "Starting PHP server on port $PORT with compression..."
-        exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
-    fi
+    echo "Starting PHP server on port $PORT with compression..."
+    exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
 fi
