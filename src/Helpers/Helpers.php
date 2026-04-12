@@ -524,12 +524,46 @@ class Helpers
                     ],
                 ];
 
+                $resolvePlaceholders = function (&$item) use (&$resolvePlaceholders) {
+                    if (is_array($item)) {
+                        foreach ($item as &$value) {
+                            $resolvePlaceholders($value);
+                        }
+                    } elseif (is_string($item) && preg_match('/\${([^}]+)}/', $item, $matches)) {
+                        $envValue = getenv($matches[1]);
+                        if ($envValue !== false) {
+                            $item = $envValue;
+                        }
+                    }
+                };
+                $resolvePlaceholders($config);
+
+                // Inject credentials from environment variables if missing or still placeholders
+                $credentialMapping = [
+                    'google' => [
+                        'GOOGLE_CLIENT_ID' => 'client_id',
+                        'GOOGLE_CLIENT_SECRET' => 'client_secret',
+                        'GOOGLE_REFRESH_TOKEN' => 'refresh_token',
+                        'GOOGLE_USER_ID' => 'user_id',
+                        'GOOGLE_REDIRECT_URI' => 'redirect_uri',
+                        'GOOGLE_TOKEN_PATH' => 'token_path',
+                    ],
+                    'facebook' => [
+                        'FACEBOOK_APP_ID' => 'app_id',
+                        'FACEBOOK_APP_SECRET' => 'app_secret',
+                        'FACEBOOK_USER_ID' => 'user_id',
+                        'FACEBOOK_REDIRECT_URI' => 'redirect_uri',
+                        'FACEBOOK_TOKEN_PATH' => 'token_path',
+                    ],
+                ];
+
                 foreach ($credentialMapping as $chan => $mapping) {
                     if (!isset($config[$chan])) {
                         $config[$chan] = [];
                     }
                     foreach ($mapping as $envKey => $configKey) {
-                        if (empty($config[$chan][$configKey]) && ($val = getenv($envKey))) {
+                        $val = getenv($envKey);
+                        if ($val && (empty($config[$chan][$configKey]) || str_contains((string)$config[$chan][$configKey], '${'))) {
                             $config[$chan][$configKey] = $val;
                         }
                     }
@@ -548,7 +582,6 @@ class Helpers
                                 // Merge nested: $config['google_search_console']['google']['client_id']
                                 $config[$chan][$commonKey] = array_merge($config[$commonKey], $config[$chan][$commonKey] ?? []);
                                 // Also merge flat: $config['google_search_console']['client_id']
-                                // (This covers both styles of driver implementation)
                                 $config[$chan] = array_merge($config[$commonKey], $config[$chan]);
                             }
                         }
