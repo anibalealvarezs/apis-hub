@@ -9,8 +9,13 @@ use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\Persistence\Proxy;
 use Entities\Entity;
 use Exception;
+use Monolog\Handler\NullHandler;
+use Monolog\Handler\RotatingFileHandler;
+use Monolog\Level;
+use Monolog\Logger;
 use Predis\Client;
 use Predis\ClientInterface;
+use Psr\Log\LoggerInterface;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
@@ -18,12 +23,6 @@ use ReflectionObject;
 use ReflectionProperty;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
-use Monolog\Handler\StreamHandler;
-use Monolog\Handler\RotatingFileHandler;
-use Monolog\Handler\NullHandler;
-use Monolog\Level;
-use Monolog\Logger;
-use Psr\Log\LoggerInterface;
 
 class Helpers
 {
@@ -70,17 +69,19 @@ class Helpers
 
         // 0. Load .env manually if it exists to ensure variables are available
         $envFileName = getenv('ENV_FILE') ?: '.env';
-        
-        // Smart Default: If we are not explicitly told a file, and we are NOT already loading .env.demo, 
+
+        // Smart Default: If we are not explicitly told a file, and we are NOT already loading .env.demo,
         // we check if we should supplement with .env.demo later.
-        
-        $loadEnvFile = function($filename) {
+
+        $loadEnvFile = function ($filename) {
             $root = getenv('CONFIG_DIR') ? dirname(getenv('CONFIG_DIR')) : __DIR__ . '/../../';
             $filePath = $root . '/' . $filename;
             if (file_exists($filePath)) {
                 $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
                 foreach ($lines as $line) {
-                    if (str_starts_with(trim($line), '#')) continue;
+                    if (str_starts_with(trim($line), '#')) {
+                        continue;
+                    }
                     if (str_contains($line, '=')) {
                         list($name, $value) = explode('=', $line, 2);
                         $name = trim($name);
@@ -89,13 +90,15 @@ class Helpers
                         $_ENV[$name] = $value;
                     }
                 }
+
                 return true;
             }
+
             return false;
         };
 
         // First pass: Load the primary env file
-        if (!defined('PHPUNIT_COMPOSER_INSTALL') && !defined('__PHPUNIT_PHAR__')) {
+        if (! defined('PHPUNIT_COMPOSER_INSTALL') && ! defined('__PHPUNIT_PHAR__')) {
             $loadEnvFile($envFileName);
         }
 
@@ -110,13 +113,14 @@ class Helpers
         $mandatoryFiles = ['database.yaml', 'security.yaml', 'app.yaml'];
         $missing = [];
         foreach ($mandatoryFiles as $mFile) {
-            if (!file_exists($rootConfigDir . '/' . $mFile)) {
+            if (! file_exists($rootConfigDir . '/' . $mFile)) {
                 $missing[] = $mFile;
             }
         }
 
-        if (!empty($missing)) {
+        if (! empty($missing)) {
             $fileList = implode(', ', $missing);
+
             throw new \Exceptions\ConfigurationException(
                 "Critical configuration files are missing: $fileList. " .
                 "Please copy them from their .example templates in the config/ directory."
@@ -126,10 +130,10 @@ class Helpers
         // 1. Load all split config files from config/
         if (is_dir($rootConfigDir)) {
             $files = self::globRecursive($rootConfigDir . '/*.yaml');
-            
+
             foreach ($files as $file) {
                 $fileConfig = self::loadYamlFile($file);
-                if (!empty($fileConfig)) {
+                if (! empty($fileConfig)) {
                     $config = array_replace_recursive($config, $fileConfig);
                 }
             }
@@ -150,22 +154,28 @@ class Helpers
      */
     private static function loadYamlFile(string $file): array
     {
-        if (!is_file($file)) {
+        if (! is_file($file)) {
             return [];
         }
+
         try {
             $content = file_get_contents($file);
             // Interpolate environment variables: ${VAR:-default}
-            $content = preg_replace_callback('/\$\{([^}:]+)(?::-([^}]*))?\}/', function($matches) {
+            $content = preg_replace_callback('/\$\{([^}:]+)(?::-([^}]*))?\}/', function ($matches) {
                 $varName = trim($matches[1]);
                 $envValue = getenv($varName);
-                if ($envValue === false && isset($_ENV[$varName])) $envValue = $_ENV[$varName];
-                if ($envValue === false && isset($_SERVER[$varName])) $envValue = $_SERVER[$varName];
-                
+                if ($envValue === false && isset($_ENV[$varName])) {
+                    $envValue = $_ENV[$varName];
+                }
+                if ($envValue === false && isset($_SERVER[$varName])) {
+                    $envValue = $_SERVER[$varName];
+                }
+
                 return ($envValue !== false) ? (string)$envValue : ($matches[2] ?? $matches[0]);
             }, $content);
 
             $parsed = Yaml::parse($content);
+
             return is_array($parsed) ? $parsed : [];
         } catch (Exception) {
             return [];
@@ -183,6 +193,7 @@ class Helpers
         foreach (glob(dirname($pattern) . '/*', GLOB_ONLYDIR | GLOB_NOSORT) as $dir) {
             $files = array_merge($files, self::globRecursive($dir . '/' . basename($pattern), $flags));
         }
+
         return array_filter($files, 'is_file');
     }
 
@@ -202,6 +213,7 @@ class Helpers
     public static function isDebug(): bool
     {
         $config = self::getProjectConfig();
+
         return (bool) ($config['debug'] ?? false);
     }
 
@@ -219,9 +231,9 @@ class Helpers
             }
 
             $mode = getenv('APP_MODE') ?: ($_ENV['APP_MODE'] ?? null);
-            
+
             // Heuristic for Demo: If APP_MODE is missing but PROJECT_NAME has 'demo'
-            if (!$mode) {
+            if (! $mode) {
                 $projectName = getenv('PROJECT_NAME') ?: ($config['project'] ?? '');
                 if (str_contains(strtolower($projectName), 'demo')) {
                     $mode = 'demo';
@@ -230,6 +242,7 @@ class Helpers
 
             self::$appMode = strtolower($mode ?: 'production');
         }
+
         return self::$appMode;
     }
 
@@ -239,7 +252,7 @@ class Helpers
         if ($mode === 'demo') {
             return true;
         }
-        
+
         try {
             $config = self::getProjectConfig();
             $envProject = getenv('PROJECT_NAME');
@@ -247,19 +260,21 @@ class Helpers
             if (str_contains(strtolower($projectName), 'demo')) {
                 return true;
             }
-        } catch (\Exception $e) {}
+        } catch (\Exception $e) {
+        }
 
         return false;
     }
+
     /**
      * @return array
      */
     public static function getCliConfig(): array
     {
         $projectConfig = self::getProjectConfig();
+
         return (array) ($projectConfig['cli'] ?? ['memory_limit' => '1G']);
     }
-
 
     /**
      * @param int $limit
@@ -271,6 +286,7 @@ class Helpers
         for ($i = 1; $i <= $limit; $i++) {
             $array[$i] = $i;
         }
+
         return $array;
     }
 
@@ -287,6 +303,7 @@ class Helpers
             $property = $reflector->getProperty($property);
             $instance->$property = $property->getValue($instance);
         }
+
         return $instance;
     }
 
@@ -299,6 +316,7 @@ class Helpers
     {
         $reflection = new ReflectionClass($class);
         $properties = $reflection->getProperties(ReflectionMethod::IS_PRIVATE);
+
         return array_map(function ($property) {
             return $property;
         }, $properties);
@@ -331,16 +349,18 @@ class Helpers
             foreach ($updateCols as $col) {
                 if ($col === 'updatedAt' || $col === 'updated_at') {
                     $updateClauses[] = "{$col} = CURRENT_TIMESTAMP";
+
                     continue;
                 }
                 if ($col === 'channeled_account_id' || $col === 'account_id' || $col === 'page_id') {
                     $updateClauses[] = "{$col} = COALESCE(EXCLUDED.{$col}, {$table}.{$col})";
+
                     continue;
                 }
                 $updateClauses[] = "{$col} = EXCLUDED.{$col}";
             }
             $updateString = implode(', ', $updateClauses);
-            
+
             return "INSERT INTO {$table} ({$colString}) VALUES {$valuesString} ON CONFLICT ({$uniqueClause}) DO UPDATE SET {$updateString}";
         } else {
             // MySQL syntax: ON DUPLICATE KEY UPDATE col = VALUES(col)
@@ -348,12 +368,13 @@ class Helpers
             foreach ($updateCols as $col) {
                 if ($col === 'updatedAt' || $col === 'updated_at') {
                     $updateClauses[] = "{$col} = CURRENT_TIMESTAMP";
+
                     continue;
                 }
                 $updateClauses[] = "{$col} = VALUES({$col})";
             }
             $updateString = implode(', ', $updateClauses);
-            
+
             return "INSERT INTO {$table} ({$colString}) VALUES {$valuesString} ON DUPLICATE KEY UPDATE {$updateString}";
         }
     }
@@ -407,10 +428,10 @@ class Helpers
                 $config['dbname'] = getenv('DB_NAME') ?: ($baseConfig['name'] ?? 'apis-hub');
                 $isPgsql = $config['driver'] === 'pdo_pgsql';
                 $config['charset'] = $isPgsql ? 'UTF8' : 'utf8mb4';
-                
-                if (!$isPgsql) {
+
+                if (! $isPgsql) {
                     $config['driverOptions'] = [
-                        1002 => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci' // PDO::MYSQL_ATTR_INIT_COMMAND
+                        1002 => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci', // PDO::MYSQL_ATTR_INIT_COMMAND
                     ];
                 }
 
@@ -419,6 +440,7 @@ class Helpers
                 throw new RuntimeException("Failed to load database configuration: " . $e->getMessage());
             }
         }
+
         return self::$dbConfig;
     }
 
@@ -429,10 +451,11 @@ class Helpers
     {
         $config = self::getDbConfig();
         $driver = $config['driver'] ?? '';
+
         return (
-            $driver === 'pdo_pgsql' || 
-            $driver === 'pgsql' || 
-            $driver === 'postgres' || 
+            $driver === 'pdo_pgsql' ||
+            $driver === 'pgsql' ||
+            $driver === 'postgres' ||
             $driver === 'postgresql' ||
             str_contains($driver, 'pgsql') ||
             str_contains($driver, 'postgres')
@@ -449,6 +472,7 @@ class Helpers
             $config = $projectConfig['channels'] ?? [];
             $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
             $filePath = $configDir . '/yaml/channelsconfig.yaml';
+
             try {
                 if (file_exists($filePath)) {
                     $yamlConfig = Yaml::parseFile($filePath);
@@ -459,20 +483,19 @@ class Helpers
 
                 // Override with environment variables if present
                 if ($envChannelsJson = getenv('CHANNELS_CONFIG')) {
-                    var_dump("CHANNELS_CONFIG found", $envChannelsJson);
                     $envChannels = json_decode($envChannelsJson, true);
                     if (is_array($envChannels)) {
                         $config = array_replace_recursive($config, $envChannels);
-                    var_dump("Merged config for klaviyo", $config["klaviyo"] ?? "not set");
                     }
                 }
 
                 // Normalize relative paths to project root to avoid CWD issues
                 $rootPath = dirname(__DIR__, 2);
-                $resolvePath = function($path) use ($rootPath) {
+                $resolvePath = function ($path) use ($rootPath) {
                     if (is_string($path) && str_starts_with($path, './')) {
                         return $rootPath . substr($path, 1);
                     }
+
                     return $path;
                 };
 
@@ -484,12 +507,15 @@ class Helpers
 
                 if (getenv('APP_ENV') === 'demo') {
                     $placeholders = ['PAGE_ID', 'IG_ACCOUNT_ID', 'PAGE_URL', 'example.com', 'AD_ACCOUNT_ID'];
-                    $cleanEntityList = function($entities) use ($placeholders) {
-                        return array_filter($entities, function($item) use ($placeholders) {
+                    $cleanEntityList = function ($entities) use ($placeholders) {
+                        return array_filter($entities, function ($item) use ($placeholders) {
                             $asString = json_encode($item);
                             foreach ($placeholders as $p) {
-                                if (str_contains($asString, $p)) return false;
+                                if (str_contains($asString, $p)) {
+                                    return false;
+                                }
                             }
+
                             return true;
                         });
                     };
@@ -508,6 +534,7 @@ class Helpers
                 throw new RuntimeException("Failed to load channels configuration: " . $e->getMessage());
             }
         }
+
         return self::$channelsConfig;
     }
 
@@ -518,12 +545,13 @@ class Helpers
     {
         if (self::$entitiesConfig === null) {
             $filePath = __DIR__ . '/../../config/entitiesconfig.yaml';
+
             try {
-                if (!file_exists($filePath)) {
+                if (! file_exists($filePath)) {
                     throw new RuntimeException("Entities configuration file not found: $filePath");
                 }
                 $config = Yaml::parseFile($filePath);
-                if (!is_array($config)) {
+                if (! is_array($config)) {
                     throw new RuntimeException("Invalid entities configuration: $filePath must return an array");
                 }
                 self::$entitiesConfig = $config;
@@ -531,6 +559,7 @@ class Helpers
                 throw new RuntimeException("Failed to load entities configuration: " . $e->getMessage());
             }
         }
+
         return self::$entitiesConfig;
     }
 
@@ -544,6 +573,7 @@ class Helpers
             $config = $projectConfig['redis'] ?? [];
 
             $filePath = __DIR__ . '/../../config/yaml/cacheconfig.yaml';
+
             try {
                 if (file_exists($filePath)) {
                     $yamlConfig = Yaml::parseFile($filePath);
@@ -552,7 +582,7 @@ class Helpers
                     }
                 }
 
-                if (!isset($config['redis'])) {
+                if (! isset($config['redis'])) {
                     $config['redis'] = [];
                 }
 
@@ -568,6 +598,7 @@ class Helpers
                 throw new RuntimeException("Failed to load cache configuration: " . $e->getMessage());
             }
         }
+
         return self::$cacheConfig;
     }
 
@@ -580,7 +611,7 @@ class Helpers
         if ($env !== false && $env !== '') {
             return $env;
         }
-        
+
         // Fallback a $_ENV (donde nuestro cargador manual inyecta los valores)
         return $_ENV['ADMIN_API_KEY'] ?? null;
     }
@@ -594,12 +625,13 @@ class Helpers
         if ($env !== false && $env !== '') {
             return $env;
         }
-        
+
         $config = self::getProjectConfig();
         $keys = $config['security']['api_keys'] ?? null;
         if (is_array($keys)) {
             return implode(',', $keys);
         }
+
         return $keys;
     }
 
@@ -612,12 +644,13 @@ class Helpers
         if ($envIps !== false && $envIps !== '' && $envIps !== '[]') {
             return array_map('trim', explode(',', $envIps));
         }
-        
+
         $config = self::getProjectConfig();
         $ips = $config['security']['authorized_ips'] ?? [];
         if (is_string($ips)) {
             return [$ips];
         }
+
         return is_array($ips) ? $ips : [];
     }
 
@@ -642,10 +675,12 @@ class Helpers
                 if (getenv('APP_ENV') === 'testing' || (defined('PHPUNIT_COMPOSER_INSTALL') || defined('__PHPUNIT_PHAR__'))) {
                     // During tests, we log the failure but don't crash everything
                     error_log('Redis initialization failed during tests: ' . $e->getMessage());
-                    // We keep the client instance even if ping failed, 
+
+                    // We keep the client instance even if ping failed,
                     // downstream code will fail specifically if it actually tries to use it.
-                    return self::$redisClient; 
+                    return self::$redisClient;
                 }
+
                 throw new RuntimeException('Failed to initialize Redis client: ' . $e->getMessage());
             }
         }
@@ -658,14 +693,14 @@ class Helpers
      */
     public static function getManager(): EntityManager
     {
-        if (self::$entityManager === null || !self::$entityManager->isOpen()) {
+        if (self::$entityManager === null || ! self::$entityManager->isOpen()) {
             try {
                 $config = self::getDbConfig();
                 $connection = DriverManager::getConnection($config);
 
                 // Create attribute metadata configuration
                 $ormConfig = ORMSetup::createAttributeMetadataConfiguration(
-                    paths: [__DIR__ . '/../Entities'],
+                    paths: array_merge([__DIR__ . '/../Entities'], \Anibalealvarezs\ApiDriverCore\Classes\EntityRegistry::getAll()),
                     isDevMode: true
                 );
 
@@ -675,6 +710,7 @@ class Helpers
                 throw new RuntimeException('Failed to initialize EntityManager: ' . $e->getMessage());
             }
         }
+
         return self::$entityManager;
     }
 
@@ -689,6 +725,7 @@ class Helpers
             }
             $subsets = $newSubsets;
         }
+
         return $subsets;
     }
 
@@ -701,6 +738,7 @@ class Helpers
             if ($entity['crud_enabled']) {
                 return $entity;
             }
+
             return false;
         });
     }
@@ -723,15 +761,17 @@ class Helpers
                 )
             )
         );
-        if (!$capitalizeFirst) {
+        if (! $capitalizeFirst) {
             $str[0] = strtolower($str[0]);
         }
+
         return $str;
     }
 
     public static function toSnakeCase(string $string): string
     {
         $string = preg_replace('/([a-z])([A-Z])/', '$1_$2', $string);
+
         return strtolower($string);
     }
 
@@ -744,13 +784,13 @@ class Helpers
     public static function humanToIsoInterval(string $human): array|string|null
     {
         $human = strtolower(trim($human));
-        
+
         $conversions = [
-            'year'   => 'Y',
-            'month'  => 'M',
-            'week'   => 'W',
-            'day'    => 'D',
-            'hour'   => 'H',
+            'year' => 'Y',
+            'month' => 'M',
+            'week' => 'W',
+            'day' => 'D',
+            'hour' => 'H',
             'minute' => 'M', // Suffix for time part
             'second' => 'S',
         ];
@@ -759,10 +799,11 @@ class Helpers
             $value = $matches[1];
             $unit = $matches[2];
             $suffix = $conversions[$unit];
-            
+
             if (in_array($unit, ['hour', 'minute', 'second'])) {
                 return "PT{$value}{$suffix}";
             }
+
             return "P{$value}{$suffix}";
         }
 
@@ -782,7 +823,7 @@ class Helpers
 
         $propsIterator = function () use ($props, $entity, $fields) {
             foreach ($props as $prop) {
-                if (method_exists($entity, self::toCamelcase('get_' . $prop->getName())) && (!$fields || in_array($prop->getName(), $fields))) {
+                if (method_exists($entity, self::toCamelcase('get_' . $prop->getName())) && (! $fields || in_array($prop->getName(), $fields))) {
                     yield $prop->getName() => $entity->{self::toCamelcase('get_' . $prop->getName())}();
                 }
             }
@@ -817,6 +858,7 @@ class Helpers
         if ($data) {
             return json_decode(base64_decode($data));
         }
+
         return (object)[];
     }
 
@@ -828,8 +870,10 @@ class Helpers
     {
         if ($data) {
             $decoded = json_decode($data);
+
             return is_object($decoded) ? $decoded : (object)[];
         }
+
         return (object)[];
     }
 
@@ -845,6 +889,7 @@ class Helpers
         }, $multiDimensionalArray);
         // Remove duplicates based on the string representation
         $uniqueStringMatrix = array_unique($stringMatrix);
+
         // Convert back to the original multidimensional array
         return array_map(function ($variant) {
             return json_decode($variant, true);
@@ -910,7 +955,7 @@ class Helpers
      */
     public static function checkJobStatus(?int $jobId): void
     {
-        if (!$jobId) {
+        if (! $jobId) {
             return;
         }
 
@@ -934,15 +979,15 @@ class Helpers
     public static function getLogLevel(string $level): Level
     {
         return match (strtolower($level)) {
-            'debug'     => Level::Debug,
-            'info'      => Level::Info,
-            'notice'    => Level::Notice,
-            'warning'   => Level::Warning,
-            'error'     => Level::Error,
-            'critical'  => Level::Critical,
-            'alert'     => Level::Alert,
+            'debug' => Level::Debug,
+            'info' => Level::Info,
+            'notice' => Level::Notice,
+            'warning' => Level::Warning,
+            'error' => Level::Error,
+            'critical' => Level::Critical,
+            'alert' => Level::Alert,
             'emergency' => Level::Emergency,
-            default     => Level::Info,
+            default => Level::Info,
         };
     }
 
@@ -956,31 +1001,32 @@ class Helpers
         $projectConfig = self::getProjectConfig();
         $logConfig = $projectConfig['logging'] ?? [];
         $enabled = (bool) ($logConfig['enabled'] ?? true);
-        
+
         $name = str_replace('.log', '', $filename);
         $logger = new Logger($name);
 
-        if (!$enabled) {
+        if (! $enabled) {
             $logger->pushHandler(new NullHandler());
+
             return $logger;
         }
 
         // Determine base level from config
-        $configLevelStr = self::isDebug() 
-            ? ($logConfig['level'] ?? 'info') 
+        $configLevelStr = self::isDebug()
+            ? ($logConfig['level'] ?? 'info')
             : ($logConfig['prod_level'] ?? 'error');
-            
+
         $baseLevel = self::getLogLevel($configLevelStr);
 
         // If a specific level was requested, we respect it if it's more restrictive
         // or if debug is on.
         if ($level !== null) {
-            $requested = ($level instanceof Level) 
-                ? $level 
+            $requested = ($level instanceof Level)
+                ? $level
                 : (is_int($level) ? Level::from($level) : self::getLogLevel($level));
-            
+
             // In non-debug mode, we don't allow logging below the prod_level
-            if (!self::isDebug() && $requested->value < $baseLevel->value) {
+            if (! self::isDebug() && $requested->value < $baseLevel->value) {
                 $requested = $baseLevel;
             }
             $finalLevel = $requested;
@@ -990,6 +1036,7 @@ class Helpers
 
         $maxFiles = $logConfig['max_days'] ?? 7;
         $logger->pushHandler(new RotatingFileHandler(__DIR__ . '/../../logs/' . $filename, $maxFiles, $finalLevel));
+
         return $logger;
     }
 
@@ -1020,31 +1067,41 @@ class Helpers
     {
         $value = (string)$value;
         // If include is set, must match at least one
-        if (!empty($include)) {
+        if (! empty($include)) {
             $matchedInclude = false;
             $includes = is_array($include) ? $include : [$include];
             foreach ($includes as $pattern) {
-                if (empty($pattern)) continue;
+                if (empty($pattern)) {
+                    continue;
+                }
                 if (str_starts_with($pattern, '/') && str_ends_with($pattern, '/')) {
                     if (preg_match($pattern, $value)) {
                         $matchedInclude = true;
+
                         break;
                     }
                 } elseif (stripos($value, $pattern) !== false) {
                     $matchedInclude = true;
+
                     break;
                 }
             }
-            if (!$matchedInclude) return false;
+            if (! $matchedInclude) {
+                return false;
+            }
         }
 
         // If exclude is set, must NOT match any
-        if (!empty($exclude)) {
+        if (! empty($exclude)) {
             $excludes = is_array($exclude) ? $exclude : [$exclude];
             foreach ($excludes as $pattern) {
-                if (empty($pattern)) continue;
+                if (empty($pattern)) {
+                    continue;
+                }
                 if (str_starts_with($pattern, '/') && str_ends_with($pattern, '/')) {
-                    if (preg_match($pattern, $value)) return false;
+                    if (preg_match($pattern, $value)) {
+                        return false;
+                    }
                 } elseif (stripos($value, $pattern) !== false) {
                     return false;
                 }
@@ -1082,7 +1139,7 @@ class Helpers
 
             $chunks[] = [
                 'start' => $currentStart->format('Y-m-d'),
-                'end' => $currentEnd->format('Y-m-d')
+                'end' => $currentEnd->format('Y-m-d'),
             ];
 
             $currentStart = $currentEnd->copy()->addDay();
@@ -1112,7 +1169,7 @@ class Helpers
             }
         }
 
-        if (!$prefix && $hostname) {
+        if (! $prefix && $hostname) {
             $assetPattern = \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::findByHostname($hostname);
             if ($assetPattern) {
                 $prefix = $assetPattern['prefix'];
@@ -1126,7 +1183,7 @@ class Helpers
         $normalizedUrl = strtolower($normalizedUrl);
 
         // 4. Extract ID from URL if regex is available
-        if (!$platformId && $urlIdRegex) {
+        if (! $platformId && $urlIdRegex) {
             if (preg_match($urlIdRegex, $normalizedUrl, $matches)) {
                 $platformId = $matches[1];
             }
@@ -1151,8 +1208,7 @@ class Helpers
     public static function isMaster(): bool
     {
         $instance = getenv('INSTANCE_NAME');
+
         return $instance && str_contains(strtolower($instance), 'master');
     }
 }
-
-

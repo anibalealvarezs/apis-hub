@@ -4,12 +4,8 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Anibalealvarezs\KlaviyoHubDriver\Conversions\KlaviyoConvert;
-use Anibalealvarezs\KlaviyoApi\KlaviyoApi;
 use Doctrine\Common\Collections\ArrayCollection;
 use Anibalealvarezs\ApiSkeleton\Enums\Channel;
-use GuzzleHttp\Exception\GuzzleException;
-use Helpers\Helpers;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
@@ -36,92 +32,14 @@ class ProductVariantRequests implements RequestInterface
         ?int $jobId = null,
         ?object $filters = null
     ): Response {
-        $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
-        $method = 'getListFrom' . $chanEnum->getCommonName();
-        return self::$method(
-                filters: $filters,
-                resume: $filters->resume ?? true,
-                jobId: $jobId
-            );
-    }
+        $chanKey = ($channel instanceof Channel) ? $channel->name : (string)$channel;
 
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode(['Product variants are retrieved along with Products.']));
-    }
-
-    /**
-     * @param array|null $fields
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     * @throws GuzzleException
-     */
-    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        $config = Helpers::getChannelsConfig()['klaviyo'];
-        $klaviyoClient = new KlaviyoApi(
-            apiKey: $config['klaviyo_api_key'],
-        );
-        $formattedFilters = [];
-        if ($filters) {
-            foreach ($filters as $key => $value) {
-                $formattedFilters[] = [
-                    "operator" => 'equals',
-                    "field" => $key,
-                    "value" => $value,
-                ];
-            }
-        }
-        $sourceVariants = $klaviyoClient->getAllCatalogVariants(
-            catalogVariantsFields: $fields,
-            filter: $formattedFilters,
-        );
-
-        return self::process(KlaviyoConvert::productVariants($sourceVariants['data']));
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute($chanKey, $startDate, $endDate, [
+            'jobId' => $jobId,
+            'resume' => $filters->resume ?? true,
+            'type' => 'product_variants',
+            'filters' => $filters,
+        ]);
     }
 
     /**

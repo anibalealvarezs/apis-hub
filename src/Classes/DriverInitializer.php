@@ -8,6 +8,8 @@ use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Exception;
 use Helpers\Helpers;
+use Anibalealvarezs\ApiDriverCore\Classes\PageTypeRegistry;
+use Anibalealvarezs\ApiDriverCore\Classes\AccountTypeRegistry;
 use Psr\Log\LoggerInterface;
 
 class DriverInitializer
@@ -128,7 +130,16 @@ class DriverInitializer
                     \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::register($type, $pConfig);
                 }
 
-                // 2. Call boot sequence
+                // 2. Register page types
+                \Anibalealvarezs\ApiDriverCore\Classes\PageTypeRegistry::register($driver::getPageTypes());
+
+                // 3. Register account types
+                \Anibalealvarezs\ApiDriverCore\Classes\AccountTypeRegistry::register($driver::getAccountTypes());
+
+                // 4. Register entity paths
+                \Anibalealvarezs\ApiDriverCore\Classes\EntityRegistry::register($driver::getEntityPaths());
+
+                // 5. Call boot sequence
                 $driver->boot();
 
             } catch (Exception $e) {

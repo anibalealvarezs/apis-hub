@@ -35,13 +35,15 @@ class ProductRequests implements RequestInterface
         ?object $filters = null
     ): \Symfony\Component\HttpFoundation\Response {
         $chanKey = ($channel instanceof Channel) ? $channel->name : (string)$channel;
+        $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
+        $mapping = $driver->getDateFilterMapping();
 
         // Intelligent date resolution
         $start = $startDate;
         $end = $endDate;
-        if (in_array($chanKey, ['shopify', 'klaviyo', 'bigcommerce', 'netsuite', 'amazon'])) {
-            $start = $filters->createdAtMin ?? $startDate;
-            $end = $filters->createdAtMax ?? $endDate;
+        if (! empty($mapping)) {
+            $start = $filters->{$mapping['start']} ?? $startDate;
+            $end = $filters->{$mapping['end']} ?? $endDate;
         }
 
         return (new \Core\Services\SyncService())->execute($chanKey, $start, $end, [

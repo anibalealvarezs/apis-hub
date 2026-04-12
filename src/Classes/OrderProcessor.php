@@ -8,7 +8,6 @@ use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Helpers\Helpers;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 
 class OrderProcessor
 {
@@ -74,17 +73,17 @@ class OrderProcessor
                     'data' => is_object($co->data) ? clone $co->data : (object)($co->data ?? []),
                 ];
             } else {
-                // Specific logic for netsuite line items append based on OrderRequests
-                if ((int)$chan === Channel::netsuite->value) {
-                    $existingData = (array)$uCOrd[$coKey]['data'];
-                    $newData = (array)$co->data;
-                    if (isset($existingData['line_items']) && isset($newData['line_items'])) {
-                        $existingData['line_items'] = Helpers::multiDimensionalArrayUnique(array_merge($existingData['line_items'], $newData['line_items']));
-                    } elseif (isset($newData['line_items'])) {
-                        $existingData['line_items'] = $newData['line_items'];
+                // Agnostic logic for data merging on duplicate platform entries in the same batch
+                $existingData = (array)$uCOrd[$coKey]['data'];
+                $newData = (array)$co->data;
+                foreach ($newData as $prop => $val) {
+                    if (is_array($val) && isset($existingData[$prop]) && is_array($existingData[$prop])) {
+                        $existingData[$prop] = Helpers::multiDimensionalArrayUnique(array_merge($existingData[$prop], $val));
+                    } else {
+                        $existingData[$prop] = $val;
                     }
-                    $uCOrd[$coKey]['data'] = (object)$existingData;
                 }
+                $uCOrd[$coKey]['data'] = (object)$existingData;
             }
 
             // Customers
@@ -419,17 +418,17 @@ class OrderProcessor
                 $orderId = $orderMap['map'][$oKey]['id'];
 
                 $cCustId = null;
-                if ($co['customerRef'] && isset($channeledCustomerMap[$co['customerRef']])) {
-                    $cCustId = $channeledCustomerMap[$co['customerRef']]['id'];
+                if (!empty($co['customer_ref']) && isset($channeledCustomerMap[$co['customer_ref']])) {
+                    $cCustId = $channeledCustomerMap[$co['customer_ref']]['id'];
                 }
 
                 $row = [
                     'order_id' => $orderId,
                     'channeled_customer_id' => $cCustId,
-                    'channel' => $coRow['channel'],
-                    'platform_id' => $coRow['platform_id'],
-                    'platform_created_at' => $coRow['platform_created_at'] instanceof DateTime ? $coRow['platform_created_at']->format('Y-m-d H:i:s') : $coRow['platform_created_at'],
-                    'data' => json_encode($coRow['data'])
+                    'channel' => $co['channel'],
+                    'platform_id' => $co['platform_id'],
+                    'platform_created_at' => $co['platform_created_at'] instanceof DateTime ? $co['platform_created_at']->format('Y-m-d H:i:s') : $co['platform_created_at'],
+                    'data' => json_encode($co['data'])
                 ];
 
                 if (isset($channeledOrderMap[$k])) {

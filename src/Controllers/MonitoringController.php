@@ -310,9 +310,9 @@ class MonitoringController extends BaseController
                                     $channelLabel = $channelId ? (Channel::tryFrom($channelId)?->getCommonName() ?? "Ch $channelId") : "Unidentified Channel";
                                     $typeValue = $res['type'] ?? '';
                                     $typeName = $typeValue;
-                                    if ($typeValue && class_exists('\Enums\Account')) {
-                                        $enum = \Enums\Account::tryFrom($typeValue);
-                                        $typeName = $enum ? ucwords(str_replace('_', ' ', $enum->value)) : $typeValue;
+                                    if ($typeValue) {
+                                        $label = \Anibalealvarezs\ApiDriverCore\Classes\AccountTypeRegistry::getLabel($typeValue);
+                                        $typeName = $label ?: ucwords(str_replace('_', ' ', $typeValue));
                                     }
                                     
                                     $label = $channelLabel . ($typeName ? " • $typeName" : "");

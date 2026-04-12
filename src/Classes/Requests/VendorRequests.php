@@ -32,61 +32,14 @@ class VendorRequests implements RequestInterface
         ?int $jobId = null,
         ?object $filters = null
     ): Response {
-        $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
-        $method = 'getListFrom' . $chanEnum->getCommonName();
-        return self::$method(
-                filters: $filters,
-                resume: $filters->resume ?? true,
-                jobId: $jobId
-            );
-    }
+        $chanKey = ($channel instanceof Channel) ? $channel->name : (string)$channel;
 
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode(['Vendors are not supported in Shopify. They\'re retrieved along with Products.']));
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromAmazon(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute($chanKey, $startDate, $endDate, [
+            'jobId' => $jobId,
+            'resume' => $filters->resume ?? true,
+            'type' => 'vendors',
+            'filters' => $filters,
+        ]);
     }
 
     /**

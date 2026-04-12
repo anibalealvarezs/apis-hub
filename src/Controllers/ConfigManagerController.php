@@ -2,19 +2,16 @@
 
 namespace Controllers;
 
-use Exception;
-use Helpers\Helpers;
 use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
-use Anibalealvarezs\ApiDriverCore\Services\ConfigSchemaRegistryService;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use DateTime;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
-use Enums\Account as AccountEnum;
-use DateTime;
+use Exception;
+use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Yaml\Yaml;
-use Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver;
 
 class ConfigManagerController extends BaseController
 {
@@ -27,7 +24,7 @@ class ConfigManagerController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        
+
         $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
         $this->assetsBackupPath = $configDir . '/assets_backup.yaml';
     }
@@ -35,18 +32,20 @@ class ConfigManagerController extends BaseController
     private function getChannelAttributes(string $channel): array
     {
         $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
+
         try {
             $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
             // We use the common config key from the driver if it exists
             $common = $driver::getCommonConfigKey();
+
             return [
                 'path' => $configDir . "/channels/{$channel}.yaml",
-                'common' => $common
+                'common' => $common,
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return [
                 'path' => $configDir . "/channels/{$channel}.yaml",
-                'common' => null
+                'common' => null,
             ];
         }
     }
@@ -54,6 +53,7 @@ class ConfigManagerController extends BaseController
     public function index(): Response
     {
         $html = file_get_contents(__DIR__ . '/../views/config_manager.html');
+
         return $this->renderWithEnv($html);
     }
 
@@ -63,7 +63,7 @@ class ConfigManagerController extends BaseController
             $logger = Helpers::setLogger('config-manager.log');
             $requestedType = $request->query->get('type');
             $forceRefresh = $request->query->get('refresh') === '1';
-            
+
             $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
             $systemConfig = Helpers::getProjectConfig();
 
@@ -91,7 +91,7 @@ class ConfigManagerController extends BaseController
                 try {
                     $backup = Yaml::parseFile($this->assetsBackupPath);
                     $previousAssets = $backup['assets'] ?? [];
-                    if (!$forceRefresh) {
+                    if (! $forceRefresh) {
                         $allAssets = $previousAssets;
                         $lastUpdated = filemtime($this->assetsBackupPath);
                     }
@@ -104,13 +104,13 @@ class ConfigManagerController extends BaseController
                 try {
                     $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
                     $chanConfig = $systemConfig['channels'][$chan] ?? [];
-                    
+
                     // 1. Update UI Config
                     $uiConfig = $driver->prepareUiConfig($chanConfig);
                     $currentConfig = array_replace_recursive($currentConfig, $uiConfig);
-                    
+
                     // 2. Fetch Assets if needed
-                    if ($requestedType && $chan !== $requestedType && !str_contains($chan, $requestedType)) {
+                    if ($requestedType && $chan !== $requestedType && ! str_contains($chan, $requestedType)) {
                         continue;
                     }
 
@@ -120,15 +120,15 @@ class ConfigManagerController extends BaseController
                         // Mix with previous assets to detect "NEW"
                         foreach ($driverAssets as $assetKey => $assetList) {
                             $prevList = $previousAssets[$assetKey] ?? [];
-                            $prevIds = array_map(fn($a) => (string)($a['id'] ?? ''), $prevList);
-                            
+                            $prevIds = array_map(fn ($a) => (string)($a['id'] ?? ''), $prevList);
+
                             foreach ($assetList as &$asset) {
-                                $asset['is_new'] = !empty($prevIds) && !in_array((string)($asset['id'] ?? ''), $prevIds);
+                                $asset['is_new'] = ! empty($prevIds) && ! in_array((string)($asset['id'] ?? ''), $prevIds);
                             }
                             $allAssets[$assetKey] = $assetList;
                         }
                     }
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     $logger->error("Error processing assets/config for $chan: " . $e->getMessage());
                 }
             }
@@ -143,7 +143,7 @@ class ConfigManagerController extends BaseController
                 'config' => $currentConfig,
                 'assets' => $allAssets,
                 'available_channels' => $availableChannels,
-                'last_updated' => $lastUpdated ? date('Y-m-d H:i:s', $lastUpdated) : null
+                'last_updated' => $lastUpdated ? date('Y-m-d H:i:s', $lastUpdated) : null,
             ]), 200, ['Content-Type' => 'application/json']);
 
         } catch (Exception $e) {
@@ -165,7 +165,7 @@ class ConfigManagerController extends BaseController
             if ($type === 'global') {
                 $appConfigPath = __DIR__ . '/../../config/app.yaml';
                 $appConf = file_exists($appConfigPath) ? (Yaml::parseFile($appConfigPath) ?: []) : [];
-                if (!isset($appConf['jobs'])) {
+                if (! isset($appConf['jobs'])) {
                     $appConf['jobs'] = [];
                 }
                 $appConf['jobs']['timeout_hours'] = (int) ($data['jobs_timeout_hours'] ?? 6);
@@ -173,13 +173,21 @@ class ConfigManagerController extends BaseController
                 $appConf['analytics']['cache_raw_metrics'] = filter_var($data['cache_raw_metrics'] ?? false, FILTER_VALIDATE_BOOLEAN);
                 $appConf['analytics']['marketing_debug_logs'] = filter_var($data['marketing_debug_logs'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-                if (!isset($appConf['cron'])) {
+                if (! isset($appConf['cron'])) {
                     $appConf['cron'] = [];
                 }
-                if (isset($data['cron_entities_hour'])) $appConf['cron']['entities_hour'] = (int) $data['cron_entities_hour'];
-                if (isset($data['cron_entities_minute'])) $appConf['cron']['entities_minute'] = (int) $data['cron_entities_minute'];
-                if (isset($data['cron_recent_hour'])) $appConf['cron']['recent_hour'] = (int) $data['cron_recent_hour'];
-                if (isset($data['cron_recent_minute'])) $appConf['cron']['recent_minute'] = (int) $data['cron_recent_minute'];
+                if (isset($data['cron_entities_hour'])) {
+                    $appConf['cron']['entities_hour'] = (int) $data['cron_entities_hour'];
+                }
+                if (isset($data['cron_entities_minute'])) {
+                    $appConf['cron']['entities_minute'] = (int) $data['cron_entities_minute'];
+                }
+                if (isset($data['cron_recent_hour'])) {
+                    $appConf['cron']['recent_hour'] = (int) $data['cron_recent_hour'];
+                }
+                if (isset($data['cron_recent_minute'])) {
+                    $appConf['cron']['recent_minute'] = (int) $data['cron_recent_minute'];
+                }
 
                 unset($appConf['db_host'], $appConf['db_name'], $appConf['app_mode']);
                 file_put_contents($appConfigPath, Yaml::dump($appConf, 10, 2));
@@ -187,8 +195,8 @@ class ConfigManagerController extends BaseController
             } else {
                 // GENERIC CHANNEL UPDATE (MODULAR)
                 $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
-                $channels = array_filter($availableChannels, fn($c) => str_contains($c, $type) || $c === $type);
-                
+                $channels = array_filter($availableChannels, fn ($c) => str_contains($c, $type) || $c === $type);
+
                 if (empty($channels) && $type !== 'all') {
                     $channels = [$type];
                 }
@@ -197,7 +205,7 @@ class ConfigManagerController extends BaseController
                     try {
                         $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
                         $attrs = $this->getChannelAttributes($chan);
-                        
+
                         // 1. Update Common Config if applicable
                         if ($attrs['common'] && isset($data['cache_chunk_size'])) {
                             $commonPath = dirname($attrs['path']) . "/" . $attrs['common'] . ".yaml";
@@ -217,19 +225,22 @@ class ConfigManagerController extends BaseController
                         $logger->info("Config updated successfully for channel: " . $chan);
                     } catch (Exception $e) {
                         $logger->error("Error updating channel {$chan}: " . $e->getMessage());
-                        if (count($channels) === 1) throw $e;
+                        if (count($channels) === 1) {
+                            throw $e;
+                        }
                     }
                 }
             }
 
             $logger->info("Config updated successfully for type: " . $type);
-            
+
             // Auto-trigger entity synchronization to ensure database reflects new config
             $this->triggerEntitySync($logger);
 
             return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
         } catch (Exception $e) {
             $logger->error("Error updating config: " . $e->getMessage());
+
             return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
         }
     }
@@ -265,13 +276,13 @@ class ConfigManagerController extends BaseController
             $data = json_decode($request->getContent(), true);
             $type = $data['type'] ?? 'all';
             $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
-            
+
             $results = [];
-            
+
             if ($type === 'all') {
                 $channelsToValidate = $availableChannels;
             } else {
-                $channelsToValidate = array_filter($availableChannels, fn($c) => str_contains($c, $type) || $c === $type);
+                $channelsToValidate = array_filter($availableChannels, fn ($c) => str_contains($c, $type) || $c === $type);
                 if (empty($channelsToValidate)) {
                     $channelsToValidate = [$type];
                 }
@@ -284,9 +295,9 @@ class ConfigManagerController extends BaseController
                     $results[$chan] = [
                         'status' => $validation['success'] ? 'valid' : 'error',
                         'message' => $validation['message'],
-                        'details' => $validation['details'] ?? []
+                        'details' => $validation['details'] ?? [],
                     ];
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     $results[$chan] = ['status' => 'error', 'message' => $e->getMessage()];
                 }
             }
@@ -303,14 +314,14 @@ class ConfigManagerController extends BaseController
             $providedToken = $request->headers->get('X-Config-Token');
             $secretToken = $_ENV['CONFIG_SECRET_TOKEN'] ?? null;
 
-            if (!$secretToken || $providedToken !== $secretToken) {
+            if (! $secretToken || $providedToken !== $secretToken) {
                 return new Response(json_encode(['error' => 'Unauthorized']), 401, ['Content-Type' => 'application/json']);
             }
 
             $configs = [];
             $allChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
             $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
-            
+
             foreach ($allChannels as $chan) {
                 $path = $this->getChannelAttributes($chan)['path'];
                 $common = $this->getChannelAttributes($chan)['common'];
@@ -340,14 +351,18 @@ class ConfigManagerController extends BaseController
                 // Key where assets are stored in YAML (defaults to assetKey)
                 $configKey = $pattern['key'] ?? $assetKey;
                 $assets = $chanConfig[$configKey] ?? [];
-                
-                if (empty($assets)) continue;
+
+                if (empty($assets)) {
+                    continue;
+                }
 
                 // DB Type Mapping
                 $typeRaw = $pattern['type'] ?? null;
-                if (!$typeRaw) continue; // Skip if no DB type mapping provided by driver
+                if (! $typeRaw) {
+                    continue;
+                } // Skip if no DB type mapping provided by driver
 
-                $typeMark = is_string($typeRaw) ? AccountEnum::from($typeRaw) : $typeRaw;
+                $typeMark = $typeRaw;
 
                 // Resolve Group Name via Common Key if exists
                 $commonKey = $driver::getCommonConfigKey();
@@ -365,17 +380,20 @@ class ConfigManagerController extends BaseController
 
                 foreach ($assets as $asset) {
                     $id = (string)($asset['id'] ?? ($asset['url'] ?? ''));
-                    if (!$id) continue;
+                    if (! $id) {
+                        continue;
+                    }
 
                     $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $id);
                     $channelValue = Channel::tryFromName($channel)?->value;
-                    if (!$channelValue) {
+                    if (! $channelValue) {
                         $logger->warning("Unknown channel encountered during database sync: $channel");
+
                         continue;
                     }
 
                     $dbChanneled = $this->em->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $id, 'channel' => $channelValue]);
-                    if (!$dbChanneled) {
+                    if (! $dbChanneled) {
                         $dbChanneled = new ChanneledAccount();
                         $dbChanneled->addPlatformId($id)
                             ->addAccount($accountEntity)
@@ -389,18 +407,20 @@ class ConfigManagerController extends BaseController
                         $dbChanneled->addName($name);
                         $this->em->persist($dbChanneled);
                     }
-                    
+
                     // Specific nested assets (like IG under Page) - if defined in pattern
                     if (isset($pattern['children'])) {
                         foreach ($pattern['children'] as $childKey => $childPattern) {
                             $childId = (string)($asset[$childPattern['id_key']] ?? '');
-                            if (!$childId) continue;
+                            if (! $childId) {
+                                continue;
+                            }
 
                             $childName = $asset[$childPattern['name_key']] ?? $name;
                             $childType = $childPattern['type'];
 
                             $dbChild = $this->em->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $childId, 'channel' => $channelValue]);
-                            if (!$dbChild) {
+                            if (! $dbChild) {
                                 $dbChild = new ChanneledAccount();
                                 $dbChild->addPlatformId($childId)
                                     ->addAccount($accountEntity)
@@ -419,7 +439,7 @@ class ConfigManagerController extends BaseController
                 }
             }
             $this->em->flush();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $logger->error("Sync Assets Error for $channel: " . $e->getMessage());
         }
     }
@@ -427,12 +447,12 @@ class ConfigManagerController extends BaseController
     public function flushCache(Request $request): Response
     {
         $channel = $request->request->get('channel');
-        if (!$channel) {
+        if (! $channel) {
             $content = json_decode($request->getContent(), true);
             $channel = $content['channel'] ?? null;
         }
 
-        if (!$channel) {
+        if (! $channel) {
             return new Response(json_encode(['error' => 'Missing channel']), 400);
         }
 
@@ -440,7 +460,7 @@ class ConfigManagerController extends BaseController
 
         return new Response(json_encode([
             'success' => true,
-            'message' => "All aggregation caches for '$channel' cleared."
+            'message' => "All aggregation caches for '$channel' cleared.",
         ]));
     }
 
@@ -472,15 +492,18 @@ class ConfigManagerController extends BaseController
     private function getEffectiveCronSchedules(): array
     {
         $schedules = [];
+
         try {
             $output = [];
             exec('crontab -l 2>/dev/null', $output);
             foreach ($output as $line) {
-                if (empty($line) || str_starts_with($line, '#') || !str_contains($line, 'apis-hub:cache')) {
+                if (empty($line) || str_starts_with($line, '#') || ! str_contains($line, 'apis-hub:cache')) {
                     continue;
                 }
                 $parts = preg_split('/\s+/', $line);
-                if (count($parts) < 5) continue;
+                if (count($parts) < 5) {
+                    continue;
+                }
                 $minute = $parts[0];
                 $hour = $parts[1];
                 $key = 'unknown';
@@ -491,19 +514,22 @@ class ConfigManagerController extends BaseController
                 }
                 $schedules[$key] = ['minute' => $minute, 'hour' => $hour, 'time' => "$minute $hour"];
             }
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+        }
+
         return $schedules;
     }
 
     private function getOrCreateAccount(string $name): Account
     {
         $accountEntity = $this->em->getRepository(Account::class)->getByName($name);
-        if (!$accountEntity) {
+        if (! $accountEntity) {
             $accountEntity = new Account();
             $accountEntity->addName($name);
             $this->em->persist($accountEntity);
             $this->em->flush();
         }
+
         return $accountEntity;
     }
 }

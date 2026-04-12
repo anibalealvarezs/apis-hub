@@ -27,8 +27,8 @@ class ChanneledAccount extends ChanneledEntity
     #[ORM\Column(type: 'string')]
     protected string $name;
 
-    #[ORM\Column(type: 'string', enumType: AccountEnum::class)]
-    protected AccountEnum $type;
+    #[ORM\Column(type: 'string')]
+    protected string $type;
 
     // Relationships with non-channeled entities
 
@@ -79,13 +79,13 @@ class ChanneledAccount extends ChanneledEntity
         return $this;
     }
 
-    public function addType(AccountEnum $type): self
+    public function addType(string $type): self
     {
         $this->type = $type;
         return $this;
     }
 
-    public function getType(): AccountEnum
+    public function getType(): string
     {
         return $this->type;
     }

@@ -53,6 +53,7 @@ class AccountRepository extends BaseRepository
         return $this->createBaseQueryBuilder()
             ->where('e.name = :name')
             ->setParameter('name', $name)
+            ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }

@@ -124,9 +124,29 @@ class PriceRuleProcessor
 
         // We return the database ID of ChanneledPriceRule so we can use it to attach discounts
         $channeledEntities = [];
+        $totalDiscountCodes = [];
+        $totalChanneledDiscountCodes = [];
+
         foreach ($uCPR as $k => $cprRow) {
             if (isset($cprMap[$k])) {
-                $channeledEntities[$cprRow['platform_id']] = $cprMap[$k]['id'];
+                $dbId = $cprMap[$k]['id'];
+                $channeledEntities[$cprRow['platform_id']] = $dbId;
+
+                // CHECK FOR EMBEDDED DISCOUNTS (Modular behavior)
+                if (isset($cprRow['data']->_discounts) && ($cprRow['data']->_discounts instanceof ArrayCollection)) {
+                    $discResult = self::processDiscounts(
+                        channeledCollection: $cprRow['data']->_discounts,
+                        priceRulePlatformId: (string)$cprRow['platform_id'],
+                        channeledPriceRuleDbId: $dbId,
+                        manager: $manager
+                    );
+                    if (!empty($discResult['discountCodes'])) {
+                        $totalDiscountCodes = array_merge($totalDiscountCodes, $discResult['discountCodes']);
+                    }
+                    if (!empty($discResult['channeledDiscountCodes'])) {
+                        $totalChanneledDiscountCodes = array_merge($totalChanneledDiscountCodes, $discResult['channeledDiscountCodes']);
+                    }
+                }
             }
         }
 
@@ -135,6 +155,8 @@ class PriceRuleProcessor
             'channeledPriceRules' => array_column($uCPR, 'platform_id'),
             'channels' => array_unique(array_column($uCPR, 'channel')),
             'cprDbIds' => $channeledEntities,
+            'discountCodes' => $totalDiscountCodes,
+            'channeledDiscountCodes' => $totalChanneledDiscountCodes,
         ];
     }
 

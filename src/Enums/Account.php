@@ -2,11 +2,18 @@
 
 namespace Enums;
 
-enum Account: string
+/**
+ * Constants for the different types of digital accounts that can be associated with a ChanneledAccount.
+ */
+class Account
 {
-    case FACEBOOK_PAGE = 'facebook_page';
-    case INSTAGRAM = 'instagram';
-    case META_AD_ACCOUNT = 'meta_ad_account';
-    case GOOGLE_AD_ACCOUNT = 'google_ad_account';
-    case GSC_SITE = 'gsc_site';
+    /**
+     * Get all registered types.
+     *
+     * @return array [key => label]
+     */
+    public static function getAll(): array
+    {
+        return \Anibalealvarezs\ApiDriverCore\Classes\AccountTypeRegistry::getAll();
+    }
 }

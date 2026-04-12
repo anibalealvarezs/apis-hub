@@ -154,10 +154,6 @@ class InstanceGeneratorService
     private function hasActiveEntities(string $channelName): bool
     {
         $chanKey = $channelName;
-        // Legacy alias support
-        if ($channelName === 'gsc') {
-            $chanKey = 'google_search_console';
-        }
 
         $registryConfig = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chanKey);
         $resourceKey = $registryConfig['resource_key'] ?? null;

@@ -37,13 +37,15 @@ class MetricRequests implements RequestInterface
     ): \Symfony\Component\HttpFoundation\Response {
         $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
         $chanKey = $chanEnum?->name ?? (string)$channel;
+        $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
+        $mapping = $driver->getDateFilterMapping();
 
-        // Intelligent date resolution for Shopify/NetSuite
+        // Intelligent date resolution
         $start = $startDate;
         $end = $endDate;
-        if (in_array($chanKey, ['shopify', 'netsuite', 'amazon'])) {
-            $start = $filters->createdAtMin ?? $startDate;
-            $end = $filters->createdAtMax ?? $endDate;
+        if (! empty($mapping)) {
+            $start = $filters->{$mapping['start']} ?? $startDate;
+            $end = $filters->{$mapping['end']} ?? $endDate;
         }
 
         return (new \Core\Services\SyncService())->execute($chanKey, $start, $end, [

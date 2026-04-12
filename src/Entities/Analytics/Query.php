@@ -45,11 +45,12 @@ class Query extends Entity
     public function addQuery(string $query): self
     {
         $this->query = $query;
+
         return $this;
     }
 
     /**
-     * Gets the query-specific data (e.g., google_search_console_country).
+     * Gets the query-specific data.
      * @return array
      */
     public function getData(): array
@@ -65,6 +66,7 @@ class Query extends Entity
     public function addData(?array $data): self
     {
         $this->data = $data;
+
         return $this;
     }
 
@@ -84,10 +86,11 @@ class Query extends Entity
      */
     public function addMetricConfig(MetricConfig $metricConfig): self
     {
-        if (!$this->metricConfigs->contains($metricConfig)) {
+        if (! $this->metricConfigs->contains($metricConfig)) {
             $this->metricConfigs->add($metricConfig);
             $metricConfig->addQuery($this);
         }
+
         return $this;
     }
 
@@ -104,6 +107,7 @@ class Query extends Entity
                 $metricConfig->addQuery(null);
             }
         }
+
         return $this;
     }
 }

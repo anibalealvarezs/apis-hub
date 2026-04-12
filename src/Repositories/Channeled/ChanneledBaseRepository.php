@@ -57,6 +57,7 @@ class ChanneledBaseRepository extends BaseRepository
             ->setParameter('platformId', $platformId)
             ->andWhere('e.channel = :channel')
             ->setParameter('channel', $channelValue)
+            ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult(hydrationMode: AbstractQuery::HYDRATE_OBJECT);
     }
@@ -175,16 +176,16 @@ class ChanneledBaseRepository extends BaseRepository
     }
 
     /**
-     * @param int $channel
+     * @param int|string $channel
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function getLastByPlatformId(int $channel): ?array
+    public function getLastByPlatformId(int|string $channel): ?array
     {
-        $this->validateChannel($channel);
+        $channelVal = $this->validateChannel($channel);
         return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::LAST)
             ->where('e.channel = :channel')
-            ->setParameter('channel', $channel)
+            ->setParameter('channel', $channelVal)
             ->addOrderBy('length', 'DESC')
             ->addOrderBy('e.platformId', 'DESC')
             ->setMaxResults(1)
@@ -193,16 +194,16 @@ class ChanneledBaseRepository extends BaseRepository
     }
 
     /**
-     * @param int $channel
+     * @param int|string $channel
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function getLastByPlatformCreatedAt(int $channel): ?array
+    public function getLastByPlatformCreatedAt(int|string $channel): ?array
     {
-        $this->validateChannel($channel);
+        $channelVal = $this->validateChannel($channel);
         $data = $this->createBaseQueryBuilderNoJoins(QueryBuilderType::LAST)
             ->where('e.channel = :channel')
-            ->setParameter('channel', $channel)
+            ->setParameter('channel', $channelVal)
             ->addOrderBy('e.platformCreatedAt', 'DESC')
             ->setMaxResults(1)
             ->getQuery()
