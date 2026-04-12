@@ -505,6 +505,36 @@ class Helpers
                     }
                 }
 
+                // Inject credentials from environment variables if missing in configuration
+                $credentialMapping = [
+                    'google' => [
+                        'GOOGLE_CLIENT_ID' => 'client_id',
+                        'GOOGLE_CLIENT_SECRET' => 'client_secret',
+                        'GOOGLE_REFRESH_TOKEN' => 'refresh_token',
+                        'GOOGLE_USER_ID' => 'user_id',
+                        'GOOGLE_REDIRECT_URI' => 'redirect_uri',
+                        'GOOGLE_TOKEN_PATH' => 'token_path',
+                    ],
+                    'facebook' => [
+                        'FACEBOOK_APP_ID' => 'app_id',
+                        'FACEBOOK_APP_SECRET' => 'app_secret',
+                        'FACEBOOK_USER_ID' => 'user_id',
+                        'FACEBOOK_REDIRECT_URI' => 'redirect_uri',
+                        'FACEBOOK_TOKEN_PATH' => 'token_path',
+                    ],
+                ];
+
+                foreach ($credentialMapping as $chan => $mapping) {
+                    if (!isset($config[$chan])) {
+                        $config[$chan] = [];
+                    }
+                    foreach ($mapping as $envKey => $configKey) {
+                        if (empty($config[$chan][$configKey]) && ($val = getenv($envKey))) {
+                            $config[$chan][$configKey] = $val;
+                        }
+                    }
+                }
+
                 if (getenv('APP_ENV') === 'demo') {
                     $placeholders = ['PAGE_ID', 'IG_ACCOUNT_ID', 'PAGE_URL', 'example.com', 'AD_ACCOUNT_ID'];
                     $cleanEntityList = function ($entities) use ($placeholders) {

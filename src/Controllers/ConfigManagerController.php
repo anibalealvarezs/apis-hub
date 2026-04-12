@@ -159,8 +159,7 @@ class ConfigManagerController extends BaseController
             $type = $data['type'] ?? '';
             $assets = $data['assets'] ?? [];
 
-            $logger->info("Update config request received for type: " . $type);
-            $logger->debug("Payload: " . json_encode($data));
+            $logger->info("Update config request received for type: " . $type, ['payload' => $data]);
 
             if ($type === 'global') {
                 $appConfigPath = __DIR__ . '/../../config/app.yaml';
@@ -279,6 +278,7 @@ class ConfigManagerController extends BaseController
             $logger = Helpers::setLogger('config-manager.log');
             $data = json_decode($request->getContent(), true);
             $type = $data['type'] ?? 'all';
+            $logger->info("Validation request received for type: " . $type, ['payload' => $data]);
             $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
 
             $results = [];
@@ -292,9 +292,21 @@ class ConfigManagerController extends BaseController
                 }
             }
 
+            $allConfigs = \Helpers\Helpers::getChannelsConfig();
             foreach ($channelsToValidate as $chan) {
                 try {
-                    $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
+                    $chanConfig = $allConfigs[$chan] ?? [];
+                    // Handle common config mapping
+                    $registryConfig = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chan);
+                    $driverClass = $registryConfig['driver'] ?? null;
+                    if ($driverClass && class_exists($driverClass)) {
+                        $commonKey = $driverClass::getCommonConfigKey();
+                        if ($commonKey && isset($allConfigs[$commonKey])) {
+                            $chanConfig = array_replace_recursive($allConfigs[$commonKey], $chanConfig);
+                        }
+                    }
+
+                    $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan, $logger, $chanConfig);
                     $validation = $driver->validateAuthentication();
                     $results[$chan] = [
                         'status' => $validation['success'] ? 'valid' : 'error',

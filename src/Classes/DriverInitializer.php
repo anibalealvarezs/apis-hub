@@ -92,7 +92,8 @@ class DriverInitializer
             return self::$instances[$cacheKey];
         }
 
-        $driver = DriverFactory::get($channel, $logger);
+        $config = $config ?: self::validateConfig($channel, $logger);
+        $driver = DriverFactory::get($channel, $logger, $config);
 
         // Merge config into the driver if needed, but getApi usually takes it
         $api = $driver->getApi($config);
@@ -122,7 +123,8 @@ class DriverInitializer
         foreach ($registry as $channel => $config) {
             if (!isset($config['driver'])) continue;
             try {
-                $driver = DriverFactory::get($channel, $logger);
+                $chanConfig = self::validateConfig($channel, $logger);
+                $driver = DriverFactory::get($channel, $logger, $chanConfig);
                 
                 // 1. Register asset patterns
                 $patterns = $driver->getAssetPatterns();
