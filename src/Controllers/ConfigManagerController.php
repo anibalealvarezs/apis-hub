@@ -195,7 +195,11 @@ class ConfigManagerController extends BaseController
             } else {
                 // GENERIC CHANNEL UPDATE (MODULAR)
                 $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
-                $channels = array_filter($availableChannels, fn ($c) => str_contains($c, $type) || $c === $type);
+                $channels = array_filter($availableChannels, function ($c) use ($type) {
+                    $cNorm = str_replace('-', '_', $c);
+                    $typeNorm = str_replace('-', '_', $type);
+                    return str_contains($cNorm, $typeNorm) || $cNorm === $typeNorm;
+                });
 
                 if (empty($channels) && $type !== 'all') {
                     $channels = [$type];
