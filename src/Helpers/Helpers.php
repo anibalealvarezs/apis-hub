@@ -78,6 +78,7 @@ class Helpers
             $filePath = $root . '/' . $filename;
             if (file_exists($filePath)) {
                 $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                error_log("DEBUG: Loading env file: $filePath (" . count($lines) . " lines)");
                 foreach ($lines as $line) {
                     if (str_starts_with(trim($line), '#')) {
                         continue;
@@ -92,6 +93,8 @@ class Helpers
                 }
 
                 return true;
+            } else {
+                error_log("DEBUG: Env file NOT FOUND: $filePath");
             }
 
             return false;
@@ -579,18 +582,23 @@ class Helpers
 
                 foreach ($commonMappings as $commonKey => $specificChannels) {
                     if (!empty($config[$commonKey])) {
+                        error_log("DEBUG: Found common config for $commonKey: " . (isset($config[$commonKey]['client_id']) ? "CID present" : "CID MISSING"));
                         foreach ($specificChannels as $chan) {
                             if (isset($config[$chan])) {
+                                error_log("DEBUG: Merging $commonKey into $chan. Pre-merge CID in $chan: " . (isset($config[$chan]['client_id']) ? "Present" : "Missing"));
                                 // Important: Merge common into specific but only for missing/empty values in specific
-                                $config[$chan] = array_replace_recursive($config[$commonKey], array_filter($config[$chan]));
+                                $config[$chan] = array_replace_recursive($config[$commonKey], array_filter($config[$chan], fn($v) => !empty($v) && !is_array($v)));
                                 // Maintain nested structure too
                                 if (!isset($config[$chan][$commonKey])) {
                                     $config[$chan][$commonKey] = $config[$commonKey];
                                 } else {
-                                    $config[$chan][$commonKey] = array_merge($config[$commonKey], array_filter($config[$chan][$commonKey]));
+                                    $config[$chan][$commonKey] = array_replace_recursive($config[$commonKey], array_filter($config[$chan][$commonKey]));
                                 }
+                                error_log("DEBUG: Post-merge CID in $chan: " . (isset($config[$chan]['client_id']) ? "Present" : "Missing"));
                             }
                         }
+                    } else {
+                        error_log("DEBUG: Common config $commonKey IS EMPTY");
                     }
                 }
 

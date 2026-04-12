@@ -1108,7 +1108,7 @@ async function validateTokens(isManual = true) {
         const fbStatusBadge = document.getElementById('fb-token-status-main');
 
         if (gscStatusBadge) {
-            const gscRes = res.results?.gsc;
+            const gscRes = res.results?.google_search_console || res.results?.gsc;
             if (gscRes && gscRes.status === 'valid') {
                 gscStatusBadge.innerHTML = '<span style="color:#238636; vertical-align:middle;"><i data-lucide="check-circle" size="12" style="margin-bottom:2px"></i> GSC</span>';
                 gscStatusBadge.style.display = 'inline-block';
@@ -1119,8 +1119,11 @@ async function validateTokens(isManual = true) {
         }
 
         if (fbStatusBadge) {
-            const fbRes = res.results?.facebook;
-            if (fbRes && fbRes.status === 'valid') {
+            const fbMarkRes = res.results?.facebook_marketing || res.results?.facebook;
+            const fbOrgRes = res.results?.facebook_organic;
+            const isFbValid = (fbMarkRes && fbMarkRes.status === 'valid') && (fbOrgRes && fbOrgRes.status === 'valid');
+            
+            if (isFbValid) {
                 fbStatusBadge.innerHTML = '<span style="color:#238636; vertical-align:middle;"><i data-lucide="check-circle" size="12" style="margin-bottom:2px"></i> FB Graph</span>';
                 fbStatusBadge.style.display = 'inline-block';
             } else {

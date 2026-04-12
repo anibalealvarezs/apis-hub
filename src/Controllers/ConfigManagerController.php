@@ -293,14 +293,23 @@ class ConfigManagerController extends BaseController
             }
 
             $allConfigs = \Helpers\Helpers::getChannelsConfig();
+            $providerResults = [];
+
             foreach ($channelsToValidate as $chan) {
                 try {
-                    $chanConfig = $allConfigs[$chan] ?? [];
-                    // Handle common config mapping
+                    // Identify the provider (commonKey)
                     $registryConfig = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chan);
                     $driverClass = $registryConfig['driver'] ?? null;
+                    $commonKey = ($driverClass && class_exists($driverClass)) ? $driverClass::getCommonConfigKey() : $chan;
+
+                    // If we already have a result for this provider, reuse it
+                    if (isset($providerResults[$commonKey])) {
+                        $results[$chan] = $providerResults[$commonKey];
+                        continue;
+                    }
+
+                    $chanConfig = $allConfigs[$chan] ?? [];
                     if ($driverClass && class_exists($driverClass)) {
-                        $commonKey = $driverClass::getCommonConfigKey();
                         if ($commonKey && isset($allConfigs[$commonKey])) {
                             $chanConfig = array_replace_recursive($allConfigs[$commonKey], $chanConfig);
                         }
@@ -308,11 +317,17 @@ class ConfigManagerController extends BaseController
 
                     $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan, $logger, $chanConfig);
                     $validation = $driver->validateAuthentication();
-                    $results[$chan] = [
+                    
+                    $result = [
                         'status' => $validation['success'] ? 'valid' : 'error',
                         'message' => $validation['message'],
                         'details' => $validation['details'] ?? [],
                     ];
+
+                    // Store result for this provider to avoid re-validation
+                    $providerResults[$commonKey] = $result;
+                    $results[$chan] = $result;
+
                 } catch (Exception $e) {
                     $results[$chan] = ['status' => 'error', 'message' => $e->getMessage()];
                 }
