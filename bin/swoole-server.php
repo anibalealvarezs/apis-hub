@@ -71,7 +71,10 @@ $server->on("Request", function (SwooleRequest $swooleRequest, SwooleResponse $s
 
     $request = new Request($get, $post, [], $cookie, $files, $server, $swooleRequest->rawContent());
 
-    // 2. Handle Request via RoutingCore
+    // 2. Initialize environment and boot drivers
+    require_once __DIR__ . "/../app/bootstrap.php";
+
+    // 3. Handle Request via RoutingCore
     $app = new RoutingCore();
     
     // Register routes
@@ -80,9 +83,8 @@ $server->on("Request", function (SwooleRequest $swooleRequest, SwooleResponse $s
     $app->multiMap(require __DIR__ . "/../src/Routes/page.php");
     $app->multiMap(require __DIR__ . "/../src/Routes/channeledcrud.php");
 
-    $entityManager = null;
     try {
-        $entityManager = require __DIR__ . "/../app/bootstrap.php";
+        $entityManager = \Helpers\Helpers::getManager();
         $response = $app->handle($request);
         
         // 3. Convert Symfony Response to Swoole Response
@@ -111,7 +113,8 @@ $server->on("Request", function (SwooleRequest $swooleRequest, SwooleResponse $s
             'message' => $message
         ]));
     } finally {
-        if ($entityManager !== null) {
+        $entityManager = \Helpers\Helpers::getManager();
+        if ($entityManager && $entityManager->isOpen()) {
             $entityManager->close();
         }
     }
