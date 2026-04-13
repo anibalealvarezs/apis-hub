@@ -28,12 +28,16 @@ $_ENV['CONFIG_DIR'] = $configDir;
 $host = '0.0.0.0';
 $port = (int) (getenv('PORT') ?: 8080);
 $useSsl = (getenv('USE_SSL') === 'true');
-
 $mode = SWOOLE_PROCESS;
 $sockType = SWOOLE_SOCK_TCP;
 
 if ($useSsl) {
-    $sockType |= SWOOLE_SSL;
+    if (file_exists(__DIR__ . '/../storage/certs/cert.pem') && file_exists(__DIR__ . '/../storage/certs/key.pem')) {
+        $sockType |= SWOOLE_SSL;
+    } else {
+        echo "WARNING: SSL certificates not found in storage/certs. Falling back to HTTP.\n";
+        $useSsl = false;
+    }
 }
 
 $server = new Server($host, $port, $mode, $sockType);
