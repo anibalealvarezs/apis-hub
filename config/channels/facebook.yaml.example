@@ -1,6 +1,6 @@
 channels:
   facebook:
-    enabled: true
+    enabled: false
     cache_all: false # If true, will fetch all accessible ad accounts and pages if none are listed below
     cache_include: null # Global include filter (fallback)
     cache_exclude: null # Global exclude filter (fallback)

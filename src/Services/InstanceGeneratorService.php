@@ -2,13 +2,11 @@
 
 namespace Services;
 
-use DateTime;
 use DateTimeImmutable;
 use Exception;
 
 class InstanceGeneratorService
 {
-    
     /**
      * @param bool $useDependencies
      * @param int $basePort
@@ -21,14 +19,14 @@ class InstanceGeneratorService
         \Helpers\Helpers::getProjectConfig(); // Asegurar que el entorno está cargado
         $today = new DateTimeImmutable('today');
         $yesterday = $today->modify('-1 day');
-        
+
         if (getenv('APP_ENV') === 'demo' || \Helpers\Helpers::isDemo()) {
             return [[
                 'name' => 'demo-entities-sync',
                 'port' => $basePort,
                 'channel' => 'none',
                 'entity' => 'none',
-                'frequency' => '0 0 * * *'
+                'frequency' => '0 0 * * *',
             ]];
         }
 
@@ -40,7 +38,7 @@ class InstanceGeneratorService
 
         foreach ($registry as $channelName => $config) {
             $driverClass = $config['driver'] ?? null;
-            if (!$driverClass || !class_exists($driverClass)) {
+            if (! $driverClass || ! class_exists($driverClass)) {
                 continue;
             }
 
@@ -51,29 +49,39 @@ class InstanceGeneratorService
             }
 
             // Merge with local overrides
-            if (!isset($overrides[$channelName]) || (isset($overrides[$channelName]['enabled']) && !$overrides[$channelName]['enabled'])) {
+            $ruleEnabled = $overrides[$channelName]['enabled'] ?? null;
+            if ($ruleEnabled === false) {
                 continue;
             }
-            $rules = array_merge($rules, $overrides[$channelName]);
 
-            if (empty($rules)) {
+            // 0. Get Caching Limits and Status for this channel
+            $chanConfig = [];
+            try {
+                $chanConfig = \Classes\DriverInitializer::validateConfig($channelName);
+            } catch (Exception $e) { /* ignore missing drivers for now */ }
+
+            // Strict check: Must be enabled in both rules (if present) and channel config
+            $channelEnabled = $chanConfig['enabled'] ?? false;
+            
+            // If it's not enabled in channel config AND not explicitly forced in rules, skip
+            if (!$channelEnabled && $ruleEnabled !== true) {
                 continue;
             }
+            
+            // If it's explicitly disabled in rules (even if enabled in config), skip
+            // (Handled by the $ruleEnabled === false check above)
+
+            $rules = array_merge($rules, $overrides[$channelName] ?? []);
 
             $channel = $channelName;
             $channelInstances = [];
-            
-            // 0. Get Caching Limits for this channel
-            $chanConfig = [];
-            try {
-                $chanConfig = \Classes\DriverInitializer::validateConfig($channel);
-            } catch (Exception $e) { /* ignore missing drivers for now */ }
 
             $limitDate = null;
-            if (!empty($chanConfig['cache_history_range'])) {
+            if (! empty($chanConfig['cache_history_range'])) {
                 try {
                     $limitDate = $today->modify('-' . $chanConfig['cache_history_range']);
-                } catch (Exception $e) { /* ignore malformed ranges */ }
+                } catch (Exception $e) { /* ignore malformed ranges */
+                }
             }
 
             // 1. Entities Sync (if applicable)
@@ -85,7 +93,7 @@ class InstanceGeneratorService
                     'port' => $currentPort++,
                     'channel' => $channel,
                     'entity' => $entitiesSyncValue,
-                    'frequency' => '0 2 * * *'
+                    'frequency' => '0 2 * * *',
                 ];
             }
 
@@ -93,56 +101,61 @@ class InstanceGeneratorService
             // 2. Historics (Quarters)
             $historyMonths = $rules['history_months'] ?? 1;
             $historyStart = $today->modify("-{$historyMonths} months");
-            
+
             // Limit history start by cache history range if stricter
             if ($limitDate && $historyStart < $limitDate) {
                 $historyStart = $limitDate;
             }
 
-                $tempStart = $historyStart;
-                
-                while ($tempStart < $yesterday) {
-                    // Calculate end of quarter or just before yesterday
-                    $quarterEnd = $this->getEndOfQuarter($tempStart);
-                    if ($quarterEnd >= $yesterday) {
-                        $quarterEnd = $yesterday;
-                    }
+            $tempStart = $historyStart;
 
-                    // If the entire quarter is before the limit date, skip it
-                    if ($limitDate && $quarterEnd < $limitDate) {
-                        $tempStart = $quarterEnd->modify('+1 day');
-                        if ($tempStart >= $yesterday) break;
-                        continue;
-                    }
-
-                    $year = $tempStart->format('Y');
-                    $quarterNumber = ceil($tempStart->format('n') / 3);
-                    $instanceName = sprintf('%s-%s-%s', str_replace('_', '-', $channel), $year, $quarterNumber);
-
-                    $channelInstances[] = [
-                        'name' => $instanceName,
-                        'port' => $currentPort++,
-                        'channel' => $channel,
-                        'entity' => 'metric',
-                        'start_date' => $tempStart->format('Y-m-d'),
-                        'end_date' => $quarterEnd->format('Y-m-d')
-                    ];
-
-                    $tempStart = $quarterEnd->modify('+1 day');
-                    if ($tempStart >= $yesterday) break;
+            while ($tempStart < $yesterday) {
+                // Calculate end of quarter or just before yesterday
+                $quarterEnd = $this->getEndOfQuarter($tempStart);
+                if ($quarterEnd >= $yesterday) {
+                    $quarterEnd = $yesterday;
                 }
 
-                // 3. Recent Instance
-                $recentName = str_replace('_', '-', $channel) . '-recent';
+                // If the entire quarter is before the limit date, skip it
+                if ($limitDate && $quarterEnd < $limitDate) {
+                    $tempStart = $quarterEnd->modify('+1 day');
+                    if ($tempStart >= $yesterday) {
+                        break;
+                    }
+
+                    continue;
+                }
+
+                $year = $tempStart->format('Y');
+                $quarterNumber = ceil($tempStart->format('n') / 3);
+                $instanceName = sprintf('%s-%s-%s', str_replace('_', '-', $channel), $year, $quarterNumber);
+
                 $channelInstances[] = [
-                    'name' => $recentName,
+                    'name' => $instanceName,
                     'port' => $currentPort++,
                     'channel' => $channel,
                     'entity' => 'metric',
-                    'start_date' => '-3 days',
-                    'end_date' => 'yesterday',
-                    'frequency' => sprintf('%d %d * * *', $rules['recent_cron_minute'], $rules['recent_cron_hour'])
+                    'start_date' => $tempStart->format('Y-m-d'),
+                    'end_date' => $quarterEnd->format('Y-m-d'),
                 ];
+
+                $tempStart = $quarterEnd->modify('+1 day');
+                if ($tempStart >= $yesterday) {
+                    break;
+                }
+            }
+
+            // 3. Recent Instance
+            $recentName = str_replace('_', '-', $channel) . '-recent';
+            $channelInstances[] = [
+                'name' => $recentName,
+                'port' => $currentPort++,
+                'channel' => $channel,
+                'entity' => 'metric',
+                'start_date' => '-3 days',
+                'end_date' => 'yesterday',
+                'frequency' => sprintf('%d %d * * *', $rules['recent_cron_minute'], $rules['recent_cron_hour']),
+            ];
 
             // 4. Handle dependencies (Optional)
             if ($useDependencies) {
@@ -172,9 +185,9 @@ class InstanceGeneratorService
         $registryConfig = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chanKey);
         $resourceKey = $registryConfig['resource_key'] ?? null;
 
-        // If we don't have a resource key for entity-level validation, 
+        // If we don't have a resource key for entity-level validation,
         // we default to true to allow standard processing based on top-level rules.
-        if (!$resourceKey) {
+        if (! $resourceKey) {
             return true;
         }
 
@@ -185,7 +198,7 @@ class InstanceGeneratorService
         }
 
         // If the configuration for the channel is missing or explicitly disabled
-        if (!$config || (isset($config['enabled']) && !$config['enabled'])) {
+        if (! $config || (isset($config['enabled']) && ! $config['enabled'])) {
             return false;
         }
 
@@ -218,10 +231,10 @@ class InstanceGeneratorService
     {
         $month = (int)$date->format('n');
         $year = (int)$date->format('Y');
-        
+
         $currentQuarter = (int)ceil($month / 3);
         $endMonth = $currentQuarter * 3;
-        
+
         return $date->setDate($year, $endMonth, 1)->modify('last day of this month');
     }
 }

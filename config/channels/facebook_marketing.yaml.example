@@ -228,5 +228,5 @@ channels:
       creative_metrics: false
     ad_accounts:
     cache_history_range: '6 months'
-    enabled: true
+    enabled: false
     cache_aggregations: true
