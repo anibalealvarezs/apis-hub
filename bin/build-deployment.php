@@ -103,7 +103,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         'restart'     => 'always',
         'command'     => null,
         'environment' => $buildEnv($masterName),
-        'networks'    => ['default', 'apis-hub_gateway'],
+        'networks'    => ['default', 'gateway'],
         'ports'       => [
             "{$externalPort}:8080",
             "{$mcpPort}:3000"
@@ -172,7 +172,7 @@ $compose = [
         'default' => [
             'name' => "{$deploymentName}_internal",
         ],
-        'apis-hub_gateway' => [
+        'gateway' => [
             'name' => "{$deploymentName}_default",
             'external' => ($env !== 'demo' && $deploymentName === 'apis-hub')
         ]
