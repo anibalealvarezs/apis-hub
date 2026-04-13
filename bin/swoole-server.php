@@ -20,6 +20,11 @@ require_once __DIR__ . "/../vendor/autoload.php";
 // Initialize environment
 \Helpers\Helpers::getProjectConfig();
 
+// Force absolute configuration path for stability in Swoole workers
+$configDir = getenv('CONFIG_DIR') ?: '/app/config';
+putenv("CONFIG_DIR=$configDir");
+$_ENV['CONFIG_DIR'] = $configDir;
+
 $host = '0.0.0.0';
 $port = (int) (getenv('PORT') ?: 8080);
 $useSsl = (getenv('USE_SSL') === 'true');
