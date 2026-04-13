@@ -40,7 +40,7 @@
     "symfony/http-kernel": "^6.1",
     "symfony/cache": "^6.1",
     "symfony/console": "^6.0",
-    "symfony/redis-messenger": "^5.4",
+    "symfony/redis-messenger": "^6.0 || ^7.0",
     "symfony/cache-contracts": "^3.0",
     "predis/predis": "^2.0",
     "anibalealvarezs/google-hub-driver": "dev-main",
