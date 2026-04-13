@@ -173,8 +173,8 @@ $compose = [
             'name' => "{$deploymentName}_internal",
         ],
         'apis-hub_gateway' => [
-            'name' => 'apis-hub_default',
-            'external' => ($env !== 'demo')
+            'name' => "{$deploymentName}_default",
+            'external' => ($env !== 'demo' && $deploymentName === 'apis-hub')
         ]
     ],
     'volumes'  => [
