@@ -54,7 +54,17 @@ $server->on("Start", function (Server $server) use ($host, $port, $useSsl) {
     echo "Swoole HTTP server is started at {$protocol}://{$host}:{$port}\n";
 });
 
-$server->on("Request", function (SwooleRequest $swooleRequest, SwooleResponse $swooleResponse) {
+// 1. Initialize environment and boot drivers
+require_once __DIR__ . "/../app/bootstrap.php";
+
+// 2. Pre-register routes
+$app = new RoutingCore();
+$app->multiMap(require __DIR__ . "/../src/Routes/cache.php");
+$app->multiMap(require __DIR__ . "/../src/Routes/crud.php");
+$app->multiMap(require __DIR__ . "/../src/Routes/page.php");
+$app->multiMap(require __DIR__ . "/../src/Routes/channeledcrud.php");
+
+$server->on("Request", function (SwooleRequest $swooleRequest, SwooleResponse $swooleResponse) use ($app) {
     // 1. Convert Swoole Request to Symfony Request
     $get = $swooleRequest->get ?? [];
     $post = $swooleRequest->post ?? [];
@@ -71,23 +81,11 @@ $server->on("Request", function (SwooleRequest $swooleRequest, SwooleResponse $s
 
     $request = new Request($get, $post, [], $cookie, $files, $server, $swooleRequest->rawContent());
 
-    // 2. Initialize environment and boot drivers
-    require_once __DIR__ . "/../app/bootstrap.php";
-
-    // 3. Handle Request via RoutingCore
-    $app = new RoutingCore();
-    
-    // Register routes
-    $app->multiMap(require __DIR__ . "/../src/Routes/cache.php");
-    $app->multiMap(require __DIR__ . "/../src/Routes/crud.php");
-    $app->multiMap(require __DIR__ . "/../src/Routes/page.php");
-    $app->multiMap(require __DIR__ . "/../src/Routes/channeledcrud.php");
-
     try {
         $entityManager = \Helpers\Helpers::getManager();
         $response = $app->handle($request);
         
-        // 3. Convert Symfony Response to Swoole Response
+        // 2. Convert Symfony Response to Swoole Response
         $swooleResponse->status($response->getStatusCode());
         foreach ($response->headers->all() as $name => $values) {
             foreach ($values as $value) {
