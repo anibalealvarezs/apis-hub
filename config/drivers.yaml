@@ -1,0 +1,75 @@
+google_search_console:
+  parent: google
+  resource_key: sites
+  driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver'
+  auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', 'persist']
+  entities: ['metrics', 'queries']
+google_analytics:
+  parent: google
+  driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAnalyticsDriver'
+  auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
+  entities: ['metrics', 'customers']
+facebook_marketing:
+  parent: facebook
+  resource_key: ad_accounts
+  driver: 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver'
+  auth: 'Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', 'persist']
+  entities: ['metrics', 'campaigns', 'ad_groups', 'ads', 'creatives', 'customers']
+facebook_organic:
+  parent: facebook
+  resource_key: pages
+  driver: 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookOrganicDriver'
+  auth: 'Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', 'persist']
+  entities: ['metrics', 'pages', 'posts', 'customers']
+shopify:
+  resource_key: stores
+  driver: 'Anibalealvarezs\ShopifyHubDriver\Drivers\ShopifyDriver'
+  auth: 'Anibalealvarezs\ShopifyHubDriver\Auth\ShopifyAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', 'persist']
+  entities: ['metrics', 'orders', 'products', 'customers', 'product_variants', 'vendors', 'product_categories', 'discounts', 'price_rules']
+klaviyo:
+  driver: 'Anibalealvarezs\KlaviyoHubDriver\Drivers\KlaviyoDriver'
+  auth: 'Anibalealvarezs\KlaviyoHubDriver\Auth\KlaviyoAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', 'persist']
+  entities: ['metrics', 'orders', 'products', 'customers', 'product_variants', 'vendors', 'product_categories', 'discounts']
+netsuite:
+  driver: 'Anibalealvarezs\NetSuiteHubDriver\Drivers\NetSuiteDriver'
+  auth: 'Anibalealvarezs\NetSuiteHubDriver\Auth\NetSuiteAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', 'persist']
+  entities: ['metrics', 'orders', 'products', 'customers', 'product_variants', 'vendors', 'product_categories']
+amazon:
+  driver: 'Anibalealvarezs\AmazonHubDriver\Drivers\AmazonDriver'
+  auth: 'Anibalealvarezs\AmazonHubDriver\Auth\AmazonAuthProvider'
+  entities: ['metrics', 'orders', 'products', 'customers', 'product_variants', 'vendors', 'product_categories']
+bigcommerce:
+  driver: 'Anibalealvarezs\BigCommerceHubDriver\Drivers\BigCommerceDriver'
+  auth: 'Anibalealvarezs\BigCommerceHubDriver\Auth\BigCommerceAuthProvider'
+  entities: ['metrics', 'orders', 'products', 'customers', 'product_variants', 'vendors', 'product_categories']
+pinterest:
+  driver: 'Anibalealvarezs\PinterestHubDriver\Drivers\PinterestDriver'
+  auth: 'Anibalealvarezs\PinterestHubDriver\Auth\PinterestAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', 'persist']
+  entities: ['metrics', 'customers']
+linkedin:
+  driver: 'Anibalealvarezs\LinkedInHubDriver\Drivers\LinkedInDriver'
+  auth: 'Anibalealvarezs\LinkedInHubDriver\Auth\LinkedInAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', 'persist']
+  entities: ['metrics', 'customers']
+x:
+  driver: 'Anibalealvarezs\XHubDriver\Drivers\XDriver'
+  auth: 'Anibalealvarezs\XHubDriver\Auth\XAuthProvider'
+  processor: ['Classes\Requests\MetricRequests', 'persist']
+  entities: ['metrics', 'customers']
+tiktok:
+  driver: 'Anibalealvarezs\TikTokHubDriver\Drivers\TikTokDriver'
+  auth: 'Anibalealvarezs\TikTokHubDriver\Auth\TikTokAuthProvider'
+  entities: ['metrics']
+triplewhale:
+  driver: 'Anibalealvarezs\TripleWhaleHubDriver\Drivers\TripleWhaleDriver'
+  auth: 'Anibalealvarezs\TripleWhaleHubDriver\Auth\TripleWhaleAuthProvider'
+  entities: ['metrics']
+instagram:
+  entities: ['customers']

@@ -2,6 +2,7 @@
 /config/**/*.yaml
 !/config/**/*.yaml.example
 !/config/entitiesconfig.yaml
+!/config/drivers.yaml
 docker-compose.yml
 
 # Development / IDE
