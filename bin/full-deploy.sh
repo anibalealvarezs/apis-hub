@@ -123,6 +123,11 @@ if [ -f "docker-compose.yml" ]; then
     docker compose --env-file "$ENV_FILE" down --remove-orphans || echo "  ⚠️ Cleanup had issues, continuing..."
 fi
 
+DEPLOYMENT_NAME=$(grep -E '^DEPLOYMENT_NAME=' "$ENV_FILE" | cut -d '=' -f 2 | tr -d '"' | tr -d "'" || echo "apis-hub")
+[ -z "$DEPLOYMENT_NAME" ] && DEPLOYMENT_NAME="apis-hub"
+echo "  🌐 Ensuring external gateway network exists (${DEPLOYMENT_NAME}_default)..."
+docker network ls | grep -w "${DEPLOYMENT_NAME}_default" >/dev/null 2>&1 || docker network create "${DEPLOYMENT_NAME}_default"
+
 echo "  🏗️  Building and starting new containers..."
 docker compose --env-file "$ENV_FILE" up -d --remove-orphans --build
 

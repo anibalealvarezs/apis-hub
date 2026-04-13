@@ -59,3 +59,7 @@ HANDOVER_RESTART.md
 STATUS-SUMMARY.md
 **/*.txt
 *.txt
+
+.env.test
+
+.agents/workflows/turbo_debug.md
