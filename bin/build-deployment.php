@@ -57,7 +57,8 @@ $buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($d
 
 // ─── Phase 1: Create Standardized Master ────────────────────────────────────────
 $masterName = "{$deploymentName}-master";
-$externalPort = getenv('EXTERNAL_PORT') ?: ($instances[0]['port'] ?? 10000);
+$startingHostPort = (int) (getenv('STARTING_HOST_PORT') ?: 10000);
+$externalPort = getenv('EXTERNAL_PORT') ?: ($instances[0]['port'] ?? $startingHostPort);
 $mcpPort = getenv('MCP_PORT') ?: 3000;
     $localMounts = [
         'api-driver-core',
