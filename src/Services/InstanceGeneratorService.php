@@ -51,12 +51,10 @@ class InstanceGeneratorService
             }
 
             // Merge with local overrides
-            if (isset($overrides[$channelName])) {
-                if (isset($overrides[$channelName]['enabled']) && !$overrides[$channelName]['enabled']) {
-                    continue;
-                }
-                $rules = array_merge($rules, $overrides[$channelName]);
+            if (!isset($overrides[$channelName]) || (isset($overrides[$channelName]['enabled']) && !$overrides[$channelName]['enabled'])) {
+                continue;
             }
+            $rules = array_merge($rules, $overrides[$channelName]);
 
             if (empty($rules)) {
                 continue;
@@ -79,26 +77,27 @@ class InstanceGeneratorService
             }
 
             // 1. Entities Sync (if applicable)
-            if ($rules['entities_sync']) {
+            $entitiesSyncValue = $rules['entities_sync'] ?? null;
+            if ($entitiesSyncValue) {
                 $instanceName = str_replace('_', '-', $channel) . '-entities-sync';
                 $channelInstances[] = [
                     'name' => $instanceName,
                     'port' => $currentPort++,
                     'channel' => $channel,
-                    'entity' => $rules['entities_sync'],
+                    'entity' => $entitiesSyncValue,
                     'frequency' => '0 2 * * *'
                 ];
             }
 
-            // 2. Historics and Recent (only if has active entities)
-            if ($this->hasActiveEntities($channelName)) {
-                // 2. Historics (Quarters)
-                $historyStart = $today->modify("-{$rules['history_months']} months");
-                
-                // Limit history start by cache history range if stricter
-                if ($limitDate && $historyStart < $limitDate) {
-                    $historyStart = $limitDate;
-                }
+            // 2. Historics and Recent (always created if channel is enabled)
+            // 2. Historics (Quarters)
+            $historyMonths = $rules['history_months'] ?? 1;
+            $historyStart = $today->modify("-{$historyMonths} months");
+            
+            // Limit history start by cache history range if stricter
+            if ($limitDate && $historyStart < $limitDate) {
+                $historyStart = $limitDate;
+            }
 
                 $tempStart = $historyStart;
                 
@@ -144,7 +143,6 @@ class InstanceGeneratorService
                     'end_date' => 'yesterday',
                     'frequency' => sprintf('%d %d * * *', $rules['recent_cron_minute'], $rules['recent_cron_hour'])
                 ];
-            }
 
             // 4. Handle dependencies (Optional)
             if ($useDependencies) {

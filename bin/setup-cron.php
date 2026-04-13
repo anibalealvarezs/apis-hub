@@ -23,7 +23,7 @@ $envVars = [
     'SHELL' => '/bin/bash'
 ];
 
-$keep = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'DB_DRIVER', 'PROJECT_CONFIG_FILE', 'APP_ENV', 'REDIS_HOST', 'REDIS_PORT', 'API_SOURCE', 'API_ENTITY', 'START_DATE', 'END_DATE', 'INSTANCE_NAME'];
+$keep = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'DB_DRIVER', 'PROJECT_CONFIG_FILE', 'APP_ENV', 'REDIS_HOST', 'REDIS_PORT', 'API_SOURCE', 'API_ENTITY', 'START_DATE', 'END_DATE', 'INSTANCE_NAME', 'CONFIG_DIR'];
 foreach ($keep as $key) {
     if ($val = getenv($key)) {
         $envVars[$key] = $val;

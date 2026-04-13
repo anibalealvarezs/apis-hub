@@ -39,7 +39,8 @@ class SyncService
         }
 
         try {
-            $driver = DriverFactory::get($channel, $this->logger);
+            $validatedConfig = \Classes\DriverInitializer::validateConfig($channel, $this->logger);
+            $driver = DriverFactory::get($channel, $this->logger, $validatedConfig);
 
             if (isset($config['processor']) && method_exists($driver, 'setDataProcessor')) {
                 $driver->{"setDataProcessor"}($config['processor']);
@@ -54,6 +55,10 @@ class SyncService
                 'end_date' => $endDate->format('Y-m-d'),
                 'config' => $config,
             ]);
+
+            // Inject production dependencies for drivers that need them (e.g. Meta)
+            $config['manager'] = Helpers::getManager();
+            $config['seeder'] = new \Classes\ProductionEntityMapper($config['manager']);
 
             return $driver->sync($startDate, $endDate, $config);
 

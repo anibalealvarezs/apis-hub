@@ -13,7 +13,7 @@ use Helpers\Helpers;
 $config = Helpers::getProjectConfig();
 
 // ─── Validate required sections ───────────────────────────────────────────────
-foreach (['database', 'instances', 'channels'] as $required) {
+foreach (['database', 'channels'] as $required) {
     if (empty($config[$required])) {
         fwrite(STDERR, "Missing required section '{$required}' in your config/ directory.\n");
         exit(1);
@@ -24,7 +24,7 @@ $env             = getenv('APP_ENV') ?: 'testing';
 $dbConfig        = $config['database'];
 $db              = $dbConfig[$env] ?? array_shift($dbConfig);
 $redis           = $config['redis'] ?? ['host' => 'redis', 'port' => 6379];
-$instances       = $config['instances'];
+$instances       = $config['instances'] ?? [];
 $projectLabel    = $config['project'] ?? 'apis-hub';
 $deploymentName  = getenv('DEPLOYMENT_NAME') ?: 'apis-hub';
 
@@ -85,7 +85,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         'mailchimp-api-anibal',
         'OAuth-v1'
     ];
-    $volumes = ['./:/app', '/app/vendor', '/app/mcp-server/node_modules', '/var/run/docker.sock:/var/run/docker.sock'];
+    $volumes = ['./:/app', '/app/mcp-server/node_modules', '/var/run/docker.sock:/var/run/docker.sock'];
     foreach ($localMounts as $mount) {
         $localPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . $mount;
         if (is_dir($localPath)) {
