@@ -107,8 +107,23 @@ export MCP_MODE=sse
 export MCP_PORT=3000
 node mcp-server/index.js &
 
+# Automatic server detection based on INSTANCE_NAME
+if [[ "$INSTANCE_NAME" == *"master"* ]]; then
+    DISABLE_HTTP_SERVER=${DISABLE_HTTP_SERVER:-false}
+    USE_SWOOLE=${USE_SWOOLE:-true}
+else
+    DISABLE_HTTP_SERVER=${DISABLE_HTTP_SERVER:-true}
+    USE_SWOOLE=${USE_SWOOLE:-false}
+fi
+
 # Start the web server
-if [ "$USE_SWOOLE" = "true" ]; then
+if [ "$DISABLE_HTTP_SERVER" = "true" ]; then
+    echo "HTTP server disabled ($INSTANCE_NAME). Running as pure worker."
+    # We keep the container alive by waiting on the background processes or just tailing a log
+    # Since cron is running and potentially other background tasks, we tail the cron log
+    touch /app/logs/cron.log
+    exec tail -f /app/logs/cron.log
+elif [ "$USE_SWOOLE" = "true" ]; then
     echo "Starting Swoole HTTP server on port $PORT..."
     exec php bin/swoole-server.php
 elif [ $# -gt 0 ]; then

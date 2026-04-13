@@ -32,10 +32,13 @@ $mode = SWOOLE_PROCESS;
 $sockType = SWOOLE_SOCK_TCP;
 
 if ($useSsl) {
-    if (file_exists(__DIR__ . '/../storage/certs/cert.pem') && file_exists(__DIR__ . '/../storage/certs/key.pem')) {
+    $certFile = getenv('SSL_CERT_FILE') ?: __DIR__ . '/../storage/certs/cert.pem';
+    $keyFile = getenv('SSL_KEY_FILE') ?: __DIR__ . '/../storage/certs/key.pem';
+    
+    if (file_exists($certFile) && file_exists($keyFile)) {
         $sockType |= SWOOLE_SSL;
     } else {
-        echo "WARNING: SSL certificates not found in storage/certs. Falling back to HTTP.\n";
+        echo "WARNING: SSL certificates not found at $certFile or $keyFile. Falling back to HTTP.\n";
         $useSsl = false;
     }
 }
@@ -43,7 +46,7 @@ if ($useSsl) {
 $server = new Server($host, $port, $mode, $sockType);
 
 $serverSettings = [
-    'worker_num' => swoole_cpu_num() * 2,
+    'worker_num' => (int) (getenv('SWOOLE_WORKER_NUM') ?: (swoole_cpu_num() * 2)),
     'enable_static_handler' => true,
     'document_root' => __DIR__ . '/..',
     'static_handler_locations' => ['/assets'],
@@ -52,8 +55,8 @@ $serverSettings = [
 ];
 
 if ($useSsl) {
-    $serverSettings['ssl_cert_file'] = __DIR__ . '/../storage/certs/cert.pem';
-    $serverSettings['ssl_key_file'] = __DIR__ . '/../storage/certs/key.pem';
+    $serverSettings['ssl_cert_file'] = $certFile;
+    $serverSettings['ssl_key_file'] = $keyFile;
 }
 
 $server->set($serverSettings);
