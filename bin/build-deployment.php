@@ -13,7 +13,7 @@ use Helpers\Helpers;
 $config = Helpers::getProjectConfig();
 
 // ─── Validate required sections ───────────────────────────────────────────────
-foreach (['database', 'channels'] as $required) {
+foreach (['database'] as $required) {
     if (empty($config[$required])) {
         fwrite(STDERR, "Missing required section '{$required}' in your config/ directory.\n");
         exit(1);
