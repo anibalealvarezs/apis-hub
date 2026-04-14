@@ -8,6 +8,12 @@ use Psr\Log\LoggerInterface;
 
 class DriverFactoryTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        DriverFactory::reset();
+    }
+
     /**
      * @dataProvider driverProvider
      */

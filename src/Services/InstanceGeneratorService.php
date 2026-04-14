@@ -183,6 +183,12 @@ class InstanceGeneratorService
         $chanKey = $channelName;
 
         $registryConfig = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chanKey);
+        
+        // If the channel is not in the registry, it's definitely not active
+        if (empty($registryConfig)) {
+            return false;
+        }
+
         $resourceKey = $registryConfig['resource_key'] ?? null;
 
         // If we don't have a resource key for entity-level validation,

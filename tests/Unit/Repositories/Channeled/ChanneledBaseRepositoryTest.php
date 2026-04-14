@@ -38,6 +38,7 @@ class ChanneledBaseRepositoryTest extends BaseUnitTestCase
             ->method('getClassMetadata')
             ->with($this->entityName)
             ->willReturn($classMetadata);
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $entityManager->expects($this->any())
             ->method('createQueryBuilder')
             ->willReturn($this->queryBuilder); // Added to return mocked QueryBuilder
@@ -687,10 +688,6 @@ class ChanneledBaseRepositoryTest extends BaseUnitTestCase
             ->with('channel', $channel)
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
-            ->method('setMaxResults')
-            ->with(1)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
             ->method('getQuery')
             ->willReturn($this->query);
         $this->query->expects($this->once())
@@ -738,10 +735,6 @@ class ChanneledBaseRepositoryTest extends BaseUnitTestCase
             ->with('channel', $channel)
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
-            ->method('setMaxResults')
-            ->with(1)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
             ->method('getQuery')
             ->willReturn($this->query);
         $this->query->expects($this->once())
@@ -785,10 +778,6 @@ class ChanneledBaseRepositoryTest extends BaseUnitTestCase
         $this->queryBuilder->expects($this->once())
             ->method('addOrderBy')
             ->with('e.platformCreatedAt', 'DESC')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setMaxResults')
-            ->with(1)
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('getQuery')
@@ -837,10 +826,6 @@ class ChanneledBaseRepositoryTest extends BaseUnitTestCase
         $this->queryBuilder->expects($this->once())
             ->method('addOrderBy')
             ->with('e.platformCreatedAt', 'DESC')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setMaxResults')
-            ->with(1)
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('getQuery')

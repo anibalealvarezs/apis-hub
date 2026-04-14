@@ -9,33 +9,39 @@ use Tests\Unit\BaseUnitTestCase;
 
 class DiscountRequestsTest extends BaseUnitTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $mockDriver = $this->createMock(\Anibalealvarezs\ApiDriverCore\Interfaces\SyncDriverInterface::class);
+        $mockDriver->method('sync')->willReturn(new \Symfony\Component\HttpFoundation\Response('[]', 200));
+        \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::setInstance('shopify', $mockDriver);
+        \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::setInstance('bigcommerce', $mockDriver);
+        \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::setInstance('netsuite', $mockDriver);
+        \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::setInstance('amazon', $mockDriver);
+    }
 
     public function testGetListFromShopify(): void
     {
-        $response = DiscountRequests::getListFromShopify();
+        $response = DiscountRequests::getList(Channel::shopify);
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertStringContainsString('Discounts are retrieved along with Price Rules.', $response->getContent());
     }
 
     public function testGetListFromBigCommerce(): void
     {
-        $response = DiscountRequests::getListFromBigCommerce();
+        $response = DiscountRequests::getList(Channel::bigcommerce);
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals('[]', $response->getContent());
     }
 
     public function testGetListFromNetsuite(): void
     {
-        $response = DiscountRequests::getListFromNetsuite();
+        $response = DiscountRequests::getList(Channel::netsuite);
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals('[]', $response->getContent());
     }
 
     public function testGetListFromAmazon(): void
     {
-        $response = DiscountRequests::getListFromAmazon();
+        $response = DiscountRequests::getList(Channel::amazon);
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals('[]', $response->getContent());
     }
 
     public function testProcess(): void

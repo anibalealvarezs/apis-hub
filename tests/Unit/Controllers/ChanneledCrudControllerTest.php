@@ -683,7 +683,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
     {
         $entity = 'customer';
         $channel = Channel::shopify;
-        $id = $this->faker->randomNumber();
+        $id = $this->faker->numberBetween(1, 1000);
         $body = json_encode(['name' => $this->faker->word]);
         $data = ['id' => $id, 'name' => $this->faker->word, 'channel' => $channel->value];
 

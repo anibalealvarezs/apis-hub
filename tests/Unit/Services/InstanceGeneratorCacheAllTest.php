@@ -39,6 +39,16 @@ class InstanceGeneratorCacheAllTest extends TestCase
         Helpers::resetConfigs();
         \Classes\DriverInitializer::reset();
         \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::reset();
+        
+        $registryReflection = new \ReflectionClass(\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::class);
+        $registryProp = $registryReflection->getProperty('registry');
+        $registryProp->setAccessible(true);
+        $registryProp->setValue(null, [
+            'facebook_marketing' => ['driver' => 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver', 'resource_key' => 'ad_accounts'],
+            'facebook_organic' => ['driver' => 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookOrganicDriver', 'resource_key' => 'pages'],
+            'google_search_console' => ['driver' => 'Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver', 'resource_key' => 'sites'],
+        ]);
+
         $this->setMockProjectConfig(['name' => 'testing', 'mode' => 'testing', 'project' => 'testing']);
     }
 
@@ -108,7 +118,7 @@ class InstanceGeneratorCacheAllTest extends TestCase
 
         $this->assertTrue($method->invoke($service, 'facebook_marketing'), 'Facebook Marketing should be active with cache_all');
         $this->assertTrue($method->invoke($service, 'facebook_organic'), 'Facebook Organic should be active with cache_all');
-        $this->assertTrue($method->invoke($service, 'gsc'), 'GSC should be active with cache_all');
+        $this->assertTrue($method->invoke($service, 'google_search_console'), 'GSC should be active with cache_all');
     }
 
     public function testHasActiveEntitiesWithoutCacheAllAndEmptyList(): void

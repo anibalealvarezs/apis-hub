@@ -43,6 +43,7 @@ class ChanneledProductRepositoryTest extends TestCase
         $entityManager->expects($this->any())
             ->method('createQueryBuilder')
             ->willReturn($this->queryBuilder);
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $this->repository = new ChanneledProductRepository($entityManager, $classMetadata);
         $this->faker = Factory::create();
     }

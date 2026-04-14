@@ -43,6 +43,7 @@ class ChanneledVendorRepositoryTest extends TestCase
         $entityManager->expects($this->any())
             ->method('createQueryBuilder')
             ->willReturn($this->queryBuilder);
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $this->repository = new ChanneledVendorRepository($entityManager, $classMetadata);
         $this->faker = Factory::create();
     }
@@ -563,7 +564,7 @@ class ChanneledVendorRepositoryTest extends TestCase
             ->method('addSelect');
         $this->queryBuilder->expects($this->never())
             ->method('leftJoin');
-        $this->queryBuilder->expects($this::once())
+        $this->queryBuilder->expects($this->once())
             ->method('from')
             ->with($this->entityName, 'e')
             ->willReturnSelf();
@@ -609,8 +610,6 @@ class ChanneledVendorRepositoryTest extends TestCase
             ->with('count(e.id)')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->never())
-            ->method('addSelect');
-        $this->queryBuilder->expects($this::never())
             ->method('leftJoin');
         $this->queryBuilder->expects($this->once())
             ->method('from')
@@ -620,7 +619,7 @@ class ChanneledVendorRepositoryTest extends TestCase
             ->method('andWhere')
             ->with('e.channel = :channel')
             ->willReturnSelf();
-        $this->queryBuilder->expects($this::once())
+        $this->queryBuilder->expects($this->once())
             ->method('setParameter')
             ->with('channel', $filters->channel)
             ->willReturnSelf();
@@ -632,7 +631,7 @@ class ChanneledVendorRepositoryTest extends TestCase
             ->willReturn($result);
 
         $actual = $this->repository->countElements($filters);
-        $this::assertEquals($result, $actual);
+        $this->assertEquals($result, $actual);
     }
 
     /**
@@ -644,7 +643,7 @@ class ChanneledVendorRepositoryTest extends TestCase
         $filters = (object)['channel' => 'invalid'];
 
         $this->expectException(InvalidArgumentException::class);
-        $this::expectExceptionMessage('Invalid channel name: invalid');
+        $this->expectExceptionMessage('Invalid channel name: invalid');
 
         $this->queryBuilder->expects($this->never())
             ->method('select');

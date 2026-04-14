@@ -39,6 +39,18 @@ class InstanceGeneratorServiceTest extends TestCase
         putenv('APP_MODE=testing');
         putenv('PROJECT_NAME=testing');
         \Helpers\Helpers::resetConfigs();
+        \Classes\DriverInitializer::reset();
+        \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::reset();
+
+        $registryReflection = new \ReflectionClass(\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::class);
+        $registryProp = $registryReflection->getProperty('registry');
+        $registryProp->setAccessible(true);
+        $registryProp->setValue(null, [
+            'facebook_marketing' => ['driver' => 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver', 'resource_key' => 'ad_accounts'],
+            'facebook_organic' => ['driver' => 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookOrganicDriver', 'resource_key' => 'pages'],
+            'google_search_console' => ['driver' => 'Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver', 'resource_key' => 'sites'],
+        ]);
+
 
         $this->setMockProjectConfig([
             'name' => 'testing',
@@ -59,7 +71,7 @@ class InstanceGeneratorServiceTest extends TestCase
                     'recent_cron_minute' => 0,
                     'recent_cron_hour' => 1
                 ],
-                'gsc' => [
+                'google_search_console' => [
                     'enabled' => true,
                     'entities_sync' => null,
                     'history_months' => 3,
@@ -115,7 +127,7 @@ class InstanceGeneratorServiceTest extends TestCase
         $names = array_column($instances, 'name');
         $this->assertContains('facebook-marketing-recent', $names);
         $this->assertContains('facebook-organic-recent', $names);
-        $this->assertContains('gsc-recent', $names);
+        $this->assertContains('google-search-console-recent', $names);
     }
 
     public function testDependencyChain(): void

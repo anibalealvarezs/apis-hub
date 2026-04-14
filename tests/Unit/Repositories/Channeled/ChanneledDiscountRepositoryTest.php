@@ -40,6 +40,7 @@ class ChanneledDiscountRepositoryTest extends TestCase
         $entityManager->expects($this->any())
             ->method('createQueryBuilder')
             ->willReturn($this->queryBuilder);
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $this->repository = new ChanneledDiscountRepository($entityManager, $classMetadata);
         $this->faker = Factory::create();
     }

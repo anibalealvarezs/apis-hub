@@ -42,6 +42,7 @@ class ChanneledMetricRepositoryTest extends TestCase
         $this->queryBuilder->method('where')->willReturnSelf();
         $this->queryBuilder->method('andWhere')->willReturnSelf();
         $this->queryBuilder->method('setParameter')->willReturnSelf();
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $this->queryBuilder->method('getQuery')->willReturn($this->query);
 
         $classMetadata = $this->createMock(ClassMetadata::class);

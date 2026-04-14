@@ -42,6 +42,7 @@ class ChanneledOrderRepositoryTest extends TestCase
             ->method('getClassMetadata')
             ->with($this->entityName)
             ->willReturn($classMetadata);
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $entityManager->expects($this->any())
             ->method('createQueryBuilder')
             ->willReturn($this->queryBuilder);

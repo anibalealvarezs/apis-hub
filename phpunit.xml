@@ -47,5 +47,6 @@
                Redis:   REDIS_HOST / REDIS_PORT / REDIS_PASSWORD
                Channels: CHANNELS_CONFIG (JSON blob) or individual GOOGLE_* / FACEBOOK_* env vars -->
         <env name="CONFIG_FILE" value=""/>
+        <env name="CONFIG_DIR" value="config"/>
     </php>
 </phpunit>

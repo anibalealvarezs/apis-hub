@@ -49,6 +49,7 @@ class CustomerRepositoryTest extends TestCase
         $this->queryBuilder->method('leftJoin')->willReturnSelf();
         $this->queryBuilder->method('where')->willReturnSelf();
         $this->queryBuilder->method('setParameter')->willReturnSelf();
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $this->queryBuilder->method('getQuery')->willReturn($this->query);
 
         $classMetadata = $this->createMock(ClassMetadata::class);
