@@ -171,6 +171,15 @@ class RoutingCore implements HttpKernelInterface
         // Don't rate limit health checks, local dev, or monitoring dashboard
         if ($path === '/api/heartbeat') return false;
         if (\Helpers\Helpers::isDemo()) return false;
+
+        // 1. IP Whitelisting Bypass
+        $authorizedIps = \Helpers\Helpers::getAuthorizedIps();
+        if (!empty($authorizedIps)) {
+            $clientIp = $request->getClientIp();
+            if (\Symfony\Component\HttpFoundation\IpUtils::checkIp($clientIp, $authorizedIps)) {
+                return false;
+            }
+        }
         
         $whiteList = [
             '/monitoring',
