@@ -67,11 +67,18 @@ class SyncService
             $startDate = new DateTime($startDateStr ?? $finalConfig['startDate'] ?? $finalConfig['start_date'] ?? '-30 days');
             $endDate = new DateTime($endDateStr ?? $finalConfig['endDate'] ?? $finalConfig['end_date'] ?? 'now');
 
+            $sanitizedConfig = $finalConfig;
+            array_walk_recursive($sanitizedConfig, function (&$value, $key) {
+                if (preg_match('/(secret|token|pass|key)/i', (string)$key)) {
+                    $value = '********';
+                }
+            });
+
             $this->logger->info("SyncService: Executing sync for channel '{$channel}'", [
                 'start_date' => $startDate->format('Y-m-d'),
                 'end_date' => $endDate->format('Y-m-d'),
                 'instance' => $instanceName,
-                'config' => $finalConfig,
+                'config' => $sanitizedConfig,
             ]);
 
             // Inject production dependencies
