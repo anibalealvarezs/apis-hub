@@ -61,6 +61,18 @@ class DriverInitializer
             }
         }
 
+        // Add sibling flags for shared OAuth flows (e.g. marketing_enabled, organic_enabled)
+        $parent = $registryConfig['parent'] ?? null;
+        if ($parent) {
+            $registry = DriverFactory::getRegistry();
+            foreach ($registry as $chan => $reg) {
+                if (($reg['parent'] ?? null) === $parent) {
+                    $propName = str_replace($parent . '_', '', $chan) . '_enabled';
+                    $config[$propName] = (bool)($allConfigs[$chan]['enabled'] ?? false);
+                }
+            }
+        }
+
         // Delegate channel-specific validation and normalization to the driver
         try {
             $driver = DriverFactory::get($channel, $logger);
