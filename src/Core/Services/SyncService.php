@@ -71,6 +71,7 @@ class SyncService
                 'start_date' => $startDate->format('Y-m-d'),
                 'end_date' => $endDate->format('Y-m-d'),
                 'instance' => $instanceName,
+                'config' => $finalConfig,
             ]);
 
             // Inject production dependencies
