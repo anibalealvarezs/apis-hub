@@ -6,6 +6,7 @@ use DateTime;
 use Exception;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class SyncService
@@ -92,7 +93,11 @@ class SyncService
             $result = $driver->sync($startDate, $endDate, $finalConfig);
             $this->logger?->info("DEBUG: SyncService::execute - driver->sync RETURNED");
 
-            return new Response(true, "Sync completed successfully", (array)$result);
+            return new JsonResponse([
+                'success' => true,
+                'message' => 'Sync completed successfully',
+                'data' => (array)$result
+            ], Response::HTTP_OK);
 
         } catch (\Throwable $e) {
             $this->logger->error("SyncService Error [{$channel}]: " . $e->getMessage(), [
