@@ -232,9 +232,7 @@ class ProcessJobsCommand extends Command
                     } catch (\Exception $e) {}
 
                     $chanConfig = $channelsConfig[$chanKey] ?? null;
-                    if (Helpers::isDebug()) {
-                        $output->writeln("DEBUG: Loaded chanConfig keys: " . implode(', ', array_keys($chanConfig ?? [])));
-                    }
+                    error_log("PROCESS_JOBS DEBUG: Instance {$instanceName} - Loaded chanConfig keys: " . implode(', ', array_keys($chanConfig ?? [])));
 
                     // Check if channel is enabled
                     if ($chanConfig && isset($chanConfig['enabled']) && !$chanConfig['enabled']) {
