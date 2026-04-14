@@ -167,9 +167,13 @@ class RoutingCore implements HttpKernelInterface
      */
     private function shouldRateLimit(Request $request): bool
     {
-        // Don't rate limit health checks or local dev (if needed)
-        if ($request->getPathInfo() === '/api/heartbeat') return false;
+        $path = $request->getPathInfo();
+        // Don't rate limit health checks, local dev, or monitoring dashboard
+        if ($path === '/api/heartbeat') return false;
         if (\Helpers\Helpers::isDemo()) return false;
+        if (str_starts_with($path, '/monitoring') || str_starts_with($path, '/api/monitoring')) return false;
+        if (str_starts_with($path, '/config-manager') || str_starts_with($path, '/api/config-manager')) return false;
+        
         return true;
     }
 
