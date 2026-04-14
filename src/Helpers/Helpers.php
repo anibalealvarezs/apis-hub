@@ -234,7 +234,7 @@ class Helpers
             // Ensure config/env is loaded
             try {
                 $config = self::getProjectConfig();
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $config = [];
             }
 
@@ -268,7 +268,7 @@ class Helpers
             if (str_contains(strtolower($projectName), 'demo')) {
                 return true;
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
         }
 
         return false;
@@ -568,7 +568,7 @@ class Helpers
                 ];
 
                 foreach ($credentialMapping as $chan => $mapping) {
-                    if (!isset($config[$chan])) {
+                    if (! isset($config[$chan])) {
                         $config[$chan] = [];
                     }
                     foreach ($mapping as $envKey => $configKey) {
@@ -586,13 +586,13 @@ class Helpers
                 ];
 
                 foreach ($commonMappings as $commonKey => $specificChannels) {
-                    if (!empty($config[$commonKey])) {
+                    if (! empty($config[$commonKey])) {
                         foreach ($specificChannels as $chan) {
                             if (isset($config[$chan])) {
                                 // Important: Merge common into specific preserving existing values
                                 $config[$chan] = array_replace_recursive($config[$commonKey], $config[$chan]);
                                 // Maintain nested structure too
-                                if (!isset($config[$chan][$commonKey])) {
+                                if (! isset($config[$chan][$commonKey])) {
                                     $config[$chan][$commonKey] = $config[$commonKey];
                                 } else {
                                     $config[$chan][$commonKey] = array_replace_recursive($config[$commonKey], array_filter($config[$chan][$commonKey]));
@@ -790,9 +790,9 @@ class Helpers
      */
     public static function getManager(): EntityManager
     {
-        if (self::$entityManager === null || !self::$entityManager->isOpen()) {
+        if (self::$entityManager === null || ! self::$entityManager->isOpen()) {
             try {
-                if (self::$connection === null || !self::$connection->isConnected()) {
+                if (self::$connection === null || ! self::$connection->isConnected()) {
                     $config = self::getDbConfig();
                     self::$connection = DriverManager::getConnection($config);
                 } else {
