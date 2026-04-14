@@ -153,7 +153,8 @@ class JobRepository extends BaseRepository
                         $value = $chanEnum->name;
                     }
                 }
-                $query->andWhere('e.' . $key . ' = :' . $key)
+                $operator = is_array($value) ? 'IN' : '=';
+                $query->andWhere("e.{$key} {$operator} (:{$key})")
                     ->setParameter($key, $value);
             }
         }
@@ -245,7 +246,8 @@ class JobRepository extends BaseRepository
                         $value = $chanEnum->name;
                     }
                 }
-                $query->andWhere('e.' . $key . ' = :' . $key)
+                $operator = is_array($value) ? 'IN' : '=';
+                $query->andWhere("e.{$key} {$operator} (:{$key})")
                     ->setParameter($key, $value);
             }
         }
@@ -285,15 +287,18 @@ class JobRepository extends BaseRepository
     }
 
     /**
-     * @param int $status
+     * @param int|int[] $status
      * @param string|null $channel
      * @param string|null $instanceName
      * @return Job[]
      */
-    public function getJobsByStatus(int $status, ?string $channel = null, ?string $instanceName = null): array
+    public function getJobsByStatus($status, ?string $channel = null, ?string $instanceName = null): array
     {
         if (Helpers::isPostgres()) {
-            $sql = "SELECT j.* FROM jobs j WHERE j.status = :status";
+            $isBatch = is_array($status);
+            $operator = $isBatch ? "IN (:status)" : "= :status";
+            
+            $sql = "SELECT j.* FROM jobs j WHERE j.status {$operator}";
             $params = ['status' => $status];
 
             if ($channel) {
