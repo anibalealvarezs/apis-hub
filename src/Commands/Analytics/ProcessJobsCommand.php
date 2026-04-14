@@ -46,6 +46,7 @@ class ProcessJobsCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        Helpers::reconnectIfNeeded($this->em);
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
 
@@ -80,6 +81,7 @@ class ProcessJobsCommand extends Command
         do {
             $progressMade = false;
             Helpers::reconnectIfNeeded($this->em);
+            $jobRepo = $this->em->getRepository(Job::class);
 
             $jobId = $input->getOption('job-id');
             if ($jobId) {

@@ -792,6 +792,9 @@ class Helpers
     {
         if (self::$entityManager === null || ! self::$entityManager->isOpen()) {
             try {
+                if (self::$entityManager !== null && ! self::$entityManager->isOpen()) {
+                    self::closeManager();
+                }
                 if (self::$connection === null || ! self::$connection->isConnected()) {
                     $config = self::getDbConfig();
                     self::$connection = DriverManager::getConnection($config);
@@ -1167,8 +1170,12 @@ class Helpers
      * @param EntityManager $em
      * @return void
      */
-    public static function reconnectIfNeeded(EntityManager $em): void
+    public static function reconnectIfNeeded(EntityManager &$em): void
     {
+        if (!$em->isOpen()) {
+            $em = self::getManager();
+        }
+
         try {
             $em->getConnection()->executeQuery('SELECT 1');
         } catch (Exception $e) {
