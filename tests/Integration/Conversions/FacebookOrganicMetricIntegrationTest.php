@@ -58,7 +58,7 @@ class FacebookOrganicMetricIntegrationTest extends BaseIntegrationTestCase
         $channeledAccount = new ChanneledAccount();
         $channeledAccount->addPlatformId($igPlatformId);
         $channeledAccount->addName($this->faker->userName);
-        $channeledAccount->addType(\Enums\Account::INSTAGRAM);
+        $channeledAccount->addType('INSTAGRAM');
         $channeledAccount->addChannel(Channel::facebook_organic->value);
         $channeledAccount->addAccount($accountEntity);
         $this->entityManager->persist($channeledAccount);

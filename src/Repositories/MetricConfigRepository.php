@@ -3,6 +3,7 @@
 namespace Repositories;
 
 use DateTime;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\OptimisticLockException;
@@ -142,11 +143,11 @@ class MetricConfigRepository extends BaseRepository
                 ->where('e.channel = :channel')
                 ->andWhere('e.name = :name')
                 ->andWhere('e.period = :period')
-                ->setParameters([
+                ->setParameters(new ArrayCollection([
                     'channel' => $channel,
                     'name' => $name,
                     'period' => $period->value,
-                ])
+                ]))
                 ->getQuery()
                 ->getSingleScalarResult() > 0;
     }
@@ -164,11 +165,11 @@ class MetricConfigRepository extends BaseRepository
             ->where('m.channel = :channel')
             ->andWhere('m.name = :name')
             ->andWhere('m.period = :period')
-            ->setParameters([
+            ->setParameters(new ArrayCollection([
                 'channel' => $channel,
                 'name' => $name,
                 'period' => $period->value,
-            ])
+            ]))
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -182,13 +183,13 @@ class MetricConfigRepository extends BaseRepository
             ->andWhere('e.name = :name')
             ->andWhere('e.period = :period')
             ->andWhere('m.metricDate BETWEEN :start AND :end')
-            ->setParameters([
+            ->setParameters(new ArrayCollection([
                 'channel' => $channel,
                 'name' => $name,
                 'period' => $period->value,
                 'start' => $start,
                 'end' => $end,
-            ])
+            ]))
             ->getQuery()
             ->getResult();
     }
@@ -271,13 +272,13 @@ class MetricConfigRepository extends BaseRepository
             ->andWhere('e.name = :name')
             ->andWhere('e.period = :period')
             ->andWhere('m.metricDate BETWEEN :start AND :end')
-            ->setParameters([
+            ->setParameters(new ArrayCollection([
                 'channel' => $channel,
                 'name' => $name,
                 'period' => $period->value,
                 'start' => $start,
                 'end' => $end,
-            ]);
+            ]));
 
         foreach ($dimensions as $key => $value) {
             $alias = 'd'.$key;

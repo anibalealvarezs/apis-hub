@@ -38,7 +38,7 @@ class FacebookBulkMetricsTest extends BaseIntegrationTestCase
         $channeledAccount->addPlatformId($adAccountId)
             ->addName('Test Account')
             ->addChannel(Channel::facebook_marketing->value)
-            ->addType(AccountEnum::META_AD_ACCOUNT)
+            ->addType('META_AD_ACCOUNT')
             ->addAccount($account)
             ->addPlatformCreatedAt(new \DateTime());
         $this->entityManager->persist($channeledAccount);

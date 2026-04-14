@@ -2,6 +2,7 @@
 
 namespace Repositories;
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\OptimisticLockException;
@@ -311,7 +312,7 @@ class JobRepository extends BaseRepository
             $rsm->addRootEntityFromClassMetadata($this->getEntityName(), 'j');
 
             $query = $this->_em->createNativeQuery($sql, $rsm);
-            $query->setParameters($params);
+            $query->setParameters(new ArrayCollection($params));
 
             return $query->getResult();
         }

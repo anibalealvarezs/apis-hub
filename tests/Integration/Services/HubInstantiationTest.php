@@ -72,7 +72,7 @@ class HubInstantiationTest extends BaseIntegrationTestCase
         $driverReflection = new \ReflectionClass($driver);
         $authProp = $driverReflection->getProperty('authProvider');
         $authProp->setAccessible(true);
-        /** @var \Anibalealvarezs\ApiSkeleton\Interfaces\AuthProviderInterface $authProvider */
+        /** @var \Anibalealvarezs\ApiDriverCore\Interfaces\AuthProviderInterface $authProvider */
         $authProvider = $authProp->getValue($driver);
         
         $this->assertEquals($fakeApiKey, $authProvider->getAccessToken());
@@ -103,7 +103,7 @@ class HubInstantiationTest extends BaseIntegrationTestCase
         putenv('CHANNELS_CONFIG=' . json_encode($config));
 
         // Reset Helpers
-        $reflection = new \ReflectionClass(\Helpers\Helpers::class);
+        $reflection = new \ReflectionClass(Helpers::class);
         $property = $reflection->getProperty('channelsConfig');
         $property->setAccessible(true);
         $property->setValue(null, null);

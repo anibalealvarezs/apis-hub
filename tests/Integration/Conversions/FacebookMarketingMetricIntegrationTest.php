@@ -120,7 +120,7 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
         $channeledAccount = new ChanneledAccount();
         $channeledAccount->addPlatformId('act_' . $this->faker->numerify('#########'));
         $channeledAccount->addName($this->faker->company);
-        $channeledAccount->addType(\Enums\Account::META_AD_ACCOUNT);
+        $channeledAccount->addType('META_AD_ACCOUNT');
         $channeledAccount->addChannel(Channel::facebook_marketing->value);
         $channeledAccount->addAccount($accountEntity);
         
