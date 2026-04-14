@@ -171,8 +171,21 @@ class RoutingCore implements HttpKernelInterface
         // Don't rate limit health checks, local dev, or monitoring dashboard
         if ($path === '/api/heartbeat') return false;
         if (\Helpers\Helpers::isDemo()) return false;
-        if (str_starts_with($path, '/monitoring') || str_starts_with($path, '/api/monitoring')) return false;
-        if (str_starts_with($path, '/config-manager') || str_starts_with($path, '/api/config-manager')) return false;
+        
+        $whiteList = [
+            '/monitoring',
+            '/api/monitoring',
+            '/config-manager',
+            '/api/config-manager',
+            '/logs',
+            '/api/monitoring/logs',
+            '/docs',
+            '/api/spec'
+        ];
+
+        foreach ($whiteList as $prefix) {
+            if (str_starts_with($path, $prefix)) return false;
+        }
         
         return true;
     }
