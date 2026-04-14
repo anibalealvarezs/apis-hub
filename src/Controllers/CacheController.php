@@ -419,7 +419,7 @@ class CacheController extends BaseController
                 endDate: $endDate,
                 logger: $logger,
                 jobId: $jobId,
-                filters: (object)$params
+                filters: is_array($params) ? (object)$params : $params
             );
 
             return json_decode($response->getContent(), true) ?: [];
