@@ -54,10 +54,12 @@ class SyncService
                 $startDateStr = $startDateOrConfig;
             }
 
+            $driverClass = \Anibalealvarezs\ApiDriverCore\Classes\DriverInitializer::getDriverClass($channel);
             $validatedConfig = \Classes\DriverInitializer::validateConfig($channel, $this->logger);
             $finalConfig = array_merge($validatedConfig, $config);
 
             $driver = DriverFactory::get($channel, $this->logger, $finalConfig);
+            $this->logger?->info("DEBUG: SyncService::execute - DRIVER RESOLVED", ['class' => $driverClass]);
 
             if (isset($finalConfig['processor']) && method_exists($driver, 'setDataProcessor')) {
                 $driver->{"setDataProcessor"}($finalConfig['processor']);
@@ -85,7 +87,11 @@ class SyncService
             $finalConfig['manager'] = Helpers::getManager();
             $finalConfig['seeder'] = new \Classes\ProductionEntityMapper($finalConfig['manager']);
 
-            return $driver->sync($startDate, $endDate, $finalConfig);
+            $this->logger?->info("DEBUG: SyncService::execute - INVOKING driver->sync");
+            $result = $driver->sync($startDate, $endDate, $finalConfig);
+            $this->logger?->info("DEBUG: SyncService::execute - driver->sync RETURNED");
+
+            return $result;
 
         } catch (\Throwable $e) {
             $this->logger->error("SyncService Error [{$channel}]: " . $e->getMessage(), [
