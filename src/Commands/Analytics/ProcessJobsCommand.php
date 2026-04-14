@@ -212,14 +212,17 @@ class ProcessJobsCommand extends Command
                         continue;
                     }
 
-                    $channelEnum = Channel::tryFromName($job->getChannel());
+                    $channelName = $job->getChannel();
+                    $channelEnum = Channel::tryFromName($channelName);
                     if (!$channelEnum) {
-                        throw new \Exception("Invalid channel enum: " . $job->getChannel());
+                        throw new \Exception("Invalid channel enum: " . $channelName);
                     }
 
-                    // Check if channel is enabled
+                    // Load full channel configuration
                     $channelsConfig = Helpers::getChannelsConfig();
-                    $chanKey = $job->getChannel();
+                    
+                    // Normalize channel key (handle common config keys like 'facebook' for multiple drivers)
+                    $chanKey = $channelName;
                     try {
                         $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
                         $commonKey = $driver::getCommonConfigKey();
@@ -228,14 +231,16 @@ class ProcessJobsCommand extends Command
                         }
                     } catch (\Exception $e) {}
 
-                    $chanConfig = $channelsConfig[$job->getChannel()] ?? $channelsConfig[$chanKey] ?? null;
+                    $chanConfig = $channelsConfig[$chanKey] ?? null;
+
+                    // Check if channel is enabled
                     if ($chanConfig && isset($chanConfig['enabled']) && !$chanConfig['enabled']) {
                         $jobRepo->update($job->getId(), (object)[
                             'status' => JobStatus::failed->value,
                             'message' => 'Channel is disabled in configuration'
                         ]);
                         if (Helpers::isDebug()) {
-                            $output->writeln("<comment>Job {$job->getUuid()} marked as failed because channel {$job->getChannel()} is disabled.</comment>");
+                            $output->writeln("<comment>Job {$job->getUuid()} marked as failed because channel {$channelName} is disabled.</comment>");
                         }
                         $stats['failed']++;
                         continue;
@@ -243,6 +248,11 @@ class ProcessJobsCommand extends Command
 
                     // Resolve relative dates (e.g. 'yesterday' -> '2024-03-05')
                     $resolvedParams = DateResolver::resolveParams($params);
+
+                    // Inject channel configuration into parameters
+                    if ($chanConfig) {
+                        $resolvedParams = array_merge($chanConfig, $resolvedParams);
+                    }
 
                     // Intelligent incremental sync for entities
                     $instanceName = $payload['instance_name'] ?? null;
@@ -261,14 +271,14 @@ class ProcessJobsCommand extends Command
                     $body = $payload['body'] ?? null;
 
                     // Set long timeout for the session to avoid lock waits
-            $connection = $this->em->getConnection();
-            $platform = $connection->getDatabasePlatform();
-            if ($platform instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
-                // PostgreSQL uses milliseconds for lock_timeout
-                $connection->executeStatement("SET lock_timeout = '300s'");
-            } else {
-                $connection->executeStatement("SET SESSION innodb_lock_wait_timeout = 300");
-            }
+                    $connection = $this->em->getConnection();
+                    $platform = $connection->getDatabasePlatform();
+                    if ($platform instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+                        // PostgreSQL uses milliseconds for lock_timeout
+                        $connection->executeStatement("SET lock_timeout = '300s'");
+                    } else {
+                        $connection->executeStatement("SET SESSION innodb_lock_wait_timeout = 300");
+                    }
 
                     $result = $controller->fetchData($job->getEntity(), $channelEnum, $resolvedParams, $body);
 

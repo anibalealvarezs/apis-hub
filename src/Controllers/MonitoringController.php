@@ -487,31 +487,26 @@ class MonitoringController extends BaseController
             return "File not found or not readable.";
         }
 
+        $size = filesize($filename);
+        if ($size === 0) return "Empty log file.";
+
         $file = fopen($filename, "rb");
         if (!$file) return "Could not open file.";
 
-        $lineCount = 0;
-        $pos = -2; // Start from end of file
-        $t = " ";
-        $data = "";
-
-        fseek($file, $pos, SEEK_END);
-
-        while ($lineCount < $lines) {
-            try {
-                if (fseek($file, $pos, SEEK_END) == -1) break;
-                $t = fgetc($file);
-                if ($t == "\n") $lineCount++;
-                $pos--;
-            } catch (\Exception $e) {
-                break;
-            }
-        }
-
-        $data = fread($file, abs($pos));
+        // Read the last 1MB or the whole file if smaller
+        $readSize = min($size, 1024 * 1024);
+        fseek($file, -$readSize, SEEK_END);
+        $data = fread($file, $readSize);
         fclose($file);
 
-        return $data ?: "Empty log file.";
+        if (!$data) return "Empty log file.";
+
+        $linesArray = explode("\n", $data);
+        if (count($linesArray) > $lines) {
+            $linesArray = array_slice($linesArray, -$lines);
+        }
+
+        return implode("\n", $linesArray);
     }
 
     private function sortInstancesByDependency(array $instances): array
