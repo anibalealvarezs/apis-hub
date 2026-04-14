@@ -293,26 +293,26 @@ class JobRepository extends BaseRepository
     public function getJobsByStatus(int $status, ?string $channel = null, ?string $instanceName = null): array
     {
         if (Helpers::isPostgres()) {
-            $sql = "SELECT * FROM jobs WHERE status = :status";
+            $sql = "SELECT j.* FROM jobs j WHERE j.status = :status";
             $params = ['status' => $status];
 
             if ($channel) {
-                $sql .= " AND channel = :channel";
+                $sql .= " AND j.channel = :channel";
                 $params['channel'] = $channel;
             }
 
             if ($instanceName) {
-                $sql .= " AND CAST(payload AS text) LIKE :instance_name_pattern";
+                $sql .= " AND CAST(j.payload AS text) LIKE :instance_name_pattern";
                 $params['instance_name_pattern'] = '%instance_name%' . $instanceName . '%';
             }
 
-            $sql .= " ORDER BY id ASC LIMIT 100";
+            $sql .= " ORDER BY j.id ASC LIMIT 100";
 
             $rsm = new \Doctrine\ORM\Query\ResultSetMappingBuilder($this->_em);
             $rsm->addRootEntityFromClassMetadata($this->getEntityName(), 'j');
 
             $query = $this->_em->createNativeQuery($sql, $rsm);
-            $query->setParameters(new ArrayCollection($params));
+            $query->setParameters($params);
 
             return $query->getResult();
         }
