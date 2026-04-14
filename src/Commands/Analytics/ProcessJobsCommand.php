@@ -107,6 +107,9 @@ class ProcessJobsCommand extends Command
 
             /** @var Job $job */
             foreach ($jobsList as $job) {
+                Helpers::reconnectIfNeeded($this->em);
+                $jobRepo = $this->em->getRepository(Job::class);
+
                 $payload = $job->getPayload() ?? [];
                 $params = $payload['params'] ?? [];
 
