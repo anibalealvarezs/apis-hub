@@ -22,48 +22,67 @@ class SyncService
      * Ejecuta la sincronización para cualquier canal registrado.
      *
      * @param string $channel El identificador del canal
-     * @param string|null $startDateStr Fecha de inicio en formato Y-m-d
-     * @param string|null $endDateStr Fecha de fin en formato Y-m-d
      * @param array $config Configuración adicional (jobId, resume, etc.)
+     * @param LoggerInterface|null $logger Logger instance
+     * @param string|null $instanceName Name of the instance running the sync
      * @return Response
-     * @throws Exception
+     * @throws \Throwable
      */
     public function execute(
         string $channel,
-        ?string $startDateStr = null,
-        ?string $endDateStr = null,
-        array $config = []
+        string|array|null $startDateOrConfig = null,
+        string|null $endDateStr = null,
+        array $config = [],
+        ?LoggerInterface $logger = null,
+        ?string $instanceName = null
     ): Response {
-        if (! $this->logger) {
+        if ($logger) {
+            $this->logger = $logger;
+        } elseif (! $this->logger) {
             $this->logger = Helpers::setLogger("sync-{$channel}.log");
         }
 
         try {
-            $validatedConfig = \Classes\DriverInitializer::validateConfig($channel, $this->logger);
-            $driver = DriverFactory::get($channel, $this->logger, $validatedConfig);
-
-            if (isset($config['processor']) && method_exists($driver, 'setDataProcessor')) {
-                $driver->{"setDataProcessor"}($config['processor']);
+            $startDateStr = null;
+            // SMART DETECT: If 2nd param is array, it's the NEW signature: execute(channel, config, logger, instance)
+            if (is_array($startDateOrConfig)) {
+                $config = $startDateOrConfig;
+                // If logger was passed in 3rd param (instanceof LoggerInterface), use it
+                // Note: parameters might be shifted
+            } else {
+                // OLD signature: execute(channel, startDate, endDate, config)
+                $startDateStr = $startDateOrConfig;
             }
 
-            // Normalización de fechas
-            $startDate = $startDateStr ? new DateTime($startDateStr) : new DateTime('-30 days');
-            $endDate = $endDateStr ? new DateTime($endDateStr) : new DateTime();
+            $validatedConfig = \Classes\DriverInitializer::validateConfig($channel, $this->logger);
+            $finalConfig = array_merge($validatedConfig, $config);
+
+            $driver = DriverFactory::get($channel, $this->logger, $finalConfig);
+
+            if (isset($finalConfig['processor']) && method_exists($driver, 'setDataProcessor')) {
+                $driver->{"setDataProcessor"}($finalConfig['processor']);
+            }
+
+            // Date normalization (works for both patterns)
+            $startDate = new DateTime($startDateStr ?? $finalConfig['startDate'] ?? $finalConfig['start_date'] ?? '-30 days');
+            $endDate = new DateTime($endDateStr ?? $finalConfig['endDate'] ?? $finalConfig['end_date'] ?? 'now');
 
             $this->logger->info("SyncService: Executing sync for channel '{$channel}'", [
                 'start_date' => $startDate->format('Y-m-d'),
                 'end_date' => $endDate->format('Y-m-d'),
-                'config' => $config,
+                'instance' => $instanceName,
             ]);
 
-            // Inject production dependencies for drivers that need them (e.g. Meta)
-            $config['manager'] = Helpers::getManager();
-            $config['seeder'] = new \Classes\ProductionEntityMapper($config['manager']);
+            // Inject production dependencies
+            $finalConfig['manager'] = Helpers::getManager();
+            $finalConfig['seeder'] = new \Classes\ProductionEntityMapper($finalConfig['manager']);
 
-            return $driver->sync($startDate, $endDate, $config);
+            return $driver->sync($startDate, $endDate, $finalConfig);
 
-        } catch (Exception $e) {
-            $this->logger->error("SyncService Error [{$channel}]: " . $e->getMessage());
+        } catch (\Throwable $e) {
+            $this->logger->error("SyncService Error [{$channel}]: " . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
 
             throw $e;
         }
