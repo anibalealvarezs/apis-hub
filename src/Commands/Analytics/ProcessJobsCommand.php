@@ -232,7 +232,7 @@ class ProcessJobsCommand extends Command
                     } catch (\Exception $e) {}
 
                     $chanConfig = $channelsConfig[$chanKey] ?? null;
-                    error_log("PROCESS_JOBS DEBUG: Instance {$instanceName} - Loaded chanConfig keys: " . implode(', ', array_keys($chanConfig ?? [])));
+                    file_put_contents('/app/logs/debug_payload.log', "PROCESS_JOBS DEBUG: Instance " . ($instanceName ?? 'unknown') . " - Loaded chanConfig keys: " . implode(', ', array_keys($chanConfig ?? [])) . PHP_EOL, FILE_APPEND);
 
                     // Check if channel is enabled
                     if ($chanConfig && isset($chanConfig['enabled']) && !$chanConfig['enabled']) {
