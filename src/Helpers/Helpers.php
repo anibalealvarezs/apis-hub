@@ -26,10 +26,11 @@ use Symfony\Component\Yaml\Yaml;
 
 class Helpers
 {
-    private static ?EntityManager $entityManager = null;
+    protected static ?EntityManager $entityManager = null;
+    protected static ?\Doctrine\DBAL\Connection $connection = null;
+    protected static ?array $dbConfig = null;
     private static ?ClientInterface $redisClient = null;
     private static ?array $cacheConfig = null;
-    private static ?array $dbConfig = null;
     private static ?array $channelsConfig = null;
     private static ?array $entitiesConfig = null;
     private static ?array $projectConfig = null;
@@ -789,25 +790,51 @@ class Helpers
      */
     public static function getManager(): EntityManager
     {
-        if (self::$entityManager === null || ! self::$entityManager->isOpen()) {
+        if (self::$entityManager === null || !self::$entityManager->isOpen()) {
             try {
-                $config = self::getDbConfig();
-                $connection = DriverManager::getConnection($config);
+                if (self::$connection === null || !self::$connection->isConnected()) {
+                    $config = self::getDbConfig();
+                    self::$connection = DriverManager::getConnection($config);
+                } else {
+                    try {
+                        self::$connection->executeQuery('SELECT 1');
+                    } catch (Exception $e) {
+                        self::$connection->close();
+                        self::$connection->connect();
+                    }
+                }
 
-                // Create attribute metadata configuration
                 $ormConfig = ORMSetup::createAttributeMetadataConfiguration(
                     paths: array_merge([__DIR__ . '/../Entities'], \Anibalealvarezs\ApiDriverCore\Classes\EntityRegistry::getAll()),
                     isDevMode: true
                 );
 
-                // Create EntityManager
-                self::$entityManager = new EntityManager($connection, $ormConfig);
+                self::$entityManager = new EntityManager(self::$connection, $ormConfig);
             } catch (Exception $e) {
                 throw new RuntimeException('Failed to initialize EntityManager: ' . $e->getMessage());
             }
         }
 
         return self::$entityManager;
+    }
+
+    /**
+     * Closes the static EntityManager and its underlying connection.
+     * Useful for freeing resources in workers or long-running loops.
+     */
+    public static function closeManager(): void
+    {
+        if (self::$entityManager !== null) {
+            if (self::$entityManager->isOpen()) {
+                self::$entityManager->close();
+            }
+            self::$entityManager = null;
+        }
+
+        if (self::$connection !== null) {
+            self::$connection->close();
+            self::$connection = null;
+        }
     }
 
     public static function getAllSubsets($elements): array

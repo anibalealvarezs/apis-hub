@@ -124,8 +124,8 @@ $server->on("Request", function (SwooleRequest $swooleRequest, SwooleResponse $s
         ]));
     } finally {
         $entityManager = \Helpers\Helpers::getManager();
-        if ($entityManager && $entityManager->isOpen()) {
-            $entityManager->close();
+        if ($entityManager) {
+            $entityManager->clear();
         }
     }
 });
