@@ -208,11 +208,11 @@ class RoutingCore implements HttpKernelInterface
             $redis = \Helpers\Helpers::getRedisClient();
             if (!$redis) return null;
 
-            $ip = $request->getClientIp();
+            $ip = $request->headers->get('CF-Connecting-IP') ?: $request->getClientIp();
             $isAdmin = $this->isAuthorized($request, true);
             
-            // Tiered Limits: Admin/Facade gets 200/min, others 60/min
-            $limit = $isAdmin ? 200 : 60;
+            // Tiered Limits: Admin gets 1000/min, others 500/min
+            $limit = $isAdmin ? 1000 : 500;
             $window = 60; // 1 minute
             
             $key = "rate_limit:{$ip}";
