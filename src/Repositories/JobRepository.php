@@ -296,10 +296,21 @@ class JobRepository extends BaseRepository
     {
         if (Helpers::isPostgres()) {
             $isBatch = is_array($status);
-            $operator = $isBatch ? "IN (:status)" : "= :status";
+            if ($isBatch) {
+                $statusPlaceholders = [];
+                $params = [];
+                foreach ($status as $i => $s) {
+                    $placeholder = "status_" . $i;
+                    $statusPlaceholders[] = ":" . $placeholder;
+                    $params[$placeholder] = $s;
+                }
+                $statusSql = "IN (" . implode(', ', $statusPlaceholders) . ")";
+            } else {
+                $statusSql = "= :status";
+                $params = ['status' => $status];
+            }
             
-            $sql = "SELECT j.* FROM jobs j WHERE j.status {$operator}";
-            $params = ['status' => $status];
+            $sql = "SELECT j.* FROM jobs j WHERE j.status {$statusSql}";
 
             if ($channel) {
                 $sql .= " AND j.channel = :channel";
