@@ -588,8 +588,8 @@ class Helpers
                     if (!empty($config[$commonKey])) {
                         foreach ($specificChannels as $chan) {
                             if (isset($config[$chan])) {
-                                // Important: Merge common into specific but only for missing/empty values in specific
-                                $config[$chan] = array_replace_recursive($config[$commonKey], array_filter($config[$chan], fn($v) => !empty($v) && !is_array($v)));
+                                // Important: Merge common into specific preserving existing values
+                                $config[$chan] = array_replace_recursive($config[$commonKey], $config[$chan]);
                                 // Maintain nested structure too
                                 if (!isset($config[$chan][$commonKey])) {
                                     $config[$chan][$commonKey] = $config[$commonKey];
