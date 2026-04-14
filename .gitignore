@@ -33,13 +33,13 @@ NEW_PROJECT_PLAN.md
 .privacy-policy
 .env.hetzner
 .env.gbs
-/config/assets_backup.yaml.apis-hub-demo
+config/assets_backup.yaml.apis-hub-demo
 *.gbs
-*/*.gbs
+**/*.gbs
 *.llenatucentro
-*/*.llenatucentro
+**/*.llenatucentro
 *.hetzner
-*/*.hetzner
+**/*.hetzner
 *.py
 */*.py
 check_db.php
@@ -59,7 +59,7 @@ HANDOVER_RESTART.md
 STATUS-SUMMARY.md
 **/*.txt
 *.txt
-
 .env.test
-
 .agents/workflows/turbo_debug.md
+
+debug_config.php
