@@ -56,18 +56,20 @@ class InstanceGeneratorService
 
             // 0. Get Caching Limits and Status for this channel
             $chanConfig = [];
+
             try {
                 $chanConfig = \Classes\DriverInitializer::validateConfig($channelName);
-            } catch (Exception $e) { /* ignore missing drivers for now */ }
+            } catch (Exception $e) { /* ignore missing drivers for now */
+            }
 
             // Strict check: Must be enabled in both rules (if present) and channel config
             $channelEnabled = $chanConfig['enabled'] ?? false;
-            
+
             // If it's not enabled in channel config AND not explicitly forced in rules, skip
-            if (!$channelEnabled && $ruleEnabled !== true) {
+            if (! $channelEnabled && $ruleEnabled !== true) {
                 continue;
             }
-            
+
             // If it's explicitly disabled in rules (even if enabled in config), skip
             // (Handled by the $ruleEnabled === false check above)
 
@@ -183,7 +185,7 @@ class InstanceGeneratorService
         $chanKey = $channelName;
 
         $registryConfig = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chanKey);
-        
+
         // If the channel is not in the registry, it's definitely not active
         if (empty($registryConfig)) {
             return false;
