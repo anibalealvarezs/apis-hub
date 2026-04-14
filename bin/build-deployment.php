@@ -60,39 +60,11 @@ $masterName = "{$deploymentName}-master";
 $startingHostPort = (int) (getenv('STARTING_HOST_PORT') ?: 10000);
 $externalPort = getenv('EXTERNAL_PORT') ?: ($instances[0]['port'] ?? $startingHostPort);
 $mcpPort = getenv('MCP_PORT') ?: 3000;
-    $localMounts = [
-        'api-driver-core',
-        'api-client-skeleton',
-        'facebook-graph-api',
-        'meta-hub-driver',
-        'google-api-anibal',
-        'google-hub-driver',
-        'klaviyo-hub-driver',
-        'shopify-hub-driver',
-        'netsuite-hub-driver',
-        'amazon-hub-driver',
-        'bigcommerce-hub-driver',
-        'pinterest-hub-driver',
-        'linkedin-hub-driver',
-        'tiktok-hub-driver',
-        'x-hub-driver',
-        'triple-whale-hub-driver',
-        'shopify-api-anibal',
-        'klaviyo-api-anibal',
-        'amazon-api-anibal',
-        'netsuite-api-anibal',
-        'shipstation-api-anibal',
-        'triple-whale-api-anibal',
-        'mailchimp-api-anibal',
-        'OAuth-v1'
+    $volumes = [
+        './:/app',
+        '/app/mcp-server/node_modules', // Protect container node_modules
+        '/var/run/docker.sock:/var/run/docker.sock'
     ];
-    $volumes = ['./:/app', '/app/mcp-server/node_modules', '/var/run/docker.sock:/var/run/docker.sock'];
-    foreach ($localMounts as $mount) {
-        $localPath = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . $mount;
-        if (is_dir($localPath)) {
-            $volumes[] = "../{$mount}:/{$mount}";
-        }
-    }
 
     $services['master'] = [
         'container_name' => $masterName,

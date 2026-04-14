@@ -82,8 +82,7 @@ class ConfigManagerController extends BaseController
                 'available_channels' => $availableChannels,
                 'db_host' => getenv('DB_HOST') ?: 'localhost',
                 'db_name' => getenv('DB_DATABASE') ?: 'apis_hub',
-                'app_mode' => getenv('APP_ENV') ?: 'production',
-                'infrastructure_rules' => $this->getInfrastructureRules(),
+                'app_mode' => getenv('APP_ENV') ?: 'production'
             ];
 
             $allAssets = [];
@@ -227,10 +226,7 @@ class ConfigManagerController extends BaseController
                         file_put_contents($attrs['path'], Yaml::dump($updatedConfig, 10, 2));
 
                         // 2b. Auto-enable infrastructure rule if channel is enabled
-                        $channelEnabled = $updatedConfig['channels'][$chan]['enabled'] ?? false;
-                        if ($channelEnabled) {
-                            $this->updateInfrastructureRuleManually($chan, true);
-                        }
+                        // (Now handled implicitly by the enabled flag in the same file)
 
                         // 3. Optional: Database Provisioning (Monolith concern)
                         $this->syncAssetsToDatabase($chan, $updatedConfig, $logger);
@@ -258,60 +254,6 @@ class ConfigManagerController extends BaseController
             $logger->error("Error updating config: " . $e->getMessage());
 
             return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
-        }
-    }
-
-    private function getInfrastructureRules(): array
-    {
-        $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
-        $rulesPath = $configDir . '/instances_rules.yaml';
-        if (file_exists($rulesPath)) {
-            $rules = Yaml::parseFile($rulesPath);
-            return $rules['rules'] ?? [];
-        }
-        return [];
-    }
-
-    private function updateInfrastructureRuleManually(string $channel, bool $enabled): void
-    {
-        $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
-        $rulesPath = $configDir . '/instances_rules.yaml';
-        $rules = file_exists($rulesPath) ? (Yaml::parseFile($rulesPath) ?: []) : [];
-        if (!isset($rules['rules'])) $rules['rules'] = [];
-        if (!isset($rules['rules'][$channel])) $rules['rules'][$channel] = ['enabled' => false];
-        $rules['rules'][$channel]['enabled'] = $enabled;
-        file_put_contents($rulesPath, Yaml::dump($rules, 10, 2));
-    }
-
-    public function updateInfrastructureRule(Request $request): Response
-    {
-        try {
-            $data = json_decode($request->getContent(), true);
-            $channel = $data['channel'] ?? null;
-            $enabled = (bool) ($data['enabled'] ?? false);
-
-            if (!$channel) {
-                return new Response(json_encode(['error' => 'Missing channel']), 400);
-            }
-
-            $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
-            $rulesPath = $configDir . '/instances_rules.yaml';
-            $rules = file_exists($rulesPath) ? (Yaml::parseFile($rulesPath) ?: []) : [];
-            
-            if (!isset($rules['rules'])) {
-                $rules['rules'] = [];
-            }
-            if (!isset($rules['rules'][$channel])) {
-                $rules['rules'][$channel] = ['enabled' => false];
-            }
-            
-            $rules['rules'][$channel]['enabled'] = $enabled;
-            
-            file_put_contents($rulesPath, Yaml::dump($rules, 10, 2));
-
-            return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
-        } catch (Exception $e) {
-            return new Response(json_encode(['error' => $e->getMessage()]), 500);
         }
     }
 

@@ -187,7 +187,6 @@ async function fetchConfig() {
         renderDynamicTabs(data.available_channels);
         populateGlobalFields();
         renderAssets(data.assets);
-        renderInfrastructureRules(data.config.infrastructure_rules, data.available_channels);
         validateTokens(false);
         
     } catch (error) {
@@ -1283,60 +1282,6 @@ function showToast(msg, isError) {
     }, 4000);
 }
 
-async function toggleInfrastructureRule(channel, enabled) {
-    try {
-        const response = await fetch('/api/config-manager/infrastructure/rule', {
-            method: 'POST',
-            headers: getAdminHeaders(),
-            body: JSON.stringify({ channel, enabled })
-        });
-        const res = await response.json();
-        if (res.success) {
-            showToast(`Infrastructure worker for ${channel} updated`, false);
-        } else throw new Error(res.error);
-    } catch (e) {
-        showToast("Rule Update Error: " + e.message, true);
-    }
-}
-
-function renderInfrastructureRules(rules, channels) {
-    const container = document.getElementById('infrastructure-workers-list');
-    if (!container) return;
-    container.innerHTML = '';
-
-    channels.forEach(chan => {
-        const rule = rules[chan] || { enabled: false };
-        const div = document.createElement('div');
-        div.className = 'asset-item' + (rule.enabled ? ' synced' : '');
-        div.style.padding = '12px 15px';
-        
-        let label = chan;
-        const map = {
-           'google_search_console': 'GSC SearchConsole',
-           'facebook_marketing': 'Meta Marketing',
-           'facebook_organic': 'Meta Organic',
-           'shopify': 'Shopify Store',
-           'klaviyo': 'Klaviyo Marketing'
-        };
-        if (map[chan]) label = map[chan];
-
-        div.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-                    <i data-lucide="server" size="14" style="color:${rule.enabled ? 'var(--primary)' : 'var(--text-dim)'}; flex-shrink:0;"></i>
-                    <span style="font-size:0.75rem; font-weight:600; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${label}</span>
-                </div>
-                <label class="switch-mini">
-                    <input type="checkbox" ${rule.enabled ? 'checked' : ''} onchange="toggleInfrastructureRule('${chan}', this.checked); this.closest('.asset-item').classList.toggle('synced', this.checked)">
-                    <span class="slider-mini"></span>
-                </label>
-            </div>
-        `;
-        container.appendChild(div);
-    });
-    lucide.createIcons();
-}
-
 // Global Hooks (Expose to window)
 window.setFbLevel = setFbLevel;
 window.setMetricLevel = setMetricLevel;
@@ -1353,7 +1298,6 @@ window.toggleSubOpt = toggleSubOpt;
 window.setFbOrganicLevel = setFbOrganicLevel;
 window.setIgLevel = setIgLevel;
 window.triggerFullSync = triggerFullSync;
-window.toggleInfrastructureRule = toggleInfrastructureRule;
 window.showToast = showToast;
 
 console.log("Config Manager script loaded.");

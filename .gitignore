@@ -61,5 +61,6 @@ STATUS-SUMMARY.md
 *.txt
 .env.test
 .agents/workflows/turbo_debug.md
-
+./bin/push-drivers.php
+./bin/sync-github-configs.php
 debug_config.php

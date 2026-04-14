@@ -32,48 +32,39 @@ class InstanceGeneratorService
 
         $projectConfig = \Helpers\Helpers::getProjectConfig();
         $overrides = $projectConfig['rules'] ?? [];
-        $registry = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry();
-
+        $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
         $currentPort = $basePort;
 
-        foreach ($registry as $channelName => $config) {
-            $driverClass = $config['driver'] ?? null;
-            if (! $driverClass || ! class_exists($driverClass)) {
+        foreach ($availableChannels as $channelName) {
+            // 0. Get configuration for this channel
+            $chanConfig = [];
+            try {
+                $chanConfig = \Classes\DriverInitializer::validateConfig($channelName);
+            } catch (Exception $e) { 
+                continue; // Skip if driver validation fails
+            }
+
+            $channelEnabled = $chanConfig['enabled'] ?? false;
+
+            // Decision: If channel is not enabled, skip infrastructure generation
+            if (!$channelEnabled) {
                 continue;
             }
 
-            // Get default rules from driver
+            // Get instance rules from driver or default
+            $driverClass = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($channelName)['driver'] ?? null;
             $rules = [];
-            if (method_exists($driverClass, 'getInstanceRules')) {
+            if ($driverClass && class_exists($driverClass) && method_exists($driverClass, 'getInstanceRules')) {
                 $rules = $driverClass::getInstanceRules();
             }
 
-            // Merge with local overrides
-            $ruleEnabled = $overrides[$channelName]['enabled'] ?? null;
-            if ($ruleEnabled === false) {
-                continue;
+            // Merge with channel-specific infrastructure settings
+            // Priority: Channel Config > Driver Default Rules
+            foreach (['cron_entities_hour', 'cron_entities_minute', 'cron_recent_hour', 'cron_recent_minute', 'cache_history_range'] as $key) {
+                if (isset($chanConfig[$key])) {
+                    $rules[$key] = $chanConfig[$key];
+                }
             }
-
-            // 0. Get Caching Limits and Status for this channel
-            $chanConfig = [];
-
-            try {
-                $chanConfig = \Classes\DriverInitializer::validateConfig($channelName);
-            } catch (Exception $e) { /* ignore missing drivers for now */
-            }
-
-            // Strict check: Must be enabled in both rules (if present) and channel config
-            $channelEnabled = $chanConfig['enabled'] ?? false;
-
-            // If it's not enabled in channel config AND not explicitly forced in rules, skip
-            if (! $channelEnabled && $ruleEnabled !== true) {
-                continue;
-            }
-
-            // If it's explicitly disabled in rules (even if enabled in config), skip
-            // (Handled by the $ruleEnabled === false check above)
-
-            $rules = array_merge($rules, $overrides[$channelName] ?? []);
 
             $channel = $channelName;
             $channelInstances = [];

@@ -203,16 +203,6 @@ return array_merge($driverRoutes, $assetRoutes, [
         'html' => false,
         'admin' => true
     ],
-    '/api/config-manager/infrastructure/rule' => [
-        'httpMethod' => 'POST',
-        'callable' => function (...$args) {
-            $request = $args['request'] ?? Request::createFromGlobals();
-            return (new ConfigManagerController())->updateInfrastructureRule($request);
-        },
-        'public' => false,
-        'html' => false,
-        'admin' => true
-    ],
     '/api/config-manager/flush-cache' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
