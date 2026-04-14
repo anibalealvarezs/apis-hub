@@ -813,6 +813,7 @@ class Helpers
                 );
 
                 self::$entityManager = new EntityManager(self::$connection, $ormConfig);
+                error_log("DEBUG: Helpers::getManager - CREATED NEW EntityManager. ID: " . spl_object_id(self::$entityManager));
             } catch (Exception $e) {
                 throw new RuntimeException('Failed to initialize EntityManager: ' . $e->getMessage());
             }

@@ -68,6 +68,7 @@ class SyncService
 
             // 3. Inject production dependencies
             $finalConfig['manager'] = Helpers::getManager();
+            $this->logger?->info("DEBUG: SyncService::execute - Manager injected. ID: " . spl_object_id($finalConfig['manager']) . " | Open: " . ($finalConfig['manager']->isOpen() ? 'YES' : 'NO'));
             $finalConfig['seeder'] = new \Classes\ProductionEntityMapper($finalConfig['manager']);
 
             // 4. Date normalization
