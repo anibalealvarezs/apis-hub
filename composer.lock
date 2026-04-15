@@ -253,13 +253,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/facebook-graph-api.git",
-                "reference": "fe1b065ff7f2c7d7e9a84ac1371099dcab9253a0"
+                "reference": "960332d6ceb68cf092ae7dfe1fc1faccdb6f94f3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-fe1b065ff7f2c7d7e9a84ac1371099dcab9253a0-zip-fe329e.zip",
-                "reference": "fe1b065ff7f2c7d7e9a84ac1371099dcab9253a0",
-                "shasum": "5fb42eb38a7e1a4e65cd8921167cacbb87eb7857"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-960332d6ceb68cf092ae7dfe1fc1faccdb6f94f3-zip-8cdcdf.zip",
+                "reference": "960332d6ceb68cf092ae7dfe1fc1faccdb6f94f3",
+                "shasum": "663313330986af97e0740168781343b0c9c15801"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -310,7 +310,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues"
             },
-            "time": "2026-04-14T13:52:01+00:00"
+            "time": "2026-04-15T00:56:47+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
@@ -388,13 +388,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "0dd3a6bf4c585c422187c38718a98425b72bb1f8"
+                "reference": "2af77d26e8b87225e6c71aed060f4a547a80b695"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-0dd3a6bf4c585c422187c38718a98425b72bb1f8-zip-70cad9.zip",
-                "reference": "0dd3a6bf4c585c422187c38718a98425b72bb1f8",
-                "shasum": "71967a3375d45156abf7f2db677809ac16625b20"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-2af77d26e8b87225e6c71aed060f4a547a80b695-zip-05a43b.zip",
+                "reference": "2af77d26e8b87225e6c71aed060f4a547a80b695",
+                "shasum": "6417e2a4ee989795b2df99780b29d70bfaac2a3c"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -418,7 +418,7 @@
                 "MIT"
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-04-14T14:02:48+00:00"
+            "time": "2026-04-15T14:33:47+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -559,13 +559,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "a344e8ec86f1ca0a893a42299f5dbef6b4f6231e"
+                "reference": "4644a4b366c6ccf27f0f984d5ff755fa9189afa4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-a344e8ec86f1ca0a893a42299f5dbef6b4f6231e-zip-d338c8.zip",
-                "reference": "a344e8ec86f1ca0a893a42299f5dbef6b4f6231e",
-                "shasum": "2abe02b9f5e2e505ab47d5c1ed0c3074c06d8003"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-4644a4b366c6ccf27f0f984d5ff755fa9189afa4-zip-dee385.zip",
+                "reference": "4644a4b366c6ccf27f0f984d5ff755fa9189afa4",
+                "shasum": "1428ce04098d42ae84def39a6e772a719ab24fd9"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -589,7 +589,7 @@
                 "MIT"
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-04-14T18:50:57+00:00"
+            "time": "2026-04-15T15:24:26+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
@@ -4303,7 +4303,7 @@
         },
         {
             "name": "symfony/polyfill-ctype",
-            "version": "v1.35.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-ctype.git",
@@ -4362,7 +4362,7 @@
                 "portable"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-ctype/tree/v1.35.0"
+                "source": "https://github.com/symfony/polyfill-ctype/tree/v1.36.0"
             },
             "funding": [
                 {
@@ -4386,7 +4386,7 @@
         },
         {
             "name": "symfony/polyfill-intl-grapheme",
-            "version": "v1.35.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-intl-grapheme.git",
@@ -4444,7 +4444,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-intl-grapheme/tree/v1.35.0"
+                "source": "https://github.com/symfony/polyfill-intl-grapheme/tree/v1.36.0"
             },
             "funding": [
                 {
@@ -4468,7 +4468,7 @@
         },
         {
             "name": "symfony/polyfill-intl-normalizer",
-            "version": "v1.35.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-intl-normalizer.git",
@@ -4529,7 +4529,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-intl-normalizer/tree/v1.35.0"
+                "source": "https://github.com/symfony/polyfill-intl-normalizer/tree/v1.36.0"
             },
             "funding": [
                 {
@@ -4553,7 +4553,7 @@
         },
         {
             "name": "symfony/polyfill-mbstring",
-            "version": "v1.35.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-mbstring.git",
@@ -4614,7 +4614,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.35.0"
+                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.36.0"
             },
             "funding": [
                 {
@@ -4703,7 +4703,7 @@
         },
         {
             "name": "symfony/polyfill-php80",
-            "version": "v1.35.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php80.git",
@@ -4763,7 +4763,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-php80/tree/v1.35.0"
+                "source": "https://github.com/symfony/polyfill-php80/tree/v1.36.0"
             },
             "funding": [
                 {
@@ -4787,7 +4787,7 @@
         },
         {
             "name": "symfony/polyfill-php83",
-            "version": "v1.35.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php83.git",
@@ -4843,7 +4843,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-php83/tree/v1.35.0"
+                "source": "https://github.com/symfony/polyfill-php83/tree/v1.36.0"
             },
             "funding": [
                 {
@@ -4867,7 +4867,7 @@
         },
         {
             "name": "symfony/polyfill-php84",
-            "version": "v1.35.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php84.git",
@@ -4923,7 +4923,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-php84/tree/v1.35.0"
+                "source": "https://github.com/symfony/polyfill-php84/tree/v1.36.0"
             },
             "funding": [
                 {
@@ -4947,7 +4947,7 @@
         },
         {
             "name": "symfony/polyfill-php85",
-            "version": "v1.35.0",
+            "version": "v1.36.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-php85.git",
@@ -5003,7 +5003,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-php85/tree/v1.35.0"
+                "source": "https://github.com/symfony/polyfill-php85/tree/v1.36.0"
             },
             "funding": [
                 {
