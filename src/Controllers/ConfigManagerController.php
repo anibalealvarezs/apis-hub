@@ -117,8 +117,7 @@ class ConfigManagerController extends BaseController
                         continue;
                     }
 
-                    $needsRefresh = $forceRefresh || empty($allAssets[$chan]);
-                    if ($needsRefresh) {
+                    if ($forceRefresh) {
                         $driverAssets = $driver->fetchAvailableAssets();
                         // Mix with previous assets to detect "NEW" and "LOST ACCESS"
                         foreach ($driverAssets as $assetKey => $assetList) {
@@ -145,6 +144,9 @@ class ConfigManagerController extends BaseController
 
                             $allAssets[$assetKey] = $assetList;
                         }
+                    } else if (empty($allAssets[$chan])) {
+                        // Ensure it exists as an array even if empty in backup
+                        $allAssets[$chan] = [];
                     }
                 } catch (Exception $e) {
                     $logger->error("Error processing assets/config for $chan: " . $e->getMessage());
