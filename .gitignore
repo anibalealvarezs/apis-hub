@@ -68,3 +68,5 @@ debug_config.php
 # Handover documents
 /Handover/
 
+
+debug_routes.php

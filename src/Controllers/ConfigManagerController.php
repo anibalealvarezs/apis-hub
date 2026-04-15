@@ -101,8 +101,38 @@ class ConfigManagerController extends BaseController
 
             foreach ($availableChannels as $chan) {
                 try {
-                    $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
                     $chanConfig = $systemConfig['channels'][$chan] ?? [];
+
+                    // Fast Load Logic: Avoid slow driver instantiation unless refreshing
+                    if (!$forceRefresh) {
+                        // Populate common UI config keys directly from YAML
+                        if ($chan === 'google_search_console') {
+                            $currentConfig['gsc_enabled'] = $chanConfig['enabled'] ?? false;
+                            if (isset($chanConfig['sites'])) {
+                                $allAssets['gsc'] = array_values($chanConfig['sites']);
+                            }
+                        } elseif (str_contains($chan, 'facebook_organic')) {
+                            $currentConfig['facebook_organic_enabled'] = $chanConfig['enabled'] ?? false;
+                            if (isset($chanConfig['pages'])) {
+                                $allAssets['facebook_pages'] = array_merge($allAssets['facebook_pages'] ?? [], array_values($chanConfig['pages']));
+                                $currentConfig['fb_pages_full_config'] = $chanConfig['pages'];
+                            }
+                        } elseif ($chan === 'facebook_marketing') {
+                            $currentConfig['facebook_marketing_enabled'] = $chanConfig['enabled'] ?? false;
+                            if (isset($chanConfig['ad_accounts'])) {
+                                $allAssets['facebook_ad_accounts'] = array_values($chanConfig['ad_accounts']);
+                                $currentConfig['fb_ad_account_ids'] = $chanConfig['ad_account_ids'] ?? [];
+                            }
+                        }
+                        
+                        // If it's not a requested type for asset discovery, we skip the rest of the driver-heavy stuff
+                        if (!$requestedType || ($chan !== $requestedType && !str_contains($chan, $requestedType))) {
+                             continue; 
+                        }
+                    }
+
+                    // For forced refresh or specific requested type discovery, we still need the driver
+                    $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
 
                     // 1. Update UI Config
                     $uiConfig = $driver->prepareUiConfig($chanConfig);
@@ -139,20 +169,6 @@ class ConfigManagerController extends BaseController
                             }
 
                             $allAssets[$assetKey] = $assetList;
-                        }
-                    } else {
-                        // POPULATE FROM CURRENT CONFIG FOR FAST INITIAL LOAD
-                        if ($chan === 'google_search_console' && isset($chanConfig['sites'])) {
-                            $allAssets['gsc'] = array_values($chanConfig['sites']);
-                        } elseif (str_contains($chan, 'facebook_organic') && isset($chanConfig['pages'])) {
-                            $allAssets['facebook_pages'] = array_merge($allAssets['facebook_pages'] ?? [], array_values($chanConfig['pages']));
-                        } elseif ($chan === 'facebook_marketing' && isset($chanConfig['ad_accounts'])) {
-                            $allAssets['facebook_ad_accounts'] = array_values($chanConfig['ad_accounts']);
-                        }
-                        // Generic Fallback: if it's not one of the specialized ones, 
-                        // we check if allAssets[chan] is already filled by previous logic or empty
-                        if (empty($allAssets[$chan])) {
-                            $allAssets[$chan] = [];
                         }
                     }
                 } catch (Exception $e) {
