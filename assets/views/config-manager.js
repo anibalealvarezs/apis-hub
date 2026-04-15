@@ -772,7 +772,7 @@ function renderAssets(assets) {
                         </div>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" class="fb-page-main-toggle" data-id="${p.id}" ${getCfg('enabled') ? 'checked' : ''} onchange="toggleOrganicHierarchy('${p.id}', this.checked)">
+                        <input type="checkbox" class="fb-page-main-toggle" data-id="${p.id}" ${getCfg('enabled') && !lostAccess ? 'checked' : ''} ${lostAccess ? 'disabled' : ''} onchange="toggleOrganicHierarchy('${p.id}', this.checked)">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -786,7 +786,7 @@ function renderAssets(assets) {
                         
                         <div class="hierarchy-item-premium">
                             <label class="switch-inline">
-                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="page_metrics" ${getCfg('page_metrics') ? 'checked' : ''}>
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="page_metrics" ${getCfg('page_metrics') ? 'checked' : ''} ${lostAccess ? 'disabled' : ''}>
                                 <span class="slider-sm"></span>
                                 <span class="lbl">Page Metrics</span>
                             </label>
@@ -794,7 +794,7 @@ function renderAssets(assets) {
                         
                         <div class="hierarchy-item-premium">
                             <label class="switch-inline">
-                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="posts" ${getCfg('posts') ? 'checked' : ''}>
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="posts" ${getCfg('posts') ? 'checked' : ''} ${lostAccess ? 'disabled' : ''}>
                                 <span class="slider-sm"></span>
                                 <span class="lbl">Posts Content</span>
                             </label>
@@ -802,7 +802,7 @@ function renderAssets(assets) {
                         
                         <div class="hierarchy-item-premium" style="margin-left: 20px; border-left: 1px solid rgba(255,255,255,0.1); padding-left:12px;">
                             <label class="switch-inline">
-                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="post_metrics" ${getCfg('post_metrics') ? 'checked' : ''}>
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="post_metrics" ${getCfg('post_metrics') ? 'checked' : ''} ${lostAccess ? 'disabled' : ''}>
                                 <span class="slider-sm"></span>
                                 <span class="lbl">Post Insights</span>
                             </label>
@@ -820,7 +820,7 @@ function renderAssets(assets) {
                         
                         <div class="hierarchy-item-premium">
                             <label class="switch-inline">
-                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_accounts" ${getCfg('ig_accounts', false) ? 'checked' : ''} onchange="toggleSubOpt('${p.id}', 'ig_accounts', this.checked)">
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_accounts" ${getCfg('ig_accounts', false) ? 'checked' : ''} ${lostAccess ? 'disabled' : ''} onchange="toggleSubOpt('${p.id}', 'ig_accounts', this.checked)">
                                 <span class="slider-sm"></span>
                                 <span class="lbl">Sync Instagram</span>
                             </label>
@@ -937,8 +937,9 @@ async function updateConfig(typeArg) {
             
             const pageData = {
                 id: pageId,
-                enabled: mainToggle.checked,
-                ig_account: igId
+                enabled: !card.classList.contains('lost-access') && mainToggle.checked, // Force disabled if lost access
+                ig_account: igId,
+                lost_access: card.classList.contains('lost-access')
             };
             
             card.querySelectorAll('.fb-page-opt').forEach(opt => {
