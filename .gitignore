@@ -64,3 +64,7 @@ STATUS-SUMMARY.md
 ./bin/push-drivers.php
 ./bin/sync-github-configs.php
 debug_config.php
+
+# Handover documents
+/Handover/
+
