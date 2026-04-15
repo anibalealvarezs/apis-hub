@@ -719,7 +719,7 @@ function renderAssets(assets) {
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                    <div class="asset-text-truncate" title="${displayUrl}" style="font-size:0.75rem; font-weight:600; color:#fff; flex:1; min-width:0;">${displayUrl}</div>
                    <label class="switch-mini">
-                       <input type="checkbox" class="gsc-asset-sync" value="${p.url}" ${isSynced ? 'checked' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
+                       <input type="checkbox" class="gsc-asset-sync" value="${p.url}" ${isSynced && !p.lost_access ? 'checked' : ''} ${p.lost_access ? 'disabled' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
                        <span class="slider-mini"></span>
                    </label>
                 </div>
@@ -891,7 +891,7 @@ function renderAssets(assets) {
                        <div style="font-size:0.6rem; color:var(--text-dim); font-family:'Fira Code';">${a.id}</div>
                    </div>
                    <label class="switch-mini">
-                       <input type="checkbox" class="fb-marketing-asset-sync" value="${a.id}" ${isSynced ? 'checked' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
+                       <input type="checkbox" class="fb-marketing-asset-sync" value="${a.id}" ${isSynced && !a.lost_access ? 'checked' : ''} ${a.lost_access ? 'disabled' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
                        <span class="slider-mini"></span>
                    </label>
                 </div>
@@ -923,8 +923,16 @@ async function updateConfig(typeArg) {
         };
 
         // Assets Sync Status
-        document.querySelectorAll('.gsc-asset-sync:checked').forEach(el => {
-            payload.assets.gsc.push({ url: el.value, target_countries: [], target_keywords: [] });
+        document.querySelectorAll('.asset-item').forEach(item => {
+            const cb = item.querySelector('.gsc-asset-sync');
+            if (cb && (cb.checked || item.classList.contains('lost-access'))) {
+                payload.assets.gsc.push({ 
+                    url: cb.value, 
+                    target_countries: [], 
+                    target_keywords: [],
+                    lost_access: item.classList.contains('lost-access')
+                });
+            }
         });
 
         // 1. Collect FB Organic Pages (All of them, enabled or not, for granularity preservation)
@@ -956,13 +964,16 @@ async function updateConfig(typeArg) {
             payload.assets.pages.push(pageData);
         });
 
-        document.querySelectorAll('.fb-marketing-asset-sync:checked').forEach(el => {
-            const item = el.closest('.asset-item');
-            const nameEl = item ? item.querySelector('[style*="font-weight:600"]') : null;
-            payload.assets.ad_accounts.push({ 
-                id: el.value,
-                name: nameEl ? nameEl.textContent.trim() : null
-            });
+        document.querySelectorAll('.asset-item').forEach(item => {
+            const cb = item.querySelector('.fb-marketing-asset-sync');
+            if (cb && (cb.checked || item.classList.contains('lost-access'))) {
+                const nameEl = item.querySelector('[style*="font-weight:600"]');
+                payload.assets.ad_accounts.push({ 
+                    id: cb.value,
+                    name: nameEl ? nameEl.textContent.trim() : null,
+                    lost_access: item.classList.contains('lost-access')
+                });
+            }
         });
 
         if (typeArg === 'google_search_console') {
