@@ -406,13 +406,22 @@
             "
           >
             <span><i data-lucide="layers"></i> Search Console properties</span>
-            <button
-              class="btn btn-mini"
-              onclick="forceRefresh('google_search_console')"
-              style="background: var(--primary)"
-            >
-              <i data-lucide="refresh-cw" size="14"></i> Sync from Google
-            </button>
+            <div style="display: flex; gap: 10px">
+              <a
+                href="/google-login"
+                class="btn btn-mini"
+                style="background: #4285f4; color: white; text-decoration: none; display: flex; align-items: center; gap: 5px;"
+              >
+                <i data-lucide="log-in" size="14"></i> Connect Google
+              </a>
+              <button
+                class="btn btn-mini"
+                onclick="forceRefresh('google_search_console')"
+                style="background: var(--primary)"
+              >
+                <i data-lucide="refresh-cw" size="14"></i> Sync from Google
+              </button>
+            </div>
             <button
               class="btn btn-mini disabled-btn"
               disabled
