@@ -187,7 +187,7 @@ async function fetchConfig() {
         renderDynamicTabs(data.available_channels);
         populateGlobalFields();
         renderAssets(data.assets);
-        validateTokens(false);
+        // validateTokens(false); // DEFERRED: Avoid sequential API calls on initial load for better performance.
         
     } catch (error) {
         console.error("Fetch Config Error:", error);

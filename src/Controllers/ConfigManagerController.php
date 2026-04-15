@@ -88,16 +88,12 @@ class ConfigManagerController extends BaseController
             $allAssets = [];
             $lastUpdated = null;
 
-            // Load previous backup
+            // Load previous backup ONLY if force refresh is requested OR explicitly enabled
             $previousAssets = [];
-            if (file_exists($this->assetsBackupPath)) {
+            if ($forceRefresh && file_exists($this->assetsBackupPath)) {
                 try {
                     $backup = Yaml::parseFile($this->assetsBackupPath);
                     $previousAssets = $backup['assets'] ?? [];
-                    if (! $forceRefresh) {
-                        $allAssets = $previousAssets;
-                        $lastUpdated = filemtime($this->assetsBackupPath);
-                    }
                 } catch (\Throwable $e) {
                     $logger->warning("Failed to load assets backup: " . $e->getMessage());
                 }
@@ -144,9 +140,20 @@ class ConfigManagerController extends BaseController
 
                             $allAssets[$assetKey] = $assetList;
                         }
-                    } else if (empty($allAssets[$chan])) {
-                        // Ensure it exists as an array even if empty in backup
-                        $allAssets[$chan] = [];
+                    } else {
+                        // POPULATE FROM CURRENT CONFIG FOR FAST INITIAL LOAD
+                        if ($chan === 'google_search_console' && isset($chanConfig['sites'])) {
+                            $allAssets['gsc'] = array_values($chanConfig['sites']);
+                        } elseif (str_contains($chan, 'facebook_organic') && isset($chanConfig['pages'])) {
+                            $allAssets['facebook_pages'] = array_merge($allAssets['facebook_pages'] ?? [], array_values($chanConfig['pages']));
+                        } elseif ($chan === 'facebook_marketing' && isset($chanConfig['ad_accounts'])) {
+                            $allAssets['facebook_ad_accounts'] = array_values($chanConfig['ad_accounts']);
+                        }
+                        // Generic Fallback: if it's not one of the specialized ones, 
+                        // we check if allAssets[chan] is already filled by previous logic or empty
+                        if (empty($allAssets[$chan])) {
+                            $allAssets[$chan] = [];
+                        }
                     }
                 } catch (Exception $e) {
                     $logger->error("Error processing assets/config for $chan: " . $e->getMessage());
