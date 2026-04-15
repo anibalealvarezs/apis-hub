@@ -108,8 +108,15 @@ class ConfigManagerController extends BaseController
                         // Populate common UI config keys directly from YAML
                         if ($chan === 'google_search_console') {
                             $currentConfig['gsc_enabled'] = $chanConfig['enabled'] ?? false;
+                            $currentConfig['gsc_cache_history_range'] = $chanConfig['cache_history_range'] ?? '16 months';
+                            $currentConfig['gsc'] = [];
                             if (isset($chanConfig['sites'])) {
                                 $allAssets['gsc'] = array_values($chanConfig['sites']);
+                                foreach ($chanConfig['sites'] as $site) {
+                                    if (isset($site['url'])) {
+                                        $currentConfig['gsc'][$site['url']] = $site;
+                                    }
+                                }
                             }
                         } elseif (str_contains($chan, 'facebook_organic')) {
                             $currentConfig['facebook_organic_enabled'] = $chanConfig['enabled'] ?? false;
