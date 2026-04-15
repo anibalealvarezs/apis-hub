@@ -120,14 +120,29 @@ class ConfigManagerController extends BaseController
                     $needsRefresh = $forceRefresh || empty($allAssets[$chan]);
                     if ($needsRefresh) {
                         $driverAssets = $driver->fetchAvailableAssets();
-                        // Mix with previous assets to detect "NEW"
+                        // Mix with previous assets to detect "NEW" and "LOST ACCESS"
                         foreach ($driverAssets as $assetKey => $assetList) {
                             $prevList = $previousAssets[$assetKey] ?? [];
                             $prevIds = array_map(fn ($a) => (string)($a['id'] ?? ''), $prevList);
+                            $freshIds = array_map(fn ($a) => (string)($a['id'] ?? ''), $assetList);
 
+                            // Mark newly discovered assets
                             foreach ($assetList as &$asset) {
                                 $asset['is_new'] = ! empty($prevIds) && ! in_array((string)($asset['id'] ?? ''), $prevIds);
                             }
+                            unset($asset);
+
+                            // Append previously-known assets that Meta no longer returns → lost_access
+                            foreach ($prevList as $prevAsset) {
+                                $prevId = (string)($prevAsset['id'] ?? '');
+                                if ($prevId && ! in_array($prevId, $freshIds)) {
+                                    $prevAsset['lost_access'] = true;
+                                    $prevAsset['enabled'] = false;
+                                    $prevAsset['is_new'] = false;
+                                    $assetList[] = $prevAsset;
+                                }
+                            }
+
                             $allAssets[$assetKey] = $assetList;
                         }
                     }
