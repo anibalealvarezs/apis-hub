@@ -43,6 +43,8 @@ class OrderProcessor
 
         // 1. Extract unique records
         foreach ($channeledCollection as $co) {
+            if (!is_object($co)) continue;
+            /** @var object{channel: string|int, platformId: string|int, customer: ?object{id: ?string|int, email: ?string}, platformCreatedAt: ?mixed, data: mixed, discountCodes: ?array, lineItems: ?array} $co */
             $chan = (string)$co->channel;
 
             // Orders
