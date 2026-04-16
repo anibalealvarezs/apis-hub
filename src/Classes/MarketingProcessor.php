@@ -33,6 +33,8 @@ class MarketingProcessor
         // 1. Bulk Insert/Update campaigns (Global)
         $campaignIds = [];
         foreach ($campaigns as $c) {
+            if (!$c instanceof \stdClass) continue;
+            /** @var \stdClass $c */
             $campaignIds[] = $c->platformId;
         }
 
@@ -44,6 +46,8 @@ class MarketingProcessor
             foreach (array_chunk($campaigns, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $c) {
+                    if (!$c instanceof \stdClass) continue;
+                    /** @var \stdClass $c */
                     $params[] = $c->platformId;
                     $params[] = $c->name;
                     $params[] = $c->startDate ? $c->startDate->toDateTimeString() : null;
@@ -80,6 +84,8 @@ class MarketingProcessor
             foreach (array_chunk($campaigns, $chunkSize) as $chunk) {
                 $channeledParams = [];
                 foreach ($chunk as $c) {
+                    if (!$c instanceof \stdClass) continue;
+                    /** @var \stdClass $c */
                     $channeledParams[] = $c->channel;
                     $channeledParams[] = $c->platformId;
                     $channeledParams[] = $campaignMap[$c->platformId] ?? null;
@@ -144,6 +150,8 @@ class MarketingProcessor
             foreach (array_chunk($adsets, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $a) {
+                    if (!$a instanceof \stdClass) continue;
+                    /** @var \stdClass $a */
                     $params[] = $a->channel;
                     $params[] = $a->platformId;
                     $params[] = $a->channeledAccountId;
@@ -230,6 +238,8 @@ class MarketingProcessor
             foreach (array_chunk($ads, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $a) {
+                    if (!$a instanceof \stdClass) continue;
+                    /** @var \stdClass $a */
                     $params[] = $a->channel;
                     $params[] = $a->platformId;
                     $params[] = $a->channeledAccountId;
@@ -277,6 +287,8 @@ class MarketingProcessor
             foreach (array_chunk($creatives, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $c) {
+                    if (!$c instanceof \stdClass) continue;
+                    /** @var \stdClass $c */
                     $params[] = $c->platformId;
                     $params[] = $c->name;
                     $params[] = json_encode($c->data);
