@@ -82,21 +82,31 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
 
         // Validate Row 1 assertions
         $this->assertArrayHasKey('18-24_male_impressions', $metricsMap);
-        $this->assertArrayHasKey('18-24_male_clicks', $metricsMap);
-        $this->assertArrayHasKey('18-24_male_spend', $metricsMap);
+        $metricImpressions = $metricsMap['18-24_male_impressions'] ?? null;
+        $this->assertNotNull($metricImpressions);
 
-        $this->assertEquals($rows[0]['impressions'], $metricsMap['18-24_male_impressions']->value);
-        $this->assertEquals($channeledAccountPlatformId, $metricsMap['18-24_male_impressions']->platformId);
-        $this->assertEquals(Channel::facebook_marketing->value, $metricsMap['18-24_male_impressions']->channel);
-        $this->assertEquals($dateStart, $metricsMap['18-24_male_impressions']->metricDate);
+        $this->assertArrayHasKey('18-24_male_clicks', $metricsMap);
+        $metricClicks = $metricsMap['18-24_male_clicks'] ?? null;
+        $this->assertNotNull($metricClicks);
+
+        $this->assertArrayHasKey('18-24_male_spend', $metricsMap);
+        $metricSpend = $metricsMap['18-24_male_spend'] ?? null;
+        $this->assertNotNull($metricSpend);
+
+        $this->assertEquals($rows[0]['impressions'], $metricImpressions->value);
+        $this->assertEquals($channeledAccountPlatformId, $metricImpressions->platformId);
+        $this->assertEquals(Channel::facebook_marketing->value, $metricImpressions->channel);
+        $this->assertEquals($dateStart, $metricImpressions->metricDate);
 
         // Ensure metadata extraction captures complex fields like actions natively
-        $this->assertArrayHasKey('actions', $metricsMap['18-24_male_impressions']->metadata);
-        $this->assertEquals($rows[0]['actions'][0]['value'], $metricsMap['18-24_male_impressions']->metadata['actions'][0]['value']);
+        $this->assertArrayHasKey('actions', $metricImpressions->metadata);
+        $this->assertEquals($rows[0]['actions'][0]['value'], $metricImpressions->metadata['actions'][0]['value']);
 
         // Validate Row 2 assertions
         $this->assertArrayHasKey('25-34_female_cost_per_unique_outbound_click', $metricsMap);
-        $this->assertEquals($rows[1]['cost_per_unique_outbound_click'][0]['value'], $metricsMap['25-34_female_cost_per_unique_outbound_click']->value); 
+        $metricCost = $metricsMap['25-34_female_cost_per_unique_outbound_click'] ?? null;
+        $this->assertNotNull($metricCost);
+        $this->assertEquals($rows[1]['cost_per_unique_outbound_click'][0]['value'], $metricCost->value); 
     }
 
     public function testCampaignMetricsTransformsDataCorrectly(): void
