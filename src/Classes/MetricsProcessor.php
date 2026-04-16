@@ -370,7 +370,9 @@ class MetricsProcessor
         $ids = [];
         foreach ($metrics as $metric) {
             if (isset($metric->creative)) {
-                $ids[] = $metric->creative->getCreativeId();
+                $ids[] = is_object($metric->creative) ? $metric->creative->getCreativeId() : (string)$metric->creative;
+            } elseif (isset($metric->creativePlatformId)) {
+                $ids[] = $metric->creativePlatformId;
             }
         }
         $ids = array_unique($ids);
@@ -696,7 +698,7 @@ class MetricsProcessor
                 'order_id' => isset($metric->order) ? ($orderMap['map'][is_object($metric->order) ? $metric->order->getOrderId() : (string)$metric->order] ?? null) : null,
                 'country_id' => isset($metric->countryCode) ? ($countryMap['map'][$metric->countryCode]?->getId() ?? null) : (isset($metric->country) ? $metric->country?->getId() : null),
                 'device_id' => isset($metric->deviceType) ? ($deviceMap['map'][$metric->deviceType]?->getId() ?? null) : (isset($metric->device) ? $metric->device?->getId() : null),
-                'creative_id' => isset($metric->creative) ? ($creativeMap['map'][is_object($metric->creative) ? $metric->creative->getCreativeId() : (string)$metric->creative] ?? null) : null,
+                'creative_id' => isset($metric->creative) ? ($creativeMap['map'][is_object($metric->creative) ? $metric->creative->getCreativeId() : (string)$metric->creative] ?? null) : (isset($metric->creativePlatformId) ? ($creativeMap['map'][$metric->creativePlatformId] ?? null) : null),
                 'dimension_set_id' => $dimensionSetMap['map'][$metric->dimensionsHash ?? KeyGenerator::generateDimensionsHash((array)$metric->dimensions)] ?? ($dimensionSetMap[$metric->dimensionsHash ?? KeyGenerator::generateDimensionsHash((array)$metric->dimensions)] ?? null),
                 'key' => $metricConfigKey,
             ];
