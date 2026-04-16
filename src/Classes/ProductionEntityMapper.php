@@ -34,7 +34,7 @@ class ProductionEntityMapper implements SeederInterface
 
     public function getDimensionManager(): DimensionManagerInterface
     {
-        return new \Classes\DimensionManagerReal($this->entityManager);
+        return new \Classes\DimensionManager($this->entityManager);
     }
 
     public function getEntityClass(string $shortName): string

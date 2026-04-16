@@ -9,14 +9,18 @@ use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Anibalealvarezs\ApiDriverCore\Interfaces\DimensionManagerInterface;
 use Doctrine\ORM\EntityManagerInterface;
 
-class DimensionManagerReal implements DimensionManagerInterface
+class DimensionManager implements DimensionManagerInterface
 {
     private array $keyCache = [];
     private array $valueCache = [];
     private array $setCache = [];
 
-    public function __construct(private EntityManagerInterface $em)
+    /** @var EntityManagerInterface */
+    private $em;
+
+    public function __construct($em)
     {
+        $this->em = $em;
     }
 
     public function clearCaches(): void
