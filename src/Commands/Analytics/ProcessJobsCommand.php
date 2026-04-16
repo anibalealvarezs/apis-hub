@@ -30,10 +30,12 @@ class ProcessJobsCommand extends Command
 {
     protected static $defaultName = 'jobs:process';
     private EntityManager $em;
+    private \Psr\Log\LoggerInterface $logger;
 
     public function __construct(?EntityManager $em = null)
     {
         $this->em = $em ?? Helpers::getManager();
+        $this->logger = Helpers::setLogger('jobs.log');
         parent::__construct();
     }
 
@@ -56,6 +58,7 @@ class ProcessJobsCommand extends Command
         
         if (Helpers::isDebug() || $forceAll) {
             $output->writeln("Querying scheduled and delayed jobs...");
+            $this->logger->info("Querying scheduled and delayed jobs...");
         }
 
         // 0. Cleanup stuck jobs (e.g. processing for > 6 hours)
@@ -63,6 +66,7 @@ class ProcessJobsCommand extends Command
         $cleaned = $jobRepo->cleanupStuckJobs($timeoutHours);
         if ($cleaned > 0 && (Helpers::isDebug() || $forceAll)) {
             $output->writeln("<comment>Cleanup: Marked {$cleaned} stuck processing jobs as failed.</comment>");
+            $this->logger->warning("Cleanup: Marked {$cleaned} stuck processing jobs as failed.");
         }
 
         $envStartDate = getenv('START_DATE');
@@ -184,6 +188,7 @@ class ProcessJobsCommand extends Command
                             if (Helpers::isDebug()) {
                                 $output->writeln("<comment>Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.</comment>");
                             }
+                            $this->logger->info("Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.");
                             $stats['skipped']++;
                             continue 2; // Skip to next job
                         }
@@ -196,6 +201,7 @@ class ProcessJobsCommand extends Command
                     if (Helpers::isDebug()) {
                         $output->writeln("<comment>Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.</comment>");
                     }
+                    $this->logger->info("Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.");
                     $stats['skipped']++;
                     continue;
                 }
@@ -203,6 +209,11 @@ class ProcessJobsCommand extends Command
                 if (Helpers::isDebug()) {
                     $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
                 }
+                $this->logger->info("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}", [
+                    'uuid' => $job->getUuid(),
+                    'entity' => $job->getEntity(),
+                    'channel' => $job->getChannel()
+                ]);
                 $stats['total']++;
 
                 try {
@@ -309,6 +320,7 @@ class ProcessJobsCommand extends Command
                     if (Helpers::isDebug()) {
                         $output->writeln("<info>Successfully completed job {$job->getUuid()}</info>");
                     }
+                    $this->logger->info("Successfully completed job {$job->getUuid()}");
                     $stats['completed']++;
                     $progressMade = true;
 
@@ -333,6 +345,9 @@ class ProcessJobsCommand extends Command
                         'message' => $e->getMessage()
                     ]);
                     $output->writeln("<error>Failed job {$job->getUuid()}: {$e->getMessage()}</error>");
+                    $this->logger->error("Failed job {$job->getUuid()}: {$e->getMessage()}", [
+                        'exception' => $e
+                    ]);
                     if (Helpers::isDebug()) {
                         $output->writeln($e->getTraceAsString());
                     }

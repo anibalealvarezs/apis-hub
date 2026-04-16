@@ -1134,26 +1134,26 @@ class Helpers
 
         if (! $enabled) {
             $logger->pushHandler(new NullHandler());
-
             return $logger;
         }
 
         // Determine base level from config
+        // Default to INFO in prod, DEBUG in dev
+        $defaultProdLevel = 'info';
+        $defaultDevLevel = 'debug';
+        
         $configLevelStr = self::isDebug()
-            ? ($logConfig['level'] ?? 'info')
-            : ($logConfig['prod_level'] ?? 'error');
+            ? ($logConfig['level'] ?? $defaultDevLevel)
+            : ($logConfig['prod_level'] ?? $defaultProdLevel);
 
         $baseLevel = self::getLogLevel($configLevelStr);
 
-        // If a specific level was requested, we respect it if it's more restrictive
-        // or if debug is on.
         if ($level !== null) {
             $requested = ($level instanceof Level)
                 ? $level
                 : (is_int($level) ? Level::from($level) : self::getLogLevel($level));
 
-            // In non-debug mode, we don't allow logging below the prod_level
-            if (! self::isDebug() && $requested->value < $baseLevel->value) {
+            if (!self::isDebug() && $requested->value < $baseLevel->value) {
                 $requested = $baseLevel;
             }
             $finalLevel = $requested;
@@ -1162,7 +1162,19 @@ class Helpers
         }
 
         $maxFiles = $logConfig['max_days'] ?? 7;
-        $logger->pushHandler(new RotatingFileHandler(__DIR__ . '/../../logs/' . $filename, $maxFiles, $finalLevel));
+        
+        // Ensure logs directory exists
+        $logDir = __DIR__ . '/../../logs';
+        if (!is_dir($logDir)) {
+            mkdir($logDir, 0777, true);
+        }
+
+        // Using RotatingFileHandler ensures files are dated like 'filename-YYYY-MM-DD.log'
+        // and older files are automatically pruned.
+        $handler = new RotatingFileHandler($logDir . '/' . $filename, $maxFiles, $finalLevel);
+        $handler->setFilenameFormat('{filename}-{date}', 'Y-m-d');
+        
+        $logger->pushHandler($handler);
 
         return $logger;
     }
