@@ -19,8 +19,8 @@ class CheckCoverageCommand extends Command
 {
     protected function configure(): void
     {
-        $this->addOption('channel', 'c', InputOption::VALUE_REQUIRED, 'The channel name')
-             ->addOption('days', 'd', InputOption::VALUE_OPTIONAL, 'Number of days to look back', 30);
+        $this->addOption(name: 'channel', shortcut: 'c', mode: InputOption::VALUE_REQUIRED, description: 'The channel name')
+             ->addOption(name: 'days', shortcut: 'd', mode: InputOption::VALUE_OPTIONAL, description: 'Number of days to look back', default: '30');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

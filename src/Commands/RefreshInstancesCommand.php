@@ -19,8 +19,8 @@ class RefreshInstancesCommand extends Command
         $defaultPort = getenv('STARTING_HOST_PORT') ?: 8081;
         $this
             ->setDescription('Regenerates config/instances.yaml based on business rules.')
-            ->addOption('no-deps', null, InputOption::VALUE_NONE, 'Do not add dependency chains between instances')
-            ->addOption('base-port', 'p', InputOption::VALUE_REQUIRED, 'Base port to start from', $defaultPort);
+            ->addOption(name: 'no-deps', shortcut: null, mode: InputOption::VALUE_NONE, description: 'Do not add dependency chains between instances')
+            ->addOption(name: 'base-port', shortcut: 'p', mode: InputOption::VALUE_REQUIRED, description: 'Base port to start from', default: (string) $defaultPort);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
