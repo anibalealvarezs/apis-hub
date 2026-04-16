@@ -787,9 +787,9 @@ class Helpers
     }
 
     /**
-     * @return EntityManager
+     * @return EntityManagerInterface
      */
-    public static function getManager(): EntityManager
+    public static function getManager(): EntityManagerInterface
     {
         if (self::$entityManager === null || ! self::$entityManager->isOpen()) {
             try {
