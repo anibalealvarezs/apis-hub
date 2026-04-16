@@ -659,11 +659,11 @@ class MetricsProcessor
                 name: $mObj->name ?? null,
                 period: $mObj->period ?? null,
                 account: isset($mObj->account) ? (is_object($mObj->account) ? (method_exists($mObj->account, 'getName') ? $mObj->account->getName() : (string)$mObj->account) : (string)$mObj->account) : null,
-                channeledAccount: isset($mObj->channeledAccount) ? (is_object($mObj->channeledAccount) ? (method_exists($mObj->channeledAccount, 'getPlatformId') ? $mObj->channeledAccount->getPlatformId() : (string)$mObj->channeledAccount) : (string)$mObj->channeledAccount) : null,
+                channeledAccount: isset($mObj->channeledAccount) ? (is_object($mObj->channeledAccount) ? (method_exists($mObj->channeledAccount, 'getPlatformId') ? $mObj->channeledAccount->getPlatformId() : (string)$mObj->channeledAccount) : (string)$mObj->channeledAccount) : ($mObj->channeledAccountPlatformId ?? null),
                 campaign: isset($mObj->campaign) ? (is_object($mObj->campaign) ? (method_exists($mObj->campaign, 'getCampaignId') ? $mObj->campaign->getCampaignId() : (string)$mObj->campaign) : (string)$mObj->campaign) : null,
-                channeledCampaign: isset($mObj->channeledCampaign) ? (is_object($mObj->channeledCampaign) ? (method_exists($mObj->channeledCampaign, 'getPlatformId') ? $mObj->channeledCampaign->getPlatformId() : (string)$mObj->channeledCampaign) : (string)$mObj->channeledCampaign) : null,
-                channeledAdGroup: isset($mObj->channeledAdGroup) ? (is_object($mObj->channeledAdGroup) ? (method_exists($mObj->channeledAdGroup, 'getPlatformId') ? $mObj->channeledAdGroup->getPlatformId() : (string)$mObj->channeledAdGroup) : (string)$mObj->channeledAdGroup) : null,
-                channeledAd: isset($mObj->channeledAd) ? (is_object($mObj->channeledAd) ? (method_exists($mObj->channeledAd, 'getPlatformId') ? $mObj->channeledAd->getPlatformId() : (string)$mObj->channeledAd) : (string)$mObj->channeledAd) : null,
+                channeledCampaign: isset($mObj->channeledCampaign) ? (is_object($mObj->channeledCampaign) ? (method_exists($mObj->channeledCampaign, 'getPlatformId') ? $mObj->channeledCampaign->getPlatformId() : (string)$mObj->channeledCampaign) : (string)$mObj->channeledCampaign) : ($mObj->channeledCampaignPlatformId ?? null),
+                channeledAdGroup: isset($mObj->channeledAdGroup) ? (is_object($mObj->channeledAdGroup) ? (method_exists($mObj->channeledAdGroup, 'getPlatformId') ? $mObj->channeledAdGroup->getPlatformId() : (string)$mObj->channeledAdGroup) : (string)$mObj->channeledAdGroup) : ($mObj->channeledAdGroupPlatformId ?? null),
+                channeledAd: isset($mObj->channeledAd) ? (is_object($mObj->channeledAd) ? (method_exists($mObj->channeledAd, 'getPlatformId') ? $mObj->channeledAd->getPlatformId() : (string)$mObj->channeledAd) : (string)$mObj->channeledAd) : ($mObj->channeledAdPlatformId ?? null),
                 page: isset($mObj->page) ? (is_object($mObj->page) ? (method_exists($mObj->page, 'getUrl') ? $mObj->page->getUrl() : (string)$mObj->page) : (string)$mObj->page) : null,
                 query: $mObj->query ?? null,
                 post: isset($mObj->post) ? (is_object($mObj->post) ? (method_exists($mObj->post, 'getPostId') ? $mObj->post->getPostId() : (string)$mObj->post) : (string)$mObj->post) : null,
@@ -672,7 +672,7 @@ class MetricsProcessor
                 order: isset($metric->order) ? (is_object($metric->order) ? $metric->order->getOrderId() : (string)$metric->order) : null,
                 country: $metric->countryCode ?? null,
                 device: $metric->deviceType ?? null,
-                creative: isset($metric->creative) ? (is_object($metric->creative) ? $metric->creative->getCreativeId() : (string)$metric->creative) : null,
+                creative: isset($metric->creative) ? (is_object($metric->creative) ? $metric->creative->getCreativeId() : (string)$metric->creative) : ($metric->creativePlatformId ?? null),
                 dimensionSet: $metric->dimensionsHash ?? (isset($metric->dimensions) ? KeyGenerator::generateDimensionsHash((array)$metric->dimensions) : null)
             );
             $metric->metricConfigKey = $metricConfigKey;
