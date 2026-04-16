@@ -152,3 +152,25 @@
 .config-cron-mini-input { width:55px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border); color:white; padding:4px 8px; font-size:0.8rem; }
 .config-filter-icon-input { background: rgba(255,255,255,0.03); border-radius:10px; border:1px solid var(--border); padding: 0 12px; display:flex; align-items:center; }
 .config-filter-raw-input { border:none; background:transparent; padding:8px 0; width:100%; color:white; font-family:var(--font-mono); font-size:0.75rem; }
+
+/* Buttons */
+.btn-outline {
+    background: transparent !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-dim) !important;
+}
+
+.btn-outline:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: var(--primary) !important;
+    color: white !important;
+}
+
+.btn-mini {
+    padding: 4px 10px !important;
+    font-size: 0.7rem !important;
+    height: 28px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+}

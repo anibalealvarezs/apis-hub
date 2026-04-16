@@ -103,11 +103,10 @@ class ConfigManagerController extends BaseController
                 try {
                     $chanConfig = $systemConfig['channels'][$chan] ?? [];
 
-                    // Always call prepareUiConfig for enabled channels or if this is the requested type
+                    // Always call prepareUiConfig if the channel has a configuration
                     $isRequestedType = $requestedType && ($chan === $requestedType || str_contains($chan, $requestedType));
-                    $isEnabled = $chanConfig['enabled'] ?? false;
 
-                    if ($isEnabled || $isRequestedType || $forceRefresh) {
+                    if (!empty($chanConfig) || $isRequestedType || $forceRefresh) {
                         $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
                         $uiConfig = $driver->prepareUiConfig($chanConfig);
                         $currentConfig = array_replace_recursive($currentConfig, $uiConfig);

@@ -771,6 +771,14 @@
               gap: 8px;
             "
           >
+            <div style="display: flex; gap: 8px">
+              <button class="btn btn-mini btn-outline" onclick="selectUnselectAllOrganicPages(true)" title="Select All Discovered Pages">
+                <i data-lucide="check-square" size="14"></i> Select All
+              </button>
+              <button class="btn btn-mini btn-outline" onclick="selectUnselectAllOrganicPages(false)" title="Unselect All Pages">
+                <i data-lucide="square" size="14"></i> Unselect All
+              </button>
+            </div>
             <button
               class="btn btn-mini"
               onclick="forceRefresh('facebook_organic')"

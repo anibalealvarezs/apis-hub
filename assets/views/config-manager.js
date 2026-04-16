@@ -1334,3 +1334,15 @@ function toggleRawMetricsWarning(show) {
         }
     }
 }
+
+function selectUnselectAllOrganicPages(enable) {
+    const toggles = document.querySelectorAll('.fb-page-main-toggle');
+    toggles.forEach(toggle => {
+        if (!toggle.disabled) {
+            toggle.checked = enable;
+            const pageId = toggle.dataset.id;
+            toggleOrganicHierarchy(pageId, enable);
+        }
+    });
+    showToast(`${enable ? 'Selected' : 'Unselected'} all accessible pages.`, false);
+}
