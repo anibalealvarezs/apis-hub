@@ -9,7 +9,7 @@ use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Anibalealvarezs\ApiDriverCore\Interfaces\DimensionManagerInterface;
 use Doctrine\ORM\EntityManagerInterface;
 
-class DimensionManager implements DimensionManagerInterface
+class DimensionManagerReal implements DimensionManagerInterface
 {
     private array $keyCache = [];
     private array $valueCache = [];
