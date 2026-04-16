@@ -189,10 +189,12 @@ class PriceRuleProcessor
         $uCDisc = [];
 
         foreach ($channeledCollection as $cd) {
-            if (!is_object($cd)) continue;
-            /** @var object{channel: string|int, code: string, platformId: string|int, platformCreatedAt: ?mixed, data: mixed} $cd */
-            $chan = (string)$cd->channel;
-            $code = (string)$cd->code;
+            if (!$cd) continue;
+            $cdObj = (object)$cd;
+            /** @var object{channel: string|int, code: string, platformId: string|int, platformCreatedAt: ?mixed, data: mixed} $cdObj */
+            
+            $chan = (string)($cdObj->channel ?? '');
+            $code = (string)($cdObj->code ?? '');
 
             $dKey = KeyGenerator::generateDiscountKey($code);
             if (!isset($uDisc[$dKey])) {
@@ -201,13 +203,12 @@ class PriceRuleProcessor
 
             $cdKey = KeyGenerator::generateChanneledDiscountKey($chan, $code);
             if (!isset($uCDisc[$cdKey])) {
-                /** @var object{platformId: string|int, platformCreatedAt: ?mixed, data: mixed} $cd */
                 $uCDisc[$cdKey] = [
                     'code' => $code,
                     'channel' => $chan,
-                    'platform_id' => (string)($cd->platformId ?? ''),
-                    'platform_created_at' => $cd->platformCreatedAt ?? null,
-                    'data' => is_object($cd->data ?? null) ? clone $cd->data : (object)($cd->data ?? []),
+                    'platform_id' => (string)($cdObj->platformId ?? ''),
+                    'platform_created_at' => $cdObj->platformCreatedAt ?? null,
+                    'data' => is_object($cdObj->data ?? null) ? clone $cdObj->data : (object)($cdObj->data ?? []),
                 ];
             }
         }
