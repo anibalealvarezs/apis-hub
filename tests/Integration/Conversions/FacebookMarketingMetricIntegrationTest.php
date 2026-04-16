@@ -83,15 +83,15 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
 
         // Validate Row 1 assertions
         $this->assertArrayHasKey('18-24_male_impressions', $metricsMap);
-        $metricImpressions = $metricsMap['18-24_male_impressions'] ?? null;
+        $metricImpressions = $metricsMap['18-24_male_impressions'];
         $this->assertNotNull($metricImpressions);
 
         $this->assertArrayHasKey('18-24_male_clicks', $metricsMap);
-        $metricClicks = $metricsMap['18-24_male_clicks'] ?? null;
+        $metricClicks = $metricsMap['18-24_male_clicks'];
         $this->assertNotNull($metricClicks);
 
         $this->assertArrayHasKey('18-24_male_spend', $metricsMap);
-        $metricSpend = $metricsMap['18-24_male_spend'] ?? null;
+        $metricSpend = $metricsMap['18-24_male_spend'];
         $this->assertNotNull($metricSpend);
 
         $this->assertEquals($rows[0]['impressions'], $metricImpressions->value);
@@ -105,9 +105,9 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
 
         // Validate Row 2 assertions
         $this->assertArrayHasKey('25-34_female_cost_per_unique_outbound_click', $metricsMap);
-        $metricCost = $metricsMap['25-34_female_cost_per_unique_outbound_click'] ?? null;
+        $metricCost = $metricsMap['25-34_female_cost_per_unique_outbound_click'];
         $this->assertNotNull($metricCost);
-        $this->assertEquals($rows[1]['cost_per_unique_outbound_click'][0]['value'], $metricCost->value); 
+        $this->assertEquals($rows[1]['cost_per_unique_outbound_click'][0]['value'], $metricCost->value);
     }
 
     public function testCampaignMetricsTransformsDataCorrectly(): void

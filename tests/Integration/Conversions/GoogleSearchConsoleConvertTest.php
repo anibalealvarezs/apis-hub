@@ -95,22 +95,32 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
         }
 
         $this->assertArrayHasKey('clicks', $metricsMap);
+        $clicksMetric = $metricsMap['clicks'];
+        $this->assertNotNull($clicksMetric);
+        $this->assertEquals($totalClicks, $clicksMetric->value);
+
         $this->assertArrayHasKey('impressions', $metricsMap);
+        $impressionsMetric = $metricsMap['impressions'];
+        $this->assertNotNull($impressionsMetric);
+        $this->assertEquals($totalImpressions, $impressionsMetric->value);
+
         $this->assertArrayHasKey('ctr', $metricsMap);
+        $ctrMetric = $metricsMap['ctr'];
+        $this->assertNotNull($ctrMetric);
+        $this->assertEquals($totalCtr, $ctrMetric->value);
+
         $this->assertArrayHasKey('position', $metricsMap);
+        $positionMetric = $metricsMap['position'];
+        $this->assertNotNull($positionMetric);
+        $this->assertEquals($weightedPosition, $positionMetric->value);
 
-        $this->assertEquals($totalClicks, $metricsMap['clicks']->value);
-        $this->assertEquals($totalImpressions, $metricsMap['impressions']->value);
-        $this->assertEquals($totalCtr, $metricsMap['ctr']->value);
-        $this->assertEquals($weightedPosition, $metricsMap['position']->value);
-
-        $this->assertEquals(Channel::google_search_console->value, $metricsMap['impressions']->channel);
-        $this->assertStringStartsWith('gsc_' . $siteKey . '_', $metricsMap['impressions']->platformId);
-        $this->assertEquals($query, $metricsMap['impressions']->query);
-        $this->assertEquals($country, $metricsMap['impressions']->countryCode);
-        $this->assertEquals($device, $metricsMap['impressions']->deviceType);
+        $this->assertEquals(Channel::google_search_console->value, $impressionsMetric->channel);
+        $this->assertStringStartsWith('gsc_' . $siteKey . '_', $impressionsMetric->platformId);
+        $this->assertEquals($query, $impressionsMetric->query);
+        $this->assertEquals($country, $impressionsMetric->countryCode);
+        $this->assertEquals($device, $impressionsMetric->deviceType);
         
-        $this->assertEquals($pageEntity->getId(), $metricsMap['impressions']->page->getId());
+        $this->assertEquals($pageEntity->getId(), $impressionsMetric->page->getId());
     }
 
     public function testRobustness(): void
