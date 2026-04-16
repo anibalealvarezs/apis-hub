@@ -29,8 +29,11 @@ use Commands\MigratePagesCanonicalCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use Helpers\Helpers;
 use Symfony\Component\Console\Application;
+use Monolog\ErrorHandler;
 
 try {
+    $logger = Helpers::setLogger('cli.log');
+    ErrorHandler::register($logger);
     $cliConfig = Helpers::getCliConfig();
     ini_set('memory_limit', $cliConfig['memory_limit'] ?? '1G');
 
