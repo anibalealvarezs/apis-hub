@@ -78,17 +78,15 @@ class GenerateEntitiesConfigCommand extends Command
 
     private function findPhpFiles(string $dir): \Generator
     {
-        if (!is_dir($dir)) {
-            return;
-        }
+        if (is_dir($dir)) {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($dir)
+            );
 
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($dir)
-        );
-
-        foreach ($iterator as $file) {
-            if ($file->getExtension() === 'php') {
-                yield $file->getPathname();
+            foreach ($iterator as $file) {
+                if ($file->getExtension() === 'php') {
+                    yield $file->getPathname();
+                }
             }
         }
     }
