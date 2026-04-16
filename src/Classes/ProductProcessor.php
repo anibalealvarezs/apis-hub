@@ -40,13 +40,17 @@ class ProductProcessor
 
         // 1. Extract unique records
         foreach ($channeledCollection as $cp) {
-            $chan = (string)$cp->channel;
+            if (!$cp) continue;
+            $cpObj = (object)$cp;
+            /** @var object{channel: mixed, vendor: ?object{name: ?string, platformId: ?string, platformCreatedAt: ?mixed, data: mixed}, platformId: mixed, sku: ?string, platformCreatedAt: ?mixed, data: mixed, variants: ?array, categories: ?array} $cpObj */
+            
+            $chan = (string)($cpObj->channel ?? '');
 
             // Vendors
             $vendorKey = null;
             $vendorName = null;
-            if (!empty($cp->vendor->name)) {
-                $vendorName = $cp->vendor->name;
+            if (!empty($cpObj->vendor->name ?? null)) {
+                $vendorName = (string)$cpObj->vendor->name;
                 $vKey = KeyGenerator::generateVendorKey($vendorName);
                 if (!isset($uVend[$vKey])) {
                     $uVend[$vKey] = ['name' => $vendorName];
@@ -59,43 +63,48 @@ class ProductProcessor
                         'vendor_name' => $vendorName, // Reference for lookup later
                         'channel' => $chan,
                         'name' => $vendorName,
-                        'platform_id' => $cp->vendor->platformId ?? $vendorName,
-                        'platform_created_at' => $cp->vendor->platformCreatedAt ?? null,
-                        'data' => $cp->vendor->data ?? [],
+                        'platform_id' => $cpObj->vendor->platformId ?? $vendorName,
+                        'platform_created_at' => $cpObj->vendor->platformCreatedAt ?? null,
+                        'data' => $cpObj->vendor->data ?? [],
                     ];
                 }
             }
 
             // Products
-            $pKey = KeyGenerator::generateProductKey((string)$cp->platformId);
+            $pId = (string)($cpObj->platformId ?? '');
+            $pKey = KeyGenerator::generateProductKey($pId);
             if (!isset($uProd[$pKey])) {
                 $uProd[$pKey] = [
-                    'product_id' => (string)$cp->platformId,
-                    'sku' => $cp->sku,
+                    'product_id' => $pId,
+                    'sku' => $cpObj->sku ?? '',
                 ];
             }
 
-            $cpKey = KeyGenerator::generateChanneledProductKey($chan, (string)$cp->platformId);
+            $cpKey = KeyGenerator::generateChanneledProductKey($chan, $pId);
             if (!isset($uCProd[$cpKey])) {
                 $uCProd[$cpKey] = [
-                    'product_id' => (string)$cp->platformId,
+                    'product_id' => $pId,
                     'vendorRef' => $vendorKey,
                     'channel' => $chan,
-                    'platform_id' => (string)$cp->platformId,
-                    'platform_created_at' => $cp->platformCreatedAt ?? null,
-                    'data' => $cp->data ?? [],
+                    'platform_id' => $pId,
+                    'platform_created_at' => $cpObj->platformCreatedAt ?? null,
+                    'data' => $cpObj->data ?? [],
                 ];
             }
 
             // Variants
-            if (!empty($cp->variants)) {
-                foreach ($cp->variants as $var) {
-                    $varPId = (string)$var->platformId;
+            if (!empty($cpObj->variants)) {
+                foreach ($cpObj->variants as $var) {
+                    if (!$var) continue;
+                    $varObj = (object)$var;
+                    /** @var object{platformId: mixed, sku: ?string, platformCreatedAt: ?mixed, data: mixed} $varObj */
+                    
+                    $varPId = (string)($varObj->platformId ?? '');
                     $vKey = KeyGenerator::generateProductVariantKey($varPId);
                     if (!isset($uVar[$vKey])) {
                         $uVar[$vKey] = [
                             'productVariantId' => $varPId,
-                            'sku' => $var->sku ?? '',
+                            'sku' => $varObj->sku ?? '',
                         ];
                     }
 
@@ -106,22 +115,26 @@ class ProductProcessor
                             'channeledProductRef' => $cpKey,
                             'channel' => $chan,
                             'platform_id' => $varPId,
-                            'platform_created_at' => $var->platformCreatedAt ?? null,
-                            'data' => $var->data ?? [],
+                            'platform_created_at' => $varObj->platformCreatedAt ?? null,
+                            'data' => $varObj->data ?? [],
                         ];
                     }
                 }
             }
 
             // Categories
-            if (!empty($cp->categories)) {
-                foreach ($cp->categories as $cat) {
-                    $catPId = (string)$cat->platformId;
+            if (!empty($cpObj->categories)) {
+                foreach ($cpObj->categories as $cat) {
+                    if (!$cat) continue;
+                    $catObj = (object)$cat;
+                    /** @var object{platformId: mixed, isSmartCollection: ?bool, platformCreatedAt: ?mixed, data: mixed} $catObj */
+                    
+                    $catPId = (string)($catObj->platformId ?? '');
                     $cKey = KeyGenerator::generateProductCategoryKey($catPId);
                     if (!isset($uCat[$cKey])) {
                         $uCat[$cKey] = [
                             'productCategoryId' => $catPId,
-                            'isSmartCollection' => $cat->isSmartCollection ?? false,
+                            'isSmartCollection' => $catObj->isSmartCollection ?? false,
                         ];
                     }
 
@@ -131,8 +144,8 @@ class ProductProcessor
                             'categoryPId' => $catPId,
                             'channel' => $chan,
                             'platform_id' => $catPId,
-                            'platform_created_at' => $cat->platformCreatedAt ?? null,
-                            'data' => $cat->data ?? [],
+                            'platform_created_at' => $catObj->platformCreatedAt ?? null,
+                            'data' => $catObj->data ?? [],
                         ];
                     }
 
