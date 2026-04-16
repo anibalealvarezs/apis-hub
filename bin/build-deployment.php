@@ -81,7 +81,10 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
             "{$mcpPort}:3000"
         ],
         'volumes'     => $volumes,
-        'depends_on'  => ['redis'],
+        'depends_on'  => [
+            'db' => ['condition' => 'service_started'],
+            'redis' => ['condition' => 'service_started'],
+        ],
         'extra_hosts' => ['host.docker.internal:host-gateway'],
     ];
 
@@ -102,7 +105,12 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
             'command'     => null,
             'environment' => $buildEnv($name, $channel, $entity),
             'volumes'     => $volumes, // Same volumes for workers
-            'depends_on'  => ['master', 'redis'],
+            'networks'    => ['default'],
+            'depends_on'  => [
+                'master' => ['condition' => 'service_started'],
+                'db' => ['condition' => 'service_started'],
+                'redis' => ['condition' => 'service_started'],
+            ],
         ];
     }
 
@@ -121,6 +129,7 @@ if (true) { // Always create DB service in this master/worker architecture
         ],
         'ports'   => ["{$dbHostPort}:5432"],
         'volumes' => ["db_data:/var/lib/postgresql/data"],
+        'networks' => ['default'],
     ];
 }
 
@@ -131,6 +140,7 @@ $services['redis'] = [
     'restart'       => 'always',
     'ports'         => ["{$redisHostPort}:6379"],
     'volumes'       => ['redis_data:/data'],
+    'networks'      => ['default'],
 ];
 
 // ─── Write docker-compose.yml ──────────────────────────────────────────────────

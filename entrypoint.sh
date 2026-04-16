@@ -10,6 +10,15 @@ if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     echo "Master Instance ($INSTANCE_NAME): Updating modular dependencies..."
     composer update --no-scripts --no-interaction --ignore-platform-reqs || echo "Modular update failed, continuing..."
 
+    # Wait for DB host to be resolvable via DNS
+    DB_HOST_TO_CHECK=${DB_HOST:-db}
+    echo "Master Instance ($INSTANCE_NAME): Waiting for database host '$DB_HOST_TO_CHECK' to be resolvable..."
+    RETRY_DNS=0
+    while ! getent hosts "$DB_HOST_TO_CHECK" > /dev/null && [ $RETRY_DNS -lt 30 ]; do
+        sleep 1
+        RETRY_DNS=$((RETRY_DNS+1))
+    done
+
     # Use mkdir for atomic lock
     if mkdir "/app/storage/db_lock" 2>/dev/null; then
         echo "Master Instance ($INSTANCE_NAME): Acquired lock. Initializing database and entities..."
