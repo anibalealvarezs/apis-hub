@@ -94,11 +94,11 @@ class SyncService
             $result = $driver->sync($startDate, $endDate, $finalConfig);
             $this->logger?->info("DEBUG: SyncService::execute - driver->sync RETURNED");
 
-            return new JsonResponse([
+            return new Response(json_encode([
                 'success' => true,
                 'message' => 'Sync completed successfully',
                 'data' => (array)$result
-            ], Response::HTTP_OK);
+            ]), Response::HTTP_OK, ['Content-Type' => 'application/json']);
 
         } catch (\Throwable $e) {
             $this->logger->error("SyncService Error [{$channel}]: " . $e->getMessage(), [
