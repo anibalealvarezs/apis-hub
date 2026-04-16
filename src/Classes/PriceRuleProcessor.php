@@ -32,6 +32,8 @@ class PriceRuleProcessor
         $uCPR = [];
 
         foreach ($channeledCollection as $cpr) {
+            if (!is_object($cpr)) continue;
+            /** @var object{channel: string|int, platformId: string|int, platformCreatedAt: ?mixed, data: mixed} $cpr */
             $chan = (string)$cpr->channel;
             $pId = (string)$cpr->platformId;
 
@@ -187,6 +189,8 @@ class PriceRuleProcessor
         $uCDisc = [];
 
         foreach ($channeledCollection as $cd) {
+            if (!is_object($cd)) continue;
+            /** @var object{channel: string|int, code: string, platformId: string|int, platformCreatedAt: ?mixed, data: mixed} $cd */
             $chan = (string)$cd->channel;
             $code = (string)$cd->code;
 
