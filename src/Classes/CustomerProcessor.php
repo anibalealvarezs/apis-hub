@@ -36,6 +36,10 @@ class CustomerProcessor
         // 1. Extract unique records
         /** @var \stdClass&object{email: string, channel: string, platformId: string, platformCreatedAt: string|\DateTime, data: array} $channeledCustomer */
         foreach ($channeledCollection as $channeledCustomer) {
+            if (!is_object($channeledCustomer)) {
+                continue;
+            }
+            /** @var object{email: string, channel: string|int, platformId: string|int, platformCreatedAt: string|\DateTime, data: array} $channeledCustomer */
             if (empty($channeledCustomer->email)) {
                 continue;
             }
