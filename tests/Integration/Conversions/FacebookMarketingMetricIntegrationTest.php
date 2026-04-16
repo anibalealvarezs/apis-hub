@@ -71,6 +71,7 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
 
         $metricsMap = [];
         foreach ($collection as $item) {
+            if (!$item) continue;
             $age = '';
             $gender = '';
             foreach ($item->dimensions as $dim) {
@@ -174,7 +175,9 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
         $rows = [['date_start' => $this->faker->date(), 'impressions' => '100', 'actions' => []]];
         $collection = FacebookMarketingMetricConvert::adAccountMetrics($rows, null, $accountEntity, metricSet: MetricSet::BASIC);
         $this->assertCount(2, $collection);
-        $this->assertEquals('100', $collection->first()->value);
+        $first = $collection->first();
+        $this->assertNotNull($first);
+        $this->assertEquals('100', $first->value);
 
         $rows = [['date_start' => $this->faker->date(), 'impressions' => '100']];
         $collection = FacebookMarketingMetricConvert::adAccountMetrics($rows, null, $accountEntity, metricSet: MetricSet::BASIC);

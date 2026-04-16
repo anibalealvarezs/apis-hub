@@ -90,8 +90,14 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
 
         $metricsMap = [];
         foreach ($collection as $item) {
+            if (!$item) continue;
             $metricsMap[$item->name] = $item;
         }
+
+        $this->assertArrayHasKey('clicks', $metricsMap);
+        $this->assertArrayHasKey('impressions', $metricsMap);
+        $this->assertArrayHasKey('ctr', $metricsMap);
+        $this->assertArrayHasKey('position', $metricsMap);
 
         $this->assertEquals($totalClicks, $metricsMap['clicks']->value);
         $this->assertEquals($totalImpressions, $metricsMap['impressions']->value);
