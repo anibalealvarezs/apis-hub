@@ -11,6 +11,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityManagerInterface;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -21,10 +22,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processQueries(Collection $metrics, EntityManager $manager): array
+    public static function processQueries(Collection $metrics, EntityManagerInterface $manager): array
     {
         // Extract queries from metrics
         $queries = array_filter(array_map(function ($metric) {
@@ -102,7 +103,7 @@ class MetricsProcessor
         return ['map' => $finalMap, 'mapReverse' => $mapReverse];
     }
 
-    public static function processCountries(Collection $metrics, EntityManager $manager): array
+    public static function processCountries(Collection $metrics, EntityManagerInterface $manager): array
     {
         $repo = $manager->getRepository(\Entities\Analytics\Country::class);
         $countries = $repo->findAll();
@@ -117,7 +118,7 @@ class MetricsProcessor
         return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
-    public static function processDevices(Collection $metrics, EntityManager $manager): array
+    public static function processDevices(Collection $metrics, EntityManagerInterface $manager): array
     {
         $repo = $manager->getRepository(\Entities\Analytics\Device::class);
         $devices = $repo->findAll();
@@ -132,7 +133,7 @@ class MetricsProcessor
         return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
-    public static function processDimensionSets(Collection $metrics, EntityManager $manager): array
+    public static function processDimensionSets(Collection $metrics, EntityManagerInterface $manager): array
     {
         $dimManager = new \Classes\DimensionManager($manager);
         $map = [];
@@ -151,10 +152,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processAccounts(Collection $metrics, EntityManager $manager): array
+    public static function processAccounts(Collection $metrics, EntityManagerInterface $manager): array
     {
         $ids = [];
         foreach ($metrics as $metric) {
@@ -185,10 +186,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processChanneledAccounts(Collection $metrics, EntityManager $manager): array
+    public static function processChanneledAccounts(Collection $metrics, EntityManagerInterface $manager): array
     {
         $ids = [];
         foreach ($metrics as $metric) {
@@ -221,10 +222,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processCampaigns(Collection $metrics, EntityManager $manager): array
+    public static function processCampaigns(Collection $metrics, EntityManagerInterface $manager): array
     {
         $ids = [];
         foreach ($metrics as $metric) {
@@ -255,10 +256,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processChanneledCampaigns(Collection $metrics, EntityManager $manager): array
+    public static function processChanneledCampaigns(Collection $metrics, EntityManagerInterface $manager): array
     {
         $ids = [];
         foreach ($metrics as $metric) {
@@ -291,10 +292,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processChanneledAdGroups(Collection $metrics, EntityManager $manager): array
+    public static function processChanneledAdGroups(Collection $metrics, EntityManagerInterface $manager): array
     {
         $ids = [];
         foreach ($metrics as $metric) {
@@ -327,10 +328,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processChanneledAds(Collection $metrics, EntityManager $manager): array
+    public static function processChanneledAds(Collection $metrics, EntityManagerInterface $manager): array
     {
         $ids = [];
         foreach ($metrics as $metric) {
@@ -363,10 +364,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processCreatives(Collection $metrics, EntityManager $manager): array
+    public static function processCreatives(Collection $metrics, EntityManagerInterface $manager): array
     {
         $ids = [];
         foreach ($metrics as $metric) {
@@ -395,7 +396,7 @@ class MetricsProcessor
         return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
-    public static function processPages(Collection $metrics, EntityManager $manager): array
+    public static function processPages(Collection $metrics, EntityManagerInterface $manager): array
     {
         $platformIds = [];
         $canonicalIds = [];
@@ -446,10 +447,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processPosts(Collection $metrics, EntityManager $manager): array
+    public static function processPosts(Collection $metrics, EntityManagerInterface $manager): array
     {
         $ids = [];
         foreach ($metrics as $metric) {
@@ -480,10 +481,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processProducts(Collection $metrics, EntityManager $manager): array
+    public static function processProducts(Collection $metrics, EntityManagerInterface $manager): array
     {
         return [
             'map' => [],
@@ -493,10 +494,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processCustomers(Collection $metrics, EntityManager $manager): array
+    public static function processCustomers(Collection $metrics, EntityManagerInterface $manager): array
     {
         return [
             'map' => [],
@@ -506,10 +507,10 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @return array
      */
-    public static function processOrders(Collection $metrics, EntityManager $manager): array
+    public static function processOrders(Collection $metrics, EntityManagerInterface $manager): array
     {
         return [
             'map' => [],
@@ -522,7 +523,7 @@ class MetricsProcessor
      */
     public static function processMetricConfigs(
         Collection $metrics,
-        EntityManager $manager,
+        EntityManagerInterface $manager,
         bool $processQueries = false,
         bool $processAccounts = false,
         bool $processChanneledAccounts = false,
@@ -815,13 +816,13 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @param array $metricConfigMap
      * @return array
      */
     public static function processMetrics(
         \Doctrine\Common\Collections\Collection|array $metrics,
-        EntityManager $manager,
+        EntityManagerInterface $manager,
         array $metricConfigMap,
         ?LoggerInterface $logger = null,
         ?string $channel = null,
@@ -977,14 +978,14 @@ class MetricsProcessor
 
     /**
      * @param Collection $metrics
-     * @param EntityManager $manager
+     * @param EntityManagerInterface $manager
      * @param array $metricMap
      * @param LoggerInterface $logger
      * @return array
      */
     public static function processChanneledMetrics(
         Collection $metrics,
-        EntityManager $manager,
+        EntityManagerInterface $manager,
         array $metricMap,
         LoggerInterface $logger,
     ): array {
