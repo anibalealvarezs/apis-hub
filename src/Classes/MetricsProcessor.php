@@ -603,21 +603,25 @@ class MetricsProcessor
         // Extract metrics from metrics
         $uniqueMetricConfigs = [];
         foreach ($metrics->toArray() as $metric) {
+            if (!$metric) continue;
+            $mObj = (object)$metric;
+            /** @var object{channel: mixed, name: mixed, period: mixed, account: mixed, channeledAccount: mixed, campaign: mixed, channeledCampaign: mixed, channeledAdGroup: mixed, channeledAd: mixed, page: mixed, query: mixed, post: mixed, product: mixed, customer: mixed, creative: mixed, country: mixed, device: mixed} $mObj */
+            
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
-                channel: $metric->channel,
-                name: $metric->name,
-                period: $metric->period,
-                account: isset($metric->account) ? (is_object($metric->account) ? $metric->account->getName() : (string)$metric->account) : null,
-                channeledAccount: isset($metric->channeledAccount) ? (is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount) : null,
-                campaign: isset($metric->campaign) ? (is_object($metric->campaign) ? $metric->campaign->getCampaignId() : (string)$metric->campaign) : null,
-                channeledCampaign: isset($metric->channeledCampaign) ? (is_object($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : (string)$metric->channeledCampaign) : null,
-                channeledAdGroup: isset($metric->channeledAdGroup) ? (is_object($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : (string)$metric->channeledAdGroup) : null,
-                channeledAd: isset($metric->channeledAd) ? (is_object($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : (string)$metric->channeledAd) : null,
-                page: isset($metric->page) ? (is_object($metric->page) ? $metric->page->getUrl() : (string)$metric->page) : null,
-                query: $metric->query ?? null,
-                post: isset($metric->post) ? (is_object($metric->post) ? $metric->post->getPostId() : (string)$metric->post) : null,
-                product: isset($metric->product) ? (is_object($metric->product) ? $metric->product->getProductId() : (string)$metric->product) : null,
-                customer: isset($metric->customer) ? (is_object($metric->customer) ? $metric->customer->getEmail() : (string)$metric->customer) : null,
+                channel: $mObj->channel ?? null,
+                name: $mObj->name ?? null,
+                period: $mObj->period ?? null,
+                account: isset($mObj->account) ? (is_object($mObj->account) ? (method_exists($mObj->account, 'getName') ? $mObj->account->getName() : (string)$mObj->account) : (string)$mObj->account) : null,
+                channeledAccount: isset($mObj->channeledAccount) ? (is_object($mObj->channeledAccount) ? (method_exists($mObj->channeledAccount, 'getPlatformId') ? $mObj->channeledAccount->getPlatformId() : (string)$mObj->channeledAccount) : (string)$mObj->channeledAccount) : null,
+                campaign: isset($mObj->campaign) ? (is_object($mObj->campaign) ? (method_exists($mObj->campaign, 'getCampaignId') ? $mObj->campaign->getCampaignId() : (string)$mObj->campaign) : (string)$mObj->campaign) : null,
+                channeledCampaign: isset($mObj->channeledCampaign) ? (is_object($mObj->channeledCampaign) ? (method_exists($mObj->channeledCampaign, 'getPlatformId') ? $mObj->channeledCampaign->getPlatformId() : (string)$mObj->channeledCampaign) : (string)$mObj->channeledCampaign) : null,
+                channeledAdGroup: isset($mObj->channeledAdGroup) ? (is_object($mObj->channeledAdGroup) ? (method_exists($mObj->channeledAdGroup, 'getPlatformId') ? $mObj->channeledAdGroup->getPlatformId() : (string)$mObj->channeledAdGroup) : (string)$mObj->channeledAdGroup) : null,
+                channeledAd: isset($mObj->channeledAd) ? (is_object($mObj->channeledAd) ? (method_exists($mObj->channeledAd, 'getPlatformId') ? $mObj->channeledAd->getPlatformId() : (string)$mObj->channeledAd) : (string)$mObj->channeledAd) : null,
+                page: isset($mObj->page) ? (is_object($mObj->page) ? (method_exists($mObj->page, 'getUrl') ? $mObj->page->getUrl() : (string)$mObj->page) : (string)$mObj->page) : null,
+                query: $mObj->query ?? null,
+                post: isset($mObj->post) ? (is_object($mObj->post) ? (method_exists($mObj->post, 'getPostId') ? $mObj->post->getPostId() : (string)$mObj->post) : (string)$mObj->post) : null,
+                product: isset($mObj->product) ? (is_object($mObj->product) ? (method_exists($mObj->product, 'getProductId') ? $mObj->product->getProductId() : (string)$mObj->product) : (string)$mObj->product) : null,
+                customer: isset($mObj->customer) ? (is_object($mObj->customer) ? (method_exists($mObj->customer, 'getEmail') ? $mObj->customer->getEmail() : (string)$mObj->customer) : (string)$mObj->customer) : null,
                 order: isset($metric->order) ? (is_object($metric->order) ? $metric->order->getOrderId() : (string)$metric->order) : null,
                 country: $metric->countryCode ?? null,
                 device: $metric->deviceType ?? null,
