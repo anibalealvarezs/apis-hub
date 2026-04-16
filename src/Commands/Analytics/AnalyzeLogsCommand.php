@@ -18,8 +18,8 @@ class AnalyzeLogsCommand extends Command
 {
     protected function configure(): void
     {
-        $this->addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'Limit of errors to show per file', 5)
-             ->addOption('hours', 't', InputOption::VALUE_OPTIONAL, 'Scan logs from the last X hours', 24);
+        $this->addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'Limit of errors to show per file', '5')
+             ->addOption('hours', 't', InputOption::VALUE_OPTIONAL, 'Scan logs from the last X hours', '24');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
