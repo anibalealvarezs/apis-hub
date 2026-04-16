@@ -59,7 +59,7 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
             rows: $rows,
             logger: null,
             account: $accountEntity,
-            channeledAccountPlatformId: $channeledAccountPlatformId,
+            channeledAccount: $channeledAccountPlatformId,
             period: Period::Daily,
             metricSet: MetricSet::FULL,
         );

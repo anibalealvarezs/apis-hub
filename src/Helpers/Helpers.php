@@ -4,6 +4,7 @@ namespace Helpers;
 
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\ORMSetup;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\Persistence\Proxy;
@@ -1183,7 +1184,7 @@ class Helpers
      * @param EntityManager $em
      * @return void
      */
-    public static function reconnectIfNeeded(EntityManager &$em): void
+    public static function reconnectIfNeeded(EntityManagerInterface &$em): void
     {
         if (!$em->isOpen()) {
             $em = self::getManager();
