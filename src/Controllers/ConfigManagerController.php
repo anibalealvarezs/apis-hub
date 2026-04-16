@@ -594,7 +594,7 @@ class ConfigManagerController extends BaseController
 
     private function getOrCreateAccount(string $name): Account
     {
-        $accountEntity = $this->em->getRepository(Account::class)->getByName($name);
+        $accountEntity = $this->em->getRepository(Account::class)->findOneBy(['name' => $name]);
         if (! $accountEntity) {
             $accountEntity = new Account();
             $accountEntity->addName($name);
