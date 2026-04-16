@@ -34,7 +34,7 @@ class OAuthDispatcherController
             $redirectUri = $this->getRedirectUri($request, $channel);
             $authUrl = $authProvider->getAuthUrl($redirectUri, $config);
 
-            return new RedirectResponse($authUrl);
+            return new Response('', 302, ['Location' => $authUrl]);
         } catch (\Exception $e) {
             return new Response("Authentication Start Error: " . $e->getMessage(), 500);
         }
