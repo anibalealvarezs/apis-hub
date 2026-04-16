@@ -33,8 +33,8 @@ class MarketingProcessor
         // 1. Bulk Insert/Update campaigns (Global)
         $campaignIds = [];
         foreach ($campaigns as $c) {
-            if (!$c instanceof \stdClass) continue;
-            /** @var \stdClass $c */
+            if (!is_object($c)) continue;
+            /** @var object{platformId: string|int} $c */
             $campaignIds[] = $c->platformId;
         }
 
@@ -46,8 +46,8 @@ class MarketingProcessor
             foreach (array_chunk($campaigns, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $c) {
-                    if (!$c instanceof \stdClass) continue;
-                    /** @var \stdClass $c */
+                    if (!is_object($c)) continue;
+                    /** @var object{platformId: string|int, name: string, startDate: ?\Carbon\Carbon, endDate: ?\Carbon\Carbon} $c */
                     $params[] = $c->platformId;
                     $params[] = $c->name;
                     $params[] = $c->startDate ? $c->startDate->toDateTimeString() : null;
@@ -84,8 +84,8 @@ class MarketingProcessor
             foreach (array_chunk($campaigns, $chunkSize) as $chunk) {
                 $channeledParams = [];
                 foreach ($chunk as $c) {
-                    if (!$c instanceof \stdClass) continue;
-                    /** @var \stdClass $c */
+                    if (!is_object($c)) continue;
+                    /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, budget: mixed, status: string, objective: string, buyingType: string, data: mixed} $c */
                     $channeledParams[] = $c->channel;
                     $channeledParams[] = $c->platformId;
                     $channeledParams[] = $campaignMap[$c->platformId] ?? null;
@@ -150,8 +150,8 @@ class MarketingProcessor
             foreach (array_chunk($adsets, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $a) {
-                    if (!$a instanceof \stdClass) continue;
-                    /** @var \stdClass $a */
+                    if (!is_object($a)) continue;
+                    /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, channeledCampaignId: string|int, name: string, startDate: ?\Carbon\Carbon, endDate: ?\Carbon\Carbon, status: string, optimizationGoal: string, billingEvent: string, targeting: mixed, data: mixed} $a */
                     $params[] = $a->channel;
                     $params[] = $a->platformId;
                     $params[] = $a->channeledAccountId;
@@ -238,8 +238,8 @@ class MarketingProcessor
             foreach (array_chunk($ads, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $a) {
-                    if (!$a instanceof \stdClass) continue;
-                    /** @var \stdClass $a */
+                    if (!is_object($a)) continue;
+                    /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, channeledCampaignId: string|int, channeledAdGroupId: string|int, channeledCreativeId: string|int, name: string, status: string, data: mixed} $a */
                     $params[] = $a->channel;
                     $params[] = $a->platformId;
                     $params[] = $a->channeledAccountId;
@@ -287,8 +287,8 @@ class MarketingProcessor
             foreach (array_chunk($creatives, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $c) {
-                    if (!$c instanceof \stdClass) continue;
-                    /** @var \stdClass $c */
+                    if (!is_object($c)) continue;
+                    /** @var object{platformId: string|int, name: string, data: mixed} $c */
                     $params[] = $c->platformId;
                     $params[] = $c->name;
                     $params[] = json_encode($c->data);
