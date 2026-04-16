@@ -24,6 +24,7 @@ trait CalculatesMetricDeltas
     {
         $lifetimeMetrics = [];
         foreach ($metrics as $metric) {
+            if (!$metric) continue;
             // Only process lifetime metrics that don't have a virtual counterpart yet
             if (($metric->period ?? null) === Period::Lifetime->value) {
                 $lifetimeMetrics[] = $metric;
