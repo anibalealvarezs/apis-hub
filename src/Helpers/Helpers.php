@@ -1288,49 +1288,7 @@ class Helpers
      */
     public static function getCanonicalPageId(string $url, string|int|null $platformId = null, string|null $type = null, string|null $hostname = null): string
     {
-        $prefix = null;
-        $urlIdRegex = null;
-
-        // 1. Resolve prefix by type if provided
-        if ($type) {
-            $assetPattern = \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::findByType($type);
-            if ($assetPattern) {
-                $prefix = $assetPattern['prefix'];
-                $urlIdRegex = $assetPattern['url_id_regex'] ?? null;
-            }
-        }
-
-        if (! $prefix && $hostname) {
-            $assetPattern = \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::findByHostname($hostname);
-            if ($assetPattern) {
-                $prefix = $assetPattern['prefix'];
-                $urlIdRegex = $assetPattern['url_id_regex'] ?? null;
-            }
-        }
-
-        // 3. Normalized URL processing
-        $normalizedUrl = preg_replace('~^https?://(?:www\.)?~i', '', $url);
-        $normalizedUrl = rtrim($normalizedUrl, '/');
-        $normalizedUrl = strtolower($normalizedUrl);
-
-        // 4. Extract ID from URL if regex is available
-        if (! $platformId && $urlIdRegex) {
-            if (preg_match($urlIdRegex, $normalizedUrl, $matches)) {
-                $platformId = $matches[1];
-            }
-        }
-
-        // 5. Build canonical ID
-        if ($platformId && $prefix) {
-            return "{$prefix}:{$platformId}";
-        }
-
-        // 6. Last resort fallback
-        if ($prefix) {
-            return "{$prefix}:" . md5($normalizedUrl);
-        }
-
-        return "site:domain:" . $normalizedUrl;
+        return \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::getCanonicalId($url, $platformId, $type, $hostname);
     }
 
     /**

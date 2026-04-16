@@ -367,10 +367,41 @@ class MetricsProcessor
 
     public static function processPages(ArrayCollection $metrics, EntityManager $manager): array
     {
-        return [
-            'map' => [],
-            'mapReverse' => [],
-        ];
+        $platformIds = [];
+        $canonicalIds = [];
+        foreach ($metrics as $metric) {
+            if (isset($metric->page)) {
+                $pId = is_object($metric->page) ? $metric->page->getPlatformId() : (string)$metric->page;
+                if ($pId) {
+                    if (str_starts_with($pId, 'http') || str_contains($pId, '/')) {
+                        $canonicalIds[] = \Helpers\Helpers::getCanonicalPageId($pId, null, 'website');
+                    } else {
+                        $platformIds[] = $pId;
+                    }
+                }
+            }
+        }
+        $platformIds = array_unique(array_filter($platformIds));
+        $canonicalIds = array_unique(array_filter($canonicalIds));
+
+        if (empty($platformIds) && empty($canonicalIds)) {
+            return ['map' => [], 'mapReverse' => []];
+        }
+
+        $conditions = [];
+        if (!empty($platformIds)) $conditions[] = "platform_id IN (".implode(',', array_fill(0, count($platformIds), '?')).")";
+        if (!empty($canonicalIds)) $conditions[] = "canonical_id IN (".implode(',', array_fill(0, count($canonicalIds), '?')).")";
+        
+        $sql = "SELECT id, platform_id, canonical_id FROM pages WHERE " . implode(" OR ", $conditions);
+        $results = $manager->getConnection()->executeQuery($sql, array_merge($platformIds, $canonicalIds))->fetchAllAssociative();
+
+        $map = []; $mapReverse = [];
+        foreach ($results as $row) {
+            if ($row['platform_id']) $map[$row['platform_id']] = (int) $row['id'];
+            if ($row['canonical_id']) $map[$row['canonical_id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['canonical_id'] ?? $row['platform_id'];
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
     /**
@@ -380,10 +411,27 @@ class MetricsProcessor
      */
     public static function processPosts(ArrayCollection $metrics, EntityManager $manager): array
     {
-        return [
-            'map' => [],
-            'mapReverse' => [],
-        ];
+        $ids = [];
+        foreach ($metrics as $metric) {
+            if (isset($metric->post)) {
+                $ids[] = is_object($metric->post) ? $metric->post->getPostId() : (string)$metric->post;
+            }
+        }
+        $ids = array_unique($ids);
+        if (empty($ids)) return ['map' => [], 'mapReverse' => []];
+
+        $results = $manager->getConnection()->executeQuery(
+            "SELECT id, post_id FROM posts WHERE post_id IN (?)",
+            [$ids],
+            [\Doctrine\DBAL\ArrayParameterType::STRING]
+        )->fetchAllAssociative();
+
+        $map = []; $mapReverse = [];
+        foreach ($results as $row) {
+            $map[$row['post_id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['post_id'];
+        }
+        return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
     /**

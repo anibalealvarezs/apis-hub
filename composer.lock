@@ -169,13 +169,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-driver-core.git",
-                "reference": "64974c2ada3e603b12d54c17da118c48ed5ff0cb"
+                "reference": "32c1791806159544d0aa42ff8aa1409d3cce0d3c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-64974c2ada3e603b12d54c17da118c48ed5ff0cb-zip-aa5f07.zip",
-                "reference": "64974c2ada3e603b12d54c17da118c48ed5ff0cb",
-                "shasum": "7bbf86834748e563b24d1772bd88b3aefa83c46b"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-32c1791806159544d0aa42ff8aa1409d3cce0d3c-zip-7b2b1a.zip",
+                "reference": "32c1791806159544d0aa42ff8aa1409d3cce0d3c",
+                "shasum": "58ef2a9da37e87e867b4d7ba6a505a787736e354"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -205,7 +205,7 @@
                 }
             ],
             "description": "Core interfaces and orchestration logic for APIs Hub drivers.",
-            "time": "2026-04-14T13:58:46+00:00"
+            "time": "2026-04-16T01:41:42+00:00"
         },
         {
             "name": "anibalealvarezs/bigcommerce-hub-driver",
@@ -388,13 +388,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "d709282d94083228466e93ab6f0f669dd0e0b9ff"
+                "reference": "afba24889edf45dcb23e2b00ed8d24d1e656510a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-d709282d94083228466e93ab6f0f669dd0e0b9ff-zip-b7724e.zip",
-                "reference": "d709282d94083228466e93ab6f0f669dd0e0b9ff",
-                "shasum": "f3ce1f035ebbef6c3654dd073fd14560a6174ed7"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-afba24889edf45dcb23e2b00ed8d24d1e656510a-zip-db786c.zip",
+                "reference": "afba24889edf45dcb23e2b00ed8d24d1e656510a",
+                "shasum": "cc921b0a51e93613300c8d2ecb7237b2d05aaf58"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -418,7 +418,7 @@
                 "MIT"
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-04-15T19:09:57+00:00"
+            "time": "2026-04-16T02:00:07+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -559,13 +559,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "4644a4b366c6ccf27f0f984d5ff755fa9189afa4"
+                "reference": "09732f0a5142c1b2e2a35f9be35467b17443cca0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-4644a4b366c6ccf27f0f984d5ff755fa9189afa4-zip-dee385.zip",
-                "reference": "4644a4b366c6ccf27f0f984d5ff755fa9189afa4",
-                "shasum": "1428ce04098d42ae84def39a6e772a719ab24fd9"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-09732f0a5142c1b2e2a35f9be35467b17443cca0-zip-e136f2.zip",
+                "reference": "09732f0a5142c1b2e2a35f9be35467b17443cca0",
+                "shasum": "e740ab8a51ff041752cff6ccdcabf92d805b4fb0"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -589,7 +589,7 @@
                 "MIT"
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-04-15T15:24:26+00:00"
+            "time": "2026-04-16T02:00:06+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
