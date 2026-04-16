@@ -7,7 +7,7 @@ use Entities\Analytics\Channeled\DimensionSet;
 use Entities\Analytics\Channeled\DimensionValue;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Anibalealvarezs\ApiDriverCore\Interfaces\DimensionManagerInterface;
-use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityManagerInterface;
 
 class DimensionManager implements DimensionManagerInterface
 {
@@ -15,7 +15,7 @@ class DimensionManager implements DimensionManagerInterface
     private array $valueCache = [];
     private array $setCache = [];
 
-    public function __construct(private EntityManager $em)
+    public function __construct(private EntityManagerInterface $em)
     {
     }
 
