@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Traits;
 
-use Carbon\Carbon;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\ORM\EntityManager;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
+use Carbon\Carbon;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\ORM\EntityManager;
 use stdClass;
 
 trait CalculatesMetricDeltas
@@ -16,15 +16,17 @@ trait CalculatesMetricDeltas
     /**
      * Identifies lifetime metrics in the collection and adds virtual daily counterparts.
      *
-     * @param ArrayCollection $metrics
+     * @param Collection $metrics
      * @param EntityManager $manager
      * @return void
      */
-    public static function injectVirtualDailyMetrics(ArrayCollection $metrics, EntityManager $manager): void
+    public static function injectVirtualDailyMetrics(Collection $metrics, EntityManager $manager): void
     {
         $lifetimeMetrics = [];
         foreach ($metrics as $metric) {
-            if (!$metric instanceof \stdClass) continue;
+            if (! $metric instanceof stdClass) {
+                continue;
+            }
             /** @var \stdClass $metric */
             if (($metric->period ?? null) === Period::Lifetime->value) {
                 $lifetimeMetrics[] = $metric;
@@ -39,7 +41,7 @@ trait CalculatesMetricDeltas
         $signatures = [];
         foreach ($lifetimeMetrics as $metric) {
             $yesterdayDate = Carbon::parse($metric->metricDate)->subDay()->toDateString();
-            
+
             $signature = KeyGenerator::generateMetricConfigKey(
                 channel: $metric->channel,
                 name: $metric->name,
@@ -61,7 +63,7 @@ trait CalculatesMetricDeltas
                 creative: isset($metric->creative) ? (is_object($metric->creative) ? $metric->creative->getCreativeId() : (string)$metric->creative) : null,
                 dimensionSet: $metric->dimensionsHash ?? null,
             );
-            
+
             $metric->atemporalSignature = $signature;
             $metric->yesterdayDate = $yesterdayDate;
             $signatures[] = $signature;
@@ -69,7 +71,7 @@ trait CalculatesMetricDeltas
 
         // 2. Batch lookup previous values from database
         $previousValuesMap = [];
-        if (!empty($signatures)) {
+        if (! empty($signatures)) {
             $chunks = array_chunk($lifetimeMetrics, 1000);
             foreach ($chunks as $chunk) {
                 $params = [];
@@ -84,7 +86,7 @@ trait CalculatesMetricDeltas
                         FROM metrics m 
                         JOIN metric_configs mc ON m.metric_config_id = mc.id 
                         WHERE (mc.config_signature, m.metric_date) IN ($placeholders)";
-                
+
                 $results = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
                 foreach ($results as $row) {
                     $key = $row['config_signature'] . '|' . $row['metric_date'];
@@ -98,14 +100,14 @@ trait CalculatesMetricDeltas
             $lookupKey = $metric->atemporalSignature . '|' . $metric->yesterdayDate;
             $prevValue = $previousValuesMap[$lookupKey] ?? 0;
             $delta = (float)$metric->value - $prevValue;
-            
+
             // Create daily virtual metric
             $virtual = clone $metric;
             $virtual->name = $metric->name . '_daily';
             $virtual->period = Period::Daily->value;
             $virtual->value = max(0, $delta);
             $virtual->isVirtualDelta = true;
-            
+
             // Re-generate the config key for the new daily metric
             $virtual->metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: $virtual->channel,

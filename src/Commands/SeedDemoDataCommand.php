@@ -168,7 +168,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
                 metrics: $metrics,
                 manager: $this->entityManager,
                 metricMap: $metricMap,
-                logger: \Helpers\Helpers::setLogger('metrics.log')
+                logger: Helpers::setLogger('metrics.log')
             );
 
             $this->entityManager->flush();
