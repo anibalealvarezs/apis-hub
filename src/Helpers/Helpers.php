@@ -767,16 +767,16 @@ class Helpers
                     'password' => null,
                 ];
 
-                self::$redisClient = new Client($config);
-                self::$redisClient->ping();
+                /** @var ClientInterface $client */
+                $client = new Client($config);
+                $client->ping();
+                self::$redisClient = $client;
             } catch (Exception $e) {
                 if (getenv('APP_ENV') === 'testing' || (defined('PHPUNIT_COMPOSER_INSTALL') || defined('__PHPUNIT_PHAR__'))) {
                     // During tests, we log the failure but don't crash everything
                     error_log('Redis initialization failed during tests: ' . $e->getMessage());
-
-                    // We keep the client instance even if ping failed,
-                    // downstream code will fail specifically if it actually tries to use it.
-                    return self::$redisClient;
+                    // Create a dummy client if real initialization failed to satisfy type hint
+                    return new Client(['host' => 'localhost', 'port' => 6379, 'timeout' => 0.1]);
                 }
 
                 throw new RuntimeException('Failed to initialize Redis client: ' . $e->getMessage());
