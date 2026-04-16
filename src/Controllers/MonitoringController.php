@@ -26,7 +26,7 @@ class MonitoringController extends BaseController
         // 1. Direct match by instance_name (the most reliable)
         if (isset($payload['instance_name'])) return $payload['instance_name'];
 
-        $chanRaw = $job instanceof Job ? $job->getChannel() : $row['channel'] ?? $job['channel'];
+        $chanRaw = $job instanceof Job ? $job->getChannel() : $job['channel'] ?? null;
         
         // Canonical Channel Name (always lowercase string)
         $chan = null;
