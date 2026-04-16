@@ -103,54 +103,40 @@ class ConfigManagerController extends BaseController
                 try {
                     $chanConfig = $systemConfig['channels'][$chan] ?? [];
 
-                    // Fast Load Logic: Avoid slow driver instantiation unless refreshing
+                    // Always call prepareUiConfig for enabled channels or if this is the requested type
+                    $isRequestedType = $requestedType && ($chan === $requestedType || str_contains($chan, $requestedType));
+                    $isEnabled = $chanConfig['enabled'] ?? false;
+
+                    if ($isEnabled || $isRequestedType || $forceRefresh) {
+                        $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
+                        $uiConfig = $driver->prepareUiConfig($chanConfig);
+                        $currentConfig = array_replace_recursive($currentConfig, $uiConfig);
+                    }
+
+                    // Fast Load Logic for Assets: Populate basic asset lists without full discovery
                     if (!$forceRefresh) {
-                        // Populate common UI config keys directly from YAML
                         if ($chan === 'google_search_console') {
-                            $currentConfig['gsc_enabled'] = $chanConfig['enabled'] ?? false;
-                            $currentConfig['gsc_cache_history_range'] = $chanConfig['cache_history_range'] ?? '16 months';
-                            $currentConfig['gsc'] = [];
                             if (isset($chanConfig['sites'])) {
                                 $allAssets['gsc'] = array_values($chanConfig['sites']);
-                                foreach ($chanConfig['sites'] as $site) {
-                                    if (isset($site['url'])) {
-                                        $currentConfig['gsc'][$site['url']] = $site;
-                                    }
-                                }
                             }
                         } elseif (str_contains($chan, 'facebook_organic')) {
-                            $currentConfig['facebook_organic_enabled'] = $chanConfig['enabled'] ?? false;
                             if (isset($chanConfig['pages'])) {
                                 $allAssets['facebook_pages'] = array_merge($allAssets['facebook_pages'] ?? [], array_values($chanConfig['pages']));
-                                $currentConfig['fb_pages_full_config'] = $chanConfig['pages'];
                             }
                         } elseif ($chan === 'facebook_marketing') {
-                            $currentConfig['facebook_marketing_enabled'] = $chanConfig['enabled'] ?? false;
                             if (isset($chanConfig['ad_accounts'])) {
                                 $allAssets['facebook_ad_accounts'] = array_values($chanConfig['ad_accounts']);
-                                $currentConfig['fb_ad_account_ids'] = $chanConfig['ad_account_ids'] ?? [];
                             }
                         }
                         
-                        // If it's not a requested type for asset discovery, we skip the rest of the driver-heavy stuff
-                        if (!$requestedType || ($chan !== $requestedType && !str_contains($chan, $requestedType))) {
+                        // If it's not a requested type for asset discovery, we skip the slow Discovery part
+                        if (!$isRequestedType) {
                              continue; 
                         }
                     }
 
-                    // For forced refresh or specific requested type discovery, we still need the driver
-                    $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
-
-                    // 1. Update UI Config
-                    $uiConfig = $driver->prepareUiConfig($chanConfig);
-                    $currentConfig = array_replace_recursive($currentConfig, $uiConfig);
-
-                    // 2. Fetch Assets if needed
-                    if ($requestedType && $chan !== $requestedType && ! str_contains($chan, $requestedType)) {
-                        continue;
-                    }
-
-                    if ($forceRefresh) {
+                    // 2. Fetch Assets if needed (Discovery)
+                    if ($isRequestedType && $forceRefresh) {
                         $driverAssets = $driver->fetchAvailableAssets();
                         // Mix with previous assets to detect "NEW" and "LOST ACCESS"
                         foreach ($driverAssets as $assetKey => $assetList) {

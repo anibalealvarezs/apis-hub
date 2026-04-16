@@ -627,14 +627,14 @@ class MetricsProcessor
                 'channel' => $channelId,
                 'name' => $metric->name,
                 'period' => $metric->period,
-                'account_id' => isset($metric->account) ? (is_object($metric->account) ? ($accountMap['map'][$metric->account->getId() ?? 0] ?? null) : null) : null,
-                'channeled_account_id' => isset($metric->channeledAccount) ? ($channeledAccountMap['map'][is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount] ?? null) : (isset($metric->channeledAccountPlatformId) ? ($channeledAccountMap['map'][$metric->channeledAccountPlatformId] ?? null) : null),
+                'account_id' => isset($metric->account) ? ($accountMap['map'][$metric->account->getId() ?? 0] ?? null) : null,
+                'channeled_account_id' => self::resolveChanneledAccountId($metric, $channeledAccountMap),
                 'campaign_id' => isset($metric->campaign) ? ($campaignMap['map'][is_object($metric->campaign) ? $metric->campaign->getCampaignId() : (string)$metric->campaign] ?? null) : (isset($metric->campaignPlatformId) ? ($campaignMap['map'][$metric->campaignPlatformId] ?? null) : null),
                 'channeled_campaign_id' => isset($metric->channeledCampaign) ? ($channeledCampaignMap['map'][is_object($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : (string)$metric->channeledCampaign] ?? null) : (isset($metric->channeledCampaignPlatformId) ? ($channeledCampaignMap['map'][$metric->channeledCampaignPlatformId] ?? null) : null),
                 'channeled_ad_group_id' => isset($metric->channeledAdGroup) ? ($channeledAdGroupMap['map'][is_object($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : (string)$metric->channeledAdGroup] ?? null) : (isset($metric->channeledAdGroupPlatformId) ? ($channeledAdGroupMap['map'][$metric->channeledAdGroupPlatformId] ?? null) : null),
                 'channeled_ad_id' => isset($metric->channeledAd) ? ($channeledAdMap['map'][is_object($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : (string)$metric->channeledAd] ?? null) : (isset($metric->channeledAdPlatformId) ? ($channeledAdMap['map'][$metric->channeledAdPlatformId] ?? null) : null),
                 'query_id' => isset($metric->query) ? ($queryMap['map'][$metric->query] ?? null) : null,
-                'page_id' => isset($metric->page) ? ($pageMap['map'][is_object($metric->page) ? $metric->page->getPlatformId() : (string)$metric->page] ?? null) : null,
+                'page_id' => self::resolvePageId($metric, $pageMap),
                 'post_id' => isset($metric->post) ? ($postMap['map'][is_object($metric->post) ? $metric->post->getPostId() : (string)$metric->post] ?? null) : null,
                 'product_id' => isset($metric->product) ? ($productMap['map'][is_object($metric->product) ? $metric->product->getProductId() : (string)$metric->product] ?? null) : null,
                 'customer_id' => isset($metric->customer) ? ($customerMap['map'][is_object($metric->customer) ? $metric->customer->getEmail() : (string)$metric->customer] ?? null) : null,
@@ -1110,6 +1110,36 @@ class MetricsProcessor
         }
 
         return ['map' => $channeledMetricMap, 'mapReverse' => $flipped];
+    }
+
+    private static function resolveChanneledAccountId(object $metric, array $channeledAccountMap): ?int
+    {
+        if (!isset($metric->channeledAccount) && !isset($metric->channeledAccountPlatformId)) return null;
+
+        $pId = isset($metric->channeledAccount) 
+            ? (is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount) 
+            : $metric->channeledAccountPlatformId;
+            
+        return $channeledAccountMap['map'][$pId] ?? null;
+    }
+
+    private static function resolvePageId(object $metric, array $pageMap): ?int
+    {
+        if (!isset($metric->page)) return null;
+
+        $pId = is_object($metric->page) ? $metric->page->getPlatformId() : (string)$metric->page;
+        if (!$pId) return null;
+
+        // Try direct platform ID mapping
+        if (isset($pageMap['map'][$pId])) return $pageMap['map'][$pId];
+
+        // Try canonical ID mapping
+        if (str_starts_with($pId, 'http') || str_contains($pId, '/')) {
+            $canonicalId = \Helpers\Helpers::getCanonicalPageId($pId, null, 'website');
+            return $pageMap['map'][$canonicalId] ?? null;
+        }
+
+        return null;
     }
 
     private static function resolveLogger(?LoggerInterface $logger = null, ?string $channel = null): LoggerInterface
