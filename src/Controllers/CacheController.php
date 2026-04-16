@@ -421,8 +421,6 @@ class CacheController extends BaseController
                 jobId: $jobId,
                 filters: is_array($params) ? (object)$params : $params
             );
-
-            return json_decode($response->getContent(), true) ?: [];
         } catch (InvalidArgumentException $e) {
             return $this->createResponse(
                 data: null,
