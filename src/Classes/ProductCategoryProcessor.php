@@ -34,14 +34,18 @@ class ProductCategoryProcessor
         $uCProd = []; // for collects
 
         foreach ($channeledCollection as $cpc) {
-            $chan = (string)$cpc->channel;
-            $catPId = (string)$cpc->platformId;
+            if (!$cpc) continue;
+            $cpcObj = (object)$cpc;
+            /** @var object{channel: string|int, platformId: string|int, isSmartCollection: ?bool, platformCreatedAt: ?mixed, platform_created_at: ?mixed, data: mixed} $cpcObj */
+            
+            $chan = (string)($cpcObj->channel ?? '');
+            $catPId = (string)($cpcObj->platformId ?? '');
 
             $cKey = KeyGenerator::generateProductCategoryKey($catPId);
             if (!isset($uCat[$cKey])) {
                 $uCat[$cKey] = [
                     'product_category_id' => $catPId,
-                    'is_smart_collection' => $cpc->isSmartCollection ?? false,
+                    'is_smart_collection' => $cpcObj->isSmartCollection ?? false,
                 ];
             }
 
@@ -51,9 +55,9 @@ class ProductCategoryProcessor
                     'categoryPId' => $catPId,
                     'channel' => $chan,
                     'platform_id' => $catPId,
-                    'platform_created_at' => isset($cpc->platformCreatedAt) ? $cpc->platformCreatedAt : (isset($cpc->platform_created_at) ? $cpc->platform_created_at : null),
-                    'is_smart_collection' => $cpc->isSmartCollection ?? false,
-                    'data' => is_object($cpc->data) ? clone $cpc->data : (object)($cpc->data ?? []),
+                    'platform_created_at' => $cpcObj->platformCreatedAt ?? ($cpcObj->platform_created_at ?? null),
+                    'is_smart_collection' => $cpcObj->isSmartCollection ?? false,
+                    'data' => is_object($cpcObj->data ?? null) ? clone $cpcObj->data : (object)($cpcObj->data ?? []),
                 ];
             }
 
@@ -188,7 +192,8 @@ class ProductCategoryProcessor
             $pivotInserts = [];
             foreach ($collects as $catPId => $prodIds) {
                 foreach ($prodIds as $prodId) {
-                    $chan = (string)$channeledCollection->first()->channel; // Assuming single channel per run
+                    $first = $channeledCollection->first();
+                    $chan = is_object($first) ? (string)($first->channel ?? '') : '';
 
                     $ccKey = KeyGenerator::generateChanneledProductCategoryKey($chan, (string)$catPId);
                     $cpKey = KeyGenerator::generateChanneledProductKey($chan, (string)$prodId);
