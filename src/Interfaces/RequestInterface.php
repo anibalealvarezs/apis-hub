@@ -2,11 +2,10 @@
 
 namespace Interfaces;
 
-use Doctrine\Common\Collections\ArrayCollection;
 use Anibalealvarezs\ApiSkeleton\Enums\Channel;
-use Symfony\Component\HttpFoundation\Response;
-
+use Doctrine\Common\Collections\ArrayCollection;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\Response;
 
 interface RequestInterface
 {
@@ -14,7 +13,7 @@ interface RequestInterface
      * @param ArrayCollection $channeledCollection
      * @return Response
      */
-    public static function process(ArrayCollection $channeledCollection): Response;
+    public static function process(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response;
 
     /**
      * @param Channel|string $channel
@@ -29,8 +28,8 @@ interface RequestInterface
         Channel|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
-        ?\Psr\Log\LoggerInterface $logger = null,
+        ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
-    ): \Symfony\Component\HttpFoundation\Response;
+    ): Response;
 }

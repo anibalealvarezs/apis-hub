@@ -7,8 +7,8 @@ namespace Traits;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Carbon\Carbon;
-use Doctrine\Common\Collections\Collection;
-use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\EntityManager;
 use stdClass;
 
 trait CalculatesMetricDeltas
@@ -16,11 +16,11 @@ trait CalculatesMetricDeltas
     /**
      * Identifies lifetime metrics in the collection and adds virtual daily counterparts.
      *
-     * @param Collection $metrics
-     * @param EntityManagerInterface $manager
+     * @param ArrayCollection $metrics
+     * @param EntityManager $manager
      * @return void
      */
-    public static function injectVirtualDailyMetrics(Collection $metrics, EntityManagerInterface $manager): void
+    public static function injectVirtualDailyMetrics(ArrayCollection $metrics, EntityManager $manager): void
     {
         $lifetimeMetrics = [];
         foreach ($metrics as $metric) {

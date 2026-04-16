@@ -23,11 +23,11 @@ use Entities\Analytics\Query;
 
 class ProductionEntityMapper implements SeederInterface
 {
-    public function __construct(private EntityManagerInterface $entityManager)
+    public function __construct(private \Doctrine\ORM\EntityManager $entityManager)
     {
     }
 
-    public function getEntityManager(): EntityManagerInterface
+    public function getEntityManager(): \Doctrine\ORM\EntityManager
     {
         return $this->entityManager;
     }

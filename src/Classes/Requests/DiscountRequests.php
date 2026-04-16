@@ -44,7 +44,7 @@ class DiscountRequests implements RequestInterface
      * @param ArrayCollection $channeledCollection
      * @return Response
      */
-    public static function process(ArrayCollection $channeledCollection): Response
+    public static function process(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response
     {
         // TODO: Implement process() method.
 

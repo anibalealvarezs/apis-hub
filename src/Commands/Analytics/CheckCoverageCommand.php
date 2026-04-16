@@ -19,14 +19,16 @@ class CheckCoverageCommand extends Command
 {
     protected function configure(): void
     {
-        $this->addOption(name: 'channel', shortcut: 'c', mode: InputOption::VALUE_REQUIRED, description: 'The channel name')
-             ->addOption(name: 'days', shortcut: 'd', mode: InputOption::VALUE_OPTIONAL, description: 'Number of days to look back', default: '30');
+        $this->addOption('channel', 'c', InputOption::VALUE_REQUIRED, 'The channel name');
+        $this->addOption('days', 'd', InputOption::VALUE_OPTIONAL, 'Number of days to look back (default: 30)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $channelName = $input->getOption('channel');
-        $days = (int) $input->getOption('days');
+        
+        $daysOpt = $input->getOption('days');
+        $days = (int) ($daysOpt !== null ? $daysOpt : 30);
 
         if (! $channelName) {
             $output->writeln("<error>Error: --channel option is required.</error>");

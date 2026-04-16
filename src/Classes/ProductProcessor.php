@@ -4,7 +4,6 @@ namespace Classes;
 
 use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Helpers\Helpers;
@@ -12,7 +11,7 @@ use Helpers\Helpers;
 class ProductProcessor
 {
     /**
-     * @param ArrayCollection $channeledCollection
+     * @param Collection $channeledCollection
      * @param EntityManager $manager
      * @return array
      * @throws Exception
@@ -622,3 +621,5 @@ class ProductProcessor
         }
     }
 }
+
+

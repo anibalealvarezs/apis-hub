@@ -31,10 +31,10 @@ class OrderRequests implements RequestInterface
         Channel|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
-        ?\Psr\Log\LoggerInterface $logger = null,
+        ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
-    ): \Symfony\Component\HttpFoundation\Response {
+    ): Response {
         $chanKey = ($channel instanceof Channel) ? $channel->name : (string)$channel;
         $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
         $mapping = $driver->getDateFilterMapping();
@@ -60,7 +60,7 @@ class OrderRequests implements RequestInterface
      * @return Response
      * @throws ORMException
      */
-    public static function process(ArrayCollection $channeledCollection): Response
+    public static function process(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response
     {
         try {
             $manager = Helpers::getManager();

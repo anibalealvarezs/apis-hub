@@ -59,9 +59,9 @@ class PriceRuleRequests implements RequestInterface
      * @return Response
      * @throws ORMException
      */
-    public static function process(ArrayCollection $channeledCollection): Response
+    public static function process(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response
     {
-        return self::processPriceRules(channeledCollection: $channeledCollection);
+        return self::processPriceRules(channeledCollection: $channeledCollection, logger: $logger);
     }
 
     /**
@@ -69,7 +69,7 @@ class PriceRuleRequests implements RequestInterface
      * @return Response
      * @throws ORMException
      */
-    public static function processPriceRules(ArrayCollection $channeledCollection): Response
+    public static function processPriceRules(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response
     {
         try {
             $manager = Helpers::getManager();

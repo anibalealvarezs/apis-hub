@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Doctrine\Common\Collections\ArrayCollection;
 use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Doctrine\Common\Collections\ArrayCollection;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;
@@ -27,10 +27,10 @@ class AdRequests implements RequestInterface
         Channel|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
-        ?\Psr\Log\LoggerInterface $logger = null,
+        ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
-    ): \Symfony\Component\HttpFoundation\Response {
+    ): Response {
         $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
         $chanKey = $chanEnum?->name ?? (string)$channel;
 

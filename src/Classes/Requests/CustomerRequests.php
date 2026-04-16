@@ -33,10 +33,10 @@ class CustomerRequests implements RequestInterface
         Channel|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
-        ?\Psr\Log\LoggerInterface $logger = null,
+        ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
-    ): \Symfony\Component\HttpFoundation\Response {
+    ): Response {
         $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
         $chanKey = $chanEnum?->name ?? (string)$channel;
         $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
@@ -65,7 +65,7 @@ class CustomerRequests implements RequestInterface
      * @throws ORMException
      * @throws OptimisticLockException
      */
-    public static function process(ArrayCollection $channeledCollection): Response
+    public static function process(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response
     {
         try {
             $manager = Helpers::getManager();

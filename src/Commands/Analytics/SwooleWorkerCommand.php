@@ -4,17 +4,14 @@ declare(strict_types=1);
 
 namespace Commands\Analytics;
 
-use Classes\Helpers;
 use Doctrine\ORM\EntityManager;
-use Entities\Job;
-use Enums\JobStatus;
+use Swoole\Process;
+use Swoole\Timer;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Swoole\Process;
-use Swoole\Timer;
 
 #[AsCommand(
     name: 'app:swoole-worker',
@@ -34,8 +31,8 @@ class SwooleWorkerCommand extends Command
 
     protected function configure(): void
     {
-        $this->addOption('workers', 'w', InputOption::VALUE_OPTIONAL, 'Number of worker processes', 2)
-             ->addOption('interval', 'i', InputOption::VALUE_OPTIONAL, 'Polling interval in seconds', 5);
+        $this->addOption(name: 'workers', shortcut: 'w', mode: InputOption::VALUE_OPTIONAL, description: 'Number of worker processes', default: 2)
+             ->addOption(name: 'interval', shortcut: 'i', mode: InputOption::VALUE_OPTIONAL, description: 'Polling interval in seconds', default: 5);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -54,10 +51,11 @@ class SwooleWorkerCommand extends Command
         for ($i = 0; $i < $workerCount; $i++) {
             $process = new Process(function (Process $worker) use ($i, $interval, $output) {
                 $output->writeln("Worker #{$i} started.");
-                
+
                 Timer::tick($interval, function () use ($i, $output) {
-                    if (!$this->running) {
+                    if (! $this->running) {
                         Timer::clearAll();
+
                         return;
                     }
 

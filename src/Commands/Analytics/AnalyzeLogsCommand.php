@@ -18,14 +18,17 @@ class AnalyzeLogsCommand extends Command
 {
     protected function configure(): void
     {
-        $this->addOption(name: 'limit', shortcut: 'l', mode: InputOption::VALUE_OPTIONAL, description: 'Limit of errors to show per file', default: '5')
-             ->addOption(name: 'hours', shortcut: 't', mode: InputOption::VALUE_OPTIONAL, description: 'Scan logs from the last X hours', default: '24');
+        $this->addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'Limit of errors to show per file (default: 5)');
+        $this->addOption('hours', 't', InputOption::VALUE_OPTIONAL, 'Scan logs from the last X hours (default: 24)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $limit = (int) $input->getOption('limit');
-        $hours = (int) $input->getOption('hours');
+        $limitOpt = $input->getOption('limit');
+        $limit = (int) ($limitOpt !== null ? $limitOpt : 5);
+        
+        $hoursOpt = $input->getOption('hours');
+        $hours = (int) ($hoursOpt !== null ? $hoursOpt : 24);
         $logDir = __DIR__ . '/../../../logs';
 
         $output->writeln("🔍 <info>Analyzing logs for errors (Last $hours hours)</info>\n");

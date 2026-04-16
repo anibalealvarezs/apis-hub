@@ -48,6 +48,7 @@ class ProductVariantRequests implements RequestInterface
      */
     public static function process(
         ArrayCollection $channeledCollection,
+        ?LoggerInterface $logger = null
     ): Response {
         // Pending
         return new Response(json_encode(['Variants processed']));

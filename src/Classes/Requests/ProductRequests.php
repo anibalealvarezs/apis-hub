@@ -59,7 +59,7 @@ class ProductRequests implements RequestInterface
      * @return Response
      * @throws ORMException
      */
-    public static function process(ArrayCollection $channeledCollection): Response
+    public static function process(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response
     {
         try {
             $manager = Helpers::getManager();
