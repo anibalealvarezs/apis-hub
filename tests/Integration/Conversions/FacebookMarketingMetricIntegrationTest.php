@@ -158,6 +158,10 @@ class FacebookMarketingMetricIntegrationTest extends BaseIntegrationTestCase
         );
 
         $this->assertCount(2, $collection);
+        $metric = $collection->first();
+        $this->assertEquals($campaignEntity, $metric->campaign);
+        $this->assertEquals($channeledCampaign, $metric->channeledCampaign);
+        $this->assertEquals($channeledAccount, $metric->channeledAccount);
     }
 
     public function testRobustness(): void

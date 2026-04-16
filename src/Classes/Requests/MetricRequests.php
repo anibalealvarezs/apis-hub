@@ -90,6 +90,11 @@ class MetricRequests implements RequestInterface
                 processQueries: true,
                 processAccounts: true,
                 processChanneledAccounts: true,
+                processCampaigns: true,
+                processChanneledCampaigns: true,
+                processChanneledAdGroups: true,
+                processChanneledAds: true,
+                processCreatives: true,
                 processDimensions: true,
                 logger: $logger,
                 channel: (string)$channel

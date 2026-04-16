@@ -493,6 +493,7 @@ class MetricsProcessor
         bool $processCountries = false,
         bool $processDevices = false,
         bool $processDimensions = false,
+        bool $processCreatives = false,
         ?array $countryMap = null,
         ?array $deviceMap = null,
         ?array $dimensionSetMap = null,
@@ -592,6 +593,11 @@ class MetricsProcessor
         // Map orders
         if ($processOrders && !$orderMap) {
             $orderMap = self::processOrders($metrics, $manager);
+        }
+    
+        // Map creatives
+        if ($processCreatives && !$creativeMap) {
+            $creativeMap = self::processCreatives($metrics, $manager);
         }
 
         // Extract metrics from metrics
