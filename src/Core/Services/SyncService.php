@@ -161,7 +161,12 @@ class SyncService
                         
                         $criteria = [];
                         if (!empty($searchValues)) $criteria[$idField] = array_unique($searchValues);
-                        if ($type === 'channeled_accounts') $criteria['channel'] = $channel;
+                        if (in_array($type, ['channeled_accounts', 'channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
+                            $enum = \Anibalealvarezs\ApiSkeleton\Enums\Channel::tryFromName($channel);
+                            if ($enum) {
+                                $criteria['channel'] = $enum->value;
+                            }
+                        }
                         if ($type === 'posts' && isset($params['page_id'])) $criteria['page'] = $params['page_id'];
                         if ($type === 'posts' && isset($params['channeled_account_id'])) $criteria['channeledAccount'] = $params['channeled_account_id'];
 
