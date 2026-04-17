@@ -699,8 +699,20 @@ class MetricsProcessor
                 'channel' => $channelId,
                 'name' => $metric->name,
                 'period' => $metric->period,
-                'account_id' => self::resolveAccountId($metric, $accountMap),
-                'channeled_account_id' => self::resolveChanneledAccountId($metric, $channeledAccountMap),
+            $channeledAccountId = self::resolveChanneledAccountId($metric, $channeledAccountMap);
+            $accountId = self::resolveAccountId($metric, $accountMap);
+            if (!$accountId && $channeledAccountMap) {
+                if ($pId = self::getMetricPlatformId($metric, 'channeledAccount')) {
+                    $accountId = $channeledAccountMap['global'][$pId] ?? null;
+                }
+            }
+
+            $uniqueMetricConfigs[$metricConfigKey] = [
+                'channel' => $channelId,
+                'name' => $metric->name,
+                'period' => $metric->period,
+                'account_id' => $accountId,
+                'channeled_account_id' => $channeledAccountId,
                 'campaign_id' => self::resolveCampaignId($metric, $campaignMap),
                 'channeled_campaign_id' => self::resolveChanneledCampaignId($metric, $channeledCampaignMap),
                 'channeled_ad_group_id' => self::resolveChanneledAdGroupId($metric, $channeledAdGroupMap),
@@ -1198,21 +1210,32 @@ class MetricsProcessor
         return ['map' => $channeledMetricMap, 'mapReverse' => $flipped];
     }
 
+    private static function getMetricPlatformId(object $metric, string $property): ?string
+    {
+        $platformProp = $property . 'PlatformId';
+        $val = $metric->$property ?? ($metric->$platformProp ?? null);
+        if (!$val) {
+            return null;
+        }
+        if (is_object($val)) {
+            $methods = ['getPlatformId', 'getId', 'getCampaignId', 'getCreativeId', 'getPostId', 'getProductId', 'getOrderId'];
+            foreach ($methods as $method) {
+                if (method_exists($val, $method)) {
+                    return (string) $val->$method();
+                }
+            }
+            return (string) $val;
+        }
+        return (string) $val;
+    }
+
     private static function resolveChanneledAccountId(object $metric, ?array $channeledAccountMap): ?int
     {
         if (!$channeledAccountMap) {
             return null;
         }
-
-        $pId = isset($metric->channeledAccount)
-            ? (is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount)
-            : ($metric->channeledAccountPlatformId ?? null);
-
-        if (! $pId) {
-            return null;
-        }
-
-        return $channeledAccountMap['map'][$pId] ?? null;
+        $pId = self::getMetricPlatformId($metric, 'channeledAccount');
+        return $pId ? ($channeledAccountMap['map'][$pId] ?? null) : null;
     }
 
     private static function resolvePageId(object $metric, ?array $pageMap): ?int
@@ -1220,124 +1243,99 @@ class MetricsProcessor
         if (!$pageMap) {
             return null;
         }
-
-        $pId = isset($metric->page)
-            ? (is_object($metric->page) ? $metric->page->getPlatformId() : (string)$metric->page)
-            : ($metric->pagePlatformId ?? null);
-
-        if (! $pId) {
+        $pId = self::getMetricPlatformId($metric, 'page');
+        if (!$pId) {
             return null;
         }
-
         // Try direct platform ID mapping
         if (isset($pageMap['map'][$pId])) {
             return $pageMap['map'][$pId];
         }
-
-        // Try canonical ID mapping
+        // Try canonical ID mapping as fallback
         if (str_starts_with($pId, 'http') || str_contains($pId, '/')) {
             $canonicalId = Helpers::getCanonicalPageId($pId, null, 'website');
-
             return $pageMap['map'][$canonicalId] ?? null;
         }
-
         return null;
     }
 
     private static function resolveAccountId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
-        $val = $metric->account ?? ($metric->accountPlatformId ?? null);
-        if (!$val) return null;
-        $key = is_object($val) ? (method_exists($val, 'getId') ? $val->getId() : (string)$val) : (int)$val;
-        return $map['map'][$key] ?? null;
+        if (!$map) {
+            return null;
+        }
+        $pId = self::getMetricPlatformId($metric, 'account');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveCampaignId(object $metric, ?array $map): ?int
     {
         if (!$map) return null;
-        $val = $metric->campaign ?? ($metric->campaignPlatformId ?? null);
-        if (!$val) return null;
-        $key = is_object($val) ? (method_exists($val, 'getCampaignId') ? $val->getCampaignId() : (string)$val) : $val;
-        return $map['map'][$key] ?? null;
+        $pId = self::getMetricPlatformId($metric, 'campaign');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveChanneledCampaignId(object $metric, ?array $map): ?int
     {
         if (!$map) return null;
-        $val = $metric->channeledCampaign ?? ($metric->channeledCampaignPlatformId ?? null);
-        if (!$val) return null;
-        $key = is_object($val) ? (method_exists($val, 'getPlatformId') ? $val->getPlatformId() : (string)$val) : $val;
-        return $map['map'][$key] ?? null;
+        $pId = self::getMetricPlatformId($metric, 'channeledCampaign');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveChanneledAdGroupId(object $metric, ?array $map): ?int
     {
         if (!$map) return null;
-        $val = $metric->channeledAdGroup ?? ($metric->channeledAdGroupPlatformId ?? null);
-        if (!$val) return null;
-        $key = is_object($val) ? (method_exists($val, 'getPlatformId') ? $val->getPlatformId() : (string)$val) : $val;
-        return $map['map'][$key] ?? null;
+        $pId = self::getMetricPlatformId($metric, 'channeledAdGroup');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveChanneledAdId(object $metric, ?array $map): ?int
     {
         if (!$map) return null;
-        $val = $metric->channeledAd ?? ($metric->channeledAdPlatformId ?? null);
-        if (!$val) return null;
-        $key = is_object($val) ? (method_exists($val, 'getPlatformId') ? $val->getPlatformId() : (string)$val) : $val;
-        return $map['map'][$key] ?? null;
+        $pId = self::getMetricPlatformId($metric, 'channeledAd');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveQueryId(object $metric, ?array $map): ?int
     {
         if (!$map) return null;
-        return isset($metric->query) ? ($map['map'][$metric->query] ?? null) : null;
+        $pId = self::getMetricPlatformId($metric, 'query');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveCreativeId(object $metric, ?array $map): ?int
     {
         if (!$map) return null;
-        $val = $metric->creative ?? ($metric->creativePlatformId ?? null);
-        if (!$val) return null;
-        $key = is_object($val) ? (method_exists($val, 'getCreativeId') ? $val->getCreativeId() : (string)$val) : $val;
-        return $map['map'][$key] ?? null;
+        $pId = self::getMetricPlatformId($metric, 'creative');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolvePostId(object $metric, ?array $map): ?int
     {
         if (!$map) return null;
-        $val = $metric->post ?? ($metric->postPlatformId ?? null);
-        if (!$val) return null;
-        $key = is_object($val) ? (method_exists($val, 'getPostId') ? $val->getPostId() : (string)$val) : $val;
-        return $map['map'][$key] ?? null;
+        $pId = self::getMetricPlatformId($metric, 'post');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveProductId(object $metric, ?array $map): ?int
     {
         if (!$map) return null;
-        $val = $metric->product ?? ($metric->productPlatformId ?? null);
-        if (!$val) return null;
-        $key = is_object($val) ? (method_exists($val, 'getProductId') ? $val->getProductId() : (string)$val) : $val;
-        return $map['map'][$key] ?? null;
+        $pId = self::getMetricPlatformId($metric, 'product');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveCustomerId(object $metric, ?array $map): ?int
     {
         if (!$map) return null;
-        $val = $metric->customer ?? ($metric->customerPlatformId ?? null);
-        if (!$val) return null;
-        $key = is_object($val) ? (method_exists($val, 'getEmail') ? $val->getEmail() : (string)$val) : $val;
-        return $map['map'][$key] ?? null;
+        $pId = self::getMetricPlatformId($metric, 'customer');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveOrderId(object $metric, ?array $map): ?int
     {
         if (!$map) return null;
-        $val = $metric->order ?? ($metric->orderPlatformId ?? null);
-        if (!$val) return null;
-        $key = is_object($val) ? (method_exists($val, 'getOrderId') ? $val->getOrderId() : (string)$val) : $val;
-        return $map['map'][$key] ?? null;
+        $pId = self::getMetricPlatformId($metric, 'order');
+        return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveCountryId(object $metric, ?array $map): ?int
