@@ -121,7 +121,7 @@ class InitializeEntitiesCommand extends Command
 
             try {
                 $driver = DriverFactory::get($channel, $this->logger);
-                $results = $driver->initializeEntities($this->entityManager, $chanConfig);
+                $results = $driver->initializeEntities(array_merge($chanConfig, ['manager' => $this->entityManager]));
                 
                 $init = $results['initialized'] ?? 0;
                 $skip = $results['skipped'] ?? 0;

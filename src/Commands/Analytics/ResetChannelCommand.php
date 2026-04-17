@@ -49,7 +49,7 @@ class ResetChannelCommand extends Command
             $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channelSlug);
             if ($driver) {
                 $output->writeln("<info>  Calling modular reset for $channelName...</info>");
-                $driver->reset($manager, 'all');
+                $driver->reset('all', ['manager' => $manager]);
             } else {
                 $output->writeln("<comment>  ⚠ Warning: No driver found for $channelSlug. Performing generic cleanup if possible.</comment>");
             }

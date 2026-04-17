@@ -67,7 +67,7 @@ class ResetEntitiesCommand extends Command
                     $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($slug);
                     if ($driver) {
                         $output->writeln("<info>    - Resetting entities for $slug...</info>");
-                        $driver->reset($manager, 'entities');
+                        $driver->reset('entities', ['manager' => $manager]);
                     }
                 }
 

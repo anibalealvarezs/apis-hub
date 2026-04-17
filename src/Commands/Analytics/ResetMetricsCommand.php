@@ -67,7 +67,7 @@ class ResetMetricsCommand extends Command
                     $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanSlug);
                     if ($driver) {
                         $output->writeln("<info>    - Resetting metrics for $chanSlug...</info>");
-                        $driver->reset($manager, 'metrics');
+                        $driver->reset('metrics', ['manager' => $manager]);
                     }
                 }
 
