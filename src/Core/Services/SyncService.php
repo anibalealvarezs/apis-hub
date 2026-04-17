@@ -3,10 +3,8 @@
 namespace Core\Services;
 
 use DateTime;
-use Exception;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class SyncService
@@ -91,7 +89,120 @@ class SyncService
             ]);
 
             $this->logger?->info("DEBUG: SyncService::execute - INVOKING driver->sync");
-            $result = $driver->sync($startDate, $endDate, $finalConfig);
+            
+            $identityMapper = function (string $type, array $params) use ($finalConfig, $channel) {
+                static $cache = [];
+                $manager = $finalConfig['manager'] ?? Helpers::getManager();
+                $repoMap = [
+                    'channeled_accounts' => \Entities\Analytics\Channeled\ChanneledAccount::class,
+                    'pages' => \Entities\Analytics\Page::class,
+                    'channeled_campaigns' => \Entities\Analytics\Channeled\ChanneledCampaign::class,
+                    'channeled_ad_groups' => \Entities\Analytics\Channeled\ChanneledAdGroup::class,
+                    'channeled_ads' => \Entities\Analytics\Channeled\ChanneledAd::class,
+                    'posts' => \Entities\Analytics\Post::class,
+                ];
+
+                if (!isset($repoMap[$type])) {
+                    return null;
+                }
+
+                $cacheKey = $type . serialize($params);
+                if (isset($cache[$cacheKey])) {
+                    return $cache[$cacheKey];
+                }
+
+                $repository = $manager->getRepository($repoMap[$type]);
+                $result = null;
+
+                switch ($type) {
+                    case 'pages':
+                        $lookupField = 'canonicalId';
+                        $searchValues = (array)($params['canonical_ids'] ?? []);
+                        $isUrlLookup = false;
+                        $canonicalMap = [];
+
+                        if (isset($params['urls'])) {
+                            $isUrlLookup = true;
+                            $urls = (array)$params['urls'];
+                            $canonicalMap = array_combine($urls, array_map(fn($u) => Helpers::getCanonicalPageId($u, null, 'website'), $urls));
+                            $searchValues = array_values($canonicalMap);
+                        } elseif (isset($params['platform_ids'])) {
+                            $lookupField = 'platformId';
+                            $searchValues = (array)$params['platform_ids'];
+                        }
+
+                        if (empty($searchValues)) break;
+
+                        $pages = $repository->findBy([$lookupField => array_unique($searchValues)]);
+                        $entityMap = [];
+                        foreach ($pages as $p) {
+                            $val = $p->{$lookupField == 'canonicalId' ? 'getCanonicalId' : 'getPlatformId'}();
+                            $entityMap[(string)$val] = ['id' => $p->getId(), 'canonical_id' => $p->getCanonicalId()];
+                        }
+
+                        if ($isUrlLookup) {
+                            foreach ($canonicalMap as $url => $cId) {
+                                if (isset($entityMap[$cId])) $result[$url] = $entityMap[$cId];
+                            }
+                        } else {
+                            $result = $entityMap;
+                        }
+                        break;
+
+                    case 'channeled_accounts':
+                    case 'channeled_campaigns':
+                    case 'channeled_ad_groups':
+                    case 'channeled_ads':
+                    case 'posts':
+                    default:
+                        $idField = ($type === 'posts' ? 'postId' : 'platformId');
+                        $getter = 'get'.ucfirst($idField);
+                        $searchValues = (array)($params['platform_ids'] ?? []);
+                        
+                        $criteria = [];
+                        if (!empty($searchValues)) $criteria[$idField] = array_unique($searchValues);
+                        if ($type === 'channeled_accounts') $criteria['channel'] = $channel;
+                        if ($type === 'posts' && isset($params['page_id'])) $criteria['page'] = $params['page_id'];
+                        if ($type === 'posts' && isset($params['channeled_account_id'])) $criteria['channeledAccount'] = $params['channeled_account_id'];
+
+                        if (empty($criteria)) break;
+
+                        $entities = $repository->findBy($criteria);
+                        $result = [];
+                        foreach ($entities as $e) {
+                            $result[(string)$e->$getter()] = [
+                                'id' => $e->getId(),
+                                'data' => ($type === 'posts' ? $e->getData() : null)
+                            ];
+                        }
+                        break;
+                }
+
+                return $cache[$cacheKey] = $result;
+            };
+
+            $jobId = $finalConfig['jobId'] ?? null;
+            $shouldContinue = $jobId ? function () use ($jobId) {
+                static $lastCheck = 0;
+                static $lastResult = true;
+
+                if (time() - $lastCheck < 5) {
+                    return $lastResult;
+                }
+
+                try {
+                    Helpers::checkJobStatus($jobId);
+                    $lastResult = true;
+                } catch (\Exception $e) {
+                    $lastResult = false;
+                }
+
+                $lastCheck = time();
+
+                return $lastResult;
+            } : null;
+
+            $result = $driver->sync($startDate, $endDate, $finalConfig, $shouldContinue, $identityMapper);
             $this->logger?->info("DEBUG: SyncService::execute - driver->sync RETURNED");
 
             return new Response(json_encode([
