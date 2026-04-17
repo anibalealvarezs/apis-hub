@@ -50,8 +50,8 @@ class MarketingProcessor
                     /** @var object{platformId: string|int, name: string, startDate: ?\Carbon\Carbon, endDate: ?\Carbon\Carbon} $c */
                     $params[] = $c->platformId;
                     $params[] = $c->name;
-                    $params[] = $c->startDate ? $c->startDate->toDateTimeString() : null;
-                    $params[] = $c->endDate ? $c->endDate->toDateTimeString() : null;
+                    $params[] = $c->startDate ? Carbon::parse($c->startDate)->toDateTimeString() : null;
+                    $params[] = $c->endDate ? Carbon::parse($c->endDate)->toDateTimeString() : null;
                 }
                 $sql = Helpers::buildUpsertSql(
                     'campaigns', 
@@ -158,8 +158,8 @@ class MarketingProcessor
                     $params[] = $campaignMap[$a->channeledCampaignId]['global_id'] ?? null;
                     $params[] = $campaignMap[$a->channeledCampaignId]['channeled_id'] ?? null;
                     $params[] = $a->name;
-                    $params[] = $a->startDate ? $a->startDate->toDateTimeString() : null;
-                    $params[] = $a->endDate ? $a->endDate->toDateTimeString() : null;
+                    $params[] = $a->startDate ? Carbon::parse($a->startDate)->toDateTimeString() : null;
+                    $params[] = $a->endDate ? Carbon::parse($a->endDate)->toDateTimeString() : null;
                     $params[] = $a->status ?? null;
                     $params[] = $a->optimizationGoal ?? null;
                     $params[] = $a->billingEvent ?? null;
