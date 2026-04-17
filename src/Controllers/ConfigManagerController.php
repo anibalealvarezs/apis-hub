@@ -472,7 +472,7 @@ class ConfigManagerController extends BaseController
                             ->addType($typeMark)
                             ->addChannel($channelValue)
                             ->addName($name)
-                            ->addPlatformCreatedAt(new DateTime('2010-10-06'))
+                            ->addPlatformCreatedAt(isset($asset['created_at']) ? new DateTime($asset['created_at']) : null)
                             ->addData([]);
                         $this->em->persist($dbChanneled);
                     } elseif ($dbChanneled->getName() !== $name) {
@@ -499,7 +499,7 @@ class ConfigManagerController extends BaseController
                                     ->addType($childType)
                                     ->addChannel($channelValue)
                                     ->addName($childName)
-                                    ->addPlatformCreatedAt(new DateTime('2010-10-06'))
+                                    ->addPlatformCreatedAt(isset($asset['created_at']) ? new DateTime($asset['created_at']) : null)
                                     ->addData([]);
                                 $this->em->persist($dbChild);
                             } elseif ($dbChild->getName() !== $childName) {
