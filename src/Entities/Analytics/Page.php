@@ -261,4 +261,9 @@ class Page extends Entity
         }
         return $this;
     }
+
+    public function __toString(): string
+    {
+        return "Page(id: " . ($this->id ?? 'null') . ", platformId: " . ($this->platformId ?? 'null') . ")";
+    }
 }
