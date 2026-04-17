@@ -695,10 +695,6 @@ class MetricsProcessor
             $channelObj = Channel::tryFromName((string) $metric->channel);
             $channelId = $channelObj ? $channelObj->value : $metric->channel;
 
-            $uniqueMetricConfigs[$metricConfigKey] = [
-                'channel' => $channelId,
-                'name' => $metric->name,
-                'period' => $metric->period,
             $channeledAccountId = self::resolveChanneledAccountId($metric, $channeledAccountMap);
             $accountId = self::resolveAccountId($metric, $accountMap);
             if (!$accountId && $channeledAccountMap) {
@@ -753,73 +749,61 @@ class MetricsProcessor
             }
         }
 
-        // Get the list of metrics that need to be inserted
-        $metricConfigsToInsert = [];
-        foreach ($uniqueMetricConfigs as $key => $metricConfig) {
-            if (! isset($metricConfigMap[$key])) {
-                $metricConfigsToInsert[] = [
-                    'channel' => $metricConfig['channel'],
-                    'name' => $metricConfig['name'],
-                    'period' => $metricConfig['period'],
-                    'account_id' => $metricConfig['account_id'] ?? null,
-                    'channeled_account_id' => $metricConfig['channeled_account_id'] ?? null,
-                    'campaign_id' => $metricConfig['campaign_id'] ?? null,
-                    'channeled_campaign_id' => $metricConfig['channeled_campaign_id'] ?? null,
-                    'channeled_ad_group_id' => $metricConfig['channeled_ad_group_id'] ?? null,
-                    'channeled_ad_id' => $metricConfig['channeled_ad_id'] ?? null,
-                    'query_id' => $metricConfig['query_id'] ?? null,
-                    'page_id' => $metricConfig['page_id'] ?? null,
-                    'post_id' => $metricConfig['post_id'] ?? null,
-                    'product_id' => $metricConfig['product_id'] ?? null,
-                    'customer_id' => $metricConfig['customer_id'] ?? null,
-                    'order_id' => $metricConfig['order_id'] ?? null,
-                    'country_id' => $metricConfig['country_id'] ?? null,
-                    'device_id' => $metricConfig['device_id'] ?? null,
-                    'dimension_set_id' => $metricConfig['dimension_set_id'] ?? null,
-                    'key' => $key,
-                ];
-            }
-        }
-
-        // INSERT IGNORE: atomic upsert.
+        // INSERT IGNORE / ON CONFLICT: atomic upsert.
         if (! empty($uniqueMetricConfigs)) {
-            $cols = ['channel', 'name', 'period', 'account_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id', 'creative_id', 'query_id', 'page_id', 'post_id', 'product_id', 'customer_id', 'order_id', 'country_id', 'device_id', 'dimension_set_id', 'config_signature'];
+            $cols = [
+                'channel', 'name', 'period', 'account_id', 'channeled_account_id',
+                'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id',
+                'creative_id', 'query_id', 'page_id', 'post_id', 'product_id',
+                'customer_id', 'order_id', 'country_id', 'device_id', 'dimension_set_id',
+                'config_signature'
+            ];
             $numCols = count($cols);
-            $chunkSize = floor(30000 / $numCols); // Ultra safe margin for Postgres (30k params max per chunk)
+            $chunkLimit = floor(30000 / $numCols);
+            $buffer = [];
+            $count = 0;
 
-            foreach (array_chunk($metricConfigsToInsert, (int)$chunkSize) as $chunk) {
-                $insertParams = [];
-                foreach ($chunk as $metricConfig) {
-                    $insertParams[] = $metricConfig['channel'];
-                    $insertParams[] = $metricConfig['name'];
-                    $insertParams[] = $metricConfig['period'];
-                    $insertParams[] = $metricConfig['account_id'] ?? null;
-                    $insertParams[] = $metricConfig['channeled_account_id'] ?? null;
-                    $insertParams[] = $metricConfig['campaign_id'] ?? null;
-                    $insertParams[] = $metricConfig['channeled_campaign_id'] ?? null;
-                    $insertParams[] = $metricConfig['channeled_ad_group_id'] ?? null;
-                    $insertParams[] = $metricConfig['channeled_ad_id'] ?? null;
-                    $insertParams[] = $metricConfig['creative_id'] ?? null;
-                    $insertParams[] = $metricConfig['query_id'] ?? null;
-                    $insertParams[] = $metricConfig['page_id'] ?? null;
-                    $insertParams[] = $metricConfig['post_id'] ?? null;
-                    $insertParams[] = $metricConfig['product_id'] ?? null;
-                    $insertParams[] = $metricConfig['customer_id'] ?? null;
-                    $insertParams[] = $metricConfig['order_id'] ?? null;
-                    $insertParams[] = $metricConfig['country_id'] ?? null;
-                    $insertParams[] = $metricConfig['device_id'] ?? null;
-                    $insertParams[] = $metricConfig['dimension_set_id'] ?? null;
-                    $insertParams[] = $metricConfig['key']; // config_signature
+            foreach ($uniqueMetricConfigs as $key => $metricConfig) {
+                if (isset($metricConfigMap[$key])) {
+                    continue;
                 }
-                $sql = Helpers::buildUpsertSql(
-                    'metric_configs',
-                    $cols,
-                    ['dimension_set_id'],
-                    ['config_signature'],
-                    count($chunk)
-                );
-                $affected = $manager->getConnection()->executeStatement($sql, $insertParams);
-                $logger->info("[MetricsProcessor] Inserted " . count($chunk) . " metric_configs (Ignore on duplicate). Affected: $affected rows.");
+
+                $buffer[] = $metricConfig['channel'];
+                $buffer[] = $metricConfig['name'];
+                $buffer[] = $metricConfig['period'];
+                $buffer[] = $metricConfig['account_id'] ?? null;
+                $buffer[] = $metricConfig['channeled_account_id'] ?? null;
+                $buffer[] = $metricConfig['campaign_id'] ?? null;
+                $buffer[] = $metricConfig['channeled_campaign_id'] ?? null;
+                $buffer[] = $metricConfig['channeled_ad_group_id'] ?? null;
+                $buffer[] = $metricConfig['channeled_ad_id'] ?? null;
+                $buffer[] = $metricConfig['creative_id'] ?? null;
+                $buffer[] = $metricConfig['query_id'] ?? null;
+                $buffer[] = $metricConfig['page_id'] ?? null;
+                $buffer[] = $metricConfig['post_id'] ?? null;
+                $buffer[] = $metricConfig['product_id'] ?? null;
+                $buffer[] = $metricConfig['customer_id'] ?? null;
+                $buffer[] = $metricConfig['order_id'] ?? null;
+                $buffer[] = $metricConfig['country_id'] ?? null;
+                $buffer[] = $metricConfig['device_id'] ?? null;
+                $buffer[] = $metricConfig['dimension_set_id'] ?? null;
+                $buffer[] = $key; // config_signature
+
+                $count++;
+
+                if ($count >= $chunkLimit) {
+                    $sql = Helpers::buildUpsertSql('metric_configs', $cols, ['dimension_set_id'], ['config_signature'], $count);
+                    $affected = $manager->getConnection()->executeStatement($sql, $buffer);
+                    $logger->info("[MetricsProcessor] Inserted chunk of $count metric_configs. Affected: $affected rows.");
+                    $buffer = [];
+                    $count = 0;
+                }
+            }
+
+            if (! empty($buffer)) {
+                $sql = Helpers::buildUpsertSql('metric_configs', $cols, ['dimension_set_id'], ['config_signature'], $count);
+                $affected = $manager->getConnection()->executeStatement($sql, $buffer);
+                $logger->info("[MetricsProcessor] Inserted final chunk of $count metric_configs. Affected: $affected rows.");
             }
         }
 

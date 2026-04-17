@@ -94,34 +94,36 @@ class CustomerProcessor
             $customerMap = array_merge($customerMap, $map);
         }
 
-        $customersToInsert = [];
+        $buffer = [];
+        $count = 0;
         foreach ($uniqueCustomers as $key => $cust) {
-            if (!isset($customerMap[$key])) {
-                $customersToInsert[] = $cust['email'];
+            if (isset($customerMap[$key])) {
+                continue;
+            }
+
+            $buffer[] = $cust['email'];
+            $count++;
+
+            if ($count >= 1000) {
+                $sql = Helpers::buildInsertIgnoreSql('customers', ['email'], 'email', $count);
+                $manager->getConnection()->executeStatement($sql, $buffer);
+                $buffer = [];
+                $count = 0;
             }
         }
 
-        if (!empty($customersToInsert)) {
-            $insertChunks = array_chunk($customersToInsert, 1000);
-            foreach ($insertChunks as $chunk) {
-                $insertPlaceholders = implode(', ', array_fill(0, count($chunk), '(?)'));
-                $sql = Helpers::buildInsertIgnoreSql(
-                    'customers', 
-                    ['email'], 
-                    'email', 
-                    count($chunk)
-                );
-                $manager->getConnection()->executeStatement($sql, $chunk);
-            }
+        if ($count > 0) {
+            $sql = Helpers::buildInsertIgnoreSql('customers', ['email'], 'email', $count);
+            $manager->getConnection()->executeStatement($sql, $buffer);
+        }
 
-            // Re-fetch to get IDs
-            foreach ($insertChunks as $chunk) {
-                $selectPlaceholders = implode(', ', array_fill(0, count($chunk), '?'));
-                $sql = "SELECT id, email FROM customers WHERE email IN ($selectPlaceholders)";
+        // Re-fetch EVERYTHNG into the map to ensure we have all IDs (including ignored ones)
+        foreach ($chunks as $chunk) {
+            $selectPlaceholders = implode(', ', array_fill(0, count($chunk), '?'));
+            $sql = "SELECT id, email FROM customers WHERE email IN ($selectPlaceholders)";
 
-                $map = MapGenerator::getCustomerMap($manager, $sql, $chunk);
-                $customerMap = array_merge($customerMap, $map);
-            }
+            $map = MapGenerator::getCustomerMap($manager, $sql, $chunk);
+            $customerMap = array_merge($customerMap, $map);
         }
 
         // 3. Prepare ChanneledCustomers
@@ -150,13 +152,16 @@ class CustomerProcessor
             $channeledCustomerMap = array_merge($channeledCustomerMap, $map);
         }
 
-        // Insert vs Update arrays
-        $ccToInsert = [];
-        $ccToUpdate = [];
+        $inCols = ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data'];
+        $upCols = ['id', 'customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data'];
+        
+        $inBuffer = [];
+        $upBuffer = [];
+        $inCount = 0;
+        $upCount = 0;
 
         foreach ($uniqueChanneledCustomers as $key => $cc) {
             $customerKey = KeyGenerator::generateCustomerKey($cc['customer_email']);
-            // Fallback in case something weird happens
             if (!isset($customerMap[$customerKey])) {
                 continue;
             }
@@ -164,90 +169,56 @@ class CustomerProcessor
 
             if (isset($channeledCustomerMap[$key])) {
                 // Determine if data update is necessary
-                $existingData = is_string($channeledCustomerMap[$key]['data'])
-                                ? json_decode($channeledCustomerMap[$key]['data'], true)
-                                : $channeledCustomerMap[$key]['data'];
+                $existingData = is_string($channeledCustomerMap[$key]['data']) ? json_decode($channeledCustomerMap[$key]['data'], true) : $channeledCustomerMap[$key]['data'];
                 if (is_array($existingData)) {
                     $mergedData = $existingData;
                     if (isset($cc['data']['addresses'])) {
-                        $mergedData['addresses'] = Helpers::multiDimensionalArrayUnique(
-                            array_merge(
-                                $mergedData['addresses'] ?? [],
-                                $cc['data']['addresses']
-                            )
-                        );
+                        $mergedData['addresses'] = Helpers::multiDimensionalArrayUnique(array_merge($mergedData['addresses'] ?? [], $cc['data']['addresses']));
                     }
                     $cc['data'] = $mergedData;
                 }
 
-                $ccToUpdate[] = [
-                    'id' => $channeledCustomerMap[$key]['id'],
-                    'customer_id' => $customerId,
-                    'email' => $cc['customer_email'],
-                    'platform_id' => $cc['platform_id'],
-                    'channel' => $cc['channel'],
-                    'platform_created_at' => $cc['platform_created_at'] instanceof DateTime ? $cc['platform_created_at']->format('Y-m-d H:i:s') : $cc['platform_created_at'],
-                    'data' => json_encode($cc['data']),
-                ];
+                $upBuffer[] = $channeledCustomerMap[$key]['id'];
+                $upBuffer[] = $customerId;
+                $upBuffer[] = $cc['customer_email'];
+                $upBuffer[] = $cc['platform_id'];
+                $upBuffer[] = $cc['channel'];
+                $upBuffer[] = $cc['platform_created_at'] instanceof DateTime ? $cc['platform_created_at']->format('Y-m-d H:i:s') : $cc['platform_created_at'];
+                $upBuffer[] = json_encode($cc['data']);
+                $upCount++;
+
+                if ($upCount >= 500) {
+                    $sql = Helpers::buildUpsertSql('channeled_customers', $upCols, ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data', 'updated_at'], 'id', $upCount);
+                    $manager->getConnection()->executeStatement($sql, $upBuffer);
+                    $upBuffer = [];
+                    $upCount = 0;
+                }
             } else {
-                $ccToInsert[] = [
-                    'customer_id' => $customerId,
-                    'email' => $cc['customer_email'],
-                    'platform_id' => $cc['platform_id'],
-                    'channel' => $cc['channel'],
-                    'platform_created_at' => $cc['platform_created_at'] instanceof DateTime ? $cc['platform_created_at']->format('Y-m-d H:i:s') : $cc['platform_created_at'],
-                    'data' => json_encode($cc['data']),
-                ];
+                $inBuffer[] = $customerId;
+                $inBuffer[] = $cc['customer_email'];
+                $inBuffer[] = $cc['platform_id'];
+                $inBuffer[] = $cc['channel'];
+                $inBuffer[] = $cc['platform_created_at'] instanceof DateTime ? $cc['platform_created_at']->format('Y-m-d H:i:s') : $cc['platform_created_at'];
+                $inBuffer[] = json_encode($cc['data']);
+                $inCount++;
+
+                if ($inCount >= 500) {
+                    $sql = "INSERT INTO channeled_customers (" . implode(',', $inCols) . ") VALUES " . implode(',', array_fill(0, $inCount, '(?, ?, ?, ?, ?, ?)'));
+                    $manager->getConnection()->executeStatement($sql, $inBuffer);
+                    $inBuffer = [];
+                    $inCount = 0;
+                }
             }
         }
 
-        // Bulk Insert ChanneledCustomers
-        if (!empty($ccToInsert)) {
-            $insertChunks = array_chunk($ccToInsert, 500);
-            foreach ($insertChunks as $chunk) {
-                $insertParams = [];
-                foreach ($chunk as $row) {
-                    $insertParams[] = $row['customer_id'];
-                    $insertParams[] = $row['email'];
-                    $insertParams[] = $row['platform_id'];
-                    $insertParams[] = $row['channel'];
-                    $insertParams[] = $row['platform_created_at'];
-                    $insertParams[] = $row['data'];
-                }
-
-                $placeholders = implode(', ', array_fill(0, count($chunk), '(?, ?, ?, ?, ?, ?)'));
-                $manager->getConnection()->executeStatement(
-                    "INSERT INTO channeled_customers (customer_id, email, platform_id, channel, platform_created_at, data) VALUES $placeholders",
-                    $insertParams
-                );
-            }
+        if ($inCount > 0) {
+            $sql = "INSERT INTO channeled_customers (" . implode(',', $inCols) . ") VALUES " . implode(',', array_fill(0, $inCount, '(?, ?, ?, ?, ?, ?)'));
+            $manager->getConnection()->executeStatement($sql, $inBuffer);
         }
 
-        // Bulk Update ChanneledCustomers (using ON DUPLICATE KEY UPDATE)
-        // Since id is primary key, we can do multi-row insert with ON DUPLICATE KEY UPDATE smoothly.
-        if (!empty($ccToUpdate)) {
-            $updateChunks = array_chunk($ccToUpdate, 500);
-            foreach ($updateChunks as $chunk) {
-                $updateParams = [];
-                foreach ($chunk as $row) {
-                    $updateParams[] = $row['id'];
-                    $updateParams[] = $row['customer_id'];
-                    $updateParams[] = $row['email'];
-                    $updateParams[] = $row['platform_id'];
-                    $updateParams[] = $row['channel'];
-                    $updateParams[] = $row['platform_created_at'];
-                    $updateParams[] = $row['data'];
-                }
-
-                $sql = Helpers::buildUpsertSql(
-                    'channeled_customers', 
-                    ['id', 'customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data'], 
-                    ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data', 'updated_at'], 
-                    'id', 
-                    count($chunk)
-                );
-                $manager->getConnection()->executeStatement($sql, $updateParams);
-            }
+        if ($upCount > 0) {
+            $sql = Helpers::buildUpsertSql('channeled_customers', $upCols, ['customer_id', 'email', 'platform_id', 'channel', 'platform_created_at', 'data', 'updated_at'], 'id', $upCount);
+            $manager->getConnection()->executeStatement($sql, $upBuffer);
         }
 
         return [
