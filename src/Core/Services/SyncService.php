@@ -66,10 +66,52 @@ class SyncService
 
             // 3. Inject production dependencies
             $finalConfig['manager'] = Helpers::getManager();
-            $this->logger?->info("DEBUG: SyncService::execute - Manager injected. ID: " . spl_object_id($finalConfig['manager']) . " | Open: " . ($finalConfig['manager']->isOpen() ? 'YES' : 'NO'));
-            $finalConfig['seeder'] = new \Classes\ProductionEntityMapper($finalConfig['manager']);
+            $manager = $finalConfig['manager'];
+            $this->logger?->info("DEBUG: SyncService::execute - Manager injected. ID: " . spl_object_id($manager) . " | Open: " . ($manager->isOpen() ? 'YES' : 'NO'));
+            $finalConfig['seeder'] = new \Classes\ProductionEntityMapper($manager);
 
-            // 4. Date normalization
+            // 4. Define and set Data Processor
+            $dataProcessor = function ($data, $mixed = null) use ($manager) {
+                $logger = ($mixed instanceof LoggerInterface) ? $mixed : $this->logger;
+                $type = is_string($mixed) ? $mixed : null;
+
+                if ($data instanceof \Doctrine\Common\Collections\ArrayCollection) {
+                    return \Classes\Requests\MetricRequests::process($data, $logger);
+                }
+
+                if ($data instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity && $type) {
+                    $collection = new \Doctrine\Common\Collections\ArrayCollection([$data]);
+                    switch ($type) {
+                        case 'campaign':
+                            \Classes\MarketingProcessor::processCampaigns($collection, $manager);
+                            break;
+                        case 'ad_group':
+                            \Classes\MarketingProcessor::processAdGroups($collection, $manager);
+                            break;
+                        case 'ad':
+                            \Classes\MarketingProcessor::processAds($collection, $manager);
+                            break;
+                        case 'creative':
+                            \Classes\MarketingProcessor::processCreatives($collection, $manager);
+                            break;
+                        case 'page':
+                            \Classes\SocialProcessor::processPages($collection, $manager);
+                            break;
+                        case 'post':
+                        case 'ig_media':
+                            \Classes\SocialProcessor::processPosts($collection, $manager);
+                            break;
+                    }
+                    return null;
+                }
+                return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
+            };
+
+            if (method_exists($driver, 'setDataProcessor')) {
+                $driver->setDataProcessor($dataProcessor);
+            }
+
+            // 5. Date normalization
             $startDate = new DateTime($startDateStr ?? $finalConfig['startDate'] ?? $finalConfig['start_date'] ?? '-30 days');
             $endDate = new DateTime($endDateStr ?? $finalConfig['endDate'] ?? $finalConfig['end_date'] ?? 'now');
 
@@ -137,7 +179,7 @@ class SyncService
                         $entityMap = [];
                         foreach ($pages as $p) {
                             $val = $p->{$lookupField == 'canonicalId' ? 'getCanonicalId' : 'getPlatformId'}();
-                            $entityMap[(string)$val] = ['id' => $p->getId(), 'canonical_id' => $p->getCanonicalId()];
+                            $entityMap[(string)$val] = $p;
                         }
 
                         if ($isUrlLookup) {
@@ -175,10 +217,7 @@ class SyncService
                         $entities = $repository->findBy($criteria);
                         $result = [];
                         foreach ($entities as $e) {
-                            $result[(string)$e->$getter()] = [
-                                'id' => $e->getId(),
-                                'data' => ($type === 'posts' ? $e->getData() : null)
-                            ];
+                            $result[(string)$e->$getter()] = $e;
                         }
                         break;
                 }

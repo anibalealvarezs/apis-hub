@@ -846,14 +846,21 @@ class MetricsProcessor
 
         $uniqueMetrics = [];
         foreach ($metrics->toArray() as $metric) {
+            if (! $metric) {
+                continue;
+            }
+            $mObj = is_object($metric) ? $metric : (object)$metric;
+            $mDimensions = $mObj->dimensions ?? [];
             $dimensions = array_map(function ($dimension) {
-                return [ 'dimensionKey' => $dimension['dimensionKey'], 'dimensionValue' => $dimension['dimensionValue'] ];
-            }, $metric->dimensions);
+                $d = (array) $dimension;
+                return [ 'dimensionKey' => $d['dimensionKey'] ?? null, 'dimensionValue' => $d['dimensionValue'] ?? null ];
+            }, (array) $mDimensions);
+
             $dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
             $metricKey = KeyGenerator::generateMetricKey(
                 dimensionsHash: $dimensionsHash,
-                metricConfigKey: $metric->metricConfigKey,
-                metricDate: $metric->metricDate,
+                metricConfigKey: $mObj->metricConfigKey ?? '',
+                metricDate: $mObj->metricDate ?? '',
             );
 
             if (! isset($metricConfigMap['map'][$metric->metricConfigKey])) {
