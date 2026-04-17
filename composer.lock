@@ -169,13 +169,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-driver-core.git",
-                "reference": "cd43a5786ea18b5e620d97605b4fe6fe8e1c1e9f"
+                "reference": "fcedfcbd9888e630472750cf03de761923a956f9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-cd43a5786ea18b5e620d97605b4fe6fe8e1c1e9f-zip-6d46ed.zip",
-                "reference": "cd43a5786ea18b5e620d97605b4fe6fe8e1c1e9f",
-                "shasum": "db1f9f4c67687c66d04526f544f2af6bed57d7f4"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-fcedfcbd9888e630472750cf03de761923a956f9-zip-9b749a.zip",
+                "reference": "fcedfcbd9888e630472750cf03de761923a956f9",
+                "shasum": "ccb6ad5dd4049db6ccbee1d25dca37bb11212ca3"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -205,7 +205,7 @@
                 }
             ],
             "description": "Core interfaces and orchestration logic for APIs Hub drivers.",
-            "time": "2026-04-17T22:44:09+00:00"
+            "time": "2026-04-17T23:11:12+00:00"
         },
         {
             "name": "anibalealvarezs/bigcommerce-hub-driver",

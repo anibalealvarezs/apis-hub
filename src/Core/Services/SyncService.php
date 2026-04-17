@@ -76,7 +76,7 @@ class SyncService
                 $type = is_string($mixed) ? $mixed : null;
 
                 if ($data instanceof \Doctrine\Common\Collections\ArrayCollection) {
-                    return \Classes\Requests\MetricRequests::process($data, $logger);
+                    return \Classes\Requests\MetricRequests::persist($data, $logger);
                 }
 
                 if ($data instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity && $type) {
