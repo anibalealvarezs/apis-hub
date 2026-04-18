@@ -253,13 +253,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/facebook-graph-api.git",
-                "reference": "9c77f7bca9f4be1e09a25ee1a2ee09b43491fb39"
+                "reference": "610a3a0790427b20e309ec893095c86a7ed2aa8f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-9c77f7bca9f4be1e09a25ee1a2ee09b43491fb39-zip-7ebb72.zip",
-                "reference": "9c77f7bca9f4be1e09a25ee1a2ee09b43491fb39",
-                "shasum": "76db57c5459013c1757a424a2fff212107705215"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/facebook-graph-api/anibalealvarezs-facebook-graph-api-610a3a0790427b20e309ec893095c86a7ed2aa8f-zip-7b1631.zip",
+                "reference": "610a3a0790427b20e309ec893095c86a7ed2aa8f",
+                "shasum": "208fa223a74f646fa6c7dc49d6bc3f732c40ff20"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -310,7 +310,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/facebook-graph-api/issues"
             },
-            "time": "2026-04-17T22:39:56+00:00"
+            "time": "2026-04-17T23:54:58+00:00"
         },
         {
             "name": "anibalealvarezs/google-api",
