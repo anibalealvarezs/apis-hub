@@ -135,4 +135,14 @@ class ProductionEntityMapper implements SeederInterface
     {
         return [];
     }
+
+    /**
+     * @inheritdoc
+     */
+    public function resolveEntity(string $type, array $params): mixed
+    {
+        // Production sync doesn't use the seeder for entity resolution.
+        // It uses the identityMapper callback.
+        return null;
+    }
 }
