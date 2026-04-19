@@ -157,10 +157,9 @@ class MetricsProcessor
     {
         $ids = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->account)) {
-                $ids[] = is_object($metric->account) ? (method_exists($metric->account, 'getId') ? $metric->account->getId() : 0) : (int)$metric->account;
-            } elseif (isset($metric->accountPlatformId)) {
-                $ids[] = (int)$metric->accountPlatformId;
+            $pId = self::getMetricPlatformId($metric, 'account');
+            if ($pId) {
+                $ids[] = (int)$pId;
             }
         }
         $ids = array_unique($ids);
@@ -414,14 +413,12 @@ class MetricsProcessor
         $platformIds = [];
         $canonicalIds = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->page)) {
-                $pId = is_object($metric->page) ? $metric->page->getPlatformId() : (string)$metric->page;
-                if ($pId) {
-                    if (str_starts_with($pId, 'http') || str_contains($pId, '/')) {
-                        $canonicalIds[] = Helpers::getCanonicalPageId($pId, null, 'website');
-                    } else {
-                        $platformIds[] = $pId;
-                    }
+            $pId = self::getMetricPlatformId($metric, 'page');
+            if ($pId) {
+                if (str_starts_with($pId, 'http') || str_contains($pId, '/')) {
+                    $canonicalIds[] = Helpers::getCanonicalPageId($pId, null, 'website');
+                } else {
+                    $platformIds[] = $pId;
                 }
             }
         }
@@ -467,10 +464,9 @@ class MetricsProcessor
     {
         $ids = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->post)) {
-                $ids[] = is_object($metric->post) ? $metric->post->getPostId() : (string)$metric->post;
-            } elseif (isset($metric->postPlatformId)) {
-                $ids[] = $metric->postPlatformId;
+            $pId = self::getMetricPlatformId($metric, 'post');
+            if ($pId) {
+                $ids[] = $pId;
             }
         }
         $ids = array_unique($ids);
@@ -669,36 +665,31 @@ class MetricsProcessor
             $mObj = $metric;
             /** @var object{channel: mixed, name: mixed, period: mixed, account: mixed, channeledAccount: mixed, campaign: mixed, channeledCampaign: mixed, channeledAdGroup: mixed, channeledAd: mixed, page: mixed, query: mixed, post: mixed, product: mixed, customer: mixed, creative: mixed, country: mixed, device: mixed} $mObj */
 
-            $mContext = (is_object($mObj) && method_exists($mObj, 'getContext')) ? $mObj->getContext() : (array)$mObj;
-
-            $rowPostValue = $mContext['post'] ?? $mObj->post ?? $mObj->postPlatformId ?? null;
-            if (is_object($rowPostValue)) {
-                $rowPostValue = method_exists($rowPostValue, 'getPostId') ? $rowPostValue->getPostId() : (method_exists($rowPostValue, 'getPlatformId') ? $rowPostValue->getPlatformId() : (string)$rowPostValue);
-            }
-
-            if (str_contains((string)($mObj->name ?? ''), 'daily')) {
-                self::log("[MetricsProcessor] Generating Key for " . ($mObj->name ?? 'unknown') . " | Resolved Post ID: " . ($rowPostValue ?? 'NULL'), 'info');
+            $rowPostValue = self::getMetricPlatformId($mObj, 'post', $logger);
+            
+            if ($logger && str_contains((string)($mObj->name ?? ''), 'daily')) {
+                $logger->info("[MetricsProcessor] Generating Key for " . ($mObj->name ?? 'unknown') . " | Resolved Post ID: " . ($rowPostValue ?? 'NULL'));
             }
 
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: $mObj->channel ?? null,
                 name: $mObj->name ?? null,
                 period: $mObj->period ?? null,
-                account: ($v = $mContext['account'] ?? $mObj->account ?? $mObj->accountPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getName') ? $v->getName() : (string)$v) : (string)$v) : null,
-                channeledAccount: ($v = $mContext['channeledAccount'] ?? $mObj->channeledAccount ?? $mObj->channeledAccountPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getPlatformId') ? $v->getPlatformId() : (string)$v) : (string)$v) : null,
-                campaign: ($v = $mContext['campaign'] ?? $mObj->campaign ?? $mObj->campaignPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getCampaignId') ? $v->getCampaignId() : (string)$v) : (string)$v) : null,
-                channeledCampaign: ($v = $mContext['channeledCampaign'] ?? $mObj->channeledCampaign ?? $mObj->channeledCampaignPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getPlatformId') ? $v->getPlatformId() : (string)$v) : (string)$v) : null,
-                channeledAdGroup: ($v = $mContext['channeledAdGroup'] ?? $mObj->channeledAdGroup ?? $mObj->channeledAdGroupPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getPlatformId') ? $v->getPlatformId() : (string)$v) : (string)$v) : null,
-                channeledAd: ($v = $mContext['channeledAd'] ?? $mObj->channeledAd ?? $mObj->channeledAdPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getPlatformId') ? $v->getPlatformId() : (string)$v) : (string)$v) : null,
-                page: ($v = $mContext['page'] ?? $mObj->page ?? $mObj->pagePlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getUrl') ? $v->getUrl() : (string)$v) : (string)$v) : null,
-                query: $mContext['query'] ?? $mObj->query ?? null,
+                account: ($v = self::getMetricPlatformId($mObj, 'account', $logger)) ?: null,
+                channeledAccount: ($v = self::getMetricPlatformId($mObj, 'channeledAccount', $logger)) ?: null,
+                campaign: ($v = self::getMetricPlatformId($mObj, 'campaign', $logger)) ?: null,
+                channeledCampaign: ($v = self::getMetricPlatformId($mObj, 'channeledCampaign', $logger)) ?: null,
+                channeledAdGroup: ($v = self::getMetricPlatformId($mObj, 'channeledAdGroup', $logger)) ?: null,
+                channeledAd: ($v = self::getMetricPlatformId($mObj, 'channeledAd', $logger)) ?: null,
+                page: ($v = self::getMetricPlatformId($mObj, 'page', $logger)) ?: null,
+                query: (is_object($mObj) && method_exists($mObj, 'getContext')) ? ($mObj->getContext()['query'] ?? $mObj->query ?? null) : ($mObj->query ?? null),
                 post: $rowPostValue,
-                product: ($v = $mContext['product'] ?? $mObj->product ?? $mObj->productPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getProductId') ? $v->getProductId() : (string)$v) : (string)$v) : null,
-                customer: ($v = $mContext['customer'] ?? $mObj->customer ?? $mObj->customerPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getEmail') ? $v->getEmail() : (string)$v) : (string)$v) : null,
-                order: ($v = $mContext['order'] ?? $mObj->order ?? $mObj->orderPlatformId ?? null) ? (is_object($v) ? $v->getOrderId() : (string)$v) : (string)$v,
+                product: ($v = self::getMetricPlatformId($mObj, 'product', $logger)) ?: null,
+                customer: ($v = self::getMetricPlatformId($mObj, 'customer', $logger)) ?: null,
+                order: ($v = self::getMetricPlatformId($mObj, 'order', $logger)) ?: null,
                 country: $mObj->countryCode ?? ($mObj->country ?? null),
                 device: $mObj->deviceType ?? ($mObj->device ?? null),
-                creative: ($v = $mContext['creative'] ?? $mObj->creative ?? $mObj->creativePlatformId ?? null) ? (is_object($v) ? $v->getCreativeId() : (string)$v) : (string)$v,
+                creative: ($v = self::getMetricPlatformId($mObj, 'creative', $logger)) ?: null,
                 dimensionSet: $mObj->dimensionsHash ?? (isset($mObj->dimensions) ? KeyGenerator::generateDimensionsHash((array)$mObj->dimensions) : null)
             );
             $metric->metricConfigKey = $metricConfigKey;
@@ -1212,7 +1203,7 @@ class MetricsProcessor
         return ['map' => $channeledMetricMap, 'mapReverse' => $flipped];
     }
 
-    private static function getMetricPlatformId(object $metric, string $property): ?string
+    private static function getMetricPlatformId(object $metric, string $property, ?LoggerInterface $logger = null): ?string
     {
         $mContext = (method_exists($metric, 'getContext')) ? $metric->getContext() : (array)$metric;
         $platformProp = $property . 'PlatformId';
@@ -1237,8 +1228,8 @@ class MetricsProcessor
             }
         }
 
-        if (str_contains((string)($metric->name ?? ''), 'daily') && $property === 'post') {
-            self::log("[MetricsProcessor] Mapping Post for " . ($metric->name ?? 'unknown') . " | Raw: " . (is_object($val) ? get_class($val) : gettype($val)) . " | Resolved Platform ID: " . ($resolvedId ?? 'NULL'), 'info');
+        if ($logger && str_contains((string)($metric->name ?? ''), 'daily') && $property === 'post') {
+            $logger->info("[MetricsProcessor] Mapping Post for " . ($metric->name ?? 'unknown') . " | Raw: " . (is_object($val) ? get_class($val) : gettype($val)) . " | Resolved Platform ID: " . ($resolvedId ?? 'NULL'));
         }
 
         return $resolvedId ?: null;
