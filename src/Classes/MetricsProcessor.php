@@ -669,6 +669,11 @@ class MetricsProcessor
             $mObj = $metric;
             /** @var object{channel: mixed, name: mixed, period: mixed, account: mixed, channeledAccount: mixed, campaign: mixed, channeledCampaign: mixed, channeledAdGroup: mixed, channeledAd: mixed, page: mixed, query: mixed, post: mixed, product: mixed, customer: mixed, creative: mixed, country: mixed, device: mixed} $mObj */
 
+            $rowPostValue = isset($mObj->post) ? (is_object($mObj->post) ? (method_exists($mObj->post, 'getPostId') ? $mObj->post->getPostId() : (string)$mObj->post) : (string)$mObj->post) : ($mObj->postPlatformId ?? null);
+            if (str_contains((string)($mObj->name ?? ''), 'daily')) {
+                error_log("[MetricsProcessor] Generating Key for " . ($mObj->name ?? 'unknown') . " | Post: " . ($rowPostValue ?? 'NULL'));
+            }
+
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: $mObj->channel ?? null,
                 name: $mObj->name ?? null,
@@ -681,7 +686,7 @@ class MetricsProcessor
                 channeledAd: isset($mObj->channeledAd) ? (is_object($mObj->channeledAd) ? (method_exists($mObj->channeledAd, 'getPlatformId') ? $mObj->channeledAd->getPlatformId() : (string)$mObj->channeledAd) : (string)$mObj->channeledAd) : ($mObj->channeledAdPlatformId ?? null),
                 page: isset($mObj->page) ? (is_object($mObj->page) ? (method_exists($mObj->page, 'getUrl') ? $mObj->page->getUrl() : (string)$mObj->page) : (string)$mObj->page) : ($mObj->pagePlatformId ?? null),
                 query: $mObj->query ?? null,
-                post: isset($mObj->post) ? (is_object($mObj->post) ? (method_exists($mObj->post, 'getPostId') ? $mObj->post->getPostId() : (string)$mObj->post) : (string)$mObj->post) : ($mObj->postPlatformId ?? null),
+                post: $rowPostValue,
                 product: isset($mObj->product) ? (is_object($mObj->product) ? (method_exists($mObj->product, 'getProductId') ? $mObj->product->getProductId() : (string)$mObj->product) : (string)$mObj->product) : ($mObj->productPlatformId ?? null),
                 customer: isset($mObj->customer) ? (is_object($mObj->customer) ? (method_exists($mObj->customer, 'getEmail') ? $mObj->customer->getEmail() : (string)$mObj->customer) : (string)$mObj->customer) : ($mObj->customerPlatformId ?? null),
                 order: isset($mObj->order) ? (is_object($mObj->order) ? $mObj->order->getOrderId() : (string)$mObj->order) : ($mObj->orderPlatformId ?? null),
