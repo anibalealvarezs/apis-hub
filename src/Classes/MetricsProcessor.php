@@ -666,7 +666,7 @@ class MetricsProcessor
             if (! $metric) {
                 continue;
             }
-            $mObj = (object)$metric;
+            $mObj = $metric;
             /** @var object{channel: mixed, name: mixed, period: mixed, account: mixed, channeledAccount: mixed, campaign: mixed, channeledCampaign: mixed, channeledAdGroup: mixed, channeledAd: mixed, page: mixed, query: mixed, post: mixed, product: mixed, customer: mixed, creative: mixed, country: mixed, device: mixed} $mObj */
 
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
