@@ -98,6 +98,23 @@ class SocialProcessor
         $conn->executeStatement($sql, $params);
     }
 
+    private static array $channelMap = [];
+
+    private static function resolveChannelId(string $channelName, EntityManager $manager): int
+    {
+        if (isset(self::$channelMap[$channelName])) {
+            return self::$channelMap[$channelName];
+        }
+
+        $channel = $manager->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channelName]);
+        if (!$channel) {
+            throw new \Exception("Channel '$channelName' not found in database during social processing.");
+        }
+
+        self::$channelMap[$channelName] = $channel->getId();
+        return self::$channelMap[$channelName];
+    }
+
     private static function processChanneledAccount(\Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity $entity, EntityManager $manager): void
     {
         $conn = $manager->getConnection();
@@ -109,7 +126,7 @@ class SocialProcessor
         $params = [
             $entity->getPlatformId(),
             $accountId,
-            $entity->getChannel(),
+            self::resolveChannelId($entity->getChannel(), $manager),
             $entity->getTitle() ?? $entity->getPlatformId(),
             $entity->getType(),
             json_encode($entity->getData() ?? [])
