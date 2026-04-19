@@ -112,8 +112,11 @@ class SyncService
             }
 
             // 5. Date normalization
-            $startDate = new DateTime($startDateStr ?? $finalConfig['startDate'] ?? $finalConfig['start_date'] ?? '-30 days');
-            $endDate = new DateTime($endDateStr ?? $finalConfig['endDate'] ?? $finalConfig['end_date'] ?? 'now');
+            $fallbackStart = $finalConfig['startDate'] ?? $finalConfig['start_date'] ?? '-30 days';
+            $startDate = new DateTime($startDateStr ?? $fallbackStart);
+            
+            $fallbackEnd = $finalConfig['endDate'] ?? $finalConfig['end_date'] ?? $startDate->format('Y-m-d');
+            $endDate = new DateTime($endDateStr ?? $fallbackEnd);
 
             // 5. Logging and Execution
             $sanitizedConfig = $finalConfig;
