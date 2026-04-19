@@ -16,15 +16,15 @@ interface ChannelInterface
     public function addPlatformId(int|string $platformId): self;
 
     /**
-     * @return int
+     * @return \Entities\Analytics\Channel
      */
-    public function getChannel(): int;
+    public function getChannel(): \Entities\Analytics\Channel;
 
     /**
-     * @param int $channel
+     * @param \Entities\Analytics\Channel $channel
      * @return ChannelInterface
      */
-    public function addChannel(int $channel): self;
+    public function addChannel(\Entities\Analytics\Channel $channel): self;
 
     /**
      * @return array|null
