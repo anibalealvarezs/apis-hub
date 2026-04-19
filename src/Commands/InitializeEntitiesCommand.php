@@ -149,17 +149,31 @@ class InitializeEntitiesCommand extends Command
                         'accounts' => \Entities\Analytics\Account::class,
                     ];
                     if (!isset($repoMap[$type])) return [];
+                    /** @var \Repositories\PageRepository|\Repositories\ChanneledAccountRepository $repo */
                     $repo = $this->entityManager->getRepository($repoMap[$type]);
                     $map = [];
-                    if ($type === 'pages' && isset($params['platform_ids'])) {
-                        $entities = $repo->findBy(['platformId' => $params['platform_ids']]);
-                        foreach ($entities as $e) $map[$e->getPlatformId()] = $e;
+                    if ($type === 'pages') {
+                        $lookupField = 'platformId';
+                        $searchValues = (array)($params['platform_ids'] ?? []);
+                        if (isset($params['canonical_ids'])) {
+                            $lookupField = 'canonicalId';
+                            $searchValues = (array)$params['canonical_ids'];
+                        } elseif (isset($params['urls'])) {
+                            $lookupField = 'canonicalId';
+                            $urls = (array)$params['urls'];
+                            $searchValues = array_map(fn($u) => Helpers::getCanonicalPageId($u, null, 'website'), $urls);
+                        }
+                        if (!empty($searchValues)) {
+                            $entities = $repo->findBy([$lookupField => array_unique($searchValues)]);
+                            $getter = 'get'.ucfirst($lookupField);
+                            foreach ($entities as $e) $map[(string)$e->$getter()] = $e;
+                        }
                     } elseif ($type === 'channeled_accounts' && isset($params['platform_ids'])) {
                         $entities = $repo->findBy(['platformId' => $params['platform_ids'], 'channel' => $channel]);
-                        foreach ($entities as $e) $map[$e->getPlatformId()] = $e;
+                        foreach ($entities as $e) $map[(string)$e->getPlatformId()] = $e;
                     } elseif ($type === 'accounts' && isset($params['names'])) {
                         $entities = $repo->findBy(['name' => $params['names']]);
-                        foreach ($entities as $e) $map[$e->getName()] = $e;
+                        foreach ($entities as $e) $map[(string)$e->getName()] = $e;
                     }
                     return $map;
                 };

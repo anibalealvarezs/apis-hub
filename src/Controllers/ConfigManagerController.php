@@ -449,11 +449,16 @@ class ConfigManagerController extends BaseController
                 }
 
                 $accountEntity = $this->getOrCreateAccount($groupName);
+                $isUrlBasedProvider = ($channel === 'google_search_console' || str_contains($channel, 'search_console'));
 
                 foreach ($assets as $asset) {
                     $id = (string)($asset['id'] ?? ($asset['url'] ?? ''));
                     if (! $id) {
                         continue;
+                    }
+
+                    if ($isUrlBasedProvider && filter_var($id, FILTER_VALIDATE_URL)) {
+                        $id = md5(rtrim($id, '/'));
                     }
 
                     $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $id);
