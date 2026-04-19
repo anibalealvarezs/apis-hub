@@ -677,7 +677,7 @@ class MetricsProcessor
             }
 
             if (str_contains((string)($mObj->name ?? ''), 'daily')) {
-                error_log("[MetricsProcessor] Generating Key for " . ($mObj->name ?? 'unknown') . " | Resolved Post ID: " . ($rowPostValue ?? 'NULL'));
+                self::log("[MetricsProcessor] Generating Key for " . ($mObj->name ?? 'unknown') . " | Resolved Post ID: " . ($rowPostValue ?? 'NULL'), 'info');
             }
 
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
@@ -1238,7 +1238,7 @@ class MetricsProcessor
         }
 
         if (str_contains((string)($metric->name ?? ''), 'daily') && $property === 'post') {
-            error_log("[MetricsProcessor] Mapping Post for " . ($metric->name ?? 'unknown') . " | Raw: " . (is_object($val) ? get_class($val) : gettype($val)) . " | Resolved Platform ID: " . ($resolvedId ?? 'NULL'));
+            self::log("[MetricsProcessor] Mapping Post for " . ($metric->name ?? 'unknown') . " | Raw: " . (is_object($val) ? get_class($val) : gettype($val)) . " | Resolved Platform ID: " . ($resolvedId ?? 'NULL'), 'info');
         }
 
         return $resolvedId ?: null;
