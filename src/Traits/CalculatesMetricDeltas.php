@@ -24,10 +24,9 @@ trait CalculatesMetricDeltas
     {
         $lifetimeMetrics = [];
         foreach ($metrics as $metric) {
-            if (! $metric instanceof stdClass) {
+            if (! is_object($metric)) {
                 continue;
             }
-            /** @var \stdClass $metric */
             if (($metric->period ?? null) === Period::Lifetime->value) {
                 $lifetimeMetrics[] = $metric;
             }
