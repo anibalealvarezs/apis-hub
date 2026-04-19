@@ -669,30 +669,36 @@ class MetricsProcessor
             $mObj = $metric;
             /** @var object{channel: mixed, name: mixed, period: mixed, account: mixed, channeledAccount: mixed, campaign: mixed, channeledCampaign: mixed, channeledAdGroup: mixed, channeledAd: mixed, page: mixed, query: mixed, post: mixed, product: mixed, customer: mixed, creative: mixed, country: mixed, device: mixed} $mObj */
 
-            $rowPostValue = isset($mObj->post) ? (is_object($mObj->post) ? (method_exists($mObj->post, 'getPostId') ? $mObj->post->getPostId() : (string)$mObj->post) : (string)$mObj->post) : ($mObj->postPlatformId ?? null);
+            $mContext = (is_object($mObj) && method_exists($mObj, 'getContext')) ? $mObj->getContext() : (array)$mObj;
+
+            $rowPostValue = $mContext['post'] ?? $mObj->post ?? $mObj->postPlatformId ?? null;
+            if (is_object($rowPostValue)) {
+                $rowPostValue = method_exists($rowPostValue, 'getPostId') ? $rowPostValue->getPostId() : (method_exists($rowPostValue, 'getPlatformId') ? $rowPostValue->getPlatformId() : (string)$rowPostValue);
+            }
+
             if (str_contains((string)($mObj->name ?? ''), 'daily')) {
-                error_log("[MetricsProcessor] Generating Key for " . ($mObj->name ?? 'unknown') . " | Post: " . ($rowPostValue ?? 'NULL'));
+                error_log("[MetricsProcessor] Generating Key for " . ($mObj->name ?? 'unknown') . " | Resolved Post ID: " . ($rowPostValue ?? 'NULL'));
             }
 
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: $mObj->channel ?? null,
                 name: $mObj->name ?? null,
                 period: $mObj->period ?? null,
-                account: isset($mObj->account) ? (is_object($mObj->account) ? (method_exists($mObj->account, 'getName') ? $mObj->account->getName() : (string)$mObj->account) : (string)$mObj->account) : ($mObj->accountPlatformId ?? null),
-                channeledAccount: isset($mObj->channeledAccount) ? (is_object($mObj->channeledAccount) ? (method_exists($mObj->channeledAccount, 'getPlatformId') ? $mObj->channeledAccount->getPlatformId() : (string)$mObj->channeledAccount) : (string)$mObj->channeledAccount) : ($mObj->channeledAccountPlatformId ?? null),
-                campaign: isset($mObj->campaign) ? (is_object($mObj->campaign) ? (method_exists($mObj->campaign, 'getCampaignId') ? $mObj->campaign->getCampaignId() : (string)$mObj->campaign) : (string)$mObj->campaign) : ($mObj->campaignPlatformId ?? null),
-                channeledCampaign: isset($mObj->channeledCampaign) ? (is_object($mObj->channeledCampaign) ? (method_exists($mObj->channeledCampaign, 'getPlatformId') ? $mObj->channeledCampaign->getPlatformId() : (string)$mObj->channeledCampaign) : (string)$mObj->channeledCampaign) : ($mObj->channeledCampaignPlatformId ?? null),
-                channeledAdGroup: isset($mObj->channeledAdGroup) ? (is_object($mObj->channeledAdGroup) ? (method_exists($mObj->channeledAdGroup, 'getPlatformId') ? $mObj->channeledAdGroup->getPlatformId() : (string)$mObj->channeledAdGroup) : (string)$mObj->channeledAdGroup) : ($mObj->channeledAdGroupPlatformId ?? null),
-                channeledAd: isset($mObj->channeledAd) ? (is_object($mObj->channeledAd) ? (method_exists($mObj->channeledAd, 'getPlatformId') ? $mObj->channeledAd->getPlatformId() : (string)$mObj->channeledAd) : (string)$mObj->channeledAd) : ($mObj->channeledAdPlatformId ?? null),
-                page: isset($mObj->page) ? (is_object($mObj->page) ? (method_exists($mObj->page, 'getUrl') ? $mObj->page->getUrl() : (string)$mObj->page) : (string)$mObj->page) : ($mObj->pagePlatformId ?? null),
-                query: $mObj->query ?? null,
+                account: ($v = $mContext['account'] ?? $mObj->account ?? $mObj->accountPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getName') ? $v->getName() : (string)$v) : (string)$v) : null,
+                channeledAccount: ($v = $mContext['channeledAccount'] ?? $mObj->channeledAccount ?? $mObj->channeledAccountPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getPlatformId') ? $v->getPlatformId() : (string)$v) : (string)$v) : null,
+                campaign: ($v = $mContext['campaign'] ?? $mObj->campaign ?? $mObj->campaignPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getCampaignId') ? $v->getCampaignId() : (string)$v) : (string)$v) : null,
+                channeledCampaign: ($v = $mContext['channeledCampaign'] ?? $mObj->channeledCampaign ?? $mObj->channeledCampaignPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getPlatformId') ? $v->getPlatformId() : (string)$v) : (string)$v) : null,
+                channeledAdGroup: ($v = $mContext['channeledAdGroup'] ?? $mObj->channeledAdGroup ?? $mObj->channeledAdGroupPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getPlatformId') ? $v->getPlatformId() : (string)$v) : (string)$v) : null,
+                channeledAd: ($v = $mContext['channeledAd'] ?? $mObj->channeledAd ?? $mObj->channeledAdPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getPlatformId') ? $v->getPlatformId() : (string)$v) : (string)$v) : null,
+                page: ($v = $mContext['page'] ?? $mObj->page ?? $mObj->pagePlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getUrl') ? $v->getUrl() : (string)$v) : (string)$v) : null,
+                query: $mContext['query'] ?? $mObj->query ?? null,
                 post: $rowPostValue,
-                product: isset($mObj->product) ? (is_object($mObj->product) ? (method_exists($mObj->product, 'getProductId') ? $mObj->product->getProductId() : (string)$mObj->product) : (string)$mObj->product) : ($mObj->productPlatformId ?? null),
-                customer: isset($mObj->customer) ? (is_object($mObj->customer) ? (method_exists($mObj->customer, 'getEmail') ? $mObj->customer->getEmail() : (string)$mObj->customer) : (string)$mObj->customer) : ($mObj->customerPlatformId ?? null),
-                order: isset($mObj->order) ? (is_object($mObj->order) ? $mObj->order->getOrderId() : (string)$mObj->order) : ($mObj->orderPlatformId ?? null),
+                product: ($v = $mContext['product'] ?? $mObj->product ?? $mObj->productPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getProductId') ? $v->getProductId() : (string)$v) : (string)$v) : null,
+                customer: ($v = $mContext['customer'] ?? $mObj->customer ?? $mObj->customerPlatformId ?? null) ? (is_object($v) ? (method_exists($v, 'getEmail') ? $v->getEmail() : (string)$v) : (string)$v) : null,
+                order: ($v = $mContext['order'] ?? $mObj->order ?? $mObj->orderPlatformId ?? null) ? (is_object($v) ? $v->getOrderId() : (string)$v) : (string)$v,
                 country: $mObj->countryCode ?? ($mObj->country ?? null),
                 device: $mObj->deviceType ?? ($mObj->device ?? null),
-                creative: isset($mObj->creative) ? (is_object($mObj->creative) ? $mObj->creative->getCreativeId() : (string)$mObj->creative) : ($mObj->creativePlatformId ?? null),
+                creative: ($v = $mContext['creative'] ?? $mObj->creative ?? $mObj->creativePlatformId ?? null) ? (is_object($v) ? $v->getCreativeId() : (string)$v) : (string)$v,
                 dimensionSet: $mObj->dimensionsHash ?? (isset($mObj->dimensions) ? KeyGenerator::generateDimensionsHash((array)$mObj->dimensions) : null)
             );
             $metric->metricConfigKey = $metricConfigKey;
@@ -1208,13 +1214,12 @@ class MetricsProcessor
 
     private static function getMetricPlatformId(object $metric, string $property): ?string
     {
+        $mContext = (method_exists($metric, 'getContext')) ? $metric->getContext() : (array)$metric;
         $platformProp = $property . 'PlatformId';
-        $val = $metric->$property ?? ($metric->$platformProp ?? null);
-        if (!$val) {
-            return null;
-        }
+        $val = $mContext[$property] ?? ($mContext[$platformProp] ?? ($metric->$property ?? ($metric->$platformProp ?? null)));
+        
         if (is_object($val)) {
-            $methods = ['getPlatformId', 'getId', 'getCampaignId', 'getCreativeId', 'getPostId', 'getProductId', 'getOrderId'];
+            $methods = ['getPlatformId', 'getId', 'getCampaignId', 'getCreativeId', 'getPostId', 'getProductId', 'getOrderId', 'getUrl', 'getEmail'];
             foreach ($methods as $method) {
                 if (method_exists($val, $method)) {
                     return (string) $val->$method();
@@ -1222,7 +1227,7 @@ class MetricsProcessor
             }
             return (string) $val;
         }
-        return (string) $val;
+        return (string) $val ?: null;
     }
 
     private static function resolveChanneledAccountId(object $metric, ?array $channeledAccountMap): ?int
