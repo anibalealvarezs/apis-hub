@@ -44,7 +44,7 @@ class SocialProcessor
             $sql = Helpers::buildUpsertSql(
                 'pages', 
                 $cols, 
-                ['url', 'title', 'platform_id', 'data'], 
+                ['url', 'title', 'hostname', 'platform_id', 'data', 'account_id'], 
                 'canonical_id', 
                 count($chunk)
             );
@@ -94,7 +94,7 @@ class SocialProcessor
             json_encode($entity->getData() ?? [])
         ];
 
-        $sql = Helpers::buildUpsertSql('pages', $cols, ['url', 'title', 'platform_id', 'data'], 'canonical_id', 1);
+        $sql = Helpers::buildUpsertSql('pages', $cols, ['url', 'title', 'hostname', 'platform_id', 'data', 'account_id'], 'canonical_id', 1);
         $conn->executeStatement($sql, $params);
     }
 

@@ -513,6 +513,28 @@ class ConfigManagerController extends BaseController
                             }
                         }
                     }
+
+                    // 4. ALSO Persist Page Entity if applicable (Optimization for GSC/Social)
+                    if ($typeMark === 'gsc_site' || $typeMark === 'facebook_page') {
+                        $canonicalId = \Helpers\Helpers::getCanonicalPageId($asset['url'] ?? $id, null, 'website');
+                        $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
+                        if (! $dbPage) {
+                            $dbPage = new \Entities\Analytics\Page();
+                            $dbPage->addCanonicalId($canonicalId)
+                                ->addUrl($asset['url'] ?? $id)
+                                ->addTitle($name)
+                                ->addAccount($accountEntity)
+                                ->addPlatformId($id)
+                                ->addHostname($asset['hostname'] ?? parse_url($asset['url'] ?? $id, PHP_URL_HOST))
+                                ->addData($asset);
+                            $this->em->persist($dbPage);
+                        } else {
+                             $dbPage->addAccount($accountEntity)
+                                ->addPlatformId($id)
+                                ->addTitle($name);
+                             $this->em->persist($dbPage);
+                        }
+                    }
                 }
             }
             $this->em->flush();
