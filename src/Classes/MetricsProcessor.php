@@ -1079,7 +1079,7 @@ class MetricsProcessor
                 $isPostgres = Helpers::isPostgres();
                 $sql = "SELECT id, channel, platform_id, metric_id, platform_created_at, data
                         FROM channeled_metrics
-                        WHERE " . ($isPostgres ? "(channel::integer, platform_id::text, metric_id::integer, platform_created_at::text)" : "(channel, platform_id, metric_id, platform_created_at)") . " IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
+                        WHERE " . ($isPostgres ? "(channel::integer, platform_id::text, metric_id::integer, platform_created_at::date::text)" : "(channel, platform_id, metric_id, platform_created_at)") . " IN (" . ($isPostgres ? "VALUES " : "") . "$placeholders)";
 
                 $chunkMap = MapGenerator::getChanneledMetricMap($manager, $sql, $selectParams, $metricMap);
                 foreach ($chunkMap as $k => $v) {
