@@ -107,6 +107,10 @@ trait CalculatesMetricDeltas
             $virtual->value = max(0, $delta);
             $virtual->isVirtualDelta = true;
 
+            $rowPost = $virtual->post ?? $virtual->postPlatformId ?? null;
+            $pVal = $rowPost ? (is_object($rowPost) ? (method_exists($rowPost, 'getPostId') ? $rowPost->getPostId() : (method_exists($rowPost, 'getPlatformId') ? $rowPost->getPlatformId() : (string)$rowPost)) : (string)$rowPost) : null;
+            error_log("[CalculatesMetricDeltas] Name: " . $virtual->name . " | Post: " . ($pVal ?? 'NULL'));
+
             // Re-generate the config key for the new daily metric
             $virtual->metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: $virtual->channel,
