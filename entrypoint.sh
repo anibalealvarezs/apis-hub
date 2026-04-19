@@ -23,7 +23,8 @@ if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     if mkdir "/app/storage/db_lock" 2>/dev/null; then
         echo "Master Instance ($INSTANCE_NAME): Acquired lock. Initializing database and entities..."
         if php bin/cli.php app:setup-db; then
-            echo "Database setup successful."
+            echo "Database setup successful. Installing dynamic drivers..."
+            php bin/cli.php app:install-drivers
         else
             echo "Database setup failed. Removing lock to allow retries."
             rmdir "/app/storage/db_lock"

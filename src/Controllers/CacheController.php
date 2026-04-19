@@ -2,7 +2,7 @@
 
 namespace Controllers;
 
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\Analytics\Channel as ChannelEntity;
 use Enums\AnalyticsEntity;
 use Exception;
 use Helpers\Helpers;
@@ -26,8 +26,9 @@ class CacheController extends BaseController
         ?string $body = null,
         ?array $params = null
     ): Response {
-        $channelEnum = Channel::tryFromName($channel);
-        if (! $channelEnum) {
+        /** @var ChannelEntity $channelEntity */
+        $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $channel]);
+        if (! $channelEntity) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -50,14 +51,14 @@ class CacheController extends BaseController
             return $this->createResponse(
                 data: null,
                 status: 'error',
-                error: "Channel ". $channelEnum->getCommonName() ." not supported for entity " . $entity,
+                error: "Channel ". $channelEntity->getLabel() ." not supported for entity " . $entity,
                 httpStatus: Response::HTTP_NOT_FOUND
             );
         }
 
         return $this->list(
             entity: $entity,
-            channel: $channelEnum,
+            channel: $channelEntity,
             body: $body,
             params: $params
         );
@@ -121,12 +122,12 @@ class CacheController extends BaseController
 
     /**
      * @param string $entity
-     * @param Channel $channel
+     * @param ChannelEntity $channel
      * @param string|null $body
      * @param array|null $params
      * @return Response
      */
-    protected function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
+    protected function list(string $entity, ChannelEntity $channel, ?string $body = null, ?array $params = null): Response
     {
         try {
             /** @var \Repositories\JobRepository $jobRepo */
@@ -146,7 +147,7 @@ class CacheController extends BaseController
                 $sql = "SELECT id FROM jobs WHERE entity IN (:entities) AND channel = :channel AND status IN (:statuses)";
                 $sqlParams = [
                     'entities' => $equivalents,
-                    'channel' => $channel->name,
+                    'channel' => $channel->getName(),
                     'statuses' => $statuses,
                 ];
 
@@ -178,7 +179,7 @@ class CacheController extends BaseController
                    ->andWhere('j.channel = :channel')
                    ->andWhere('j.status IN (:statuses)')
                    ->setParameter('entities', array_unique($equivalents))
-                   ->setParameter('channel', $channel->name)
+                   ->setParameter('channel', $channel->getName())
                    ->setParameter('statuses', $statuses);
 
                 $payloadField = 'j.payload';
@@ -220,7 +221,7 @@ class CacheController extends BaseController
 
             // --- ATOMIC LOCK START ---
             $redis = Helpers::getRedisClient();
-            $lockKey = 'lock:schedule:' . sha1($channel->name . $entity . json_encode($payload));
+            $lockKey = 'lock:schedule:' . sha1($channel->getName() . $entity . json_encode($payload));
 
             // Try to acquire lock for 30 seconds
             if (! $redis->set($lockKey, 'locked', 'EX', 30, 'NX')) {
@@ -244,7 +245,7 @@ class CacheController extends BaseController
                        ->andWhere('j.channel = :channel')
                        ->andWhere('j.status IN (:statuses)')
                        ->setParameter('entities', array_unique($equivalents))
-                       ->setParameter('channel', $channel->name)
+                       ->setParameter('channel', $channel->getName())
                        ->setParameter('statuses', $statuses);
 
                     $payloadField = 'j.payload';
@@ -278,7 +279,7 @@ class CacheController extends BaseController
 
                 $jobData = (object) [
                     'entity' => $entity,
-                    'channel' => $channel->name,
+                    'channel' => $channel->getName(),
                     'status' => \Enums\JobStatus::scheduled->value,
                     'payload' => $payload,
                 ];
@@ -327,12 +328,7 @@ class CacheController extends BaseController
                 ->setParameter('statuses', [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value]);
 
             if ($channel) {
-                $channelEnum = Channel::tryFromName($channel);
-                if ($channelEnum) {
-                    $qb->andWhere('j.channel = :channel')->setParameter('channel', $channelEnum->name);
-                } else {
-                    $qb->andWhere('j.channel = :channel')->setParameter('channel', $channel);
-                }
+                $qb->andWhere('j.channel = :channel')->setParameter('channel', $channel);
             }
             if ($entity) {
                 $qb->andWhere('j.entity = :entity')->setParameter('entity', $entity);
@@ -393,13 +389,13 @@ class CacheController extends BaseController
      * Fetch data and cache it.
      *
      * @param string $entity
-     * @param Channel $channel
+     * @param ChannelEntity $channel
      * @param array|null $params
      * @param string|null $body
      * @return mixed
      * @throws ReflectionException
      */
-    public function fetchData(string $entity, Channel $channel, ?array $params = null, ?string $body = null): mixed
+    public function fetchData(string $entity, ChannelEntity $channel, ?array $params = null, ?string $body = null): mixed
     {
         try {
             $resolvedClassName = $this->getEntityRequestsClassName($entity);

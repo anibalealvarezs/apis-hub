@@ -50,12 +50,17 @@ class SetupDatabaseCommand extends Command
             $schemaInput = new ArrayInput(['--force' => true]);
             $schemaUpdateCommand->run($schemaInput, $output);
 
-            // 3. Initialize Entities
+            // 3. Install Drivers (Dynamic Registry)
+            $output->writeln("<info>🔌 Registration of Providers and Channels...</info>");
+            $installDriversCommand = $this->getApplication()->find('app:install-drivers');
+            $installDriversCommand->run(new ArrayInput([]), $output);
+
+            // 4. Initialize Entities
             $output->writeln("<info>🌱 Seeding initial entities...</info>");
             $initEntitiesCommand = $this->getApplication()->find('app:initialize-entities');
             $initEntitiesCommand->run(new ArrayInput([]), $output);
 
-            // 4. Auto-Seed for Demo (Smart Zero-Touch)
+            // 5. Auto-Seed for Demo (Smart Zero-Touch)
             $skipSeed = (string)getenv('SKIP_SEED');
             if (getenv('APP_ENV') === 'demo' && $skipSeed !== '1' && $skipSeed !== 'true') {
                 $output->writeln("<info>🎁 Environment is 'demo'. Filling with sample data...</info>");

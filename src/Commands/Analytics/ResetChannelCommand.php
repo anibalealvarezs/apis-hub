@@ -2,7 +2,7 @@
 
 namespace Commands\Analytics;
 
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\Analytics\Channel as ChannelEntity;
 use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Command\Command;
@@ -36,13 +36,19 @@ class ResetChannelCommand extends Command
         $isPostgres = strpos($connection->getDatabasePlatform()->getName(), 'postgresql') !== false;
 
         try {
-            $enum = Channel::tryFromName($channelName);
-            if (!$enum) {
+            /** @var ChannelEntity $channelEntity */
+            $channelEntity = $manager->getRepository(ChannelEntity::class)->findOneBy(['name' => $channelName]);
+            if (!$channelEntity) {
+                // Secondary check by ID just in case
+                $channelEntity = is_numeric($channelName) ? $manager->getRepository(ChannelEntity::class)->find((int)$channelName) : null;
+            }
+
+            if (!$channelEntity) {
                 throw new \Exception("Unknown channel: $channelName.");
             }
 
-            $channelId = $enum->value;
-            $channelSlug = $enum->name;
+            $channelId = $channelEntity->getId();
+            $channelSlug = $channelEntity->getName();
 
             $output->writeln("<info>🚀 Starting ATOMIC RESET for channel: $channelName...</info>");
 

@@ -7,7 +7,7 @@ namespace Classes\Requests;
 use Carbon\Carbon;
 use Classes\MetricsProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\Analytics\Channel as ChannelEntity;
 use Exception;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
@@ -28,15 +28,14 @@ class MetricRequests implements RequestInterface
      * @return \Symfony\Component\HttpFoundation\Response
      */
     public static function getList(
-        Channel|string $channel,
+        ChannelEntity|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
     ): \Symfony\Component\HttpFoundation\Response {
-        $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
-        $chanKey = $chanEnum?->name ?? (string)$channel;
+        $chanKey = ($channel instanceof ChannelEntity) ? $channel->getName() : (string)$channel;
         $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
         $mapping = $driver->getDateFilterMapping();
 

@@ -12,8 +12,9 @@ class ChanneledEntity extends Entity implements ChannelInterface
     #[ORM\Column(name: 'platform_id', type: 'string')]
     protected int|string $platformId;
 
-    #[ORM\Column(type: 'integer')]
-    protected int $channel;
+    #[ORM\ManyToOne(targetEntity: \Entities\Analytics\Channel::class)]
+    #[ORM\JoinColumn(name: 'channel', referencedColumnName: 'id', nullable: false)]
+    protected \Entities\Analytics\Channel $channel;
 
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $data = null;
@@ -58,18 +59,18 @@ class ChanneledEntity extends Entity implements ChannelInterface
     }
 
     /**
-     * @return int
+     * @return \Entities\Analytics\Channel
      */
-    public function getChannel(): int
+    public function getChannel(): \Entities\Analytics\Channel
     {
         return $this->channel;
     }
 
     /**
-     * @param int $channel
+     * @param \Entities\Analytics\Channel $channel
      * @return static
      */
-    public function addChannel(int $channel): static
+    public function addChannel(\Entities\Analytics\Channel $channel): static
     {
         $this->channel = $channel;
         return $this;

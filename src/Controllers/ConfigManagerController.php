@@ -436,17 +436,11 @@ class ConfigManagerController extends BaseController
 
                 $typeMark = $typeRaw;
 
-                // Resolve Group Name via Common Key if exists
+                $chanConfig = $config['channels'][$channel] ?? [];
                 $commonKey = $driver::getCommonConfigKey();
-                $groupName = "Default Group";
-                if ($commonKey) {
-                    $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
-                    $commonPath = $configDir . "/channels/{$commonKey}.yaml";
-                    if (file_exists($commonPath)) {
-                        $commonConfig = Yaml::parseFile($commonPath);
-                        $groupName = $commonConfig['channels'][$commonKey]['accounts_group_name'] ?? "Default Group";
-                    }
-                }
+                $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
+                
+                $groupName = $chanConfig['accounts_group_name'] ?? ($config['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
 
                 $accountEntity = $this->getOrCreateAccount($groupName);
                 $isUrlBasedProvider = ($channel === 'google_search_console' || str_contains($channel, 'search_console'));

@@ -7,7 +7,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\Analytics\Channel as ChannelEntity;
 use Enums\QueryBuilderType;
 use Exception;
 use InvalidArgumentException;
@@ -17,6 +17,8 @@ use ValueError;
 
 class ChanneledBaseRepository extends BaseRepository
 {
+    private static array $channelCache = [];
+
     /**
      * @param QueryBuilderType $type
      * @return QueryBuilder
@@ -133,7 +135,8 @@ class ChanneledBaseRepository extends BaseRepository
     protected function replaceChannelName(array $entity): array
     {
         if (isset($entity['channel']) && is_int($entity['channel'])) {
-            $entity['channel'] = Channel::from($entity['channel'])->getName();
+            $channel = $this->resolveChannel($entity['channel']);
+            $entity['channel'] = $channel ? $channel->getName() : (string)$entity['channel'];
         }
         return $entity;
     }
@@ -147,32 +150,48 @@ class ChanneledBaseRepository extends BaseRepository
         if ($channel === null || (is_string($channel) && empty($channel))) {
             throw new InvalidArgumentException('Invalid channel: channel cannot be null or empty');
         }
-        if (is_string($channel)) {
-            return $this->validateChannelName($channel);
-        }
-        $channelEnum = Channel::tryFrom($channel);
-        if ($channelEnum === null) {
+        
+        $channelEntity = $this->resolveChannel($channel);
+        if (!$channelEntity) {
             throw new InvalidArgumentException('Invalid channel: ' . $channel);
         }
-        return $channelEnum->value;
+        
+        return $channelEntity->getId();
     }
 
     /**
      * @param string $name
      * @return int
-     * @throws ValueError
      */
     protected function validateChannelName(string $name): int
     {
-        try {
-            $channel = Channel::tryFromName($name);
-            if ($channel === null) {
-                throw new InvalidArgumentException("Invalid channel name: $name");
-            }
-            return $channel->value;
-        } catch (Exception) {
-            throw new InvalidArgumentException("Invalid channel name: $name");
+        return $this->validateChannel($name);
+    }
+
+    /**
+     * @param int|string $identity
+     * @return ChannelEntity|null
+     */
+    protected function resolveChannel(int|string $identity): ?ChannelEntity
+    {
+        if (isset(self::$channelCache[$identity])) {
+            return self::$channelCache[$identity];
         }
+
+        $repo = $this->_em->getRepository(ChannelEntity::class);
+        if (is_int($identity) || ctype_digit($identity)) {
+            $channel = $repo->find((int)$identity);
+        } else {
+            $channel = $repo->findOneBy(['name' => $identity]);
+        }
+
+        if ($channel) {
+            self::$channelCache[$identity] = $channel;
+            self::$channelCache[$channel->getId()] = $channel;
+            self::$channelCache[$channel->getName()] = $channel;
+        }
+
+        return $channel;
     }
 
     /**

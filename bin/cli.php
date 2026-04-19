@@ -26,6 +26,7 @@ use Commands\RefreshInstancesCommand;
 use Commands\SetupDatabaseCommand;
 use Commands\SeedDemoDataCommand;
 use Commands\MigratePagesCanonicalCommand;
+use Commands\InstallDriversCommand;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use Helpers\Helpers;
 use Symfony\Component\Console\Application;
@@ -84,6 +85,7 @@ try {
         new \Commands\Analytics\SwooleWorkerCommand($entityManager),
         new \Commands\Analytics\ScaleDownCommand($entityManager),
         new MigratePagesCanonicalCommand(Helpers::getManager()),
+        new InstallDriversCommand(),
     ]);
 
 

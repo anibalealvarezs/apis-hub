@@ -142,7 +142,13 @@ class InitializeEntitiesCommand extends Command
                     return $stats;
                 };
 
-                $identityMapper = function (string $type, array $params) use ($channel) {
+                /** @var \Entities\Analytics\Channel $channelEntity */
+                $channelEntity = $this->entityManager->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channel]);
+                if (!$channelEntity) {
+                    throw new Exception("Channel entity not found for database lookup: $channel");
+                }
+
+                $identityMapper = function (string $type, array $params) use ($channel, $channelEntity) {
                     $repoMap = [
                         'channeled_accounts' => \Entities\Analytics\Channeled\ChanneledAccount::class,
                         'pages' => \Entities\Analytics\Page::class,
@@ -169,7 +175,7 @@ class InitializeEntitiesCommand extends Command
                             foreach ($entities as $e) $map[(string)$e->$getter()] = $e;
                         }
                     } elseif ($type === 'channeled_accounts' && isset($params['platform_ids'])) {
-                        $entities = $repo->findBy(['platformId' => $params['platform_ids'], 'channel' => $channel]);
+                        $entities = $repo->findBy(['platformId' => $params['platform_ids'], 'channel' => $channelEntity]);
                         foreach ($entities as $e) $map[(string)$e->getPlatformId()] = $e;
                     } elseif ($type === 'accounts' && isset($params['names'])) {
                         $entities = $repo->findBy(['name' => $params['names']]);

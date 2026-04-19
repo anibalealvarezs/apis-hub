@@ -5,7 +5,7 @@ namespace Commands\Analytics;
 use Controllers\CacheController;
 use Doctrine\ORM\EntityManager;
 use Entities\Job;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\Analytics\Channel as ChannelEntity;
 use Enums\JobStatus;
 use Helpers\Helpers;
 use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
@@ -147,13 +147,7 @@ class ProcessJobsCommand extends Command
 
                 // Global filters from env
                 if (!$jobId && $envChannel = getenv('API_SOURCE')) {
-                    $envChannelEnum = Channel::tryFromName($envChannel);
-                    $jobChannelEnum = Channel::tryFromName($job->getChannel());
-                    
-                    $envMatch = $envChannelEnum ? $envChannelEnum->name : $envChannel;
-                    $jobMatch = $jobChannelEnum ? $jobChannelEnum->name : $job->getChannel();
-
-                    if ($jobMatch !== $envMatch) {
+                    if ($job->getChannel() !== $envChannel) {
                         $stats['skipped']++;
                         continue;
                     }
@@ -167,8 +161,8 @@ class ProcessJobsCommand extends Command
 
                 // Cooldown check for delayed jobs
                 if (!$jobId && $job->getStatus() === JobStatus::delayed->value) {
-                    $channelEnum = Channel::tryFromName($job->getChannel());
-                    $cooldown = $channelEnum ? $channelEnum->getCooldown() : 600;
+                    $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $job->getChannel()]);
+                    $cooldown = $channelEntity ? $channelEntity->getCooldown() : 600;
                     $updatedAt = $job->getUpdatedAt();
                     if ($updatedAt) {
                         $elapsed = time() - $updatedAt->getTimestamp();
@@ -229,9 +223,9 @@ class ProcessJobsCommand extends Command
                     }
 
                     $channelName = $job->getChannel();
-                    $channelEnum = Channel::tryFromName($channelName);
-                    if (!$channelEnum) {
-                        throw new \Exception("Invalid channel enum: " . $channelName);
+                    $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $channelName]);
+                    if (!$channelEntity) {
+                        throw new \Exception("Invalid channel entity: " . $channelName);
                     }
 
                     // Load full channel configuration
@@ -297,7 +291,7 @@ class ProcessJobsCommand extends Command
                         $connection->executeStatement("SET SESSION innodb_lock_wait_timeout = 300");
                     }
 
-                    $result = $controller->fetchData($job->getEntity(), $channelEnum, $resolvedParams, $body);
+                    $result = $controller->fetchData($job->getEntity(), $channelEntity, $resolvedParams, $body);
 
                     if ($result instanceof Response && $result->getStatusCode() >= 400) {
                         $content = json_decode($result->getContent(), true);
