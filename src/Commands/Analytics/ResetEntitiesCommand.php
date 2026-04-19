@@ -2,7 +2,6 @@
 
 namespace Commands\Analytics;
 
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Command\Command;
@@ -51,11 +50,11 @@ class ResetEntitiesCommand extends Command
                     throw new \Exception("No channels found for group: $group");
                 }
             } else {
-                $enum = Channel::tryFromName($channelName);
-                if (!$enum) {
+                $chanObj = $manager->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channelName]);
+                if (!$chanObj) {
                     throw new \Exception("Unknown channel: $channelName. Use all or any specific channel name.");
                 }
-                $targetChannelSlugs = [$enum->name];
+                $targetChannelSlugs = [$chanObj->getName()];
             }
 
             $output->writeln('<info>🗑  Resetting Entities for selected channels...</info>');
