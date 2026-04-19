@@ -666,10 +666,6 @@ class MetricsProcessor
             /** @var object{channel: mixed, name: mixed, period: mixed, account: mixed, channeledAccount: mixed, campaign: mixed, channeledCampaign: mixed, channeledAdGroup: mixed, channeledAd: mixed, page: mixed, query: mixed, post: mixed, product: mixed, customer: mixed, creative: mixed, country: mixed, device: mixed} $mObj */
 
             $rowPostValue = self::getMetricPlatformId($mObj, 'post', $logger);
-            
-            if ($logger && str_contains((string)($mObj->name ?? ''), 'daily')) {
-                $logger->info("[MetricsProcessor] Generating Key for " . ($mObj->name ?? 'unknown') . " | Resolved Post ID: " . ($rowPostValue ?? 'NULL'));
-            }
 
             $metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: $mObj->channel ?? null,
@@ -1226,10 +1222,6 @@ class MetricsProcessor
             } else {
                 $resolvedId = (string) $val;
             }
-        }
-
-        if ($logger && str_contains((string)($metric->name ?? ''), 'daily') && $property === 'post') {
-            $logger->info("[MetricsProcessor] Mapping Post for " . ($metric->name ?? 'unknown') . " | Raw: " . (is_object($val) ? get_class($val) : gettype($val)) . " | Resolved Platform ID: " . ($resolvedId ?? 'NULL'));
         }
 
         return $resolvedId ?: null;
