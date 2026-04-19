@@ -111,6 +111,81 @@ class SeedDemoDataCommand extends Command implements SeederInterface
         };
     }
 
+    public function resolveEntity(string $type, array $params): mixed
+    {
+        $class = $this->getEntityClass($type);
+        $repo = $this->entityManager->getRepository($class);
+        
+        $criteria = [];
+        if (isset($params['name'])) $criteria['name'] = $params['name'];
+        if (isset($params['platformId'])) $criteria['platformId'] = $params['platformId'];
+        if (isset($params['campaignId'])) $criteria['campaignId'] = $params['campaignId'];
+        if (isset($params['postId'])) $criteria['postId'] = $params['postId'];
+        if (isset($params['canonicalId'])) $criteria['canonicalId'] = $params['canonicalId'];
+        if (isset($params['channel'])) $criteria['channel'] = $params['channel'];
+        if (isset($params['channeledAccount'])) {
+            $ca = $params['channeledAccount'];
+            $criteria['channeledAccount'] = ($ca instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity) ? $this->entityManager->getReference($this->getEntityClass('channeled_account'), $ca->id) : $ca;
+        }
+
+        $entity = empty($criteria) ? null : $repo->findOneBy($criteria);
+
+        if (!$entity) {
+            $entity = new $class();
+            $setters = [
+                'name' => 'addName',
+                'platformId' => 'addPlatformId',
+                'campaignId' => 'addCampaignId',
+                'postId' => 'addPostId',
+                'canonicalId' => 'addCanonicalId',
+                'channel' => 'addChannel',
+                'title' => 'addTitle',
+                'url' => 'addUrl',
+                'type' => 'addType',
+                'budget' => 'addBudget',
+                'data' => 'addData',
+                'account' => 'addAccount',
+                'channeledAccount' => 'addChanneledAccount',
+                'campaign' => 'addCampaign',
+                'channeledCampaign' => 'addChanneledCampaign',
+                'channeledAdGroup' => 'addChanneledAdGroup',
+            ];
+
+            foreach ($params as $key => $val) {
+                if (isset($setters[$key]) && method_exists($entity, $setters[$key])) {
+                    $method = $setters[$key];
+                    if ($val instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity) {
+                        $relType = match($key) {
+                            'account' => 'account',
+                            'channeledAccount' => 'channeled_account',
+                            'campaign' => 'campaign',
+                            'channeledCampaign' => 'channeled_campaign',
+                            'channeledAdGroup' => 'channeled_ad_group',
+                            default => null
+                        };
+                        if ($relType) {
+                            $val = $this->entityManager->getReference($this->getEntityClass($relType), $val->id);
+                        }
+                    }
+                    $entity->$method($val);
+                }
+            }
+            
+            $this->entityManager->persist($entity);
+            $this->entityManager->flush();
+        }
+
+        $ue = new \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity();
+        $ue->setPlatformId($entity->getPlatformId() ?? (method_exists($entity, 'getCampaignId') ? $entity->getCampaignId() : null))
+           ->setChannel($entity->getChannel())
+           ->setTitle(method_exists($entity, 'getName') ? $entity->getName() : (method_exists($entity, 'getTitle') ? $entity->getTitle() : null))
+           ->setUrl(method_exists($entity, 'getUrl') ? $entity->getUrl() : null);
+        
+        $ue->id = $entity->getId();
+        
+        return $ue;
+    }
+
     public function processMetricsMassive(\Doctrine\Common\Collections\Collection $metrics): void
     {
         if ($metrics->isEmpty()) {

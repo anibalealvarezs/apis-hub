@@ -285,7 +285,8 @@ class MonitoringController extends BaseController
                                   LEFT JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
                                   GROUP BY e.channel, ca.type";
                         } else {
-                            $columns = $conn->fetchFirstColumn("DESCRIBE $tableName");
+                            $sm = $conn->createSchemaManager();
+                            $columns = array_keys($sm->listTableColumns($tableName));
                             if (in_array('channeled_account_id', $columns)) {
                                 $sql = "SELECT e.channel, ca.type, COUNT(*) as count 
                                       FROM $tableName e 

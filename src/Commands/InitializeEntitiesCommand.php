@@ -121,7 +121,54 @@ class InitializeEntitiesCommand extends Command
 
             try {
                 $driver = DriverFactory::get($channel, $this->logger);
-                $results = $driver->initializeEntities(array_merge($chanConfig, ['manager' => $this->entityManager]));
+
+                $dataProcessor = function ($collection, $logger) {
+                    $stats = ['rows' => 0, 'metrics' => 0, 'duplicates' => 0];
+                    if ($collection instanceof \Doctrine\Common\Collections\ArrayCollection) {
+                        foreach ($collection as $entity) {
+                            if ($entity instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity) {
+                                // For now, we manually map UniversalEntity to Doctrine entities in this command
+                                // but we could make it more generic.
+                                // Actually, for initialization, we mostly deal with Pages and ChanneledAccounts
+                                \Classes\SocialProcessor::processUniversalEntity($entity, $this->entityManager);
+                                $stats['rows']++;
+                            } else {
+                                $this->entityManager->persist($entity);
+                                $stats['rows']++;
+                            }
+                        }
+                        $this->entityManager->flush();
+                    }
+                    return $stats;
+                };
+
+                $identityMapper = function (string $type, array $params) use ($channel) {
+                    $repoMap = [
+                        'channeled_accounts' => \Entities\Analytics\Channeled\ChanneledAccount::class,
+                        'pages' => \Entities\Analytics\Page::class,
+                        'accounts' => \Entities\Analytics\Account::class,
+                    ];
+                    if (!isset($repoMap[$type])) return [];
+                    $repo = $this->entityManager->getRepository($repoMap[$type]);
+                    $map = [];
+                    if ($type === 'pages' && isset($params['platform_ids'])) {
+                        $entities = $repo->findBy(['platformId' => $params['platform_ids']]);
+                        foreach ($entities as $e) $map[$e->getPlatformId()] = $e;
+                    } elseif ($type === 'channeled_accounts' && isset($params['platform_ids'])) {
+                        $entities = $repo->findBy(['platformId' => $params['platform_ids'], 'channel' => $channel]);
+                        foreach ($entities as $e) $map[$e->getPlatformId()] = $e;
+                    } elseif ($type === 'accounts' && isset($params['names'])) {
+                        $entities = $repo->findBy(['name' => $params['names']]);
+                        foreach ($entities as $e) $map[$e->getName()] = $e;
+                    }
+                    return $map;
+                };
+
+                $results = $driver->initializeEntities(array_merge($chanConfig, [
+                    'manager' => $this->entityManager,
+                    'identityMapper' => $identityMapper,
+                    'dataProcessor' => $dataProcessor
+                ]));
                 
                 $init = $results['initialized'] ?? 0;
                 $skip = $results['skipped'] ?? 0;
