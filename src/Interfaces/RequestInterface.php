@@ -2,7 +2,7 @@
 
 namespace Interfaces;
 
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\Analytics\Channel;
 use Doctrine\Common\Collections\ArrayCollection;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
