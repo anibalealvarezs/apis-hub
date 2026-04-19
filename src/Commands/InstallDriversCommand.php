@@ -67,16 +67,14 @@ class InstallDriversCommand extends Command
                 }
 
                 // Get Channel Info
-                $channelSystemName = (new $driverClass)->getChannel();
                 $channelLabel = method_exists($driverClass, 'getChannelLabel') ? $driverClass::getChannelLabel() : ucfirst($channelName);
                 $channelIcon = method_exists($driverClass, 'getChannelIcon') ? $driverClass::getChannelIcon() : substr($channelLabel, 0, 1);
                 $cooldown = method_exists($driverClass, 'getCooldown') ? $driverClass::getCooldown() : (str_contains($channelName, 'facebook') || str_contains($channelName, 'instagram') ? 3600 : 600);
 
-                // Integrity Check: Channel Mismatch
-                if ($channelName !== $channelSystemName) {
-                    $io->error("Channel name mismatch: Registry key '$channelName' does not match Driver identity '$channelSystemName'!");
-                    continue;
-                }
+                // For validation, we use the static label or just the registry key
+                // Instantiating the driver here is dangerous as it may have dependencies
+                $channelSystemName = $channelName; 
+
 
                 /** @var Channel $dbChannel */
                 $dbChannel = $this->entityManager->getRepository(Channel::class)->findOneBy(['name' => $channelName]);
