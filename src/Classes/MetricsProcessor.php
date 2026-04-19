@@ -1216,18 +1216,32 @@ class MetricsProcessor
     {
         $mContext = (method_exists($metric, 'getContext')) ? $metric->getContext() : (array)$metric;
         $platformProp = $property . 'PlatformId';
+        
         $val = $mContext[$property] ?? ($mContext[$platformProp] ?? ($metric->$property ?? ($metric->$platformProp ?? null)));
         
-        if (is_object($val)) {
-            $methods = ['getPlatformId', 'getId', 'getCampaignId', 'getCreativeId', 'getPostId', 'getProductId', 'getOrderId', 'getUrl', 'getEmail'];
-            foreach ($methods as $method) {
-                if (method_exists($val, $method)) {
-                    return (string) $val->$method();
+        $resolvedId = null;
+        if ($val) {
+            if (is_object($val)) {
+                $methods = ['getPostId', 'getPlatformId', 'getCampaignId', 'getCreativeId', 'getProductId', 'getOrderId', 'getUrl', 'getEmail', 'getId'];
+                foreach ($methods as $method) {
+                    if (method_exists($val, $method)) {
+                        $resolvedId = (string) $val->$method();
+                        break;
+                    }
                 }
+                if (!$resolvedId) {
+                    $resolvedId = (string) $val;
+                }
+            } else {
+                $resolvedId = (string) $val;
             }
-            return (string) $val;
         }
-        return (string) $val ?: null;
+
+        if (str_contains((string)($metric->name ?? ''), 'daily') && $property === 'post') {
+            error_log("[MetricsProcessor] Mapping Post for " . ($metric->name ?? 'unknown') . " | Raw: " . (is_object($val) ? get_class($val) : gettype($val)) . " | Resolved Platform ID: " . ($resolvedId ?? 'NULL'));
+        }
+
+        return $resolvedId ?: null;
     }
 
     private static function resolveChanneledAccountId(object $metric, ?array $channeledAccountMap): ?int
