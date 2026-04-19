@@ -19,7 +19,7 @@ class MetricRequests implements RequestInterface
     
 
     /**
-     * @param Channel|string $channel
+     * @param ChannelEntity|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
      * @param \Psr\Log\LoggerInterface|null $logger
