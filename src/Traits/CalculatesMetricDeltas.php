@@ -106,25 +106,33 @@ trait CalculatesMetricDeltas
             $virtual->period = Period::Daily->value;
             $virtual->value = max(0, $delta);
             $virtual->isVirtualDelta = true;
-
             $rowPost = $virtual->post ?? $virtual->postPlatformId ?? null;
             $pVal = $rowPost ? (is_object($rowPost) ? (method_exists($rowPost, 'getPostId') ? $rowPost->getPostId() : (method_exists($rowPost, 'getPlatformId') ? $rowPost->getPlatformId() : (string)$rowPost)) : (string)$rowPost) : null;
-            error_log("[CalculatesMetricDeltas] Name: " . $virtual->name . " | Post: " . ($pVal ?? 'NULL'));
+
+            // Important: Explicitly set these as public properties to survive (object) casting in MetricsProcessor
+            $virtual->post = $rowPost;
+            $virtual->page = $virtual->page ?? $virtual->pagePlatformId ?? null;
+            $virtual->account = $virtual->account ?? $virtual->accountPlatformId ?? null;
+            $virtual->channeledAccount = $virtual->channeledAccount ?? $virtual->channeledAccountPlatformId ?? null;
+            $virtual->campaign = $virtual->campaign ?? $virtual->campaignPlatformId ?? null;
+            $virtual->channeledCampaign = $virtual->channeledCampaign ?? $virtual->channeledCampaignPlatformId ?? null;
+            $virtual->channeledAdGroup = $virtual->channeledAdGroup ?? $virtual->channeledAdGroupPlatformId ?? null;
+            $virtual->channeledAd = $virtual->channeledAd ?? $virtual->channeledAdPlatformId ?? null;
 
             // Re-generate the config key for the new daily metric
             $virtual->metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: $virtual->channel,
                 name: $virtual->name,
                 period: $virtual->period,
-                account: ($rowAccount = $virtual->account ?? $virtual->accountPlatformId ?? null) ? (is_object($rowAccount) ? $rowAccount->getName() : (string)$rowAccount) : null,
-                channeledAccount: ($rowCa = $virtual->channeledAccount ?? $virtual->channeledAccountPlatformId ?? null) ? (is_object($rowCa) ? (string)$rowCa->getPlatformId() : (string)$rowCa) : null,
-                campaign: ($rowC = $virtual->campaign ?? $virtual->campaignPlatformId ?? null) ? (is_object($rowC) ? (string)$rowC->getCampaignId() : (string)$rowC) : null,
-                channeledCampaign: ($rowCc = $virtual->channeledCampaign ?? $virtual->channeledCampaignPlatformId ?? null) ? (is_object($rowCc) ? (string)$rowCc->getPlatformId() : (string)$rowCc) : null,
-                channeledAdGroup: ($rowCag = $virtual->channeledAdGroup ?? $virtual->channeledAdGroupPlatformId ?? null) ? (is_object($rowCag) ? $rowCag->getPlatformId() : (string)$rowCag) : null,
-                channeledAd: ($rowCad = $virtual->channeledAd ?? $virtual->channeledAdPlatformId ?? null) ? (is_object($rowCad) ? $rowCad->getPlatformId() : (string)$rowCad) : null,
-                page: ($rowP = $virtual->page ?? $virtual->pagePlatformId ?? null) ? (is_object($rowP) ? $rowP->getUrl() : (string)$rowP) : null,
+                account: ($rowAccount = $virtual->account) ? (is_object($rowAccount) ? $rowAccount->getName() : (string)$rowAccount) : null,
+                channeledAccount: ($rowCa = $virtual->channeledAccount) ? (is_object($rowCa) ? (string)$rowCa->getPlatformId() : (string)$rowCa) : null,
+                campaign: ($rowC = $virtual->campaign) ? (is_object($rowC) ? (string)$rowC->getCampaignId() : (string)$rowC) : null,
+                channeledCampaign: ($rowCc = $virtual->channeledCampaign) ? (is_object($rowCc) ? (string)$rowCc->getPlatformId() : (string)$rowCc) : null,
+                channeledAdGroup: ($rowCag = $virtual->channeledAdGroup) ? (is_object($rowCag) ? $rowCag->getPlatformId() : (string)$rowCag) : null,
+                channeledAd: ($rowCad = $virtual->channeledAd) ? (is_object($rowCad) ? $rowCad->getPlatformId() : (string)$rowCad) : null,
+                page: ($rowP = $virtual->page) ? (is_object($rowP) ? $rowP->getUrl() : (string)$rowP) : null,
                 query: $virtual->query ?? null,
-                post: ($rowPost = $virtual->post ?? $virtual->postPlatformId ?? null) ? (is_object($rowPost) ? (method_exists($rowPost, 'getPostId') ? $rowPost->getPostId() : (method_exists($rowPost, 'getPlatformId') ? $rowPost->getPlatformId() : (string)$rowPost)) : (string)$rowPost) : null,
+                post: $pVal,
                 product: ($rowPr = $virtual->product ?? $virtual->productPlatformId ?? null) ? (is_object($rowPr) ? $rowPr->getProductId() : (string)$rowPr) : null,
                 customer: ($rowCu = $virtual->customer ?? $virtual->customerPlatformId ?? null) ? (is_object($rowCu) ? $rowCu->getEmail() : (string)$rowCu) : null,
                 order: ($rowO = $virtual->order ?? $virtual->orderPlatformId ?? null) ? (is_object($rowO) ? $rowO->getOrderId() : (string)$rowO) : null,
