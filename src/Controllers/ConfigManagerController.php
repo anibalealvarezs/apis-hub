@@ -427,7 +427,7 @@ class ConfigManagerController extends BaseController
 
             foreach ($patterns as $assetKey => $pattern) {
                 $configKey = $pattern['key'] ?? $assetKey;
-                $assets = $chanConfig[$configKey] ?? ($chanConfig['assets'][$configKey] ?? []);
+                $assets = $chanConfig[$configKey] ?? ($chanConfig[$configKey] ?? []);
                 if (empty($assets)) {
                     continue;
                 }
@@ -437,11 +437,11 @@ class ConfigManagerController extends BaseController
                 }
                 foreach ($assets as $asset) {
                     $idValue = (string)($asset['id'] ?? ($asset['url'] ?? ''));
-                    $urlValue = (string)($asset['url'] ?? ($isUrl ? $idValue : ''));
-                    
-                    // Platform ID: MD5 only for URLs or GSC domain properties. Raw for IDs (like act_...)
                     $isUrl = (str_contains($idValue, '://') || str_contains($idValue, '.') || str_contains($idValue, 'sc-domain:'));
-                    $platformId = ($isUrl && !is_numeric($idValue)) ? md5(rtrim($idValue, '/')) : $idValue;
+                    $urlValue = (string)($asset['url'] ?? ($isUrl ? $idValue : ''));
+
+                    // Platform ID: MD5 only for URLs or GSC domain properties. Raw for IDs (like act_...)
+                    $platformId = ($isUrl && ! is_numeric($idValue)) ? md5(rtrim($idValue, '/')) : $idValue;
 
                     $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $idValue);
                     $dbChanneled = $entitiesMap[$platformId] ?? null;
@@ -467,15 +467,15 @@ class ConfigManagerController extends BaseController
                     // Prepare for Page processing: Specific logic for each type
                     $targetsForPages = [];
                     $isPage = (
-                        str_contains($urlValue, '://') || 
-                        str_contains($urlValue, 'sc-domain:') || 
-                        ($pattern['type'] ?? '') === 'facebook_page' || 
+                        str_contains($urlValue, '://') ||
+                        str_contains($urlValue, 'sc-domain:') ||
+                        ($pattern['type'] ?? '') === 'facebook_page' ||
                         ($pattern['type'] ?? '') === 'instagram_account'
                     );
 
                     if ($isPage && ($pattern['type'] ?? '') !== 'facebook_ad_account') {
                         $hostname = $asset['hostname'] ?? null;
-                        if (!$hostname && $urlValue) {
+                        if (! $hostname && $urlValue) {
                             if (str_contains($urlValue, 'sc-domain:')) {
                                 $hostname = str_replace('sc-domain:', '', $urlValue);
                             } else {
@@ -496,7 +496,7 @@ class ConfigManagerController extends BaseController
                             'url' => $urlValue,
                             'prefix' => $prefix,
                             'suffix' => $pageSuffix,
-                            'hostname' => $hostname
+                            'hostname' => $hostname,
                         ];
                     }
 
@@ -559,14 +559,14 @@ class ConfigManagerController extends BaseController
                             $dbPage = new \Entities\Analytics\Page();
                             $dbPage->addCanonicalId($canonicalId);
                         }
-                        
+
                         $dbPage->addUrl($pageUrl)
                                 ->addTitle($target['name'])
                                 ->addAccount($accountEntity)
                                 ->addPlatformId($target['pId'])
                                 ->addHostname($target['hostname'] ?? null)
                                 ->addData([]);
-                        
+
                         $this->em->persist($dbPage);
                     }
                 }
