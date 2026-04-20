@@ -82,8 +82,9 @@ class Helpers
         // Smart Default: If we are not explicitly told a file, and we are NOT already loading .env.demo,
         // we check if we should supplement with .env.demo later.
 
-        $loadEnvFile = function ($filename) use ($rootConfigDir) {
-            $filePath = $rootConfigDir . '/' . $filename;
+        $loadEnvFile = function ($filename) {
+            $currentConfigDir = self::getConfigDir();
+            $filePath = $currentConfigDir . '/' . $filename;
             if (file_exists($filePath)) {
                 $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
                 foreach ($lines as $line) {
@@ -109,6 +110,9 @@ class Helpers
         if (! defined('PHPUNIT_COMPOSER_INSTALL') && ! defined('__PHPUNIT_PHAR__')) {
             $loadEnvFile($envFileName);
         }
+
+        // RECALCULATE rootConfigDir in case it was changed in the .env file
+        $rootConfigDir = self::getConfigDir();
 
         // Second pass: Smart Chain Load for Demo
         // If we just loaded .env and discovered it's a demo, load .env.demo over it if it exists.
