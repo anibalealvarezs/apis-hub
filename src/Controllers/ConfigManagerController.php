@@ -445,9 +445,11 @@ class ConfigManagerController extends BaseController
                     $logger->info("DEBUG: Resolved Platform ID: $platformId");
 
                     $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $idValue);
+                    $logger->info("DEBUG: Looking for $platformId in map...");
                     $dbChanneled = $entitiesMap[$platformId] ?? null;
 
                     if (! $dbChanneled) {
+                        $logger->info("DEBUG: Creating NEW ChanneledAccount...");
                         $dbChanneled = new ChanneledAccount();
                         $dbChanneled->addPlatformId($platformId)
                             ->addAccount($accountEntity)
@@ -458,11 +460,14 @@ class ConfigManagerController extends BaseController
                             ->addData([]);
                         $this->em->persist($dbChanneled);
                         $entitiesMap[$platformId] = $dbChanneled;
+                        $logger->info("DEBUG: NEW ChanneledAccount persisted.");
                     } else {
-                        $dbChanneled->addAccount($accountEntity); // Ensure account is set (fixes ID=1 missing account)
+                        $logger->info("DEBUG: Updating existing ChanneledAccount...");
+                        $dbChanneled->addAccount($accountEntity);
                         if ($dbChanneled->getName() !== $name) {
                             $dbChanneled->addName($name);
                         }
+                        $logger->info("DEBUG: Existing ChanneledAccount updated.");
                     }
 
                     // Prepare for Page processing (Agnostic: Parent + Children with prefixes)
