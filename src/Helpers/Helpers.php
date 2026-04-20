@@ -82,7 +82,7 @@ class Helpers
         // Smart Default: If we are not explicitly told a file, and we are NOT already loading .env.demo,
         // we check if we should supplement with .env.demo later.
 
-        $loadEnvFile = function ($filename) {
+        $loadEnvFile = function ($filename) use ($rootConfigDir) {
             $filePath = $rootConfigDir . '/' . $filename;
             if (file_exists($filePath)) {
                 $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
