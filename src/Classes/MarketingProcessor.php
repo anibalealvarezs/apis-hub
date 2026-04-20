@@ -11,6 +11,23 @@ use Helpers\Helpers;
 
 class MarketingProcessor
 {
+    private static array $channelMap = [];
+
+    private static function resolveChannelId(string $channelName, EntityManager $manager): int
+    {
+        if (isset(self::$channelMap[$channelName])) {
+            return self::$channelMap[$channelName];
+        }
+
+        $channel = $manager->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channelName]);
+        if (!$channel) {
+            throw new \Exception("Channel '$channelName' not found in database during marketing processing.");
+        }
+
+        self::$channelMap[$channelName] = $channel->getId();
+        return self::$channelMap[$channelName];
+    }
+
     private static function getLogger(): \Psr\Log\LoggerInterface
     {
         return Helpers::setLogger('marketing-processor.log');
@@ -86,7 +103,7 @@ class MarketingProcessor
                 foreach ($chunk as $c) {
                     if (!is_object($c)) continue;
                     /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, budget: mixed, status: string, objective: string, buyingType: string, data: mixed} $c */
-                    $channeledParams[] = $c->channel;
+                    $channeledParams[] = self::resolveChannelId($c->channel, $manager);
                     $channeledParams[] = $c->platformId;
                     $channeledParams[] = $campaignMap[$c->platformId] ?? null;
                     $channeledParams[] = $c->channeledAccountId;
@@ -152,7 +169,7 @@ class MarketingProcessor
                 foreach ($chunk as $a) {
                     if (!is_object($a)) continue;
                     /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, channeledCampaignId: string|int, name: string, startDate: ?\Carbon\Carbon, endDate: ?\Carbon\Carbon, status: string, optimizationGoal: string, billingEvent: string, targeting: mixed, data: mixed} $a */
-                    $params[] = $a->channel;
+                    $params[] = self::resolveChannelId($a->channel, $manager);
                     $params[] = $a->platformId;
                     $params[] = $a->channeledAccountId;
                     $params[] = $campaignMap[$a->channeledCampaignId]['global_id'] ?? null;
@@ -240,7 +257,7 @@ class MarketingProcessor
                 foreach ($chunk as $a) {
                     if (!is_object($a)) continue;
                     /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, channeledCampaignId: string|int, channeledAdGroupId: string|int, channeledCreativeId: string|int, name: string, status: string, data: mixed} $a */
-                    $params[] = $a->channel;
+                    $params[] = self::resolveChannelId($a->channel, $manager);
                     $params[] = $a->platformId;
                     $params[] = $a->channeledAccountId;
                     $params[] = $campaignMap[$a->channeledCampaignId] ?? null;
