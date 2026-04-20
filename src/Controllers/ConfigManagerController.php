@@ -3,9 +3,8 @@
 namespace Controllers;
 
 use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
-use Entities\Analytics\Channel;
-use DateTime;
 use Entities\Analytics\Account;
+use Entities\Analytics\Channel;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Exception;
 use Helpers\Helpers;
@@ -61,7 +60,7 @@ class ConfigManagerController extends BaseController
     {
         // Force refresh of configuration cache (critical for Swoole/Long-lived environments)
         Helpers::resetConfigs();
-        
+
         try {
             $logger = Helpers::setLogger('config-manager.log');
             $requestedType = $request->query->get('type');
@@ -82,7 +81,7 @@ class ConfigManagerController extends BaseController
                 'available_channels' => $availableChannels,
                 'db_host' => getenv('DB_HOST') ?: 'localhost',
                 'db_name' => getenv('DB_DATABASE') ?: 'apis_hub',
-                'app_mode' => getenv('APP_ENV') ?: 'production'
+                'app_mode' => getenv('APP_ENV') ?: 'production',
             ];
 
             $allAssets = [];
@@ -106,14 +105,14 @@ class ConfigManagerController extends BaseController
                     // Always call prepareUiConfig if the channel has a configuration
                     $isRequestedType = $requestedType && ($chan === $requestedType || str_contains($chan, $requestedType));
 
-                    if (!empty($chanConfig) || $isRequestedType || $forceRefresh) {
+                    if (! empty($chanConfig) || $isRequestedType || $forceRefresh) {
                         $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
                         $uiConfig = $driver->prepareUiConfig($chanConfig);
                         $currentConfig = array_replace_recursive($currentConfig, $uiConfig);
                     }
 
                     // Fast Load Logic for Assets: Populate basic asset lists without full discovery
-                    if (!$forceRefresh) {
+                    if (! $forceRefresh) {
                         if ($chan === 'google_search_console') {
                             if (isset($chanConfig['sites'])) {
                                 $allAssets['gsc'] = array_values($chanConfig['sites']);
@@ -127,10 +126,10 @@ class ConfigManagerController extends BaseController
                                 $allAssets['facebook_ad_accounts'] = array_values($chanConfig['ad_accounts']);
                             }
                         }
-                        
+
                         // If it's not a requested type for asset discovery, we skip the slow Discovery part
-                        if (!$isRequestedType) {
-                             continue; 
+                        if (! $isRequestedType) {
+                            continue;
                         }
                     }
 
@@ -232,6 +231,7 @@ class ConfigManagerController extends BaseController
                 $channels = array_filter($availableChannels, function ($c) use ($type) {
                     $cNorm = str_replace('-', '_', $c);
                     $typeNorm = str_replace('-', '_', $type);
+
                     return str_contains($cNorm, $typeNorm) || $cNorm === $typeNorm;
                 });
 
@@ -319,6 +319,7 @@ class ConfigManagerController extends BaseController
                     // If we already have a result for this provider, reuse it
                     if (isset($providerResults[$commonKey])) {
                         $results[$chan] = $providerResults[$commonKey];
+
                         continue;
                     }
 
@@ -331,7 +332,7 @@ class ConfigManagerController extends BaseController
 
                     $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan, $logger, $chanConfig);
                     $validation = $driver->validateAuthentication();
-                    
+
                     $result = [
                         'status' => $validation['success'] ? 'valid' : 'error',
                         'message' => $validation['message'],
@@ -385,9 +386,6 @@ class ConfigManagerController extends BaseController
         }
     }
 
-
-
-
     private function syncAssetsToDatabase(string $channel, array $config, $logger): void
     {
         try {
@@ -399,6 +397,7 @@ class ConfigManagerController extends BaseController
             $channelEntity = $this->em->getRepository(Channel::class)->findOneBy(['name' => $channel]);
             if (! $channelEntity) {
                 $logger->warning("Unknown channel encountered during database sync: $channel");
+
                 return;
             }
 
@@ -420,16 +419,20 @@ class ConfigManagerController extends BaseController
             foreach ($patterns as $assetKey => $pattern) {
                 $configKey = $pattern['key'] ?? $assetKey;
                 $assets = $chanConfig[$configKey] ?? [];
-                if (empty($assets)) continue;
-
+                if (empty($assets)) {
+                    continue;
+                }
                 $typeMark = $pattern['type'] ?? null;
-                if (! $typeMark) continue;
-
+                if (! $typeMark) {
+                    continue;
+                }
                 foreach ($assets as $asset) {
-                    $idValue = (string)($asset['id'] ?? '');
-                    if (! $idValue) continue;
+                    $idValue = (string)($asset['id'] ?? ($asset['url'] ?? ''));
+                    if (! $idValue) {
+                        continue;
+                    }
 
-                    $urlValue = $asset['url'] ?? $idValue;
+                    $urlValue = (string)($asset['url'] ?? ($asset['id'] ?? ''));
                     
                     // If ID is not numeric (it's a URL or path), apply MD5
                     $platformId = is_numeric($idValue) ? $idValue : md5(rtrim($idValue, '/'));
@@ -455,13 +458,27 @@ class ConfigManagerController extends BaseController
                         }
                     }
 
+                    // Prepare for Page processing (Agnostic: Parent + Children with prefixes)
+                    $targetsForPages = [];
+                    if (isset($pattern['prefix'])) {
+                        $targetsForPages[] = [
+                            'pId' => $platformId,
+                            'name' => $name,
+                            'url' => $urlValue,
+                            'prefix' => $pattern['prefix'],
+                            'hostname' => $asset['hostname'] ?? null
+                        ];
+                    }
+
                     // Nested children (Instagram, etc)
                     if (isset($pattern['children'])) {
                         foreach ($pattern['children'] as $childPattern) {
-                            $childIdValue = (string)($asset[$childPattern['id_key']] ?? '');
-                            if (! $childIdValue) continue;
+                            $childIdRaw = (string)($asset[$childPattern['id_key']] ?? '');
+                            if (! $childIdRaw) {
+                                continue;
+                            }
 
-                            $childPlatformId = is_numeric($childIdValue) ? $childIdValue : md5(rtrim($childIdValue, '/'));
+                            $childPlatformId = is_numeric($childIdRaw) ? $childIdRaw : md5(rtrim($childIdRaw, '/'));
                             $childName = $asset[$childPattern['name_key']] ?? $name;
                             $childType = $childPattern['type'];
 
@@ -483,34 +500,45 @@ class ConfigManagerController extends BaseController
                                     $dbChild->addName($childName);
                                 }
                             }
+                            
+                            // If child pattern defines a prefix, it gets a Page record
+                            if (isset($childPattern['prefix'])) {
+                                $targetsForPages[] = [
+                                    'pId' => $childPlatformId,
+                                    'name' => $childName,
+                                    'url' => null,
+                                    'prefix' => $childPattern['prefix'],
+                                    'hostname' => $childPattern['hostname'] ?? null
+                                ];
+                            }
                         }
                     }
 
-                    // Persist Page if applicable
-                    if ($typeMark === 'gsc_site' || $typeMark === 'facebook_page' || $typeMark === 'instagram') {
-                        $prefix = $pattern['prefix'] ?? ($typeMark === 'gsc_site' ? 'sc-domain' : 'site');
-                        $canonicalId = "{$prefix}:{$platformId}";
-                        
+                    // Persist Pages Agnostically (Building canonicalId exactly as intended by Driver)
+                    foreach ($targetsForPages as $target) {
+                        $canonicalId = "{$target['prefix']}:{$target['pId']}";
                         $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
-                        
-                        // Ensure we use a proper URL. If urlValue looks like just a number, we probably shouldn't use it as URL
-                        $pageUrl = (isset($asset['url']) && !empty($asset['url'])) ? $asset['url'] : (is_numeric($urlValue) ? null : $urlValue);
+
+                        $pageUrl = (string)$target['url'];
+                        if (is_numeric($pageUrl) || empty($pageUrl)) {
+                            $pageUrl = null; 
+                        }
 
                         if (! $dbPage) {
                             $dbPage = new \Entities\Analytics\Page();
                             $dbPage->addCanonicalId($canonicalId)
                                 ->addUrl($pageUrl)
-                                ->addTitle($name)
+                                ->addTitle($target['name'])
                                 ->addAccount($accountEntity)
-                                ->addPlatformId($platformId)
-                                ->addHostname($asset['hostname'] ?? ($pageUrl ? parse_url($pageUrl, PHP_URL_HOST) : null))
+                                ->addPlatformId($target['pId'])
+                                ->addHostname($target['hostname'] ?? ($pageUrl ? parse_url($pageUrl, PHP_URL_HOST) : null))
                                 ->addData([]);
                             $this->em->persist($dbPage);
                         } else {
                              $dbPage->addAccount($accountEntity)
-                                ->addPlatformId($platformId)
+                                ->addPlatformId($target['pId'])
                                 ->addUrl($pageUrl)
-                                ->addTitle($name);
+                                ->addTitle($target['name']);
                         }
                     }
                 }
