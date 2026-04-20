@@ -411,29 +411,57 @@ class ConfigManagerController extends BaseController
             }
             // End Get Channel Entity
 
-            // 2. Bulk Load ALL ChanneledAccounts and Pages for this channel to avoid N+1 queries
+            // 2. Bulk Load ALL ChanneledAccounts for this channel to avoid N+1 queries
             $existingEntities = $this->em->getRepository(ChanneledAccount::class)->findBy(['channel' => $channelEntity->getId()]);
             $entitiesMap = [];
             foreach ($existingEntities as $e) {
                 $entitiesMap[(string)$e->getPlatformId()] = $e;
             }
 
-            $existingPages = $this->em->getRepository(\Entities\Analytics\Page::class)->findBy(['account' => $accountEntity->getId()]);
+            // 3. Pre-collect all potential canonical IDs from ALL patterns to bulk load Pages
+            $allCanonicalIds = [];
+            foreach ($patterns as $assetKey => $pattern) {
+                $assets = $chanConfig[$pattern['key']] ?? [];
+                foreach ($assets as $asset) {
+                    if (isset($pattern['page'])) {
+                        $rawPlatformId = match($pattern['page']['platform_id']['type']) {
+                            'md5' => md5($asset[$pattern['page']['platform_id']['key']]),
+                            'raw' => $asset[$pattern['page']['platform_id']['key']],
+                            default => $asset[$pattern['page']['platform_id']['key']]
+                        };
+                        if (method_exists($driver, 'getCleanId')) {
+                            $platformId = $driver->getCleanId($rawPlatformId);
+                        } else {
+                            $platformId = $rawPlatformId;
+                        }
+                        $hostname = method_exists($driver, 'getCleanHostname') ? $driver->getCleanHostname($asset[$pattern['page']['hostname_key']]) : ($asset[$pattern['page']['hostname_key']] ?? null);
+                        $canSource = $pattern['page']['canonical_id']['field'];
+                        $canValue = match($canSource) {
+                            'platformId' => $platformId,
+                            'hostname' => $hostname,
+                            default => $asset[$canSource] ?? null
+                        };
+                        if (! empty($canValue)) {
+                            $allCanonicalIds[] = $pattern['page']['canonical_id']['preffix'] . ':' . $canValue;
+                        }
+                    }
+                }
+            }
+
             $pagesMap = [];
-            foreach ($existingPages as $p) {
-                foreach ($p->getCanonicalIds() as $cId) {
-                    $pagesMap[$cId] = $p;
+            if (! empty($allCanonicalIds)) {
+                $existingPages = $this->em->getRepository(\Entities\Analytics\Page::class)->findBy(['canonicalId' => $allCanonicalIds]);
+                foreach ($existingPages as $p) {
+                    $pagesMap[$p->getCanonicalId()] = $p;
                 }
             }
             // End Get Entities
 
-            // 3. Identify common account group
+            // 4. Identify common account group
             $commonKey = $driver::getCommonConfigKey();
             $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
             $groupName = $chanConfig['accounts_group_name'] ?? ($rawConfig['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
-            $logger->info("DEBUG: Resolving account group: $groupName");
             $accountEntity = $this->getOrCreateAccount($groupName);
-            $logger->info("DEBUG: Account entity resolved: " . $accountEntity->getName());
             // End Identify common account group
 
             foreach ($patterns as $assetKey => $pattern) {
