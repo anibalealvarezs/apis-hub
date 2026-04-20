@@ -535,19 +535,15 @@ class ConfigManagerController extends BaseController
                             $dbPage = new \Entities\Analytics\Page();
                             $dbPage->addCanonicalId($canonicalId);
                         }
+                        
                         $dbPage->addUrl($pageUrl)
                                 ->addTitle($target['name'])
                                 ->addAccount($accountEntity)
                                 ->addPlatformId($target['pId'])
                                 ->addHostname($target['hostname'] ?? ($pageUrl ? parse_url($pageUrl, PHP_URL_HOST) : null))
                                 ->addData([]);
-                            $this->em->persist($dbPage);
-                        } else {
-                            $dbPage->addAccount($accountEntity)
-                               ->addPlatformId($target['pId'])
-                               ->addUrl($pageUrl)
-                               ->addTitle($target['name']);
-                        }
+                        
+                        $this->em->persist($dbPage);
                     }
                 }
             }
