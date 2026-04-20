@@ -56,14 +56,18 @@ class InstallDriversCommand extends Command
                     $io->warning("Provider mismatch for $channelName: Registry says '{$regConfig['parent']}', Driver says '$providerSystemName'. Registry takes precedence.");
                 }
                 
-                /** @var Provider $provider */
-                $provider = $this->entityManager->getRepository(Provider::class)->findOneBy(['name' => $providerName]);
+                static $providersCache = [];
+                $provider = $providersCache[$providerName] ?? $this->entityManager->getRepository(Provider::class)->findOneBy(['name' => $providerName]);
+                
                 if (!$provider) {
                     $provider = new Provider();
                     $provider->setName($providerName)
                         ->setLabel($providerLabel);
                     $this->entityManager->persist($provider);
+                    $providersCache[$providerName] = $provider;
                     $io->note("Created Provider: $providerLabel ($providerName)");
+                } else {
+                    $providersCache[$providerName] = $provider;
                 }
 
                 // Get Channel Info
