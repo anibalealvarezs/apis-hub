@@ -417,7 +417,14 @@ class ConfigManagerController extends BaseController
             $groupName = $chanConfig['accounts_group_name'] ?? ($projectConfig['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
             $accountEntity = $this->getOrCreateAccount($groupName);
 
-            $isUrlBasedProvider = ($channel === 'google_search_console' || str_contains($channel, 'search_console'));
+            // 4. Bulk Load ALL existing Pages for this account to avoid N+1 queries
+            $existingPages = $this->em->getRepository(\Entities\Analytics\Page::class)->findBy(['account' => $accountEntity]);
+            $pagesMap = [];
+            foreach ($existingPages as $p) {
+                if ($p->getCanonicalId()) {
+                    $pagesMap[$p->getCanonicalId()] = $p;
+                }
+            }
 
             foreach ($patterns as $assetKey => $pattern) {
                 $configKey = $pattern['key'] ?? $assetKey;
@@ -520,7 +527,7 @@ class ConfigManagerController extends BaseController
                     // Persist Pages Agnostically (Building canonicalId exactly as intended by Driver)
                     foreach ($targetsForPages as $target) {
                         $canonicalId = "{$target['prefix']}:{$target['pId']}";
-                        $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
+                        $dbPage = $pagesMap[$canonicalId] ?? null;
 
                         $pageUrl = (string)$target['url'];
                         if (is_numeric($pageUrl) || empty($pageUrl)) {
