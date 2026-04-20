@@ -692,8 +692,16 @@ function addMetricRule(metric, rule = null) {
     lucide.createIcons();
 }
 
+let availableAssetsMaps = { pages: {}, ad_accounts: {}, gsc: {} };
+
 function renderAssets(assets) {
     if (!assets) return;
+
+    // Reset maps
+    availableAssetsMaps = { pages: {}, ad_accounts: {}, gsc: {} };
+    if (assets.facebook_pages) assets.facebook_pages.forEach(p => availableAssetsMaps.pages[String(p.id)] = p);
+    if (assets.facebook_ad_accounts) assets.facebook_ad_accounts.forEach(a => availableAssetsMaps.ad_accounts[String(a.id)] = a);
+    if (assets.gsc) assets.gsc.forEach(g => availableAssetsMaps.gsc[String(g.url)] = g);
     
     const gscList = document.getElementById('gsc-list');
     const fbOrganicList = document.getElementById('fb-pages-list');
@@ -926,11 +934,14 @@ async function updateConfig(typeArg) {
         document.querySelectorAll('.asset-item').forEach(item => {
             const cb = item.querySelector('.gsc-asset-sync');
             if (cb && (cb.checked || item.classList.contains('lost-access'))) {
+                const url = cb.value;
+                const original = availableAssetsMaps.gsc[url] || {};
                 payload.assets.gsc.push({ 
-                    url: cb.value, 
+                    url: url, 
                     target_countries: [], 
                     target_keywords: [],
-                    lost_access: item.classList.contains('lost-access')
+                    lost_access: item.classList.contains('lost-access'),
+                    data: original.data || []
                 });
             }
         });
@@ -942,12 +953,19 @@ async function updateConfig(typeArg) {
             
             const pageId = String(mainToggle.dataset.id);
             const igId = card.dataset.ig || null;
+            const original = availableAssetsMaps.pages[pageId] || {};
             
             const pageData = {
                 id: pageId,
                 enabled: !card.classList.contains('lost-access') && mainToggle.checked, // Force disabled if lost access
                 ig_account: igId,
-                lost_access: card.classList.contains('lost-access')
+                lost_access: card.classList.contains('lost-access'),
+                hostname: original.hostname || null,
+                created_time: original.created_time || null,
+                data: original.data || [],
+                ig_hostname: original.ig_hostname || null,
+                ig_created_time: original.ig_created_time || null,
+                ig_data: original.ig_data || []
             };
             
             card.querySelectorAll('.fb-page-opt').forEach(opt => {
@@ -967,11 +985,15 @@ async function updateConfig(typeArg) {
         document.querySelectorAll('.asset-item').forEach(item => {
             const cb = item.querySelector('.fb-marketing-asset-sync');
             if (cb && (cb.checked || item.classList.contains('lost-access'))) {
+                const accId = String(cb.value);
+                const original = availableAssetsMaps.ad_accounts[accId] || {};
                 const nameEl = item.querySelector('[style*="font-weight:600"]');
                 payload.assets.ad_accounts.push({ 
-                    id: cb.value,
+                    id: accId,
                     name: nameEl ? nameEl.textContent.trim() : null,
-                    lost_access: item.classList.contains('lost-access')
+                    lost_access: item.classList.contains('lost-access'),
+                    created_time: original.created_time || null,
+                    data: original.data || []
                 });
             }
         });
