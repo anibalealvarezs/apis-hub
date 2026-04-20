@@ -53,12 +53,18 @@ class SetupDatabaseCommand extends Command
             // 3. Install Drivers (Dynamic Registry)
             $output->writeln("<info>🔌 Registration of Providers and Channels...</info>");
             $installDriversCommand = $this->getApplication()->find('app:install-drivers');
-            $installDriversCommand->run(new ArrayInput([]), $output);
+            $exitCode = $installDriversCommand->run(new ArrayInput([]), $output);
+            if ($exitCode !== Command::SUCCESS) {
+                throw new \Exception("Failed to install/register drivers.");
+            }
 
             // 4. Initialize Entities
             $output->writeln("<info>🌱 Seeding initial entities...</info>");
             $initEntitiesCommand = $this->getApplication()->find('app:initialize-entities');
-            $initEntitiesCommand->run(new ArrayInput([]), $output);
+            $exitCode = $initEntitiesCommand->run(new ArrayInput([]), $output);
+            if ($exitCode !== Command::SUCCESS) {
+                throw new \Exception("Failed to initialize core/channel entities.");
+            }
 
             // 5. Auto-Seed for Demo (Smart Zero-Touch)
             $skipSeed = (string)getenv('SKIP_SEED');

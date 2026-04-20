@@ -62,9 +62,8 @@ class InitializeEntitiesCommand extends Command
     {
         $this->logger->info("Initializing Core Entities (Countries, Devices)...");
 
-        // Countries
-        /** @var \Repositories\CountryRepository $countryRepository */
         $countryRepository = $this->entityManager->getRepository(Country::class);
+        $added = 0;
         foreach (CountryEnum::cases() as $countryEnum) {
             $country = $countryRepository->getByCode($countryEnum->value);
             if (!$country) {
@@ -72,23 +71,27 @@ class InitializeEntitiesCommand extends Command
                 $country->addCode($countryEnum)
                     ->addName($countryEnum->getFullName());
                 $this->entityManager->persist($country);
+                $added++;
             }
         }
+        $this->entityManager->flush();
+        $this->logger->info("  - Countries: $added added.");
 
-        // Devices
-        /** @var \Repositories\DeviceRepository $deviceRepository */
         $deviceRepository = $this->entityManager->getRepository(Device::class);
+        $added = 0;
         foreach (DeviceEnum::cases() as $deviceCase) {
             $device = $deviceRepository->getByType($deviceCase->value);
             if (!$device) {
                 $device = new Device();
                 $device->addType($deviceCase);
                 $this->entityManager->persist($device);
+                $added++;
             }
         }
 
         $this->entityManager->flush();
-        $this->logger->info("Core entities flushed.");
+        $this->logger->info("  - Devices: $added added.");
+        $this->logger->info("Core entities initialization complete.");
     }
 
     protected function initializeChannelEntities(): void
@@ -145,7 +148,8 @@ class InitializeEntitiesCommand extends Command
                 /** @var \Entities\Analytics\Channel $channelEntity */
                 $channelEntity = $this->entityManager->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channel]);
                 if (!$channelEntity) {
-                    throw new Exception("Channel entity not found for database lookup: $channel");
+                    $this->logger->error("  - ERROR: Channel entity '$channel' NOT FOUND in database. Ensure 'app:install-drivers' ran correctly.");
+                    continue; // Skip this channel instead of failing the whole command
                 }
 
                 $identityMapper = function (string $type, array $params) use ($channel, $channelEntity) {
