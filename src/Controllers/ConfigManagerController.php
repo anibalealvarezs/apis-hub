@@ -389,6 +389,7 @@ class ConfigManagerController extends BaseController
     private function syncAssetsToDatabase(string $channel, array $config, $logger): void
     {
         $logger->info("DEBUG: syncAssetsToDatabase START for $channel");
+
         try {
             $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
             $patterns = $driver->getAssetPatterns();
@@ -437,14 +438,11 @@ class ConfigManagerController extends BaseController
                 }
                 foreach ($assets as $asset) {
                     $idValue = (string)($asset['id'] ?? ($asset['url'] ?? ''));
-                    if (! $idValue) {
-                        continue;
-                    }
-
-                    $urlValue = (string)($asset['url'] ?? ($asset['id'] ?? ''));
+                    $logger->info("DEBUG: Processing asset with original ID/URL: $idValue");
 
                     // If ID is not numeric (it's a URL or path), apply MD5
                     $platformId = is_numeric($idValue) ? $idValue : md5(rtrim($idValue, '/'));
+                    $logger->info("DEBUG: Resolved Platform ID: $platformId");
 
                     $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $idValue);
                     $dbChanneled = $entitiesMap[$platformId] ?? null;
