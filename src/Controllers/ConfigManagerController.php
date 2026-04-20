@@ -564,7 +564,7 @@ class ConfigManagerController extends BaseController
                                 ->addTitle($target['name'])
                                 ->addAccount($accountEntity)
                                 ->addPlatformId($target['pId'])
-                                ->addHostname($target['hostname'] ?? ($pageUrl ? parse_url($pageUrl, PHP_URL_HOST) : null))
+                                ->addHostname($target['hostname'] ?? null)
                                 ->addData([]);
                         
                         $this->em->persist($dbPage);
