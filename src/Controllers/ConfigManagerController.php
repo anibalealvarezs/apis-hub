@@ -487,14 +487,19 @@ class ConfigManagerController extends BaseController
                             'custom' => $pattern['page']['url']['preffix'] . $asset[$pattern['page']['url']['key']],
                             'default',
                             'normal',
-                            default => $asset['url'] ?? $asset['id'] ?? null
+                            default => $asset['url'] ?? null
                         };
                         $canSource = $pattern['page']['canonical_id']['field'];
                         $canValue = match($canSource) {
                             'platformId' => $platformId,
                             'hostname' => $hostname,
-                            default => $asset[$canSource] ?? $asset['id'] ?? null
+                            default => $asset[$canSource] ?? null
                         };
+
+                        if (empty($canValue)) {
+                            continue;
+                        }
+
                         $canonicalId = $pattern['page']['canonical_id']['preffix'] . ':' . $canValue;
                         $data = $asset[$pattern['page']['data_key']] ?? [];
 
