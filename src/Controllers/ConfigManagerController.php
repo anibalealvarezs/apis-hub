@@ -464,18 +464,39 @@ class ConfigManagerController extends BaseController
                         }
                     }
 
-                    // Prepare for Page processing: Only if it has a URL (exactly as per your logic)
+                    // Prepare for Page processing: Specific logic for each type
                     $targetsForPages = [];
-                    if (!empty($urlValue) && !is_numeric($urlValue)) {
-                        // Suffix is Hostname if available (GSC), otherwise Platform ID (FB)
-                        $pageSuffix = $asset['hostname'] ?? $platformId;
-                        
+                    $isPage = (
+                        str_contains($urlValue, '://') || 
+                        str_contains($urlValue, 'sc-domain:') || 
+                        ($pattern['type'] ?? '') === 'facebook_page' || 
+                        ($pattern['type'] ?? '') === 'instagram_account'
+                    );
+
+                    if ($isPage && ($pattern['type'] ?? '') !== 'facebook_ad_account') {
+                        $hostname = $asset['hostname'] ?? null;
+                        if (!$hostname && $urlValue) {
+                            if (str_contains($urlValue, 'sc-domain:')) {
+                                $hostname = str_replace('sc-domain:', '', $urlValue);
+                            } else {
+                                $hostname = parse_url($urlValue, PHP_URL_HOST);
+                            }
+                        }
+
+                        // GSC has a double prefix in your DB (site:domain:sc-domain:...)
+                        $prefix = $pattern['prefix'] ?? 'site:domain';
+                        $pageSuffix = $hostname ?? $platformId;
+                        if (str_contains($urlValue, 'sc-domain:')) {
+                            $pageSuffix = $urlValue;
+                        }
+
                         $targetsForPages[] = [
                             'pId' => $platformId,
                             'name' => $name,
                             'url' => $urlValue,
-                            'prefix' => $pattern['prefix'] ?? 'site:domain',
+                            'prefix' => $prefix,
                             'suffix' => $pageSuffix,
+                            'hostname' => $hostname
                         ];
                     }
 
