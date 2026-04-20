@@ -110,11 +110,13 @@ fi
 echo "Starting cron service..."
 cron || service cron start || echo "Cron service startup failed"
 
-# Start MCP Server in SSE mode (background)
-echo "Starting MCP Server on port 3000..."
-export MCP_MODE=sse
-export MCP_PORT=3000
-node mcp-server/index.js &
+# Start MCP Server in SSE mode (background) - ONLY on master
+if [[ "$INSTANCE_NAME" == *"master"* ]]; then
+    echo "Starting MCP Server on port 3000..."
+    export MCP_MODE=sse
+    export MCP_PORT=3000
+    node mcp-server/index.js &
+fi
 
 # Automatic server detection based on INSTANCE_NAME
 if [[ "$INSTANCE_NAME" == *"master"* ]]; then
