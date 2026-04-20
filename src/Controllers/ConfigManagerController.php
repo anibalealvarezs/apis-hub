@@ -427,7 +427,7 @@ class ConfigManagerController extends BaseController
 
             foreach ($patterns as $assetKey => $pattern) {
                 $configKey = $pattern['key'] ?? $assetKey;
-                $assets = $chanConfig[$configKey] ?? [];
+                $assets = $chanConfig[$configKey] ?? ($chanConfig['assets'][$configKey] ?? []);
                 if (empty($assets)) {
                     continue;
                 }
@@ -437,7 +437,7 @@ class ConfigManagerController extends BaseController
                 }
                 foreach ($assets as $asset) {
                     $idValue = (string)($asset['id'] ?? ($asset['url'] ?? ''));
-                    $urlValue = (string)($asset['url'] ?? ($asset['id'] ?? ''));
+                    $urlValue = (string)($asset['url'] ?? '');
                     
                     // Platform ID: MD5 only for URLs or GSC domain properties. Raw for IDs (like act_...)
                     $isUrl = (str_contains($idValue, '://') || str_contains($idValue, '.') || str_contains($idValue, 'sc-domain:'));
@@ -464,18 +464,20 @@ class ConfigManagerController extends BaseController
                         }
                     }
 
-                    // Prepare for Page processing: Standard site:domain: prefix
+                    // Prepare for Page processing: Only if it has a URL (exactly as per your logic)
                     $targetsForPages = [];
-                    // Suffix is Hostname if available (GSC), otherwise Platform ID (FB)
-                    $pageSuffix = $asset['hostname'] ?? $platformId;
-                    
-                    $targetsForPages[] = [
-                        'pId' => $platformId,
-                        'name' => $name,
-                        'url' => $urlValue,
-                        'prefix' => $pattern['prefix'] ?? 'site:domain',
-                        'suffix' => $pageSuffix,
-                    ];
+                    if (!empty($urlValue) && !is_numeric($urlValue)) {
+                        // Suffix is Hostname if available (GSC), otherwise Platform ID (FB)
+                        $pageSuffix = $asset['hostname'] ?? $platformId;
+                        
+                        $targetsForPages[] = [
+                            'pId' => $platformId,
+                            'name' => $name,
+                            'url' => $urlValue,
+                            'prefix' => $pattern['prefix'] ?? 'site:domain',
+                            'suffix' => $pageSuffix,
+                        ];
+                    }
 
                     // Nested children (Instagram, etc)
                     if (isset($pattern['children'])) {
