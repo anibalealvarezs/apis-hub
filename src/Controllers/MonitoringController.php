@@ -220,26 +220,26 @@ class MonitoringController extends BaseController
         }
 
         $statsConfig = [
-            'Accounts' => ['class' => 'Analytics\Account', 'channeled' => 'Analytics\Channeled\ChanneledAccount'],
-            'Metrics' => ['class' => 'Analytics\Metric', 'channeled' => 'Analytics\Channeled\ChanneledMetric'],
-            'Campaigns' => ['class' => 'Analytics\Campaign', 'channeled' => 'Analytics\Channeled\ChanneledCampaign'],
-            'Ad Groups' => ['class' => null, 'channeled' => 'Analytics\Channeled\ChanneledAdGroup'],
-            'Ads' => ['class' => null, 'channeled' => 'Analytics\Channeled\ChanneledAd'],
-            'Creatives' => ['class' => 'Analytics\Creative', 'channeled' => null],
-            'Orders' => ['class' => 'Analytics\Order', 'channeled' => 'Analytics\Channeled\ChanneledOrder'],
-            'Customers' => ['class' => 'Analytics\Customer', 'channeled' => 'Analytics\Channeled\ChanneledCustomer'],
-            'Products' => ['class' => 'Analytics\Product', 'channeled' => 'Analytics\Channeled\ChanneledProduct'],
-            'Variants' => ['class' => 'Analytics\ProductVariant', 'channeled' => 'Analytics\Channeled\ChanneledProductVariant'],
-            'Categories' => ['class' => 'Analytics\ProductCategory', 'channeled' => 'Analytics\Channeled\ChanneledProductCategory'],
-            'Discounts' => ['class' => 'Analytics\Discount', 'channeled' => 'Analytics\Channeled\ChanneledDiscount'],
-            'Price Rules' => ['class' => 'Analytics\PriceRule', 'channeled' => 'Analytics\Channeled\ChanneledPriceRule'],
-            'Vendors' => ['class' => 'Analytics\Vendor', 'channeled' => 'Analytics\Channeled\ChanneledVendor'],
-            'Pages' => ['class' => 'Analytics\Page', 'channeled' => 'Analytics\Page'],
-            'Posts' => ['class' => 'Analytics\Post', 'channeled' => 'Analytics\Post'],
-            'Queries' => ['class' => 'Analytics\Query', 'channeled' => null],
-            'Countries' => ['class' => 'Analytics\Country', 'channeled' => null],
-            'Devices' => ['class' => 'Analytics\Device', 'channeled' => null],
-            'Jobs' => ['class' => 'Job', 'channeled' => 'Job']
+            'Accounts' => ['class' => 'Entities\Analytics\Account', 'channeled' => 'Entities\Analytics\Channeled\ChanneledAccount'],
+            'Metrics' => ['class' => 'Entities\Analytics\Metric', 'channeled' => 'Entities\Analytics\Channeled\ChanneledMetric'],
+            'Campaigns' => ['class' => 'Entities\Analytics\Campaign', 'channeled' => 'Entities\Analytics\Channeled\ChanneledCampaign'],
+            'Ad Groups' => ['class' => null, 'channeled' => 'Entities\Analytics\Channeled\ChanneledAdGroup'],
+            'Ads' => ['class' => null, 'channeled' => 'Entities\Analytics\Channeled\ChanneledAd'],
+            'Creatives' => ['class' => 'Entities\Analytics\Creative', 'channeled' => null],
+            'Orders' => ['class' => 'Entities\Analytics\Order', 'channeled' => 'Entities\Analytics\Channeled\ChanneledOrder'],
+            'Customers' => ['class' => 'Entities\Analytics\Customer', 'channeled' => 'Entities\Analytics\Channeled\ChanneledCustomer'],
+            'Products' => ['class' => 'Entities\Analytics\Product', 'channeled' => 'Entities\Analytics\Channeled\ChanneledProduct'],
+            'Variants' => ['class' => 'Entities\Analytics\ProductVariant', 'channeled' => 'Entities\Analytics\Channeled\ChanneledProductVariant'],
+            'Categories' => ['class' => 'Entities\Analytics\ProductCategory', 'channeled' => 'Entities\Analytics\Channeled\ChanneledProductCategory'],
+            'Discounts' => ['class' => 'Entities\Analytics\Discount', 'channeled' => 'Entities\Analytics\Channeled\ChanneledDiscount'],
+            'Price Rules' => ['class' => 'Entities\Analytics\PriceRule', 'channeled' => 'Entities\Analytics\Channeled\ChanneledPriceRule'],
+            'Vendors' => ['class' => 'Entities\Analytics\Vendor', 'channeled' => 'Entities\Analytics\Channeled\ChanneledVendor'],
+            'Pages' => ['class' => 'Entities\Analytics\Page', 'channeled' => 'Entities\Analytics\Page'],
+            'Posts' => ['class' => 'Entities\Analytics\Post', 'channeled' => 'Entities\Analytics\Post'],
+            'Queries' => ['class' => 'Entities\Analytics\Query', 'channeled' => null],
+            'Countries' => ['class' => 'Entities\Analytics\Country', 'channeled' => null],
+            'Devices' => ['class' => 'Entities\Analytics\Device', 'channeled' => null],
+            'Jobs' => ['class' => 'Entities\Job', 'channeled' => 'Entities\Job']
         ];
 
         $dbTotals = [];
@@ -307,8 +307,12 @@ class MonitoringController extends BaseController
                             try {
                                 $results = $conn->fetchAllAssociative($sql);
                                 foreach ($results as $res) {
-                                    $channelId = (int)($res['channel'] ?? 0);
-                                    $channelLabel = $channelId ? (Channel::tryFrom($channelId)?->getCommonName() ?? "Ch $channelId") : "Unidentified Channel";
+                                    $chanRaw = $res['channel'] ?? null;
+                                    $channelLabel = "Unidentified Channel";
+                                    if ($chanRaw) {
+                                        $channelEntity = is_numeric($chanRaw) ? Channel::tryFrom((int)$chanRaw) : Channel::tryFromName((string)$chanRaw);
+                                        $channelLabel = $channelEntity ? $channelEntity->getCommonName() : (string)$chanRaw;
+                                    }
                                     $typeValue = $res['type'] ?? '';
                                     $typeName = $typeValue;
                                     if ($typeValue) {
@@ -569,37 +573,37 @@ class MonitoringController extends BaseController
     private static function getTableNameForEntity(string $entityPath): ?string
     {
         $map = [
-            'Analytics\Account' => 'accounts',
-            'Analytics\Metric' => 'metrics',
-            'Analytics\Campaign' => 'campaigns',
-            'Analytics\Creative' => 'creatives',
-            'Analytics\Order' => 'orders',
-            'Analytics\Customer' => 'customers',
-            'Analytics\Product' => 'products',
-            'Analytics\ProductVariant' => 'product_variants',
-            'Analytics\ProductCategory' => 'product_categories',
-            'Analytics\Discount' => 'discounts',
-            'Analytics\PriceRule' => 'price_rules',
-            'Analytics\Vendor' => 'vendors',
-            'Analytics\Page' => 'pages',
-            'Analytics\Post' => 'posts',
-            'Analytics\Query' => 'queries',
-            'Analytics\Country' => 'countries',
-            'Analytics\Device' => 'devices',
-            'Job' => 'jobs',
-            'Analytics\Channeled\ChanneledAccount' => 'channeled_accounts',
-            'Analytics\Channeled\ChanneledMetric' => 'channeled_metrics',
-            'Analytics\Channeled\ChanneledCampaign' => 'channeled_campaigns',
-            'Analytics\Channeled\ChanneledAdGroup' => 'channeled_ad_groups',
-            'Analytics\Channeled\ChanneledAd' => 'channeled_ads',
-            'Analytics\Channeled\ChanneledOrder' => 'channeled_orders',
-            'Analytics\Channeled\ChanneledCustomer' => 'channeled_customers',
-            'Analytics\Channeled\ChanneledProduct' => 'channeled_products',
-            'Analytics\Channeled\ChanneledProductVariant' => 'channeled_product_variants',
-            'Analytics\Channeled\ChanneledProductCategory' => 'channeled_product_categories',
-            'Analytics\Channeled\ChanneledDiscount' => 'channeled_discounts',
-            'Analytics\Channeled\ChanneledPriceRule' => 'channeled_price_rules',
-            'Analytics\Channeled\ChanneledVendor' => 'channeled_vendors',
+            'Entities\Analytics\Account' => 'accounts',
+            'Entities\Analytics\Metric' => 'metrics',
+            'Entities\Analytics\Campaign' => 'campaigns',
+            'Entities\Analytics\Creative' => 'creatives',
+            'Entities\Analytics\Order' => 'orders',
+            'Entities\Analytics\Customer' => 'customers',
+            'Entities\Analytics\Product' => 'products',
+            'Entities\Analytics\ProductVariant' => 'product_variants',
+            'Entities\Analytics\ProductCategory' => 'product_categories',
+            'Entities\Analytics\Discount' => 'discounts',
+            'Entities\Analytics\PriceRule' => 'price_rules',
+            'Entities\Analytics\Vendor' => 'vendors',
+            'Entities\Analytics\Page' => 'pages',
+            'Entities\Analytics\Post' => 'posts',
+            'Entities\Analytics\Query' => 'queries',
+            'Entities\Analytics\Country' => 'countries',
+            'Entities\Analytics\Device' => 'devices',
+            'Entities\Job' => 'jobs',
+            'Entities\Analytics\Channeled\ChanneledAccount' => 'channeled_accounts',
+            'Entities\Analytics\Channeled\ChanneledMetric' => 'channeled_metrics',
+            'Entities\Analytics\Channeled\ChanneledCampaign' => 'channeled_campaigns',
+            'Entities\Analytics\Channeled\ChanneledAdGroup' => 'channeled_ad_groups',
+            'Entities\Analytics\Channeled\ChanneledAd' => 'channeled_ads',
+            'Entities\Analytics\Channeled\ChanneledOrder' => 'channeled_orders',
+            'Entities\Analytics\Channeled\ChanneledCustomer' => 'channeled_customers',
+            'Entities\Analytics\Channeled\ChanneledProduct' => 'channeled_products',
+            'Entities\Analytics\Channeled\ChanneledProductVariant' => 'channeled_product_variants',
+            'Entities\Analytics\Channeled\ChanneledProductCategory' => 'channeled_product_categories',
+            'Entities\Analytics\Channeled\ChanneledDiscount' => 'channeled_discounts',
+            'Entities\Analytics\Channeled\ChanneledPriceRule' => 'channeled_price_rules',
+            'Entities\Analytics\Channeled\ChanneledVendor' => 'channeled_vendors',
         ];
         return $map[$entityPath] ?? null;
     }
