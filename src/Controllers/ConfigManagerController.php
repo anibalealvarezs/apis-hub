@@ -450,7 +450,7 @@ class ConfigManagerController extends BaseController
                         $dbChanneled->addPlatformId($platformId)
                             ->addAccount($accountEntity)
                             ->addType($typeMark)
-                            ->addChannel($channelEntity->getId())
+                            ->addChannel($channelEntity)
                             ->addName($name)
                             ->addPlatformCreatedAt(isset($asset['created_at']) ? new \DateTime($asset['created_at']) : null)
                             ->addData([]);
@@ -494,7 +494,7 @@ class ConfigManagerController extends BaseController
                                 $dbChild->addPlatformId($childPlatformId)
                                     ->addAccount($accountEntity)
                                     ->addType($childType)
-                                    ->addChannel($channelEntity->getId())
+                                    ->addChannel($channelEntity)
                                     ->addName($childName)
                                     ->addPlatformCreatedAt(isset($asset['created_at']) ? new \DateTime($asset['created_at']) : null)
                                     ->addData([]);
