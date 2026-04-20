@@ -210,8 +210,11 @@ class SyncService
                             $enum = \Entities\Analytics\Channel::tryFromName($channel);
                             if ($enum) {
                                 $criteria['channel'] = $enum->value;
+                            } else {
+                                $this->logger?->warning("SyncService::identityMapper - Channel '$channel' not found in database channels table.");
                             }
                         }
+                        if ($this->logger) $this->logger->info("SyncService::identityMapper - Lookup criteria for $type", ['criteria' => $criteria]);
                         if ($type === 'posts' && isset($params['page_id'])) $criteria['page'] = $params['page_id'];
                         if ($type === 'posts' && isset($params['channeled_account_id'])) $criteria['channeledAccount'] = $params['channeled_account_id'];
 
