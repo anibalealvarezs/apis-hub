@@ -439,8 +439,9 @@ class ConfigManagerController extends BaseController
                     $idValue = (string)($asset['id'] ?? ($asset['url'] ?? ''));
                     $urlValue = (string)($asset['url'] ?? ($asset['id'] ?? ''));
                     
-                    // Platform ID: MD5 for URLs, Numeric for IDs
-                    $platformId = is_numeric($idValue) ? $idValue : md5(rtrim($idValue, '/'));
+                    // Platform ID: MD5 only for URLs or GSC domain properties. Raw for IDs (like act_...)
+                    $isUrl = (str_contains($idValue, '://') || str_contains($idValue, '.') || str_contains($idValue, 'sc-domain:'));
+                    $platformId = ($isUrl && !is_numeric($idValue)) ? md5(rtrim($idValue, '/')) : $idValue;
 
                     $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $idValue);
                     $dbChanneled = $entitiesMap[$platformId] ?? null;
