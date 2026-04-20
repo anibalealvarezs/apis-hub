@@ -725,7 +725,10 @@ function renderAssets(assets) {
             div.className = itemClass;
             div.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                   <div class="asset-text-truncate" title="${displayUrl}" style="font-size:0.75rem; font-weight:600; color:#fff; flex:1; min-width:0;">${displayUrl}</div>
+                   <div style="flex:1; min-width:0;">
+                       <div class="asset-text-truncate" title="${displayUrl}" style="font-size:0.75rem; font-weight:600; color:#fff;">${displayUrl}</div>
+                       ${p.data ? `<div style="font-size:0.55rem; color:var(--primary); opacity:0.8;">Metadata Available (OK)</div>` : ''}
+                   </div>
                    <label class="switch-mini">
                        <input type="checkbox" class="gsc-asset-sync" value="${p.url}" ${isSynced && !p.lost_access ? 'checked' : ''} ${p.lost_access ? 'disabled' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
                        <span class="slider-mini"></span>
@@ -776,7 +779,11 @@ function renderAssets(assets) {
                         </div>
                         <div>
                             <div style="font-weight:700; color:white; font-size:0.9rem;">${p.title || 'Untitled Page'}</div>
-                            <div style="font-size:0.65rem; color:var(--text-dim);">ID: ${p.id}</div>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <div style="font-size:0.65rem; color:var(--text-dim);">ID: ${p.id}</div>
+                                ${p.created_time ? `<div style="font-size:0.65rem; color:var(--primary); padding:1px 5px; background:rgba(0,255,150,0.05); border-radius:4px;">Created: ${new Date(p.created_time).toLocaleDateString()}</div>` : ''}
+                                ${p.hostname ? `<div style="font-size:0.65rem; color:var(--secondary); padding:1px 5px; background:rgba(0,150,255,0.05); border-radius:4px;">Host: ${p.hostname}</div>` : ''}
+                            </div>
                         </div>
                     </div>
                     <label class="switch">
@@ -896,7 +903,10 @@ function renderAssets(assets) {
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                    <div>
                        <div style="font-size:0.75rem; font-weight:600; color:#fff;">${a.name}</div>
-                       <div style="font-size:0.6rem; color:var(--text-dim); font-family:'Fira Code';">${a.id}</div>
+                       <div style="display:flex; gap:8px; align-items:center;">
+                           <div style="font-size:0.6rem; color:var(--text-dim); font-family:'Fira Code';">${a.id}</div>
+                           ${a.created_time ? `<div style="font-size:0.6rem; color:var(--primary); opacity:0.8;">Created: ${new Date(a.created_time).toLocaleDateString()}</div>` : ''}
+                       </div>
                    </div>
                    <label class="switch-mini">
                        <input type="checkbox" class="fb-marketing-asset-sync" value="${a.id}" ${isSynced && !a.lost_access ? 'checked' : ''} ${a.lost_access ? 'disabled' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
