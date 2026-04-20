@@ -426,75 +426,90 @@ class ConfigManagerController extends BaseController
                 if (! $typeMark) continue;
 
                 foreach ($assets as $asset) {
-                    $id = (string)($asset['id'] ?? ($asset['url'] ?? ''));
-                    if (! $id) continue;
+                    $idValue = (string)($asset['id'] ?? '');
+                    if (! $idValue) continue;
 
-                    if ($isUrlBasedProvider && filter_var($id, FILTER_VALIDATE_URL)) {
-                        $id = md5(rtrim($id, '/'));
-                    }
+                    $urlValue = $asset['url'] ?? $idValue;
+                    
+                    // If ID is not numeric (it's a URL or path), apply MD5
+                    $platformId = is_numeric($idValue) ? $idValue : md5(rtrim($idValue, '/'));
 
-                    $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $id);
-                    $dbChanneled = $entitiesMap[$id] ?? null;
+                    $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $idValue);
+                    $dbChanneled = $entitiesMap[$platformId] ?? null;
 
                     if (! $dbChanneled) {
                         $dbChanneled = new ChanneledAccount();
-                        $dbChanneled->addPlatformId($id)
+                        $dbChanneled->addPlatformId($platformId)
                             ->addAccount($accountEntity)
                             ->addType($typeMark)
                             ->addChannel($channelEntity->getId())
                             ->addName($name)
-                            ->addPlatformCreatedAt(isset($asset['created_at']) ? new DateTime($asset['created_at']) : null)
+                            ->addPlatformCreatedAt(isset($asset['created_at']) ? new \DateTime($asset['created_at']) : null)
                             ->addData([]);
                         $this->em->persist($dbChanneled);
-                        $entitiesMap[$id] = $dbChanneled; // Add to map for children lookup
-                    } elseif ($dbChanneled->getName() !== $name) {
-                        $dbChanneled->addName($name);
+                        $entitiesMap[$platformId] = $dbChanneled;
+                    } else {
+                        $dbChanneled->addAccount($accountEntity); // Ensure account is set (fixes ID=1 missing account)
+                        if ($dbChanneled->getName() !== $name) {
+                            $dbChanneled->addName($name);
+                        }
                     }
 
                     // Nested children (Instagram, etc)
                     if (isset($pattern['children'])) {
                         foreach ($pattern['children'] as $childPattern) {
-                            $childId = (string)($asset[$childPattern['id_key']] ?? '');
-                            if (! $childId) continue;
+                            $childIdValue = (string)($asset[$childPattern['id_key']] ?? '');
+                            if (! $childIdValue) continue;
 
+                            $childPlatformId = is_numeric($childIdValue) ? $childIdValue : md5(rtrim($childIdValue, '/'));
                             $childName = $asset[$childPattern['name_key']] ?? $name;
                             $childType = $childPattern['type'];
 
-                            $dbChild = $entitiesMap[$childId] ?? null;
+                            $dbChild = $entitiesMap[$childPlatformId] ?? null;
                             if (! $dbChild) {
                                 $dbChild = new ChanneledAccount();
-                                $dbChild->addPlatformId($childId)
+                                $dbChild->addPlatformId($childPlatformId)
                                     ->addAccount($accountEntity)
                                     ->addType($childType)
                                     ->addChannel($channelEntity->getId())
                                     ->addName($childName)
-                                    ->addPlatformCreatedAt(isset($asset['created_at']) ? new DateTime($asset['created_at']) : null)
+                                    ->addPlatformCreatedAt(isset($asset['created_at']) ? new \DateTime($asset['created_at']) : null)
                                     ->addData([]);
                                 $this->em->persist($dbChild);
-                                $entitiesMap[$childId] = $dbChild;
-                            } elseif ($dbChild->getName() !== $childName) {
-                                $dbChild->addName($childName);
+                                $entitiesMap[$childPlatformId] = $dbChild;
+                            } else {
+                                $dbChild->addAccount($accountEntity);
+                                if ($dbChild->getName() !== $childName) {
+                                    $dbChild->addName($childName);
+                                }
                             }
                         }
                     }
 
                     // Persist Page if applicable
-                    if ($typeMark === 'gsc_site' || $typeMark === 'facebook_page') {
-                        $canonicalId = \Helpers\Helpers::getCanonicalPageId($asset['url'] ?? $id, null, 'website');
+                    if ($typeMark === 'gsc_site' || $typeMark === 'facebook_page' || $typeMark === 'instagram') {
+                        $prefix = $pattern['prefix'] ?? ($typeMark === 'gsc_site' ? 'sc-domain' : 'site');
+                        $canonicalId = "{$prefix}:{$platformId}";
+                        
                         $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
+                        
+                        // Ensure we use a proper URL. If urlValue looks like just a number, we probably shouldn't use it as URL
+                        $pageUrl = (isset($asset['url']) && !empty($asset['url'])) ? $asset['url'] : (is_numeric($urlValue) ? null : $urlValue);
+
                         if (! $dbPage) {
                             $dbPage = new \Entities\Analytics\Page();
                             $dbPage->addCanonicalId($canonicalId)
-                                ->addUrl($asset['url'] ?? $id)
+                                ->addUrl($pageUrl)
                                 ->addTitle($name)
                                 ->addAccount($accountEntity)
-                                ->addPlatformId($id)
-                                ->addHostname($asset['hostname'] ?? parse_url($asset['url'] ?? $id, PHP_URL_HOST))
-                                ->addData($asset);
+                                ->addPlatformId($platformId)
+                                ->addHostname($asset['hostname'] ?? ($pageUrl ? parse_url($pageUrl, PHP_URL_HOST) : null))
+                                ->addData([]);
                             $this->em->persist($dbPage);
                         } else {
                              $dbPage->addAccount($accountEntity)
-                                ->addPlatformId($id)
+                                ->addPlatformId($platformId)
+                                ->addUrl($pageUrl)
                                 ->addTitle($name);
                         }
                     }
