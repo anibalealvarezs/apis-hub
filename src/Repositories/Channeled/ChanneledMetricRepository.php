@@ -11,7 +11,7 @@ use Doctrine\ORM\QueryBuilder;
 use Entities\Analytics\Channeled\ChanneledMetric;
 use Entities\Analytics\Metric;
 use Entities\Entity;
-use Entities\\Analytics\\Channel;
+use Entities\Analytics\Channel;
 use Enums\QueryBuilderType;
 
 class ChanneledMetricRepository extends ChanneledBaseRepository

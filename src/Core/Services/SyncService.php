@@ -207,7 +207,7 @@ class SyncService
                         $criteria = [];
                         if (!empty($searchValues)) $criteria[$idField] = array_unique($searchValues);
                         if (in_array($type, ['channeled_accounts', 'channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
-                            $enum = \Entities\\Analytics\\Channel::tryFromName($channel);
+                            $enum = \Entities\Analytics\Channel::tryFromName($channel);
                             if ($enum) {
                                 $criteria['channel'] = $enum->value;
                             }

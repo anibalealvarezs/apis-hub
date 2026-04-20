@@ -5,7 +5,7 @@ namespace Commands;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Anibalealvarezs\ApiDriverCore\Interfaces\DimensionManagerInterface;
 use Anibalealvarezs\ApiDriverCore\Interfaces\SeederInterface;
-use Entities\\Analytics\\Channel;
+use Entities\Analytics\Channel;
 use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
 use Classes\DimensionManager;
 use Doctrine\DBAL\Connection;

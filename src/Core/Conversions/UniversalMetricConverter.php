@@ -7,7 +7,7 @@ namespace Core\Conversions;
 use Carbon\Carbon;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Doctrine\Common\Collections\ArrayCollection;
-use Entities\\Analytics\\Channel;
+use Entities\Analytics\Channel;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Psr\Log\LoggerInterface;
 use stdClass;

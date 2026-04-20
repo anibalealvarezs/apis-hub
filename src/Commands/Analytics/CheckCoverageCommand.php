@@ -2,7 +2,7 @@
 
 namespace Commands\Analytics;
 
-use Entities\\Analytics\\Channel;
+use Entities\Analytics\Channel;
 use Helpers\Helpers;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

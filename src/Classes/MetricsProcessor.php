@@ -3,7 +3,7 @@
 namespace Classes;
 
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
-use Entities\\Analytics\\Channel;
+use Entities\Analytics\Channel;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Carbon\Carbon;
 use DateTime;

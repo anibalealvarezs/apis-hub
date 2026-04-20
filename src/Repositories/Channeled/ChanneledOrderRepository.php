@@ -6,7 +6,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Entities\\Analytics\\Channel;
+use Entities\Analytics\Channel;
 use Enums\QueryBuilderType;
 use Exception;
 

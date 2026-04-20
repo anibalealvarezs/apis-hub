@@ -2,7 +2,7 @@
 
 namespace Controllers;
 
-use Entities\\Analytics\\Channel;
+use Entities\Analytics\Channel;
 use Exception;
 use Helpers\Helpers;
 use InvalidArgumentException;

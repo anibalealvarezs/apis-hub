@@ -140,7 +140,7 @@ class GenerateEntitiesConfigCommand extends Command
 
         // Only for general type: try to add channeled_class
         if ($type === 'general') {
-            $channeledClass = 'Entities\\Analytics\\Channeled\\Channeled' . $classInfo['shortName'];
+            $channeledClass = 'Entities\Analytics\Channeled\\Channeled' . $classInfo['shortName'];
             if (class_exists($channeledClass)) {
                 $config = ['class' => $config['class'], 'channeled_class' => $this->normalizeClassName($channeledClass)] + $config;
             }

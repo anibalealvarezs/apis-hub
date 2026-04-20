@@ -3,7 +3,7 @@
 namespace Repositories\Channeled;
 
 use Doctrine\ORM\QueryBuilder;
-use Entities\\Analytics\\Channel;
+use Entities\Analytics\Channel;
 use Enums\QueryBuilderType;
 use Exception;
 use RuntimeException;
