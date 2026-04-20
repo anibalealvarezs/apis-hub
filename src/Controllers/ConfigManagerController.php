@@ -388,15 +388,18 @@ class ConfigManagerController extends BaseController
 
     private function syncAssetsToDatabase(string $channel, array $config, $logger): void
     {
+        $logger->info("DEBUG: syncAssetsToDatabase START for $channel");
         try {
             $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
             $patterns = $driver->getAssetPatterns();
+            $logger->info("DEBUG: Patterns loaded: " . implode(', ', array_keys($patterns)));
             // Read channel config directly from disk (already saved before this method is called).
             // Do NOT call resetConfigs() here — it nulls the EntityManager and corrupts the persistence flow.
             $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
             $chanYaml = $configDir . '/channels/' . $channel . '.yaml';
             $rawConfig = file_exists($chanYaml) ? (\Symfony\Component\Yaml\Yaml::parseFile($chanYaml) ?: []) : [];
             $chanConfig = $rawConfig['channels'][$channel] ?? $rawConfig;
+            $logger->info("DEBUG: Config loaded from disk for $channel");
 
             // 1. Get Channel Entity (Fast lookup)
             $channelEntity = $this->em->getRepository(Channel::class)->findOneBy(['name' => $channel]);
@@ -417,11 +420,14 @@ class ConfigManagerController extends BaseController
             $commonKey = $driver::getCommonConfigKey();
             $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
             $groupName = $chanConfig['accounts_group_name'] ?? ($rawConfig['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
+            $logger->info("DEBUG: Resolving account group: $groupName");
             $accountEntity = $this->getOrCreateAccount($groupName);
+            $logger->info("DEBUG: Account entity resolved: " . $accountEntity->getName());
 
             foreach ($patterns as $assetKey => $pattern) {
                 $configKey = $pattern['key'] ?? $assetKey;
                 $assets = $chanConfig[$configKey] ?? [];
+                $logger->info("DEBUG: Processing pattern $assetKey (found " . count($assets) . " assets)");
                 if (empty($assets)) {
                     continue;
                 }
@@ -546,7 +552,9 @@ class ConfigManagerController extends BaseController
                     }
                 }
             }
+            $logger->info("DEBUG: Attempting final flush for $channel");
             $this->em->flush();
+            $logger->info("DEBUG: syncAssetsToDatabase FINISHED for $channel");
         } catch (Exception $e) {
             $logger->error("Sync Assets Error for $channel: " . $e->getMessage());
         }
