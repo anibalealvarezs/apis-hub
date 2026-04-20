@@ -4,7 +4,7 @@ namespace Classes;
 
 use Anibalealvarezs\ApiDriverCore\Interfaces\DimensionManagerInterface;
 use Anibalealvarezs\ApiDriverCore\Interfaces\SeederInterface;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\EntityManagerInterface;
 use Entities\Analytics\Account;

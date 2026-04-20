@@ -3,7 +3,7 @@
 namespace Controllers;
 
 use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use DateTime;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;

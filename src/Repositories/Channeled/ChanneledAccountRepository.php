@@ -8,7 +8,7 @@ use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\Account;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use Enums\QueryBuilderType;
 use Exception;
 

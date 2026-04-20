@@ -7,7 +7,7 @@ namespace Classes\Requests;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\ORMException;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use GuzzleHttp\Exception\GuzzleException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;

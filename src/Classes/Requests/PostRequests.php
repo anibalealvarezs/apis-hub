@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;

@@ -3,7 +3,7 @@
 namespace Repositories;
 
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;

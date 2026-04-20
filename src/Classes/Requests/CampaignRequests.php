@@ -6,7 +6,7 @@ namespace Classes\Requests;
 
 use Classes\MarketingProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;

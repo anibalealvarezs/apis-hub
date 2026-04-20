@@ -6,7 +6,7 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Entities\Entity;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use Enums\QueryBuilderType;
 
 class ChanneledCustomerRepository extends ChanneledBaseRepository

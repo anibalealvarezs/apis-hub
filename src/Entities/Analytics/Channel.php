@@ -81,4 +81,77 @@ class Channel extends Entity
         $this->provider = $provider;
         return $this;
     }
+
+    /**
+     * Compatibility Bridge: Resolves channel by name from database.
+     * 
+     * @param string|null $name
+     * @return self|null
+     */
+    public static function tryFromName(?string $name): ?self
+    {
+        if (!$name) return null;
+        try {
+            return \Helpers\Helpers::getManager()->getRepository(self::class)->findOneBy(['name' => $name]);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Compatibility Bridge: Returns the provider name.
+     * 
+     * @return string
+     */
+    public function getCommonName(): string
+    {
+        return $this->getProvider()->getName();
+    }
+
+    /**
+     * Compatibility Bridge: Emulates Enum::tryFrom()
+     * 
+     * @param int|null $id
+     * @return self|null
+     */
+    public static function tryFrom(?int $id): ?self
+    {
+        if (!$id) return null;
+        try {
+            return \Helpers\Helpers::getManager()->getRepository(self::class)->find($id);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Compatibility Bridge: Emulates Enum::from()
+     * 
+     * @param int $id
+     * @return self
+     * @throws \ValueError
+     */
+    public static function from(int $id): self
+    {
+        $instance = self::tryFrom($id);
+        if (!$instance) {
+            throw new \ValueError("$id is not a valid backing value for Channel");
+        }
+        return $instance;
+    }
+
+    /**
+     * Magic getter for Enum compatibility (name, value).
+     * 
+     * @param string $prop
+     * @return mixed
+     */
+    public function __get(string $prop)
+    {
+        return match ($prop) {
+            'name' => $this->getName(),
+            'value' => $this->getId(),
+            default => throw new \Error("Undefined property: " . static::class . "::" . $prop),
+        };
+    }
 }

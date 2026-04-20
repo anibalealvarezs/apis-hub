@@ -15,7 +15,7 @@ use Entities\Analytics\Metric;
 use Entities\Analytics\Page;
 use Entities\Analytics\Query;
 use Entities\Entity;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Enums\QueryBuilderType;
 use Exception;

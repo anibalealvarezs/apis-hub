@@ -9,7 +9,7 @@ use Doctrine\DBAL\Exception;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;

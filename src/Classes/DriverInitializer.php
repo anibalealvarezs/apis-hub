@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Classes;
 
 use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use Exception;
 use Helpers\Helpers;
 use Anibalealvarezs\ApiDriverCore\Classes\PageTypeRegistry;

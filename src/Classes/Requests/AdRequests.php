@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\\Analytics\\Channel;
 use Doctrine\Common\Collections\ArrayCollection;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
