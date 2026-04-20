@@ -260,8 +260,8 @@ class ConfigManagerController extends BaseController
                         // 2b. Auto-enable infrastructure rule if channel is enabled
                         // (Now handled implicitly by the enabled flag in the same file)
 
-                        // 3. Optional: Database Provisioning (Monolith concern)
-                        $this->syncAssetsToDatabase($chan, $updatedConfig, $logger);
+                        // 3. Optional: Database Provisioning (Delegated to background sync)
+                        // $this->syncAssetsToDatabase($chan, $updatedConfig, $logger);
 
                         $logger->info("Config updated successfully for channel: " . $chan);
                     } catch (Exception $e) {
