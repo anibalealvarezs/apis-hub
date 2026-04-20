@@ -391,10 +391,12 @@ class ConfigManagerController extends BaseController
         try {
             $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
             $patterns = $driver->getAssetPatterns();
-            // Reset config cache first so we read the freshly-saved channel data, not stale in-memory state.
-            \Helpers\Helpers::resetConfigs();
-            $projectConfig = \Helpers\Helpers::getProjectConfig();
-            $chanConfig = $projectConfig['channels'][$channel] ?? [];
+            // Read channel config directly from disk (already saved before this method is called).
+            // Do NOT call resetConfigs() here — it nulls the EntityManager and corrupts the persistence flow.
+            $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
+            $chanYaml = $configDir . '/channels/' . $channel . '.yaml';
+            $rawConfig = file_exists($chanYaml) ? (\Symfony\Component\Yaml\Yaml::parseFile($chanYaml) ?: []) : [];
+            $chanConfig = $rawConfig['channels'][$channel] ?? $rawConfig;
 
             // 1. Get Channel Entity (Fast lookup)
             $channelEntity = $this->em->getRepository(Channel::class)->findOneBy(['name' => $channel]);
@@ -414,17 +416,8 @@ class ConfigManagerController extends BaseController
             // 3. Identify common account group
             $commonKey = $driver::getCommonConfigKey();
             $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
-            $groupName = $chanConfig['accounts_group_name'] ?? ($projectConfig['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
+            $groupName = $chanConfig['accounts_group_name'] ?? ($rawConfig['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
             $accountEntity = $this->getOrCreateAccount($groupName);
-
-            // 4. Bulk Load ALL existing Pages for this account to avoid N+1 queries
-            $existingPages = $this->em->getRepository(\Entities\Analytics\Page::class)->findBy(['account' => $accountEntity]);
-            $pagesMap = [];
-            foreach ($existingPages as $p) {
-                if ($p->getCanonicalId()) {
-                    $pagesMap[$p->getCanonicalId()] = $p;
-                }
-            }
 
             foreach ($patterns as $assetKey => $pattern) {
                 $configKey = $pattern['key'] ?? $assetKey;
@@ -527,7 +520,7 @@ class ConfigManagerController extends BaseController
                     // Persist Pages Agnostically (Building canonicalId exactly as intended by Driver)
                     foreach ($targetsForPages as $target) {
                         $canonicalId = "{$target['prefix']}:{$target['pId']}";
-                        $dbPage = $pagesMap[$canonicalId] ?? null;
+                        $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
 
                         $pageUrl = (string)$target['url'];
                         if (is_numeric($pageUrl) || empty($pageUrl)) {
