@@ -428,7 +428,6 @@ class ConfigManagerController extends BaseController
             foreach ($patterns as $assetKey => $pattern) {
                 $configKey = $pattern['key'] ?? $assetKey;
                 $assets = $chanConfig[$configKey] ?? [];
-                $logger->info("DEBUG: Processing pattern $assetKey (found " . count($assets) . " assets)");
                 if (empty($assets)) {
                     continue;
                 }
@@ -438,18 +437,15 @@ class ConfigManagerController extends BaseController
                 }
                 foreach ($assets as $asset) {
                     $idValue = (string)($asset['id'] ?? ($asset['url'] ?? ''));
-                    $logger->info("DEBUG: Processing asset with original ID/URL: $idValue");
-
-                    // If ID is not numeric (it's a URL or path), apply MD5
+                    $urlValue = (string)($asset['url'] ?? ($asset['id'] ?? ''));
+                    
+                    // Platform ID: MD5 for URLs, Numeric for IDs
                     $platformId = is_numeric($idValue) ? $idValue : md5(rtrim($idValue, '/'));
-                    $logger->info("DEBUG: Resolved Platform ID: $platformId");
 
                     $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $idValue);
-                    $logger->info("DEBUG: Looking for $platformId in map...");
                     $dbChanneled = $entitiesMap[$platformId] ?? null;
 
                     if (! $dbChanneled) {
-                        $logger->info("DEBUG: Creating NEW ChanneledAccount...");
                         $dbChanneled = new ChanneledAccount();
                         $dbChanneled->addPlatformId($platformId)
                             ->addAccount($accountEntity)
@@ -460,27 +456,25 @@ class ConfigManagerController extends BaseController
                             ->addData([]);
                         $this->em->persist($dbChanneled);
                         $entitiesMap[$platformId] = $dbChanneled;
-                        $logger->info("DEBUG: NEW ChanneledAccount persisted.");
                     } else {
-                        $logger->info("DEBUG: Updating existing ChanneledAccount...");
                         $dbChanneled->addAccount($accountEntity);
                         if ($dbChanneled->getName() !== $name) {
                             $dbChanneled->addName($name);
                         }
-                        $logger->info("DEBUG: Existing ChanneledAccount updated.");
                     }
 
-                    // Prepare for Page processing (Agnostic: Parent + Children with prefixes)
+                    // Prepare for Page processing: Standard site:domain: prefix
                     $targetsForPages = [];
-                    if (isset($pattern['prefix'])) {
-                        $targetsForPages[] = [
-                            'pId' => $platformId,
-                            'name' => $name,
-                            'url' => $urlValue,
-                            'prefix' => $pattern['prefix'],
-                            'hostname' => $asset['hostname'] ?? null,
-                        ];
-                    }
+                    // Suffix is Hostname if available (GSC), otherwise Platform ID (FB)
+                    $pageSuffix = $asset['hostname'] ?? $platformId;
+                    
+                    $targetsForPages[] = [
+                        'pId' => $platformId,
+                        'name' => $name,
+                        'url' => $urlValue,
+                        'prefix' => 'site:domain',
+                        'suffix' => $pageSuffix,
+                    ];
 
                     // Nested children (Instagram, etc)
                     if (isset($pattern['children'])) {
@@ -520,34 +514,28 @@ class ConfigManagerController extends BaseController
                                     'name' => $childName,
                                     'url' => null,
                                     'prefix' => $childPattern['prefix'],
+                                    'suffix' => $childPattern['hostname'] ?? $childPlatformId,
                                     'hostname' => $childPattern['hostname'] ?? null,
                                 ];
                             }
                         }
                     }
 
-                    // Persist Pages Agnostically (Building canonicalId exactly as intended by Driver)
-                    $logger->info("DEBUG: Starting Page loop for " . count($targetsForPages) . " targets");
+                    // Persist Pages (Using site:domain:suffix convention)
                     foreach ($targetsForPages as $target) {
-                        $canonicalId = "{$target['prefix']}:{$target['pId']}";
-                        $logger->info("DEBUG: Searching for Page with canonicalId: $canonicalId");
-                        try {
-                            $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
-                            $logger->info("DEBUG: Page search finished. Found: " . ($dbPage ? "YES" : "NO"));
-                        } catch (\Exception $pageEx) {
-                            $logger->error("DEBUG: ERROR SEARCHING PAGE: " . $pageEx->getMessage());
-                            continue;
-                        }
+                        $canonicalId = "{$target['prefix']}:{$target['suffix']}";
+                        $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
 
                         $pageUrl = (string)$target['url'];
                         if (is_numeric($pageUrl) || empty($pageUrl)) {
-                            $pageUrl = null;
+                            $pageUrl = (string)$target['pId'];
                         }
 
                         if (! $dbPage) {
                             $dbPage = new \Entities\Analytics\Page();
-                            $dbPage->addCanonicalId($canonicalId)
-                                ->addUrl($pageUrl)
+                            $dbPage->addCanonicalId($canonicalId);
+                        }
+                        $dbPage->addUrl($pageUrl)
                                 ->addTitle($target['name'])
                                 ->addAccount($accountEntity)
                                 ->addPlatformId($target['pId'])
