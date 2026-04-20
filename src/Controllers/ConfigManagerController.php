@@ -456,9 +456,9 @@ class ConfigManagerController extends BaseController
                         } else {
                             $platformId = $rawPlatformId;
                         }
-                        $platformCreatedAt = $asset[$pattern['channeled_account']['platform_created_at_key']];
-                        $typeMark = $asset[$pattern['channeled_account']['type']];
-                        $name = $asset[$pattern['channeled_account']['name_key']];
+                        $platformCreatedAt = $asset[$pattern['channeled_account']['platform_created_at_key']] ?? null;
+                        $typeMark = $pattern['channeled_account']['type'];
+                        $name = $asset[$pattern['channeled_account']['name_key']] ?? null;
                         $data = $asset[$pattern['channeled_account']['data_key']] ?? [];
 
                         $dbChanneled = $entitiesMap[$platformId] ?? null;
