@@ -439,7 +439,7 @@ class ConfigManagerController extends BaseController
                         // Prepare channeled account for processing
                         $rawPlatformId = match($pattern['channeled_account']['platform_id']['type']) {
                             'md5' => md5($asset[$pattern['channeled_account']['platform_id']['key']]),
-                            'raw',
+                            'raw' => $asset[$pattern['channeled_account']['platform_id']['key']],
                             default => $asset[$pattern['channeled_account']['platform_id']['key']]
                         };
                         if (method_exists($driver, 'getCleanId')) {
