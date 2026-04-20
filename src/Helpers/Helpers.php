@@ -83,8 +83,8 @@ class Helpers
         // we check if we should supplement with .env.demo later.
 
         $loadEnvFile = function ($filename) {
-            $currentConfigDir = self::getConfigDir();
-            $filePath = $currentConfigDir . '/' . $filename;
+            $root = dirname(self::getConfigDir());
+            $filePath = $root . '/' . $filename;
             if (file_exists($filePath)) {
                 $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
                 foreach ($lines as $line) {
@@ -97,6 +97,7 @@ class Helpers
                         $value = trim($value, " \t\n\r\0\x0B\"'");
                         putenv("$name=$value");
                         $_ENV[$name] = $value;
+                        $_SERVER[$name] = $value;
                     }
                 }
 
