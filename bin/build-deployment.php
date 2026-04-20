@@ -60,9 +60,8 @@ $masterName = "{$deploymentName}-master";
 $startingHostPort = (int) (getenv('STARTING_HOST_PORT') ?: 10000);
 $externalPort = getenv('EXTERNAL_PORT') ?: ($instances[0]['port'] ?? $startingHostPort);
 $mcpPort = getenv('MCP_PORT') ?: 3000;
-    $volumes = [
+    $phpVolumes = [
         './:/app',
-        '/app/mcp-server/node_modules', // Protect container node_modules
         '/var/run/docker.sock:/var/run/docker.sock'
     ];
 
@@ -77,13 +76,13 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         'environment' => $buildEnv($masterName),
         'networks'    => ['default', 'gateway'],
         'ports'       => [
-            "{$externalPort}:8080",
-            "{$mcpPort}:3000"
+            "{$externalPort}:8080"
         ],
-        'volumes'     => $volumes,
+        'volumes'     => $phpVolumes,
         'depends_on'  => [
             'db' => ['condition' => 'service_started'],
             'redis' => ['condition' => 'service_started'],
+            'mcp' => ['condition' => 'service_started'],
         ],
         'extra_hosts' => ['host.docker.internal:host-gateway'],
     ];
@@ -104,7 +103,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
             'restart'     => 'always',
             'command'     => null,
             'environment' => $buildEnv($name, $channel, $entity),
-            'volumes'     => $volumes, // Same volumes for workers
+            'volumes'     => $phpVolumes,
             'networks'    => ['default'],
             'depends_on'  => [
                 'master' => ['condition' => 'service_started'],
@@ -113,6 +112,30 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
             ],
         ];
     }
+
+    // ─── Phase 2.5: Create Dedicated MCP Service ─────────────────────────────────────
+    $services['mcp'] = [
+        'container_name' => "{$deploymentName}-mcp",
+        'build' => [
+            'context'    => '.',
+            'dockerfile' => 'Dockerfile',
+        ],
+        'restart'     => 'always',
+        'command'     => 'node mcp-server/index.js',
+        'environment' => [
+            'MCP_MODE=sse',
+            'MCP_PORT=3000',
+            'INSTANCE_NAME=mcp-server'
+        ],
+        'networks'    => ['default', 'gateway'],
+        'ports'       => [
+            "{$mcpPort}:3000"
+        ],
+        'volumes'     => [
+            './:/app',
+            '/app/mcp-server/node_modules'
+        ],
+    ];
 
 // ─── Phase 3: Infrastructure (DB & Redis) ────────────────────────────────────────
 $dbHost = (($env === 'production' || $env === 'testing') ? 'db' : ($db['host'] ?? 'db'));
