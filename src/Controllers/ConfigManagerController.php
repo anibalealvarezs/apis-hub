@@ -411,13 +411,21 @@ class ConfigManagerController extends BaseController
             }
             // End Get Channel Entity
 
-            // 2. Bulk Load ALL ChanneledAccounts for this channel to avoid N+1 queries
+            // 2. Bulk Load ALL ChanneledAccounts and Pages for this channel to avoid N+1 queries
             $existingEntities = $this->em->getRepository(ChanneledAccount::class)->findBy(['channel' => $channelEntity->getId()]);
             $entitiesMap = [];
             foreach ($existingEntities as $e) {
                 $entitiesMap[(string)$e->getPlatformId()] = $e;
             }
-            // End Get ChanneledAccounts
+
+            $existingPages = $this->em->getRepository(\Entities\Analytics\Page::class)->findBy(['account' => $accountEntity->getId()]);
+            $pagesMap = [];
+            foreach ($existingPages as $p) {
+                foreach ($p->getCanonicalIds() as $cId) {
+                    $pagesMap[$cId] = $p;
+                }
+            }
+            // End Get Entities
 
             // 3. Identify common account group
             $commonKey = $driver::getCommonConfigKey();
@@ -464,7 +472,7 @@ class ConfigManagerController extends BaseController
                             ->addType($typeMark)
                             ->addChannel($channelEntity)
                             ->addName($name)
-                            ->addPlatformCreatedAt($platformCreatedAt)
+                            ->addPlatformCreatedAt(is_string($platformCreatedAt) ? new \DateTime($platformCreatedAt) : null)
                             ->addData($data);
                         $this->em->persist($dbChanneled);
                         $entitiesMap[$platformId] = $dbChanneled;
@@ -504,11 +512,12 @@ class ConfigManagerController extends BaseController
                         $canonicalId = $pattern['page']['canonical_id']['preffix'] . ':' . $canValue;
                         $data = $asset[$pattern['page']['data_key']] ?? [];
 
-                        $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
+                        $dbPage = $pagesMap[$canonicalId] ?? null;
 
                         if (! $dbPage) {
                             $dbPage = new \Entities\Analytics\Page();
                             $dbPage->addCanonicalId($canonicalId);
+                            $pagesMap[$canonicalId] = $dbPage;
                         }
 
                         $dbPage->addUrl($url)
