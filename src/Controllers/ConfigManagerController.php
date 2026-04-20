@@ -437,7 +437,7 @@ class ConfigManagerController extends BaseController
                 }
                 foreach ($assets as $asset) {
                     $idValue = (string)($asset['id'] ?? ($asset['url'] ?? ''));
-                    $urlValue = (string)($asset['url'] ?? '');
+                    $urlValue = (string)($asset['url'] ?? ($isUrl ? $idValue : ''));
                     
                     // Platform ID: MD5 only for URLs or GSC domain properties. Raw for IDs (like act_...)
                     $isUrl = (str_contains($idValue, '://') || str_contains($idValue, '.') || str_contains($idValue, 'sc-domain:'));
