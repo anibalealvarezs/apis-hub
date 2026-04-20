@@ -527,9 +527,17 @@ class ConfigManagerController extends BaseController
                     }
 
                     // Persist Pages Agnostically (Building canonicalId exactly as intended by Driver)
+                    $logger->info("DEBUG: Starting Page loop for " . count($targetsForPages) . " targets");
                     foreach ($targetsForPages as $target) {
                         $canonicalId = "{$target['prefix']}:{$target['pId']}";
-                        $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
+                        $logger->info("DEBUG: Searching for Page with canonicalId: $canonicalId");
+                        try {
+                            $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
+                            $logger->info("DEBUG: Page search finished. Found: " . ($dbPage ? "YES" : "NO"));
+                        } catch (\Exception $pageEx) {
+                            $logger->error("DEBUG: ERROR SEARCHING PAGE: " . $pageEx->getMessage());
+                            continue;
+                        }
 
                         $pageUrl = (string)$target['url'];
                         if (is_numeric($pageUrl) || empty($pageUrl)) {
