@@ -473,7 +473,7 @@ class ConfigManagerController extends BaseController
                         'pId' => $platformId,
                         'name' => $name,
                         'url' => $urlValue,
-                        'prefix' => 'site:domain',
+                        'prefix' => $pattern['prefix'] ?? 'site:domain',
                         'suffix' => $pageSuffix,
                     ];
 
