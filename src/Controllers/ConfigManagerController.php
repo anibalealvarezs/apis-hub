@@ -432,6 +432,7 @@ class ConfigManagerController extends BaseController
                 $assets = $chanConfig[$pattern['key']] ?? [];
                 if (empty($assets)) {
                     $logger->info("No assets found for key: $assetKey");
+
                     continue;
                 }
                 foreach ($assets as $asset) {
@@ -453,7 +454,7 @@ class ConfigManagerController extends BaseController
                         $data = $asset[$pattern['channeled_account']['data_key']] ?? [];
 
                         $dbChanneled = $entitiesMap[$platformId] ?? null;
-                        if (!$dbChanneled) {
+                        if (! $dbChanneled) {
                             $dbChanneled = new ChanneledAccount();
                             $dbChanneled->addPlatformId($platformId);
                         }
@@ -473,7 +474,7 @@ class ConfigManagerController extends BaseController
                         // Prepare channeled account for processing
                         $rawPlatformId = match($pattern['page']['platform_id']['type']) {
                             'md5' => md5($asset[$pattern['page']['platform_id']['key']]),
-                            'raw',
+                            'raw' => $asset[$pattern['page']['platform_id']['key']],
                             default => $asset[$pattern['page']['platform_id']['key']]
                         };
                         if (method_exists($driver, 'getCleanId')) {
@@ -485,8 +486,8 @@ class ConfigManagerController extends BaseController
                         $title = $asset[$pattern['page']['title_key']] ?? null;
                         $url = match($pattern['page']['url']['type']) {
                             'custom' => $pattern['page']['url']['preffix'] . $asset[$pattern['page']['url']['key']],
-                            'default',
-                            'normal',
+                            'default' => $asset['url'] ?? null,
+                            'normal' => $asset['url'] ?? null,
                             default => $asset['url'] ?? null
                         };
                         $canSource = $pattern['page']['canonical_id']['field'];
