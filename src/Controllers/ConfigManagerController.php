@@ -275,9 +275,6 @@ class ConfigManagerController extends BaseController
 
             $logger->info("Config updated successfully for type: " . $type);
 
-            // Auto-trigger entity synchronization to ensure database reflects new config
-            $this->triggerEntitySync($logger);
-
             // Reset cached configs within the current process (critical for Swoole/Long-lived environments)
             Helpers::resetConfigs();
 
@@ -286,30 +283,6 @@ class ConfigManagerController extends BaseController
             $logger->error("Error updating config: " . $e->getMessage());
 
             return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
-        }
-    }
-
-    /**
-     * Executes the entity initialization command in the background to avoid blocking the UI
-     */
-    private function triggerEntitySync($logger): void
-    {
-        try {
-            $consolePath = realpath(__DIR__ . '/../../bin/cli.php');
-            if ($consolePath) {
-                $phpPath = PHP_BINARY ?: 'php';
-                // Run in background to not block the UI response, but ensure it starts
-                $command = "\"$phpPath\" \"$consolePath\" app:initialize-entities > /dev/null 2>&1 &";
-                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-                    $command = "start /B $phpPath \"$consolePath\" app:initialize-entities > NUL 2>&1";
-                }
-                exec($command);
-                $logger->info("Entity synchronization triggered successfully via: $command");
-            } else {
-                $logger->error("Could not find console binary to trigger synchronization.");
-            }
-        } catch (Exception $e) {
-            $logger->error("Failed to trigger entity synchronization: " . $e->getMessage());
         }
     }
 
@@ -412,6 +385,9 @@ class ConfigManagerController extends BaseController
         }
     }
 
+
+
+
     private function syncAssetsToDatabase(string $channel, array $config, $logger): void
     {
         try {
@@ -419,96 +395,90 @@ class ConfigManagerController extends BaseController
             $patterns = $driver->getAssetPatterns();
             $chanConfig = $config['channels'][$channel] ?? [];
 
+            // 1. Get Channel Entity (Fast lookup)
+            $channelEntity = $this->em->getRepository(Channel::class)->findOneBy(['name' => $channel]);
+            if (! $channelEntity) {
+                $logger->warning("Unknown channel encountered during database sync: $channel");
+                return;
+            }
+
+            // 2. Bulk Load ALL ChanneledAccounts for this channel to avoid N+1 queries
+            $existingEntities = $this->em->getRepository(ChanneledAccount::class)->findBy(['channel' => $channelEntity->getId()]);
+            $entitiesMap = [];
+            foreach ($existingEntities as $e) {
+                $entitiesMap[(string)$e->getPlatformId()] = $e;
+            }
+
+            // 3. Identify common account group
+            $commonKey = $driver::getCommonConfigKey();
+            $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
+            $groupName = $chanConfig['accounts_group_name'] ?? ($config['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
+            $accountEntity = $this->getOrCreateAccount($groupName);
+
+            $isUrlBasedProvider = ($channel === 'google_search_console' || str_contains($channel, 'search_console'));
+
             foreach ($patterns as $assetKey => $pattern) {
-                // Key where assets are stored in YAML (defaults to assetKey)
                 $configKey = $pattern['key'] ?? $assetKey;
                 $assets = $chanConfig[$configKey] ?? [];
+                if (empty($assets)) continue;
 
-                if (empty($assets)) {
-                    continue;
-                }
-
-                // DB Type Mapping
-                $typeRaw = $pattern['type'] ?? null;
-                if (! $typeRaw) {
-                    continue;
-                } // Skip if no DB type mapping provided by driver
-
-                $typeMark = $typeRaw;
-
-                $chanConfig = $config['channels'][$channel] ?? [];
-                $commonKey = $driver::getCommonConfigKey();
-                $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
-                
-                $groupName = $chanConfig['accounts_group_name'] ?? ($config['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
-
-                $accountEntity = $this->getOrCreateAccount($groupName);
-                $isUrlBasedProvider = ($channel === 'google_search_console' || str_contains($channel, 'search_console'));
+                $typeMark = $pattern['type'] ?? null;
+                if (! $typeMark) continue;
 
                 foreach ($assets as $asset) {
                     $id = (string)($asset['id'] ?? ($asset['url'] ?? ''));
-                    if (! $id) {
-                        continue;
-                    }
+                    if (! $id) continue;
 
                     if ($isUrlBasedProvider && filter_var($id, FILTER_VALIDATE_URL)) {
                         $id = md5(rtrim($id, '/'));
                     }
 
                     $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $id);
-                    $channelValue = Channel::tryFromName($channel)?->value;
-                    if (! $channelValue) {
-                        $logger->warning("Unknown channel encountered during database sync: $channel");
+                    $dbChanneled = $entitiesMap[$id] ?? null;
 
-                        continue;
-                    }
-
-                    $dbChanneled = $this->em->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $id, 'channel' => $channelValue]);
                     if (! $dbChanneled) {
                         $dbChanneled = new ChanneledAccount();
                         $dbChanneled->addPlatformId($id)
                             ->addAccount($accountEntity)
                             ->addType($typeMark)
-                            ->addChannel($channelValue)
+                            ->addChannel($channelEntity->getId())
                             ->addName($name)
                             ->addPlatformCreatedAt(isset($asset['created_at']) ? new DateTime($asset['created_at']) : null)
                             ->addData([]);
                         $this->em->persist($dbChanneled);
+                        $entitiesMap[$id] = $dbChanneled; // Add to map for children lookup
                     } elseif ($dbChanneled->getName() !== $name) {
                         $dbChanneled->addName($name);
-                        $this->em->persist($dbChanneled);
                     }
 
-                    // Specific nested assets (like IG under Page) - if defined in pattern
+                    // Nested children (Instagram, etc)
                     if (isset($pattern['children'])) {
-                        foreach ($pattern['children'] as $childKey => $childPattern) {
+                        foreach ($pattern['children'] as $childPattern) {
                             $childId = (string)($asset[$childPattern['id_key']] ?? '');
-                            if (! $childId) {
-                                continue;
-                            }
+                            if (! $childId) continue;
 
                             $childName = $asset[$childPattern['name_key']] ?? $name;
                             $childType = $childPattern['type'];
 
-                            $dbChild = $this->em->getRepository(ChanneledAccount::class)->findOneBy(['platformId' => $childId, 'channel' => $channelValue]);
+                            $dbChild = $entitiesMap[$childId] ?? null;
                             if (! $dbChild) {
                                 $dbChild = new ChanneledAccount();
                                 $dbChild->addPlatformId($childId)
                                     ->addAccount($accountEntity)
                                     ->addType($childType)
-                                    ->addChannel($channelValue)
+                                    ->addChannel($channelEntity->getId())
                                     ->addName($childName)
                                     ->addPlatformCreatedAt(isset($asset['created_at']) ? new DateTime($asset['created_at']) : null)
                                     ->addData([]);
                                 $this->em->persist($dbChild);
+                                $entitiesMap[$childId] = $dbChild;
                             } elseif ($dbChild->getName() !== $childName) {
                                 $dbChild->addName($childName);
-                                $this->em->persist($dbChild);
                             }
                         }
                     }
 
-                    // 4. ALSO Persist Page Entity if applicable (Optimization for GSC/Social)
+                    // Persist Page if applicable
                     if ($typeMark === 'gsc_site' || $typeMark === 'facebook_page') {
                         $canonicalId = \Helpers\Helpers::getCanonicalPageId($asset['url'] ?? $id, null, 'website');
                         $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
@@ -526,7 +496,6 @@ class ConfigManagerController extends BaseController
                              $dbPage->addAccount($accountEntity)
                                 ->addPlatformId($id)
                                 ->addTitle($name);
-                             $this->em->persist($dbPage);
                         }
                     }
                 }
