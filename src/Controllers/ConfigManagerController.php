@@ -391,7 +391,8 @@ class ConfigManagerController extends BaseController
         try {
             $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
             $patterns = $driver->getAssetPatterns();
-            // The per-channel YAML has no 'channels' wrapper, so we must read from the main app config.
+            // Reset config cache first so we read the freshly-saved channel data, not stale in-memory state.
+            \Helpers\Helpers::resetConfigs();
             $projectConfig = \Helpers\Helpers::getProjectConfig();
             $chanConfig = $projectConfig['channels'][$channel] ?? [];
 
