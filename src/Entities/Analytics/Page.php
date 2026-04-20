@@ -18,13 +18,13 @@ class Page extends Entity
     #[ORM\Column(name: "canonical_id", type: 'string', unique: true, nullable: true)]
     protected ?string $canonicalId = null;
 
-    #[ORM\Column(type: 'string')]
+    #[ORM\Column(type: 'text')]
     protected string $url;
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     protected ?string $title = null;
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     protected ?string $hostname = null;
 
     #[ORM\Column(name: 'platform_id', type: 'string')]

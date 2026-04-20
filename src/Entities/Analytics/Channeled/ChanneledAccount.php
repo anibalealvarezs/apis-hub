@@ -24,7 +24,7 @@ use Repositories\Channeled\ChanneledAccountRepository;
 #[ORM\HasLifecycleCallbacks]
 class ChanneledAccount extends ChanneledEntity
 {
-    #[ORM\Column(type: 'string')]
+    #[ORM\Column(type: 'text')]
     protected string $name;
 
     #[ORM\Column(type: 'string')]
