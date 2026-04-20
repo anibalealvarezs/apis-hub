@@ -391,7 +391,9 @@ class ConfigManagerController extends BaseController
         try {
             $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
             $patterns = $driver->getAssetPatterns();
-            $chanConfig = $config['channels'][$channel] ?? [];
+            // The per-channel YAML has no 'channels' wrapper, so we must read from the main app config.
+            $projectConfig = \Helpers\Helpers::getProjectConfig();
+            $chanConfig = $projectConfig['channels'][$channel] ?? [];
 
             // 1. Get Channel Entity (Fast lookup)
             $channelEntity = $this->em->getRepository(Channel::class)->findOneBy(['name' => $channel]);
@@ -411,7 +413,7 @@ class ConfigManagerController extends BaseController
             // 3. Identify common account group
             $commonKey = $driver::getCommonConfigKey();
             $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
-            $groupName = $chanConfig['accounts_group_name'] ?? ($config['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
+            $groupName = $chanConfig['accounts_group_name'] ?? ($projectConfig['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
             $accountEntity = $this->getOrCreateAccount($groupName);
 
             $isUrlBasedProvider = ($channel === 'google_search_console' || str_contains($channel, 'search_console'));
@@ -433,7 +435,7 @@ class ConfigManagerController extends BaseController
                     }
 
                     $urlValue = (string)($asset['url'] ?? ($asset['id'] ?? ''));
-                    
+
                     // If ID is not numeric (it's a URL or path), apply MD5
                     $platformId = is_numeric($idValue) ? $idValue : md5(rtrim($idValue, '/'));
 
@@ -466,7 +468,7 @@ class ConfigManagerController extends BaseController
                             'name' => $name,
                             'url' => $urlValue,
                             'prefix' => $pattern['prefix'],
-                            'hostname' => $asset['hostname'] ?? null
+                            'hostname' => $asset['hostname'] ?? null,
                         ];
                     }
 
@@ -500,7 +502,7 @@ class ConfigManagerController extends BaseController
                                     $dbChild->addName($childName);
                                 }
                             }
-                            
+
                             // If child pattern defines a prefix, it gets a Page record
                             if (isset($childPattern['prefix'])) {
                                 $targetsForPages[] = [
@@ -508,7 +510,7 @@ class ConfigManagerController extends BaseController
                                     'name' => $childName,
                                     'url' => null,
                                     'prefix' => $childPattern['prefix'],
-                                    'hostname' => $childPattern['hostname'] ?? null
+                                    'hostname' => $childPattern['hostname'] ?? null,
                                 ];
                             }
                         }
@@ -521,7 +523,7 @@ class ConfigManagerController extends BaseController
 
                         $pageUrl = (string)$target['url'];
                         if (is_numeric($pageUrl) || empty($pageUrl)) {
-                            $pageUrl = null; 
+                            $pageUrl = null;
                         }
 
                         if (! $dbPage) {
@@ -535,10 +537,10 @@ class ConfigManagerController extends BaseController
                                 ->addData([]);
                             $this->em->persist($dbPage);
                         } else {
-                             $dbPage->addAccount($accountEntity)
-                                ->addPlatformId($target['pId'])
-                                ->addUrl($pageUrl)
-                                ->addTitle($target['name']);
+                            $dbPage->addAccount($accountEntity)
+                               ->addPlatformId($target['pId'])
+                               ->addUrl($pageUrl)
+                               ->addTitle($target['name']);
                         }
                     }
                 }

@@ -66,6 +66,7 @@ class Page extends Entity
     public function addUrl(string $url): self
     {
         $this->url = $url;
+
         return $this;
     }
 
@@ -86,6 +87,7 @@ class Page extends Entity
     public function addTitle(?string $title): self
     {
         $this->title = $title;
+
         return $this;
     }
 
@@ -106,6 +108,7 @@ class Page extends Entity
     public function addHostname(?string $hostname): self
     {
         $this->hostname = $hostname;
+
         return $this;
     }
 
@@ -124,6 +127,7 @@ class Page extends Entity
     public function addPlatformId(int|string $platformId): self
     {
         $this->platformId = $platformId;
+
         return $this;
     }
 
@@ -142,6 +146,7 @@ class Page extends Entity
     public function addCanonicalId(?string $canonicalId): self
     {
         $this->canonicalId = $canonicalId;
+
         return $this;
     }
 
@@ -162,6 +167,7 @@ class Page extends Entity
     public function addData(?array $data): self
     {
         $this->data = $data;
+
         return $this;
     }
 
@@ -200,10 +206,11 @@ class Page extends Entity
      */
     public function addMetricConfig(MetricConfig $metricConfig): self
     {
-        if (!$this->metricConfigs->contains($metricConfig)) {
+        if (! $this->metricConfigs->contains($metricConfig)) {
             $this->metricConfigs->add($metricConfig);
             $metricConfig->addPage($this);
         }
+
         return $this;
     }
 
@@ -220,6 +227,7 @@ class Page extends Entity
                 $metricConfig->addPage(null);
             }
         }
+
         return $this;
     }
 
@@ -239,10 +247,11 @@ class Page extends Entity
      */
     public function addPost(Post $post): self
     {
-        if (!$this->posts->contains($post)) {
+        if (! $this->posts->contains($post)) {
             $this->posts->add($post);
             $post->addPage($this);
         }
+
         return $this;
     }
 
@@ -259,6 +268,7 @@ class Page extends Entity
                 $post->addPage(null);
             }
         }
+
         return $this;
     }
 
