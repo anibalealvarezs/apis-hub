@@ -74,7 +74,7 @@ class Helpers
         }
 
         $config = [];
-        $rootConfigDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
+        $rootConfigDir = self::getConfigDir();
 
         // 0. Load .env manually if it exists to ensure variables are available
         $envFileName = getenv('ENV_FILE') ?: '.env';
@@ -83,8 +83,7 @@ class Helpers
         // we check if we should supplement with .env.demo later.
 
         $loadEnvFile = function ($filename) {
-            $root = getenv('CONFIG_DIR') ? dirname(getenv('CONFIG_DIR')) : __DIR__ . '/../../';
-            $filePath = $root . '/' . $filename;
+            $filePath = $rootConfigDir . '/' . $filename;
             if (file_exists($filePath)) {
                 $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
                 foreach ($lines as $line) {
@@ -214,6 +213,14 @@ class Helpers
         $config = self::getProjectConfig();
         $timezone = $config['timezone'] ?? 'UTC';
         date_default_timezone_set($timezone);
+    }
+
+    /**
+     * @return string
+     */
+    public static function getConfigDir(): string
+    {
+        return getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
     }
 
     /**
@@ -479,7 +486,7 @@ class Helpers
         if (self::$channelsConfig === null) {
             $projectConfig = self::getProjectConfig();
             $config = $projectConfig['channels'] ?? [];
-            $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
+            $configDir = self::getConfigDir();
             $filePath = $configDir . '/yaml/channelsconfig.yaml';
 
             try {
@@ -778,6 +785,7 @@ class Helpers
                     // Create a dummy client if real initialization failed to satisfy type hint
                     /** @var ClientInterface $client */
                     $client = new Client(['host' => 'localhost', 'port' => 6379, 'timeout' => 0.1]);
+
                     return $client;
                 }
 
@@ -1137,6 +1145,7 @@ class Helpers
 
         if (! $enabled) {
             $logger->pushHandler(new NullHandler());
+
             return $logger;
         }
 
@@ -1144,7 +1153,7 @@ class Helpers
         // Default to INFO in prod, DEBUG in dev
         $defaultProdLevel = 'info';
         $defaultDevLevel = 'debug';
-        
+
         $configLevelStr = self::isDebug()
             ? ($logConfig['level'] ?? $defaultDevLevel)
             : ($logConfig['prod_level'] ?? $defaultProdLevel);
@@ -1156,7 +1165,7 @@ class Helpers
                 ? $level
                 : (is_int($level) ? Level::from($level) : self::getLogLevel($level));
 
-            if (!self::isDebug() && $requested->value < $baseLevel->value) {
+            if (! self::isDebug() && $requested->value < $baseLevel->value) {
                 $requested = $baseLevel;
             }
             $finalLevel = $requested;
@@ -1165,10 +1174,10 @@ class Helpers
         }
 
         $maxFiles = $logConfig['max_days'] ?? 7;
-        
+
         // Ensure logs directory exists
         $logDir = __DIR__ . '/../../logs';
-        if (!is_dir($logDir)) {
+        if (! is_dir($logDir)) {
             mkdir($logDir, 0777, true);
         }
 
@@ -1176,7 +1185,7 @@ class Helpers
         // and older files are automatically pruned.
         $handler = new RotatingFileHandler($logDir . '/' . $filename, $maxFiles, $finalLevel);
         $handler->setFilenameFormat('{filename}-{date}', 'Y-m-d');
-        
+
         $logger->pushHandler($handler);
 
         return $logger;
@@ -1188,7 +1197,7 @@ class Helpers
      */
     public static function reconnectIfNeeded(EntityManagerInterface &$em): void
     {
-        if (!$em->isOpen()) {
+        if (! $em->isOpen()) {
             $em = self::getManager();
         }
 

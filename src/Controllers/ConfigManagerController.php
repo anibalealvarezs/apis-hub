@@ -396,7 +396,7 @@ class ConfigManagerController extends BaseController
             $logger->info("DEBUG: Patterns loaded: " . implode(', ', array_keys($patterns)));
             // Read channel config directly from disk (already saved before this method is called).
             // Do NOT call resetConfigs() here — it nulls the EntityManager and corrupts the persistence flow.
-            $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
+            $configDir = Helpers::getConfigDir();
             $chanYaml = $configDir . '/channels/' . $channel . '.yaml';
             $rawConfig = file_exists($chanYaml) ? (\Symfony\Component\Yaml\Yaml::parseFile($chanYaml) ?: []) : [];
             $chanConfig = $rawConfig['channels'][$channel] ?? $rawConfig;
@@ -409,6 +409,7 @@ class ConfigManagerController extends BaseController
 
                 return;
             }
+            // End Get Channel Entity
 
             // 2. Bulk Load ALL ChanneledAccounts for this channel to avoid N+1 queries
             $existingEntities = $this->em->getRepository(ChanneledAccount::class)->findBy(['channel' => $channelEntity->getId()]);
@@ -416,6 +417,7 @@ class ConfigManagerController extends BaseController
             foreach ($existingEntities as $e) {
                 $entitiesMap[(string)$e->getPlatformId()] = $e;
             }
+            // End Get ChanneledAccounts
 
             // 3. Identify common account group
             $commonKey = $driver::getCommonConfigKey();
@@ -424,149 +426,91 @@ class ConfigManagerController extends BaseController
             $logger->info("DEBUG: Resolving account group: $groupName");
             $accountEntity = $this->getOrCreateAccount($groupName);
             $logger->info("DEBUG: Account entity resolved: " . $accountEntity->getName());
+            // End Identify common account group
 
             foreach ($patterns as $assetKey => $pattern) {
-                $configKey = $pattern['key'] ?? $assetKey;
-                $assets = $chanConfig[$configKey] ?? ($chanConfig[$configKey] ?? []);
+                $assets = $chanConfig[$pattern['key']] ?? [];
                 if (empty($assets)) {
-                    continue;
-                }
-                $typeMark = $pattern['type'] ?? null;
-                if (! $typeMark) {
+                    $logger->info("No assets found for key: $assetKey");
                     continue;
                 }
                 foreach ($assets as $asset) {
-                    $idValue = (string)($asset['id'] ?? ($asset['url'] ?? ''));
-                    $isUrl = (str_contains($idValue, '://') || str_contains($idValue, '.') || str_contains($idValue, 'sc-domain:'));
-                    $urlValue = (string)($asset['url'] ?? ($isUrl ? $idValue : ''));
+                    if (isset($pattern['channeled_account'])) {
+                        // Prepare channeled account for processing
+                        $rawPlatformId = match($pattern['channeled_account']['platform_id']['type']) {
+                            'md5' => md5($asset[$pattern['channeled_account']['platform_id']['key']]),
+                            'raw',
+                            default => $asset[$pattern['channeled_account']['platform_id']['key']]
+                        };
+                        if (method_exists($driver, 'getCleanId')) {
+                            $platformId = $driver->getCleanId($rawPlatformId);
+                        } else {
+                            $platformId = $rawPlatformId;
+                        }
+                        $platformCreatedAt = $asset[$pattern['channeled_account']['platform_created_at_key']];
+                        $typeMark = $asset[$pattern['channeled_account']['type']];
+                        $name = $asset[$pattern['channeled_account']['name_key']];
+                        $data = $asset[$pattern['channeled_account']['data_key']] ?? [];
 
-                    // Platform ID: MD5 only for URLs or GSC domain properties. Raw for IDs (like act_...)
-                    $platformId = ($isUrl && ! is_numeric($idValue)) ? md5(rtrim($idValue, '/')) : $idValue;
+                        $dbChanneled = $entitiesMap[$platformId] ?? null;
+                        if (!$dbChanneled) {
+                            $dbChanneled = new ChanneledAccount();
+                            $dbChanneled->addPlatformId($platformId);
+                        }
 
-                    $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $idValue);
-                    $dbChanneled = $entitiesMap[$platformId] ?? null;
-
-                    if (! $dbChanneled) {
-                        $dbChanneled = new ChanneledAccount();
-                        $dbChanneled->addPlatformId($platformId)
-                            ->addAccount($accountEntity)
+                        // Process channeled account
+                        $dbChanneled->addAccount($accountEntity)
                             ->addType($typeMark)
                             ->addChannel($channelEntity)
                             ->addName($name)
-                            ->addPlatformCreatedAt(isset($asset['created_at']) ? new \DateTime($asset['created_at']) : null)
-                            ->addData([]);
+                            ->addPlatformCreatedAt($platformCreatedAt)
+                            ->addData($data);
                         $this->em->persist($dbChanneled);
                         $entitiesMap[$platformId] = $dbChanneled;
-                    } else {
-                        $dbChanneled->addAccount($accountEntity);
-                        if ($dbChanneled->getName() !== $name) {
-                            $dbChanneled->addName($name);
-                        }
                     }
 
-                    // Prepare for Page processing: Specific logic for each type
-                    $targetsForPages = [];
-                    $isPage = (
-                        str_contains($urlValue, '://') ||
-                        str_contains($urlValue, 'sc-domain:') ||
-                        ($pattern['type'] ?? '') === 'facebook_page' ||
-                        ($pattern['type'] ?? '') === 'instagram_account'
-                    );
-
-                    if ($isPage && ($pattern['type'] ?? '') !== 'facebook_ad_account') {
-                        $hostname = $asset['hostname'] ?? null;
-                        if (! $hostname && $urlValue) {
-                            if (str_contains($urlValue, 'sc-domain:')) {
-                                $hostname = str_replace('sc-domain:', '', $urlValue);
-                            } else {
-                                $hostname = parse_url($urlValue, PHP_URL_HOST);
-                            }
+                    if (isset($pattern['page'])) {
+                        // Prepare channeled account for processing
+                        $rawPlatformId = match($pattern['page']['platform_id']['type']) {
+                            'md5' => md5($asset[$pattern['page']['platform_id']['key']]),
+                            'raw',
+                            default => $asset[$pattern['page']['platform_id']['key']]
+                        };
+                        if (method_exists($driver, 'getCleanId')) {
+                            $platformId = $driver->getCleanId($rawPlatformId);
+                        } else {
+                            $platformId = $rawPlatformId;
                         }
-
-                        // GSC has a double prefix in your DB (site:domain:sc-domain:...)
-                        $prefix = $pattern['prefix'] ?? 'site:domain';
-                        $pageSuffix = $hostname ?? $platformId;
-                        if (str_contains($urlValue, 'sc-domain:')) {
-                            $pageSuffix = $urlValue;
-                        }
-
-                        $targetsForPages[] = [
-                            'pId' => $platformId,
-                            'name' => $name,
-                            'url' => $urlValue,
-                            'prefix' => $prefix,
-                            'suffix' => $pageSuffix,
+                        $hostname = method_exists($driver, 'getCleanHostname') ? $driver->getCleanHostname($asset[$pattern['page']['hostname_key']]) : ($asset[$pattern['page']['hostname_key']] ?? null);
+                        $title = $asset[$pattern['page']['title_key']] ?? null;
+                        $url = match($pattern['page']['url']['type']) {
+                            'custom' => $pattern['page']['url']['preffix'] . $asset[$pattern['page']['url']['key']],
+                            'default',
+                            'normal',
+                            default => $asset['url'] ?? $asset['id'] ?? null
+                        };
+                        $canSource = $pattern['page']['canonical_id']['field'];
+                        $canValue = match($canSource) {
+                            'platformId' => $platformId,
                             'hostname' => $hostname,
-                        ];
-                    }
+                            default => $asset[$canSource] ?? $asset['id'] ?? null
+                        };
+                        $canonicalId = $pattern['page']['canonical_id']['preffix'] . ':' . $canValue;
+                        $data = $asset[$pattern['page']['data_key']] ?? [];
 
-                    // Nested children (Instagram, etc)
-                    if (isset($pattern['children'])) {
-                        foreach ($pattern['children'] as $childPattern) {
-                            $childIdRaw = (string)($asset[$childPattern['id_key']] ?? '');
-                            if (! $childIdRaw) {
-                                continue;
-                            }
-
-                            $childPlatformId = is_numeric($childIdRaw) ? $childIdRaw : md5(rtrim($childIdRaw, '/'));
-                            $childName = $asset[$childPattern['name_key']] ?? $name;
-                            $childType = $childPattern['type'];
-
-                            $dbChild = $entitiesMap[$childPlatformId] ?? null;
-                            if (! $dbChild) {
-                                $dbChild = new ChanneledAccount();
-                                $dbChild->addPlatformId($childPlatformId)
-                                    ->addAccount($accountEntity)
-                                    ->addType($childType)
-                                    ->addChannel($channelEntity)
-                                    ->addName($childName)
-                                    ->addPlatformCreatedAt(isset($asset['created_at']) ? new \DateTime($asset['created_at']) : null)
-                                    ->addData([]);
-                                $this->em->persist($dbChild);
-                                $entitiesMap[$childPlatformId] = $dbChild;
-                            } else {
-                                $dbChild->addAccount($accountEntity);
-                                if ($dbChild->getName() !== $childName) {
-                                    $dbChild->addName($childName);
-                                }
-                            }
-
-                            // If child pattern defines a prefix, it gets a Page record
-                            if (isset($childPattern['prefix'])) {
-                                $targetsForPages[] = [
-                                    'pId' => $childPlatformId,
-                                    'name' => $childName,
-                                    'url' => null,
-                                    'prefix' => $childPattern['prefix'],
-                                    'suffix' => $childPattern['hostname'] ?? $childPlatformId,
-                                    'hostname' => $childPattern['hostname'] ?? null,
-                                ];
-                            }
-                        }
-                    }
-
-                    // Persist Pages (Using site:domain:suffix convention)
-                    foreach ($targetsForPages as $target) {
-                        $canonicalId = "{$target['prefix']}:{$target['suffix']}";
                         $dbPage = $this->em->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId]);
-
-                        $pageUrl = (string)$target['url'];
-                        if (is_numeric($pageUrl) || empty($pageUrl)) {
-                            $pageUrl = (string)$target['pId'];
-                        }
 
                         if (! $dbPage) {
                             $dbPage = new \Entities\Analytics\Page();
                             $dbPage->addCanonicalId($canonicalId);
                         }
 
-                        $dbPage->addUrl($pageUrl)
-                                ->addTitle($target['name'])
+                        $dbPage->addUrl($url)
+                                ->addTitle($title)
                                 ->addAccount($accountEntity)
-                                ->addPlatformId($target['pId'])
-                                ->addHostname($target['hostname'] ?? null)
-                                ->addData([]);
-
+                                ->addPlatformId($platformId)
+                                ->addHostname($hostname)
+                                ->addData($data);
                         $this->em->persist($dbPage);
                     }
                 }
