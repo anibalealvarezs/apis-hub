@@ -27,9 +27,11 @@ class MetricsProcessor
     {
         // Extract queries from metrics
         $queries = array_filter(array_map(function ($metric) {
-            $queryValue = (isset($metric->query) || (is_object($metric) && property_exists($metric, 'query'))) ? $metric->query : null;
-
-            return is_object($queryValue) && method_exists($queryValue, 'getQuery') ? $queryValue->getQuery() : $queryValue;
+            $queryValue = $metric['query'] ?? null;
+            if (is_object($queryValue) && method_exists($queryValue, 'getQuery')) {
+                return $queryValue->getQuery();
+            }
+            return $queryValue;
         }, $metrics->toArray()));
 
         // Remove duplicates
@@ -136,10 +138,10 @@ class MetricsProcessor
         $dimManager = new \Classes\DimensionManager($manager);
         $map = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->dimensions) && ! empty($metric->dimensions)) {
-                $hash = $metric->dimensionsHash ?? KeyGenerator::generateDimensionsHash((array)$metric->dimensions);
+            if (isset($metric['dimensions']) && ! empty($metric['dimensions'])) {
+                $hash = $metric['dimensionsHash'] ?? KeyGenerator::generateDimensionsHash((array)$metric['dimensions']);
                 if (! isset($map[$hash])) {
-                    $set = $dimManager->resolveDimensionSet((array)$metric->dimensions);
+                    $set = $dimManager->resolveDimensionSet((array)$metric['dimensions']);
                     $map[$hash] = $set->getId();
                 }
             }
@@ -192,10 +194,10 @@ class MetricsProcessor
     {
         $ids = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->channeledAccount)) {
-                $ids[] = is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount;
-            } elseif (isset($metric->channeledAccountPlatformId)) {
-                $ids[] = $metric->channeledAccountPlatformId;
+            if (isset($metric['channeledAccount'])) {
+                $ids[] = is_object($metric['channeledAccount']) ? $metric['channeledAccount']->getPlatformId() : (string)$metric['channeledAccount'];
+            } elseif (isset($metric['channeledAccountPlatformId'])) {
+                $ids[] = $metric['channeledAccountPlatformId'];
             }
         }
         $ids = array_unique($ids);
@@ -303,10 +305,10 @@ class MetricsProcessor
     {
         $ids = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->channeledAdGroup)) {
-                $ids[] = is_object($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : (string)$metric->channeledAdGroup;
-            } elseif (isset($metric->channeledAdGroupPlatformId)) {
-                $ids[] = $metric->channeledAdGroupPlatformId;
+            if (isset($metric['channeledAdGroup'])) {
+                $ids[] = is_object($metric['channeledAdGroup']) ? $metric['channeledAdGroup']->getPlatformId() : (string)$metric['channeledAdGroup'];
+            } elseif (isset($metric['channeledAdGroupPlatformId'])) {
+                $ids[] = $metric['channeledAdGroupPlatformId'];
             }
         }
         $ids = array_unique($ids);
