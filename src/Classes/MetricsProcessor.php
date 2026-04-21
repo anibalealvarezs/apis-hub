@@ -382,7 +382,11 @@ class MetricsProcessor
         $ids = [];
         foreach ($metrics as $metric) {
             if (isset($metric->creative)) {
-                $ids[] = is_object($metric->creative) ? $metric->creative->getCreativeId() : (string)$metric->creative;
+                if (is_object($metric->creative)) {
+                    $ids[] = method_exists($metric->creative, 'getCreativeId') ? $metric->creative->getCreativeId() : (method_exists($metric->creative, 'getPlatformId') ? $metric->creative->getPlatformId() : (string)$metric->creative);
+                } else {
+                    $ids[] = (string)$metric->creative;
+                }
             } elseif (isset($metric->creativePlatformId)) {
                 $ids[] = $metric->creativePlatformId;
             }
@@ -1206,25 +1210,17 @@ class MetricsProcessor
         
         $val = $mContext[$property] ?? ($mContext[$platformProp] ?? ($metric->$property ?? ($metric->$platformProp ?? null)));
         
-        $resolvedId = null;
-        if ($val) {
-            if (is_object($val)) {
-                $methods = ['getPostId', 'getPlatformId', 'getCampaignId', 'getCreativeId', 'getProductId', 'getOrderId', 'getUrl', 'getEmail', 'getId'];
-                foreach ($methods as $method) {
-                    if (method_exists($val, $method)) {
-                        $resolvedId = (string) $val->$method();
-                        break;
-                    }
+        if (is_object($val)) {
+            $methods = ['getPostId', 'getPlatformId', 'getCampaignId', 'getCreativeId', 'getAdGroupId', 'getAdId', 'getProductId', 'getOrderId', 'getUrl', 'getEmail', 'getId'];
+            foreach ($methods as $method) {
+                if (method_exists($val, $method)) {
+                    return (string) $val->$method();
                 }
-                if (!$resolvedId) {
-                    $resolvedId = (string) $val;
-                }
-            } else {
-                $resolvedId = (string) $val;
             }
+            return (string)$val;
         }
 
-        return $resolvedId ?: null;
+        return $val ? (string)$val : null;
     }
 
     private static function resolveChanneledAccountId(object $metric, ?array $channeledAccountMap): ?int
