@@ -12,7 +12,9 @@ use Enums\Account as AccountEnum;
 use Repositories\Channeled\ChanneledAccountRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledAccountRepository::class)]
-#[ORM\Table(name: 'channeled_accounts')]
+#[ORM\Table(name: 'channeled_accounts', uniqueConstraints: [
+    new ORM\UniqueConstraint(name: 'channeled_accounts_platform_channel_unique', columns: ['platform_id', 'channel'])
+])]
 #[ORM\Index(columns: ['name', 'channel', 'type'], name: 'idx_cha_name_channel_type_idx')]
 #[ORM\Index(columns: ['name', 'channel'], name: 'idx_cha_name_channel_idx')]
 #[ORM\Index(columns: ['platform_id', 'type'], name: 'idx_cha_platform_id_type_idx')]
