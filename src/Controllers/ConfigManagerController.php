@@ -394,10 +394,8 @@ class ConfigManagerController extends BaseController
             $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
             $patterns = $driver->getAssetPatterns();
 
-            $rawConfigDir = Helpers::getConfigDir();
-            $chanYaml = $rawConfigDir . '/channels/' . $channel . '.yaml';
-            $rawConfig = file_exists($chanYaml) ? (\Symfony\Component\Yaml\Yaml::parseFile($chanYaml) ?: []) : [];
-            $chanConfig = $rawConfig['channels'][$channel] ?? $rawConfig;
+            // Use the config passed as argument instead of reading from disk
+            $chanConfig = $config['channels'][$channel] ?? $config;
 
             // 1. Get Channel Entity
             $channelEntity = $this->loadChannelEntity(channel: $channel, logger: $logger);
@@ -405,16 +403,16 @@ class ConfigManagerController extends BaseController
                 return;
             }
 
-            // 2. Bulk Load ALL ChanneledAccounts
+            // 2. Identify common account group
+            $accountEntity = $this->identifyAccountGroup(chanConfig: $chanConfig, rawConfig: $config, driver: $driver);
+
+            // 3. Bulk Load ALL ChanneledAccounts for this channel
             $entitiesMap = $this->loadChanneledAccountsMap(channelEntity: $channelEntity);
 
-            // 3. Bulk Load Pages
+            // 4. Pre-collect Canonical IDs for bulk loading Pages
             $pagesMap = $this->loadPagesMap(patterns: $patterns, chanConfig: $chanConfig, driver: $driver);
 
-            // 4. Identify common account group
-            $accountEntity = $this->identifyAccountGroup(chanConfig: $chanConfig, rawConfig: $rawConfig, driver: $driver);
-
-            // 5. Process Assets
+            // 5. Process Assets in a single pass
             $this->processSyncAssets(
                 patterns: $patterns,
                 chanConfig: $chanConfig,
