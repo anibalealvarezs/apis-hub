@@ -713,8 +713,8 @@ class MetricsProcessor
                 'channeled_account_id' => $channeledAccountId,
                 'campaign_id' => self::resolveCampaignId($metric, $campaignMap),
                 'channeled_campaign_id' => self::resolveChanneledCampaignId($metric, $channeledCampaignMap),
-                'channeled_ad_group_id' => self::resolveChanneledAdGroupId($metric, $channeledAdGroupMap),
-                'channeled_ad_id' => self::resolveChanneledAdId($metric, $channeledAdMap),
+                'channeled_ad_group_id' => self::resolveChanneledAdGroupId($metric, $channeledAdGroupMap, $logger),
+                'channeled_ad_id' => self::resolveChanneledAdId($metric, $channeledAdMap, $logger),
                 'query_id' => self::resolveQueryId($metric, $queryMap),
                 'page_id' => self::resolvePageId($metric, $pageMap),
                 'creative_id' => self::resolveCreativeId($metric, $creativeMap),
@@ -1276,18 +1276,26 @@ class MetricsProcessor
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
-    private static function resolveChanneledAdGroupId(object $metric, ?array $map): ?int
+    private static function resolveChanneledAdGroupId(object $metric, ?array $map, ?LoggerInterface $logger = null): ?int
     {
         if (!$map) return null;
         $pId = self::getMetricPlatformId($metric, 'channeledAdGroup');
-        return $pId ? ($map['map'][$pId] ?? null) : null;
+        $resolved = $pId ? ($map['map'][$pId] ?? null) : null;
+        if ($pId && !$resolved) {
+            $logger?->warning("MetricsProcessor: Failed to resolve AdSet Platform ID '$pId' to a database record. Entity might not be cached.");
+        }
+        return $resolved;
     }
 
-    private static function resolveChanneledAdId(object $metric, ?array $map): ?int
+    private static function resolveChanneledAdId(object $metric, ?array $map, ?LoggerInterface $logger = null): ?int
     {
         if (!$map) return null;
         $pId = self::getMetricPlatformId($metric, 'channeledAd');
-        return $pId ? ($map['map'][$pId] ?? null) : null;
+        $resolved = $pId ? ($map['map'][$pId] ?? null) : null;
+        if ($pId && !$resolved) {
+            $logger?->warning("MetricsProcessor: Failed to resolve Ad Platform ID '$pId' to a database record. Entity might not be cached.");
+        }
+        return $resolved;
     }
 
     private static function resolveQueryId(object $metric, ?array $map): ?int
