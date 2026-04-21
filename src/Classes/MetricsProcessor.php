@@ -678,7 +678,7 @@ class MetricsProcessor
                 channeledAdGroup: ($v = self::getMetricPlatformId($mObj, 'channeledAdGroup', $logger)) ?: null,
                 channeledAd: ($v = self::getMetricPlatformId($mObj, 'channeledAd', $logger)) ?: null,
                 page: ($v = self::getMetricPlatformId($mObj, 'page', $logger)) ?: null,
-                query: (is_object($mObj) && method_exists($mObj, 'getContext')) ? ($mObj->getContext()['query'] ?? $mObj->query ?? null) : ($mObj->query ?? null),
+                query: (is_object($mObj) && is_callable([$mObj, 'getContext'])) ? ($mObj->getContext()['query'] ?? $mObj->query ?? null) : ($mObj->query ?? null),
                 post: $rowPostValue,
                 product: ($v = self::getMetricPlatformId($mObj, 'product', $logger)) ?: null,
                 customer: ($v = self::getMetricPlatformId($mObj, 'customer', $logger)) ?: null,
@@ -1201,7 +1201,7 @@ class MetricsProcessor
 
     private static function getMetricPlatformId(object $metric, string $property, ?LoggerInterface $logger = null): ?string
     {
-        $mContext = (method_exists($metric, 'getContext')) ? $metric->getContext() : (array)$metric;
+        $mContext = (is_object($metric) && is_callable([$metric, 'getContext'])) ? $metric->getContext() : (array)$metric;
         $platformProp = $property . 'PlatformId';
         
         $val = $mContext[$property] ?? ($mContext[$platformProp] ?? ($metric->$property ?? ($metric->$platformProp ?? null)));
