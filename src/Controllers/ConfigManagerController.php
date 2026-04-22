@@ -464,19 +464,15 @@ class ConfigManagerController extends BaseController
             }
 
             // 6. Persist pages
-            $matches = [
-                'matched' => [],
-                'unmatched' => [],
-            ];
-            $ps = [];
             $logger->info("DEBUG: # of pages to persist: " . count($allPages));
             foreach ($allPages as $page) {
-                $ps[] = $page['platformId'];
-                $logger->info("DEBUG: ". json_encode($page));
                 $dbPage = $pagesMap[$page['canonicalId']] ?? null;
                 if (! $dbPage) {
+                    $logger->info("DEBUG: Page not found: " . $page['canonicalId']);
                     $dbPage = new Page();
                     $dbPage->addCanonicalId($page['canonicalId']);
+                } else {
+                    $logger->info("DEBUG: Page found: " . $page['canonicalId']);
                 }
                 $dbPage->addUrl($page['url'])
                     ->addTitle($page['title'])
@@ -490,12 +486,6 @@ class ConfigManagerController extends BaseController
             // 7. Persist channeled accounts
             $logger->info("DEBUG: # of channeled accounts to persist: " . count($allChaneledAccounts));
             foreach ($allChaneledAccounts as $channeledAccount) {
-                if (in_array($channeledAccount['platformId'], $ps)) {
-                    $matches['matched'][] = $channeledAccount['platformId'];
-                } else {
-                    $matches['unmatched'][] = $channeledAccount['platformId'];
-                }
-                $logger->info("DEBUG: ". json_encode($channeledAccount));
                 $dbChanneledAccount = $channeledAccountsMap[$channeledAccount['platformId']] ?? null;
                 if (! $dbChanneledAccount) {
                     $dbChanneledAccount = new ChanneledAccount();
@@ -509,8 +499,6 @@ class ConfigManagerController extends BaseController
                     ->addData($channeledAccount['data']);
                 $this->em->persist($dbChanneledAccount);
             }
-            $logger->info("DEBUG: Matched IDs: " . implode(', ', $matches['matched']));
-            $logger->info("DEBUG: Unmatched IDs: " . implode(', ', $matches['unmatched']));
             $logger->info("DEBUG: Attempting final flush for $channel");
             $this->em->flush();
             $logger->info("DEBUG: syncAssetsToDatabase FINISHED for $channel");
