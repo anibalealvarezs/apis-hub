@@ -453,7 +453,6 @@ class ConfigManagerController extends BaseController
                     $pagesMap[$p->getCanonicalId()] = $p;
                 }
             }
-            $logger->info("DEBUG: Pages map: " . json_encode($pagesMap));
 
             // 5. Pre-collect all potential channeled accounts IDs to bulk load ChanneledAccounts
             $channeledAccountsMap = [];
