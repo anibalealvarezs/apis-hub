@@ -487,7 +487,7 @@ class ConfigManagerController extends BaseController
             // 7. Persist channeled accounts
             $logger->info("DEBUG: # of channeled accounts to persist: " . count($allChaneledAccounts));
             foreach ($allChaneledAccounts as $channeledAccount) {
-                if (in_array($ps, $channeledAccount['platformId'])) {
+                if (in_array($channeledAccount['platformId'], $ps)) {
                     $matches['matched'][] = $channeledAccount['platformId'];
                 } else {
                     $matches['unmatched'][] = $channeledAccount['platformId'];
