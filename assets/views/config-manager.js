@@ -779,10 +779,10 @@ function renderAssets(assets) {
                         </div>
                         <div>
                             <div style="font-weight:700; color:white; font-size:0.9rem;">${p.title || 'Untitled Page'}</div>
-                            <div style="display:flex; gap:8px; align-items:center;">
-                                <div style="font-size:0.65rem; color:var(--text-dim);">ID: ${p.id}</div>
-                                ${p.created_time ? `<div style="font-size:0.65rem; color:var(--primary); padding:1px 5px; background:rgba(0,255,150,0.05); border-radius:4px;">Created: ${new Date(p.created_time).toLocaleDateString()}</div>` : ''}
-                                ${p.hostname ? `<div style="font-size:0.65rem; color:var(--secondary); padding:1px 5px; background:rgba(0,150,255,0.05); border-radius:4px;">Host: ${p.hostname}</div>` : ''}
+                            <div style="display:flex; gap:8px; align-items:center; min-width: 0; flex-wrap: nowrap;">
+                                <div style="font-size:0.6rem; color:var(--text-dim); flex-shrink: 0;">ID: ${p.id}</div>
+                                ${p.created_time ? `<div style="font-size:0.6rem; color:var(--primary); padding:1px 5px; background:rgba(0,255,150,0.05); border-radius:4px; flex-shrink: 0;">${new Date(p.created_time).toLocaleDateString()}</div>` : ''}
+                                ${p.hostname ? `<div style="font-size:0.6rem; color:var(--secondary); padding:1px 5px; background:rgba(0,150,255,0.05); border-radius:4px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.hostname}">${p.hostname}</div>` : ''}
                             </div>
                         </div>
                     </div>
