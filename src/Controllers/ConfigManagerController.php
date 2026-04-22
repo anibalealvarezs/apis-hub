@@ -4,6 +4,8 @@ namespace Controllers;
 
 use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
+use Anibalealvarezs\MetaHubDriver\Enums\MetaEntityType;
+use DateTime;
 use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\OptimisticLockException;
@@ -407,122 +409,88 @@ class ConfigManagerController extends BaseController
             // 1. Get Channel Entity (Fast lookup)
             $channelEntity = $this->em->getRepository(Channel::class)->findOneBy(['name' => $channel]);
 
-            // 2. Bulk Load ALL ChanneledAccounts for this channel to avoid N+1 queries
-            $existingEntities = $this->em->getRepository(ChanneledAccount::class)->findBy(['channel' => $channelEntity->getId()]);
-            $entitiesMap = [];
-            foreach ($existingEntities as $e) {
-                $entitiesMap[(string)$e->getPlatformId()] = $e;
-            }
-
-            // 3. Pre-collect all potential canonical IDs from ALL patterns to bulk load Pages
-            $allCanonicalIds = [];
-            foreach ($patterns as $pattern) {
-                $assets = $chanConfig[$pattern['key']] ?? [];
-                foreach ($assets as $asset) {
-                    if (isset($pattern['page'])) {
-                        $pPattern = $pattern['page'];
-                        $platformId = PagePatternsHelper::getPlatformId(asset: $asset, pattern: $pPattern, driver: $driver);
-                        $hostname = PagePatternsHelper::getHostname(asset: $asset, pattern: $pPattern, driver: $driver);
-                        $canonicalId = PagePatternsHelper::getCanonicalId(
-                            asset: $asset,
-                            pattern: $pPattern,
-                            platformId: $platformId,
-                            hostname: $hostname
-                        );
-                        if ($canonicalId) {
-                            $allCanonicalIds[] = $canonicalId;
-                        }
-                    }
-                }
-            }
-
-            $pagesMap = [];
-            if (! empty($allCanonicalIds)) {
-                $existingPages = $this->em->getRepository(Page::class)->findBy(['canonicalId' => $allCanonicalIds]);
-                foreach ($existingPages as $p) {
-                    $pagesMap[$p->getCanonicalId()] = $p;
-                }
-            }
-            // End Get Entities
-
-            // 4. Identify common account group
+            // 2. Identify common account group
             $commonKey = $driver::getCommonConfigKey();
             $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
             $groupName = $chanConfig['accounts_group_name'] ?? ($rawConfig['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
             $accountEntity = $this->getOrCreateAccount($groupName);
-            // End Identify common account group
 
-            foreach ($patterns as $assetKey => $pattern) {
-                $assets = $chanConfig[$pattern['key']] ?? [];
-                if (empty($assets)) {
-                    $logger->info("No assets found for key: $assetKey");
-
-                    continue;
-                }
-                foreach ($assets as $asset) {
-                    if (isset($pattern['channeled_account'])) {
-                        $channeledAccountPattern = $pattern['channeled_account'];
-                        if (!$platformId = ChanneledAccountPatternsHelper::getPlatformId(asset: $asset, pattern: $channeledAccountPattern, driver: $driver)) {
-                            continue;
-                        }
-
-                        $platformCreatedAt = ChanneledAccountPatternsHelper::getPlatformCreatedAt(asset: $asset, pattern: $channeledAccountPattern);
-                        $typeMark = ChanneledAccountPatternsHelper::getType(pattern: $channeledAccountPattern);
-                        $name = ChanneledAccountPatternsHelper::getName(asset: $asset, pattern: $channeledAccountPattern);
-                        $data = ChanneledAccountPatternsHelper::getData(asset: $asset, pattern: $channeledAccountPattern);
-
-                        $dbChanneled = $entitiesMap[$platformId] ?? null;
-                        if (! $dbChanneled) {
-                            $dbChanneled = new ChanneledAccount();
-                            $dbChanneled->addPlatformId($platformId);
-                        }
-
-                        // Process channeled account
-                        $dbChanneled->addAccount($accountEntity)
-                            ->addType($typeMark)
-                            ->addChannel($channelEntity)
-                            ->addName($name)
-                            ->addPlatformCreatedAt(is_string($platformCreatedAt) ? new \DateTime($platformCreatedAt) : null)
-                            ->addData($data);
-                        $this->em->persist($dbChanneled);
-                        $entitiesMap[$platformId] = $dbChanneled;
+            // 3. Get all pages to be persisted with their related channeled accounts (if defined)
+            $allPages = [];
+            $allChaneledAccounts = [];
+            if (empty($chanConfig['pages'])) {
+                $logger->info("No pages found for channel: $channel");
+            } else {
+                foreach ($chanConfig['pages'] as $asset) {
+                    if (method_exists($driver, 'getPages')) {
+                        $allPages = [...$allPages, ...$driver::getPages($asset)];
                     }
-
-                    if (isset($pattern['page'])) {
-                        $pagePattern = $pattern['page'];
-                        $platformId = PagePatternsHelper::getPlatformId(asset: $asset, pattern: $pagePattern, driver: $driver);
-                        $hostname = PagePatternsHelper::getHostname(asset: $asset, pattern: $pagePattern, driver: $driver);
-                        $title = PagePatternsHelper::getTitle(asset: $asset, pattern: $pagePattern);
-                        $url = PagePatternsHelper::getUrl(asset: $asset, pattern: $pagePattern);
-                        $canonicalId = PagePatternsHelper::getCanonicalId(
-                            asset: $asset,
-                            pattern: $pagePattern,
-                            platformId: $platformId,
-                            hostname: $hostname
-                        );
-                        if (!$canonicalId) {
-                            continue;
-                        }
-                        $data = PagePatternsHelper::getData(asset: $asset, pattern: $pagePattern);
-
-                        $dbPage = $pagesMap[$canonicalId] ?? null;
-
-                        if (! $dbPage) {
-                            $dbPage = new Page();
-                            $dbPage->addCanonicalId($canonicalId);
-                            $pagesMap[$canonicalId] = $dbPage;
-                        }
-
-                        $dbPage->addUrl($url)
-                                ->addTitle($title)
-                                ->addAccount($accountEntity)
-                                ->addPlatformId($platformId)
-                                ->addHostname($hostname)
-                                ->addData($data);
-                        $this->em->persist($dbPage);
+                    if (method_exists($driver, 'getChanneledAccounts')) {
+                        $allChaneledAccounts = [...$allChaneledAccounts, ...$driver::getChanneledAccounts($asset)];
                     }
                 }
             }
+
+            if (empty($chanConfig['ad_accounts'])) {
+                $logger->info("No ad accounts found for channel: $channel");
+            } else {
+                foreach ($chanConfig['ad_accounts'] as $asset) {
+                    if (method_exists($driver, 'getChanneledAccounts')) {
+                        $allChaneledAccounts = [...$allChaneledAccounts, ...$driver::getChanneledAccounts($asset)];
+                    }
+                }
+            }
+
+            // 4. Pre-collect all potential canonical IDs from ALL patterns to bulk load Pages
+            $pagesMap = [];
+            if (! empty($allPages)) {
+                $existingPages = $this->em->getRepository(Page::class)->findBy(['canonicalId' => array_map(fn ($p) => $p['canonicalId'], $allPages)]);
+                foreach ($existingPages as $p) {
+                    $pagesMap[$p->getCanonicalId()] = $p;
+                }
+            }
+
+            // 5. Pre-collect all potential channeled accounts from ALL patterns to bulk load ChanneledAccounts
+            $channeledAccountsMap = [];
+            if (! empty($allChaneledAccounts)) {
+                $existingChanneledAccounts = $this->em->getRepository(ChanneledAccount::class)->findBy(['platformId' =>  array_map(fn ($a) => $a['platformId'], $allChaneledAccounts)]);
+                foreach ($existingChanneledAccounts as $c) {
+                    $channeledAccountsMap[(string)$c->getPlatformId()] = $c;
+                }
+            }
+
+            // 6. Persist pages
+            foreach ($allPages as $page) {
+                $dbPage = $pagesMap[$page['canonicalId']] ?? null;
+                if (! $dbPage) {
+                    $dbPage = new Page();
+                    $dbPage->addCanonicalId($page['canonicalId']);
+                }
+                $dbPage->addUrl($page['url'])
+                    ->addTitle($page['title'])
+                    ->addAccount($accountEntity)
+                    ->addPlatformId($page['platformId'])
+                    ->addHostname($page['hostname'])
+                    ->addData($page['data']);
+                $this->em->persist($dbPage);
+            }
+
+            // 7. Persist channeled accounts
+            foreach ($allChaneledAccounts as $channeledAccount) {
+                $dbChanneledAccount = $channeledAccountsMap[$channeledAccount['platformId']] ?? null;
+                if (! $dbChanneledAccount) {
+                    $dbChanneledAccount = new ChanneledAccount();
+                    $dbChanneledAccount->addPlatformId($channeledAccount['platformId']);
+                }
+                $dbChanneledAccount->addAccount($accountEntity)
+                    ->addType($channeledAccount['type'])
+                    ->addChannel($channelEntity)
+                    ->addName($channeledAccount['name'])
+                    ->addPlatformCreatedAt(is_string($channeledAccount['platformCreatedAt']) ? new DateTime($channeledAccount['platformCreatedAt']) : null)
+                    ->addData($channeledAccount['data']);
+                $this->em->persist($dbChanneledAccount);
+            }
+
             $logger->info("DEBUG: Attempting final flush for $channel");
             $this->em->flush();
             $logger->info("DEBUG: syncAssetsToDatabase FINISHED for $channel");

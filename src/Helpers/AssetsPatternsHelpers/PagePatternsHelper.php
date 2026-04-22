@@ -6,11 +6,18 @@ use Anibalealvarezs\ApiDriverCore\Interfaces\SyncDriverInterface;
 
 class PagePatternsHelper
 {
+    /**
+     * @throws \Exception
+     */
     public static function getPlatformId(array $asset, array $pattern, object $driver): string {
         $rawPlatformId = match($pattern['platform_id']['type']) {
             'md5' => md5($asset[$pattern['platform_id']['key']]),
             default => $asset[$pattern['platform_id']['key']]
         };
+        if (!method_exists($driver, 'getPlatformId')) {
+            throw new \Exception("Driver must implement getPlatformId method to use platform_id patterns.");
+        }
+        $platformId = $driver->getPlatformId($rawPlatformId);
         if (method_exists($driver, 'getCleanId')) {
             $platformId = $driver->getCleanId($rawPlatformId);
         } else {
