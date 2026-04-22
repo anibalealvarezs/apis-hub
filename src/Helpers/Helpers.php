@@ -2,14 +2,25 @@
 
 namespace Helpers;
 
+use Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry;
+use Anibalealvarezs\ApiDriverCore\Classes\EntityRegistry;
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
+use Carbon\Carbon;
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Exception\NotSupported;
+use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\ORMSetup;
 use Doctrine\Persistence\Mapping\MappingException;
 use Doctrine\Persistence\Proxy;
 use Entities\Entity;
+use Enums\JobStatus;
 use Exception;
+use Exceptions\ConfigurationException;
+use Exceptions\JobCancelledException;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Level;
@@ -28,7 +39,7 @@ use Symfony\Component\Yaml\Yaml;
 class Helpers
 {
     protected static ?EntityManager $entityManager = null;
-    protected static ?\Doctrine\DBAL\Connection $connection = null;
+    protected static ?Connection $connection = null;
     protected static ?array $dbConfig = null;
     private static ?ClientInterface $redisClient = null;
     private static ?array $cacheConfig = null;
@@ -56,7 +67,7 @@ class Helpers
 
         // Reset DriverFactory instances to ensure they pick up new config
         if (class_exists('\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory')) {
-            \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::reset();
+            DriverFactory::reset();
         }
     }
 
@@ -212,6 +223,7 @@ class Helpers
 
     /**
      * @return void
+     * @throws ConfigurationException
      */
     public static function applyTimezone(): void
     {
@@ -230,6 +242,7 @@ class Helpers
 
     /**
      * @return bool
+     * @throws ConfigurationException
      */
     public static function isDebug(): bool
     {
@@ -289,6 +302,7 @@ class Helpers
 
     /**
      * @return array
+     * @throws ConfigurationException
      */
     public static function getCliConfig(): array
     {
@@ -430,6 +444,7 @@ class Helpers
 
     /**
      * @return array
+     * @throws ConfigurationException
      */
     public static function getDbConfig(): array
     {
@@ -467,6 +482,7 @@ class Helpers
 
     /**
      * @return bool
+     * @throws ConfigurationException
      */
     public static function isPostgres(): bool
     {
@@ -485,6 +501,7 @@ class Helpers
 
     /**
      * @return array
+     * @throws ConfigurationException
      */
     public static function getChannelsConfig(): array
     {
@@ -525,25 +542,6 @@ class Helpers
                         $config[$chan]['token_path'] = $resolvePath($chanConfig['token_path']);
                     }
                 }
-
-                // Inject credentials from environment variables if missing in configuration
-                $credentialMapping = [
-                    'google' => [
-                        'GOOGLE_CLIENT_ID' => 'client_id',
-                        'GOOGLE_CLIENT_SECRET' => 'client_secret',
-                        'GOOGLE_REFRESH_TOKEN' => 'refresh_token',
-                        'GOOGLE_USER_ID' => 'user_id',
-                        'GOOGLE_REDIRECT_URI' => 'redirect_uri',
-                        'GOOGLE_TOKEN_PATH' => 'token_path',
-                    ],
-                    'facebook' => [
-                        'FACEBOOK_APP_ID' => 'app_id',
-                        'FACEBOOK_APP_SECRET' => 'app_secret',
-                        'FACEBOOK_USER_ID' => 'user_id',
-                        'FACEBOOK_REDIRECT_URI' => 'redirect_uri',
-                        'FACEBOOK_TOKEN_PATH' => 'token_path',
-                    ],
-                ];
 
                 $resolvePlaceholders = function (&$item) use (&$resolvePlaceholders) {
                     if (is_array($item)) {
@@ -630,7 +628,7 @@ class Helpers
                         });
                     };
 
-                    $registry = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry();
+                    $registry = DriverFactory::getRegistry();
                     foreach ($registry as $chan => $rConfig) {
                         $resourceKey = $rConfig['resource_key'] ?? null;
                         if ($resourceKey && isset($config[$chan][$resourceKey])) {
@@ -675,6 +673,7 @@ class Helpers
 
     /**
      * @return array
+     * @throws ConfigurationException
      */
     public static function getCacheConfig(): array
     {
@@ -712,6 +711,9 @@ class Helpers
         return self::$cacheConfig;
     }
 
+    /**
+     * @throws ConfigurationException
+     */
     public static function getAdminApiKey(): ?string
     {
         // Forzamos la carga de la configuración para procesar el archivo .env
@@ -728,6 +730,7 @@ class Helpers
 
     /**
      * @return string|null
+     * @throws ConfigurationException
      */
     public static function getAppApiKey(): ?string
     {
@@ -747,6 +750,7 @@ class Helpers
 
     /**
      * @return array
+     * @throws ConfigurationException
      */
     public static function getAuthorizedIps(): array
     {
@@ -824,7 +828,7 @@ class Helpers
                 }
 
                 $ormConfig = ORMSetup::createAttributeMetadataConfiguration(
-                    paths: array_merge([__DIR__ . '/../Entities'], \Anibalealvarezs\ApiDriverCore\Classes\EntityRegistry::getAll()),
+                    paths: array_merge([__DIR__ . '/../Entities'], EntityRegistry::getAll()),
                     isDevMode: true
                 );
 
@@ -922,7 +926,7 @@ class Helpers
      * Converts a human-readable interval like '3 years' or '1 month' to ISO8601 interval 'P3Y'.
      *
      * @param string $human
-     * @return string
+     * @return array|string|null
      */
     public static function humanToIsoInterval(string $human): array|string|null
     {
@@ -1094,7 +1098,10 @@ class Helpers
     /**
      * @param int|null $jobId
      * @return void
-     * @throws \Exceptions\JobCancelledException
+     * @throws NotSupported
+     * @throws NoResultException
+     * @throws NonUniqueResultException
+     * @throws JobCancelledException
      */
     public static function checkJobStatus(?int $jobId): void
     {
@@ -1110,8 +1117,8 @@ class Helpers
             ->getQuery()
             ->getSingleScalarResult();
 
-        if ($status == \Enums\JobStatus::failed->value || $status == \Enums\JobStatus::cancelled->value) {
-            throw new \Exceptions\JobCancelledException("El Job #{$jobId} fue interrumpido o cancelado manualmente.");
+        if ($status == JobStatus::failed->value || $status == JobStatus::cancelled->value) {
+            throw new JobCancelledException("El Job #{$jobId} fue interrumpido o cancelado manualmente.");
         }
     }
 
@@ -1138,6 +1145,7 @@ class Helpers
      * @param string $filename
      * @param Level|int|string|null $level
      * @return LoggerInterface
+     * @throws ConfigurationException
      */
     public static function setLogger(string $filename, Level|int|string|null $level = null): LoggerInterface
     {
@@ -1199,6 +1207,7 @@ class Helpers
     /**
      * @param EntityManager $em
      * @return void
+     * @throws \Doctrine\DBAL\Exception
      */
     public static function reconnectIfNeeded(EntityManagerInterface &$em): void
     {
@@ -1218,9 +1227,9 @@ class Helpers
      * Checks if a string matches inclusion/exclusion filters.
      * Supports both plain text and regex (if delimited by /).
      *
-     * @param string $value
-     * @param string|array|null $include
-     * @param string|array|null $exclude
+     * @param string|int $value
+     * @param null $include
+     * @param null $exclude
      * @return bool
      */
     public static function matchesFilter(string|int $value, $include = null, $exclude = null): bool
@@ -1281,8 +1290,8 @@ class Helpers
      */
     public static function getDateChunks(string $startDate, string $endDate, string $interval = '1 week'): array
     {
-        $start = \Carbon\Carbon::parse($startDate);
-        $end = \Carbon\Carbon::parse($endDate);
+        $start = Carbon::parse($startDate);
+        $end = Carbon::parse($endDate);
 
         if ($start->isAfter($end)) {
             return [];
@@ -1311,13 +1320,13 @@ class Helpers
     /**
      * @param string $url
      * @param string|int|null $platformId
-     * @param \Enums\PageType|string|null $type
+     * @param string|null $type
      * @param string|null $hostname
      * @return string
      */
     public static function getCanonicalPageId(string $url, string|int|null $platformId = null, string|null $type = null, string|null $hostname = null): string
     {
-        return \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::getCanonicalId($url, $platformId, $type, $hostname);
+        return AssetRegistry::getCanonicalId($url, $platformId, $type, $hostname);
     }
 
     /**
