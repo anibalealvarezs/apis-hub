@@ -826,10 +826,10 @@ function renderAssets(assets) {
 
                     <!-- IG Section -->
                     ${p.ig_account ? `
-                    <div class="hierarchy-col" style="border-left: 1px solid rgba(255,255,255,0.05); padding-left: 20px;">
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
-                            <div style="background:rgba(225, 48, 108, 0.1); color:#E1306C; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:700; text-transform:uppercase; display:flex; align-items:center; gap:5px;">
-                                <i data-lucide="instagram" size="10"></i> ${p.ig_account_name || p.ig_account}
+                    <div class="hierarchy-col" style="border-left: 1px solid rgba(255,255,255,0.05); padding-left: 20px; min-width: 0;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:12px; min-width: 0;">
+                            <div style="background:rgba(225, 48, 108, 0.1); color:#E1306C; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:700; text-transform:uppercase; display:flex; align-items:center; gap:5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${p.ig_account_name || p.ig_account}">
+                                <i data-lucide="instagram" size="10" style="flex-shrink: 0;"></i> <span style="overflow: hidden; text-overflow: ellipsis;">${p.ig_account_name || p.ig_account}</span>
                             </div>
                         </div>
                         
