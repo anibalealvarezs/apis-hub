@@ -793,7 +793,7 @@ function renderAssets(assets) {
                 </div>
 
                 <!-- Page Options Hierarchy -->
-                <div id="hierarchy-${p.id}" style="display:${getCfg('enabled') ? 'grid' : 'none'}; grid-template-columns: 1fr 1fr; gap:20px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+                <div id="hierarchy-${p.id}" style="display:${getCfg('enabled') ? 'grid' : 'none'}; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap:20px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
                     
                     <!-- FB Section -->
                     <div class="hierarchy-col">
