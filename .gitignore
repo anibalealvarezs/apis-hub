@@ -74,3 +74,5 @@ debug_routes.php
 tmp_check_ad.php
 
 config/channels/facebook_organic.yaml.test
+
+config/channels/google_search_console.yaml.test
