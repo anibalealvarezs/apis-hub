@@ -397,8 +397,8 @@ class ConfigManagerController extends BaseController
 
         try {
             $driver = DriverFactory::get($channel);
-            $patterns = $driver->getAssetPatterns();
-            $logger->info("DEBUG: Patterns loaded: " . implode(', ', array_keys($patterns)));
+            /* $patterns = $driver->getAssetPatterns();
+            $logger->info("DEBUG: Patterns loaded: " . implode(', ', array_keys($patterns))); */
             // Read channel config directly from disk (already saved before this method is called).
             // Do NOT call resetConfigs() here — it nulls the EntityManager and corrupts the persistence flow.
             $chanYaml = Helpers::getConfigDir() . '/channels/' . $channel . '.yaml';
@@ -418,7 +418,7 @@ class ConfigManagerController extends BaseController
             // 3. Get all pages to be persisted with their related channeled accounts (if defined)
             $allPages = [];
             $allChaneledAccounts = [];
-            if (empty($chanConfig['pages']) && empty($chanConfig['sties'])) {
+            if (empty($chanConfig['pages']) && empty($chanConfig['sites'])) {
                 $logger->info("No pages found for channel: $channel");
             } else {
                 $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : $chanConfig['sites'];
@@ -442,7 +442,7 @@ class ConfigManagerController extends BaseController
                 }
             }
 
-            // 4. Pre-collect all potential canonical IDs from ALL patterns to bulk load Pages
+            // 4. Pre-collect all potential pages IDs to bulk load Pages
             $pagesMap = [];
             if (! empty($allPages)) {
                 $existingPages = $this->em->getRepository(Page::class)->findBy(['canonicalId' => array_map(fn ($p) => $p['canonicalId'], $allPages)]);
@@ -451,7 +451,7 @@ class ConfigManagerController extends BaseController
                 }
             }
 
-            // 5. Pre-collect all potential channeled accounts from ALL patterns to bulk load ChanneledAccounts
+            // 5. Pre-collect all potential channeled accounts IDs to bulk load ChanneledAccounts
             $channeledAccountsMap = [];
             if (! empty($allChaneledAccounts)) {
                 $existingChanneledAccounts = $this->em->getRepository(ChanneledAccount::class)->findBy(['platformId' =>  array_map(fn ($a) => $a['platformId'], $allChaneledAccounts)]);
@@ -463,6 +463,7 @@ class ConfigManagerController extends BaseController
             // 6. Persist pages
             $logger->info("DEBUG: # of pages to persist: " . count($allPages));
             foreach ($allPages as $page) {
+                $logger->info("DEBUG: ". json_encode($page));
                 $dbPage = $pagesMap[$page['canonicalId']] ?? null;
                 if (! $dbPage) {
                     $dbPage = new Page();
@@ -480,6 +481,7 @@ class ConfigManagerController extends BaseController
             // 7. Persist channeled accounts
             $logger->info("DEBUG: # of channeled accounts to persist: " . count($allChaneledAccounts));
             foreach ($allChaneledAccounts as $channeledAccount) {
+                $logger->info("DEBUG: ". json_encode($channeledAccount));
                 $dbChanneledAccount = $channeledAccountsMap[$channeledAccount['platformId']] ?? null;
                 if (! $dbChanneledAccount) {
                     $dbChanneledAccount = new ChanneledAccount();
