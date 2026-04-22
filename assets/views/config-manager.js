@@ -971,6 +971,7 @@ async function updateConfig(typeArg) {
                 ig_account: igId,
                 lost_access: card.classList.contains('lost-access'),
                 hostname: original.hostname || null,
+                link: original.link || null,
                 created_time: original.created_time || null,
                 data: original.data || [],
                 ig_hostname: original.ig_hostname || null,
