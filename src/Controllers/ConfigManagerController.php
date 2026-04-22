@@ -417,8 +417,6 @@ class ConfigManagerController extends BaseController
 
             // 3. Get all pages to be persisted with their related channeled accounts (if defined)
             $allPages = [];
-            $countPages = 0;
-            $countChanneledAccounts = 0;
             $allChaneledAccounts = [];
             if (empty($chanConfig['pages']) && empty($chanConfig['sites'])) {
                 $logger->info("No pages found for channel: $channel");
@@ -427,11 +425,9 @@ class ConfigManagerController extends BaseController
                 foreach ($assets as $asset) {
                     if (method_exists($driver, 'getPages')) {
                         $allPages = [...$allPages, ...$driver::getPages($asset)];
-                        $countPages++;
                     }
                     if (method_exists($driver, 'getChanneledAccounts')) {
                         $allChaneledAccounts = [...$allChaneledAccounts, ...$driver::getChanneledAccounts($asset)];
-                        $countChanneledAccounts++;
                     }
                 }
             }
@@ -445,6 +441,9 @@ class ConfigManagerController extends BaseController
                     }
                 }
             }
+
+            $logger->info("DEBUG: Counted pages: " . count($allPages));
+            $logger->info("DEBUG: Counted channeled accounts: " . count($allChaneledAccounts));
 
             // 4. Pre-collect all potential pages IDs to bulk load Pages
             $pagesMap = [];
@@ -510,8 +509,6 @@ class ConfigManagerController extends BaseController
                     ->addData($channeledAccount['data']);
                 $this->em->persist($dbChanneledAccount);
             }
-            $logger->info("DEBUG: Counted pages: " . $countPages);
-            $logger->info("DEBUG: Counted channeled accounts: " . $countChanneledAccounts);
             $logger->info("DEBUG: Matched IDs: " . implode(', ', $matches['matched']));
             $logger->info("DEBUG: Unmatched IDs: " . implode(', ', $matches['unmatched']));
             $logger->info("DEBUG: Attempting final flush for $channel");
