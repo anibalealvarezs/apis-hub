@@ -35,7 +35,7 @@ class PagePatternsHelper
         };
     }
 
-    public static function getCanonicalId(array $asset, array $pattern, string $platformId, string $hostname): ?string {
+    public static function getCanonicalId(array $asset, array $pattern, ?string $platformId, ?string $hostname): ?string {
         $canSource = $pattern['canonical_id']['field'];
         $canValue = match($canSource) {
             'platformId' => $platformId,

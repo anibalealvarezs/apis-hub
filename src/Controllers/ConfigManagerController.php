@@ -282,7 +282,7 @@ class ConfigManagerController extends BaseController
             Helpers::resetConfigs();
 
             return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $logger->error("Error updating config: " . $e->getMessage());
 
             return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
@@ -420,24 +420,17 @@ class ConfigManagerController extends BaseController
                 $assets = $chanConfig[$pattern['key']] ?? [];
                 foreach ($assets as $asset) {
                     if (isset($pattern['page'])) {
-                        $rawPlatformId = match($pattern['page']['platform_id']['type']) {
-                            'md5' => md5($asset[$pattern['page']['platform_id']['key']]),
-                            default => $asset[$pattern['page']['platform_id']['key']]
-                        };
-                        if (method_exists($driver, 'getCleanId')) {
-                            $platformId = $driver->getCleanId($rawPlatformId);
-                        } else {
-                            $platformId = $rawPlatformId;
-                        }
-                        $hostname = method_exists($driver, 'getCleanHostname') ? $driver->getCleanHostname($asset[$pattern['page']['hostname_key']]) : ($asset[$pattern['page']['hostname_key']] ?? null);
-                        $canSource = $pattern['page']['canonical_id']['field'];
-                        $canValue = match($canSource) {
-                            'platformId' => $platformId,
-                            'hostname' => $hostname,
-                            default => $asset[$canSource] ?? null
-                        };
-                        if (! empty($canValue)) {
-                            $allCanonicalIds[] = $pattern['page']['canonical_id']['prefix'] . ':' . $canValue;
+                        $pPattern = $pattern['page'];
+                        $platformId = PagePatternsHelper::getPlatformId(asset: $asset, pattern: $pPattern, driver: $driver);
+                        $hostname = PagePatternsHelper::getHostname(asset: $asset, pattern: $pPattern, driver: $driver);
+                        $canonicalId = PagePatternsHelper::getCanonicalId(
+                            asset: $asset,
+                            pattern: $pPattern,
+                            platformId: $platformId,
+                            hostname: $hostname
+                        );
+                        if ($canonicalId) {
+                            $allCanonicalIds[] = $canonicalId;
                         }
                     }
                 }
@@ -533,7 +526,7 @@ class ConfigManagerController extends BaseController
             $logger->info("DEBUG: Attempting final flush for $channel");
             $this->em->flush();
             $logger->info("DEBUG: syncAssetsToDatabase FINISHED for $channel");
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $logger->error("Sync Assets Error for $channel: " . $e->getMessage());
         }
     }
