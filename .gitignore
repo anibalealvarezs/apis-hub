@@ -72,3 +72,5 @@ debug_config.php
 debug_routes.php
 
 tmp_check_ad.php
+
+config/channels/facebook_organic.yaml.test
