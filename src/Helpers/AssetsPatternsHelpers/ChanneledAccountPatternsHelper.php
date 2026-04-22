@@ -22,8 +22,8 @@ class ChanneledAccountPatternsHelper
         return $asset[$pattern['platform_created_at_key']] ?? null;
     }
 
-    public static function getType(array $asset, array $pattern): string {
-        return $asset[$pattern['type']];
+    public static function getType(array $pattern): string {
+        return $pattern['type'];
     }
 
     public static function getName(array $asset, array $pattern): ?string {

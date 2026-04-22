@@ -474,7 +474,7 @@ class ConfigManagerController extends BaseController
                         }
 
                         $platformCreatedAt = ChanneledAccountPatternsHelper::getPlatformCreatedAt(asset: $asset, pattern: $channeledAccountPattern);
-                        $typeMark = ChanneledAccountPatternsHelper::getType(asset: $asset, pattern: $channeledAccountPattern);
+                        $typeMark = ChanneledAccountPatternsHelper::getType(pattern: $channeledAccountPattern);
                         $name = ChanneledAccountPatternsHelper::getName(asset: $asset, pattern: $channeledAccountPattern);
                         $data = ChanneledAccountPatternsHelper::getData(asset: $asset, pattern: $channeledAccountPattern);
 
