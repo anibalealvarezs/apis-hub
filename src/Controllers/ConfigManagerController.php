@@ -418,10 +418,11 @@ class ConfigManagerController extends BaseController
             // 3. Get all pages to be persisted with their related channeled accounts (if defined)
             $allPages = [];
             $allChaneledAccounts = [];
-            if (empty($chanConfig['pages'])) {
+            if (empty($chanConfig['pages']) && empty($chanConfig['sties'])) {
                 $logger->info("No pages found for channel: $channel");
             } else {
-                foreach ($chanConfig['pages'] as $asset) {
+                $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : $chanConfig['sites'];
+                foreach ($assets as $asset) {
                     if (method_exists($driver, 'getPages')) {
                         $allPages = [...$allPages, ...$driver::getPages($asset)];
                     }
