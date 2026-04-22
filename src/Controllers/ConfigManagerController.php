@@ -461,6 +461,7 @@ class ConfigManagerController extends BaseController
             }
 
             // 6. Persist pages
+            $logger->info("DEBUG: # of pages to persist: " . count($allPages));
             foreach ($allPages as $page) {
                 $dbPage = $pagesMap[$page['canonicalId']] ?? null;
                 if (! $dbPage) {
@@ -477,6 +478,7 @@ class ConfigManagerController extends BaseController
             }
 
             // 7. Persist channeled accounts
+            $logger->info("DEBUG: # of channeled accounts to persist: " . count($allChaneledAccounts));
             foreach ($allChaneledAccounts as $channeledAccount) {
                 $dbChanneledAccount = $channeledAccountsMap[$channeledAccount['platformId']] ?? null;
                 if (! $dbChanneledAccount) {
