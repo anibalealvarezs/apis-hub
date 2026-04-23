@@ -287,7 +287,7 @@ class MetricsProcessor
             if ($channel) {
                 $enum = \Entities\Analytics\Channel::tryFromName((string)$channel);
                 if ($enum) {
-                    $channelFilter = " AND channel_id = " . (int)$enum->value;
+                    $channelFilter = " AND channel = " . (int)$enum->value;
                 }
             }
             $sql = "SELECT id, platform_id, account_id FROM channeled_accounts WHERE (" . implode(' OR ', $clauses) . ")" . $channelFilter;
