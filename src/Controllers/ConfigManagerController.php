@@ -423,7 +423,6 @@ class ConfigManagerController extends BaseController
             } else {
                 $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : $chanConfig['sites'];
                 foreach ($assets as $asset) {
-                    if (!($asset['enabled'] ?? true)) continue;
                     if (method_exists($driver, 'getPages')) {
                         $allPages = [...$allPages, ...$driver::getPages($asset)];
                     }
@@ -437,7 +436,6 @@ class ConfigManagerController extends BaseController
                 $logger->info("No ad accounts found for channel: $channel");
             } else {
                 foreach ($chanConfig['ad_accounts'] as $asset) {
-                    if (!($asset['enabled'] ?? true)) continue;
                     if (method_exists($driver, 'getChanneledAccounts')) {
                         $allChaneledAccounts = [...$allChaneledAccounts, ...$driver::getChanneledAccounts($asset)];
                     }
@@ -465,38 +463,77 @@ class ConfigManagerController extends BaseController
                 }
             }
 
-            // 6. Persist pages
-            $logger->info("DEBUG: # of pages to persist: " . count($allPages));
-            foreach ($allPages as $page) {
-                $dbPage = $pagesMap[$page['canonicalId']] ?? null;
-                if (! $dbPage) {
-                    $dbPage = new Page();
-                    $dbPage->addCanonicalId($page['canonicalId']);
+            // 6. Persist pages and channeled accounts with nested logic
+            $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : ($chanConfig['sites'] ?? []);
+            foreach ($assets as $asset) {
+                $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
+                $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
+
+                $anyEnabled = false;
+                foreach ($groupPages as $p) { if ($p['enabled'] ?? true) { $anyEnabled = true; break; } }
+                if (!$anyEnabled) { foreach ($groupAccounts as $a) { if ($a['enabled'] ?? true) { $anyEnabled = true; break; } } }
+
+                foreach ($groupPages as $page) {
+                    $dbPage = $pagesMap[$page['canonicalId']] ?? null;
+                    if (!$dbPage && !$anyEnabled) continue;
+                    if (!$dbPage) {
+                        $dbPage = new Page();
+                        $dbPage->addCanonicalId($page['canonicalId']);
+                    }
+                    $dbPage->addUrl($page['url'])
+                        ->addTitle($page['title'])
+                        ->addAccount($accountEntity)
+                        ->addPlatformId($page['platformId'])
+                        ->addHostname($page['hostname'])
+                        ->addData($page['data']);
+                    $this->em->persist($dbPage);
+                    $pagesMap[$page['canonicalId']] = $dbPage;
                 }
-                $dbPage->addUrl($page['url'])
-                    ->addTitle($page['title'])
-                    ->addAccount($accountEntity)
-                    ->addPlatformId($page['platformId'])
-                    ->addHostname($page['hostname'])
-                    ->addData($page['data']);
-                $this->em->persist($dbPage);
+
+                foreach ($groupAccounts as $account) {
+                    $dbChanneledAccount = $channeledAccountsMap[$account['platformId']] ?? null;
+                    if (!$dbChanneledAccount && !$anyEnabled) continue;
+                    if (!$dbChanneledAccount) {
+                        $dbChanneledAccount = new ChanneledAccount();
+                        $dbChanneledAccount->addPlatformId($account['platformId']);
+                    }
+                    $dbChanneledAccount->addAccount($accountEntity)
+                        ->addType($account['type'])
+                        ->addChannel($channelEntity)
+                        ->addName($account['name'])
+                        ->addPlatformCreatedAt(is_string($account['platformCreatedAt']) ? new DateTime($account['platformCreatedAt']) : null)
+                        ->addData($account['data'])
+                        ->setEnabled($account['enabled'] ?? true);
+                    $this->em->persist($dbChanneledAccount);
+                    $channeledAccountsMap[$account['platformId']] = $dbChanneledAccount;
+                }
             }
 
-            // 7. Persist channeled accounts
-            $logger->info("DEBUG: # of channeled accounts to persist: " . count($allChaneledAccounts));
-            foreach ($allChaneledAccounts as $channeledAccount) {
-                $dbChanneledAccount = $channeledAccountsMap[$channeledAccount['platformId']] ?? null;
-                if (! $dbChanneledAccount) {
-                    $dbChanneledAccount = new ChanneledAccount();
-                    $dbChanneledAccount->addPlatformId($channeledAccount['platformId']);
+            // 7. Persist ad accounts
+            if (!empty($chanConfig['ad_accounts'])) {
+                foreach ($chanConfig['ad_accounts'] as $asset) {
+                    $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
+                    $anyEnabled = false;
+                    foreach ($groupAccounts as $a) { if ($a['enabled'] ?? true) { $anyEnabled = true; break; } }
+
+                    foreach ($groupAccounts as $account) {
+                        $dbChanneledAccount = $channeledAccountsMap[$account['platformId']] ?? null;
+                        if (!$dbChanneledAccount && !$anyEnabled) continue;
+                        if (!$dbChanneledAccount) {
+                            $dbChanneledAccount = new ChanneledAccount();
+                            $dbChanneledAccount->addPlatformId($account['platformId']);
+                        }
+                        $dbChanneledAccount->addAccount($accountEntity)
+                            ->addType($account['type'])
+                            ->addChannel($channelEntity)
+                            ->addName($account['name'])
+                            ->addPlatformCreatedAt(is_string($account['platformCreatedAt']) ? new DateTime($account['platformCreatedAt']) : null)
+                            ->addData($account['data'])
+                            ->setEnabled($account['enabled'] ?? true);
+                        $this->em->persist($dbChanneledAccount);
+                        $channeledAccountsMap[$account['platformId']] = $dbChanneledAccount;
+                    }
                 }
-                $dbChanneledAccount->addAccount($accountEntity)
-                    ->addType($channeledAccount['type'])
-                    ->addChannel($channelEntity)
-                    ->addName($channeledAccount['name'])
-                    ->addPlatformCreatedAt(is_string($channeledAccount['platformCreatedAt']) ? new DateTime($channeledAccount['platformCreatedAt']) : null)
-                    ->addData($channeledAccount['data']);
-                $this->em->persist($dbChanneledAccount);
             }
             $logger->info("DEBUG: Attempting final flush for $channel");
             $this->em->flush();
