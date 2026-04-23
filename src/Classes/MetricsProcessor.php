@@ -223,7 +223,6 @@ class MetricsProcessor
                 if ($driverClass) {
                     $context = $driverClass::getContextForCategory(AssetCategory::IDENTITY) ?? '';
                     $hints[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::IDENTITY, $context);
-                    $hints[] = $driverClass::getCanonicalId(['id' => $pId], AssetCategory::IDENTITY, $context);
                 }
                 if (is_object($metric->channeledAccount) && method_exists($metric->channeledAccount, 'getId')) {
                      $hints[] = (string)$metric->channeledAccount->getId();
@@ -251,16 +250,14 @@ class MetricsProcessor
             $types[] = \Doctrine\DBAL\ArrayParameterType::INTEGER;
         }
         if (!empty($stringHints)) {
-            $clauses[] = "platform_id IN (?) OR canonical_id IN (?)";
+            $clauses[] = "platform_id IN (?)";
             $params[] = $stringHints;
-            $params[] = $stringHints;
-            $types[] = \Doctrine\DBAL\ArrayParameterType::STRING;
             $types[] = \Doctrine\DBAL\ArrayParameterType::STRING;
         }
 
         $results = [];
         if (!empty($clauses)) {
-            $sql = "SELECT id, platform_id, canonical_id, account_id FROM channeled_accounts WHERE " . implode(' OR ', $clauses);
+            $sql = "SELECT id, platform_id, account_id FROM channeled_accounts WHERE " . implode(' OR ', $clauses);
             $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
         }
 
@@ -271,14 +268,10 @@ class MetricsProcessor
                 $map[$row['platform_id']] = (int) $row['id'];
                 $map['global'][$row['platform_id']] = (int) ($row['account_id'] ?? 0);
             }
-            if ($row['canonical_id']) {
-                $map[$row['canonical_id']] = (int) $row['id'];
-                $map['global'][$row['canonical_id']] = (int) ($row['account_id'] ?? 0);
-            }
             $map[(string)$row['id']] = (int) $row['id'];
             $map['global'][(string)$row['id']] = (int) ($row['account_id'] ?? 0);
             
-            $mapReverse[$row['id']] = $row['platform_id'] ?: $row['canonical_id'] ?: (string)$row['id'];
+            $mapReverse[$row['id']] = $row['platform_id'] ?: (string)$row['id'];
         }
 
         return ['map' => $map, 'mapReverse' => $mapReverse];
