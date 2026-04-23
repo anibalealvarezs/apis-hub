@@ -6,6 +6,7 @@ namespace Commands;
 
 use Classes\DriverInitializer;
 use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
+use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
 use DateTime;
 use Doctrine\ORM\EntityManagerInterface;
 use Entities\Analytics\Country;
@@ -162,7 +163,16 @@ class InitializeEntitiesCommand extends Command
                     /** @var \Repositories\PageRepository|\Repositories\ChanneledAccountRepository $repo */
                     $repo = $this->entityManager->getRepository($repoMap[$type]);
                     $map = [];
-                    if ($type === 'pages') {
+                    $category = match ($type) {
+                        'pages' => AssetCategory::PAGEABLE,
+                        'channeled_accounts' => AssetCategory::IDENTITY,
+                        default => null
+                    };
+
+                    $driverClass = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[$channel]['driver'] ?? null;
+                    $context = $driverClass && $category ? $driverClass::getContextForCategory($category) : '';
+
+                    if ($type === 'pages' && $category) {
                         $lookupField = 'platformId';
                         $searchValues = (array)($params['platform_ids'] ?? []);
                         if (isset($params['canonical_ids'])) {
@@ -171,15 +181,26 @@ class InitializeEntitiesCommand extends Command
                         } elseif (isset($params['urls'])) {
                             $lookupField = 'canonicalId';
                             $urls = (array)$params['urls'];
-                            $searchValues = array_map(fn($u) => Helpers::getCanonicalPageId($u, null, 'website'), $urls);
+                            $searchValues = array_map(function($u) use ($driverClass, $category, $context) {
+                                if ($driverClass) {
+                                    return $driverClass::getCanonicalId(['url' => $u], $category, $context);
+                                }
+                                throw new \RuntimeException("Driver not found for channel: " . $channel);
+                            }, $urls);
                         }
                         if (!empty($searchValues)) {
                             $entities = $repo->findBy([$lookupField => array_unique($searchValues)]);
                             $getter = 'get'.ucfirst($lookupField);
                             foreach ($entities as $e) $map[(string)$e->$getter()] = $e;
                         }
-                    } elseif ($type === 'channeled_accounts' && isset($params['platform_ids'])) {
-                        $entities = $repo->findBy(['platformId' => $params['platform_ids'], 'channel' => $channelEntity]);
+                    } elseif ($type === 'channeled_accounts' && isset($params['platform_ids']) && $category) {
+                        $ids = (array)$params['platform_ids'];
+                        if ($driverClass) {
+                            $searchValues = array_map(fn ($id) => $driverClass::getPlatformId(['id' => $id], $category, $context), $ids);
+                        } else {
+                            $searchValues = $ids;
+                        }
+                        $entities = $repo->findBy(['platformId' => array_unique($searchValues), 'channel' => $channelEntity]);
                         foreach ($entities as $e) $map[(string)$e->getPlatformId()] = $e;
                     } elseif ($type === 'accounts' && isset($params['names'])) {
                         $entities = $repo->findBy(['name' => $params['names']]);
@@ -189,110 +210,70 @@ class InitializeEntitiesCommand extends Command
                 };
 
                 // 1. Sync Assets from YAML to Database (Ported from ConfigManagerController)
-                $patterns = $driver->getAssetPatterns();
-
-                // Determine Group Account
                 $commonKey = $driver::getCommonConfigKey();
                 $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
                 $groupName = $chanConfig['accounts_group_name'] ?? ($channelsConfig[$commonKey]['accounts_group_name'] ?? $defaultGroupName);
 
                 $accountRepo = $this->entityManager->getRepository(\Entities\Analytics\Account::class);
                 $accountEntity = $accountRepo->findOneBy(['name' => $groupName]);
+
                 if (!$accountEntity) {
-                    $this->logger->info("  - Creating default account group: $groupName");
                     $accountEntity = new \Entities\Analytics\Account();
-                    $accountEntity->addName($groupName);
+                    $accountEntity->addName($groupName)->addDescription("Group Account for $channel");
                     $this->entityManager->persist($accountEntity);
-                    $this->entityManager->flush($accountEntity);
+                    $this->entityManager->flush();
                 }
 
-                $isUrlBasedProvider = ($channel === 'google_search_console' || str_contains($channel, 'search_console'));
+                $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : ($chanConfig['sites'] ?? []);
+                foreach ($assets as $asset) {
+                    $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
+                    $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
 
-                foreach ($patterns as $assetKey => $pattern) {
-                    $configKey = $pattern['key'] ?? $assetKey;
-                    $assets = $chanConfig[$configKey] ?? [];
-                    if (empty($assets)) continue;
+                    $anyEnabled = false;
+                    foreach ($groupPages as $p) { if ($p['enabled'] ?? true) { $anyEnabled = true; break; } }
+                    if (!$anyEnabled) { foreach ($groupAccounts as $a) { if ($a['enabled'] ?? true) { $anyEnabled = true; break; } } }
 
-                    $typeMark = $pattern['type'] ?? null;
-                    if (!$typeMark) continue;
+                    foreach ($groupPages as $page) {
+                        $pId = $page['platformId'] ?? null;
+                        $canonicalId = $page['canonicalId'] ?? null;
+                        if (!$pId && !$canonicalId) continue;
 
-                    foreach ($assets as $asset) {
-                        $id = (string)($asset['id'] ?? ($asset['url'] ?? ''));
-                        if (!$id) continue;
-
-                        if ($isUrlBasedProvider && filter_var($id, FILTER_VALIDATE_URL)) {
-                            $id = md5(rtrim($id, '/'));
+                        $dbPage = $canonicalId ? ($this->entityManager->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId])) : null;
+                        if (!$dbPage && !$anyEnabled) continue;
+                        if (!$dbPage) {
+                            $dbPage = new \Entities\Analytics\Page();
+                            if ($canonicalId) $dbPage->addCanonicalId($canonicalId);
                         }
+                        $dbPage->addUrl($page['url'] ?? null)
+                            ->addTitle($page['title'] ?? null)
+                            ->addAccount($accountEntity)
+                            ->addPlatformId($page['platformId'])
+                            ->addHostname($page['hostname'] ?? null)
+                            ->addData($page['data'] ?? []);
+                        $this->entityManager->persist($dbPage);
+                    }
 
-                        $name = $asset['name'] ?? $asset['title'] ?? ("Asset " . $id);
-                        $chanAccountRepo = $this->entityManager->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class);
-                        
-                        $dbChanneled = $chanAccountRepo->findOneBy([
-                            'platformId' => $id, 
-                            'channel' => $channelEntity
-                        ]);
+                    foreach ($groupAccounts as $account) {
+                        $pId = $account['platformId'] ?? null;
+                        if (!$pId) continue;
 
-                        if (!$dbChanneled) {
-                            $dbChanneled = new \Entities\Analytics\Channeled\ChanneledAccount();
-                            $dbChanneled->addPlatformId($id)
-                                ->addAccount($accountEntity)
-                                ->addType($typeMark)
-                                ->addChannel($channelEntity)
-                                ->addName($name)
-                                ->addPlatformCreatedAt(isset($asset['created_at']) ? new \DateTime($asset['created_at']) : null)
-                                ->addData([]);
-                            $this->entityManager->persist($dbChanneled);
-                        } elseif ($dbChanneled->getName() !== $name) {
-                            $dbChanneled->addName($name);
-                            $this->entityManager->persist($dbChanneled);
+                        $dbChanneledAccount = $this->entityManager->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class)->findOneBy(['platformId' => $pId]);
+                        if (!$dbChanneledAccount && !$anyEnabled) continue;
+                        if (!$dbChanneledAccount) {
+                            $dbChanneledAccount = new \Entities\Analytics\Channeled\ChanneledAccount();
+                            $dbChanneledAccount->addPlatformId($pId);
                         }
-
-                        // Children
-                        if (isset($pattern['children'])) {
-                            foreach ($pattern['children'] as $childPattern) {
-                                $childId = (string)($asset[$childPattern['id_key']] ?? '');
-                                if (!$childId) continue;
-
-                                $childName = $asset[$childPattern['name_key']] ?? $name;
-                                $childType = $childPattern['type'];
-
-                                $dbChild = $chanAccountRepo->findOneBy([
-                                    'platformId' => $childId, 
-                                    'channel' => $channelEntity
-                                ]);
-                                if (!$dbChild) {
-                                    $dbChild = new \Entities\Analytics\Channeled\ChanneledAccount();
-                                    $dbChild->addPlatformId($childId)
-                                        ->addAccount($accountEntity)
-                                        ->addType($childType)
-                                        ->addChannel($channelEntity)
-                                        ->addName($childName)
-                                        ->addPlatformCreatedAt(isset($asset['created_at']) ? new \DateTime($asset['created_at']) : null)
-                                        ->addData([]);
-                                    $this->entityManager->persist($dbChild);
-                                }
-                            }
-                        }
-
-                        // Page Entity
-                        if ($typeMark === 'gsc_site' || $typeMark === 'facebook_page') {
-                            $canonicalId = \Helpers\Helpers::getCanonicalPageId($asset['url'] ?? $id, null, 'website');
-                            $pageRepo = $this->entityManager->getRepository(\Entities\Analytics\Page::class);
-                            $dbPage = $pageRepo->findOneBy(['canonicalId' => $canonicalId]);
-                            if (!$dbPage) {
-                                $dbPage = new \Entities\Analytics\Page();
-                                $dbPage->addCanonicalId($canonicalId)
-                                    ->addUrl($asset['url'] ?? $id)
-                                    ->addTitle($name)
-                                    ->addAccount($accountEntity)
-                                    ->addPlatformId($id)
-                                    ->addHostname($asset['hostname'] ?? parse_url($asset['url'] ?? $id, PHP_URL_HOST))
-                                    ->addData($asset);
-                                $this->entityManager->persist($dbPage);
-                            }
-                        }
+                        $dbChanneledAccount->addAccount($accountEntity)
+                            ->addType($account['type'])
+                            ->addChannel($channelEntity)
+                            ->addName($account['name'] ?? null)
+                            ->addPlatformCreatedAt(is_string($account['platformCreatedAt'] ?? null) ? new \DateTime($account['platformCreatedAt']) : null)
+                            ->addData($account['data'] ?? [])
+                            ->setEnabled($account['enabled'] ?? true);
+                        $this->entityManager->persist($dbChanneledAccount);
                     }
                 }
+                $this->entityManager->flush();
                 $this->entityManager->flush();
 
                 // 2. Initialize Channel-specific Entities via Driver hook

@@ -3,13 +3,14 @@
 namespace Classes;
 
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
-use Entities\Analytics\Channel;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Carbon\Carbon;
 use DateTime;
+use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Entities\Analytics\Channel;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -190,15 +191,28 @@ class MetricsProcessor
      */
     public static function processChanneledAccounts(ArrayCollection $metrics, EntityManager $manager): array
     {
+        $channel = $metrics->first()?->channel;
+        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+
         $ids = [];
         foreach ($metrics as $metric) {
+            $pId = null;
             if (isset($metric->channeledAccount)) {
-                $ids[] = is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount;
+                $pId = is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount;
             } elseif (isset($metric->channeledAccountPlatformId)) {
-                $ids[] = $metric->channeledAccountPlatformId;
+                $pId = (string)$metric->channeledAccountPlatformId;
+            }
+
+            if ($pId) {
+                if ($driverClass) {
+                    $context = $driverClass::getContextForCategory(AssetCategory::IDENTITY) ?? '';
+                    $ids[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::IDENTITY, $context);
+                } else {
+                    $ids[] = $pId;
+                }
             }
         }
-        $ids = array_unique($ids);
+        $ids = array_unique(array_filter($ids));
         if (empty($ids)) {
             return ['map' => [], 'mapReverse' => []];
         }
@@ -414,15 +428,26 @@ class MetricsProcessor
 
     public static function processPages(ArrayCollection $metrics, EntityManager $manager): array
     {
+        $channel = $metrics->first()?->channel;
+        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+
         $platformIds = [];
         $canonicalIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'page');
             if ($pId) {
                 if (str_starts_with($pId, 'http') || str_contains($pId, '/')) {
-                    $canonicalIds[] = Helpers::getCanonicalPageId($pId, null, 'website');
+                    if ($driverClass) {
+                        $context = $driverClass::getContextForCategory(AssetCategory::PAGEABLE) ?? '';
+                        $canonicalIds[] = $driverClass::getCanonicalId(['url' => $pId], AssetCategory::PAGEABLE, $context);
+                    }
                 } else {
-                    $platformIds[] = $pId;
+                    if ($driverClass) {
+                        $context = $driverClass::getContextForCategory(AssetCategory::PAGEABLE) ?? '';
+                        $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::PAGEABLE, $context);
+                    } else {
+                        $platformIds[] = $pId;
+                    }
                 }
             }
         }
@@ -699,7 +724,7 @@ class MetricsProcessor
 
             $channeledAccountId = self::resolveChanneledAccountId($metric, $channeledAccountMap);
             $accountId = self::resolveAccountId($metric, $accountMap);
-            if (!$accountId && $channeledAccountMap) {
+            if (! $accountId && $channeledAccountMap) {
                 if ($pId = self::getMetricPlatformId($metric, 'channeledAccount')) {
                     $accountId = $channeledAccountMap['global'][$pId] ?? null;
                 }
@@ -758,7 +783,7 @@ class MetricsProcessor
                 'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id',
                 'creative_id', 'query_id', 'page_id', 'post_id', 'product_id',
                 'customer_id', 'order_id', 'country_id', 'device_id', 'dimension_set_id',
-                'config_signature'
+                'config_signature',
             ];
             $numCols = count($cols);
             $chunkLimit = floor(30000 / $numCols);
@@ -855,6 +880,7 @@ class MetricsProcessor
             $mDimensions = $mObj->dimensions ?? [];
             $dimensions = array_map(function ($dimension) {
                 $d = (array) $dimension;
+
                 return [ 'dimensionKey' => $d['dimensionKey'] ?? null, 'dimensionValue' => $d['dimensionValue'] ?? null ];
             }, (array) $mDimensions);
 
@@ -1015,7 +1041,9 @@ class MetricsProcessor
 
         $metricsMapByMKey = [];
         foreach ($metrics as $m) {
-            if (!$m) continue;
+            if (! $m) {
+                continue;
+            }
             $mObj = (object)$m;
             /** @var object{dimensions_hash: ?string, dimensionsHash: ?string, metric_config_key: ?string, metricConfigKey: ?string, metric_date: ?string, metricDate: ?string} $mObj */
             $mKey = KeyGenerator::generateMetricKey(
@@ -1028,7 +1056,9 @@ class MetricsProcessor
 
         $uniqueChanneledMetrics = [];
         foreach ($metrics->toArray() as $metric) {
-            if (!$metric) continue;
+            if (! $metric) {
+                continue;
+            }
             $mObj = (object)$metric;
             /** @var object{dimensions_hash: ?string, dimensionsHash: ?string, metric_config_key: ?string, metricConfigKey: ?string, metric_date: ?string, metricDate: ?string, platform_id: ?string, platformId: ?string, channel: mixed} $mObj */
             $metricKey = KeyGenerator::generateMetricKey(
@@ -1207,9 +1237,9 @@ class MetricsProcessor
     {
         $mContext = (is_object($metric) && is_callable([$metric, 'getContext'])) ? $metric->getContext() : (array)$metric;
         $platformProp = $property . 'PlatformId';
-        
+
         $val = $mContext[$property] ?? ($mContext[$platformProp] ?? ($metric->$property ?? ($metric->$platformProp ?? null)));
-        
+
         if (is_object($val)) {
             $methods = ['getPostId', 'getPlatformId', 'getCampaignId', 'getCreativeId', 'getAdGroupId', 'getAdId', 'getProductId', 'getOrderId', 'getUrl', 'getEmail', 'getId'];
             foreach ($methods as $method) {
@@ -1217,6 +1247,7 @@ class MetricsProcessor
                     return (string) $val->$method();
                 }
             }
+
             return (string)$val;
         }
 
@@ -1225,143 +1256,201 @@ class MetricsProcessor
 
     private static function resolveChanneledAccountId(object $metric, ?array $channeledAccountMap): ?int
     {
-        if (!$channeledAccountMap) {
+        if (! $channeledAccountMap) {
             return null;
         }
         $pId = self::getMetricPlatformId($metric, 'channeledAccount');
+
         return $pId ? ($channeledAccountMap['map'][$pId] ?? null) : null;
     }
 
     private static function resolvePageId(object $metric, ?array $pageMap): ?int
     {
-        if (!$pageMap) {
+        if (! $pageMap) {
             return null;
         }
         $pId = self::getMetricPlatformId($metric, 'page');
-        if (!$pId) {
+        if (! $pId) {
             return null;
         }
+
+        $channel = $metric->channel ?? null;
+        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+
         // Try direct platform ID mapping
-        if (isset($pageMap['map'][$pId])) {
-            return $pageMap['map'][$pId];
+        $searchId = $pId;
+        if ($driverClass) {
+            $context = $driverClass::getContextForCategory(AssetCategory::PAGEABLE) ?? '';
+            $searchId = $driverClass::getPlatformId(['id' => $pId], AssetCategory::PAGEABLE, $context);
         }
+        if (isset($pageMap['map'][$searchId])) {
+            return $pageMap['map'][$searchId];
+        }
+
         // Try canonical ID mapping as fallback
         if (str_starts_with($pId, 'http') || str_contains($pId, '/')) {
-            $canonicalId = Helpers::getCanonicalPageId($pId, null, 'website');
-            return $pageMap['map'][$canonicalId] ?? null;
+            if ($driverClass) {
+                $context = $driverClass::getContextForCategory(AssetCategory::PAGEABLE) ?? '';
+                $canonicalId = $driverClass::getCanonicalId(['url' => $pId], AssetCategory::PAGEABLE, $context);
+                return $pageMap['map'][$canonicalId] ?? null;
+            }
         }
+
         return null;
     }
 
     private static function resolveAccountId(object $metric, ?array $map): ?int
     {
-        if (!$map) {
+        if (! $map) {
             return null;
         }
         $pId = self::getMetricPlatformId($metric, 'account');
+
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveCampaignId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $pId = self::getMetricPlatformId($metric, 'campaign');
+
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveChanneledCampaignId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $pId = self::getMetricPlatformId($metric, 'channeledCampaign');
+
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveChanneledAdGroupId(object $metric, ?array $map, ?LoggerInterface $logger = null): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $pId = self::getMetricPlatformId($metric, 'channeledAdGroup');
         $resolved = $pId ? ($map['map'][$pId] ?? null) : null;
-        if ($pId && !$resolved) {
+        if ($pId && ! $resolved) {
             $logger?->warning("MetricsProcessor: Failed to resolve AdSet Platform ID '$pId' to a database record. Entity might not be cached.");
         }
+
         return $resolved;
     }
 
     private static function resolveChanneledAdId(object $metric, ?array $map, ?LoggerInterface $logger = null): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $pId = self::getMetricPlatformId($metric, 'channeledAd');
         $resolved = $pId ? ($map['map'][$pId] ?? null) : null;
-        if ($pId && !$resolved) {
+        if ($pId && ! $resolved) {
             $logger?->warning("MetricsProcessor: Failed to resolve Ad Platform ID '$pId' to a database record. Entity might not be cached.");
         }
+
         return $resolved;
     }
 
     private static function resolveQueryId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $pId = self::getMetricPlatformId($metric, 'query');
+
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveCreativeId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $pId = self::getMetricPlatformId($metric, 'creative');
+
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolvePostId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $pId = self::getMetricPlatformId($metric, 'post');
+
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveProductId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $pId = self::getMetricPlatformId($metric, 'product');
+
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveCustomerId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $pId = self::getMetricPlatformId($metric, 'customer');
+
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveOrderId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $pId = self::getMetricPlatformId($metric, 'order');
+
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
     private static function resolveCountryId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
+
         return isset($metric->countryCode) ? ($map['map'][$metric->countryCode]?->getId() ?? null) : (isset($metric->country) ? $metric->country?->getId() : null);
     }
 
     private static function resolveDeviceId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
+
         return isset($metric->deviceType) ? ($map['map'][$metric->deviceType]?->getId() ?? null) : (isset($metric->device) ? $metric->device?->getId() : null);
     }
 
     private static function resolveDimensionSetId(object $metric, ?array $map): ?int
     {
-        if (!$map) return null;
+        if (! $map) {
+            return null;
+        }
         $hash = $metric->dimensionsHash ?? KeyGenerator::generateDimensionsHash((array)($metric->dimensions ?? []));
+
         return $map['map'][$hash] ?? ($map[$hash] ?? null);
     }
 
     private static function resolveLogger(?LoggerInterface $logger = null, ?string $channel = null): LoggerInterface
     {
-        if ($logger) return $logger;
+        if ($logger) {
+            return $logger;
+        }
+
         return Helpers::setLogger(($channel ?? 'metrics-processor') . '.log');
     }
 }

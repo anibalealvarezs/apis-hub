@@ -4,18 +4,12 @@ namespace Controllers;
 
 use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
-use Anibalealvarezs\MetaHubDriver\Enums\MetaEntityType;
 use DateTime;
-use Doctrine\ORM\Exception\NotSupported;
-use Doctrine\ORM\Exception\ORMException;
-use Doctrine\ORM\OptimisticLockException;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channel;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Page;
 use Exception;
-use Helpers\AssetsPatternsHelpers\ChanneledAccountPatternsHelper;
-use Helpers\AssetsPatternsHelpers\PagePatternsHelper;
 use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -106,6 +100,7 @@ class ConfigManagerController extends BaseController
 
             foreach ($availableChannels as $chan) {
                 $driver = DriverFactory::get($chan);
+
                 try {
                     $chanConfig = $systemConfig['channels'][$chan] ?? [];
 
@@ -194,6 +189,7 @@ class ConfigManagerController extends BaseController
     public function updateConfig(Request $request): Response
     {
         $logger = Helpers::setLogger('config-manager.log');
+
         try {
             $data = json_decode($request->getContent(), true);
             $type = $data['type'] ?? '';
@@ -421,7 +417,7 @@ class ConfigManagerController extends BaseController
             if (empty($chanConfig['pages']) && empty($chanConfig['sites'])) {
                 $logger->info("No pages found for channel: $channel");
             } else {
-                $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : $chanConfig['sites'];
+                $assets = ! empty($chanConfig['pages']) ? $chanConfig['pages'] : $chanConfig['sites'];
                 foreach ($assets as $asset) {
                     if (method_exists($driver, 'getPages')) {
                         $allPages = [...$allPages, ...$driver::getPages($asset)];
@@ -457,26 +453,45 @@ class ConfigManagerController extends BaseController
             // 5. Pre-collect all potential channeled accounts IDs to bulk load ChanneledAccounts
             $channeledAccountsMap = [];
             if (! empty($allChaneledAccounts)) {
-                $existingChanneledAccounts = $this->em->getRepository(ChanneledAccount::class)->findBy(['platformId' =>  array_map(fn ($a) => $a['platformId'], $allChaneledAccounts)]);
+                $existingChanneledAccounts = $this->em->getRepository(ChanneledAccount::class)->findBy([
+                    'platformId' => array_map(fn ($a) => $a['platformId'], $allChaneledAccounts),
+                    'channel' => $channelEntity
+                ]);
                 foreach ($existingChanneledAccounts as $c) {
                     $channeledAccountsMap[(string)$c->getPlatformId()] = $c;
                 }
             }
 
             // 6. Persist pages and channeled accounts with nested logic
-            $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : ($chanConfig['sites'] ?? []);
+            $assets = ! empty($chanConfig['pages']) ? $chanConfig['pages'] : ($chanConfig['sites'] ?? []);
             foreach ($assets as $asset) {
                 $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
                 $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
 
                 $anyEnabled = false;
-                foreach ($groupPages as $p) { if ($p['enabled'] ?? true) { $anyEnabled = true; break; } }
-                if (!$anyEnabled) { foreach ($groupAccounts as $a) { if ($a['enabled'] ?? true) { $anyEnabled = true; break; } } }
+                foreach ($groupPages as $p) {
+                    if ($p['enabled'] ?? true) {
+                        $anyEnabled = true;
+
+                        break;
+                    }
+                }
+                if (! $anyEnabled) {
+                    foreach ($groupAccounts as $a) {
+                        if ($a['enabled'] ?? true) {
+                            $anyEnabled = true;
+
+                            break;
+                        }
+                    }
+                }
 
                 foreach ($groupPages as $page) {
                     $dbPage = $pagesMap[$page['canonicalId']] ?? null;
-                    if (!$dbPage && !$anyEnabled) continue;
-                    if (!$dbPage) {
+                    if (! $dbPage && ! $anyEnabled) {
+                        continue;
+                    }
+                    if (! $dbPage) {
                         $dbPage = new Page();
                         $dbPage->addCanonicalId($page['canonicalId']);
                     }
@@ -492,8 +507,10 @@ class ConfigManagerController extends BaseController
 
                 foreach ($groupAccounts as $account) {
                     $dbChanneledAccount = $channeledAccountsMap[$account['platformId']] ?? null;
-                    if (!$dbChanneledAccount && !$anyEnabled) continue;
-                    if (!$dbChanneledAccount) {
+                    if (! $dbChanneledAccount && ! $anyEnabled) {
+                        continue;
+                    }
+                    if (! $dbChanneledAccount) {
                         $dbChanneledAccount = new ChanneledAccount();
                         $dbChanneledAccount->addPlatformId($account['platformId']);
                     }
@@ -510,16 +527,24 @@ class ConfigManagerController extends BaseController
             }
 
             // 7. Persist ad accounts
-            if (!empty($chanConfig['ad_accounts'])) {
+            if (! empty($chanConfig['ad_accounts'])) {
                 foreach ($chanConfig['ad_accounts'] as $asset) {
                     $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
                     $anyEnabled = false;
-                    foreach ($groupAccounts as $a) { if ($a['enabled'] ?? true) { $anyEnabled = true; break; } }
+                    foreach ($groupAccounts as $a) {
+                        if ($a['enabled'] ?? true) {
+                            $anyEnabled = true;
+
+                            break;
+                        }
+                    }
 
                     foreach ($groupAccounts as $account) {
                         $dbChanneledAccount = $channeledAccountsMap[$account['platformId']] ?? null;
-                        if (!$dbChanneledAccount && !$anyEnabled) continue;
-                        if (!$dbChanneledAccount) {
+                        if (! $dbChanneledAccount && ! $anyEnabled) {
+                            continue;
+                        }
+                        if (! $dbChanneledAccount) {
                             $dbChanneledAccount = new ChanneledAccount();
                             $dbChanneledAccount->addPlatformId($account['platformId']);
                         }

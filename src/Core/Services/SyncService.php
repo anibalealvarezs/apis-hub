@@ -84,26 +84,34 @@ class SyncService
                     switch ($type) {
                         case 'campaign':
                             \Classes\MarketingProcessor::processCampaigns($collection, $manager);
+
                             break;
                         case 'ad_group':
                             \Classes\MarketingProcessor::processAdGroups($collection, $manager);
+
                             break;
                         case 'ad':
                             \Classes\MarketingProcessor::processAds($collection, $manager);
+
                             break;
                         case 'creative':
                             \Classes\MarketingProcessor::processCreatives($collection, $manager);
+
                             break;
                         case 'page':
                             \Classes\SocialProcessor::processPages($collection, $manager);
+
                             break;
                         case 'post':
                         case 'ig_media':
                             \Classes\SocialProcessor::processPosts($collection, $manager);
+
                             break;
                     }
+
                     return null;
                 }
+
                 return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
             };
 
@@ -114,7 +122,7 @@ class SyncService
             // 5. Date normalization
             $fallbackStart = $finalConfig['startDate'] ?? $finalConfig['start_date'] ?? '-30 days';
             $startDate = new DateTime($startDateStr ?? $fallbackStart);
-            
+
             $fallbackEnd = $finalConfig['endDate'] ?? $finalConfig['end_date'] ?? $startDate->format('Y-m-d');
             $endDate = new DateTime($endDateStr ?? $fallbackEnd);
 
@@ -134,7 +142,7 @@ class SyncService
             ]);
 
             $this->logger?->info("DEBUG: SyncService::execute - INVOKING driver->sync");
-            
+
             $identityMapper = function (string $type, array $params) use ($finalConfig, $channel) {
                 static $cache = [];
                 $manager = $finalConfig['manager'] ?? Helpers::getManager();
@@ -147,7 +155,7 @@ class SyncService
                     'posts' => \Entities\Analytics\Post::class,
                 ];
 
-                if (!isset($repoMap[$type])) {
+                if (! isset($repoMap[$type])) {
                     return null;
                 }
 
@@ -159,72 +167,111 @@ class SyncService
                 $repository = $manager->getRepository($repoMap[$type]);
                 $result = null;
 
-                switch ($type) {
-                    case 'pages':
-                        $lookupField = 'canonicalId';
-                        $searchValues = (array)($params['canonical_ids'] ?? []);
-                        $isUrlLookup = false;
-                        $canonicalMap = [];
+                $category = match ($type) {
+                    'pages' => AssetCategory::PAGEABLE,
+                    'channeled_accounts' => AssetCategory::IDENTITY,
+                    'channeled_campaigns' => AssetCategory::CAMPAIGN,
+                    'channeled_ad_groups' => AssetCategory::GROUPING,
+                    'channeled_ads' => AssetCategory::UNIT,
+                    'posts' => AssetCategory::UNIT,
+                    default => null
+                };
 
-                        if (isset($params['urls'])) {
-                            $isUrlLookup = true;
-                            $urls = (array)$params['urls'];
-                            $canonicalMap = array_combine($urls, array_map(fn($u) => Helpers::getCanonicalPageId($u, null, 'website'), $urls));
-                            $searchValues = array_values($canonicalMap);
-                        } elseif (isset($params['platform_ids'])) {
-                            $lookupField = 'platformId';
-                            $searchValues = (array)$params['platform_ids'];
-                        }
+                if (!$category) {
+                    break;
+                }
 
-                        if (empty($searchValues)) break;
+                $driverClass = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null;
+                $context = $driverClass ? $driverClass::getContextForCategory($category) : '';
 
-                        $pages = $repository->findBy([$lookupField => array_unique($searchValues)]);
-                        $entityMap = [];
-                        foreach ($pages as $p) {
-                            $val = $p->{$lookupField == 'canonicalId' ? 'getCanonicalId' : 'getPlatformId'}();
-                            $entityMap[(string)$val] = $p;
-                        }
+                if ($type === 'pages') {
+                    $lookupField = 'canonicalId';
+                    $searchValues = (array)($params['canonical_ids'] ?? []);
+                    $isUrlLookup = false;
+                    $canonicalMap = [];
 
-                        if ($isUrlLookup) {
-                            foreach ($canonicalMap as $url => $cId) {
-                                if (isset($entityMap[$cId])) $result[$url] = $entityMap[$cId];
+                    if (isset($params['urls'])) {
+                        $isUrlLookup = true;
+                        $urls = (array)$params['urls'];
+                        $canonicalMap = array_combine($urls, array_map(function ($u) use ($driverClass, $category, $context) {
+                            if ($driverClass) {
+                                return $driverClass::getCanonicalId(['url' => $u], $category, $context);
                             }
+                            throw new \RuntimeException("Driver not found for channel: " . $channel);
+                        }, $urls));
+                        $searchValues = array_values($canonicalMap);
+                    } elseif (isset($params['platform_ids'])) {
+                        $lookupField = 'platformId';
+                        $ids = (array)$params['platform_ids'];
+                        if ($driverClass) {
+                            $searchValues = array_map(fn ($id) => $driverClass::getPlatformId(['id' => $id], $category, $context), $ids);
                         } else {
-                            $result = $entityMap;
+                            $searchValues = $ids;
                         }
-                        break;
+                    }
 
-                    case 'channeled_accounts':
-                    case 'channeled_campaigns':
-                    case 'channeled_ad_groups':
-                    case 'channeled_ads':
-                    case 'posts':
-                    default:
-                        $idField = ($type === 'posts' ? 'postId' : 'platformId');
-                        $getter = 'get'.ucfirst($idField);
-                        $searchValues = (array)($params['platform_ids'] ?? []);
-                        
-                        $criteria = [];
-                        if (!empty($searchValues)) $criteria[$idField] = array_unique($searchValues);
-                        if (in_array($type, ['channeled_accounts', 'channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
-                            $enum = \Entities\Analytics\Channel::tryFromName($channel);
-                            if ($enum) {
-                                $criteria['channel'] = $enum->value;
+                    if (empty($searchValues)) {
+                        break;
+                    }
+
+                    $pages = $repository->findBy([$lookupField => array_unique($searchValues)]);
+                    $entityMap = [];
+                    foreach ($pages as $p) {
+                        $val = $p->{$lookupField == 'canonicalId' ? 'getCanonicalId' : 'getPlatformId'}();
+                        $entityMap[(string)$val] = $p;
+                    }
+
+                    if ($isUrlLookup) {
+                        foreach ($canonicalMap as $url => $cId) {
+                            if (isset($entityMap[$cId])) {
+                                $result[$url] = $entityMap[$cId];
+                            }
+                        }
+                    } else {
+                        $result = $entityMap;
+                    }
+                } else {
+                    $idField = ($type === 'posts' ? 'postId' : 'platformId');
+                    $ids = (array)($params['platform_ids'] ?? []);
+
+                    if ($driverClass) {
+                        $searchValues = array_map(fn ($id) => $driverClass::getPlatformId(['id' => $id], $category, $context), $ids);
+                    } else {
+                        $searchValues = $ids;
+                    }
+
+                    $criteria = [];
+                    if (! empty($searchValues)) {
+                        $criteria[$idField] = array_unique($searchValues);
+                    }
+                    if (in_array($type, ['channeled_accounts', 'channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
+                        $enum = \Entities\Analytics\Channel::tryFromName($channel);
+                        if ($enum) {
+                            $criteria['channel'] = $enum->value;
                             } else {
                                 $this->logger?->warning("SyncService::identityMapper - Channel '$channel' not found in database channels table.");
                             }
                         }
-                        if ($this->logger) $this->logger->info("SyncService::identityMapper - Lookup criteria for $type", ['criteria' => $criteria]);
-                        if ($type === 'posts' && isset($params['page_id'])) $criteria['page'] = $params['page_id'];
-                        if ($type === 'posts' && isset($params['channeled_account_id'])) $criteria['channeledAccount'] = $params['channeled_account_id'];
+                        if ($this->logger) {
+                            $this->logger->info("SyncService::identityMapper - Lookup criteria for $type", ['criteria' => $criteria]);
+                        }
+                        if ($type === 'posts' && isset($params['page_id'])) {
+                            $criteria['page'] = $params['page_id'];
+                        }
+                        if ($type === 'posts' && isset($params['channeled_account_id'])) {
+                            $criteria['channeledAccount'] = $params['channeled_account_id'];
+                        }
 
-                        if (empty($criteria)) break;
+                        if (empty($criteria)) {
+                            break;
+                        }
 
                         $entities = $repository->findBy($criteria);
                         $result = [];
                         foreach ($entities as $e) {
                             $result[(string)$e->$getter()] = $e;
                         }
+
                         break;
                 }
 
@@ -258,13 +305,14 @@ class SyncService
             return new Response(json_encode([
                 'success' => true,
                 'message' => 'Sync completed successfully',
-                'data' => (array)$result
+                'data' => (array)$result,
             ]), Response::HTTP_OK, ['Content-Type' => 'application/json']);
 
         } catch (\Throwable $e) {
             $this->logger->error("SyncService Error [{$channel}]: " . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             throw $e;
         }
     }
