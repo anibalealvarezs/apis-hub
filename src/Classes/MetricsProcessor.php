@@ -159,7 +159,6 @@ class MetricsProcessor
         $channel = $metrics->first()?->channel;
         $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
-        $ids = [];
         $names = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'account');
@@ -169,68 +168,31 @@ class MetricsProcessor
 
             if ($driverClass) {
                 $context = $driverClass::getContextForCategory(AssetCategory::IDENTITY) ?? '';
-                $resolvedId = $driverClass::getPlatformId(['id' => $pId], AssetCategory::IDENTITY, $context);
-                if (is_numeric($resolvedId)) {
-                    $ids[] = (int)$resolvedId;
-                } else {
-                    $names[] = (string)$resolvedId;
-                }
+                $names[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::IDENTITY, $context);
             } else {
-                if (is_numeric($pId)) {
-                    $ids[] = (int)$pId;
-                } else {
-                    $names[] = (string)$pId;
-                }
+                $names[] = (string)$pId;
             }
 
             // Also check for explicit properties if they differ
             if (isset($metric->accountPlatformId) && $metric->accountPlatformId != $pId) {
                 if ($driverClass) {
                     $context = $driverClass::getContextForCategory(AssetCategory::IDENTITY) ?? '';
-                    $resolvedId = $driverClass::getPlatformId(['id' => $metric->accountPlatformId], AssetCategory::IDENTITY, $context);
-                    if (is_numeric($resolvedId)) {
-                        $ids[] = (int)$resolvedId;
-                    } else {
-                        $names[] = (string)$resolvedId;
-                    }
+                    $names[] = $driverClass::getPlatformId(['id' => $metric->accountPlatformId], AssetCategory::IDENTITY, $context);
                 } else {
-                    if (is_numeric($metric->accountPlatformId)) {
-                        $ids[] = (int)$metric->accountPlatformId;
-                    } else {
-                        $names[] = (string)$metric->accountPlatformId;
-                    }
+                    $names[] = (string)$metric->accountPlatformId;
                 }
             }
         }
 
-        $ids = array_unique(array_filter($ids));
         $names = array_unique(array_filter($names));
 
-        if (empty($ids) && empty($names)) {
+        if (empty($names)) {
             return ['map' => [], 'mapReverse' => []];
         }
 
-        $clauses = [];
-        $params = [];
-        $types = [];
+        $sql = "SELECT id, name FROM accounts WHERE name IN (?)";
+        $results = $manager->getConnection()->executeQuery($sql, [$names], [\Doctrine\DBAL\ArrayParameterType::STRING])->fetchAllAssociative();
 
-        if (!empty($ids)) {
-            $clauses[] = "id IN (?)";
-            $params[] = $ids;
-            $types[] = \Doctrine\DBAL\ArrayParameterType::INTEGER;
-        }
-
-        if (!empty($names)) {
-            $clauses[] = "name IN (?)";
-            $params[] = $names;
-            $types[] = \Doctrine\DBAL\ArrayParameterType::STRING;
-        }
-
-        $results = [];
-        if (!empty($clauses)) {
-            $sql = "SELECT id, name FROM accounts WHERE " . implode(' OR ', $clauses);
-            $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
-        }
 
         $map = [];
         $mapReverse = [];
@@ -254,15 +216,10 @@ class MetricsProcessor
         $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $platformIds = [];
-        $numericIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'channeledAccount');
             if (!$pId) {
                 continue;
-            }
-
-            if (is_numeric($pId)) {
-                $numericIds[] = (int)$pId;
             }
 
             if ($driverClass) {
@@ -278,21 +235,14 @@ class MetricsProcessor
         }
 
         $platformIds = array_unique(array_filter($platformIds));
-        $numericIds = array_unique(array_filter($numericIds));
 
-        if (empty($platformIds) && empty($numericIds)) {
+        if (empty($platformIds)) {
             return ['map' => [], 'mapReverse' => []];
         }
 
         $clauses = [];
         $params = [];
         $types = [];
-
-        if (!empty($numericIds)) {
-            $clauses[] = "id IN (?)";
-            $params[] = $numericIds;
-            $types[] = \Doctrine\DBAL\ArrayParameterType::INTEGER;
-        }
 
         if (!empty($platformIds)) {
             $clauses[] = "platform_id IN (?)";
@@ -310,7 +260,7 @@ class MetricsProcessor
                     $channelFilter = " AND channel = " . (int)$enum->value;
                 }
             }
-            $sql = "SELECT id, platform_id, account_id FROM channeled_accounts WHERE (" . implode(' OR ', $clauses) . ")" . $channelFilter;
+            $sql = "SELECT id, platform_id, account_id FROM channeled_accounts WHERE " . implode(' OR ', $clauses) . $channelFilter;
             $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
         }
 
