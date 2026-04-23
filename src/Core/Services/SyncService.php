@@ -177,8 +177,8 @@ class SyncService
                     default => null
                 };
 
-                if (!$category) {
-                    break;
+                if (! $category) {
+                    return null;
                 }
 
                 $driverClass = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null;
@@ -193,10 +193,11 @@ class SyncService
                     if (isset($params['urls'])) {
                         $isUrlLookup = true;
                         $urls = (array)$params['urls'];
-                        $canonicalMap = array_combine($urls, array_map(function ($u) use ($driverClass, $category, $context) {
+                        $canonicalMap = array_combine($urls, array_map(function ($u) use ($driverClass, $category, $context, $channel) {
                             if ($driverClass) {
                                 return $driverClass::getCanonicalId(['url' => $u], $category, $context);
                             }
+
                             throw new \RuntimeException("Driver not found for channel: " . $channel);
                         }, $urls));
                         $searchValues = array_values($canonicalMap);
@@ -211,7 +212,7 @@ class SyncService
                     }
 
                     if (empty($searchValues)) {
-                        break;
+                        return null;
                     }
 
                     $pages = $repository->findBy([$lookupField => array_unique($searchValues)]);
@@ -232,6 +233,7 @@ class SyncService
                     }
                 } else {
                     $idField = ($type === 'posts' ? 'postId' : 'platformId');
+                    $getter = ($type === 'posts' ? 'getPostId' : 'getPlatformId');
                     $ids = (array)($params['platform_ids'] ?? []);
 
                     if ($driverClass) {
@@ -248,31 +250,31 @@ class SyncService
                         $enum = \Entities\Analytics\Channel::tryFromName($channel);
                         if ($enum) {
                             $criteria['channel'] = $enum->value;
-                            } else {
-                                $this->logger?->warning("SyncService::identityMapper - Channel '$channel' not found in database channels table.");
-                            }
+                        } else {
+                            $this->logger?->warning("SyncService::identityMapper - Channel '$channel' not found in database channels table.");
                         }
-                        if ($this->logger) {
-                            $this->logger->info("SyncService::identityMapper - Lookup criteria for $type", ['criteria' => $criteria]);
-                        }
-                        if ($type === 'posts' && isset($params['page_id'])) {
-                            $criteria['page'] = $params['page_id'];
-                        }
-                        if ($type === 'posts' && isset($params['channeled_account_id'])) {
-                            $criteria['channeledAccount'] = $params['channeled_account_id'];
-                        }
+                    }
+                    if ($this->logger) {
+                        $this->logger->info("SyncService::identityMapper - Lookup criteria for $type", ['criteria' => $criteria]);
+                    }
+                    if ($type === 'posts' && isset($params['page_id'])) {
+                        $criteria['page'] = $params['page_id'];
+                    }
+                    if ($type === 'posts' && isset($params['channeled_account_id'])) {
+                        $criteria['channeledAccount'] = $params['channeled_account_id'];
+                    }
 
-                        if (empty($criteria)) {
-                            break;
-                        }
+                    if (empty($criteria)) {
+                        return [];
+                    }
 
-                        $entities = $repository->findBy($criteria);
-                        $result = [];
-                        foreach ($entities as $e) {
-                            $result[(string)$e->$getter()] = $e;
-                        }
+                    $entities = $repository->findBy($criteria);
+                    $result = [];
+                    foreach ($entities as $e) {
+                        $result[(string)$e->$getter()] = $e;
+                    }
 
-                        break;
+                    return $cache[$cacheKey] = $result;
                 }
 
                 return $cache[$cacheKey] = $result;
