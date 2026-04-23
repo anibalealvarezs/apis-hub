@@ -423,6 +423,7 @@ class ConfigManagerController extends BaseController
             } else {
                 $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : $chanConfig['sites'];
                 foreach ($assets as $asset) {
+                    if (!($asset['enabled'] ?? true)) continue;
                     if (method_exists($driver, 'getPages')) {
                         $allPages = [...$allPages, ...$driver::getPages($asset)];
                     }
@@ -436,6 +437,7 @@ class ConfigManagerController extends BaseController
                 $logger->info("No ad accounts found for channel: $channel");
             } else {
                 foreach ($chanConfig['ad_accounts'] as $asset) {
+                    if (!($asset['enabled'] ?? true)) continue;
                     if (method_exists($driver, 'getChanneledAccounts')) {
                         $allChaneledAccounts = [...$allChaneledAccounts, ...$driver::getChanneledAccounts($asset)];
                     }
