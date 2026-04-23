@@ -167,18 +167,38 @@ class MetricsProcessor
                 continue;
             }
 
-            if (is_numeric($pId)) {
-                $ids[] = (int)$pId;
+            if ($driverClass) {
+                $context = $driverClass::getContextForCategory(AssetCategory::ACCOUNT) ?? '';
+                $resolvedId = $driverClass::getPlatformId(['id' => $pId], AssetCategory::ACCOUNT, $context);
+                if (is_numeric($resolvedId)) {
+                    $ids[] = (int)$resolvedId;
+                } else {
+                    $names[] = (string)$resolvedId;
+                }
             } else {
-                $names[] = (string)$pId;
+                if (is_numeric($pId)) {
+                    $ids[] = (int)$pId;
+                } else {
+                    $names[] = (string)$pId;
+                }
             }
 
             // Also check for explicit properties if they differ
             if (isset($metric->accountPlatformId) && $metric->accountPlatformId != $pId) {
-                if (is_numeric($metric->accountPlatformId)) {
-                    $ids[] = (int)$metric->accountPlatformId;
+                if ($driverClass) {
+                    $context = $driverClass::getContextForCategory(AssetCategory::ACCOUNT) ?? '';
+                    $resolvedId = $driverClass::getPlatformId(['id' => $metric->accountPlatformId], AssetCategory::ACCOUNT, $context);
+                    if (is_numeric($resolvedId)) {
+                        $ids[] = (int)$resolvedId;
+                    } else {
+                        $names[] = (string)$resolvedId;
+                    }
                 } else {
-                    $names[] = (string)$metric->accountPlatformId;
+                    if (is_numeric($metric->accountPlatformId)) {
+                        $ids[] = (int)$metric->accountPlatformId;
+                    } else {
+                        $names[] = (string)$metric->accountPlatformId;
+                    }
                 }
             }
         }
@@ -209,14 +229,7 @@ class MetricsProcessor
         $results = [];
         if (!empty($clauses)) {
             $sql = "SELECT id, name FROM accounts WHERE " . implode(' OR ', $clauses);
-            if ($logger) {
-                $logger->info("[MetricsProcessor::processAccounts] Searching for IDs/Names: ", ['ids' => $ids, 'names' => $names]);
-            }
             $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
-        }
-
-        if ($logger) {
-            $logger->info("[MetricsProcessor::processAccounts] Found results: ", ['count' => count($results), 'data' => $results]);
         }
 
         $map = [];
@@ -298,14 +311,7 @@ class MetricsProcessor
                 }
             }
             $sql = "SELECT id, platform_id, account_id FROM channeled_accounts WHERE (" . implode(' OR ', $clauses) . ")" . $channelFilter;
-            if ($logger) {
-                $logger->info("[MetricsProcessor::processChanneledAccounts] Searching for platformIds/numericIds: ", ['platformIds' => $platformIds, 'numericIds' => $numericIds, 'channel' => (string)$channel]);
-            }
             $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
-        }
-
-        if ($logger) {
-            $logger->info("[MetricsProcessor::processChanneledAccounts] Found results: ", ['count' => count($results), 'data' => $results]);
         }
 
         $map = [];
