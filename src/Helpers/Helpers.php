@@ -588,7 +588,7 @@ class Helpers
                         if (isset($config[$chan])) {
                             // Important: Merge parent into child preserving existing child values
                             $config[$chan] = array_replace_recursive($config[$parent], $config[$chan]);
-                            // Maintain nested structure for backward compatibility (e.g. $config['gsc']['google'])
+                            // Maintain nested structure for backward compatibility
                             if (! isset($config[$chan][$parent])) {
                                 $config[$chan][$parent] = $config[$parent];
                             } else {

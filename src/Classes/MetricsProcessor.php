@@ -3,10 +3,10 @@
 namespace Classes;
 
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
+use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Carbon\Carbon;
 use DateTime;
-use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
@@ -162,7 +162,7 @@ class MetricsProcessor
         $names = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'account');
-            if (!$pId) {
+            if (! $pId) {
                 continue;
             }
 
@@ -218,7 +218,7 @@ class MetricsProcessor
         $platformIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'channeledAccount');
-            if (!$pId) {
+            if (! $pId) {
                 continue;
             }
 
@@ -244,18 +244,18 @@ class MetricsProcessor
         $params = [];
         $types = [];
 
-        if (!empty($platformIds)) {
+        if (! empty($platformIds)) {
             $clauses[] = "platform_id IN (?)";
             $params[] = $platformIds;
             $types[] = \Doctrine\DBAL\ArrayParameterType::STRING;
         }
 
         $results = [];
-        if (!empty($clauses)) {
+        if (! empty($clauses)) {
             // Include channel filter if available
             $channelFilter = "";
             if ($channel) {
-                $enum = \Entities\Analytics\Channel::tryFromName((string)$channel);
+                $enum = Channel::tryFromName((string)$channel);
                 if ($enum) {
                     $channelFilter = " AND channel = " . (int)$enum->value;
                 }
@@ -273,7 +273,7 @@ class MetricsProcessor
             }
             $map[(string)$row['id']] = (int) $row['id'];
             $map['global'][(string)$row['id']] = (int) ($row['account_id'] ?? 0);
-            
+
             $mapReverse[$row['id']] = $row['platform_id'] ?: (string)$row['id'];
         }
 
@@ -293,7 +293,9 @@ class MetricsProcessor
         $platformIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'campaign');
-            if (!$pId) continue;
+            if (! $pId) {
+                continue;
+            }
 
             if ($driverClass) {
                 $context = $driverClass::getContextForCategory(AssetCategory::CAMPAIGN) ?? '';
@@ -335,7 +337,9 @@ class MetricsProcessor
         $platformIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'channeledCampaign');
-            if (!$pId) continue;
+            if (! $pId) {
+                continue;
+            }
 
             if ($driverClass) {
                 $context = $driverClass::getContextForCategory(AssetCategory::CAMPAIGN) ?? '';
@@ -379,7 +383,9 @@ class MetricsProcessor
         $platformIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'channeledAdGroup');
-            if (!$pId) continue;
+            if (! $pId) {
+                continue;
+            }
 
             if ($driverClass) {
                 $context = $driverClass::getContextForCategory(AssetCategory::GROUPING) ?? '';
@@ -424,7 +430,9 @@ class MetricsProcessor
         $platformIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'channeledAd');
-            if (!$pId) continue;
+            if (! $pId) {
+                continue;
+            }
 
             if ($driverClass) {
                 $context = $driverClass::getContextForCategory(AssetCategory::UNIT) ?? '';
@@ -469,7 +477,9 @@ class MetricsProcessor
         $platformIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'creative');
-            if (!$pId) continue;
+            if (! $pId) {
+                continue;
+            }
 
             if ($driverClass) {
                 $context = $driverClass::getContextForCategory(AssetCategory::RESOURCE) ?? '';
@@ -514,9 +524,9 @@ class MetricsProcessor
                     $hints = ['id' => $pId, 'url' => $pId];
                     // Also try the specific platform ID property if it differs
                     if (isset($metric->pagePlatformId) && $metric->pagePlatformId !== $pId) {
-                         $hints['id'] = $metric->pagePlatformId;
+                        $hints['id'] = $metric->pagePlatformId;
                     }
-                    
+
                     $canonicalIds[] = $driverClass::getCanonicalId($hints, AssetCategory::PAGEABLE, $context);
                     $platformIds[] = $driverClass::getPlatformId($hints, AssetCategory::PAGEABLE, $context);
                 } else {
@@ -574,7 +584,9 @@ class MetricsProcessor
         $platformIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'post');
-            if (!$pId) continue;
+            if (! $pId) {
+                continue;
+            }
 
             if ($driverClass) {
                 $context = $driverClass::getContextForCategory(AssetCategory::UNIT) ?? '';
@@ -810,14 +822,14 @@ class MetricsProcessor
             $accountId = self::resolveAccountId($metric, $accountMap);
 
             if (! $accountId && $channeledAccountId && $channeledAccountMap) {
-                 $pId = self::getMetricPlatformId($metric, 'channeledAccount');
-                 $accountId = $channeledAccountMap['global'][$pId] ?? null;
-                 if (! $accountId) {
-                     $id = $channeledAccountMap['map'][$pId] ?? null;
-                     if ($id) {
-                         $accountId = $channeledAccountMap['global'][(string)$id] ?? null;
-                     }
-                 }
+                $pId = self::getMetricPlatformId($metric, 'channeledAccount');
+                $accountId = $channeledAccountMap['global'][$pId] ?? null;
+                if (! $accountId) {
+                    $id = $channeledAccountMap['map'][$pId] ?? null;
+                    if ($id) {
+                        $accountId = $channeledAccountMap['global'][(string)$id] ?? null;
+                    }
+                }
             }
 
             $uniqueMetricConfigs[$metricConfigKey] = [
@@ -1382,6 +1394,7 @@ class MetricsProcessor
             if ($driverClass) {
                 $context = $driverClass::getContextForCategory(AssetCategory::PAGEABLE) ?? '';
                 $canonicalId = $driverClass::getCanonicalId(['url' => $pId], AssetCategory::PAGEABLE, $context);
+
                 return $pageMap['map'][$canonicalId] ?? null;
             }
         }

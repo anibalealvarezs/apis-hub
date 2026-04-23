@@ -2,12 +2,11 @@
 
 namespace Repositories;
 
-use Doctrine\Common\Collections\ArrayCollection;
-use Entities\Analytics\Channel;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\Mapping\MappingException;
+use Entities\Analytics\Channel;
 use Entities\Job;
 use Enums\AnalyticsEntity;
 use Enums\JobStatus;
@@ -182,7 +181,7 @@ class JobRepository extends BaseRepository
                 $query->andWhere('e.entity IN (:ctx_entities)')->setParameter('ctx_entities', array_unique($equivalents));
             }
 
-            // Differentiate by Date Range in payload (e.g. gsc-jan vs gsc-feb)
+            // Differentiate by Date Range in payload
             // We use a loose LIKE pattern to be compatible with MySQL JSON columns.
             // In PostgreSQL, this is handled via Native SQL in the calling methods to avoid DQL parsing issues.
             if (! Helpers::isPostgres()) {
@@ -309,7 +308,7 @@ class JobRepository extends BaseRepository
                 $statusSql = "= :status";
                 $params = ['status' => $status];
             }
-            
+
             $sql = "SELECT j.* FROM jobs j WHERE j.status {$statusSql}";
 
             if ($channel) {

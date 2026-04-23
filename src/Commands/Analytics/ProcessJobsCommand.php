@@ -2,24 +2,23 @@
 
 namespace Commands\Analytics;
 
+use Anibalealvarezs\ApiDriverCore\Exceptions\RateLimitException;
+use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
 use Controllers\CacheController;
+use Doctrine\DBAL\Exception\LockWaitTimeoutException;
 use Doctrine\ORM\EntityManager;
-use Entities\Job;
 use Entities\Analytics\Channel as ChannelEntity;
+use Entities\Job;
 use Enums\JobStatus;
 use Helpers\Helpers;
-use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
 use Services\DateResolver;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\HttpFoundation\Response;
-use Anibalealvarezs\ApiDriverCore\Exceptions\RateLimitException;
-use Doctrine\DBAL\Exception\LockWaitTimeoutException;
-use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Input\InputOption;
 use Throwable;
-
 
 #[AsCommand(
     name: 'app:process-jobs',
@@ -55,7 +54,7 @@ class ProcessJobsCommand extends Command
         $envChannel = getenv('API_SOURCE');
         $envInstance = getenv('INSTANCE_NAME');
         $forceAll = $input->getOption('force-all');
-        
+
         if (Helpers::isDebug() || $forceAll) {
             $output->writeln("Querying scheduled and delayed jobs...");
             $this->logger->info("Querying scheduled and delayed jobs...");
@@ -77,7 +76,7 @@ class ProcessJobsCommand extends Command
             'failed' => 0,
             'delayed' => 0,
             'skipped' => 0,
-            'total' => 0
+            'total' => 0,
         ];
 
         $controller = new CacheController();
@@ -119,48 +118,54 @@ class ProcessJobsCommand extends Command
 
                 // 1. Instance Name Match (Primary Filter)
                 $jobInstance = $payload['instance_name'] ?? null;
-                if (!$jobId && !$forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance) {
+                if (! $jobId && ! $forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance) {
                     $stats['skipped']++;
+
                     continue;
                 }
 
                 // 2. Date Range Filters (Fallback/Secondary)
-                if (!$jobId && $envStartDate !== false && $envStartDate !== '') {
+                if (! $jobId && $envStartDate !== false && $envStartDate !== '') {
                     $jobStart = $params['startDate'] ?? $params['start_date'] ?? null;
                     if ($jobStart !== $envStartDate) {
                         $stats['skipped']++;
+
                         continue;
                     }
                 }
-                if (!$jobId && $envEndDate !== false && $envEndDate !== '') {
+                if (! $jobId && $envEndDate !== false && $envEndDate !== '') {
                     $jobEnd = $params['endDate'] ?? $params['end_date'] ?? null;
                     if ($jobEnd !== $envEndDate) {
                         $stats['skipped']++;
+
                         continue;
                     }
                 }
 
-                if (!$jobId && $job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
+                if (! $jobId && $job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
                     $stats['skipped']++;
+
                     continue;
                 }
 
                 // Global filters from env
-                if (!$jobId && $envChannel = getenv('API_SOURCE')) {
+                if (! $jobId && $envChannel = getenv('API_SOURCE')) {
                     if ($job->getChannel() !== $envChannel) {
                         $stats['skipped']++;
+
                         continue;
                     }
                 }
-                if (!$jobId && $envEntity = getenv('API_ENTITY')) {
+                if (! $jobId && $envEntity = getenv('API_ENTITY')) {
                     if ($job->getEntity() !== $envEntity) {
                         $stats['skipped']++;
+
                         continue;
                     }
                 }
 
                 // Cooldown check for delayed jobs
-                if (!$jobId && $job->getStatus() === JobStatus::delayed->value) {
+                if (! $jobId && $job->getStatus() === JobStatus::delayed->value) {
                     $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $job->getChannel()]);
                     $cooldown = $channelEntity ? $channelEntity->getCooldown() : 600;
                     $updatedAt = $job->getUpdatedAt();
@@ -168,6 +173,7 @@ class ProcessJobsCommand extends Command
                         $elapsed = time() - $updatedAt->getTimestamp();
                         if ($elapsed < $cooldown) {
                             $stats['skipped']++;
+
                             continue;
                         }
                     }
@@ -175,15 +181,16 @@ class ProcessJobsCommand extends Command
 
                 // Dependency check
                 $requires = $params['requires'] ?? null;
-                if (!$jobId && $requires) {
+                if (! $jobId && $requires) {
                     $requiredInstances = array_map('trim', explode(',', $requires));
                     foreach ($requiredInstances as $requiredInstance) {
-                        if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
+                        if (! $jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
                             if (Helpers::isDebug()) {
                                 $output->writeln("<comment>Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.</comment>");
                             }
                             $this->logger->info("Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.");
                             $stats['skipped']++;
+
                             continue 2; // Skip to next job
                         }
                     }
@@ -191,12 +198,13 @@ class ProcessJobsCommand extends Command
 
                 // Guard: Prevent another job for the same instance from running if one is already processing
                 $instanceName = $payload['instance_name'] ?? null;
-                if (!$jobId && $instanceName && $jobRepo->isAnotherJobProcessing($instanceName)) {
+                if (! $jobId && $instanceName && $jobRepo->isAnotherJobProcessing($instanceName)) {
                     if (Helpers::isDebug()) {
                         $output->writeln("<comment>Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.</comment>");
                     }
                     $this->logger->info("Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.");
                     $stats['skipped']++;
+
                     continue;
                 }
 
@@ -206,54 +214,58 @@ class ProcessJobsCommand extends Command
                 $this->logger->info("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}", [
                     'uuid' => $job->getUuid(),
                     'entity' => $job->getEntity(),
-                    'channel' => $job->getChannel()
+                    'channel' => $job->getChannel(),
                 ]);
                 $stats['total']++;
 
                 try {
                     // Atomic claim by repository
                     // Even if we provide job-id, we must ensure it's not already being processed by another worker
-                    if (!$jobRepo->claimJob($job->getId())) {
+                    if (! $jobRepo->claimJob($job->getId())) {
                         if (Helpers::isDebug() || $jobId) {
                             $output->writeln("<comment>Job {$job->getUuid()} already claimed or in progress. Skipping.</comment>");
                         }
                         $stats['skipped']++;
                         $stats['total']--;
+
                         continue;
                     }
 
                     $channelName = $job->getChannel();
                     $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $channelName]);
-                    if (!$channelEntity) {
+                    if (! $channelEntity) {
                         throw new \Exception("Invalid channel entity: " . $channelName);
                     }
 
                     // Load full channel configuration
                     $channelsConfig = Helpers::getChannelsConfig();
-                    
-                    // Normalize channel key (handle common config keys like 'facebook' for multiple drivers)
+
+                    // Normalize channel key (handle common config keys)
                     $chanKey = $channelName;
+
                     try {
                         $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
                         $commonKey = $driver::getCommonConfigKey();
-                        if ($commonKey && !isset($channelsConfig[$chanKey])) {
+                        if ($commonKey && ! isset($channelsConfig[$chanKey])) {
                             $chanKey = $commonKey;
                         }
-                    } catch (\Exception $e) {}
+                    } catch (\Exception $e) {
+                    }
 
                     $chanConfig = $channelsConfig[$chanKey] ?? null;
                     $this->logger->debug("PROCESS_JOBS DEBUG: Instance " . ($instanceName ?? 'unknown') . " - Loaded chanConfig keys: " . implode(', ', array_keys($chanConfig ?? [])));
 
                     // Check if channel is enabled
-                    if ($chanConfig && isset($chanConfig['enabled']) && !$chanConfig['enabled']) {
+                    if ($chanConfig && isset($chanConfig['enabled']) && ! $chanConfig['enabled']) {
                         $jobRepo->update($job->getId(), (object)[
                             'status' => JobStatus::failed->value,
-                            'message' => 'Channel is disabled in configuration'
+                            'message' => 'Channel is disabled in configuration',
                         ]);
                         if (Helpers::isDebug()) {
                             $output->writeln("<comment>Job {$job->getUuid()} marked as failed because channel {$channelName} is disabled.</comment>");
                         }
                         $stats['failed']++;
+
                         continue;
                     }
 
@@ -296,8 +308,9 @@ class ProcessJobsCommand extends Command
                     if ($result instanceof Response && $result->getStatusCode() >= 400) {
                         $content = json_decode($result->getContent(), true);
                         $errorMsg = $content['error'] ?? 'Unknown error from fetchData';
+
                         // Handle Rate Limits in a generic way
-                        // The driver should throw RateLimitException 
+                        // The driver should throw RateLimitException
                         // but if we have specific legacy exceptions we can handle them here for now
                         throw new \Exception($errorMsg);
                     }
@@ -305,7 +318,7 @@ class ProcessJobsCommand extends Command
                     // Update to completed
                     $jobRepo->update($job->getId(), (object)[
                         'status' => JobStatus::completed->value,
-                        'message' => 'Success'
+                        'message' => 'Success',
                     ]);
 
                     // Invalidate recent aggregation caches for this channel
@@ -336,11 +349,11 @@ class ProcessJobsCommand extends Command
                     // Update to failed
                     $jobRepo->update($job->getId(), (object)[
                         'status' => JobStatus::failed->value,
-                        'message' => $e->getMessage()
+                        'message' => $e->getMessage(),
                     ]);
                     $output->writeln("<error>Failed job {$job->getUuid()}: {$e->getMessage()}</error>");
                     $this->logger->error("Failed job {$job->getUuid()}: {$e->getMessage()}", [
-                        'exception' => $e
+                        'exception' => $e,
                     ]);
                     if (Helpers::isDebug()) {
                         $output->writeln($e->getTraceAsString());

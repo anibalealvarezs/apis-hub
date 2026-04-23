@@ -8,8 +8,6 @@ use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Entities\Analytics\Channel;
 use Exception;
 use Helpers\Helpers;
-use Anibalealvarezs\ApiDriverCore\Classes\PageTypeRegistry;
-use Anibalealvarezs\ApiDriverCore\Classes\AccountTypeRegistry;
 use Psr\Log\LoggerInterface;
 
 class DriverInitializer
@@ -61,7 +59,7 @@ class DriverInitializer
             }
         }
 
-        // Add sibling flags for shared OAuth flows (e.g. marketing_enabled, organic_enabled)
+        // Add sibling flags for shared OAuth flows
         $parent = $registryConfig['parent'] ?? null;
         if ($parent) {
             $registry = DriverFactory::getRegistry();
@@ -121,7 +119,6 @@ class DriverInitializer
         return $api;
     }
 
-
     /**
      * Boot all registered drivers.
      * Registers asset patterns and calls boot() on each driver.
@@ -133,11 +130,14 @@ class DriverInitializer
     {
         $registry = DriverFactory::getRegistry();
         foreach ($registry as $channel => $config) {
-            if (!isset($config['driver'])) continue;
+            if (! isset($config['driver'])) {
+                continue;
+            }
+
             try {
                 $chanConfig = self::validateConfig($channel, $logger);
                 $driver = DriverFactory::get($channel, $logger, $chanConfig);
-                
+
                 // 1. Register asset patterns
                 $patterns = $driver->getAssetPatterns();
                 foreach ($patterns as $type => $pConfig) {
