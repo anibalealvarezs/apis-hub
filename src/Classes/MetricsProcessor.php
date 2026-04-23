@@ -171,11 +171,29 @@ class MetricsProcessor
             return ['map' => [], 'mapReverse' => []];
         }
 
-        $results = $manager->getConnection()->executeQuery(
-            "SELECT id FROM accounts WHERE id IN (?) OR name IN (?)",
-            [$hints, $hints],
-            [\Doctrine\DBAL\ArrayParameterType::STRING, \Doctrine\DBAL\ArrayParameterType::STRING]
-        )->fetchAllAssociative();
+        $numericHints = array_filter($hints, 'is_numeric');
+        $stringHints = array_diff($hints, $numericHints);
+
+        $clauses = [];
+        $params = [];
+        $types = [];
+
+        if (!empty($numericHints)) {
+            $clauses[] = "id IN (?)";
+            $params[] = array_map('intval', $numericHints);
+            $types[] = \Doctrine\DBAL\ArrayParameterType::INTEGER;
+        }
+        if (!empty($stringHints)) {
+            $clauses[] = "name IN (?)";
+            $params[] = $stringHints;
+            $types[] = \Doctrine\DBAL\ArrayParameterType::STRING;
+        }
+
+        $results = [];
+        if (!empty($clauses)) {
+            $sql = "SELECT id FROM accounts WHERE " . implode(' OR ', $clauses);
+            $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
+        }
 
         $map = [];
         $mapReverse = [];
@@ -220,11 +238,31 @@ class MetricsProcessor
             return ['map' => [], 'mapReverse' => []];
         }
 
-        $results = $manager->getConnection()->executeQuery(
-            "SELECT id, platform_id, canonical_id, account_id FROM channeled_accounts WHERE platform_id IN (?) OR canonical_id IN (?) OR id IN (?)",
-            [$hints, $hints, $hints],
-            [\Doctrine\DBAL\ArrayParameterType::STRING, \Doctrine\DBAL\ArrayParameterType::STRING, \Doctrine\DBAL\ArrayParameterType::STRING]
-        )->fetchAllAssociative();
+        $numericHints = array_filter($hints, 'is_numeric');
+        $stringHints = array_diff($hints, $numericHints);
+
+        $clauses = [];
+        $params = [];
+        $types = [];
+
+        if (!empty($numericHints)) {
+            $clauses[] = "id IN (?)";
+            $params[] = array_map('intval', $numericHints);
+            $types[] = \Doctrine\DBAL\ArrayParameterType::INTEGER;
+        }
+        if (!empty($stringHints)) {
+            $clauses[] = "platform_id IN (?) OR canonical_id IN (?)";
+            $params[] = $stringHints;
+            $params[] = $stringHints;
+            $types[] = \Doctrine\DBAL\ArrayParameterType::STRING;
+            $types[] = \Doctrine\DBAL\ArrayParameterType::STRING;
+        }
+
+        $results = [];
+        if (!empty($clauses)) {
+            $sql = "SELECT id, platform_id, canonical_id, account_id FROM channeled_accounts WHERE " . implode(' OR ', $clauses);
+            $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
+        }
 
         $map = [];
         $mapReverse = [];
