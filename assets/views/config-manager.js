@@ -726,6 +726,8 @@ function renderAssets(assets) {
 
             div.className = itemClass;
             div.innerHTML = `
+                ${p.is_new ? '<div class="asset-badge-new">NEW</div>' : ''}
+                ${p.lost_access ? '<div class="asset-badge-lost">LOST ACCESS</div>' : ''}
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                    <div style="flex:1; min-width:0;">
                        <div class="asset-text-truncate" title="${displayUrl}" style="font-size:0.75rem; font-weight:600; color:#fff;">${displayUrl}</div>
@@ -905,6 +907,8 @@ function renderAssets(assets) {
 
             div.className = itemClass;
             div.innerHTML = `
+                ${a.is_new ? '<div class="asset-badge-new">NEW</div>' : ''}
+                ${a.lost_access ? '<div class="asset-badge-lost" style="font-size: 0.5rem; padding: 1px 5px;">LOST ACCESS</div>' : ''}
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                    <div>
                        <div style="font-size:0.75rem; font-weight:600; color:#fff;">${a.name}</div>
@@ -977,6 +981,7 @@ async function updateConfig(typeArg) {
                 ig_account: igId,
                 lost_access: card.classList.contains('lost-access'),
                 hostname: original.hostname || null,
+                url: original.url || original.link || null,
                 link: original.link || null,
                 created_time: original.created_time || null,
                 data: original.data || [],
