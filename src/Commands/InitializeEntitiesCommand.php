@@ -234,17 +234,30 @@ class InitializeEntitiesCommand extends Command
                             $rawAssets = [$rawAssets];
                         }
                         foreach ($rawAssets as $ra) {
-                            $assets[] = $ra;
+                            $assets[] = [
+                                'data' => $ra,
+                                'category' => $pattern['category'] ?? null
+                            ];
                         }
                     }
                 }
-                if (empty($assets)) {
-                    $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : ($chanConfig['sites'] ?? []);
-                }
 
-                foreach ($assets as $asset) {
-                    $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
-                    $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
+                foreach ($assets as $assetInfo) {
+                    $asset = $assetInfo['data'];
+                    $category = $assetInfo['category'];
+
+                    $groupPages = [];
+                    $groupAccounts = [];
+
+                    if ($category === AssetCategory::PAGEABLE) {
+                        $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
+                    } elseif ($category === AssetCategory::IDENTITY) {
+                        $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
+                    } else {
+                        // Fallback for ad accounts or other legacy assets
+                        $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
+                        $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
+                    }
 
                     $anyEnabled = false;
                     foreach ($groupPages as $p) { if ($p['enabled'] ?? true) { $anyEnabled = true; break; } }

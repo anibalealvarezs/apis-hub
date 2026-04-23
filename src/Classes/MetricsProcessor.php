@@ -156,45 +156,59 @@ class MetricsProcessor
      */
     public static function processAccounts(ArrayCollection $metrics, EntityManager $manager, ?LoggerInterface $logger = null): array
     {
-        $hints = [];
+        $channel = $metrics->first()?->channel;
+        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+
+        $ids = [];
+        $names = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'account');
-            if ($pId) {
-                $hints[] = (string)$pId;
+            if (!$pId) {
+                continue;
             }
-            if (isset($metric->accountPlatformId)) {
-                $hints[] = (string)$metric->accountPlatformId;
+
+            if (is_numeric($pId)) {
+                $ids[] = (int)$pId;
+            } else {
+                $names[] = (string)$pId;
             }
-        }
-        $hints = array_unique(array_filter($hints));
-        if ($logger) {
-            $logger->debug("--- PROCESS ACCOUNTS HINTS: " . json_encode($hints));
-        }
-        if (empty($hints)) {
-            return ['map' => [], 'mapReverse' => []];
+
+            // Also check for explicit properties if they differ
+            if (isset($metric->accountPlatformId) && $metric->accountPlatformId != $pId) {
+                if (is_numeric($metric->accountPlatformId)) {
+                    $ids[] = (int)$metric->accountPlatformId;
+                } else {
+                    $names[] = (string)$metric->accountPlatformId;
+                }
+            }
         }
 
-        $numericHints = array_filter($hints, 'is_numeric');
-        $stringHints = array_diff($hints, $numericHints);
+        $ids = array_unique(array_filter($ids));
+        $names = array_unique(array_filter($names));
+
+        if (empty($ids) && empty($names)) {
+            return ['map' => [], 'mapReverse' => []];
+        }
 
         $clauses = [];
         $params = [];
         $types = [];
 
-        if (!empty($numericHints)) {
+        if (!empty($ids)) {
             $clauses[] = "id IN (?)";
-            $params[] = array_map('intval', $numericHints);
+            $params[] = $ids;
             $types[] = \Doctrine\DBAL\ArrayParameterType::INTEGER;
         }
-        if (!empty($stringHints)) {
+
+        if (!empty($names)) {
             $clauses[] = "name IN (?)";
-            $params[] = $stringHints;
+            $params[] = $names;
             $types[] = \Doctrine\DBAL\ArrayParameterType::STRING;
         }
 
         $results = [];
         if (!empty($clauses)) {
-            $sql = "SELECT id FROM accounts WHERE " . implode(' OR ', $clauses);
+            $sql = "SELECT id, name FROM accounts WHERE " . implode(' OR ', $clauses);
             $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
         }
 
@@ -202,7 +216,8 @@ class MetricsProcessor
         $mapReverse = [];
         foreach ($results as $row) {
             $map[(string)$row['id']] = (int) $row['id'];
-            $mapReverse[$row['id']] = (string)$row['id'];
+            $map[(string)$row['name']] = (int) $row['id'];
+            $mapReverse[$row['id']] = (string)$row['name'];
         }
 
         return ['map' => $map, 'mapReverse' => $mapReverse];
@@ -218,52 +233,64 @@ class MetricsProcessor
         $channel = $metrics->first()?->channel;
         $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
-        $hints = [];
+        $platformIds = [];
+        $numericIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'channeledAccount');
-            if ($pId) {
-                $hints[] = (string)$pId;
-                if ($driverClass) {
-                    $context = $driverClass::getContextForCategory(AssetCategory::IDENTITY) ?? '';
-                    $hints[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::IDENTITY, $context);
-                }
-                if (is_object($metric->channeledAccount) && method_exists($metric->channeledAccount, 'getId')) {
-                     $hints[] = (string)$metric->channeledAccount->getId();
-                }
+            if (!$pId) {
+                continue;
             }
+
+            if (is_numeric($pId)) {
+                $numericIds[] = (int)$pId;
+            }
+
+            if ($driverClass) {
+                $context = $driverClass::getContextForCategory(AssetCategory::IDENTITY) ?? '';
+                $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::IDENTITY, $context);
+            } else {
+                $platformIds[] = (string)$pId;
+            }
+
             if (isset($metric->channeledAccountPlatformId)) {
-                $hints[] = (string)$metric->channeledAccountPlatformId;
+                $platformIds[] = (string)$metric->channeledAccountPlatformId;
             }
-        }
-        $hints = array_unique(array_filter($hints));
-        if ($logger) {
-            $logger->debug("--- PROCESS CHANNELED ACCOUNTS HINTS: " . json_encode($hints));
-        }
-        if (empty($hints)) {
-            return ['map' => [], 'mapReverse' => []];
         }
 
-        $numericHints = array_filter($hints, 'is_numeric');
-        $stringHints = array_diff($hints, $numericHints);
+        $platformIds = array_unique(array_filter($platformIds));
+        $numericIds = array_unique(array_filter($numericIds));
+
+        if (empty($platformIds) && empty($numericIds)) {
+            return ['map' => [], 'mapReverse' => []];
+        }
 
         $clauses = [];
         $params = [];
         $types = [];
 
-        if (!empty($numericHints)) {
+        if (!empty($numericIds)) {
             $clauses[] = "id IN (?)";
-            $params[] = array_map('intval', $numericHints);
+            $params[] = $numericIds;
             $types[] = \Doctrine\DBAL\ArrayParameterType::INTEGER;
         }
-        if (!empty($stringHints)) {
+
+        if (!empty($platformIds)) {
             $clauses[] = "platform_id IN (?)";
-            $params[] = $stringHints;
+            $params[] = $platformIds;
             $types[] = \Doctrine\DBAL\ArrayParameterType::STRING;
         }
 
         $results = [];
         if (!empty($clauses)) {
-            $sql = "SELECT id, platform_id, account_id FROM channeled_accounts WHERE " . implode(' OR ', $clauses);
+            // Include channel filter if available
+            $channelFilter = "";
+            if ($channel) {
+                $enum = \Entities\Analytics\Channel::tryFromName((string)$channel);
+                if ($enum) {
+                    $channelFilter = " AND channel_id = " . (int)$enum->value;
+                }
+            }
+            $sql = "SELECT id, platform_id, account_id FROM channeled_accounts WHERE (" . implode(' OR ', $clauses) . ")" . $channelFilter;
             $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
         }
 
@@ -290,24 +317,30 @@ class MetricsProcessor
      */
     public static function processCampaigns(ArrayCollection $metrics, EntityManager $manager): array
     {
-        $ids = [];
+        $channel = $metrics->first()?->channel;
+        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+
+        $platformIds = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->campaign)) {
-                $ids[] = is_object($metric->campaign) ? $metric->campaign->getCampaignId() : (string)$metric->campaign;
-            } elseif (isset($metric->campaignPlatformId)) {
-                $ids[] = $metric->campaignPlatformId;
+            $pId = self::getMetricPlatformId($metric, 'campaign');
+            if (!$pId) continue;
+
+            if ($driverClass) {
+                $context = $driverClass::getContextForCategory(AssetCategory::CAMPAIGN) ?? '';
+                $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::CAMPAIGN, $context);
+            } else {
+                $platformIds[] = (string)$pId;
             }
         }
-        $ids = array_unique($ids);
-        if (empty($ids)) {
+        $platformIds = array_unique(array_filter($platformIds));
+
+        if (empty($platformIds)) {
             return ['map' => [], 'mapReverse' => []];
         }
 
-        $results = $manager->getConnection()->executeQuery(
-            "SELECT id, campaign_id FROM campaigns WHERE campaign_id IN (?)",
-            [$ids],
-            [\Doctrine\DBAL\ArrayParameterType::STRING]
-        )->fetchAllAssociative();
+        $placeholders = implode(',', array_fill(0, count($platformIds), '?'));
+        $sql = "SELECT id, campaign_id FROM campaigns WHERE campaign_id IN ($placeholders)";
+        $results = $manager->getConnection()->executeQuery($sql, $platformIds)->fetchAllAssociative();
 
         $map = [];
         $mapReverse = [];
@@ -326,24 +359,30 @@ class MetricsProcessor
      */
     public static function processChanneledCampaigns(ArrayCollection $metrics, EntityManager $manager): array
     {
-        $ids = [];
+        $channel = $metrics->first()?->channel;
+        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+
+        $platformIds = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->channeledCampaign)) {
-                $ids[] = is_object($metric->channeledCampaign) ? $metric->channeledCampaign->getPlatformId() : (string)$metric->channeledCampaign;
-            } elseif (isset($metric->channeledCampaignPlatformId)) {
-                $ids[] = $metric->channeledCampaignPlatformId;
+            $pId = self::getMetricPlatformId($metric, 'channeledCampaign');
+            if (!$pId) continue;
+
+            if ($driverClass) {
+                $context = $driverClass::getContextForCategory(AssetCategory::CAMPAIGN) ?? '';
+                $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::CAMPAIGN, $context);
+            } else {
+                $platformIds[] = (string)$pId;
             }
         }
-        $ids = array_unique($ids);
-        if (empty($ids)) {
+        $platformIds = array_unique(array_filter($platformIds));
+
+        if (empty($platformIds)) {
             return ['map' => [], 'mapReverse' => []];
         }
 
-        $results = $manager->getConnection()->executeQuery(
-            "SELECT id, platform_id, campaign_id, channeled_account_id FROM channeled_campaigns WHERE platform_id IN (?)",
-            [$ids],
-            [\Doctrine\DBAL\ArrayParameterType::STRING]
-        )->fetchAllAssociative();
+        $placeholders = implode(',', array_fill(0, count($platformIds), '?'));
+        $sql = "SELECT id, platform_id, campaign_id, channeled_account_id FROM channeled_campaigns WHERE platform_id IN ($placeholders)";
+        $results = $manager->getConnection()->executeQuery($sql, $platformIds)->fetchAllAssociative();
 
         $map = [];
         $mapReverse = [];
@@ -364,24 +403,30 @@ class MetricsProcessor
      */
     public static function processChanneledAdGroups(ArrayCollection $metrics, EntityManager $manager): array
     {
-        $ids = [];
+        $channel = $metrics->first()?->channel;
+        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+
+        $platformIds = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->channeledAdGroup)) {
-                $ids[] = is_object($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : (string)$metric->channeledAdGroup;
-            } elseif (isset($metric->channeledAdGroupPlatformId)) {
-                $ids[] = $metric->channeledAdGroupPlatformId;
+            $pId = self::getMetricPlatformId($metric, 'channeledAdGroup');
+            if (!$pId) continue;
+
+            if ($driverClass) {
+                $context = $driverClass::getContextForCategory(AssetCategory::GROUPING) ?? '';
+                $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::GROUPING, $context);
+            } else {
+                $platformIds[] = (string)$pId;
             }
         }
-        $ids = array_unique($ids);
-        if (empty($ids)) {
+        $platformIds = array_unique(array_filter($platformIds));
+
+        if (empty($platformIds)) {
             return ['map' => [], 'mapReverse' => []];
         }
 
-        $results = $manager->getConnection()->executeQuery(
-            "SELECT id, platform_id, campaign_id, channeled_campaign_id, channeled_account_id FROM channeled_ad_groups WHERE platform_id IN (?)",
-            [$ids],
-            [\Doctrine\DBAL\ArrayParameterType::STRING]
-        )->fetchAllAssociative();
+        $placeholders = implode(',', array_fill(0, count($platformIds), '?'));
+        $sql = "SELECT id, platform_id, campaign_id, channeled_campaign_id, channeled_account_id FROM channeled_ad_groups WHERE platform_id IN ($placeholders)";
+        $results = $manager->getConnection()->executeQuery($sql, $platformIds)->fetchAllAssociative();
 
         $map = [];
         $mapReverse = [];
@@ -403,24 +448,30 @@ class MetricsProcessor
      */
     public static function processChanneledAds(ArrayCollection $metrics, EntityManager $manager): array
     {
-        $ids = [];
+        $channel = $metrics->first()?->channel;
+        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+
+        $platformIds = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->channeledAd)) {
-                $ids[] = is_object($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : (string)$metric->channeledAd;
-            } elseif (isset($metric->channeledAdPlatformId)) {
-                $ids[] = $metric->channeledAdPlatformId;
+            $pId = self::getMetricPlatformId($metric, 'channeledAd');
+            if (!$pId) continue;
+
+            if ($driverClass) {
+                $context = $driverClass::getContextForCategory(AssetCategory::UNIT) ?? '';
+                $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::UNIT, $context);
+            } else {
+                $platformIds[] = (string)$pId;
             }
         }
-        $ids = array_unique($ids);
-        if (empty($ids)) {
+        $platformIds = array_unique(array_filter($platformIds));
+
+        if (empty($platformIds)) {
             return ['map' => [], 'mapReverse' => []];
         }
 
-        $results = $manager->getConnection()->executeQuery(
-            "SELECT id, platform_id, channeled_ad_group_id, channeled_campaign_id, channeled_account_id FROM channeled_ads WHERE platform_id IN (?)",
-            [$ids],
-            [\Doctrine\DBAL\ArrayParameterType::STRING]
-        )->fetchAllAssociative();
+        $placeholders = implode(',', array_fill(0, count($platformIds), '?'));
+        $sql = "SELECT id, platform_id, channeled_ad_group_id, channeled_campaign_id, channeled_account_id FROM channeled_ads WHERE platform_id IN ($placeholders)";
+        $results = $manager->getConnection()->executeQuery($sql, $platformIds)->fetchAllAssociative();
 
         $map = [];
         $mapReverse = [];
@@ -442,28 +493,30 @@ class MetricsProcessor
      */
     public static function processCreatives(ArrayCollection $metrics, EntityManager $manager): array
     {
-        $ids = [];
+        $channel = $metrics->first()?->channel;
+        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+
+        $platformIds = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->creative)) {
-                if (is_object($metric->creative)) {
-                    $ids[] = method_exists($metric->creative, 'getCreativeId') ? $metric->creative->getCreativeId() : (method_exists($metric->creative, 'getPlatformId') ? $metric->creative->getPlatformId() : (string)$metric->creative);
-                } else {
-                    $ids[] = (string)$metric->creative;
-                }
-            } elseif (isset($metric->creativePlatformId)) {
-                $ids[] = $metric->creativePlatformId;
+            $pId = self::getMetricPlatformId($metric, 'creative');
+            if (!$pId) continue;
+
+            if ($driverClass) {
+                $context = $driverClass::getContextForCategory(AssetCategory::RESOURCE) ?? '';
+                $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::RESOURCE, $context);
+            } else {
+                $platformIds[] = (string)$pId;
             }
         }
-        $ids = array_unique($ids);
-        if (empty($ids)) {
+        $platformIds = array_unique(array_filter($platformIds));
+
+        if (empty($platformIds)) {
             return ['map' => [], 'mapReverse' => []];
         }
 
-        $results = $manager->getConnection()->executeQuery(
-            "SELECT id, creative_id FROM creatives WHERE creative_id IN (?)",
-            [$ids],
-            [\Doctrine\DBAL\ArrayParameterType::STRING]
-        )->fetchAllAssociative();
+        $placeholders = implode(',', array_fill(0, count($platformIds), '?'));
+        $sql = "SELECT id, creative_id FROM creatives WHERE creative_id IN ($placeholders)";
+        $results = $manager->getConnection()->executeQuery($sql, $platformIds)->fetchAllAssociative();
 
         $map = [];
         $mapReverse = [];
@@ -545,23 +598,30 @@ class MetricsProcessor
      */
     public static function processPosts(ArrayCollection $metrics, EntityManager $manager): array
     {
-        $ids = [];
+        $channel = $metrics->first()?->channel;
+        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+
+        $platformIds = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'post');
-            if ($pId) {
-                $ids[] = $pId;
+            if (!$pId) continue;
+
+            if ($driverClass) {
+                $context = $driverClass::getContextForCategory(AssetCategory::UNIT) ?? '';
+                $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::UNIT, $context);
+            } else {
+                $platformIds[] = (string)$pId;
             }
         }
-        $ids = array_unique($ids);
-        if (empty($ids)) {
+        $platformIds = array_unique(array_filter($platformIds));
+
+        if (empty($platformIds)) {
             return ['map' => [], 'mapReverse' => []];
         }
 
-        $results = $manager->getConnection()->executeQuery(
-            "SELECT id, post_id FROM posts WHERE post_id IN (?)",
-            [$ids],
-            [\Doctrine\DBAL\ArrayParameterType::STRING]
-        )->fetchAllAssociative();
+        $placeholders = implode(',', array_fill(0, count($platformIds), '?'));
+        $sql = "SELECT id, post_id FROM posts WHERE post_id IN ($placeholders)";
+        $results = $manager->getConnection()->executeQuery($sql, $platformIds)->fetchAllAssociative();
 
         $map = [];
         $mapReverse = [];
