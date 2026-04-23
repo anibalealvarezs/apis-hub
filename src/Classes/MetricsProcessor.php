@@ -209,7 +209,14 @@ class MetricsProcessor
         $results = [];
         if (!empty($clauses)) {
             $sql = "SELECT id, name FROM accounts WHERE " . implode(' OR ', $clauses);
+            if ($logger) {
+                $logger->info("[MetricsProcessor::processAccounts] Searching for IDs/Names: ", ['ids' => $ids, 'names' => $names]);
+            }
             $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
+        }
+
+        if ($logger) {
+            $logger->info("[MetricsProcessor::processAccounts] Found results: ", ['count' => count($results), 'data' => $results]);
         }
 
         $map = [];
@@ -291,7 +298,14 @@ class MetricsProcessor
                 }
             }
             $sql = "SELECT id, platform_id, account_id FROM channeled_accounts WHERE (" . implode(' OR ', $clauses) . ")" . $channelFilter;
+            if ($logger) {
+                $logger->info("[MetricsProcessor::processChanneledAccounts] Searching for platformIds/numericIds: ", ['platformIds' => $platformIds, 'numericIds' => $numericIds, 'channel' => (string)$channel]);
+            }
             $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
+        }
+
+        if ($logger) {
+            $logger->info("[MetricsProcessor::processChanneledAccounts] Found results: ", ['count' => count($results), 'data' => $results]);
         }
 
         $map = [];
