@@ -156,29 +156,39 @@ class MetricsProcessor
      */
     public static function processAccounts(ArrayCollection $metrics, EntityManager $manager): array
     {
-        $ids = [];
+        $hints = [];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'account');
             if ($pId) {
-                $ids[] = (int)$pId;
+                $hints[] = (string)$pId;
+                if (is_object($metric->account) && method_exists($metric->account, 'getPlatformId')) {
+                    $hints[] = (string)$metric->account->getPlatformId();
+                    $hints[] = (string)$metric->account->getId();
+                }
+            }
+            if (isset($metric->accountPlatformId)) {
+                $hints[] = (string)$metric->accountPlatformId;
             }
         }
-        $ids = array_unique($ids);
-        if (empty($ids)) {
+        $hints = array_unique(array_filter($hints));
+        if (empty($hints)) {
             return ['map' => [], 'mapReverse' => []];
         }
 
         $results = $manager->getConnection()->executeQuery(
-            "SELECT id FROM accounts WHERE id IN (?)",
-            [$ids],
-            [\Doctrine\DBAL\ArrayParameterType::INTEGER]
+            "SELECT id, platform_id FROM accounts WHERE id IN (?) OR platform_id IN (?)",
+            [$hints, $hints],
+            [\Doctrine\DBAL\ArrayParameterType::STRING, \Doctrine\DBAL\ArrayParameterType::STRING]
         )->fetchAllAssociative();
 
         $map = [];
         $mapReverse = [];
         foreach ($results as $row) {
-            $map[$row['id']] = (int) $row['id'];
-            $mapReverse[$row['id']] = $row['id'];
+            if ($row['platform_id']) {
+                $map[$row['platform_id']] = (int) $row['id'];
+            }
+            $map[(string)$row['id']] = (int) $row['id'];
+            $mapReverse[$row['id']] = $row['platform_id'] ?: (string)$row['id'];
         }
 
         return ['map' => $map, 'mapReverse' => $mapReverse];
@@ -194,41 +204,50 @@ class MetricsProcessor
         $channel = $metrics->first()?->channel;
         $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
-        $ids = [];
+        $hints = [];
         foreach ($metrics as $metric) {
-            $pId = null;
-            if (isset($metric->channeledAccount)) {
-                $pId = is_object($metric->channeledAccount) ? $metric->channeledAccount->getPlatformId() : (string)$metric->channeledAccount;
-            } elseif (isset($metric->channeledAccountPlatformId)) {
-                $pId = (string)$metric->channeledAccountPlatformId;
-            }
-
+            $pId = self::getMetricPlatformId($metric, 'channeledAccount');
             if ($pId) {
+                $hints[] = (string)$pId;
                 if ($driverClass) {
                     $context = $driverClass::getContextForCategory(AssetCategory::IDENTITY) ?? '';
-                    $ids[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::IDENTITY, $context);
-                } else {
-                    $ids[] = $pId;
+                    $hints[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::IDENTITY, $context);
+                    $hints[] = $driverClass::getCanonicalId(['id' => $pId], AssetCategory::IDENTITY, $context);
+                }
+                if (is_object($metric->channeledAccount)) {
+                     $hints[] = (string)$metric->channeledAccount->getId();
                 }
             }
+            if (isset($metric->channeledAccountPlatformId)) {
+                $hints[] = (string)$metric->channeledAccountPlatformId;
+            }
         }
-        $ids = array_unique(array_filter($ids));
-        if (empty($ids)) {
+        $hints = array_unique(array_filter($hints));
+        if (empty($hints)) {
             return ['map' => [], 'mapReverse' => []];
         }
 
         $results = $manager->getConnection()->executeQuery(
-            "SELECT id, platform_id, account_id FROM channeled_accounts WHERE platform_id IN (?)",
-            [$ids],
-            [\Doctrine\DBAL\ArrayParameterType::STRING]
+            "SELECT id, platform_id, canonical_id, account_id FROM channeled_accounts WHERE platform_id IN (?) OR canonical_id IN (?) OR id IN (?)",
+            [$hints, $hints, $hints],
+            [\Doctrine\DBAL\ArrayParameterType::STRING, \Doctrine\DBAL\ArrayParameterType::STRING, \Doctrine\DBAL\ArrayParameterType::STRING]
         )->fetchAllAssociative();
 
         $map = [];
         $mapReverse = [];
         foreach ($results as $row) {
-            $map[$row['platform_id']] = (int) $row['id'];
-            $map['global'][$row['platform_id']] = (int) ($row['account_id'] ?? 0);
-            $mapReverse[$row['id']] = $row['platform_id'];
+            if ($row['platform_id']) {
+                $map[$row['platform_id']] = (int) $row['id'];
+                $map['global'][$row['platform_id']] = (int) ($row['account_id'] ?? 0);
+            }
+            if ($row['canonical_id']) {
+                $map[$row['canonical_id']] = (int) $row['id'];
+                $map['global'][$row['canonical_id']] = (int) ($row['account_id'] ?? 0);
+            }
+            $map[(string)$row['id']] = (int) $row['id'];
+            $map['global'][(string)$row['id']] = (int) ($row['account_id'] ?? 0);
+            
+            $mapReverse[$row['id']] = $row['platform_id'] ?: $row['canonical_id'] ?: (string)$row['id'];
         }
 
         return ['map' => $map, 'mapReverse' => $mapReverse];
@@ -729,10 +748,16 @@ class MetricsProcessor
 
             $channeledAccountId = self::resolveChanneledAccountId($metric, $channeledAccountMap);
             $accountId = self::resolveAccountId($metric, $accountMap);
-            if (! $accountId && $channeledAccountMap) {
-                if ($pId = self::getMetricPlatformId($metric, 'channeledAccount')) {
-                    $accountId = $channeledAccountMap['global'][$pId] ?? null;
-                }
+
+            if (! $accountId && $channeledAccountId && $channeledAccountMap) {
+                 $pId = self::getMetricPlatformId($metric, 'channeledAccount');
+                 $accountId = $channeledAccountMap['global'][$pId] ?? null;
+                 if (! $accountId) {
+                     $id = $channeledAccountMap['map'][$pId] ?? null;
+                     if ($id) {
+                         $accountId = $channeledAccountMap['global'][(string)$id] ?? null;
+                     }
+                 }
             }
 
             $uniqueMetricConfigs[$metricConfigKey] = [
