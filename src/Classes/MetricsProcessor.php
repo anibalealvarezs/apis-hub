@@ -154,7 +154,7 @@ class MetricsProcessor
      * @param EntityManager $manager
      * @return array
      */
-    public static function processAccounts(ArrayCollection $metrics, EntityManager $manager): array
+    public static function processAccounts(ArrayCollection $metrics, EntityManager $manager, ?LoggerInterface $logger = null): array
     {
         $hints = [];
         foreach ($metrics as $metric) {
@@ -167,6 +167,9 @@ class MetricsProcessor
             }
         }
         $hints = array_unique(array_filter($hints));
+        if ($logger) {
+            $logger->debug("--- PROCESS ACCOUNTS HINTS: " . json_encode($hints));
+        }
         if (empty($hints)) {
             return ['map' => [], 'mapReverse' => []];
         }
@@ -210,7 +213,7 @@ class MetricsProcessor
      * @param EntityManager $manager
      * @return array
      */
-    public static function processChanneledAccounts(ArrayCollection $metrics, EntityManager $manager): array
+    public static function processChanneledAccounts(ArrayCollection $metrics, EntityManager $manager, ?LoggerInterface $logger = null): array
     {
         $channel = $metrics->first()?->channel;
         $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
@@ -233,6 +236,9 @@ class MetricsProcessor
             }
         }
         $hints = array_unique(array_filter($hints));
+        if ($logger) {
+            $logger->debug("--- PROCESS CHANNELED ACCOUNTS HINTS: " . json_encode($hints));
+        }
         if (empty($hints)) {
             return ['map' => [], 'mapReverse' => []];
         }
@@ -680,12 +686,12 @@ class MetricsProcessor
 
         // Map accounts
         if ($processAccounts && ! $accountMap) {
-            $accountMap = self::processAccounts($metrics, $manager);
+            $accountMap = self::processAccounts($metrics, $manager, $logger);
         }
 
         // Map channeled accounts
         if ($processChanneledAccounts && ! $channeledAccountMap) {
-            $channeledAccountMap = self::processChanneledAccounts($metrics, $manager);
+            $channeledAccountMap = self::processChanneledAccounts($metrics, $manager, $logger);
         }
 
         // Map campaigns
