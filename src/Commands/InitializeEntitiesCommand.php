@@ -224,7 +224,24 @@ class InitializeEntitiesCommand extends Command
                     $this->entityManager->flush();
                 }
 
-                $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : ($chanConfig['sites'] ?? []);
+                $registryPatterns = $driverClass::getAssetPatterns();
+                $assets = [];
+                foreach ($registryPatterns as $pattern) {
+                    $key = $pattern['key'] ?? null;
+                    if ($key && isset($chanConfig[$key])) {
+                        $rawAssets = (array)$chanConfig[$key];
+                        if (!empty($rawAssets) && !isset($rawAssets[0])) {
+                            $rawAssets = [$rawAssets];
+                        }
+                        foreach ($rawAssets as $ra) {
+                            $assets[] = $ra;
+                        }
+                    }
+                }
+                if (empty($assets)) {
+                    $assets = !empty($chanConfig['pages']) ? $chanConfig['pages'] : ($chanConfig['sites'] ?? []);
+                }
+
                 foreach ($assets as $asset) {
                     $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
                     $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
