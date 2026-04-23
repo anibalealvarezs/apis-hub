@@ -436,15 +436,20 @@ class MetricsProcessor
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'page');
             if ($pId) {
-                if (str_starts_with($pId, 'http') || str_contains($pId, '/')) {
-                    if ($driverClass) {
-                        $context = $driverClass::getContextForCategory(AssetCategory::PAGEABLE) ?? '';
-                        $canonicalIds[] = $driverClass::getCanonicalId(['url' => $pId], AssetCategory::PAGEABLE, $context);
+                if ($driverClass) {
+                    $context = $driverClass::getContextForCategory(AssetCategory::PAGEABLE) ?? '';
+                    // Collect all available hints for the driver
+                    $hints = ['id' => $pId, 'url' => $pId];
+                    // Also try the specific platform ID property if it differs
+                    if (isset($metric->pagePlatformId) && $metric->pagePlatformId !== $pId) {
+                         $hints['id'] = $metric->pagePlatformId;
                     }
+                    
+                    $canonicalIds[] = $driverClass::getCanonicalId($hints, AssetCategory::PAGEABLE, $context);
+                    $platformIds[] = $driverClass::getPlatformId($hints, AssetCategory::PAGEABLE, $context);
                 } else {
-                    if ($driverClass) {
-                        $context = $driverClass::getContextForCategory(AssetCategory::PAGEABLE) ?? '';
-                        $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::PAGEABLE, $context);
+                    if (str_starts_with($pId, 'http') || str_contains($pId, '/')) {
+                        // Without driver, we can't reliably resolve URL to platform ID
                     } else {
                         $platformIds[] = $pId;
                     }
