@@ -79,4 +79,3 @@ config/channels/google_search_console.yaml.test
 
 config/channels/facebook_marketing.yaml.test
 
-agnostic_id_implementation_plan.md
