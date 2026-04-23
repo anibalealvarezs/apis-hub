@@ -161,10 +161,6 @@ class MetricsProcessor
             $pId = self::getMetricPlatformId($metric, 'account');
             if ($pId) {
                 $hints[] = (string)$pId;
-                if (is_object($metric->account) && method_exists($metric->account, 'getPlatformId')) {
-                    $hints[] = (string)$metric->account->getPlatformId();
-                    $hints[] = (string)$metric->account->getId();
-                }
             }
             if (isset($metric->accountPlatformId)) {
                 $hints[] = (string)$metric->accountPlatformId;
@@ -176,7 +172,7 @@ class MetricsProcessor
         }
 
         $results = $manager->getConnection()->executeQuery(
-            "SELECT id, platform_id FROM accounts WHERE id IN (?) OR platform_id IN (?)",
+            "SELECT id FROM accounts WHERE id IN (?) OR name IN (?)",
             [$hints, $hints],
             [\Doctrine\DBAL\ArrayParameterType::STRING, \Doctrine\DBAL\ArrayParameterType::STRING]
         )->fetchAllAssociative();
@@ -184,11 +180,8 @@ class MetricsProcessor
         $map = [];
         $mapReverse = [];
         foreach ($results as $row) {
-            if ($row['platform_id']) {
-                $map[$row['platform_id']] = (int) $row['id'];
-            }
             $map[(string)$row['id']] = (int) $row['id'];
-            $mapReverse[$row['id']] = $row['platform_id'] ?: (string)$row['id'];
+            $mapReverse[$row['id']] = (string)$row['id'];
         }
 
         return ['map' => $map, 'mapReverse' => $mapReverse];
