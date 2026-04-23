@@ -19,18 +19,29 @@ if [[ "$INSTANCE_NAME" == *"master"* ]]; then
         RETRY_DNS=$((RETRY_DNS+1))
     done
 
+    LOCK_DIR="/app/storage/db_lock"
+    # Automatic stale lock removal (if older than 15 minutes)
+    if [ -d "$LOCK_DIR" ]; then
+        LAST_MOD=$(stat -c %Y "$LOCK_DIR" 2>/dev/null || echo 0)
+        NOW=$(date +%s)
+        if [ "$((NOW - LAST_MOD))" -gt 900 ]; then
+            echo "Master Instance ($INSTANCE_NAME): Found stale lock (age: $((NOW - LAST_MOD))s). Removing..."
+            rmdir "$LOCK_DIR" 2>/dev/null || true
+        fi
+    fi
+
     # Use mkdir for atomic lock
-    if mkdir "/app/storage/db_lock" 2>/dev/null; then
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
         echo "Master Instance ($INSTANCE_NAME): Acquired lock. Initializing database and entities..."
         if php bin/cli.php app:setup-db; then
             echo "Database setup successful."
         else
             echo "Database setup failed. Removing lock to allow retries."
-            rmdir "/app/storage/db_lock"
-            exit 1 # Exit with error to signal failure
+            rmdir "$LOCK_DIR"
+            exit 1
         fi
     else
-        echo "Instance ($INSTANCE_NAME): Database setup already in progress or completed. Waiting..."
+        echo "Instance ($INSTANCE_NAME): Database setup already in progress or stale. Waiting..."
         INSTANCE_TYPE="waiting-master"
     fi
 fi
@@ -67,10 +78,20 @@ if [ -n "$PROJECT_CONFIG_FILE" ]; then
     # Extract project name from path (e.g. deploy/alimentos-bahia.yaml -> alimentos-bahia)
     PROJECT_NAME=$(basename "$PROJECT_CONFIG_FILE" .yaml)
     
+    REFRESH_LOCK="/app/storage/refresh_lock"
     # Ensure instances.yaml is fresh. Only one instance needs to do this to avoid race conditions.
-    # But all instances need the result for the cron setup.
     if [[ "$INSTANCE_NAME" == *"master"* ]]; then
-        if mkdir "/app/storage/refresh_lock" 2>/dev/null; then
+        # Automatic stale lock removal (if older than 5 minutes)
+        if [ -d "$REFRESH_LOCK" ]; then
+            LAST_MOD=$(stat -c %Y "$REFRESH_LOCK" 2>/dev/null || echo 0)
+            NOW=$(date +%s)
+            if [ "$((NOW - LAST_MOD))" -gt 300 ]; then
+                echo "Master Instance ($INSTANCE_NAME): Found stale refresh lock. Removing..."
+                rm -rf "$REFRESH_LOCK"
+            fi
+        fi
+
+        if mkdir "$REFRESH_LOCK" 2>/dev/null; then
 
              echo "Regenerating instance configuration..."
              php bin/cli.php app:refresh-instances || echo "Instance refresh failed"
