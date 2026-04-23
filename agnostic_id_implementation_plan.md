@@ -8,7 +8,7 @@ Currently, the Drivers in this project are tightly coupled to the APIs Hub's int
 
 ### The Solution: Role-Based Agnoticism
 
-This architecture introduces a functional middle-layer using **Asset Categories**. The Driver describes the _nature_ of its data (e.g., "this is a identifiable identity", "this is a pageable asset"). The Hub then maps these functional roles to its own internal entities.
+This architecture introduces a functional middle-layer using **Asset Categories**. The Driver describes the *nature* of its data (e.g., "this is a identifiable identity", "this is a pageable asset"). The Hub then maps these functional roles to its own internal entities.
 
 ### Key Goals
 
@@ -90,3 +90,24 @@ The Hub maintains an internal map between its Entities and the Categories.
 1. **Verification**: Execute sync for all major channels to confirm metrics are correctly mapped using the new role-based logic.
 2. **Removal**: Delete all Hub-specific strings from drivers. Rename or inline internal helper methods.
 3. **Deprecation**: Remove legacy identification helpers (`PagePatternsHelper`, `Helpers::getCanonicalPageId`). Every identification request MUST go through the Driver role methods.
+
+---
+
+## 6. Future Domain Expansion Examples
+
+This architecture is designed to handle non-marketing domains by mapping their unique entities to universal roles.
+
+### 6.1 Google Analytics (Metrics Driver)
+- **Role**: `IDENTITY` & `PAGEABLE` -> **GA4 Property ID**.
+- **Rationale**: While GSC identifies by URL, GA identifies by Property ID. The Hub asks for a `PAGEABLE` asset, and the Driver provides the Property ID formulated as `ga4:property:12345`.
+
+### 6.2 Shopify (E-Commerce Driver)
+- **Role**: `UNIT` -> **Product** or **Order**.
+- **Role**: `RESOURCE` -> **Discount Code**.
+- **Rationale**: An "Order" generates data much like a "Post." By tagging both as `UNIT`, the Hub's metric processor can link sales data to Shopify assets using the same code path it uses for Facebook engagement.
+
+### 6.3 Klaviyo (Automation Driver)
+- **Role**: `CAMPAIGN` -> **Flow**.
+- **Role**: `GROUPING` -> **Automation Step**.
+- **Role**: `UNIT` -> **Individual Email Message**.
+- **Rationale**: Hierarchical flows map perfectly to the Campaign/Grouping/Unit tree. The Hub doesn't need to know it's "Email" rather than "Ads," it only needs to know the hierarchical depth for aggregation.
