@@ -112,20 +112,15 @@ class ConfigManagerController extends BaseController
                         $currentConfig = array_replace_recursive($currentConfig, $uiConfig);
                     }
 
-                    // Fast Load Logic for Assets: Populate basic asset lists without full discovery
+                    // Fast Load Logic for Assets: Populate basic asset lists from config without full discovery
                     if (! $forceRefresh) {
-                        if ($chan === 'google_search_console') {
-                            if (isset($chanConfig['sites'])) {
-                                $allAssets['gsc'] = array_values($chanConfig['sites']);
-                            }
-                        } elseif (str_contains($chan, 'facebook_organic')) {
-                            if (isset($chanConfig['pages'])) {
-                                $allAssets['facebook_pages'] = array_merge($allAssets['facebook_pages'] ?? [], array_values($chanConfig['pages']));
-                            }
-                        } elseif ($chan === 'facebook_marketing') {
-                            if (isset($chanConfig['ad_accounts'])) {
-                                $allAssets['facebook_ad_accounts'] = array_values($chanConfig['ad_accounts']);
-                            }
+                        $resourceKey = $systemConfig[$chan]['resource_key'] ?? null;
+                        if ($resourceKey && isset($chanConfig[$resourceKey])) {
+                            // Merge with existing assets if the key is already present (e.g. across multiple social channels)
+                            $allAssets[$resourceKey] = array_merge(
+                                $allAssets[$resourceKey] ?? [],
+                                array_values($chanConfig[$resourceKey])
+                            );
                         }
 
                         // If it's not a requested type for asset discovery, we skip the slow Discovery part
@@ -389,20 +384,17 @@ class ConfigManagerController extends BaseController
 
     private function syncAssetsToDatabase(string $channel, $logger): void
     {
-        $logger->info("DEBUG: syncAssetsToDatabase START for $channel");
+        // 1. Get Registry and dynamic keys
+        $systemConfig = Helpers::getProjectConfig();
+        $resourceKey = $systemConfig[$channel]['resource_key'] ?? null;
 
         try {
             $driver = DriverFactory::get($channel);
-            /* $patterns = $driver->getAssetPatterns();
-            $logger->info("DEBUG: Patterns loaded: " . implode(', ', array_keys($patterns))); */
             // Read channel config directly from disk (already saved before this method is called).
-            // Do NOT call resetConfigs() here — it nulls the EntityManager and corrupts the persistence flow.
             $chanYaml = Helpers::getConfigDir() . '/channels/' . $channel . '.yaml';
             $rawConfig = file_exists($chanYaml) ? (Yaml::parseFile($chanYaml) ?: []) : [];
             $chanConfig = $rawConfig['channels'][$channel] ?? $rawConfig;
             $logger->info("DEBUG: Config loaded from disk for $channel");
-
-            // 1. Get Channel Entity (Fast lookup)
             $channelEntity = $this->em->getRepository(Channel::class)->findOneBy(['name' => $channel]);
 
             // 2. Identify common account group
@@ -411,13 +403,15 @@ class ConfigManagerController extends BaseController
             $groupName = $chanConfig['accounts_group_name'] ?? ($rawConfig['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
             $accountEntity = $this->getOrCreateAccount($groupName);
 
-            // 3. Get all pages to be persisted with their related channeled accounts (if defined)
+            // 4. Get all pages to be persisted with their related channeled accounts (if defined)
             $allPages = [];
             $allChaneledAccounts = [];
-            if (empty($chanConfig['pages']) && empty($chanConfig['sites'])) {
-                $logger->info("No pages found for channel: $channel");
+
+            $assets = ($resourceKey && isset($chanConfig[$resourceKey])) ? $chanConfig[$resourceKey] : [];
+
+            if (empty($assets)) {
+                $logger->info("No assets found for channel: $channel under key: $resourceKey");
             } else {
-                $assets = ! empty($chanConfig['pages']) ? $chanConfig['pages'] : $chanConfig['sites'];
                 foreach ($assets as $asset) {
                     if (method_exists($driver, 'getPages')) {
                         $allPages = [...$allPages, ...$driver::getPages($asset)];
@@ -428,9 +422,8 @@ class ConfigManagerController extends BaseController
                 }
             }
 
-            if (empty($chanConfig['ad_accounts'])) {
-                $logger->info("No ad accounts found for channel: $channel");
-            } else {
+            // Also check for ad_accounts if not already the primary resource key (secondary assets)
+            if (! empty($chanConfig['ad_accounts']) && $resourceKey !== 'ad_accounts') {
                 foreach ($chanConfig['ad_accounts'] as $asset) {
                     if (method_exists($driver, 'getChanneledAccounts')) {
                         $allChaneledAccounts = [...$allChaneledAccounts, ...$driver::getChanneledAccounts($asset)];
@@ -455,15 +448,14 @@ class ConfigManagerController extends BaseController
             if (! empty($allChaneledAccounts)) {
                 $existingChanneledAccounts = $this->em->getRepository(ChanneledAccount::class)->findBy([
                     'platformId' => array_map(fn ($a) => $a['platformId'], $allChaneledAccounts),
-                    'channel' => $channelEntity
+                    'channel' => $channelEntity,
                 ]);
                 foreach ($existingChanneledAccounts as $c) {
                     $channeledAccountsMap[(string)$c->getPlatformId()] = $c;
                 }
             }
 
-            // 6. Persist pages and channeled accounts with nested logic
-            $assets = ! empty($chanConfig['pages']) ? $chanConfig['pages'] : ($chanConfig['sites'] ?? []);
+            // 6. Persist assets with nested logic using dynamic resource key
             foreach ($assets as $asset) {
                 $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
                 $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
@@ -526,8 +518,8 @@ class ConfigManagerController extends BaseController
                 }
             }
 
-            // 7. Persist ad accounts
-            if (! empty($chanConfig['ad_accounts'])) {
+            // 7. Persist ad accounts (if not already handled by resourceKey logic)
+            if (! empty($chanConfig['ad_accounts']) && $resourceKey !== 'ad_accounts') {
                 foreach ($chanConfig['ad_accounts'] as $asset) {
                     $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
                     $anyEnabled = false;
