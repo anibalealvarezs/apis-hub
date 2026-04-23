@@ -168,8 +168,8 @@ class MetricsProcessor
             }
 
             if ($driverClass) {
-                $context = $driverClass::getContextForCategory(AssetCategory::ACCOUNT) ?? '';
-                $resolvedId = $driverClass::getPlatformId(['id' => $pId], AssetCategory::ACCOUNT, $context);
+                $context = $driverClass::getContextForCategory(AssetCategory::IDENTITY) ?? '';
+                $resolvedId = $driverClass::getPlatformId(['id' => $pId], AssetCategory::IDENTITY, $context);
                 if (is_numeric($resolvedId)) {
                     $ids[] = (int)$resolvedId;
                 } else {
@@ -186,8 +186,8 @@ class MetricsProcessor
             // Also check for explicit properties if they differ
             if (isset($metric->accountPlatformId) && $metric->accountPlatformId != $pId) {
                 if ($driverClass) {
-                    $context = $driverClass::getContextForCategory(AssetCategory::ACCOUNT) ?? '';
-                    $resolvedId = $driverClass::getPlatformId(['id' => $metric->accountPlatformId], AssetCategory::ACCOUNT, $context);
+                    $context = $driverClass::getContextForCategory(AssetCategory::IDENTITY) ?? '';
+                    $resolvedId = $driverClass::getPlatformId(['id' => $metric->accountPlatformId], AssetCategory::IDENTITY, $context);
                     if (is_numeric($resolvedId)) {
                         $ids[] = (int)$resolvedId;
                     } else {
