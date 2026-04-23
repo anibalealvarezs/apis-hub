@@ -85,11 +85,11 @@ class SocialProcessor
         $accountId = is_object($account) ? $account->getId() : $account;
 
         $params = [
-            $entity->getUrl(),
-            $entity->getCanonicalId() ?? $entity->getPlatformId(),
-            $entity->getTitle(),
-            $entity->getHostname(),
-            $entity->getPlatformId(),
+            (string)$entity->getUrl(),
+            (string)($entity->getCanonicalId() ?? $entity->getPlatformId()),
+            (string)$entity->getTitle(),
+            (string)$entity->getHostname(),
+            (string)$entity->getPlatformId(),
             $accountId,
             json_encode($entity->getData() ?? [])
         ];
@@ -124,11 +124,11 @@ class SocialProcessor
         $accountId = is_object($account) ? $account->getId() : $account;
 
         $params = [
-            $entity->getPlatformId(),
+            (string)$entity->getPlatformId(),
             $accountId,
-            self::resolveChannelId($entity->getChannel(), $manager),
-            $entity->getTitle() ?? $entity->getPlatformId(),
-            $entity->getType(),
+            self::resolveChannelId((string)$entity->getChannel(), $manager),
+            (string)($entity->getTitle() ?? $entity->getPlatformId()),
+            (string)$entity->getType(),
             json_encode($entity->getData() ?? [])
         ];
 
