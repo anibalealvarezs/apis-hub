@@ -63,7 +63,7 @@ class SocialProcessor
         $channel = $entity->getChannel();
         $context = $entity->getContext();
 
-        if ($type === 'facebook_page' || $type === 'instagram' || $type === 'gsc_site' || !$type) {
+        if (in_array($type, ['pages', 'sites']) || !$type) {
             // It's a Page if it has a URL or is explicitly typed as such
             if ($entity->getUrl() || $entity->getCanonicalId()) {
                 self::processPageEntity($entity, $manager);

@@ -559,55 +559,40 @@ class Helpers
                 };
                 $resolvePlaceholders($config);
 
-                // Inject credentials from environment variables if missing or empty
-                $credentialMapping = [
-                    'google' => [
-                        'GOOGLE_CLIENT_ID' => 'client_id',
-                        'GOOGLE_CLIENT_SECRET' => 'client_secret',
-                        'GOOGLE_REFRESH_TOKEN' => 'refresh_token',
-                        'GOOGLE_USER_ID' => 'user_id',
-                        'GOOGLE_REDIRECT_URI' => 'redirect_uri',
-                        'GOOGLE_TOKEN_PATH' => 'token_path',
-                    ],
-                    'facebook' => [
-                        'FACEBOOK_APP_ID' => 'app_id',
-                        'FACEBOOK_APP_SECRET' => 'app_secret',
-                        'FACEBOOK_USER_ID' => 'user_id',
-                        'FACEBOOK_REDIRECT_URI' => 'redirect_uri',
-                        'FACEBOOK_TOKEN_PATH' => 'token_path',
-                    ],
-                ];
+                // Dynamic config enrichment from Drivers and Registry (Decoupled implementation)
+                $registry = DriverFactory::getRegistry();
 
-                foreach ($credentialMapping as $chan => $mapping) {
-                    if (! isset($config[$chan])) {
-                        $config[$chan] = [];
-                    }
-                    foreach ($mapping as $envKey => $configKey) {
-                        $val = getenv($envKey);
-                        if ($val && empty($config[$chan][$configKey])) {
-                            $config[$chan][$configKey] = $val;
+                // 1. Inject credentials from environment variables using Driver-defined mappings
+                foreach ($registry as $chan => $chanDef) {
+                    $driverClass = $chanDef['driver'] ?? null;
+                    if ($driverClass && class_exists($driverClass) && method_exists($driverClass, 'getEnvMapping')) {
+                        $mapping = $driverClass::getEnvMapping();
+                        foreach ($mapping as $targetChan => $envMap) {
+                            if (! isset($config[$targetChan])) {
+                                $config[$targetChan] = [];
+                            }
+                            foreach ($envMap as $envKey => $configKey) {
+                                $val = getenv($envKey);
+                                if ($val && empty($config[$targetChan][$configKey])) {
+                                    $config[$targetChan][$configKey] = $val;
+                                }
+                            }
                         }
                     }
                 }
 
-                // Inject common credentials into specific channels for backward compatibility
-                $commonMappings = [
-                    'google' => ['google_search_console', 'google_analytics', 'gsc'],
-                    'facebook' => ['facebook_marketing', 'facebook_organic', 'instagram_insights'],
-                ];
-
-                foreach ($commonMappings as $commonKey => $specificChannels) {
-                    if (! empty($config[$commonKey])) {
-                        foreach ($specificChannels as $chan) {
-                            if (isset($config[$chan])) {
-                                // Important: Merge common into specific preserving existing values
-                                $config[$chan] = array_replace_recursive($config[$commonKey], $config[$chan]);
-                                // Maintain nested structure too
-                                if (! isset($config[$chan][$commonKey])) {
-                                    $config[$chan][$commonKey] = $config[$commonKey];
-                                } else {
-                                    $config[$chan][$commonKey] = array_replace_recursive($config[$commonKey], array_filter($config[$chan][$commonKey]));
-                                }
+                // 2. Generic Parental Inheritance (Backward Compatibility for common credentials)
+                foreach ($registry as $chan => $chanDef) {
+                    $parent = $chanDef['parent'] ?? null;
+                    if ($parent && ! empty($config[$parent])) {
+                        if (isset($config[$chan])) {
+                            // Important: Merge parent into child preserving existing child values
+                            $config[$chan] = array_replace_recursive($config[$parent], $config[$chan]);
+                            // Maintain nested structure for backward compatibility (e.g. $config['gsc']['google'])
+                            if (! isset($config[$chan][$parent])) {
+                                $config[$chan][$parent] = $config[$parent];
+                            } else {
+                                $config[$chan][$parent] = array_replace_recursive($config[$parent], array_filter($config[$chan][$parent]));
                             }
                         }
                     }

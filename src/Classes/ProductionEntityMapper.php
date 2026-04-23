@@ -49,13 +49,12 @@ class ProductionEntityMapper implements SeederInterface
             'ad', 'Ad' => ChanneledAd::class,
             'channeled_ad', 'ChanneledAd' => ChanneledAd::class,
             'creative', 'Creative' => Creative::class,
-            'page', 'Page', 'FacebookPage' => Page::class,
+            'page', 'Page' => Page::class,
             'post', 'Post' => Post::class,
             'query', 'Query' => Query::class,
             'country', 'Country' => Country::class,
             'device', 'Device' => Device::class,
             'ChanneledSyncError' => ChanneledSyncError::class,
-            'ChanneledPage' => Page::class,
             default => throw new \Exception("Unknown entity type: $shortName")
         };
     }
