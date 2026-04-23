@@ -713,12 +713,14 @@ function renderAssets(assets) {
         if (props.length === 0) gscList.innerHTML = '<div class="empty-state">No GSC properties found.</div>';
         props.forEach(p => {
             const cfgGsc = currentConfig?.gsc || {};
-            const isSynced = cfgGsc[p.url] !== undefined && cfgGsc[p.url].enabled !== false && !p.lost_access;
+            const isInConfig = cfgGsc[p.url] !== undefined;
+            const isSynced = isInConfig && cfgGsc[p.url].enabled !== false && !p.lost_access;
             const displayUrl = p.url.replace('sc-domain:', '');
             const div = document.createElement('div');
             
             let itemClass = 'asset-item';
             if (isSynced) itemClass += ' synced';
+            if (isInConfig) itemClass += ' in-config';
             if (p.is_new) itemClass += ' is-new';
             if (p.lost_access) itemClass += ' lost-access';
 
@@ -891,11 +893,13 @@ function renderAssets(assets) {
         accounts.forEach(a => {
             const savedAccs = currentConfig.fb_ad_accounts_full_config || [];
             const saved = savedAccs.find(acc => String(acc.id) === String(a.id));
-            const isSynced = saved && saved.enabled !== false && !a.lost_access;
+            const isInConfig = !!saved;
+            const isSynced = isInConfig && saved.enabled !== false && !a.lost_access;
             const div = document.createElement('div');
             
             let itemClass = 'asset-item';
             if (isSynced) itemClass += ' synced';
+            if (isInConfig) itemClass += ' in-config';
             if (a.is_new) itemClass += ' is-new';
             if (a.lost_access) itemClass += ' lost-access';
 
@@ -944,7 +948,7 @@ async function updateConfig(typeArg) {
         // Assets Sync Status (GSC)
         document.querySelectorAll('.asset-item').forEach(item => {
             const cb = item.querySelector('.gsc-asset-sync');
-            if (cb && (cb.checked || item.classList.contains('synced') || item.classList.contains('lost-access'))) {
+            if (cb && (cb.checked || item.classList.contains('in-config') || item.classList.contains('lost-access'))) {
                 const url = cb.value;
                 const original = availableAssetsMaps.gsc[url] || {};
                 payload.assets.gsc.push({ 
@@ -996,8 +1000,8 @@ async function updateConfig(typeArg) {
         });
 
         document.querySelectorAll('.asset-item').forEach(item => {
-            const cb = item.querySelector('.fb-marketing-asset-sync');
-            if (cb && (cb.checked || item.classList.contains('synced') || item.classList.contains('lost-access'))) {
+            const cb = item.querySelector('.gsc-asset-sync') || item.querySelector('.fb-marketing-asset-sync');
+            if (cb && (cb.checked || item.classList.contains('in-config') || item.classList.contains('lost-access'))) {
                 const accId = String(cb.value);
                 const original = availableAssetsMaps.ad_accounts[accId] || {};
                 const nameEl = item.querySelector('[style*="font-weight:600"]');
