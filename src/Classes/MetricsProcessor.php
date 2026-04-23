@@ -225,7 +225,7 @@ class MetricsProcessor
                     $hints[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::IDENTITY, $context);
                     $hints[] = $driverClass::getCanonicalId(['id' => $pId], AssetCategory::IDENTITY, $context);
                 }
-                if (is_object($metric->channeledAccount)) {
+                if (is_object($metric->channeledAccount) && method_exists($metric->channeledAccount, 'getId')) {
                      $hints[] = (string)$metric->channeledAccount->getId();
                 }
             }
