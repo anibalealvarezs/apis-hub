@@ -5,6 +5,7 @@ namespace Core\Services;
 use DateTime;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
+use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
 use Symfony\Component\HttpFoundation\Response;
 
 class SyncService
