@@ -287,7 +287,10 @@ class InitializeEntitiesCommand extends Command
                         $pId = $account['platformId'] ?? null;
                         if (!$pId) continue;
 
-                        $dbChanneledAccount = $this->entityManager->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class)->findOneBy(['platformId' => $pId]);
+                        $dbChanneledAccount = $this->entityManager->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class)->findOneBy([
+                            'platformId' => (string)$pId,
+                            'channel' => $channelEntity
+                        ]);
                         if (!$dbChanneledAccount && !$anyEnabled) continue;
                         if (!$dbChanneledAccount) {
                             $dbChanneledAccount = new \Entities\Analytics\Channeled\ChanneledAccount();
