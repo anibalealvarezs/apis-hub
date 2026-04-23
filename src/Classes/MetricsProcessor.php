@@ -261,7 +261,15 @@ class MetricsProcessor
                 }
             }
             $sql = "SELECT id, platform_id, account_id FROM channeled_accounts WHERE " . implode(' OR ', $clauses) . $channelFilter;
-            $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
+            try {
+                error_log("DEBUG: MetricsProcessor::identifyChanneledAccounts - Executing query for " . count($platformIds) . " IDs.");
+                $results = $manager->getConnection()->executeQuery($sql, $params, $types)->fetchAllAssociative();
+            } catch (\Exception $e) {
+                error_log("ERROR: MetricsProcessor::identifyChanneledAccounts failed: " . $e->getMessage());
+                error_log("SQL: " . $sql);
+                error_log("PARAMS: " . json_encode($params));
+                throw $e;
+            }
         }
 
         $map = [];

@@ -189,6 +189,7 @@ class InitializeEntitiesCommand extends Command
                             }, $urls);
                         }
                         if (!empty($searchValues)) {
+                            error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'pages' by $lookupField: " . json_encode(array_unique($searchValues)));
                             $entities = $repo->findBy([$lookupField => array_unique($searchValues)]);
                             $getter = 'get'.ucfirst($lookupField);
                             foreach ($entities as $e) $map[(string)$e->$getter()] = $e;
@@ -200,7 +201,9 @@ class InitializeEntitiesCommand extends Command
                         } else {
                             $searchValues = $ids;
                         }
-                        $entities = $repo->findBy(['platformId' => array_unique($searchValues), 'channel' => $channelEntity]);
+                        $searchValues = array_unique($searchValues);
+                        error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'channeled_accounts' by platformId: " . json_encode($searchValues));
+                        $entities = $repo->findBy(['platformId' => $searchValues, 'channel' => $channelEntity]);
                         foreach ($entities as $e) $map[(string)$e->getPlatformId()] = $e;
                     } elseif ($type === 'accounts' && isset($params['names'])) {
                         $entities = $repo->findBy(['name' => $params['names']]);

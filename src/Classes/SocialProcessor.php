@@ -95,7 +95,15 @@ class SocialProcessor
         ];
 
         $sql = Helpers::buildUpsertSql('pages', $cols, ['url', 'title', 'hostname', 'platform_id', 'data', 'account_id'], 'canonical_id', 1);
-        $conn->executeStatement($sql, $params);
+        try {
+            error_log("DEBUG: SocialProcessor::processPageEntity - Executing UPSERT on 'pages' for platform_id: " . $entity->getPlatformId());
+            $conn->executeStatement($sql, $params);
+        } catch (\Exception $e) {
+            error_log("ERROR: SocialProcessor::processPageEntity failed: " . $e->getMessage());
+            error_log("SQL: " . $sql);
+            error_log("PARAMS: " . json_encode($params));
+            throw $e;
+        }
     }
 
     private static array $channelMap = [];
@@ -133,7 +141,15 @@ class SocialProcessor
         ];
 
         $sql = Helpers::buildUpsertSql('channeled_accounts', $cols, ['name', 'type', 'data', 'account_id'], ['platform_id', 'channel'], 1);
-        $conn->executeStatement($sql, $params);
+        try {
+            error_log("DEBUG: SocialProcessor::processChanneledAccount - Executing UPSERT on 'channeled_accounts' for platform_id: " . $entity->getPlatformId());
+            $conn->executeStatement($sql, $params);
+        } catch (\Exception $e) {
+            error_log("ERROR: SocialProcessor::processChanneledAccount failed: " . $e->getMessage());
+            error_log("SQL: " . $sql);
+            error_log("PARAMS: " . json_encode($params));
+            throw $e;
+        }
     }
 
     /**
@@ -171,7 +187,15 @@ class SocialProcessor
                 ['post_id', 'page_id', 'account_id', 'channeled_account_id'], 
                 count($chunk)
             );
-            $conn->executeStatement($sql, $params);
+            try {
+                error_log("DEBUG: SocialProcessor::processPosts - Executing bulk UPSERT on 'posts' for " . count($chunk) . " items.");
+                $conn->executeStatement($sql, $params);
+            } catch (\Exception $e) {
+                error_log("ERROR: SocialProcessor::processPosts failed: " . $e->getMessage());
+                error_log("SQL: " . $sql);
+                error_log("PARAMS: " . json_encode($params));
+                throw $e;
+            }
         }
     }
 }
