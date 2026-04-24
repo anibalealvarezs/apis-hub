@@ -61,8 +61,9 @@ class SetupDatabaseCommand extends Command
             // 4. Initialize Entities
             $output->writeln("<info>🌱 Seeding initial entities...</info>");
             $initEntitiesCommand = $this->getApplication()->find('app:initialize-entities');
-            $exitCode = $initEntitiesCommand->run(new ArrayInput([]), $output);
             if ($exitCode !== Command::SUCCESS) {
+                error_log("CRITICAL: app:initialize-entities failed with exit code: " . $exitCode);
+                $output->writeln("<error>CRITICAL: app:initialize-entities failed with exit code: {$exitCode}</error>");
                 throw new \Exception("Failed to initialize core/channel entities.");
             }
 
