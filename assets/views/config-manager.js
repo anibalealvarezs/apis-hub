@@ -699,9 +699,21 @@ function renderAssets(assets) {
 
     // Reset maps
     availableAssetsMaps = { pages: {}, ad_accounts: {}, gsc: {} };
-    if (assets.facebook_pages) assets.facebook_pages.forEach(p => availableAssetsMaps.pages[String(p.id)] = p);
-    if (assets.facebook_ad_accounts) assets.facebook_ad_accounts.forEach(a => availableAssetsMaps.ad_accounts[String(a.id)] = a);
-    if (assets.gsc) assets.gsc.forEach(g => availableAssetsMaps.gsc[String(g.url)] = g);
+    
+    const getAssetArray = (key) => {
+        const data = assets[key];
+        if (!data) return [];
+        return Array.isArray(data) ? data : Object.values(data);
+    };
+
+    // Standardize assets for indexing
+    const fbPages = [...getAssetArray('facebook_pages'), ...getAssetArray('pages'), ...getAssetArray('fb_pages_full_config')];
+    const fbAdAccounts = [...getAssetArray('facebook_ad_accounts'), ...getAssetArray('ad_accounts'), ...getAssetArray('fb_ad_accounts_full_config')];
+    const gscAssets = [...getAssetArray('gsc'), ...getAssetArray('sites')];
+
+    fbPages.forEach(p => { if (p && p.id) availableAssetsMaps.pages[String(p.id).trim()] = p; });
+    fbAdAccounts.forEach(a => { if (a && a.id) availableAssetsMaps.ad_accounts[String(a.id).trim()] = a; });
+    gscAssets.forEach(g => { if (g && g.url) availableAssetsMaps.gsc[String(g.url).trim()] = g; });
     
     const gscList = document.getElementById('gsc-list');
     const fbOrganicList = document.getElementById('fb-pages-list');
@@ -709,12 +721,16 @@ function renderAssets(assets) {
     
     if (gscList) {
         gscList.innerHTML = '';
-        const props = assets.gsc || [];
+        const props = gscAssets;
         if (props.length === 0) gscList.innerHTML = '<div class="empty-state">No GSC properties found.</div>';
         props.forEach(p => {
-            const cfgGsc = currentConfig?.gsc || {};
-            const isInConfig = cfgGsc[p.url] !== undefined;
-            const isSynced = isInConfig && cfgGsc[p.url].enabled !== false && !p.lost_access;
+            if (!p || !p.url) return;
+            const cfgGsc = currentConfig?.gsc || currentConfig?.sites || currentConfig?.google_search_console?.sites || {};
+            // Convert to map if it's an array for faster lookup
+            const gscMap = Array.isArray(cfgGsc) ? Object.fromEntries(cfgGsc.map(s => [s.url, s])) : cfgGsc;
+            const savedItem = gscMap[p.url];
+            const isInConfig = savedItem !== undefined;
+            const isSynced = isInConfig && savedItem.enabled !== false && !p.lost_access;
             const displayUrl = p.url.replace('sc-domain:', '');
             const div = document.createElement('div');
             
@@ -745,12 +761,14 @@ function renderAssets(assets) {
 
     if (fbOrganicList) {
         fbOrganicList.innerHTML = '';
-        const pages = assets.facebook_pages || [];
+        const pages = fbPages;
         if (pages.length === 0) fbOrganicList.innerHTML = '<div class="empty-state">No Facebook pages found.</div>';
         
         pages.forEach(p => {
+            if (!p || !p.id) return;
             const getCfg = (key, def = true) => {
-                const savedPages = currentConfig.fb_pages_full_config || [];
+                const rawSaved = currentConfig.fb_pages_full_config || currentConfig.pages || [];
+                const savedPages = Array.isArray(rawSaved) ? rawSaved : Object.values(rawSaved);
                 const pId = String(p.id).trim();
                 const saved = savedPages.find(pg => String(pg.id).trim() === pId);
                 
@@ -887,13 +905,15 @@ function renderAssets(assets) {
 
     if (fbMarketingList) {
         fbMarketingList.innerHTML = '';
-        const accounts = assets.facebook_ad_accounts || [];
+        const accounts = fbAdAccounts;
         // Sort alphabetically by name
         accounts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         
         if (accounts.length === 0) fbMarketingList.innerHTML = '<div class="empty-state">No Ad accounts found.</div>';
         accounts.forEach(a => {
-            const savedAccs = currentConfig.fb_ad_accounts_full_config || [];
+            if (!a || !a.id) return;
+            const rawAccs = currentConfig.fb_ad_accounts_full_config || currentConfig.ad_accounts || currentConfig.facebook_marketing?.ad_accounts || [];
+            const savedAccs = Array.isArray(rawAccs) ? rawAccs : Object.values(rawAccs);
             const saved = savedAccs.find(acc => String(acc.id) === String(a.id));
             const isInConfig = !!saved;
             const isSynced = isInConfig && saved.enabled !== false && !a.lost_access;
@@ -1005,7 +1025,7 @@ async function updateConfig(typeArg) {
         });
 
         document.querySelectorAll('.asset-item').forEach(item => {
-            const cb = item.querySelector('.gsc-asset-sync') || item.querySelector('.fb-marketing-asset-sync');
+            const cb = item.querySelector('.fb-marketing-asset-sync');
             if (cb && (cb.checked || item.classList.contains('in-config') || item.classList.contains('lost-access'))) {
                 const accId = String(cb.value);
                 const original = availableAssetsMaps.ad_accounts[accId] || {};
