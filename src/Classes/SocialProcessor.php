@@ -32,13 +32,16 @@ class SocialProcessor
         foreach (array_chunk($pages, $chunkSize) as $chunk) {
             $params = [];
             foreach ($chunk as $p) {
-                $params[] = $p->url;
-                $params[] = $p->canonicalId ?? null;
-                $params[] = $p->title ?? null;
-                $params[] = $p->hostname ?? null;
-                $params[] = $p->platformId;
-                $params[] = $p->accountId;
-                $params[] = json_encode($p->data ?? []);
+                $account = $p->getContext()['account'] ?? null;
+                $accountId = is_object($account) ? $account->getId() : $account;
+
+                $params[] = $p->getUrl();
+                $params[] = $p->getCanonicalId() ?? null;
+                $params[] = $p->getTitle() ?? null;
+                $params[] = $p->getHostname() ?? null;
+                $params[] = $p->getPlatformId();
+                $params[] = $accountId;
+                $params[] = json_encode($p->getData() ?? []);
             }
 
             $sql = Helpers::buildUpsertSql(
@@ -173,11 +176,18 @@ class SocialProcessor
         foreach (array_chunk($posts, $chunkSize) as $chunk) {
             $params = [];
             foreach ($chunk as $p) {
-                $params[] = $p->platformId;
-                $params[] = $p->pageId;
-                $params[] = $p->accountId;
-                $params[] = $p->channeledAccountId ?? null;
-                $params[] = json_encode($p->data ?? []);
+                $account = $p->getContext()['account'] ?? null;
+                $accountId = is_object($account) ? $account->getId() : $account;
+                $page = $p->getContext()['page'] ?? null;
+                $pageId = is_object($page) ? $page->getId() : ($p->getContext()['page_id'] ?? null);
+                $channeledAccount = $p->getContext()['channeled_account'] ?? null;
+                $channeledAccountId = is_object($channeledAccount) ? $channeledAccount->getId() : ($p->getContext()['channeled_account_id'] ?? null);
+
+                $params[] = $p->getPlatformId();
+                $params[] = $pageId;
+                $params[] = $accountId;
+                $params[] = $channeledAccountId;
+                $params[] = json_encode($p->getData() ?? []);
             }
 
             $sql = Helpers::buildUpsertSql(

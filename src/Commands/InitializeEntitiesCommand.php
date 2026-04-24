@@ -141,7 +141,12 @@ class InitializeEntitiesCommand extends Command
                                 $stats['rows']++;
                             }
                         }
-                        $this->entityManager->flush();
+                        try {
+                            $this->entityManager->flush();
+                        } catch (\Exception $e) {
+                            error_log("ERROR during initialization flush: " . $e->getMessage());
+                            throw $e;
+                        }
                     }
                     return $stats;
                 };
@@ -323,10 +328,21 @@ class InitializeEntitiesCommand extends Command
                 $skip = $results['skipped'] ?? 0;
                 
                 $this->logger->info("  - $channel results: $init initialized, $skip skipped.");
-            } catch (Exception $e) {
-                $this->logger->error("  - Failed to initialize $channel: " . $e->getMessage());
+            } catch (\Exception $e) {
+                $output->writeln("<error>  - FATAL ERROR initializing channel '$channel': " . $e->getMessage() . "</error>");
+                error_log("FATAL ERROR initializing channel '$channel': " . $e->getMessage());
+                error_log($e->getTraceAsString());
+                return Command::FAILURE;
             }
         }
-        $this->entityManager->flush();
+        try {
+            $this->entityManager->flush();
+        } catch (\Exception $e) {
+            $output->writeln("<error>  - Final flush failed: " . $e->getMessage() . "</error>");
+            return Command::FAILURE;
+        }
+
+        $output->writeln("<info>  - All channels initialized successfully.</info>");
+        return Command::SUCCESS;
     }
 }
