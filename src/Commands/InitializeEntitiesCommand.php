@@ -47,7 +47,10 @@ class InitializeEntitiesCommand extends Command
             $this->initializeCoreEntities();
 
             // 2. Initialize Channel-specific Entities via Drivers
-            $this->initializeChannelEntities();
+            $exitCode = $this->initializeChannelEntities($output);
+            if ($exitCode !== Command::SUCCESS) {
+                return $exitCode;
+            }
 
             $this->logger->info("Initialization complete.");
 
@@ -95,7 +98,7 @@ class InitializeEntitiesCommand extends Command
         $this->logger->info("Core entities initialization complete.");
     }
 
-    protected function initializeChannelEntities(): void
+    protected function initializeChannelEntities(OutputInterface $output): int
     {
         $registry = DriverFactory::getRegistry();
         $channelsConfig = Helpers::getChannelsConfig();
