@@ -160,9 +160,18 @@ class MetricsProcessor
         $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $names = [];
+        $accountMap = ['map' => [], 'mapReverse' => []];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'account');
+
             if (! $pId) {
+                continue;
+            }
+
+            // If it's already an Account entity, we can map it immediately
+            if ($pId instanceof \Entities\Analytics\Account && $pId->getId()) {
+                $accountMap['map'][(string)$pId->getName()] = $pId->getId();
+                $accountMap['mapReverse'][$pId->getId()] = $pId;
                 continue;
             }
 
@@ -1343,7 +1352,7 @@ class MetricsProcessor
         return ['map' => $channeledMetricMap, 'mapReverse' => $flipped];
     }
 
-    private static function getMetricPlatformId(object $metric, string $property, ?LoggerInterface $logger = null): ?string
+    private static function getMetricPlatformId(object $metric, string $property, ?LoggerInterface $logger = null)
     {
         $mContext = (is_object($metric) && is_callable([$metric, 'getContext'])) ? $metric->getContext() : (array)$metric;
         $platformProp = $property . 'PlatformId';
@@ -1351,14 +1360,14 @@ class MetricsProcessor
         $val = $mContext[$property] ?? ($mContext[$platformProp] ?? ($metric->$property ?? ($metric->$platformProp ?? null)));
 
         if (is_object($val)) {
-            $methods = ['getPostId', 'getPlatformId', 'getCampaignId', 'getCreativeId', 'getAdGroupId', 'getAdId', 'getProductId', 'getOrderId', 'getUrl', 'getEmail', 'getId', 'getName'];
+            $methods = ['getName', 'getPostId', 'getPlatformId', 'getCampaignId', 'getCreativeId', 'getAdGroupId', 'getAdId', 'getProductId', 'getOrderId', 'getUrl', 'getEmail', 'getId'];
             foreach ($methods as $method) {
                 if (method_exists($val, $method)) {
                     return (string) $val->$method();
                 }
             }
 
-            return (string)$val;
+            return $val;
         }
 
         return $val ? (string)$val : null;
