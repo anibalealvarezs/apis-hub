@@ -1351,7 +1351,7 @@ class MetricsProcessor
         $val = $mContext[$property] ?? ($mContext[$platformProp] ?? ($metric->$property ?? ($metric->$platformProp ?? null)));
 
         if (is_object($val)) {
-            $methods = ['getPostId', 'getPlatformId', 'getCampaignId', 'getCreativeId', 'getAdGroupId', 'getAdId', 'getProductId', 'getOrderId', 'getUrl', 'getEmail', 'getId'];
+            $methods = ['getPostId', 'getPlatformId', 'getCampaignId', 'getCreativeId', 'getAdGroupId', 'getAdId', 'getProductId', 'getOrderId', 'getUrl', 'getEmail', 'getId', 'getName'];
             foreach ($methods as $method) {
                 if (method_exists($val, $method)) {
                     return (string) $val->$method();
