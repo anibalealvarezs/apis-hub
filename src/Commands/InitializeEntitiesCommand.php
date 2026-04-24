@@ -4,23 +4,21 @@ declare(strict_types=1);
 
 namespace Commands;
 
-use Classes\DriverInitializer;
 use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
-use DateTime;
+use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Device as DeviceEnum;
 use Doctrine\ORM\EntityManagerInterface;
 use Entities\Analytics\Country;
 use Entities\Analytics\Device;
-use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
-use Anibalealvarezs\ApiSkeleton\Enums\Device as DeviceEnum;
 use Exception;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Logger\ConsoleLogger;
+use Symfony\Component\Console\Output\OutputInterface;
 
 #[AsCommand(
     name: 'app:initialize-entities',
@@ -58,6 +56,7 @@ class InitializeEntitiesCommand extends Command
 
         } catch (Exception $e) {
             $this->logger?->error("Initialization failed: " . $e->getMessage());
+
             return Command::FAILURE;
         }
     }
@@ -70,7 +69,7 @@ class InitializeEntitiesCommand extends Command
         $added = 0;
         foreach (CountryEnum::cases() as $countryEnum) {
             $country = $countryRepository->getByCode($countryEnum->value);
-            if (!$country) {
+            if (! $country) {
                 $country = new Country();
                 $country->addCode($countryEnum)
                     ->addName($countryEnum->getFullName());
@@ -85,7 +84,7 @@ class InitializeEntitiesCommand extends Command
         $added = 0;
         foreach (DeviceEnum::cases() as $deviceCase) {
             $device = $deviceRepository->getByType($deviceCase->value);
-            if (!$device) {
+            if (! $device) {
                 $device = new Device();
                 $device->addType($deviceCase);
                 $this->entityManager->persist($device);
@@ -102,14 +101,15 @@ class InitializeEntitiesCommand extends Command
     {
         $registry = DriverFactory::getRegistry();
         $channelsConfig = Helpers::getChannelsConfig();
-        
+
         foreach ($registry as $channel => $driverCfg) {
             // Determine if specifically enabled for this channel
             $chanConfig = $channelsConfig[$channel] ?? [];
-            
+
             $driverClass = $driverCfg['driver'] ?? null;
-            if (!$driverClass || !class_exists($driverClass)) {
+            if (! $driverClass || ! class_exists($driverClass)) {
                 $this->logger->error("Driver class '$driverClass' not found for channel: $channel");
+
                 continue;
             }
 
@@ -119,8 +119,9 @@ class InitializeEntitiesCommand extends Command
                 $chanConfig = array_replace_recursive($channelsConfig[$commonKey], $chanConfig);
             }
 
-            if (!($chanConfig['enabled'] ?? false)) {
+            if (! ($chanConfig['enabled'] ?? false)) {
                 $this->logger->info("Channel '$channel' is disabled. Skipping.");
+
                 continue;
             }
 
@@ -144,20 +145,24 @@ class InitializeEntitiesCommand extends Command
                                 $stats['rows']++;
                             }
                         }
+
                         try {
                             $this->entityManager->flush();
-                        } catch (\Exception $e) {
+                        } catch (Exception $e) {
                             error_log("ERROR during initialization flush: " . $e->getMessage());
+
                             throw $e;
                         }
                     }
+
                     return $stats;
                 };
 
                 /** @var \Entities\Analytics\Channel $channelEntity */
                 $channelEntity = $this->entityManager->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channel]);
-                if (!$channelEntity) {
+                if (! $channelEntity) {
                     $this->logger->error("  - ERROR: Channel entity '$channel' NOT FOUND in database. Ensure 'app:install-drivers' ran correctly.");
+
                     continue; // Skip this channel instead of failing the whole command
                 }
 
@@ -167,7 +172,9 @@ class InitializeEntitiesCommand extends Command
                         'pages' => \Entities\Analytics\Page::class,
                         'accounts' => \Entities\Analytics\Account::class,
                     ];
-                    if (!isset($repoMap[$type])) return [];
+                    if (! isset($repoMap[$type])) {
+                        return [];
+                    }
                     /** @var \Repositories\PageRepository|\Repositories\ChanneledAccountRepository $repo */
                     $repo = $this->entityManager->getRepository($repoMap[$type]);
                     $map = [];
@@ -189,18 +196,21 @@ class InitializeEntitiesCommand extends Command
                         } elseif (isset($params['urls'])) {
                             $lookupField = 'canonicalId';
                             $urls = (array)$params['urls'];
-                            $searchValues = array_map(function($u) use ($driverClass, $category, $context) {
+                            $searchValues = array_map(function ($u) use ($driverClass, $category, $context) {
                                 if ($driverClass) {
                                     return $driverClass::getCanonicalId(['url' => $u], $category, $context);
                                 }
+
                                 throw new \RuntimeException("Driver not found for channel: " . $channel);
                             }, $urls);
                         }
-                        if (!empty($searchValues)) {
+                        if (! empty($searchValues)) {
                             error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'pages' by $lookupField: " . json_encode(array_unique($searchValues)));
                             $entities = $repo->findBy([$lookupField => array_unique($searchValues)]);
                             $getter = 'get'.ucfirst($lookupField);
-                            foreach ($entities as $e) $map[(string)$e->$getter()] = $e;
+                            foreach ($entities as $e) {
+                                $map[(string)$e->$getter()] = $e;
+                            }
                         }
                     } elseif ($type === 'channeled_accounts' && isset($params['platform_ids']) && $category) {
                         $ids = (array)$params['platform_ids'];
@@ -212,11 +222,16 @@ class InitializeEntitiesCommand extends Command
                         $searchValues = array_unique($searchValues);
                         error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'channeled_accounts' by platformId: " . json_encode($searchValues));
                         $entities = $repo->findBy(['platformId' => $searchValues, 'channel' => $channelEntity]);
-                        foreach ($entities as $e) $map[(string)$e->getPlatformId()] = $e;
+                        foreach ($entities as $e) {
+                            $map[(string)$e->getPlatformId()] = $e;
+                        }
                     } elseif ($type === 'accounts' && isset($params['names'])) {
                         $entities = $repo->findBy(['name' => $params['names']]);
-                        foreach ($entities as $e) $map[(string)$e->getName()] = $e;
+                        foreach ($entities as $e) {
+                            $map[(string)$e->getName()] = $e;
+                        }
                     }
+
                     return $map;
                 };
 
@@ -228,7 +243,7 @@ class InitializeEntitiesCommand extends Command
                 $accountRepo = $this->entityManager->getRepository(\Entities\Analytics\Account::class);
                 $accountEntity = $accountRepo->findOneBy(['name' => $groupName]);
 
-                if (!$accountEntity) {
+                if (! $accountEntity) {
                     $accountEntity = new \Entities\Analytics\Account();
                     $accountEntity->addName($groupName)->addDescription("Group Account for $channel");
                     $this->entityManager->persist($accountEntity);
@@ -241,13 +256,13 @@ class InitializeEntitiesCommand extends Command
                     $key = $pattern['key'] ?? null;
                     if ($key && isset($chanConfig[$key])) {
                         $rawAssets = (array)$chanConfig[$key];
-                        if (!empty($rawAssets) && !isset($rawAssets[0])) {
+                        if (! empty($rawAssets) && ! isset($rawAssets[0])) {
                             $rawAssets = [$rawAssets];
                         }
                         foreach ($rawAssets as $ra) {
                             $assets[] = [
                                 'data' => $ra,
-                                'category' => $pattern['category'] ?? null
+                                'category' => $pattern['category'] ?? null,
                             ];
                         }
                     }
@@ -271,19 +286,39 @@ class InitializeEntitiesCommand extends Command
                     }
 
                     $anyEnabled = false;
-                    foreach ($groupPages as $p) { if ($p['enabled'] ?? true) { $anyEnabled = true; break; } }
-                    if (!$anyEnabled) { foreach ($groupAccounts as $a) { if ($a['enabled'] ?? true) { $anyEnabled = true; break; } } }
+                    foreach ($groupPages as $p) {
+                        if ($p['enabled'] ?? true) {
+                            $anyEnabled = true;
+
+                            break;
+                        }
+                    }
+                    if (! $anyEnabled) {
+                        foreach ($groupAccounts as $a) {
+                            if ($a['enabled'] ?? true) {
+                                $anyEnabled = true;
+
+                                break;
+                            }
+                        }
+                    }
 
                     foreach ($groupPages as $page) {
                         $pId = $page['platformId'] ?? null;
                         $canonicalId = $page['canonicalId'] ?? null;
-                        if (!$pId && !$canonicalId) continue;
+                        if (! $pId && ! $canonicalId) {
+                            continue;
+                        }
 
                         $dbPage = $canonicalId ? ($this->entityManager->getRepository(\Entities\Analytics\Page::class)->findOneBy(['canonicalId' => $canonicalId])) : null;
-                        if (!$dbPage && !$anyEnabled) continue;
-                        if (!$dbPage) {
+                        if (! $dbPage && ! $anyEnabled) {
+                            continue;
+                        }
+                        if (! $dbPage) {
                             $dbPage = new \Entities\Analytics\Page();
-                            if ($canonicalId) $dbPage->addCanonicalId($canonicalId);
+                            if ($canonicalId) {
+                                $dbPage->addCanonicalId($canonicalId);
+                            }
                         }
                         $dbPage->addUrl($page['url'] ?? null)
                             ->addTitle($page['title'] ?? null)
@@ -296,14 +331,18 @@ class InitializeEntitiesCommand extends Command
 
                     foreach ($groupAccounts as $account) {
                         $pId = $account['platformId'] ?? null;
-                        if (!$pId) continue;
+                        if (! $pId) {
+                            continue;
+                        }
 
                         $dbChanneledAccount = $this->entityManager->getRepository(\Entities\Analytics\Channeled\ChanneledAccount::class)->findOneBy([
                             'platformId' => (string)$pId,
-                            'channel' => $channelEntity
+                            'channel' => $channelEntity,
                         ]);
-                        if (!$dbChanneledAccount && !$anyEnabled) continue;
-                        if (!$dbChanneledAccount) {
+                        if (! $dbChanneledAccount && ! $anyEnabled) {
+                            continue;
+                        }
+                        if (! $dbChanneledAccount) {
                             $dbChanneledAccount = new \Entities\Analytics\Channeled\ChanneledAccount();
                             $dbChanneledAccount->addPlatformId($pId);
                         }
@@ -324,28 +363,32 @@ class InitializeEntitiesCommand extends Command
                 $results = $driver->initializeEntities(array_merge($chanConfig, [
                     'manager' => $this->entityManager,
                     'identityMapper' => $identityMapper,
-                    'dataProcessor' => $dataProcessor
+                    'dataProcessor' => $dataProcessor,
                 ]));
-                
+
                 $init = $results['initialized'] ?? 0;
                 $skip = $results['skipped'] ?? 0;
-                
+
                 $this->logger->info("  - $channel results: $init initialized, $skip skipped.");
             } catch (\Exception $e) {
                 $output->writeln("<error>  - FATAL ERROR initializing channel '$channel': " . $e->getMessage() . "</error>");
                 error_log("FATAL ERROR initializing channel '$channel': " . $e->getMessage());
                 error_log($e->getTraceAsString());
+
                 return Command::FAILURE;
             }
         }
+
         try {
             $this->entityManager->flush();
         } catch (\Exception $e) {
             $output->writeln("<error>  - Final flush failed: " . $e->getMessage() . "</error>");
+
             return Command::FAILURE;
         }
 
         $output->writeln("<info>  - All channels initialized successfully.</info>");
+
         return Command::SUCCESS;
     }
 }
