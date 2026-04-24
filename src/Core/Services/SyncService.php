@@ -154,6 +154,7 @@ class SyncService
                     'channeled_ad_groups' => \Entities\Analytics\Channeled\ChanneledAdGroup::class,
                     'channeled_ads' => \Entities\Analytics\Channeled\ChanneledAd::class,
                     'posts' => \Entities\Analytics\Post::class,
+                    'accounts' => \Entities\Analytics\Account::class,
                 ];
 
                 if (! isset($repoMap[$type])) {
@@ -231,6 +232,12 @@ class SyncService
                         }
                     } else {
                         $result = $entityMap;
+                    }
+                } elseif ($type === 'accounts' && isset($params['names'])) {
+                    $entities = $repository->findBy(['name' => $params['names']]);
+                    $result = [];
+                    foreach ($entities as $e) {
+                        $result[(string)$e->getName()] = $e;
                     }
                 } else {
                     $idField = ($type === 'posts' ? 'postId' : 'platformId');
