@@ -65,13 +65,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/amazon-hub-driver.git",
-                "reference": "d22243b890773c9b6cf7edf2cd4235623b7dca66"
+                "reference": "a454f066674569da936488117a44bfe1a83714ea"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/amazon-hub-driver/anibalealvarezs-amazon-hub-driver-d22243b890773c9b6cf7edf2cd4235623b7dca66-zip-371f4b.zip",
-                "reference": "d22243b890773c9b6cf7edf2cd4235623b7dca66",
-                "shasum": "bce71bbf3403ff41f29f382f6bfbabf205eebc08"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/amazon-hub-driver/anibalealvarezs-amazon-hub-driver-a454f066674569da936488117a44bfe1a83714ea-zip-0a67df.zip",
+                "reference": "a454f066674569da936488117a44bfe1a83714ea",
+                "shasum": "7be8a21b17237bb02d490120c017d102fc7a544d"
             },
             "require": {
                 "anibalealvarezs/amazon-api": "dev-main",
@@ -98,7 +98,7 @@
                 }
             ],
             "description": "Amazon driver for the Hub ecosystem",
-            "time": "2026-04-19T23:25:46+00:00"
+            "time": "2026-04-23T19:20:35+00:00"
         },
         {
             "name": "anibalealvarezs/api-client-skeleton",
@@ -106,13 +106,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-client-skeleton.git",
-                "reference": "2539607f24d21f2684d3e7baa7a01e9e8144fc91"
+                "reference": "d0c0ddb0f1f66680f896a1da7c96417a806c64eb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-2539607f24d21f2684d3e7baa7a01e9e8144fc91-zip-5d0272.zip",
-                "reference": "2539607f24d21f2684d3e7baa7a01e9e8144fc91",
-                "shasum": "b640d2460e5d16cd818a36afa155d33a47b01854"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-client-skeleton/anibalealvarezs-api-client-skeleton-d0c0ddb0f1f66680f896a1da7c96417a806c64eb-zip-ff7de6.zip",
+                "reference": "d0c0ddb0f1f66680f896a1da7c96417a806c64eb",
+                "shasum": "d93095f7d2d51c32736711c34e7e90aace0eaa80"
             },
             "require": {
                 "anibalealvarezs/oauth-v1": "@dev",
@@ -161,7 +161,7 @@
             "support": {
                 "issues": "https://github.com/anibalealvarezs/api-client-skeleton/issues"
             },
-            "time": "2026-04-19T23:14:45+00:00"
+            "time": "2026-04-25T01:16:17+00:00"
         },
         {
             "name": "anibalealvarezs/api-driver-core",
@@ -169,13 +169,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/api-driver-core.git",
-                "reference": "31bc50f5520cbc46ba0c0592fb1dbd4f0ff8011f"
+                "reference": "2f895d57097179ec461c7f12fac7e5d5a87cf63d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-31bc50f5520cbc46ba0c0592fb1dbd4f0ff8011f-zip-296d90.zip",
-                "reference": "31bc50f5520cbc46ba0c0592fb1dbd4f0ff8011f",
-                "shasum": "03e3d8732b2ed8e1e43f37be993c5dcdb355fdf0"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/api-driver-core/anibalealvarezs-api-driver-core-2f895d57097179ec461c7f12fac7e5d5a87cf63d-zip-8e251e.zip",
+                "reference": "2f895d57097179ec461c7f12fac7e5d5a87cf63d",
+                "shasum": "c1db7b15a76607271dacd075b42efc993d78982a"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -205,7 +205,7 @@
                 }
             ],
             "description": "Core interfaces and orchestration logic for APIs Hub drivers.",
-            "time": "2026-04-23T14:21:13+00:00"
+            "time": "2026-04-25T01:14:37+00:00"
         },
         {
             "name": "anibalealvarezs/bigcommerce-hub-driver",
@@ -213,13 +213,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/bigcommerce-hub-driver.git",
-                "reference": "44726b2124dcfffbba9631454048c6614abbaeaf"
+                "reference": "7247e9d35cfda44a98469271fc8489ad3afd74f6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/bigcommerce-hub-driver/anibalealvarezs-bigcommerce-hub-driver-44726b2124dcfffbba9631454048c6614abbaeaf-zip-268910.zip",
-                "reference": "44726b2124dcfffbba9631454048c6614abbaeaf",
-                "shasum": "6ac35b47bdad229433b9d17043b9747611f2fa7d"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/bigcommerce-hub-driver/anibalealvarezs-bigcommerce-hub-driver-7247e9d35cfda44a98469271fc8489ad3afd74f6-zip-105ab5.zip",
+                "reference": "7247e9d35cfda44a98469271fc8489ad3afd74f6",
+                "shasum": "42bd64aa0b35cb5ebdb77f11454618164b890b48"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -245,7 +245,7 @@
                 }
             ],
             "description": "BigCommerce driver for the Hub ecosystem",
-            "time": "2026-04-19T23:26:09+00:00"
+            "time": "2026-04-23T19:20:36+00:00"
         },
         {
             "name": "anibalealvarezs/facebook-graph-api",
@@ -388,13 +388,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/google-hub-driver.git",
-                "reference": "179e3c277b3952f45959efb5258153ae2745d3cd"
+                "reference": "3467387a53090cf9529a22c98cd1d73d1c00802e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-179e3c277b3952f45959efb5258153ae2745d3cd-zip-7ddcec.zip",
-                "reference": "179e3c277b3952f45959efb5258153ae2745d3cd",
-                "shasum": "b12205bcbc73b445e467d8883e80d6d59125ed4c"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/google-hub-driver/anibalealvarezs-google-hub-driver-3467387a53090cf9529a22c98cd1d73d1c00802e-zip-c97cdb.zip",
+                "reference": "3467387a53090cf9529a22c98cd1d73d1c00802e",
+                "shasum": "de47a0c780b0a3d0da11d50febaa49221cd2dc94"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -418,7 +418,7 @@
                 "MIT"
             ],
             "description": "APIs-Hub driver for Google (Search Console & Analytics) integration.",
-            "time": "2026-04-23T14:21:35+00:00"
+            "time": "2026-04-25T01:16:19+00:00"
         },
         {
             "name": "anibalealvarezs/klaviyo-api",
@@ -478,13 +478,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/klaviyo-hub-driver.git",
-                "reference": "6cf11a61319d48a7298d1398c067d229bf7421f7"
+                "reference": "a4d27c48db17cd0f399bf7079569ed799b314370"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/klaviyo-hub-driver/anibalealvarezs-klaviyo-hub-driver-6cf11a61319d48a7298d1398c067d229bf7421f7-zip-684798.zip",
-                "reference": "6cf11a61319d48a7298d1398c067d229bf7421f7",
-                "shasum": "1d2774607c3e276f7303fa9f28e1f13d6e565a8b"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/klaviyo-hub-driver/anibalealvarezs-klaviyo-hub-driver-a4d27c48db17cd0f399bf7079569ed799b314370-zip-d74d55.zip",
+                "reference": "a4d27c48db17cd0f399bf7079569ed799b314370",
+                "shasum": "a7e171e37e3c2ead0e8926b45e0d8b27ee07049d"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -511,7 +511,7 @@
                 }
             ],
             "description": "Klaviyo driver for the Hub ecosystem",
-            "time": "2026-04-19T23:24:56+00:00"
+            "time": "2026-04-23T19:20:37+00:00"
         },
         {
             "name": "anibalealvarezs/linkedin-hub-driver",
@@ -519,13 +519,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/linkedin-hub-driver.git",
-                "reference": "3050a21d9e21ef19c2189beb89818574603e9bfe"
+                "reference": "8424943d9a874471a32786ae072a79b91cde0c1e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/linkedin-hub-driver/anibalealvarezs-linkedin-hub-driver-3050a21d9e21ef19c2189beb89818574603e9bfe-zip-200bd1.zip",
-                "reference": "3050a21d9e21ef19c2189beb89818574603e9bfe",
-                "shasum": "4b9614989cf7330db423b6ac38aba2e310cebfc0"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/linkedin-hub-driver/anibalealvarezs-linkedin-hub-driver-8424943d9a874471a32786ae072a79b91cde0c1e-zip-177a96.zip",
+                "reference": "8424943d9a874471a32786ae072a79b91cde0c1e",
+                "shasum": "244fc9102b35c84f0bf3165c9d1f5c7b6260fe54"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -551,7 +551,7 @@
                 }
             ],
             "description": "LinkedIn driver for the Hub ecosystem",
-            "time": "2026-04-19T23:25:53+00:00"
+            "time": "2026-04-23T19:20:38+00:00"
         },
         {
             "name": "anibalealvarezs/meta-hub-driver",
@@ -559,13 +559,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/meta-hub-driver.git",
-                "reference": "e66562d1b242ef8b96e5aebe653f15d10a446088"
+                "reference": "e29fed76b67cb77c3d41fe7476e7e7389dbe6708"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-e66562d1b242ef8b96e5aebe653f15d10a446088-zip-7f6a45.zip",
-                "reference": "e66562d1b242ef8b96e5aebe653f15d10a446088",
-                "shasum": "5ad5b7fb0182a5d584771a77ea277cc7ff4a2886"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/meta-hub-driver/anibalealvarezs-meta-hub-driver-e29fed76b67cb77c3d41fe7476e7e7389dbe6708-zip-6e4f9c.zip",
+                "reference": "e29fed76b67cb77c3d41fe7476e7e7389dbe6708",
+                "shasum": "ce308388951f9f3e4dd4e131e7d76223dfce203c"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -592,7 +592,7 @@
                 "MIT"
             ],
             "description": "APIs-Hub driver for Meta (Facebook & Instagram) integration.",
-            "time": "2026-04-23T14:21:45+00:00"
+            "time": "2026-04-23T23:15:17+00:00"
         },
         {
             "name": "anibalealvarezs/netsuite-api",
@@ -654,13 +654,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/netsuite-hub-driver.git",
-                "reference": "4f74452e021dfb37ce542a2629c1b1c35ffe2121"
+                "reference": "311979858c1a8715f3d7c14ffb723dda1e49f0b5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/netsuite-hub-driver/anibalealvarezs-netsuite-hub-driver-4f74452e021dfb37ce542a2629c1b1c35ffe2121-zip-477463.zip",
-                "reference": "4f74452e021dfb37ce542a2629c1b1c35ffe2121",
-                "shasum": "dc77c0c80b1fe49e9e1dad65f106e1a73a1d4d15"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/netsuite-hub-driver/anibalealvarezs-netsuite-hub-driver-311979858c1a8715f3d7c14ffb723dda1e49f0b5-zip-0f05d0.zip",
+                "reference": "311979858c1a8715f3d7c14ffb723dda1e49f0b5",
+                "shasum": "14ac1ecc0368004ac1779a34a303053da6633098"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -687,7 +687,7 @@
                 }
             ],
             "description": "NetSuite driver for the Hub ecosystem",
-            "time": "2026-04-19T23:26:16+00:00"
+            "time": "2026-04-23T19:20:39+00:00"
         },
         {
             "name": "anibalealvarezs/oauth-v1",
@@ -753,13 +753,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/pinterest-hub-driver.git",
-                "reference": "6f4f6f037857cfdeb03d86375e6ef7c28f686a20"
+                "reference": "c73c67f737b52351eb785d9f6873415d9d08f03d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/pinterest-hub-driver/anibalealvarezs-pinterest-hub-driver-6f4f6f037857cfdeb03d86375e6ef7c28f686a20-zip-a86ded.zip",
-                "reference": "6f4f6f037857cfdeb03d86375e6ef7c28f686a20",
-                "shasum": "fe0d493f2f4bb53bd04605aefd45d521f17176f7"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/pinterest-hub-driver/anibalealvarezs-pinterest-hub-driver-c73c67f737b52351eb785d9f6873415d9d08f03d-zip-a927a4.zip",
+                "reference": "c73c67f737b52351eb785d9f6873415d9d08f03d",
+                "shasum": "31610cfa6ad2559e39769e8174a2208e3d7aad1f"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -785,7 +785,7 @@
                 }
             ],
             "description": "Pinterest driver for the Hub ecosystem",
-            "time": "2026-04-19T23:26:01+00:00"
+            "time": "2026-04-23T19:20:40+00:00"
         },
         {
             "name": "anibalealvarezs/shopify-api",
@@ -857,13 +857,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/shopify-hub-driver.git",
-                "reference": "1b561e1e3c1a94e01ae504036abe57de337a83b5"
+                "reference": "31f19589c8eb7ae4461d68349376fa2f530112c5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/shopify-hub-driver/anibalealvarezs-shopify-hub-driver-1b561e1e3c1a94e01ae504036abe57de337a83b5-zip-dde643.zip",
-                "reference": "1b561e1e3c1a94e01ae504036abe57de337a83b5",
-                "shasum": "917044014a882b46cb8748f0dd9b4c3d23cf04b3"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/shopify-hub-driver/anibalealvarezs-shopify-hub-driver-31f19589c8eb7ae4461d68349376fa2f530112c5-zip-59db62.zip",
+                "reference": "31f19589c8eb7ae4461d68349376fa2f530112c5",
+                "shasum": "cc2349b186dbf905339935d64a1711c771068e9b"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -890,7 +890,7 @@
                 }
             ],
             "description": "Shopify driver for the Hub ecosystem",
-            "time": "2026-04-19T23:25:02+00:00"
+            "time": "2026-04-23T19:20:41+00:00"
         },
         {
             "name": "anibalealvarezs/tiktok-hub-driver",
@@ -898,13 +898,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/tiktok-hub-driver.git",
-                "reference": "9edd9ed62d79ba3f668ed7a9d51ba7e7d0048590"
+                "reference": "bc2caf731cdf2bf19e37927823fbf76100c1b922"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/tiktok-hub-driver/anibalealvarezs-tiktok-hub-driver-9edd9ed62d79ba3f668ed7a9d51ba7e7d0048590-zip-0f853a.zip",
-                "reference": "9edd9ed62d79ba3f668ed7a9d51ba7e7d0048590",
-                "shasum": "67bff1e377306fdc70a90c8802253c86d089c5d4"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/tiktok-hub-driver/anibalealvarezs-tiktok-hub-driver-bc2caf731cdf2bf19e37927823fbf76100c1b922-zip-72abd6.zip",
+                "reference": "bc2caf731cdf2bf19e37927823fbf76100c1b922",
+                "shasum": "6668c531c8609d7e2c054d557a0a91ee866ddaae"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -930,7 +930,7 @@
                 }
             ],
             "description": "TikTok driver for the Hub ecosystem",
-            "time": "2026-04-19T23:25:38+00:00"
+            "time": "2026-04-23T19:20:42+00:00"
         },
         {
             "name": "anibalealvarezs/triple-whale-api",
@@ -992,13 +992,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/triple-whale-hub-driver.git",
-                "reference": "0b43cc822b6116e702031e2cd1b8e01bd83aaff9"
+                "reference": "7464161944a171621417e55113906ecab84e1028"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/triple-whale-hub-driver/anibalealvarezs-triple-whale-hub-driver-0b43cc822b6116e702031e2cd1b8e01bd83aaff9-zip-d1882b.zip",
-                "reference": "0b43cc822b6116e702031e2cd1b8e01bd83aaff9",
-                "shasum": "9628d97dc125473930c64be2e13b1d39f402f0b7"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/triple-whale-hub-driver/anibalealvarezs-triple-whale-hub-driver-7464161944a171621417e55113906ecab84e1028-zip-e39867.zip",
+                "reference": "7464161944a171621417e55113906ecab84e1028",
+                "shasum": "346989bb089c38f500117102e63360288d5de5be"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -1025,7 +1025,7 @@
                 }
             ],
             "description": "Triple Whale driver for the Hub ecosystem",
-            "time": "2026-04-19T23:24:25+00:00"
+            "time": "2026-04-23T19:20:43+00:00"
         },
         {
             "name": "anibalealvarezs/x-hub-driver",
@@ -1033,13 +1033,13 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:anibalealvarezs/x-hub-driver.git",
-                "reference": "73afc156f95d26617059c3b681d1bec7bcd484d8"
+                "reference": "b91fbbf2a8b4b6adc8e5f52396ea3b6b6c904f35"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/x-hub-driver/anibalealvarezs-x-hub-driver-73afc156f95d26617059c3b681d1bec7bcd484d8-zip-56c815.zip",
-                "reference": "73afc156f95d26617059c3b681d1bec7bcd484d8",
-                "shasum": "90a446de3f0ebf9c726fd031e84be099c784c2ed"
+                "url": "https://satis.anibalalvarez.com/dist/anibalealvarezs/x-hub-driver/anibalealvarezs-x-hub-driver-b91fbbf2a8b4b6adc8e5f52396ea3b6b6c904f35-zip-0da3b2.zip",
+                "reference": "b91fbbf2a8b4b6adc8e5f52396ea3b6b6c904f35",
+                "shasum": "6c70521ffffd68a9bb0213f4f2afd4c663aa0a95"
             },
             "require": {
                 "anibalealvarezs/api-client-skeleton": "dev-main",
@@ -1065,7 +1065,7 @@
                 }
             ],
             "description": "X (Twitter) driver for the Hub ecosystem",
-            "time": "2026-04-19T23:24:32+00:00"
+            "time": "2026-04-23T19:20:44+00:00"
         },
         {
             "name": "carbonphp/carbon-doctrine-types",
