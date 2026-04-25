@@ -21,6 +21,7 @@ This document lists common command chains needed during development to keep loca
 - [9. Local Packages: Symlink Refresh Command](#9-local-packages-symlink-refresh-command)
 - [10. Server Strategy When `composer.lock` Is Not Updated](#10-server-strategy-when-composerlock-is-not-updated)
 - [11. One-Shot Lock Refresh + Auto-Commit + Dev Restore](#11-one-shot-lock-refresh--auto-commit--dev-restore)
+  - [Definitive command (GitKraken flow)](#definitive-command)
 
 ---
 
@@ -372,6 +373,8 @@ Use this command to automate the full cycle across all local packages:
 - restore local development state (path symlinks),
 - re-enable `assume-unchanged` on `composer.json` and `composer.lock`.
 
+### Definitive command
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "D:\laragon\www\apis-hub\scripts\refresh-locks-and-restore-dev.ps1"
 ```
@@ -391,4 +394,3 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "D:\laragon\www\apis-hub\scr
 
 > [!IMPORTANT]
 > The script does **not** push. After it finishes, review commits and push manually.
-

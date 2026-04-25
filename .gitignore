@@ -79,3 +79,4 @@ config/channels/google_search_console.yaml.test
 
 config/channels/facebook_marketing.yaml.test
 
+.ai-rules
