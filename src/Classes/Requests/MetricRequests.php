@@ -4,39 +4,44 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Carbon\Carbon;
 use Classes\MetricsProcessor;
+use Core\Services\SyncService;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Channel as ChannelEntity;
 use Exception;
+use Exceptions\ConfigurationException;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class MetricRequests implements RequestInterface
 {
-    
+
 
     /**
      * @param ChannelEntity|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
-     * @param \Psr\Log\LoggerInterface|null $logger
+     * @param LoggerInterface|null $logger
      * @param int|null $jobId
      * @param object|null $filters
-     * @return \Symfony\Component\HttpFoundation\Response
+     * @return Response
+     * @throws Throwable
      */
     public static function getList(
         ChannelEntity|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
-        ?\Psr\Log\LoggerInterface $logger = null,
+        ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
-    ): \Symfony\Component\HttpFoundation\Response {
+    ): Response {
         $chanKey = ($channel instanceof ChannelEntity) ? $channel->getName() : (string)$channel;
-        $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
+        $driver = DriverFactory::get($chanKey);
         $mapping = $driver->getDateFilterMapping();
 
         // Intelligent date resolution
@@ -47,7 +52,7 @@ class MetricRequests implements RequestInterface
             $end = $filters->{$mapping['end']} ?? $endDate;
         }
 
-        return (new \Core\Services\SyncService($logger))->execute($chanKey, $start, $end, [
+        return (new SyncService($logger))->execute($chanKey, $start, $end, [
             'jobId' => $jobId,
             'resume' => $filters->resume ?? true,
             'filters' => $filters,
@@ -64,6 +69,8 @@ class MetricRequests implements RequestInterface
      * @param ArrayCollection $collection
      * @param LoggerInterface|null $logger
      * @return array
+     * @throws \Doctrine\DBAL\Exception
+     * @throws ConfigurationException
      */
     public static function persist(ArrayCollection $collection, ?LoggerInterface $logger = null): array
     {
@@ -93,14 +100,14 @@ class MetricRequests implements RequestInterface
                 processChanneledCampaigns: true,
                 processChanneledAdGroups: true,
                 processChanneledAds: true,
-                processCreatives: true,
-                processDimensions: true,
                 processPosts: true,
                 processProducts: true,
                 processCustomers: true,
                 processOrders: true,
                 processCountries: true,
                 processDevices: true,
+                processDimensions: true,
+                processCreatives: true,
                 logger: $logger,
                 channel: (string)$channel
             );
@@ -146,6 +153,8 @@ class MetricRequests implements RequestInterface
      * @param ArrayCollection $collection
      * @param LoggerInterface|null $logger
      * @return Response
+     * @throws ConfigurationException
+     * @throws \Doctrine\DBAL\Exception
      */
     public static function process(ArrayCollection $collection, ?LoggerInterface $logger = null): Response
     {
@@ -158,14 +167,14 @@ class MetricRequests implements RequestInterface
     }
 
 
-    public static function getRetentionRange(array $config, string $channel, string $default): Carbon
+    public static function getRetentionRange(array $config): Carbon
     {
         $days = $config['retention_days'] ?? 30;
 
         return Carbon::now()->subDays((int)$days);
     }
 
-    protected static function determineDateRange(string $channel, ?string $start, ?string $end): array
+    protected static function determineDateRange(?string $start, ?string $end): array
     {
         return [
             'start' => $start ?: Carbon::now()->subDays(30)->format('Y-m-d'),

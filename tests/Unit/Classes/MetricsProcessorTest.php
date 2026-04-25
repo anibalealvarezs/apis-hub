@@ -7,6 +7,7 @@ use Doctrine\ORM\EntityManager;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\EntityRepository;
 use Tests\Unit\BaseUnitTestCase;
 use Entities\Analytics\Country;
 use Entities\Analytics\Device;
@@ -59,7 +60,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
 
     public function testProcessCountriesReturnsMap(): void
     {
-        $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repo = $this->createMock(EntityRepository::class);
         $this->entityManager->method('getRepository')->with(Country::class)->willReturn($repo);
 
         $country = $this->createMock(Country::class);
@@ -68,7 +69,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
 
         $repo->method('findAll')->willReturn([$country]);
 
-        $res = MetricsProcessor::processCountries(new ArrayCollection(), $this->entityManager);
+        $res = MetricsProcessor::processCountries($this->entityManager);
         
         $this->assertArrayHasKey('USA', $res['map']);
         $this->assertSame($country, $res['map']['USA']);
@@ -76,7 +77,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
 
     public function testProcessDevicesReturnsMap(): void
     {
-        $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repo = $this->createMock(EntityRepository::class);
         $this->entityManager->method('getRepository')->with(Device::class)->willReturn($repo);
 
         $device = $this->createMock(Device::class);
@@ -85,7 +86,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
 
         $repo->method('findAll')->willReturn([$device]);
 
-        $res = MetricsProcessor::processDevices(new ArrayCollection(), $this->entityManager);
+        $res = MetricsProcessor::processDevices($this->entityManager);
         
         $this->assertArrayHasKey('desktop', $res['map']);
         $this->assertSame($device, $res['map']['desktop']);

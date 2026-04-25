@@ -6,6 +6,8 @@ namespace Entities\Analytics;
 
 use Doctrine\ORM\Mapping as ORM;
 use Entities\Entity;
+use Helpers\Helpers;
+use Throwable;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'channels')]
@@ -92,8 +94,8 @@ class Channel extends Entity
     {
         if (!$name) return null;
         try {
-            return \Helpers\Helpers::getManager()->getRepository(self::class)->findOneBy(['name' => $name]);
-        } catch (\Throwable $e) {
+            return Helpers::getManager()->getRepository(self::class)->findOneBy(['name' => $name]);
+        } catch (Throwable $e) {
             return null;
         }
     }
@@ -118,8 +120,8 @@ class Channel extends Entity
     {
         if (!$id) return null;
         try {
-            return \Helpers\Helpers::getManager()->getRepository(self::class)->find($id);
-        } catch (\Throwable $e) {
+            return Helpers::getManager()->getRepository(self::class)->find($id);
+        } catch (Throwable $e) {
             return null;
         }
     }

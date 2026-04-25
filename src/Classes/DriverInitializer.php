@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Classes;
 
+use Anibalealvarezs\ApiDriverCore\Classes\AccountTypeRegistry;
+use Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry;
+use Anibalealvarezs\ApiDriverCore\Classes\EntityRegistry;
+use Anibalealvarezs\ApiDriverCore\Classes\PageTypeRegistry;
 use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
-use Entities\Analytics\Channel;
 use Exception;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
@@ -16,7 +19,6 @@ class DriverInitializer
     private static array $configs = [];
 
     /**
-     * Limpia todas las instancias y configuraciones (útil para testing).
      */
     public static function reset(): void
     {
@@ -76,9 +78,7 @@ class DriverInitializer
             $driver = DriverFactory::get($channel, $logger);
             $config = $driver->validateConfig($config);
         } catch (Exception $e) {
-            if ($logger) {
-                $logger->warning("Driver validation failed for $channel: " . $e->getMessage());
-            }
+            $logger?->warning("Driver validation failed for $channel: " . $e->getMessage());
         }
 
         self::$configs[$channel] = $config;
@@ -141,25 +141,23 @@ class DriverInitializer
                 // 1. Register asset patterns
                 $patterns = $driver->getAssetPatterns();
                 foreach ($patterns as $type => $pConfig) {
-                    \Anibalealvarezs\ApiDriverCore\Classes\AssetRegistry::register($type, $pConfig);
+                    AssetRegistry::register($type, $pConfig);
                 }
 
                 // 2. Register page types
-                \Anibalealvarezs\ApiDriverCore\Classes\PageTypeRegistry::register($driver::getPageTypes());
+                PageTypeRegistry::register($driver::getPageTypes());
 
                 // 3. Register account types
-                \Anibalealvarezs\ApiDriverCore\Classes\AccountTypeRegistry::register($driver::getAccountTypes());
+                AccountTypeRegistry::register($driver::getAccountTypes());
 
                 // 4. Register entity paths
-                \Anibalealvarezs\ApiDriverCore\Classes\EntityRegistry::register($driver::getEntityPaths());
+                EntityRegistry::register($driver::getEntityPaths());
 
                 // 5. Call boot sequence
                 $driver->boot();
 
             } catch (Exception $e) {
-                if ($logger) {
-                    $logger->error("Failed to boot driver for $channel: " . $e->getMessage());
-                }
+                $logger?->error("Failed to boot driver for $channel: " . $e->getMessage());
             }
         }
     }

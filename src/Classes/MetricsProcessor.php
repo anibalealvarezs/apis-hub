@@ -3,26 +3,33 @@
 namespace Classes;
 
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Anibalealvarezs\ApiDriverCore\Enums\AssetCategory;
-use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Carbon\Carbon;
 use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Entities\Analytics\Account;
 use Entities\Analytics\Channel;
+use Entities\Analytics\Country;
+use Entities\Analytics\Device;
+use Exceptions\ConfigurationException;
 use Helpers\Helpers;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
+use Traits\CalculatesMetricDeltas;
 
 class MetricsProcessor
 {
-    use \Traits\CalculatesMetricDeltas;
+    use CalculatesMetricDeltas;
 
     /**
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
      * @return array
+     * @throws Exception
      */
     public static function processQueries(ArrayCollection $metrics, EntityManager $manager): array
     {
@@ -86,7 +93,7 @@ class MetricsProcessor
         // Re-fetch ALL unique queries to ensure map is complete
         try {
             $allExistingQueries = $manager->getConnection()
-                ->executeQuery($sql = "SELECT id, query FROM queries WHERE query IN ($selectPlaceholders)", $selectParams)
+                ->executeQuery(sql: "SELECT id, query FROM queries WHERE query IN ($selectPlaceholders)", params: $selectParams)
                 ->fetchAllAssociative();
         } catch (Exception $e) {
             throw new RuntimeException("Failed to re-fetch queries: " . $e->getMessage(), 0, $e);
@@ -102,13 +109,13 @@ class MetricsProcessor
         return ['map' => $finalMap, 'mapReverse' => $mapReverse];
     }
 
-    public static function processCountries(ArrayCollection $metrics, EntityManager $manager): array
+    public static function processCountries(EntityManager $manager): array
     {
-        $repo = $manager->getRepository(\Entities\Analytics\Country::class);
+        $repo = $manager->getRepository(Country::class);
         $countries = $repo->findAll();
         $map = [];
         $mapReverse = [];
-        /** @var \Entities\Analytics\Country $country */
+        /** @var Country $country */
         foreach ($countries as $country) {
             $map[$country->getCode()->value] = $country;
             $mapReverse[$country->getId()] = $country;
@@ -117,13 +124,13 @@ class MetricsProcessor
         return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
-    public static function processDevices(ArrayCollection $metrics, EntityManager $manager): array
+    public static function processDevices(EntityManager $manager): array
     {
-        $repo = $manager->getRepository(\Entities\Analytics\Device::class);
+        $repo = $manager->getRepository(Device::class);
         $devices = $repo->findAll();
         $map = [];
         $mapReverse = [];
-        /** @var \Entities\Analytics\Device $device */
+        /** @var Device $device */
         foreach ($devices as $device) {
             $map[$device->getType()->value] = $device;
             $mapReverse[$device->getId()] = $device;
@@ -134,10 +141,10 @@ class MetricsProcessor
 
     public static function processDimensionSets(ArrayCollection $metrics, EntityManager $manager): array
     {
-        $dimManager = new \Classes\DimensionManager($manager);
+        $dimManager = new DimensionManager($manager);
         $map = [];
         foreach ($metrics as $metric) {
-            if (isset($metric->dimensions) && ! empty($metric->dimensions)) {
+            if (! empty($metric->dimensions)) {
                 $hash = $metric->dimensionsHash ?? KeyGenerator::generateDimensionsHash((array)$metric->dimensions);
                 if (! isset($map[$hash])) {
                     $set = $dimManager->resolveDimensionSet((array)$metric->dimensions);
@@ -152,26 +159,20 @@ class MetricsProcessor
     /**
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
+     * @param LoggerInterface|null $logger
      * @return array
+     * @throws Exception
      */
     public static function processAccounts(ArrayCollection $metrics, EntityManager $manager, ?LoggerInterface $logger = null): array
     {
         $channel = $metrics->first()?->channel;
-        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $names = [];
-        $accountMap = ['map' => [], 'mapReverse' => []];
         foreach ($metrics as $metric) {
             $pId = self::getMetricPlatformId($metric, 'account');
 
             if (! $pId) {
-                continue;
-            }
-
-            // If it's already an Account entity, we can map it immediately
-            if ($pId instanceof \Entities\Analytics\Account && $pId->getId()) {
-                $accountMap['map'][(string)$pId->getName()] = $pId->getId();
-                $accountMap['mapReverse'][$pId->getId()] = $pId;
                 continue;
             }
 
@@ -200,7 +201,7 @@ class MetricsProcessor
         }
 
         $sql = "SELECT id, name FROM accounts WHERE name IN (?)";
-        $results = $manager->getConnection()->executeQuery($sql, [$names], [\Doctrine\DBAL\ArrayParameterType::STRING])->fetchAllAssociative();
+        $results = $manager->getConnection()->executeQuery($sql, [$names], [ArrayParameterType::STRING])->fetchAllAssociative();
 
 
         $map = [];
@@ -217,12 +218,14 @@ class MetricsProcessor
     /**
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
+     * @param LoggerInterface|null $logger
      * @return array
+     * @throws Exception
      */
     public static function processChanneledAccounts(ArrayCollection $metrics, EntityManager $manager, ?LoggerInterface $logger = null): array
     {
         $channel = $metrics->first()?->channel;
-        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $platformIds = [];
         foreach ($metrics as $metric) {
@@ -249,24 +252,19 @@ class MetricsProcessor
             return ['map' => [], 'mapReverse' => []];
         }
 
-        $clauses = [];
-        $params = [];
-        $types = [];
-
-        if (! empty($platformIds)) {
-            $clauses[] = "platform_id IN (?)";
-            $params[] = $platformIds;
-            $types[] = \Doctrine\DBAL\ArrayParameterType::STRING;
-        }
+        $clauses = ["platform_id IN (?)"];
+        $params = [$platformIds];
+        $types = [ArrayParameterType::STRING];
 
         $results = [];
         if (! empty($clauses)) {
             // Include channel filter if available
             $channelFilter = "";
             if ($channel) {
-                $enum = Channel::tryFromName((string)$channel);
+                $channelFilter = " AND channel = " . (int)Channel::tryFromName($channel)->getId();
+                $enum = Channel::tryFromName($channel);
                 if ($enum) {
-                    $channelFilter = " AND channel = " . (int)$enum->value;
+                    $channelFilter = " AND channel = " . (int)$enum->getId();
                 }
             }
             $sql = "SELECT id, platform_id, account_id FROM channeled_accounts WHERE " . implode(' OR ', $clauses) . $channelFilter;
@@ -301,11 +299,12 @@ class MetricsProcessor
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
      * @return array
+     * @throws Exception
      */
     public static function processCampaigns(ArrayCollection $metrics, EntityManager $manager): array
     {
         $channel = $metrics->first()?->channel;
-        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $platformIds = [];
         foreach ($metrics as $metric) {
@@ -345,11 +344,12 @@ class MetricsProcessor
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
      * @return array
+     * @throws Exception
      */
     public static function processChanneledCampaigns(ArrayCollection $metrics, EntityManager $manager): array
     {
         $channel = $metrics->first()?->channel;
-        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $platformIds = [];
         foreach ($metrics as $metric) {
@@ -391,11 +391,12 @@ class MetricsProcessor
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
      * @return array
+     * @throws Exception
      */
     public static function processChanneledAdGroups(ArrayCollection $metrics, EntityManager $manager): array
     {
         $channel = $metrics->first()?->channel;
-        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $platformIds = [];
         foreach ($metrics as $metric) {
@@ -438,11 +439,12 @@ class MetricsProcessor
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
      * @return array
+     * @throws Exception
      */
     public static function processChanneledAds(ArrayCollection $metrics, EntityManager $manager): array
     {
         $channel = $metrics->first()?->channel;
-        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $platformIds = [];
         foreach ($metrics as $metric) {
@@ -485,11 +487,12 @@ class MetricsProcessor
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
      * @return array
+     * @throws Exception
      */
     public static function processCreatives(ArrayCollection $metrics, EntityManager $manager): array
     {
         $channel = $metrics->first()?->channel;
-        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $platformIds = [];
         foreach ($metrics as $metric) {
@@ -525,10 +528,13 @@ class MetricsProcessor
         return ['map' => $map, 'mapReverse' => $mapReverse];
     }
 
+    /**
+     * @throws Exception
+     */
     public static function processPages(ArrayCollection $metrics, EntityManager $manager): array
     {
         $channel = $metrics->first()?->channel;
-        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $platformIds = [];
         $canonicalIds = [];
@@ -592,11 +598,12 @@ class MetricsProcessor
      * @param ArrayCollection $metrics
      * @param EntityManager $manager
      * @return array
+     * @throws Exception
      */
     public static function processPosts(ArrayCollection $metrics, EntityManager $manager): array
     {
         $channel = $metrics->first()?->channel;
-        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         $platformIds = [];
         foreach ($metrics as $metric) {
@@ -673,6 +680,7 @@ class MetricsProcessor
 
     /**
      * Processes metrics and returns a map of metric IDs.
+     * @throws Exception
      */
     public static function processMetricConfigs(
         ArrayCollection $metrics,
@@ -730,12 +738,12 @@ class MetricsProcessor
 
         // Map countries
         if ($processCountries && ! $countryMap) {
-            $countryMap = self::processCountries($metrics, $manager);
+            $countryMap = self::processCountries($manager);
         }
 
         // Map devices
         if ($processDevices && ! $deviceMap) {
-            $deviceMap = self::processDevices($metrics, $manager);
+            $deviceMap = self::processDevices($manager);
         }
 
         // Map dimension sets
@@ -805,7 +813,6 @@ class MetricsProcessor
                 continue;
             }
             $mObj = $metric;
-            /** @var object{channel: mixed, name: mixed, period: mixed, account: mixed, channeledAccount: mixed, campaign: mixed, channeledCampaign: mixed, channeledAdGroup: mixed, channeledAd: mixed, page: mixed, query: mixed, post: mixed, product: mixed, customer: mixed, creative: mixed, country: mixed, device: mixed} $mObj */
 
             $rowPostValue = self::getMetricPlatformId($mObj, 'post', $logger);
 
@@ -813,27 +820,27 @@ class MetricsProcessor
                 channel: $mObj->channel ?? null,
                 name: $mObj->name ?? null,
                 period: $mObj->period ?? null,
-                account: ($v = self::getMetricPlatformId($mObj, 'account', $logger)) ?: null,
-                channeledAccount: ($v = self::getMetricPlatformId($mObj, 'channeledAccount', $logger)) ?: null,
-                campaign: ($v = self::getMetricPlatformId($mObj, 'campaign', $logger)) ?: null,
-                channeledCampaign: ($v = self::getMetricPlatformId($mObj, 'channeledCampaign', $logger)) ?: null,
-                channeledAdGroup: ($v = self::getMetricPlatformId($mObj, 'channeledAdGroup', $logger)) ?: null,
-                channeledAd: ($v = self::getMetricPlatformId($mObj, 'channeledAd', $logger)) ?: null,
-                page: ($v = self::getMetricPlatformId($mObj, 'page', $logger)) ?: null,
+                account: (self::getMetricPlatformId($mObj, 'account', $logger)) ?: null,
+                channeledAccount: (self::getMetricPlatformId($mObj, 'channeledAccount', $logger)) ?: null,
+                campaign: (self::getMetricPlatformId($mObj, 'campaign', $logger)) ?: null,
+                channeledCampaign: (self::getMetricPlatformId($mObj, 'channeledCampaign', $logger)) ?: null,
+                channeledAdGroup: (self::getMetricPlatformId($mObj, 'channeledAdGroup', $logger)) ?: null,
+                channeledAd: (self::getMetricPlatformId($mObj, 'channeledAd', $logger)) ?: null,
+                creative: (self::getMetricPlatformId($mObj, 'creative', $logger)) ?: null,
+                page: (self::getMetricPlatformId($mObj, 'page', $logger)) ?: null,
                 query: (is_object($mObj) && is_callable([$mObj, 'getContext'])) ? ($mObj->getContext()['query'] ?? $mObj->query ?? null) : ($mObj->query ?? null),
                 post: $rowPostValue,
-                product: ($v = self::getMetricPlatformId($mObj, 'product', $logger)) ?: null,
-                customer: ($v = self::getMetricPlatformId($mObj, 'customer', $logger)) ?: null,
-                order: ($v = self::getMetricPlatformId($mObj, 'order', $logger)) ?: null,
+                product: (self::getMetricPlatformId($mObj, 'product', $logger)) ?: null,
+                customer: (self::getMetricPlatformId($mObj, 'customer', $logger)) ?: null,
+                order: (self::getMetricPlatformId($mObj, 'order', $logger)) ?: null,
                 country: $mObj->countryCode ?? ($mObj->country ?? null),
                 device: $mObj->deviceType ?? ($mObj->device ?? null),
-                creative: ($v = self::getMetricPlatformId($mObj, 'creative', $logger)) ?: null,
                 dimensionSet: $mObj->dimensionsHash ?? (isset($mObj->dimensions) ? KeyGenerator::generateDimensionsHash((array)$mObj->dimensions) : null)
             );
             $metric->metricConfigKey = $metricConfigKey;
 
             $channelObj = Channel::tryFromName((string) $metric->channel);
-            $channelId = $channelObj ? $channelObj->value : $metric->channel;
+            $channelId = $channelObj ? $channelObj->getId() : $metric->channel;
 
             $channeledAccountId = self::resolveChanneledAccountId($metric, $channeledAccountMap);
             $accountId = self::resolveAccountId($metric, $accountMap);
@@ -973,10 +980,14 @@ class MetricsProcessor
     }
 
     /**
-     * @param ArrayCollection $metrics
+     * @param ArrayCollection|array $metrics
      * @param EntityManager $manager
      * @param array $metricConfigMap
+     * @param LoggerInterface|null $logger
+     * @param string|null $channel
      * @return array
+     * @throws Exception
+     * @throws ConfigurationException
      */
     public static function processMetrics(
         ArrayCollection|array $metrics,
@@ -1005,9 +1016,9 @@ class MetricsProcessor
 
             $dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
             $metricKey = KeyGenerator::generateMetricKey(
+                metricDate: $mObj->metricDate ?? '',
                 dimensionsHash: $dimensionsHash,
                 metricConfigKey: $mObj->metricConfigKey ?? '',
-                metricDate: $mObj->metricDate ?? '',
             );
 
             if (! isset($metricConfigMap['map'][$metric->metricConfigKey])) {
@@ -1118,9 +1129,9 @@ class MetricsProcessor
                 $fetched = $manager->getConnection()->executeQuery($reFetchSql, $reFetchParams)->fetchAllAssociative();
                 foreach ($fetched as $metricRow) {
                     $metricKey = KeyGenerator::generateMetricKey(
+                        metricDate: $metricRow['metric_date'],
                         dimensionsHash: $metricRow['dimensions_hash'],
                         metricConfigKey: $metricConfigMap['mapReverse'][$metricRow['metric_config_id']],
-                        metricDate: $metricRow['metric_date'],
                     );
                     $metricMap[$metricKey] = (int)$metricRow['id'];
                 }
@@ -1130,7 +1141,7 @@ class MetricsProcessor
         if (! empty($metricsToUpdate)) {
             foreach ($metricsToUpdate as $update) {
                 $manager->getConnection()->executeStatement(
-                    "UPDATE metrics SET value = GREATEST(COALESCE(value, 0), ?) WHERE id = ?",
+                    "UPDATE metrics SET value = GREATEST(value, ?) WHERE id = ?",
                     [$update['value'], $update['id']]
                 );
             }
@@ -1148,6 +1159,8 @@ class MetricsProcessor
      * @param array $metricMap
      * @param LoggerInterface $logger
      * @return array
+     * @throws ConfigurationException
+     * @throws Exception
      */
     public static function processChanneledMetrics(
         ArrayCollection $metrics,
@@ -1166,9 +1179,9 @@ class MetricsProcessor
             $mObj = (object)$m;
             /** @var object{dimensions_hash: ?string, dimensionsHash: ?string, metric_config_key: ?string, metricConfigKey: ?string, metric_date: ?string, metricDate: ?string} $mObj */
             $mKey = KeyGenerator::generateMetricKey(
+                metricDate: $mObj->metric_date ?? ($mObj->metricDate ?? ''),
                 dimensionsHash: $mObj->dimensions_hash ?? ($mObj->dimensionsHash ?? ''),
-                metricConfigKey: $mObj->metric_config_key ?? ($mObj->metricConfigKey ?? ''),
-                metricDate: $mObj->metric_date ?? ($mObj->metricDate ?? '')
+                metricConfigKey: $mObj->metric_config_key ?? ($mObj->metricConfigKey ?? '')
             );
             $metricsMapByMKey[$mKey] = $m;
         }
@@ -1181,9 +1194,9 @@ class MetricsProcessor
             $mObj = (object)$metric;
             /** @var object{dimensions_hash: ?string, dimensionsHash: ?string, metric_config_key: ?string, metricConfigKey: ?string, metric_date: ?string, metricDate: ?string, platform_id: ?string, platformId: ?string, channel: mixed} $mObj */
             $metricKey = KeyGenerator::generateMetricKey(
+                metricDate: $mObj->metric_date ?? ($mObj->metricDate ?? ''),
                 dimensionsHash: $mObj->dimensions_hash ?? ($mObj->dimensionsHash ?? ''),
                 metricConfigKey: $mObj->metric_config_key ?? ($mObj->metricConfigKey ?? ''),
-                metricDate: $mObj->metric_date ?? ($mObj->metricDate ?? ''),
             );
 
             if (! isset($metricMap['map'][$metricKey])) {
@@ -1201,7 +1214,7 @@ class MetricsProcessor
             );
 
             $channelObj = Channel::tryFromName((string) $metric->channel);
-            $channelId = $channelObj ? $channelObj->value : $metric->channel;
+            $channelId = $channelObj ? $channelObj->getId() : $metric->channel;
 
             $uniqueChanneledMetrics[$channeledMetricKey] = [
                 'channel' => $channelId,
@@ -1220,7 +1233,7 @@ class MetricsProcessor
             $isPostgres = Helpers::isPostgres();
             foreach ($chunk as $m) {
                 $mChannelObj = Channel::tryFromName((string) $m['channel']);
-                $mChannelId = $mChannelObj ? $mChannelObj->value : (int)$m['channel'];
+                $mChannelId = $mChannelObj ? $mChannelObj->getId() : (int)$m['channel'];
                 $selectParams[] = $mChannelId;
                 $selectParams[] = (string)$m['platform_id'];
                 $selectParams[] = (int)$m['metric_id'];
@@ -1242,7 +1255,7 @@ class MetricsProcessor
         }
         $logger->info("Channeled mapping complete: " . count($channeledMetricMap) . " existing channeled metrics found in DB.");
 
-        $dimManager = new \Classes\DimensionManager($manager);
+        $dimManager = new DimensionManager($manager);
         $channeledMetricsToInsert = [];
         $channeledMetricsToUpdate = [];
         foreach ($uniqueChanneledMetrics as $key => $channeledMetric) {
@@ -1250,7 +1263,7 @@ class MetricsProcessor
                 $originalMetric = $metricsMapByMKey[$channeledMetric['metricKey']] ?? null;
 
                 $dimensionSetId = null;
-                if ($originalMetric && isset($originalMetric->dimensions) && ! empty($originalMetric->dimensions)) {
+                if ($originalMetric && ! empty($originalMetric->dimensions)) {
                     $dimensionSetId = $dimManager->resolveDimensionSet((array)$originalMetric->dimensions)->getId();
                 }
 
@@ -1354,7 +1367,7 @@ class MetricsProcessor
 
     private static function getMetricPlatformId(object $metric, string $property, ?LoggerInterface $logger = null)
     {
-        $mContext = (is_object($metric) && is_callable([$metric, 'getContext'])) ? $metric->getContext() : (array)$metric;
+        $mContext = (is_callable([$metric, 'getContext'])) ? $metric->getContext() : (array)$metric;
         $platformProp = $property . 'PlatformId';
 
         $val = $mContext[$property] ?? ($mContext[$platformProp] ?? ($metric->$property ?? ($metric->$platformProp ?? null)));
@@ -1394,7 +1407,7 @@ class MetricsProcessor
         }
 
         $channel = $metric->channel ?? null;
-        $driverClass = $channel ? \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
+        $driverClass = $channel ? DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null : null;
 
         // Try direct platform ID mapping
         $searchId = $pId;

@@ -18,15 +18,13 @@ class MetricsHelpers
      * @param array $targetKeywords
      * @param array $targetCountries
      * @param array $allDimensions
-     * @param callable $fillWithNullsCallback
      * @return array
      */
     public static function getFinalRecords(
         array $allRows,
         array $targetKeywords,
         array $targetCountries,
-        array $allDimensions,
-        callable $fillWithNullsCallback
+        array $allDimensions
     ): array {
         $childrenSums = self::computeChildrenSum($allRows);
 
