@@ -18,6 +18,9 @@ This document lists common command chains needed during development to keep loca
 - [6. Remote Deployment (Hetzner)](#6-remote-deployment-hetzner)
 - [7. Database Maintenance & Reset (Nuclear Operations)](#7-database-maintenance--reset-nuclear-operations)
 - [8. Multiple Deployments & Port Isolation](#8-multiple-deployments--port-isolation)
+- [9. Local Packages: Symlink Refresh Command](#9-local-packages-symlink-refresh-command)
+- [10. Server Strategy When `composer.lock` Is Not Updated](#10-server-strategy-when-composerlock-is-not-updated)
+- [11. One-Shot Lock Refresh + Auto-Commit + Dev Restore](#11-one-shot-lock-refresh--auto-commit--dev-restore)
 
 ---
 
@@ -264,3 +267,128 @@ After a new deployment, you can verify which project a container belongs to by c
 ```bash
 docker ps --filter "label=com.docker.compose.project=client-xyz"
 ```
+
+---
+
+## 9. Local Packages: Symlink Refresh Command
+
+Use this in **PowerShell** to refresh all local `anibalealvarezs/*` path packages across the workspace (including `apis-hub-facade`).
+
+```powershell
+$composer = "C:\ProgramData\ComposerSetup\bin\composer.bat"
+$repos = @(
+  "D:\laragon\www\amazon-api-anibal",
+  "D:\laragon\www\amazon-hub-driver",
+  "D:\laragon\www\api-client-skeleton",
+  "D:\laragon\www\api-driver-core",
+  "D:\laragon\www\apis-hub",
+  "D:\laragon\www\apis-hub-api",
+  "D:\laragon\www\apis-hub-facade",
+  "D:\laragon\www\bigcommerce-hub-driver",
+  "D:\laragon\www\facebook-graph-api",
+  "D:\laragon\www\google-api-anibal",
+  "D:\laragon\www\google-hub-driver",
+  "D:\laragon\www\klaviyo-api-anibal",
+  "D:\laragon\www\klaviyo-hub-driver",
+  "D:\laragon\www\linkedin-hub-driver",
+  "D:\laragon\www\mailchimp-api-anibal",
+  "D:\laragon\www\meta-hub-driver",
+  "D:\laragon\www\netsuite-api-anibal",
+  "D:\laragon\www\netsuite-hub-driver",
+  "D:\laragon\www\pinterest-hub-driver",
+  "D:\laragon\www\shipstation-api-anibal",
+  "D:\laragon\www\shopify-api-anibal",
+  "D:\laragon\www\shopify-hub-driver",
+  "D:\laragon\www\tiktok-hub-driver",
+  "D:\laragon\www\triple-whale-api-anibal",
+  "D:\laragon\www\triple-whale-hub-driver",
+  "D:\laragon\www\x-hub-driver"
+)
+
+foreach ($repo in $repos) {
+  if (-not (Test-Path "$repo\composer.json")) { continue }
+
+  Write-Host "==> $repo"
+  Set-Location $repo
+
+  # Remove only local vendor namespace, keep the rest of vendor untouched.
+  if (Test-Path ".\vendor\anibalealvarezs") {
+    Remove-Item ".\vendor\anibalealvarezs" -Recurse -Force
+  }
+
+  & $composer update "anibalealvarezs/*" -W --ignore-platform-reqs --no-interaction
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Failed in $repo"
+  }
+}
+```
+
+Quick verification (example):
+
+```powershell
+Get-Item "D:\laragon\www\apis-hub-facade\vendor\anibalealvarezs\google-api" | Format-List FullName,Attributes,LinkType,Target
+```
+
+---
+
+## 10. Server Strategy When `composer.lock` Is Not Updated
+
+If `composer.lock` is intentionally kept local (for path symlink workflow), the safest way to ensure servers take the latest package versions is:
+
+1. **Do not rely on `composer update` in production.**
+2. In CI, run `composer update` (or targeted updates), commit the resulting `composer.lock`, and deploy with `composer install`.
+3. Deploy servers using:
+
+```bash
+composer install --no-dev --prefer-dist --optimize-autoloader --classmap-authoritative
+```
+
+### Recommended release flow
+
+1. Update package versions/tags in package repositories.
+2. In the consuming app repository, run `composer update` in CI/release branch.
+3. Commit `composer.lock` as part of the release commit.
+4. Deploy using `composer install` only.
+
+### Why this matters
+
+- Without committing `composer.lock`, each server may resolve different dependency versions at deploy time.
+- With committed `composer.lock`, every server installs the exact same dependency graph.
+
+### For your local monorepo workflow
+
+- Keep local path repositories and symlinks for daily development.
+- Keep `composer.json`/`composer.lock` as `assume-unchanged` locally if needed.
+- Before creating a production release, generate and commit a real `composer.lock` from a clean, non-path release context.
+
+---
+
+## 11. One-Shot Lock Refresh + Auto-Commit + Dev Restore
+
+Use this command to automate the full cycle across all local packages:
+
+- update `composer.lock` from non-path repositories,
+- create commit(s) for changed locks,
+- restore local development state (path symlinks),
+- re-enable `assume-unchanged` on `composer.json` and `composer.lock`.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "D:\laragon\www\apis-hub\scripts\refresh-locks-and-restore-dev.ps1"
+```
+
+Optional variants:
+
+```powershell
+# Dry-run (no updates/commits)
+powershell -NoProfile -ExecutionPolicy Bypass -File "D:\laragon\www\apis-hub\scripts\refresh-locks-and-restore-dev.ps1" -DryRun
+
+# Custom commit message
+powershell -NoProfile -ExecutionPolicy Bypass -File "D:\laragon\www\apis-hub\scripts\refresh-locks-and-restore-dev.ps1" -CommitMessage "chore(deps): refresh lock files"
+
+# Run only selected repos by folder name
+powershell -NoProfile -ExecutionPolicy Bypass -File "D:\laragon\www\apis-hub\scripts\refresh-locks-and-restore-dev.ps1" -OnlyRepos apis-hub,apis-hub-api,apis-hub-facade
+```
+
+> [!IMPORTANT]
+> The script does **not** push. After it finishes, review commits and push manually.
+
