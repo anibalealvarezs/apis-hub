@@ -64,19 +64,13 @@ STATUS-SUMMARY.md
 ./bin/push-drivers.php
 ./bin/sync-github-configs.php
 debug_config.php
+debug_routes.php
+tmp_check_ad.php
+config/channels/facebook_organic.yaml.test
+config/channels/google_search_console.yaml.test
+config/channels/facebook_marketing.yaml.test
+.ai-rules
+scripts/*.ps1
 
 # Handover documents
 /Handover/
-
-
-debug_routes.php
-
-tmp_check_ad.php
-
-config/channels/facebook_organic.yaml.test
-
-config/channels/google_search_console.yaml.test
-
-config/channels/facebook_marketing.yaml.test
-
-.ai-rules
