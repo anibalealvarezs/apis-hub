@@ -10,17 +10,17 @@ use Repositories\QueryRepository;
 
 #[ORM\Entity(repositoryClass: QueryRepository::class)]
 #[ORM\Table(name: 'queries')]
-#[ORM\Index(columns: ['query'], name: 'idx_queries_idx')]
+#[ORM\Index(name: 'idx_queries_idx', columns: ['query'])]
 #[ORM\HasLifecycleCallbacks]
 class Query extends Entity
 {
-    #[ORM\Column(type: 'string', unique: true)]
+    #[ORM\Column(type: 'string', length: 1024, unique: true)]
     protected string $query;
 
     #[ORM\Column(type: 'json', nullable: true)]
     protected ?array $data = [];
 
-    #[ORM\OneToMany(mappedBy: 'query', targetEntity: MetricConfig::class, orphanRemoval: true)]
+    #[ORM\OneToMany(targetEntity: MetricConfig::class, mappedBy: 'query', orphanRemoval: true)]
     protected Collection $metricConfigs;
 
     public function __construct()

@@ -1500,6 +1500,7 @@ class MetricsProcessor
         return $pId ? ($map['map'][$pId] ?? null) : null;
     }
 
+
     private static function resolveCreativeId(object $metric, ?array $map): ?int
     {
         if (! $map) {
