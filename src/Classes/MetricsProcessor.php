@@ -419,7 +419,7 @@
                     $context = $driverClass::getContextForCategory(AssetCategory::GROUPING) ?? '';
                     $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::GROUPING, $context);
                 } else {
-                    $platformIds[] = (string)$pId;
+                    $platformIds[] = $pId;
                 }
             }
             $platformIds = array_unique(array_filter($platformIds));
@@ -467,7 +467,7 @@
                     $context = $driverClass::getContextForCategory(AssetCategory::UNIT) ?? '';
                     $platformIds[] = $driverClass::getPlatformId(['id' => $pId], AssetCategory::UNIT, $context);
                 } else {
-                    $platformIds[] = (string)$pId;
+                    $platformIds[] = $pId;
                 }
             }
             $platformIds = array_unique(array_filter($platformIds));
@@ -1230,7 +1230,6 @@
                     metric: $metricMap['map'][$metricKey],
                     platformCreatedAt: Carbon::parse($metric->platform_created_at ?? $metric->platformCreatedAt)->format('Y-m-d'),
                 );
-
 
                 $uniqueChanneledMetrics[$channeledMetricKey] = [
                     'channel'             => $channelId,
