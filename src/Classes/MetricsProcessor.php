@@ -1023,7 +1023,14 @@
                     return ['dimensionKey' => $d['dimensionKey'] ?? null, 'dimensionValue' => $d['dimensionValue'] ?? null];
                 }, (array)$mDimensions);
 
-                $dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
+                if (!empty($mObj->dimensionsHash)) {
+                    $dimensionsHash = (string)$mObj->dimensionsHash;
+                } elseif (!empty($mObj->dimensions_hash)) {
+                    $dimensionsHash = (string)$mObj->dimensions_hash;
+                } else {
+                    KeyGenerator::sortDimensions($dimensions);
+                    $dimensionsHash = KeyGenerator::generateDimensionsHash($dimensions);
+                }
                 $metricKey = KeyGenerator::generateMetricKey(
                     metricDate: $mObj->metricDate ?? '',
                     dimensionsHash: $dimensionsHash,
@@ -1035,8 +1042,6 @@
 
                     continue;
                 }
-
-                KeyGenerator::sortDimensions($dimensions);
                 $uniqueMetrics[$metricKey] = [
                     'value'            => $metric->value,
                     'metadata'         => $metric->metadata,
@@ -1216,15 +1221,16 @@
                     continue;
                 }
 
+                $channelObj = Channel::tryFromName((string)$metric->channel);
+                $channelId = $channelObj ? $channelObj->getId() : (int)$metric->channel;
+
                 $channeledMetricKey = KeyGenerator::generateChanneledMetricKey(
-                    channel: $mObj->channel ?? '',
+                    channel: $channelId,
                     platformId: $mObj->platform_id ?? ($mObj->platformId ?? ''),
                     metric: $metricMap['map'][$metricKey],
                     platformCreatedAt: Carbon::parse($metric->platform_created_at ?? $metric->platformCreatedAt)->format('Y-m-d'),
                 );
 
-                $channelObj = Channel::tryFromName((string)$metric->channel);
-                $channelId = $channelObj ? $channelObj->getId() : $metric->channel;
 
                 $uniqueChanneledMetrics[$channeledMetricKey] = [
                     'channel'             => $channelId,
