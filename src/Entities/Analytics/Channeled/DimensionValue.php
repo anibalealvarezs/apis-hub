@@ -16,7 +16,7 @@ class DimensionValue extends Entity
     #[ORM\JoinColumn(name: 'dimension_key_id', nullable: false, onDelete: 'CASCADE')]
     protected DimensionKey $dimensionKey;
 
-    #[ORM\Column(type: 'string', length: 255)]
+    #[ORM\Column(type: 'string', length: 512)]
     protected string $value;
 
     public function getDimensionKey(): DimensionKey
