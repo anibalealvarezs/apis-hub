@@ -32,8 +32,12 @@ class SocialProcessor
         foreach (array_chunk($pages, $chunkSize) as $chunk) {
             $params = [];
             foreach ($chunk as $p) {
-                $account = $p->getContext()['account'] ?? null;
-                $accountId = is_object($account) ? $account->getId() : $account;
+                $context = $p->getContext() ?? [];
+                $accountId = self::resolveContextId(
+                    $context,
+                    ['account'],
+                    ['account_id', 'accountId', 'accountPlatformId']
+                );
 
                 $params[] = $p->getUrl();
                 $params[] = $p->getCanonicalId() ?? null;
@@ -84,8 +88,12 @@ class SocialProcessor
         $conn = $manager->getConnection();
         $cols = ['url', 'canonical_id', 'title', 'hostname', 'platform_id', 'account_id', 'data'];
         
-        $account = $entity->getContext()['account'] ?? null;
-        $accountId = is_object($account) ? $account->getId() : $account;
+        $context = $entity->getContext() ?? [];
+        $accountId = self::resolveContextId(
+            $context,
+            ['account'],
+            ['account_id', 'accountId', 'accountPlatformId']
+        );
 
         $params = [
             (string)$entity->getUrl(),
@@ -176,12 +184,23 @@ class SocialProcessor
         foreach (array_chunk($posts, $chunkSize) as $chunk) {
             $params = [];
             foreach ($chunk as $p) {
-                $account = $p->getContext()['account'] ?? null;
-                $accountId = is_object($account) ? $account->getId() : $account;
-                $page = $p->getContext()['page'] ?? null;
-                $pageId = is_object($page) ? $page->getId() : ($p->getContext()['page_id'] ?? null);
-                $channeledAccount = $p->getContext()['channeled_account'] ?? null;
-                $channeledAccountId = is_object($channeledAccount) ? $channeledAccount->getId() : ($p->getContext()['channeled_account_id'] ?? null);
+                $context = $p->getContext() ?? [];
+
+                $accountId = self::resolveContextId(
+                    $context,
+                    ['account'],
+                    ['account_id', 'accountId', 'accountPlatformId']
+                );
+                $pageId = self::resolveContextId(
+                    $context,
+                    ['page'],
+                    ['page_id', 'pageId', 'pagePlatformId']
+                );
+                $channeledAccountId = self::resolveContextId(
+                    $context,
+                    ['channeled_account', 'channeledAccount'],
+                    ['channeled_account_id', 'channeledAccountId']
+                );
 
                 $params[] = $p->getPlatformId();
                 $params[] = $pageId;
@@ -207,5 +226,39 @@ class SocialProcessor
                 throw $e;
             }
         }
+    }
+
+    /**
+     * Resolve relation IDs from mixed context conventions (legacy snake_case and newer camelCase).
+     */
+    private static function resolveContextId(array $context, array $entityKeys, array $scalarKeys): mixed
+    {
+        foreach ($entityKeys as $key) {
+            if (!array_key_exists($key, $context) || $context[$key] === null) {
+                continue;
+            }
+
+            $value = $context[$key];
+            if (is_object($value) && method_exists($value, 'getId')) {
+                return $value->getId();
+            }
+
+            if (!is_object($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        foreach ($scalarKeys as $key) {
+            if (!array_key_exists($key, $context)) {
+                continue;
+            }
+
+            $value = $context[$key];
+            if ($value !== null && $value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 }
