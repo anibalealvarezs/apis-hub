@@ -1451,36 +1451,43 @@
 
             $primary = self::getMetricRelationValue($metric, $property, in_array($property, $preferPlatformProp, true));
 
+            $finalValue = null;
+
             if (!is_object($primary)) {
-                return ($primary !== null && $primary !== '') ? (string)$primary : null;
+                $finalValue = ($primary !== null && $primary !== '') ? (string)$primary : null;
+            } else {
+                $methods = match ($property) {
+                    'query' => ['getQuery', '__toString'],
+                    'page' => ['getCanonicalId', 'getPlatformId', 'getUrl', 'getId'],
+                    'account' => ['getName', 'getId'],
+                    'channeledAccount', 'channeledCampaign', 'channeledAdGroup', 'channeledAd' => ['getPlatformId', 'getId'],
+                    'campaign' => ['getCampaignId', 'getPlatformId', 'getId'],
+                    'creative' => ['getCreativeId', 'getPlatformId', 'getId'],
+                    'post' => ['getPostId', 'getPlatformId', 'getId'],
+                    'product' => ['getProductId', 'getPlatformId', 'getId'],
+                    'customer' => ['getEmail', 'getPlatformId', 'getId'],
+                    'order' => ['getOrderId', 'getPlatformId', 'getId'],
+                    default => ['getPlatformId', 'getCanonicalId', 'getId'],
+                };
+
+                foreach ($methods as $method) {
+                    if (!method_exists($primary, $method)) {
+                        continue;
+                    }
+
+                    $resolved = $method === '__toString' ? (string)$primary : $primary->$method();
+                    if ($resolved !== null && $resolved !== '') {
+                        $finalValue = (string)$resolved;
+                        break;
+                    }
+                }
             }
 
-            $methods = match ($property) {
-                'query' => ['getQuery', '__toString'],
-                'page' => ['getCanonicalId', 'getPlatformId', 'getUrl', 'getId'],
-                'account' => ['getName', 'getId'],
-                'channeledAccount', 'channeledCampaign', 'channeledAdGroup', 'channeledAd' => ['getPlatformId', 'getId'],
-                'campaign' => ['getCampaignId', 'getPlatformId', 'getId'],
-                'creative' => ['getCreativeId', 'getPlatformId', 'getId'],
-                'post' => ['getPostId', 'getPlatformId', 'getId'],
-                'product' => ['getProductId', 'getPlatformId', 'getId'],
-                'customer' => ['getEmail', 'getPlatformId', 'getId'],
-                'order' => ['getOrderId', 'getPlatformId', 'getId'],
-                default => ['getPlatformId', 'getCanonicalId', 'getId'],
-            };
-
-            foreach ($methods as $method) {
-                if (!method_exists($primary, $method)) {
-                    continue;
-                }
-
-                $resolved = $method === '__toString' ? (string)$primary : $primary->$method();
-                if ($resolved !== null && $resolved !== '') {
-                    return (string)$resolved;
-                }
+            if ($finalValue !== null && $property === 'query' && mb_strlen($finalValue) > 512) {
+                $finalValue = mb_substr($finalValue, 0, 512);
             }
 
-            return null;
+            return $finalValue;
         }
 
         private static function resolveChanneledAccountId(object $metric, ?array $channeledAccountMap): ?int
