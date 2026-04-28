@@ -32,6 +32,9 @@ use Repositories\MetricConfigRepository;
     columns: ['channel', 'name', 'period', 'post_id'],
     name: 'idx_metric_configs_lookup_post_idx'
 )]
+#[ORM\Index(columns: ['page_id'], name: 'idx_metric_configs_page_idx')]
+#[ORM\Index(columns: ['account_id'], name: 'idx_metric_configs_account_idx')]
+#[ORM\Index(columns: ['channeled_account_id'], name: 'idx_metric_configs_channeled_account_idx')]
 #[ORM\UniqueConstraint(name: 'metric_config_signature_unique', columns: ['config_signature'])]
 class MetricConfig extends Entity
 {

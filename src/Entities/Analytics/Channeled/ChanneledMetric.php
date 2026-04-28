@@ -14,6 +14,7 @@ use Repositories\Channeled\ChanneledMetricRepository;
 #[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_metrics_platform_channel_idx')]
 #[ORM\Index(columns: ['platform_id', 'channel', 'metric_id'], name: 'idx_channeled_metrics_full_idx')]
 #[ORM\Index(columns: ['platform_id', 'channel', 'platform_created_at'], name: 'idx_channeled_metrics_platform_created_idx')]
+#[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_metrics_created_at_idx')]
 #[ORM\HasLifecycleCallbacks]
 class ChanneledMetric extends ChanneledEntity
 {
