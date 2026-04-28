@@ -2,7 +2,9 @@
 
     namespace Repositories;
 
+    use DateTime;
     use Doctrine\Common\Collections\ArrayCollection;
+    use Doctrine\DBAL\Connection;
     use Doctrine\ORM\AbstractQuery;
     use Doctrine\ORM\EntityRepository;
     use Doctrine\ORM\NonUniqueResultException;
@@ -15,6 +17,7 @@
     use Exception;
     use Exceptions\ConfigurationException;
     use Helpers\Helpers;
+    use Anibalealvarezs\ApiDriverCore\Classes\MetricAggregationStrategyRegistry;
     use ReflectionException;
 
     class BaseRepository extends EntityRepository
@@ -232,6 +235,22 @@
             $isMetric = str_ends_with($entityName, 'Analytics\Metric');
             $isPostgres = Helpers::isPostgres();
 
+            $optimizedResult = $this->tryOptimizedWeightedMetricAggregate(
+                connection: $connection,
+                aggregations: $aggregations,
+                groupBy: $groupBy,
+                filters: $filters,
+                startDate: $startDate,
+                endDate: $endDate,
+                orderBy: $orderBy,
+                orderDir: $orderDir,
+                isMetric: $isMetric,
+                isPostgres: $isPostgres,
+            );
+            if ($optimizedResult !== null) {
+                return $optimizedResult;
+            }
+
             if ($this->isChanneledMetric) {
                 $qb->join('e', 'metrics', 'm', 'e.metric_id = m.id')
                     ->join('m', 'metric_configs', 'mc', 'm.metric_config_id = mc.id');
@@ -244,13 +263,8 @@
             }
 
             // Selects with aggregation functions
-            $this->needsImpressionsJoin = false;
-            foreach ($aggregations as $expr) {
-                if (str_contains(strtolower($expr), 'position')) {
-                    $this->needsImpressionsJoin = true;
-                    break;
-                }
-            }
+            $weightedStrategies = $this->resolveWeightedAggregationStrategies($aggregations);
+            $this->needsImpressionsJoin = $weightedStrategies !== [];
 
             if ($this->needsImpressionsJoin && $this->isChanneledMetric) {
                 // Reverted JOIN due to performance impact on non-indexed tables
@@ -574,7 +588,504 @@
         }
 
         /**
+         * Optimized path for query-level weighted metric aggregation.
+         * Avoids correlated subqueries by pre-aggregating weight metrics in a CTE.
+         * @throws \Doctrine\DBAL\Exception
+         */
+        protected function tryOptimizedWeightedMetricAggregate(
+            Connection $connection,
+            array      $aggregations,
+            array      $groupBy,
+            ?object    $filters,
+            ?string    $startDate,
+            ?string    $endDate,
+            ?string    $orderBy,
+            ?string    $orderDir,
+            bool       $isMetric,
+            bool       $isPostgres
+        ): ?array
+        {
+            if (!$this->isChanneledMetric && !$isMetric) {
+                return null;
+            }
+
+            if ($startDate === null || $endDate === null) {
+                return null;
+            }
+
+            $filtersArr = [];
+            if ($filters !== null) {
+                foreach ($filters as $key => $value) {
+                    $filtersArr[(string)$key] = $value;
+                }
+            }
+
+            $allowedFilterKeys = ['page', 'debug_sql', '_'];
+            foreach (array_keys($filtersArr) as $key) {
+                if (!in_array($key, $allowedFilterKeys, true)) {
+                    return null;
+                }
+            }
+
+            $page = $filtersArr['page'] ?? null;
+            if ($page !== null && !is_numeric($page)) {
+                return null;
+            }
+
+            $supported = ['clicks', 'impressions', 'ctr'];
+            foreach ($aggregations as $expr) {
+                $normalizedExpr = strtolower(trim((string)$expr));
+                if (!in_array($normalizedExpr, $supported, true) && MetricAggregationStrategyRegistry::resolve($normalizedExpr) === null) {
+                    return null;
+                }
+            }
+
+            $weightedStrategies = $this->resolveWeightedAggregationStrategies($aggregations);
+            if ($weightedStrategies === []) {
+                return null;
+            }
+
+            $normalizedGroupBy = array_values(array_map(static fn($field) => strtolower(trim((string)$field)), $groupBy));
+            if (!$this->isGroupPatternAllowedForWeightedStrategies($normalizedGroupBy, $weightedStrategies)) {
+                return null;
+            }
+
+            $groupPattern = $this->resolveGroupPattern($normalizedGroupBy);
+            if ($groupPattern === null) {
+                return null;
+            }
+
+            $quoteChar = $isPostgres ? '"' : '`';
+
+            $valueSource = $this->isChanneledMetric
+                ? 'FROM channeled_metrics e
+                   JOIN metrics m ON e.metric_id = m.id
+                   JOIN metric_configs mc ON mc.id = m.metric_config_id'
+                : 'FROM metrics m
+                   JOIN metric_configs mc ON mc.id = m.metric_config_id';
+
+            $baseMetricNames = ['clicks', 'clicks_daily'];
+            foreach ($weightedStrategies as $strategy) {
+                $baseMetricNames = array_merge($baseMetricNames, $strategy['source_metric_names'], $strategy['weight_metric_names']);
+            }
+            $baseMetricNames = array_values(array_unique($baseMetricNames));
+            $metricNameListSql = $this->toSqlStringList($baseMetricNames);
+
+            $baseWhere = [
+                'm.metric_date >= :startDate',
+                'm.metric_date <= :endDate',
+                "mc.period = 'daily'",
+                "mc.name IN ($metricNameListSql)",
+            ];
+            $params = [
+                'startDate' => $startDate,
+                'endDate' => $endDate,
+            ];
+            if ($page !== null) {
+                $baseWhere[] = 'mc.page_id = :pageId';
+                $params['pageId'] = (int)$page;
+            }
+            $baseWhereSql = implode("\n      AND ", $baseWhere);
+
+            $weightedComputedSelect = [];
+            foreach ($weightedStrategies as $alias => $strategy) {
+                $prefix = $strategy['prefix'];
+                $weightedComputedSelect[] = "SUM(COALESCE(p.{$prefix}_metric, 0) * COALESCE(p.{$prefix}_weight, 0)) / NULLIF(SUM(COALESCE(p.{$prefix}_weight, 0)), 0) AS {$prefix}_value";
+            }
+
+            $weightedPairColumns = [];
+            foreach ($weightedStrategies as $strategy) {
+                $prefix = $strategy['prefix'];
+                $weightedPairColumns[] = "MAX(CASE WHEN b.name IN (".$this->toSqlStringList($strategy['source_metric_names']).") THEN b.value END) AS {$prefix}_metric";
+                $weightedPairColumns[] = "MAX(CASE WHEN b.name IN (".$this->toSqlStringList($strategy['weight_metric_names']).") THEN b.value END) AS {$prefix}_weight";
+            }
+
+            $firstWeightNames = array_values($weightedStrategies)[0]['weight_metric_names'];
+            $firstWeightNameList = $this->toSqlStringList($firstWeightNames);
+
+            $grouping = $this->buildWeightedGroupingConfig($groupPattern, $isPostgres, $quoteChar);
+            if ($grouping === null) {
+                return null;
+            }
+
+            $finalGroupProjection = $grouping['final_select'] !== []
+                ? implode(",\n                ", $grouping['final_select']).",\n                "
+                : '';
+
+            $finalGroupByClause = $grouping['group_by'] !== []
+                ? "\n            GROUP BY ".implode(', ', $grouping['group_by'])
+                : '';
+
+            $outerGroupProjection = $grouping['outer_select'] !== []
+                ? implode(",\n            ", $grouping['outer_select']).",\n            "
+                : '';
+
+            $dimensionJoinClause = $grouping['joins'] !== []
+                ? implode("\n            ", $grouping['joins'])
+                : '';
+
+            $selectMetrics = [];
+            foreach ($aggregations as $alias => $expr) {
+                $lowerExpr = strtolower(trim((string)$expr));
+                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+                $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
+
+                $mapped = match ($lowerExpr) {
+                    'clicks' => 'clicks',
+                    'impressions' => 'impressions',
+                    'ctr' => 'ctr',
+                    default => null,
+                };
+
+                if ($mapped !== null) {
+                    $selectMetrics[] = "f.$mapped AS $quotedAlias";
+                    continue;
+                }
+
+                $strategy = MetricAggregationStrategyRegistry::resolve($lowerExpr);
+                if ($strategy !== null) {
+                    $prefix = $weightedStrategies[$safeAlias]['prefix'] ?? null;
+                    if ($prefix === null) {
+                        return null;
+                    }
+                    $selectMetrics[] = "f.{$prefix}_value AS $quotedAlias";
+                    continue;
+                }
+
+                return null;
+            }
+
+            if ($selectMetrics === []) {
+                return null;
+            }
+
+            $orderSql = '';
+            if ($orderBy !== null && $orderBy !== '') {
+                $direction = strtoupper((string)$orderDir) === 'DESC' ? 'DESC' : 'ASC';
+                $safeOrderBy = preg_replace('/[^a-z0-9_.]/i', '', $orderBy);
+                $orderField = null;
+
+                if (isset($grouping['order_map'][strtolower($safeOrderBy)])) {
+                    $orderField = $grouping['order_map'][strtolower($safeOrderBy)];
+                } elseif ($safeOrderBy !== '') {
+                    $orderField = $safeOrderBy;
+                }
+
+                if ($orderField !== null) {
+                    $orderSql = " ORDER BY $orderField $direction";
+                }
+            }
+
+            $weightedPairSql = implode(",\n        ", $weightedPairColumns);
+            $weightedComputedSql = implode(",\n        ", $weightedComputedSelect);
+
+            $sql = "WITH base AS (
+            SELECT
+                m.metric_date,
+                mc.channel,
+                mc.page_id,
+                mc.query_id,
+                mc.country_id,
+                mc.device_id,
+                mc.dimension_set_id,
+                mc.name,
+                mc.period,
+                m.value
+            $valueSource
+            WHERE $baseWhereSql
+        ),
+        paired AS (
+            SELECT
+                b.metric_date,
+                b.channel,
+                b.page_id,
+                b.query_id,
+                b.country_id,
+                b.device_id,
+                b.dimension_set_id,
+                SUM(CASE WHEN b.name IN ('clicks', 'clicks_daily') THEN b.value ELSE 0 END) AS clicks_value,
+                SUM(CASE WHEN b.name IN ($firstWeightNameList) THEN b.value ELSE 0 END) AS impressions_value,
+                $weightedPairSql
+            FROM base b
+            GROUP BY b.metric_date, b.channel, b.page_id, b.query_id, b.country_id, b.device_id, b.dimension_set_id
+        ),
+        finalized AS (
+            SELECT
+                $finalGroupProjection
+                SUM(COALESCE(p.clicks_value, 0)) AS clicks,
+                SUM(COALESCE(p.impressions_value, 0)) AS impressions,
+                SUM(COALESCE(p.clicks_value, 0)) / NULLIF(SUM(COALESCE(p.impressions_value, 0)), 0) AS ctr,
+                $weightedComputedSql
+            FROM paired p
+            $dimensionJoinClause$finalGroupByClause
+        )
+        SELECT
+            $outerGroupProjection
+            ".implode(",\n    ", $selectMetrics)."
+        FROM finalized f".$orderSql;
+
+            return $connection->fetchAllAssociative(
+                $sql,
+                $params
+            );
+        }
+
+        /**
+         * @param array<string, string> $aggregations
+         * @return array<string, array<string, mixed>>
+         * @throws ConfigurationException
+         */
+        protected function resolveWeightedAggregationStrategies(array $aggregations): array
+        {
+            $strategies = [];
+            foreach ($aggregations as $alias => $expr) {
+                $normalizedExpr = strtolower(trim((string)$expr));
+                $strategy = MetricAggregationStrategyRegistry::resolve($normalizedExpr);
+                if ($strategy === null || ($strategy['method'] ?? null) !== MetricAggregationStrategyRegistry::METHOD_WEIGHTED_BY_METRIC) {
+                    continue;
+                }
+
+                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+                $strategies[$safeAlias] = [
+                    ...$strategy,
+                    'alias'               => $safeAlias,
+                    'quoted_alias'        => Helpers::isPostgres() ? '"'.$safeAlias.'"' : '`'.$safeAlias.'`',
+                    'prefix'              => 'wm_'.count($strategies),
+                    'source_metric_names' => array_values(array_unique(array_map('strtolower', (array)($strategy['source_metric_names'] ?? [$normalizedExpr])))),
+                    'weight_metric_names' => array_values(array_unique(array_map('strtolower', (array)($strategy['weight_metric_names'] ?? [])))),
+                ];
+
+                if ($strategies[$safeAlias]['weight_metric_names'] === []) {
+                    unset($strategies[$safeAlias]);
+                }
+            }
+
+            return $strategies;
+        }
+
+        /**
+         * @param array<int, string> $values
+         */
+        protected function toSqlStringList(array $values): string
+        {
+            $escaped = array_map(static function (string $value): string {
+                return "'".str_replace("'", "''", strtolower(trim($value)))."'";
+            }, $values);
+
+            return implode(',', $escaped);
+        }
+
+        /**
+         * @param array<int, string> $groupBy
+         */
+        protected function resolveGroupPattern(array $groupBy): ?string
+        {
+            if ($groupBy === []) {
+                return 'none';
+            }
+
+            if (count($groupBy) === 1 && in_array($groupBy[0], ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+                return $groupBy[0];
+            }
+
+            if (count($groupBy) === 1 && in_array($groupBy[0], ['dimensions.query', 'dimensions.page', 'dimensions.country', 'dimensions.device'], true)) {
+                return $groupBy[0];
+            }
+
+            $canonical = $this->canonicalizeGroupPattern($groupBy);
+            if ($canonical === $this->canonicalizeGroupPattern(['dimensions.country', 'dimensions.device'])) {
+                return 'dimensions.country+dimensions.device';
+            }
+
+            return null;
+        }
+
+        /**
+         * @param array<int, string> $groupBy
+         * @param array<string, array<string, mixed>> $weightedStrategies
+         */
+        protected function isGroupPatternAllowedForWeightedStrategies(array $groupBy, array $weightedStrategies): bool
+        {
+            $groupCanonical = $this->canonicalizeGroupPattern($groupBy);
+
+            foreach ($weightedStrategies as $strategy) {
+                $allowedPatterns = $strategy['allowed_group_by_patterns'] ?? [];
+                if ($allowedPatterns === []) {
+                    return false;
+                }
+
+                $isAllowed = false;
+                foreach ($allowedPatterns as $pattern) {
+                    $normalizedPattern = array_values(array_map(static fn($field) => strtolower(trim((string)$field)), (array)$pattern));
+                    if ($this->canonicalizeGroupPattern($normalizedPattern) === $groupCanonical) {
+                        $isAllowed = true;
+                        break;
+                    }
+                }
+
+                if (!$isAllowed) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /**
+         * @param array<int, string> $groupBy
+         */
+        protected function canonicalizeGroupPattern(array $groupBy): string
+        {
+            $normalized = array_values(array_map(static fn($field) => strtolower(trim((string)$field)), $groupBy));
+            sort($normalized);
+
+            return implode('|', $normalized);
+        }
+
+        /**
+         * @return array<string, mixed>|null
+         */
+        protected function buildWeightedGroupingConfig(string $groupPattern, bool $isPostgres, string $quoteChar): ?array
+        {
+            $dimAlias = static fn(string $name): string => $quoteChar.$name.$quoteChar;
+
+            return match ($groupPattern) {
+                'none' => [
+                    'final_select' => [],
+                    'group_by' => [],
+                    'outer_select' => [],
+                    'joins' => [],
+                    'order_map' => [],
+                ],
+                'daily' => [
+                    'final_select' => ['p.metric_date AS group_value'],
+                    'group_by' => ['p.metric_date'],
+                    'outer_select' => ['f.group_value AS '.$dimAlias('daily')],
+                    'joins' => [],
+                    'order_map' => ['daily' => $dimAlias('daily')],
+                ],
+                'weekly' => [
+                    'final_select' => [
+                        $this->buildTemporalBucketExpression('weekly', $isPostgres, 'p.metric_date').' AS group_value',
+                    ],
+                    'group_by' => [
+                        $this->buildTemporalBucketExpression('weekly', $isPostgres, 'p.metric_date'),
+                    ],
+                    'outer_select' => ['f.group_value AS '.$dimAlias('weekly')],
+                    'joins' => [],
+                    'order_map' => ['weekly' => $dimAlias('weekly')],
+                ],
+                'monthly' => [
+                    'final_select' => [
+                        $this->buildTemporalBucketExpression('monthly', $isPostgres, 'p.metric_date').' AS group_value',
+                    ],
+                    'group_by' => [
+                        $this->buildTemporalBucketExpression('monthly', $isPostgres, 'p.metric_date'),
+                    ],
+                    'outer_select' => ['f.group_value AS '.$dimAlias('monthly')],
+                    'joins' => [],
+                    'order_map' => ['monthly' => $dimAlias('monthly')],
+                ],
+                'quarterly' => [
+                    'final_select' => [
+                        $this->buildTemporalBucketExpression('quarterly', $isPostgres, 'p.metric_date').' AS group_value',
+                    ],
+                    'group_by' => [
+                        $this->buildTemporalBucketExpression('quarterly', $isPostgres, 'p.metric_date'),
+                    ],
+                    'outer_select' => ['f.group_value AS '.$dimAlias('quarterly')],
+                    'joins' => [],
+                    'order_map' => ['quarterly' => $dimAlias('quarterly')],
+                ],
+                'yearly' => [
+                    'final_select' => [
+                        $this->buildTemporalBucketExpression('yearly', $isPostgres, 'p.metric_date').' AS group_value',
+                    ],
+                    'group_by' => [
+                        $this->buildTemporalBucketExpression('yearly', $isPostgres, 'p.metric_date'),
+                    ],
+                    'outer_select' => ['f.group_value AS '.$dimAlias('yearly')],
+                    'joins' => [],
+                    'order_map' => ['yearly' => $dimAlias('yearly')],
+                ],
+                'dimensions.query' => [
+                    'final_select' => ["COALESCE(q.query, 'unknown') AS group_value"],
+                    'group_by' => ["COALESCE(q.query, 'unknown')"],
+                    'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.query')],
+                    'joins' => ['LEFT JOIN queries q ON q.id = p.query_id'],
+                    'order_map' => ['dimensions.query' => $dimAlias('dimensions.query')],
+                ],
+                'dimensions.page' => [
+                    'final_select' => ["COALESCE(pg.url, 'unknown') AS group_value"],
+                    'group_by' => ["COALESCE(pg.url, 'unknown')"],
+                    'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.page')],
+                    'joins' => ['LEFT JOIN pages pg ON pg.id = p.page_id'],
+                    'order_map' => ['dimensions.page' => $dimAlias('dimensions.page')],
+                ],
+                'dimensions.country' => [
+                    'final_select' => ["COALESCE(c.name, 'unknown') AS group_value"],
+                    'group_by' => ["COALESCE(c.name, 'unknown')"],
+                    'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.country')],
+                    'joins' => ['LEFT JOIN countries c ON c.id = p.country_id'],
+                    'order_map' => ['dimensions.country' => $dimAlias('dimensions.country')],
+                ],
+                'dimensions.device' => [
+                    'final_select' => ["COALESCE(d.type, 'unknown') AS group_value"],
+                    'group_by' => ["COALESCE(d.type, 'unknown')"],
+                    'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.device')],
+                    'joins' => ['LEFT JOIN devices d ON d.id = p.device_id'],
+                    'order_map' => ['dimensions.device' => $dimAlias('dimensions.device')],
+                ],
+                'dimensions.country+dimensions.device' => [
+                    'final_select' => [
+                        "COALESCE(c.name, 'unknown') AS group_country",
+                        "COALESCE(d.type, 'unknown') AS group_device",
+                    ],
+                    'group_by' => [
+                        "COALESCE(c.name, 'unknown')",
+                        "COALESCE(d.type, 'unknown')",
+                    ],
+                    'outer_select' => [
+                        'f.group_country AS '.$dimAlias('dimensions.country'),
+                        'f.group_device AS '.$dimAlias('dimensions.device'),
+                    ],
+                    'joins' => [
+                        'LEFT JOIN countries c ON c.id = p.country_id',
+                        'LEFT JOIN devices d ON d.id = p.device_id',
+                    ],
+                    'order_map' => [
+                        'dimensions.country' => $dimAlias('dimensions.country'),
+                        'dimensions.device' => $dimAlias('dimensions.device'),
+                    ],
+                ],
+                default => null,
+            };
+        }
+
+        protected function buildTemporalBucketExpression(string $granularity, bool $isPostgres, string $dateColumn): string
+        {
+            if ($isPostgres) {
+                return match ($granularity) {
+                    'weekly' => "TO_CHAR($dateColumn, 'IYYY-\"W\"IW')",
+                    'monthly' => "TO_CHAR($dateColumn, 'YYYY-MM')",
+                    'quarterly' => "CONCAT(TO_CHAR($dateColumn, 'YYYY'), '-Q', EXTRACT(QUARTER FROM $dateColumn))",
+                    'yearly' => "TO_CHAR($dateColumn, 'YYYY')",
+                    default => "TO_CHAR($dateColumn, 'YYYY-MM-DD')",
+                };
+            }
+
+            return match ($granularity) {
+                'weekly' => "DATE_FORMAT($dateColumn, '%x-W%v')",
+                'monthly' => "DATE_FORMAT($dateColumn, '%Y-%m')",
+                'quarterly' => "CONCAT(YEAR($dateColumn), '-Q', QUARTER($dateColumn))",
+                'yearly' => "DATE_FORMAT($dateColumn, '%Y')",
+                default => "DATE_FORMAT($dateColumn, '%Y-%m-%d')",
+            };
+        }
+
+        /**
          * Fills gaps in a time series result set with zeroed-out records.
+         * @throws Exception
          */
         protected function fillTemporalGaps(
             array  $results,
@@ -586,8 +1097,8 @@
             array  $groupBy
         ): array
         {
-            $start = new \DateTime($startDate);
-            $end = new \DateTime($endDate);
+            $start = new DateTime($startDate);
+            $end = new DateTime($endDate);
             $periods = [];
 
             // Generate all expected periods

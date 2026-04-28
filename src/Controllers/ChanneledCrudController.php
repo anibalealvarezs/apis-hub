@@ -453,7 +453,12 @@ class ChanneledCrudController extends BaseController
                 return $this->createResponse(
                     data: $cachedData,
                     status: 'success',
-                    meta: ['cached' => true, 'cache_type' => $cacheType]
+                    meta: [
+                        'cached' => true,
+                        'cache_type' => $cacheType,
+                        'cacheable' => true,
+                        'cache_key' => $cacheKey
+                    ]
                 );
             }
             // ---------------------------
@@ -479,14 +484,20 @@ class ChanneledCrudController extends BaseController
             $logger->info("===========================");
 
             // --- Cache the results ---
-            if ($cacheKey && !empty($data)) {
+            if ($cacheKey) {
                 CacheStrategyService::set($cacheKey, $data, $cacheType);
             }
             // -------------------------
 
             return $this->createResponse(
                 data: $data,
-                status: 'success'
+                status: 'success',
+                meta: [
+                    'cached' => false,
+                    'cache_type' => $cacheType,
+                    'cacheable' => (bool) $cacheKey,
+                    'cache_key' => $cacheKey
+                ]
             );
         } catch (InvalidArgumentException $e) {
             return $this->createResponse(

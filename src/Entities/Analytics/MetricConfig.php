@@ -39,6 +39,26 @@
         columns: ['channel', 'page_id', 'query_id', 'dimension_set_id', 'name', 'id'],
         name: 'idx_metric_configs_position_lookup_idx'
     )]
+    #[ORM\Index(
+        columns: ['channel', 'page_id', 'dimension_set_id', 'name', 'id'],
+        name: 'idx_metric_configs_page_dimension_lookup_idx'
+    )]
+    #[ORM\Index(
+        columns: ['channel', 'page_id', 'post_id', 'dimension_set_id', 'name'],
+        name: 'idx_metric_configs_page_post_dimension_lookup_idx'
+    )]
+    #[ORM\Index(
+        columns: ['channel', 'channeled_account_id', 'campaign_id', 'dimension_set_id', 'name'],
+        name: 'idx_metric_configs_campaign_dimension_lookup_idx'
+    )]
+    #[ORM\Index(
+        columns: ['channel', 'channeled_campaign_id', 'channeled_ad_group_id', 'dimension_set_id', 'name'],
+        name: 'idx_metric_configs_ad_group_dimension_lookup_idx'
+    )]
+    #[ORM\Index(
+        columns: ['channel', 'channeled_ad_group_id', 'channeled_ad_id', 'creative_id', 'dimension_set_id', 'name'],
+        name: 'idx_metric_configs_ad_creative_dimension_lookup_idx'
+    )]
     #[ORM\UniqueConstraint(name: 'metric_config_signature_unique', columns: ['config_signature'])]
     class MetricConfig extends Entity
     {
