@@ -1,104 +1,105 @@
 {
-  "name": "anibalealvarezs/apis-hub",
-  "description": "A headless data extraction and caching engine tailored for Analytics and E-commerce integrations.",
-  "license": "MIT",
-  "keywords": [
-    "apis-hub",
-    "headless",
-    "etl",
-    "analytics",
-    "caching",
-    "redis",
-    "doctrine-orm",
-    "php-cli"
-  ],
-  "homepage": "https://github.com/anibalealvarezs/apis-hub",
-  "authors": [
-    {
-      "name": "Aníbal Álvarez",
-      "email": "anibalealvarezs@gmail.com"
-    }
-  ],
-  "support": {
-    "issues": "https://github.com/anibalealvarezs/apis-hub/issues"
-  },
-  "require": {
-    "php": ">=8.1",
-    "ext-json": "*",
-    "anibalealvarezs/api-client-skeleton": "dev-main",
-    "anibalealvarezs/api-driver-core": "dev-main",
-    "anibalealvarezs/facebook-graph-api": "dev-main",
-    "anibalealvarezs/google-api": "dev-develop",
-    "doctrine/orm": "^2.12.3",
-    "doctrine/dbal": "^3.3.7",
-    "fakerphp/faker": "^1.20",
-    "nesbot/carbon": "^2.61",
-    "symfony/yaml": "^6.0 || ^7.0",
-    "symfony/config": "^6.1",
-    "symfony/routing": "^6.1",
-    "symfony/http-foundation": "^6.1",
-    "symfony/http-kernel": "^6.1",
-    "symfony/cache": "^6.1",
-    "symfony/console": "^6.0",
-    "symfony/redis-messenger": "^6.0 || ^7.0",
-    "symfony/cache-contracts": "^3.0",
-    "predis/predis": "^2.0",
-    "anibalealvarezs/google-hub-driver": "dev-main",
-    "anibalealvarezs/meta-hub-driver": "dev-main",
-    "anibalealvarezs/klaviyo-hub-driver": "dev-main",
-    "anibalealvarezs/shopify-hub-driver": "dev-main",
-    "anibalealvarezs/netsuite-hub-driver": "dev-main",
-    "anibalealvarezs/amazon-hub-driver": "dev-main",
-    "anibalealvarezs/bigcommerce-hub-driver": "dev-main",
-    "anibalealvarezs/pinterest-hub-driver": "dev-main",
-    "anibalealvarezs/linkedin-hub-driver": "dev-main",
-    "anibalealvarezs/tiktok-hub-driver": "dev-main",
-    "anibalealvarezs/x-hub-driver": "dev-main",
-    "anibalealvarezs/triple-whale-hub-driver": "dev-main"
-  },
-  "autoload": {
-    "psr-4": {
-      "Classes\\": "src/Classes/",
-      "Commands\\": "src/Commands/",
-      "Controllers\\": "src/Controllers/",
-      "Core\\": "src/Core/",
-      "Channels\\": "src/Channels/",
-      "Entities\\": "src/Entities/",
-      "Enums\\": "src/Enums/",
-      "Exceptions\\": "src/Exceptions/",
-      "Fixtures\\": "src/Fixtures/",
-      "Helpers\\": "src/Helpers/",
-      "Interfaces\\": "src/Interfaces/",
-      "Repositories\\": "src/Repositories/",
-      "Routes\\": "src/Routes/",
-      "Services\\": "src/Services/",
-      "Traits\\": "src/Traits/"
-    }
-  },
-  "autoload-dev": {
-    "psr-4": {
-      "Tests\\": "tests/"
-    }
-  },
-  "require-dev": {
-    "doctrine/data-fixtures": "^1.5.3",
-    "phpbench/phpbench": "^1.2.6",
-    "phpunit/phpunit": "^9",
-    "mikey179/vfsstream": "2.0.x-dev",
-    "phpstan/phpstan": "^1.10"
-  },
-  "repositories": [
-    {
-      "type": "composer",
-      "url": "https://satis.anibalalvarez.com/"
-    }
-  ],
-  "minimum-stability": "dev",
-  "prefer-stable": true,
-  "config": {
-    "platform": {
-      "php": "8.3.30"
+    "name": "anibalealvarezs/apis-hub",
+    "description": "A headless data extraction and caching engine tailored for Analytics and E-commerce integrations.",
+    "license": "MIT",
+    "keywords": [
+        "apis-hub",
+        "headless",
+        "etl",
+        "analytics",
+        "caching",
+        "redis",
+        "doctrine-orm",
+        "php-cli"
+    ],
+    "homepage": "https://github.com/anibalealvarezs/apis-hub",
+    "authors": [
+        {
+            "name": "Aníbal Álvarez",
+            "email": "anibalealvarezs@gmail.com"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/anibalealvarezs/apis-hub/issues"
     },
-    "platform-check": false
-  }
+    "require": {
+        "php": ">=8.1",
+        "ext-json": "*",
+        "anibalealvarezs/api-client-skeleton": "dev-main",
+        "anibalealvarezs/api-driver-core": "dev-main",
+        "anibalealvarezs/facebook-graph-api": "dev-main",
+        "anibalealvarezs/google-api": "dev-develop",
+        "doctrine/orm": "^2.12.3",
+        "doctrine/dbal": "^3.3.7",
+        "fakerphp/faker": "^1.20",
+        "nesbot/carbon": "^2.61",
+        "symfony/yaml": "^6.0 || ^7.0",
+        "symfony/config": "^6.1",
+        "symfony/routing": "^6.1",
+        "symfony/http-foundation": "^6.1",
+        "symfony/http-kernel": "^6.1",
+        "symfony/cache": "^6.1",
+        "symfony/console": "^6.0",
+        "symfony/redis-messenger": "^6.0 || ^7.0",
+        "symfony/cache-contracts": "^3.0",
+        "predis/predis": "^2.0",
+        "anibalealvarezs/google-hub-driver": "dev-main",
+        "anibalealvarezs/meta-hub-driver": "dev-main",
+        "anibalealvarezs/klaviyo-hub-driver": "dev-main",
+        "anibalealvarezs/shopify-hub-driver": "dev-main",
+        "anibalealvarezs/netsuite-hub-driver": "dev-main",
+        "anibalealvarezs/amazon-hub-driver": "dev-main",
+        "anibalealvarezs/bigcommerce-hub-driver": "dev-main",
+        "anibalealvarezs/pinterest-hub-driver": "dev-main",
+        "anibalealvarezs/linkedin-hub-driver": "dev-main",
+        "anibalealvarezs/tiktok-hub-driver": "dev-main",
+        "anibalealvarezs/x-hub-driver": "dev-main",
+        "anibalealvarezs/triple-whale-hub-driver": "dev-main"
+    },
+    "autoload": {
+        "psr-4": {
+            "Classes\\": "src/Classes/",
+            "Commands\\": "src/Commands/",
+            "Controllers\\": "src/Controllers/",
+            "Core\\": "src/Core/",
+            "Channels\\": "src/Channels/",
+            "Entities\\": "src/Entities/",
+            "Enums\\": "src/Enums/",
+            "Exceptions\\": "src/Exceptions/",
+            "Fixtures\\": "src/Fixtures/",
+            "Helpers\\": "src/Helpers/",
+            "Interfaces\\": "src/Interfaces/",
+            "Repositories\\": "src/Repositories/",
+            "Routes\\": "src/Routes/",
+            "Services\\": "src/Services/",
+            "Traits\\": "src/Traits/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "require-dev": {
+        "doctrine/instantiator": "^1.5",
+        "mikey179/vfsstream": "2.0.x-dev",
+        "doctrine/data-fixtures": "^1.5.3",
+        "phpstan/phpstan": "^1.10",
+        "phpbench/phpbench": "^1.2.6",
+        "phpunit/phpunit": "^9"
+    },
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://satis.anibalalvarez.com/"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "platform": {
+            "php": "8.3.30"
+        },
+        "platform-check": false
+    }
 }

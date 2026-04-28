@@ -808,7 +808,8 @@ class Helpers
                         self::$connection->executeQuery('SELECT 1');
                     } catch (Exception $e) {
                         self::$connection->close();
-                        self::$connection->connect();
+                        // DBAL reconnects lazily on next query execution.
+                        self::$connection->executeQuery('SELECT 1');
                     }
                 }
 
@@ -1203,8 +1204,10 @@ class Helpers
         try {
             $em->getConnection()->executeQuery('SELECT 1');
         } catch (Exception $e) {
-            $em->getConnection()->close();
-            $em->getConnection()->connect();
+            $connection = $em->getConnection();
+            $connection->close();
+            // DBAL reconnects lazily on the next query execution.
+            $connection->executeQuery('SELECT 1');
         }
     }
 
