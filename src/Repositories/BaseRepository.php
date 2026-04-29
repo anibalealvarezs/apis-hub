@@ -909,7 +909,7 @@
                 return $groupBy[0];
             }
 
-            if (count($groupBy) === 1 && in_array($groupBy[0], ['dimensions.query', 'dimensions.page', 'dimensions.country', 'dimensions.device'], true)) {
+            if (count($groupBy) === 1 && in_array($groupBy[0], ['dimensions.query', 'dimensions.page', 'dimensions.country', 'dimensions.device', 'dimensions.searchAppearance'], true)) {
                 return $groupBy[0];
             }
 
@@ -1050,6 +1050,21 @@
                         "LEFT JOIN dimension_values dv_page ON dv_page.id = dsi_page.dimension_value_id"
                     ],
                     'order_map'    => ['dimensions.page' => $dimAlias('dimensions.page')],
+                ],
+                'dimensions.searchAppearance' => [
+                    'final_select' => ["COALESCE(dv_sa.value, 'unknown') AS group_value"],
+                    'group_by'     => ["COALESCE(dv_sa.value, 'unknown')"],
+                    'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.searchAppearance')],
+                    'joins'        => [
+                        "LEFT JOIN dimension_set_items dsi_sa ON dsi_sa.dimension_set_id = p.dimension_set_id
+                            AND dsi_sa.dimension_value_id IN (
+                                SELECT dka_v.id FROM dimension_values dka_v 
+                                JOIN dimension_keys dka_k ON dka_k.id = dka_v.dimension_key_id 
+                                WHERE LOWER(dka_k.name) = 'searchappearance'
+                            )",
+                        "LEFT JOIN dimension_values dv_sa ON dv_sa.id = dsi_sa.dimension_value_id"
+                    ],
+                    'order_map'    => ['dimensions.searchAppearance' => $dimAlias('dimensions.searchAppearance')],
                 ],
                 'dimensions.country' => [
                     'final_select' => ["COALESCE(c.name, 'unknown') AS group_value"],
