@@ -1054,7 +1054,6 @@ async function updateConfig(typeArg) {
             
             const calcSynthEl = document.getElementById('gsc-calculate-synthetics');
             payload.feature_toggles.calculate_synthetics = calcSynthEl ? calcSynthEl.checked : false;
-            console.log("DEBUG GSC Save - Toggle element:", calcSynthEl, "Checked state sent:", payload.feature_toggles.calculate_synthetics);
         } else if (typeArg === 'facebook_organic') {
             payload.enabled = document.getElementById('fb-organic-enabled').checked;
             payload.organic_history_range = document.getElementById('fb-organic-history-range').value;
