@@ -1037,10 +1037,16 @@
                     'order_map'    => ['dimensions.query' => $dimAlias('dimensions.query')],
                 ],
                 'dimensions.page' => [
-                    'final_select' => ["COALESCE(pg.url, 'unknown') AS group_value"],
-                    'group_by'     => ["COALESCE(pg.url, 'unknown')"],
+                    'final_select' => ["COALESCE(dv_page.value, 'unknown') AS group_value"],
+                    'group_by'     => ["COALESCE(dv_page.value, 'unknown')"],
                     'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.page')],
-                    'joins'        => ['LEFT JOIN pages pg ON pg.id = p.page_id'],
+                    'joins'        => [
+                        'LEFT JOIN dimension_set_items dsi_page ON dsi_page.dimension_set_id = p.dimension_set_id',
+                        "LEFT JOIN dimension_values dv_page ON dv_page.id = dsi_page.dimension_value_id
+                            AND dv_page.dimension_key_id IN (
+                                SELECT dkp.id FROM dimension_keys dkp WHERE LOWER(dkp.name) = 'page'
+                            )",
+                    ],
                     'order_map'    => ['dimensions.page' => $dimAlias('dimensions.page')],
                 ],
                 'dimensions.country' => [
