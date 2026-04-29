@@ -215,6 +215,11 @@ function populateGlobalFields() {
         const gscStatus = document.getElementById('gsc-channel-enabled');
         if (gscStatus) gscStatus.checked = !!currentConfig.gsc_enabled;
 
+        const gscCalcSynth = document.getElementById('gsc-calculate-synthetics');
+        if (gscCalcSynth) {
+            gscCalcSynth.checked = !!(currentConfig.gsc_calculate_synthetics || currentConfig.google_search_console?.calculate_synthetics);
+        }
+
         const fbOrganicStatus = document.getElementById('fb-organic-enabled');
         if (fbOrganicStatus) fbOrganicStatus.checked = !!currentConfig.fb_organic_enabled;
 
@@ -1046,6 +1051,7 @@ async function updateConfig(typeArg) {
             payload.cache_history_range = document.getElementById('gsc-history-range')?.value;
             payload.feature_toggles.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
             payload.feature_toggles.cron_recent_minute = document.getElementById('gsc-cron-minute')?.value;
+            payload.feature_toggles.calculate_synthetics = document.getElementById('gsc-calculate-synthetics')?.checked;
         } else if (typeArg === 'facebook_organic') {
             payload.enabled = document.getElementById('fb-organic-enabled').checked;
             payload.organic_history_range = document.getElementById('fb-organic-history-range').value;
