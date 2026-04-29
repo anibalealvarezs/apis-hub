@@ -675,11 +675,11 @@
             $quoteChar = $isPostgres ? '"' : '`';
 
             $valueSource = $this->isChanneledMetric
-                ? 'FROM channeled_metrics e
-                   JOIN metrics m ON e.metric_id = m.id
-                   JOIN metric_configs mc ON mc.id = m.metric_config_id'
-                : 'FROM metrics m
-                   JOIN metric_configs mc ON mc.id = m.metric_config_id';
+                ? 'FROM metric_configs mc
+                   JOIN metrics m ON m.metric_config_id = mc.id
+                   JOIN channeled_metrics e ON e.metric_id = m.id'
+                : 'FROM metric_configs mc
+                   JOIN metrics m ON m.metric_config_id = mc.id';
 
             $baseMetricNames = ['clicks', 'clicks_daily'];
             foreach ($weightedStrategies as $strategy) {
@@ -1041,11 +1041,13 @@
                     'group_by'     => ["COALESCE(dv_page.value, 'unknown')"],
                     'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.page')],
                     'joins'        => [
-                        'LEFT JOIN dimension_set_items dsi_page ON dsi_page.dimension_set_id = p.dimension_set_id',
-                        "LEFT JOIN dimension_values dv_page ON dv_page.id = dsi_page.dimension_value_id
-                            AND dv_page.dimension_key_id IN (
-                                SELECT dkp.id FROM dimension_keys dkp WHERE LOWER(dkp.name) = 'page'
+                        "LEFT JOIN dimension_set_items dsi_page ON dsi_page.dimension_set_id = p.dimension_set_id
+                            AND dsi_page.dimension_value_id IN (
+                                SELECT dkp_v.id FROM dimension_values dkp_v 
+                                JOIN dimension_keys dkp_k ON dkp_k.id = dkp_v.dimension_key_id 
+                                WHERE LOWER(dkp_k.name) = 'page'
                             )",
+                        "LEFT JOIN dimension_values dv_page ON dv_page.id = dsi_page.dimension_value_id"
                     ],
                     'order_map'    => ['dimensions.page' => $dimAlias('dimensions.page')],
                 ],
