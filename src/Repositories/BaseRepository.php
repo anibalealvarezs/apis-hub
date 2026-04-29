@@ -590,6 +590,18 @@
         /**
          * Optimized path for query-level weighted metric aggregation.
          * Avoids correlated subqueries by pre-aggregating weight metrics in a CTE.
+         * @param Connection $connection
+         * @param array $aggregations
+         * @param array $groupBy
+         * @param object|null $filters
+         * @param string|null $startDate
+         * @param string|null $endDate
+         * @param string|null $orderBy
+         * @param string|null $orderDir
+         * @param bool $isMetric
+         * @param bool $isPostgres
+         * @return array|null
+         * @throws ConfigurationException
          * @throws \Doctrine\DBAL\Exception
          */
         protected function tryOptimizedWeightedMetricAggregate(
@@ -620,7 +632,7 @@
                 }
             }
 
-            $allowedFilterKeys = ['page', 'debug_sql', '_'];
+            $allowedFilterKeys = ['page', 'channel', 'debug_sql', '_'];
             foreach (array_keys($filtersArr) as $key) {
                 if (!in_array($key, $allowedFilterKeys, true)) {
                     return null;
@@ -629,6 +641,11 @@
 
             $page = $filtersArr['page'] ?? null;
             if ($page !== null && !is_numeric($page)) {
+                return null;
+            }
+
+            $channel = $filtersArr['channel'] ?? null;
+            if ($channel !== null && (!is_string($channel) || trim($channel) === '')) {
                 return null;
             }
 
@@ -679,11 +696,15 @@
             ];
             $params = [
                 'startDate' => $startDate,
-                'endDate' => $endDate,
+                'endDate'   => $endDate,
             ];
             if ($page !== null) {
                 $baseWhere[] = 'mc.page_id = :pageId';
                 $params['pageId'] = (int)$page;
+            }
+            if ($channel !== null) {
+                $baseWhere[] = 'mc.channel = :channel';
+                $params['channel'] = trim($channel);
             }
             $baseWhereSql = implode("\n      AND ", $baseWhere);
 
@@ -845,7 +866,7 @@
                     continue;
                 }
 
-                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', $alias) ?: $alias;
                 $strategies[$safeAlias] = [
                     ...$strategy,
                     'alias'               => $safeAlias,
@@ -952,96 +973,96 @@
             return match ($groupPattern) {
                 'none' => [
                     'final_select' => [],
-                    'group_by' => [],
+                    'group_by'     => [],
                     'outer_select' => [],
-                    'joins' => [],
-                    'order_map' => [],
+                    'joins'        => [],
+                    'order_map'    => [],
                 ],
                 'daily' => [
                     'final_select' => ['p.metric_date AS group_value'],
-                    'group_by' => ['p.metric_date'],
+                    'group_by'     => ['p.metric_date'],
                     'outer_select' => ['f.group_value AS '.$dimAlias('daily')],
-                    'joins' => [],
-                    'order_map' => ['daily' => $dimAlias('daily')],
+                    'joins'        => [],
+                    'order_map'    => ['daily' => $dimAlias('daily')],
                 ],
                 'weekly' => [
                     'final_select' => [
                         $this->buildTemporalBucketExpression('weekly', $isPostgres, 'p.metric_date').' AS group_value',
                     ],
-                    'group_by' => [
+                    'group_by'     => [
                         $this->buildTemporalBucketExpression('weekly', $isPostgres, 'p.metric_date'),
                     ],
                     'outer_select' => ['f.group_value AS '.$dimAlias('weekly')],
-                    'joins' => [],
-                    'order_map' => ['weekly' => $dimAlias('weekly')],
+                    'joins'        => [],
+                    'order_map'    => ['weekly' => $dimAlias('weekly')],
                 ],
                 'monthly' => [
                     'final_select' => [
                         $this->buildTemporalBucketExpression('monthly', $isPostgres, 'p.metric_date').' AS group_value',
                     ],
-                    'group_by' => [
+                    'group_by'     => [
                         $this->buildTemporalBucketExpression('monthly', $isPostgres, 'p.metric_date'),
                     ],
                     'outer_select' => ['f.group_value AS '.$dimAlias('monthly')],
-                    'joins' => [],
-                    'order_map' => ['monthly' => $dimAlias('monthly')],
+                    'joins'        => [],
+                    'order_map'    => ['monthly' => $dimAlias('monthly')],
                 ],
                 'quarterly' => [
                     'final_select' => [
                         $this->buildTemporalBucketExpression('quarterly', $isPostgres, 'p.metric_date').' AS group_value',
                     ],
-                    'group_by' => [
+                    'group_by'     => [
                         $this->buildTemporalBucketExpression('quarterly', $isPostgres, 'p.metric_date'),
                     ],
                     'outer_select' => ['f.group_value AS '.$dimAlias('quarterly')],
-                    'joins' => [],
-                    'order_map' => ['quarterly' => $dimAlias('quarterly')],
+                    'joins'        => [],
+                    'order_map'    => ['quarterly' => $dimAlias('quarterly')],
                 ],
                 'yearly' => [
                     'final_select' => [
                         $this->buildTemporalBucketExpression('yearly', $isPostgres, 'p.metric_date').' AS group_value',
                     ],
-                    'group_by' => [
+                    'group_by'     => [
                         $this->buildTemporalBucketExpression('yearly', $isPostgres, 'p.metric_date'),
                     ],
                     'outer_select' => ['f.group_value AS '.$dimAlias('yearly')],
-                    'joins' => [],
-                    'order_map' => ['yearly' => $dimAlias('yearly')],
+                    'joins'        => [],
+                    'order_map'    => ['yearly' => $dimAlias('yearly')],
                 ],
                 'dimensions.query' => [
                     'final_select' => ["COALESCE(q.query, 'unknown') AS group_value"],
-                    'group_by' => ["COALESCE(q.query, 'unknown')"],
+                    'group_by'     => ["COALESCE(q.query, 'unknown')"],
                     'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.query')],
-                    'joins' => ['LEFT JOIN queries q ON q.id = p.query_id'],
-                    'order_map' => ['dimensions.query' => $dimAlias('dimensions.query')],
+                    'joins'        => ['LEFT JOIN queries q ON q.id = p.query_id'],
+                    'order_map'    => ['dimensions.query' => $dimAlias('dimensions.query')],
                 ],
                 'dimensions.page' => [
                     'final_select' => ["COALESCE(pg.url, 'unknown') AS group_value"],
-                    'group_by' => ["COALESCE(pg.url, 'unknown')"],
+                    'group_by'     => ["COALESCE(pg.url, 'unknown')"],
                     'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.page')],
-                    'joins' => ['LEFT JOIN pages pg ON pg.id = p.page_id'],
-                    'order_map' => ['dimensions.page' => $dimAlias('dimensions.page')],
+                    'joins'        => ['LEFT JOIN pages pg ON pg.id = p.page_id'],
+                    'order_map'    => ['dimensions.page' => $dimAlias('dimensions.page')],
                 ],
                 'dimensions.country' => [
                     'final_select' => ["COALESCE(c.name, 'unknown') AS group_value"],
-                    'group_by' => ["COALESCE(c.name, 'unknown')"],
+                    'group_by'     => ["COALESCE(c.name, 'unknown')"],
                     'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.country')],
-                    'joins' => ['LEFT JOIN countries c ON c.id = p.country_id'],
-                    'order_map' => ['dimensions.country' => $dimAlias('dimensions.country')],
+                    'joins'        => ['LEFT JOIN countries c ON c.id = p.country_id'],
+                    'order_map'    => ['dimensions.country' => $dimAlias('dimensions.country')],
                 ],
                 'dimensions.device' => [
                     'final_select' => ["COALESCE(d.type, 'unknown') AS group_value"],
-                    'group_by' => ["COALESCE(d.type, 'unknown')"],
+                    'group_by'     => ["COALESCE(d.type, 'unknown')"],
                     'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.device')],
-                    'joins' => ['LEFT JOIN devices d ON d.id = p.device_id'],
-                    'order_map' => ['dimensions.device' => $dimAlias('dimensions.device')],
+                    'joins'        => ['LEFT JOIN devices d ON d.id = p.device_id'],
+                    'order_map'    => ['dimensions.device' => $dimAlias('dimensions.device')],
                 ],
                 'dimensions.country+dimensions.device' => [
                     'final_select' => [
                         "COALESCE(c.name, 'unknown') AS group_country",
                         "COALESCE(d.type, 'unknown') AS group_device",
                     ],
-                    'group_by' => [
+                    'group_by'     => [
                         "COALESCE(c.name, 'unknown')",
                         "COALESCE(d.type, 'unknown')",
                     ],
@@ -1049,13 +1070,13 @@
                         'f.group_country AS '.$dimAlias('dimensions.country'),
                         'f.group_device AS '.$dimAlias('dimensions.device'),
                     ],
-                    'joins' => [
+                    'joins'        => [
                         'LEFT JOIN countries c ON c.id = p.country_id',
                         'LEFT JOIN devices d ON d.id = p.device_id',
                     ],
-                    'order_map' => [
+                    'order_map'    => [
                         'dimensions.country' => $dimAlias('dimensions.country'),
-                        'dimensions.device' => $dimAlias('dimensions.device'),
+                        'dimensions.device'  => $dimAlias('dimensions.device'),
                     ],
                 ],
                 default => null,
