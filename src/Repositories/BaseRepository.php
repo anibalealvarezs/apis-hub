@@ -844,7 +844,7 @@
             FROM metrics m
             JOIN metric_configs mc ON m.metric_config_id = mc.id
             WHERE m.metric_config_id IN (
-                SELECT id FROM metric_configs mc
+                SELECT id FROM metric_configs mc2
                 WHERE $baseWhereSql
             )
             AND m.metric_date >= :startDate
@@ -882,10 +882,11 @@
         LEFT JOIN LATERAL (
             SELECT mc2.page_id, mc2.query_id, mc2.country_id, mc2.device_id, mc2.dimension_set_id
             FROM metric_configs mc2
-            WHERE mc2.dimensions_hash = f.dimensions_hash
+            JOIN metrics m2 ON m2.metric_config_id = mc2.id
+            WHERE m2.dimensions_hash = f.dimensions_hash
             LIMIT 1
         ) mc ON TRUE
-        ".$orderSql;
+        $orderSql";
 
             return $connection->fetchAllAssociative(
                 $sql,
