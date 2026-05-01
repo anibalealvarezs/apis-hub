@@ -621,6 +621,10 @@
                 return null;
             }
 
+            if (!$isPostgres) {
+                return null;
+            }
+
             if ($startDate === null || $endDate === null) {
                 return null;
             }
@@ -632,7 +636,11 @@
                 }
             }
 
-            $allowedFilterKeys = ['page', 'channel', 'debug_sql', '_'];
+            $allowedFilterKeys = [
+                'page', 'channel', 'debug_sql', '_',
+                'country', 'device', 'query',
+                'dimensions.country', 'dimensions.device', 'dimensions.query'
+            ];
             foreach (array_keys($filtersArr) as $key) {
                 if (!in_array($key, $allowedFilterKeys, true)) {
                     return null;
@@ -645,7 +653,22 @@
             }
 
             $channel = $filtersArr['channel'] ?? null;
-            if ($channel !== null && (!is_string($channel) || trim($channel) === '')) {
+            if ($channel !== null && (!is_string($channel) && !is_numeric($channel))) {
+                return null;
+            }
+
+            $country = $filtersArr['country'] ?? $filtersArr['dimensions.country'] ?? null;
+            if ($country !== null && !is_numeric($country)) {
+                return null;
+            }
+
+            $device = $filtersArr['device'] ?? $filtersArr['dimensions.device'] ?? null;
+            if ($device !== null && !is_numeric($device)) {
+                return null;
+            }
+
+            $query = $filtersArr['query'] ?? $filtersArr['dimensions.query'] ?? null;
+            if ($query !== null && !is_numeric($query)) {
                 return null;
             }
 
@@ -659,6 +682,7 @@
 
             $weightedStrategies = $this->resolveWeightedAggregationStrategies($aggregations);
             if ($weightedStrategies === []) {
+                fwrite(STDERR, "DEBUG REPO: No weighted strategies found for: " . implode(', ', array_values($aggregations)) . "\n");
                 return null;
             }
 
@@ -704,7 +728,19 @@
             }
             if ($channel !== null) {
                 $baseWhere[] = 'mc.channel = :channel';
-                $params['channel'] = trim($channel);
+                $params['channel'] = (int)$channel;
+            }
+            if ($country !== null) {
+                $baseWhere[] = 'mc.country_id = :countryId';
+                $params['countryId'] = (int)$country;
+            }
+            if ($device !== null) {
+                $baseWhere[] = 'mc.device_id = :deviceId';
+                $params['deviceId'] = (int)$device;
+            }
+            if ($query !== null) {
+                $baseWhere[] = 'mc.query_id = :queryId';
+                $params['queryId'] = (int)$query;
             }
             $baseWhereSql = implode("\n      AND ", $baseWhere);
 
@@ -1253,7 +1289,7 @@
                 'cpc'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('clicks', 'clicks_daily')" : "mc.name IN ('clicks', 'clicks_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0)",
                 'cpm'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / (NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'impressions_daily')" : "mc.name IN ('impressions', 'impressions_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0) / 1000)",
                 'position'                     => $this->needsImpressionsJoin ?
-                    "SUM(CASE WHEN mc.name = 'position' THEN $valCol * (SELECT m2.value FROM metrics m2 JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id WHERE mc2.name IN ('impressions', 'page_media_view', 'post_media_view') AND m2.metric_date = ".($this->isChanneledMetric ? "m.metric_date" : "e.metric_date")." AND mc2.channel = mc.channel AND (mc2.dimension_set_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.dimension_set_id) AND (mc2.query_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.query_id) AND (mc2.page_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.page_id) LIMIT 1) ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0)" :
+                    "SUM(CASE WHEN mc.name = 'position' THEN $valCol * (SELECT m2.value FROM metrics m2 JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id WHERE mc2.name IN ('impressions', 'page_media_view', 'post_media_view') AND m2.metric_date = ".($this->isChanneledMetric ? "m.metric_date" : "e.metric_date")." AND mc2.channel = mc.channel AND (mc2.dimension_set_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.dimension_set_id) AND (mc2.query_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.query_id) AND (mc2.page_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.page_id) AND (mc2.country_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.country_id) AND (mc2.device_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.device_id) LIMIT 1) ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0)" :
                     "NULL",
                 'unique_clicks'                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'unique_clicks'" : "mc.name = 'unique_clicks'")." THEN $valCol ELSE 0 END)",
                 'results'                      => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END)",
