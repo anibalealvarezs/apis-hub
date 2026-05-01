@@ -835,6 +835,17 @@
             $weightedPairSql = implode(",\n        ", $weightedPairColumns);
             $weightedComputedSql = implode(",\n        ", $weightedComputedSelect);
 
+            $configIds = $this->getEntityManager()->getConnection()->fetchFirstColumn(
+                "SELECT id FROM metric_configs mc WHERE $baseWhereSql",
+                $params
+            );
+
+            if (empty($configIds)) {
+                return [];
+            }
+
+            $configIdsList = implode(',', array_map('intval', $configIds));
+
             $sql = "WITH base AS (
             SELECT
                 m.metric_date,
@@ -843,10 +854,7 @@
                 m.value
             FROM metrics m
             JOIN metric_configs mc ON m.metric_config_id = mc.id
-            WHERE m.metric_config_id IN (
-                SELECT id FROM metric_configs mc2
-                WHERE $baseWhereSql
-            )
+            WHERE m.metric_config_id IN ($configIdsList)
             AND m.metric_date >= :startDate
             AND m.metric_date <= :endDate
         ),
