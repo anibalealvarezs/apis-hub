@@ -850,6 +850,11 @@
             SELECT
                 m.metric_date,
                 m.dimensions_hash,
+                mc.page_id,
+                mc.query_id,
+                mc.country_id,
+                mc.device_id,
+                mc.dimension_set_id,
                 mc.name,
                 m.value
             FROM metrics m
@@ -862,6 +867,11 @@
             SELECT
                 b.metric_date,
                 b.dimensions_hash,
+                MAX(b.page_id) as page_id,
+                MAX(b.query_id) as query_id,
+                MAX(b.country_id) as country_id,
+                MAX(b.device_id) as device_id,
+                MAX(b.dimension_set_id) as dimension_set_id,
                 SUM(CASE WHEN b.name IN ('clicks', 'clicks_daily') THEN b.value ELSE 0 END) AS clicks_value,
                 SUM(CASE WHEN b.name IN ($firstWeightNameList) THEN b.value ELSE 0 END) AS impressions_value,
                 $weightedPairSql
@@ -872,6 +882,11 @@
             SELECT
                 p.metric_date as date,
                 p.dimensions_hash,
+                MAX(p.page_id) as page_id,
+                MAX(p.query_id) as query_id,
+                MAX(p.country_id) as country_id,
+                MAX(p.device_id) as device_id,
+                MAX(p.dimension_set_id) as dimension_set_id,
                 SUM(COALESCE(p.clicks_value, 0)) AS clicks,
                 SUM(COALESCE(p.impressions_value, 0)) AS impressions,
                 SUM(COALESCE(p.clicks_value, 0)) / NULLIF(SUM(COALESCE(p.impressions_value, 0)), 0) AS ctr,
@@ -879,21 +894,7 @@
             FROM paired p
             GROUP BY p.metric_date, p.dimensions_hash
         )
-        SELECT 
-            f.*,
-            mc.page_id,
-            mc.query_id,
-            mc.country_id,
-            mc.device_id,
-            mc.dimension_set_id
-        FROM finalized f
-        LEFT JOIN LATERAL (
-            SELECT mc2.page_id, mc2.query_id, mc2.country_id, mc2.device_id, mc2.dimension_set_id
-            FROM metric_configs mc2
-            JOIN metrics m2 ON m2.metric_config_id = mc2.id
-            WHERE m2.dimensions_hash = f.dimensions_hash
-            LIMIT 1
-        ) mc ON TRUE
+        SELECT f.* FROM finalized f
         $orderSql";
 
             return $connection->fetchAllAssociative(
