@@ -17,7 +17,7 @@
     #[ORM\Table(name: 'metric_configs')]
     #[ORM\Index(columns: ['channel', 'name', 'period'], name: 'idx_metric_configs_base_idx')]
     #[ORM\Index(
-        columns: ['channel', 'name', 'period', 'query_id', 'page_id', 'country_id', 'device_id', 'dimension_set_id'],
+        columns: ['channel', 'name', 'period', 'page_id', 'query_id', 'country_id', 'device_id', 'dimension_set_id'],
         name: 'idx_metric_configs_lookup_full_idx'
     )]
     #[ORM\Index(
