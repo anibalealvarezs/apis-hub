@@ -839,28 +839,21 @@
             SELECT
                 m.metric_date,
                 m.dimensions_hash,
-                mc.channel,
-                mc.page_id,
-                mc.query_id,
-                mc.country_id,
-                mc.device_id,
-                mc.dimension_set_id,
                 mc.name,
-                mc.period,
                 m.value
-            $valueSource
-            WHERE $baseWhereSql
+            FROM metrics m
+            JOIN metric_configs mc ON m.metric_config_id = mc.id
+            WHERE m.metric_config_id IN (
+                SELECT id FROM metric_configs mc
+                WHERE $baseWhereSql
+            )
+            AND m.metric_date >= :startDate
+            AND m.metric_date <= :endDate
         ),
         paired AS (
             SELECT
                 b.metric_date,
                 b.dimensions_hash,
-                MAX(b.channel) as channel,
-                MAX(b.page_id) as page_id,
-                MAX(b.query_id) as query_id,
-                MAX(b.country_id) as country_id,
-                MAX(b.device_id) as device_id,
-                MAX(b.dimension_set_id) as dimension_set_id,
                 SUM(CASE WHEN b.name IN ('clicks', 'clicks_daily') THEN b.value ELSE 0 END) AS clicks_value,
                 SUM(CASE WHEN b.name IN ($firstWeightNameList) THEN b.value ELSE 0 END) AS impressions_value,
                 $weightedPairSql
@@ -869,18 +862,30 @@
         ),
         finalized AS (
             SELECT
-                $finalGroupProjection
+                p.metric_date as date,
+                p.dimensions_hash,
                 SUM(COALESCE(p.clicks_value, 0)) AS clicks,
                 SUM(COALESCE(p.impressions_value, 0)) AS impressions,
                 SUM(COALESCE(p.clicks_value, 0)) / NULLIF(SUM(COALESCE(p.impressions_value, 0)), 0) AS ctr,
                 $weightedComputedSql
             FROM paired p
-            $dimensionJoinClause$finalGroupByClause
+            GROUP BY p.metric_date, p.dimensions_hash
         )
-        SELECT
-            $outerGroupProjection
-            ".implode(",\n    ", $selectMetrics)."
-        FROM finalized f".$orderSql;
+        SELECT 
+            f.*,
+            mc.page_id,
+            mc.query_id,
+            mc.country_id,
+            mc.device_id,
+            mc.dimension_set_id
+        FROM finalized f
+        LEFT JOIN LATERAL (
+            SELECT mc2.page_id, mc2.query_id, mc2.country_id, mc2.device_id, mc2.dimension_set_id
+            FROM metric_configs mc2
+            WHERE mc2.dimensions_hash = f.dimensions_hash
+            LIMIT 1
+        ) mc ON TRUE
+        ".$orderSql;
 
             return $connection->fetchAllAssociative(
                 $sql,
