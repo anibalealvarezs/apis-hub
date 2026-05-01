@@ -849,7 +849,6 @@
             $sql = "WITH base AS (
             SELECT
                 m.metric_date,
-                m.dimensions_hash,
                 mc.page_id,
                 mc.query_id,
                 mc.country_id,
@@ -866,33 +865,31 @@
         paired AS (
             SELECT
                 b.metric_date,
-                b.dimensions_hash,
-                MAX(b.page_id) as page_id,
-                MAX(b.query_id) as query_id,
-                MAX(b.country_id) as country_id,
-                MAX(b.device_id) as device_id,
-                MAX(b.dimension_set_id) as dimension_set_id,
+                b.page_id,
+                b.query_id,
+                b.country_id,
+                b.device_id,
+                b.dimension_set_id,
                 SUM(CASE WHEN b.name IN ('clicks', 'clicks_daily') THEN b.value ELSE 0 END) AS clicks_value,
                 SUM(CASE WHEN b.name IN ($firstWeightNameList) THEN b.value ELSE 0 END) AS impressions_value,
                 $weightedPairSql
             FROM base b
-            GROUP BY b.metric_date, b.dimensions_hash
+            GROUP BY b.metric_date, b.page_id, b.query_id, b.country_id, b.device_id, b.dimension_set_id
         ),
         finalized AS (
             SELECT
                 p.metric_date as date,
-                p.dimensions_hash,
-                MAX(p.page_id) as page_id,
-                MAX(p.query_id) as query_id,
-                MAX(p.country_id) as country_id,
-                MAX(p.device_id) as device_id,
-                MAX(p.dimension_set_id) as dimension_set_id,
+                p.page_id,
+                p.query_id,
+                p.country_id,
+                p.device_id,
+                p.dimension_set_id,
                 SUM(COALESCE(p.clicks_value, 0)) AS clicks,
                 SUM(COALESCE(p.impressions_value, 0)) AS impressions,
                 SUM(COALESCE(p.clicks_value, 0)) / NULLIF(SUM(COALESCE(p.impressions_value, 0)), 0) AS ctr,
                 $weightedComputedSql
             FROM paired p
-            GROUP BY p.metric_date, p.dimensions_hash
+            GROUP BY p.metric_date, p.page_id, p.query_id, p.country_id, p.device_id, p.dimension_set_id
         )
         SELECT f.* FROM finalized f
         $orderSql";
