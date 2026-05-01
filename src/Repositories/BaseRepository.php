@@ -682,7 +682,6 @@
 
             $weightedStrategies = $this->resolveWeightedAggregationStrategies($aggregations);
             if ($weightedStrategies === []) {
-                fwrite(STDERR, "DEBUG REPO: No weighted strategies found for: " . implode(', ', array_values($aggregations)) . "\n");
                 return null;
             }
 
@@ -839,6 +838,7 @@
             $sql = "WITH base AS (
             SELECT
                 m.metric_date,
+                m.dimensions_hash,
                 mc.channel,
                 mc.page_id,
                 mc.query_id,
@@ -854,17 +854,18 @@
         paired AS (
             SELECT
                 b.metric_date,
-                b.channel,
-                b.page_id,
-                b.query_id,
-                b.country_id,
-                b.device_id,
-                b.dimension_set_id,
+                b.dimensions_hash,
+                MAX(b.channel) as channel,
+                MAX(b.page_id) as page_id,
+                MAX(b.query_id) as query_id,
+                MAX(b.country_id) as country_id,
+                MAX(b.device_id) as device_id,
+                MAX(b.dimension_set_id) as dimension_set_id,
                 SUM(CASE WHEN b.name IN ('clicks', 'clicks_daily') THEN b.value ELSE 0 END) AS clicks_value,
                 SUM(CASE WHEN b.name IN ($firstWeightNameList) THEN b.value ELSE 0 END) AS impressions_value,
                 $weightedPairSql
             FROM base b
-            GROUP BY b.metric_date, b.channel, b.page_id, b.query_id, b.country_id, b.device_id, b.dimension_set_id
+            GROUP BY b.metric_date, b.dimensions_hash
         ),
         finalized AS (
             SELECT

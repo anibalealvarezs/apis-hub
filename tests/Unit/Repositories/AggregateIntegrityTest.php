@@ -117,8 +117,8 @@ class AggregateIntegrityTest extends TestCase
         // Verify it used the WITH base AS (...) structure
         $this->assertNotEmpty($capturedSql, "SQL should have been captured from optimized path.");
         $this->assertStringContainsString('WITH base AS', $capturedSql);
-        $this->assertStringContainsString('GROUP BY b.metric_date', $capturedSql);
-        $this->assertStringContainsString('b.country_id', $capturedSql);
-        $this->assertStringContainsString('b.device_id', $capturedSql);
+        $this->assertStringContainsString('GROUP BY b.metric_date, b.dimensions_hash', $capturedSql);
+        $this->assertStringContainsString('MAX(b.country_id)', $capturedSql);
+        $this->assertStringContainsString('MAX(b.device_id)', $capturedSql);
     }
 }
