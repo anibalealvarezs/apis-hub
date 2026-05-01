@@ -84,19 +84,26 @@ abstract class BaseIntegrationTestCase extends TestCase
         $testDbName = getenv('TEST_DB_NAME') ?: (($defaultConfig['dbname'] ?? 'apis-hub') . '-test');
         $config = ORMSetup::createAttributeMetadataConfiguration($paths, $isDevMode);
 
-        // Safely create DB if not exists
-        $tmpConnection = DriverManager::getConnection($dbParams, $config);
-        if ($dbParams['driver'] === 'pdo_pgsql') {
-            $exists = $tmpConnection->fetchOne("SELECT 1 FROM pg_database WHERE datname = '{$testDbName}'");
-            if (!$exists) {
-                $tmpConnection->executeStatement("CREATE DATABASE \"{$testDbName}\"");
-            }
+        if ($dbParams['driver'] === 'pdo_sqlite') {
+            $dbParams = [
+                'driver' => 'pdo_sqlite',
+                'memory' => true,
+            ];
         } else {
-            $tmpConnection->executeStatement("CREATE DATABASE IF NOT EXISTS `{$testDbName}`");
+            // Safely create DB if not exists
+            $tmpConnection = DriverManager::getConnection($dbParams, $config);
+            if ($dbParams['driver'] === 'pdo_pgsql') {
+                $exists = $tmpConnection->fetchOne("SELECT 1 FROM pg_database WHERE datname = '{$testDbName}'");
+                if (!$exists) {
+                    $tmpConnection->executeStatement("CREATE DATABASE \"{$testDbName}\"");
+                }
+            } else {
+                $tmpConnection->executeStatement("CREATE DATABASE IF NOT EXISTS `{$testDbName}`");
+            }
+            $tmpConnection->close();
+            $dbParams['dbname'] = $testDbName;
         }
-        $tmpConnection->close();
 
-        $dbParams['dbname'] = $testDbName;
         $connection = DriverManager::getConnection($dbParams, $config);
         self::$staticEntityManager = new EntityManager($connection, $config);
 

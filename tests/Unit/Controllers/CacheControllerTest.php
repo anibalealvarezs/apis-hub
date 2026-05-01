@@ -4,7 +4,7 @@ namespace Tests\Unit\Controllers;
 
 use Controllers\CacheController;
 use Doctrine\ORM\EntityManager;
-use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Entities\Analytics\Channel;
 use Exception;
 use Tests\Unit\BaseUnitTestCase;
 use ReflectionException;
@@ -48,7 +48,8 @@ class CacheControllerTest extends BaseUnitTestCase
         $body = null;
         $params = ['key' => 'value'];
         $data = ['result' => $this->faker->word];
-        $channelEnum = Channel::shopify;
+        $channelEnum = $this->createMock(Channel::class);
+        $channelEnum->method('getName')->willReturn($channel);
 
         // Mock entities config and channel
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
@@ -94,7 +95,8 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testListReturnsSuccessResponse(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $data = ['result' => $this->faker->word];
 
         $this->controller->setMockListData($data);
@@ -112,7 +114,8 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testListHandlesException(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $exceptionMessage = 'Fetch error';
 
         $this->controller->setMockListException(new Exception($exceptionMessage));
@@ -164,7 +167,8 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testFetchDataReturnsDataForValidMethod(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $params = ['key' => 'value'];
         $body = json_encode(['filters' => ['a' => 'b']]);
         $data = ['result' => $this->faker->word];
@@ -192,7 +196,8 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testFetchDataReturnsErrorResponseForInvalidMethod(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $requestsClassName = \Classes\Requests\MetricRequests::class;
                 $methodName = 'getList';
 
@@ -215,7 +220,8 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testFetchDataReturnsErrorResponseForInvalidParameters(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $params = ['invalid' => 'param'];
         $requestsClassName = \Classes\Requests\MetricRequests::class;
                 $methodName = 'getList';
@@ -242,7 +248,8 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testFetchDataHandlesExtraParametersGracefully(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $params = ['extra' => 'param'];
         $requestsClassName = \Classes\Requests\MetricRequests::class;
                 $methodName = 'getList';
@@ -334,7 +341,7 @@ class ConcreteCacheController extends CacheController
             );
         }
 
-        $channelEnum = $this->mockChannels[$channel] ?? Channel::shopify; // Default for tests
+        $channelEnum = $this->mockChannels[$channel] ?? $this->createMock(Channel::class); // Default for tests
         return $this->list($entity, $channelEnum, $body, $params);
     }
 
