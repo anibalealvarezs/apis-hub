@@ -558,12 +558,6 @@
                 $qb->orderBy($orderBy, $direction);
             }
 
-            $isPostgres = Helpers::isPostgres();
-            $logger = Helpers::setLogger('api_debug.log');
-            $logger->info("=== REPOSITORY AGGREGATE SQL DEBUG ===");
-            $logger->info("SQL: ".$qb->getSQL());
-            $logger->info("PARAMS: ".json_encode($qb->getParameters()));
-
             $stmt = $qb->executeQuery();
             $results = $stmt->fetchAllAssociative();
 
@@ -639,38 +633,20 @@
             $allowedFilterKeys = [
                 'page', 'channel', 'debug_sql', '_',
                 'country', 'device', 'query',
-                'dimensions.country', 'dimensions.device', 'dimensions.query'
+                'dimensions.country', 'dimensions.device', 'dimensions.query',
+                'dimensions.searchAppearance'
             ];
             foreach (array_keys($filtersArr) as $key) {
-                if (!in_array($key, $allowedFilterKeys, true)) {
+                if (!in_array($key, $allowedFilterKeys, true) && !str_starts_with($key, 'dimensions.')) {
                     return null;
                 }
             }
 
             $page = $filtersArr['page'] ?? null;
-            if ($page !== null && !is_numeric($page)) {
-                return null;
-            }
-
             $channel = $filtersArr['channel'] ?? null;
-            if ($channel !== null && (!is_string($channel) && !is_numeric($channel))) {
-                return null;
-            }
-
             $country = $filtersArr['country'] ?? $filtersArr['dimensions.country'] ?? null;
-            if ($country !== null && !is_numeric($country)) {
-                return null;
-            }
-
             $device = $filtersArr['device'] ?? $filtersArr['dimensions.device'] ?? null;
-            if ($device !== null && !is_numeric($device)) {
-                return null;
-            }
-
             $query = $filtersArr['query'] ?? $filtersArr['dimensions.query'] ?? null;
-            if ($query !== null && !is_numeric($query)) {
-                return null;
-            }
 
             $supported = ['clicks', 'impressions', 'ctr'];
             foreach ($aggregations as $expr) {
@@ -711,37 +687,38 @@
             $baseMetricNames = array_values(array_unique($baseMetricNames));
             $metricNameListSql = $this->toSqlStringList($baseMetricNames);
 
-            $baseWhere = [
-                'm.metric_date >= :startDate',
-                'm.metric_date <= :endDate',
+            $configWhere = [
                 "mc.period = 'daily'",
                 "mc.name IN ($metricNameListSql)",
             ];
-            $params = [
-                'startDate' => $startDate,
-                'endDate'   => $endDate,
-            ];
+            $configParams = [];
+
             if ($page !== null) {
-                $baseWhere[] = 'mc.page_id = :pageId';
-                $params['pageId'] = (int)$page;
+                $configWhere[] = 'mc.page_id = :pageId';
+                $configParams['pageId'] = (int)$page;
             }
             if ($channel !== null) {
-                $baseWhere[] = 'mc.channel = :channel';
-                $params['channel'] = (int)$channel;
+                $configWhere[] = 'mc.channel = :channel';
+                $configParams['channel'] = (int)$channel;
             }
             if ($country !== null) {
-                $baseWhere[] = 'mc.country_id = :countryId';
-                $params['countryId'] = (int)$country;
+                $configWhere[] = 'mc.country_id = :countryId';
+                $configParams['countryId'] = (int)$country;
             }
             if ($device !== null) {
-                $baseWhere[] = 'mc.device_id = :deviceId';
-                $params['deviceId'] = (int)$device;
+                $configWhere[] = 'mc.device_id = :deviceId';
+                $configParams['deviceId'] = (int)$device;
             }
             if ($query !== null) {
-                $baseWhere[] = 'mc.query_id = :queryId';
-                $params['queryId'] = (int)$query;
+                $configWhere[] = 'mc.query_id = :queryId';
+                $configParams['queryId'] = (int)$query;
             }
-            $baseWhereSql = implode("\n      AND ", $baseWhere);
+
+            $configWhereSql = implode(' AND ', $configWhere);
+            $configIds = $this->getEntityManager()->getConnection()->fetchFirstColumn(
+                "SELECT id FROM metric_configs mc WHERE $configWhereSql",
+                $configParams
+            );
 
             $weightedComputedSelect = [];
             foreach ($weightedStrategies as $alias => $strategy) {
@@ -835,14 +812,14 @@
             $weightedPairSql = implode(",\n        ", $weightedPairColumns);
             $weightedComputedSql = implode(",\n        ", $weightedComputedSelect);
 
-            $configIds = $this->getEntityManager()->getConnection()->fetchFirstColumn(
-                "SELECT id FROM metric_configs mc WHERE $baseWhereSql",
-                $params
-            );
-
             if (empty($configIds)) {
                 return [];
             }
+
+            $params = [
+                'startDate' => $startDate,
+                'endDate'   => $endDate,
+            ];
 
             $configIdsList = implode(',', array_map('intval', $configIds));
 
