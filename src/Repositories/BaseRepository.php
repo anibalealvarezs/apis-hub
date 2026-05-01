@@ -823,6 +823,14 @@
 
             $configIdsList = implode(',', array_map('intval', $configIds));
 
+            $finalSelectFields = $grouping['final_select'] !== []
+                ? implode(",\n                ", $grouping['final_select']) . ","
+                : "";
+
+            $finalGroupByFields = $grouping['group_by'] !== []
+                ? "GROUP BY " . implode(', ', $grouping['group_by'])
+                : "";
+
             $sql = "WITH base AS (
             SELECT
                 m.metric_date,
@@ -855,18 +863,13 @@
         ),
         finalized AS (
             SELECT
-                p.metric_date as date,
-                p.page_id,
-                p.query_id,
-                p.country_id,
-                p.device_id,
-                p.dimension_set_id,
+                $finalSelectFields
                 SUM(COALESCE(p.clicks_value, 0)) AS clicks,
                 SUM(COALESCE(p.impressions_value, 0)) AS impressions,
                 SUM(COALESCE(p.clicks_value, 0)) / NULLIF(SUM(COALESCE(p.impressions_value, 0)), 0) AS ctr,
                 $weightedComputedSql
             FROM paired p
-            GROUP BY p.metric_date, p.page_id, p.query_id, p.country_id, p.device_id, p.dimension_set_id
+            $finalGroupByFields
         )
         SELECT f.* FROM finalized f
         $orderSql";
@@ -931,16 +934,31 @@
                 return 'none';
             }
 
-            if (count($groupBy) === 1 && in_array($groupBy[0], ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
-                return $groupBy[0];
+            $normalized = array_values(array_map(static fn($field) => strtolower(trim((string)$field)), $groupBy));
+            
+            if (count($normalized) === 1) {
+                $field = $normalized[0];
+                if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+                    return $field;
+                }
+                $map = [
+                    'query' => 'dimensions.query',
+                    'page' => 'dimensions.page',
+                    'country' => 'dimensions.country',
+                    'device' => 'dimensions.device',
+                    'searchappearance' => 'dimensions.searchAppearance',
+                ];
+                if (isset($map[$field])) {
+                    return $map[$field];
+                }
+                if (in_array($field, ['dimensions.query', 'dimensions.page', 'dimensions.country', 'dimensions.device', 'dimensions.searchappearance'], true)) {
+                    return $field;
+                }
             }
 
-            if (count($groupBy) === 1 && in_array($groupBy[0], ['dimensions.query', 'dimensions.page', 'dimensions.country', 'dimensions.device', 'dimensions.searchAppearance'], true)) {
-                return $groupBy[0];
-            }
-
-            $canonical = $this->canonicalizeGroupPattern($groupBy);
-            if ($canonical === $this->canonicalizeGroupPattern(['dimensions.country', 'dimensions.device'])) {
+            $canonical = $this->canonicalizeGroupPattern($normalized);
+            if ($canonical === $this->canonicalizeGroupPattern(['dimensions.country', 'dimensions.device']) || 
+                $canonical === $this->canonicalizeGroupPattern(['country', 'device'])) {
                 return 'dimensions.country+dimensions.device';
             }
 
@@ -1005,9 +1023,9 @@
                     'order_map'    => [],
                 ],
                 'daily' => [
-                    'final_select' => ['p.metric_date AS group_value'],
+                    'final_select' => ['p.metric_date AS date'],
                     'group_by'     => ['p.metric_date'],
-                    'outer_select' => ['f.group_value AS '.$dimAlias('daily')],
+                    'outer_select' => ['f.date AS '.$dimAlias('daily')],
                     'joins'        => [],
                     'order_map'    => ['daily' => $dimAlias('daily')],
                 ],
