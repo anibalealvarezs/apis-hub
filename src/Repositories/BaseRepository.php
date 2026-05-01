@@ -715,8 +715,22 @@
             }
 
             $configWhereSql = implode(' AND ', $configWhere);
+            
+            // Critical GSC Optimization: Pick the most appropriate dimension set to avoid double counting
+            // For GSC, we usually want the set that matches exactly the requested filters + groupBys.
+            // If we are grouping by query, we want a set that HAS query.
+            // If we are just getting totals for a page, we want the set that is JUST page.
+            $dsWhere = "";
+            if ($groupPattern === 'dimensions.query' || $query !== null) {
+                // Look for set with Query
+                $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'query')";
+            } elseif ($groupPattern === 'none' && $page !== null) {
+                // Totals for a page: pick the set that has ONLY page (or the smallest one)
+                // For now, let's assume the set with the fewest dimensions that includes 'page'
+            }
+
             $configIds = $this->getEntityManager()->getConnection()->fetchFirstColumn(
-                "SELECT id FROM metric_configs mc WHERE $configWhereSql",
+                "SELECT id FROM metric_configs mc WHERE $configWhereSql $dsWhere",
                 $configParams
             );
 
@@ -947,12 +961,13 @@
                     'country' => 'dimensions.country',
                     'device' => 'dimensions.device',
                     'searchappearance' => 'dimensions.searchAppearance',
+                    'search_appearance' => 'dimensions.searchAppearance',
                 ];
                 if (isset($map[$field])) {
                     return $map[$field];
                 }
-                if (in_array($field, ['dimensions.query', 'dimensions.page', 'dimensions.country', 'dimensions.device', 'dimensions.searchappearance'], true)) {
-                    return $field;
+                if (in_array($field, ['dimensions.query', 'dimensions.page', 'dimensions.country', 'dimensions.device', 'dimensions.searchappearance', 'dimensions.search_appearance'], true)) {
+                    return 'dimensions.searchAppearance';
                 }
             }
 
@@ -1074,33 +1089,27 @@
                     'order_map'    => ['yearly' => $dimAlias('yearly')],
                 ],
                 'dimensions.query' => [
-                    'final_select' => ["COALESCE(q.query, 'unknown') AS group_value"],
-                    'group_by'     => ["COALESCE(q.query, 'unknown')"],
-                    'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.query')],
-                    'joins'        => ['LEFT JOIN queries q ON q.id = p.query_id'],
-                    'order_map'    => ['dimensions.query' => $dimAlias('dimensions.query')],
+                    'final_select' => ['p.query_id AS group_key'],
+                    'group_by'     => ['p.query_id'],
+                    'outer_select' => ["COALESCE(q.query, 'unknown') AS " . $dimAlias('dimensions.query')],
+                    'joins'        => ['LEFT JOIN queries q ON q.id = f.group_key'],
+                    'order_map'    => ['dimensions.query' => "COALESCE(q.query, 'unknown')"],
                 ],
                 'dimensions.page' => [
-                    'final_select' => ["COALESCE(dv_page.value, 'unknown') AS group_value"],
-                    'group_by'     => ["COALESCE(dv_page.value, 'unknown')"],
-                    'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.page')],
+                    'final_select' => ['p.page_id AS group_key'],
+                    'group_by'     => ['p.page_id'],
+                    'outer_select' => ["COALESCE(dv_page.value, 'unknown') AS " . $dimAlias('dimensions.page')],
                     'joins'        => [
-                        "LEFT JOIN dimension_set_items dsi_page ON dsi_page.dimension_set_id = p.dimension_set_id
-                            AND dsi_page.dimension_value_id IN (
-                                SELECT dkp_v.id FROM dimension_values dkp_v 
-                                JOIN dimension_keys dkp_k ON dkp_k.id = dkp_v.dimension_key_id 
-                                WHERE LOWER(dkp_k.name) = 'page'
-                            )",
-                        "LEFT JOIN dimension_values dv_page ON dv_page.id = dsi_page.dimension_value_id"
+                        "LEFT JOIN dimension_values dv_page ON dv_page.id = f.group_key"
                     ],
-                    'order_map'    => ['dimensions.page' => $dimAlias('dimensions.page')],
+                    'order_map'    => ['dimensions.page' => "COALESCE(dv_page.value, 'unknown')"],
                 ],
                 'dimensions.searchAppearance' => [
-                    'final_select' => ["COALESCE(dv_sa.value, 'unknown') AS group_value"],
-                    'group_by'     => ["COALESCE(dv_sa.value, 'unknown')"],
-                    'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.searchAppearance')],
+                    'final_select' => ['p.dimension_set_id AS group_key'],
+                    'group_by'     => ['p.dimension_set_id'],
+                    'outer_select' => ["COALESCE(dv_sa.value, 'unknown') AS " . $dimAlias('dimensions.searchAppearance')],
                     'joins'        => [
-                        "LEFT JOIN dimension_set_items dsi_sa ON dsi_sa.dimension_set_id = p.dimension_set_id
+                        "LEFT JOIN dimension_set_items dsi_sa ON dsi_sa.dimension_set_id = f.group_key
                             AND dsi_sa.dimension_value_id IN (
                                 SELECT dka_v.id FROM dimension_values dka_v 
                                 JOIN dimension_keys dka_k ON dka_k.id = dka_v.dimension_key_id 
@@ -1108,21 +1117,21 @@
                             )",
                         "LEFT JOIN dimension_values dv_sa ON dv_sa.id = dsi_sa.dimension_value_id"
                     ],
-                    'order_map'    => ['dimensions.searchAppearance' => $dimAlias('dimensions.searchAppearance')],
+                    'order_map'    => ['dimensions.searchAppearance' => "COALESCE(dv_sa.value, 'unknown')"],
                 ],
                 'dimensions.country' => [
-                    'final_select' => ["COALESCE(c.name, 'unknown') AS group_value"],
-                    'group_by'     => ["COALESCE(c.name, 'unknown')"],
-                    'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.country')],
-                    'joins'        => ['LEFT JOIN countries c ON c.id = p.country_id'],
-                    'order_map'    => ['dimensions.country' => $dimAlias('dimensions.country')],
+                    'final_select' => ['p.country_id AS group_key'],
+                    'group_by'     => ['p.country_id'],
+                    'outer_select' => ["COALESCE(c.name, 'unknown') AS " . $dimAlias('dimensions.country')],
+                    'joins'        => ['LEFT JOIN countries c ON c.id = f.group_key'],
+                    'order_map'    => ['dimensions.country' => "COALESCE(c.name, 'unknown')"],
                 ],
                 'dimensions.device' => [
-                    'final_select' => ["COALESCE(d.type, 'unknown') AS group_value"],
-                    'group_by'     => ["COALESCE(d.type, 'unknown')"],
-                    'outer_select' => ['f.group_value AS '.$dimAlias('dimensions.device')],
-                    'joins'        => ['LEFT JOIN devices d ON d.id = p.device_id'],
-                    'order_map'    => ['dimensions.device' => $dimAlias('dimensions.device')],
+                    'final_select' => ['p.device_id AS group_key'],
+                    'group_by'     => ['p.device_id'],
+                    'outer_select' => ["COALESCE(d.type, 'unknown') AS " . $dimAlias('dimensions.device')],
+                    'joins'        => ['LEFT JOIN devices d ON d.id = f.group_key'],
+                    'order_map'    => ['dimensions.device' => "COALESCE(d.type, 'unknown')"],
                 ],
                 'dimensions.country+dimensions.device' => [
                     'final_select' => [
