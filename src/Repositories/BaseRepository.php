@@ -782,8 +782,12 @@
                 m.metric_date, mc.page_id, mc.query_id, mc.country_id, mc.device_id, mc.dimension_set_id, mc.name, m.value
             FROM metrics m
             JOIN metric_configs mc ON m.metric_config_id = mc.id
-            $dimJoinSql
-            WHERE $configWhereSql
+            WHERE m.metric_config_id IN (
+                SELECT sub_mc.id 
+                FROM metric_configs sub_mc 
+                " . str_replace('mc.', 'sub_mc.', $dimJoinSql) . " 
+                WHERE " . str_replace('mc.', 'sub_mc.', $configWhereSql) . "
+            )
             AND m.metric_date >= :startDate
             AND m.metric_date <= :endDate
         ),
