@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Performance;
 
+use Entities\Analytics\Channel;
 use Helpers\Helpers;
 use RuntimeException;
 
@@ -38,17 +39,22 @@ final class AggregateBenchmarkRunner
         $debugSql = ($options['debug-sql'] ?? false) === true;
         $dryRun = ($options['dry-run'] ?? false) === true;
         $output = strtolower((string)($options['output'] ?? 'table'));
+        $channelId = self::resolveChannelId($options['channel'] ?? null);
 
         $payloads = [];
         foreach ($payloadFiles as $payloadFile) {
+            $payload = self::loadPayload($payloadFile, $debugSql);
+            $payload = self::injectChannelFilter($payload, $channelId);
             $payloads[] = [
                 'file' => $payloadFile,
-                'payload' => self::loadPayload($payloadFile, $debugSql),
+                'payload' => $payload,
             ];
         }
 
+        self::assertChannelParity($entityClass, $payloads, $channelId);
+
         if ($dryRun) {
-            self::printDryRun($entityClass, $payloads, $runs, $warmupRuns, $debugSql);
+            self::printDryRun($entityClass, $payloads, $runs, $warmupRuns, $debugSql, $channelId);
             return 0;
         }
 
@@ -207,6 +213,62 @@ final class AggregateBenchmarkRunner
         return self::ENTITY_ALIASES[strtolower($entity)] ?? $entity;
     }
 
+    private static function resolveChannelId(string|bool|null $channelOption): ?int
+    {
+        if ($channelOption === null || $channelOption === false || trim((string)$channelOption) === '') {
+            return null;
+        }
+
+        if (ctype_digit((string)$channelOption)) {
+            return (int)$channelOption;
+        }
+
+        $channel = Channel::tryFromName((string)$channelOption);
+        if ($channel === null) {
+            throw new RuntimeException("Channel name not found: {$channelOption}");
+        }
+
+        return $channel->value;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private static function injectChannelFilter(array $payload, ?int $channelId): array
+    {
+        $payload['filters'] = is_array($payload['filters'] ?? null) ? $payload['filters'] : [];
+
+        if ($channelId !== null && !isset($payload['filters']['channel'])) {
+            $payload['filters']['channel'] = $channelId;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $payloads
+     */
+    private static function assertChannelParity(string $entityClass, array $payloads, ?int $channelId): void
+    {
+        if ($entityClass !== self::ENTITY_ALIASES['channeled_metric']) {
+            return;
+        }
+
+        if ($channelId !== null) {
+            return;
+        }
+
+        foreach ($payloads as $entry) {
+            $filters = is_array($entry['payload']['filters'] ?? null) ? $entry['payload']['filters'] : [];
+            if (isset($filters['channel'])) {
+                return;
+            }
+        }
+
+        throw new RuntimeException("Channeled metric benchmarks require channel context to match the real aggregate endpoint. Pass --channel=<name|id> or include filters.channel in each payload.");
+    }
+
     private static function toObject(array $data): ?object
     {
         if ($data === []) {
@@ -219,17 +281,19 @@ final class AggregateBenchmarkRunner
     /**
      * @param array<int, array<string, mixed>> $payloads
      */
-    private static function printDryRun(string $entityClass, array $payloads, int $runs, int $warmupRuns, bool $debugSql): void
+    private static function printDryRun(string $entityClass, array $payloads, int $runs, int $warmupRuns, bool $debugSql, ?int $channelId): void
     {
         echo "Dry run OK\n";
         echo "Entity: {$entityClass}\n";
+        echo "Channel: " . ($channelId !== null ? (string)$channelId : 'none') . "\n";
         echo "Runs: {$runs}\n";
         echo "Warmup: {$warmupRuns}\n";
         echo "Debug SQL: " . ($debugSql ? 'yes' : 'no') . "\n";
         echo "Payloads:\n";
         foreach ($payloads as $entry) {
             $groupBy = json_encode($entry['payload']['groupBy'] ?? [], JSON_UNESCAPED_SLASHES);
-            echo " - {$entry['file']} | groupBy={$groupBy}\n";
+            $filters = json_encode($entry['payload']['filters'] ?? [], JSON_UNESCAPED_SLASHES);
+            echo " - {$entry['file']} | groupBy={$groupBy} | filters={$filters}\n";
         }
     }
 
@@ -293,6 +357,7 @@ Usage:
 
 Options:
   --entity=alias|fqcn         Entity repository to benchmark. Aliases: metric, channeled_metric.
+  --channel=name|id           Channel context for channeled entities (recommended for parity with channeled API routes).
   --payload=path.json         Payload file to run. Can be repeated.
   --payload-dir=path\to\dir  Directory with payload JSON files.
   --runs=n                    Number of measured runs per payload. Default: 3.
@@ -303,8 +368,8 @@ Options:
   --help                      Show this help.
 
 Examples:
-  php tests/Performance/aggregate-benchmark.php --dry-run --payload-dir=tests/Performance/fixtures
-  php tests/Performance/aggregate-benchmark.php --entity=channeled_metric --payload-dir=tests/Performance/fixtures --runs=5 --warmup=1 --debug-sql
+  php tests/Performance/aggregate-benchmark.php --dry-run --entity=channeled_metric --channel=google_search_console --payload-dir=tests/Performance/fixtures
+  php tests/Performance/aggregate-benchmark.php --entity=channeled_metric --channel=google_search_console --payload-dir=tests/Performance/fixtures --runs=5 --warmup=1 --debug-sql
 TXT;
         echo PHP_EOL;
     }
