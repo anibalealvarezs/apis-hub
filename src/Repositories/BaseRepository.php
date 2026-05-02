@@ -1009,10 +1009,12 @@
                 return 'none';
             }
 
-            $normalized = array_values(array_map(static fn($field) => strtolower(trim((string)$field)), $groupBy));
+            $rawFields = array_values(array_map(static fn($field) => trim((string)$field), $groupBy));
+            $normalized = array_values(array_map(static fn($field) => strtolower($field), $rawFields));
 
             if (count($normalized) === 1) {
                 $field = $normalized[0];
+                $rawField = $rawFields[0];
                 if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
                     return $field;
                 }
@@ -1021,16 +1023,17 @@
                     return $field;
                 }
 
-                if (str_starts_with($field, 'dimensions.') && strlen($field) > 11) {
-                    return $field;
+                if (str_starts_with(strtolower($rawField), 'dimensions.') && strlen($rawField) > 11) {
+                    return 'dimensions.'.substr($rawField, 11);
                 }
             }
 
-            $allDimensions = array_reduce($normalized, static fn(bool $carry, string $field): bool => $carry && str_starts_with($field, 'dimensions.'), true);
+            $allDimensions = array_reduce($rawFields, static fn(bool $carry, string $field): bool => $carry && str_starts_with(strtolower($field), 'dimensions.'), true);
             if ($allDimensions) {
-                sort($normalized);
+                $dimensionFields = array_map(static fn(string $field): string => 'dimensions.'.substr($field, 11), $rawFields);
+                usort($dimensionFields, static fn(string $left, string $right): int => strcmp(strtolower($left), strtolower($right)));
 
-                return implode('+', $normalized);
+                return implode('+', $dimensionFields);
             }
 
             $knownEntityFields = ['query', 'page', 'country', 'device'];
