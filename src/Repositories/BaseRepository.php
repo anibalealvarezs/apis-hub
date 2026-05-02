@@ -885,7 +885,7 @@
             FROM paired p
             $finalGroupByFields
         )
-        SELECT f.* FROM finalized f
+        SELECT " . implode(', ', $selectMetrics) . " FROM finalized f
         $orderSql";
 
             return $connection->fetchAllAssociative(
