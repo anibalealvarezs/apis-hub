@@ -714,147 +714,83 @@
                 $configParams['queryId'] = (int)$query;
             }
 
-            $configWhereSql = implode(' AND ', $configWhere);
-            
-            // Critical GSC Optimization: Pick the most appropriate dimension set to avoid double counting
-            // For GSC, we usually want the set that matches exactly the requested filters + groupBys.
-            // If we are grouping by query, we want a set that HAS query.
-            // If we are just getting totals for a page, we want the set that is JUST page.
-            $dsWhere = "";
-            if ($groupPattern === 'dimensions.query' || $query !== null) {
-                // Look for set with Query
-                $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'query')";
-            } elseif ($groupPattern === 'none' && $page !== null) {
-                // Totals for a page: pick the set that has ONLY page (or the smallest one)
-                // For now, let's assume the set with the fewest dimensions that includes 'page'
+            $dimJoinSql = "";
+            $dimWhereSql = "";
+            foreach ($filtersArr as $key => $value) {
+                if (str_starts_with($key, 'dimensions.') && !in_array(str_replace('dimensions.', '', $key), ['query', 'country', 'device'])) {
+                    $dk = str_replace('dimensions.', '', $key);
+                    $alias = "dsi_" . preg_replace('/[^a-z0-9]/i', '_', $dk);
+                    $dimJoinSql .= " JOIN dimension_set_items $alias ON mc.dimension_set_id = $alias.dimension_set_id
+                                    JOIN dimension_values dv_$alias ON $alias.dimension_value_id = dv_$alias.id
+                                    JOIN dimension_keys dk_$alias ON dv_$alias.dimension_key_id = dk_$alias.id";
+                    $dimWhereSql .= " AND LOWER(dk_$alias.name) = :{$alias}_key AND dv_$alias.value = :{$alias}_val";
+                    $configParams["{$alias}_key"] = strtolower($dk);
+                    $configParams["{$alias}_val"] = $value;
+                }
             }
+
+            $configWhereSql = implode(' AND ', $configWhere) . $dimWhereSql;
 
             $configIds = $this->getEntityManager()->getConnection()->fetchFirstColumn(
-                "SELECT id FROM metric_configs mc WHERE $configWhereSql $dsWhere",
+                "SELECT mc.id FROM metric_configs mc $dimJoinSql WHERE $configWhereSql",
                 $configParams
             );
-
-            $weightedComputedSelect = [];
-            foreach ($weightedStrategies as $alias => $strategy) {
-                $prefix = $strategy['prefix'];
-                $weightedComputedSelect[] = "SUM(COALESCE(p.{$prefix}_metric, 0) * COALESCE(p.{$prefix}_weight, 0)) / NULLIF(SUM(COALESCE(p.{$prefix}_weight, 0)), 0) AS {$prefix}_value";
-            }
-
-            $weightedPairColumns = [];
-            foreach ($weightedStrategies as $strategy) {
-                $prefix = $strategy['prefix'];
-                $weightedPairColumns[] = "MAX(CASE WHEN b.name IN (".$this->toSqlStringList($strategy['source_metric_names']).") THEN b.value END) AS {$prefix}_metric";
-                $weightedPairColumns[] = "MAX(CASE WHEN b.name IN (".$this->toSqlStringList($strategy['weight_metric_names']).") THEN b.value END) AS {$prefix}_weight";
-            }
-
-            $firstWeightNames = array_values($weightedStrategies)[0]['weight_metric_names'];
-            $firstWeightNameList = $this->toSqlStringList($firstWeightNames);
-
-            $grouping = $this->buildWeightedGroupingConfig($groupPattern, $isPostgres, $quoteChar);
-            if ($grouping === null) {
-                return null;
-            }
-
-            $finalGroupProjection = $grouping['final_select'] !== []
-                ? implode(",\n                ", $grouping['final_select']).",\n                "
-                : '';
-
-            $finalGroupByClause = $grouping['group_by'] !== []
-                ? "\n            GROUP BY ".implode(', ', $grouping['group_by'])
-                : '';
-
-            $outerGroupProjection = $grouping['outer_select'] !== []
-                ? implode(",\n            ", $grouping['outer_select']).",\n            "
-                : '';
-
-            $dimensionJoinClause = $grouping['joins'] !== []
-                ? implode("\n            ", $grouping['joins'])
-                : '';
-
-            $selectMetrics = [];
-            foreach ($aggregations as $alias => $expr) {
-                $lowerExpr = strtolower(trim((string)$expr));
-                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
-                $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
-
-                $mapped = match ($lowerExpr) {
-                    'clicks' => 'clicks',
-                    'impressions' => 'impressions',
-                    'ctr' => 'ctr',
-                    default => null,
-                };
-
-                if ($mapped !== null) {
-                    $selectMetrics[] = "f.$mapped AS $quotedAlias";
-                    continue;
-                }
-
-                $strategy = MetricAggregationStrategyRegistry::resolve($lowerExpr);
-                if ($strategy !== null) {
-                    $prefix = $weightedStrategies[$safeAlias]['prefix'] ?? null;
-                    if ($prefix === null) {
-                        return null;
-                    }
-                    $selectMetrics[] = "f.{$prefix}_value AS $quotedAlias";
-                    continue;
-                }
-
-                return null;
-            }
-
-            if ($selectMetrics === []) {
-                return null;
-            }
-
-            $orderSql = '';
-            if ($orderBy !== null && $orderBy !== '') {
-                $direction = strtoupper((string)$orderDir) === 'DESC' ? 'DESC' : 'ASC';
-                $safeOrderBy = preg_replace('/[^a-z0-9_.]/i', '', $orderBy);
-                $orderField = null;
-
-                if (isset($grouping['order_map'][strtolower($safeOrderBy)])) {
-                    $orderField = $grouping['order_map'][strtolower($safeOrderBy)];
-                } elseif ($safeOrderBy !== '') {
-                    $orderField = $safeOrderBy;
-                }
-
-                if ($orderField !== null) {
-                    $orderSql = " ORDER BY $orderField $direction";
-                }
-            }
-
-            $weightedPairSql = implode(",\n        ", $weightedPairColumns);
-            $weightedComputedSql = implode(",\n        ", $weightedComputedSelect);
 
             if (empty($configIds)) {
                 return [];
             }
 
-            $params = [
+            $configIdsList = implode(',', array_map('intval', $configIds));
+
+            $weightedPairColumns = [];
+            $weightedComputedSelect = [];
+            foreach ($weightedStrategies as $strategy) {
+                $prefix = $strategy['prefix'];
+                $weightedPairColumns[] = "MAX(CASE WHEN b.name IN (".$this->toSqlStringList($strategy['source_metric_names']).") THEN b.value END) AS {$prefix}_metric";
+                $weightedPairColumns[] = "MAX(CASE WHEN b.name IN (".$this->toSqlStringList($strategy['weight_metric_names']).") THEN b.value END) AS {$prefix}_weight";
+                $weightedComputedSelect[] = "SUM(COALESCE(p.{$prefix}_metric, 0) * COALESCE(p.{$prefix}_weight, 0)) / NULLIF(SUM(COALESCE(p.{$prefix}_weight, 0)), 0) AS {$prefix}_value";
+            }
+
+            $grouping = $this->buildWeightedGroupingConfig($groupPattern, $isPostgres, $quoteChar);
+            
+            $selectMetrics = [];
+            foreach ($aggregations as $alias => $expr) {
+                $lowerExpr = strtolower(trim((string)$expr));
+                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+                $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
+                $prefix = $weightedStrategies[$safeAlias]['prefix'] ?? null;
+
+                $selectMetrics[] = match ($lowerExpr) {
+                    'clicks' => "f.clicks AS $quotedAlias",
+                    'impressions' => "f.impressions AS $quotedAlias",
+                    'ctr' => "f.ctr AS $quotedAlias",
+                    default => "f.{$prefix}_value AS $quotedAlias"
+                };
+            }
+            if ($grouping['outer_select'] !== []) $selectMetrics = array_merge($grouping['outer_select'], $selectMetrics);
+
+            $orderSql = '';
+            if ($orderBy !== null && $orderBy !== '') {
+                $direction = strtoupper((string)$orderDir) === 'DESC' ? 'DESC' : 'ASC';
+                $safeOrderBy = preg_replace('/[^a-z0-9_.]/i', '', $orderBy);
+                $orderField = $grouping['order_map'][strtolower($safeOrderBy)] ?? $safeOrderBy;
+                $orderSql = " ORDER BY $orderField $direction";
+            }
+
+            $weightedPairSql = implode(",\n        ", $weightedPairColumns);
+            $weightedComputedSql = implode(",\n        ", $weightedComputedSelect);
+            $firstWeightNameList = $this->toSqlStringList(array_values($weightedStrategies)[0]['weight_metric_names']);
+            $finalSelectFields = $grouping['final_select'] !== [] ? implode(",\n                ", $grouping['final_select']) . "," : "";
+            $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY " . implode(', ', $grouping['group_by']) : "";
+
+            $sqlParams = [
                 'startDate' => $startDate,
                 'endDate'   => $endDate,
             ];
 
-            $configIdsList = implode(',', array_map('intval', $configIds));
-
-            $finalSelectFields = $grouping['final_select'] !== []
-                ? implode(",\n                ", $grouping['final_select']) . ","
-                : "";
-
-            $finalGroupByFields = $grouping['group_by'] !== []
-                ? "GROUP BY " . implode(', ', $grouping['group_by'])
-                : "";
-
             $sql = "WITH base AS (
             SELECT
-                m.metric_date,
-                mc.page_id,
-                mc.query_id,
-                mc.country_id,
-                mc.device_id,
-                mc.dimension_set_id,
-                mc.name,
-                m.value
+                m.metric_date, mc.page_id, mc.query_id, mc.country_id, mc.device_id, mc.dimension_set_id, mc.name, m.value
             FROM metrics m
             JOIN metric_configs mc ON m.metric_config_id = mc.id
             WHERE m.metric_config_id IN ($configIdsList)
@@ -863,12 +799,7 @@
         ),
         paired AS (
             SELECT
-                b.metric_date,
-                b.page_id,
-                b.query_id,
-                b.country_id,
-                b.device_id,
-                b.dimension_set_id,
+                b.metric_date, b.page_id, b.query_id, b.country_id, b.device_id, b.dimension_set_id,
                 SUM(CASE WHEN b.name IN ('clicks', 'clicks_daily') THEN b.value ELSE 0 END) AS clicks_value,
                 SUM(CASE WHEN b.name IN ($firstWeightNameList) THEN b.value ELSE 0 END) AS impressions_value,
                 $weightedPairSql
@@ -886,6 +817,7 @@
             $finalGroupByFields
         )
         SELECT " . implode(', ', $selectMetrics) . " FROM finalized f
+        " . implode("\n            ", $grouping['joins']) . "
         $orderSql";
 
             return $connection->fetchAllAssociative(
