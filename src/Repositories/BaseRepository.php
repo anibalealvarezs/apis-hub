@@ -737,17 +737,18 @@
 
             // GSC Optimization: Pick the most appropriate dimension set to avoid double counting
             $dsWhere = "";
-            if ($groupPattern === 'dimensions.query' || $query !== null) {
-                // Set with Query
+            $hasQueryFilter = ($groupPattern === 'dimensions.query' || $query !== null);
+            $hasCountryFilter = ($groupPattern === 'dimensions.country' || $country !== null);
+            $hasDeviceFilter = ($groupPattern === 'dimensions.device' || $device !== null);
+            $hasSearchAppearanceFilter = ($groupPattern === 'dimensions.searchAppearance' || isset($filtersArr['dimensions.searchAppearance']) || isset($filtersArr['dimensions.searchappearance']));
+
+            if ($hasQueryFilter) {
                 $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'query')";
-            } elseif ($groupPattern === 'dimensions.country' || $country !== null) {
-                // Set with Country
+            } elseif ($hasCountryFilter) {
                 $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'country')";
-            } elseif ($groupPattern === 'dimensions.device' || $device !== null) {
-                // Set with Device
+            } elseif ($hasDeviceFilter) {
                 $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'device')";
-            } elseif ($groupPattern === 'dimensions.searchAppearance') {
-                 // Set with SearchAppearance
+            } elseif ($hasSearchAppearanceFilter) {
                  $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'searchAppearance')";
             } else {
                 // Totals: pick the smallest set (Page only)
