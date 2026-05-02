@@ -783,7 +783,7 @@
         ),
         base AS (
             SELECT
-                m.metric_date, mc.page_id, mc.query_id, mc.country_id, mc.device_id,
+                m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id,
                 SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
                 SUM(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
                 ".implode(",\n                ", array_map(function ($strategy) {
@@ -799,7 +799,7 @@
             WHERE m.metric_date >= :startDate
             AND m.metric_date <= :endDate
             AND mc.dimension_set_id IN (SELECT DISTINCT dimension_set_id FROM configs)
-            GROUP BY m.metric_date, mc.page_id, mc.query_id, mc.country_id, mc.device_id
+            GROUP BY m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id
         ),
         paired AS (
             SELECT
