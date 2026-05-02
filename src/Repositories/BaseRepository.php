@@ -730,6 +730,7 @@
             }
 
             $configWhereSql = implode(' AND ', $configWhere) . $dimWhereSql;
+            $sqlParams = array_merge($sqlParams, $configParams);
 
             $weightedPairColumns = [];
             $weightedComputedSelect = [];
