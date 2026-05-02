@@ -31,6 +31,7 @@
         protected bool $isChanneledMetric = false;
         private array $activeAggregateJoins = [];
         private bool $needsImpressionsJoin = false;
+        private ?string $aggregateRequestedPeriod = null;
         protected static array $defaultRelationMap = [
             'query'                => ['table' => 'queries', 'fk' => 'query_id', 'field' => 'query', 'alias' => 'rq'],
             'channeledAccount'     => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
@@ -224,6 +225,11 @@
             ?string $orderDir = 'ASC'
         ): array
         {
+            $this->aggregateRequestedPeriod = null;
+            if ($filters !== null && isset($filters->period) && is_string($filters->period) && trim($filters->period) !== '') {
+                $this->aggregateRequestedPeriod = strtolower(trim($filters->period));
+            }
+
             $connection = $this->_em->getConnection();
             $qb = $connection->createQueryBuilder();
             $tableName = $this->_class->getTableName();
@@ -1573,6 +1579,8 @@
          */
         protected function getDefaultFormulas(string $valCol, bool $isPostgres): array
         {
+            $periodCondition = $this->getMetricPeriodConditionSql($isPostgres);
+
             return [
                 'spend'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'clicks'                               => "SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
@@ -1642,7 +1650,37 @@
                 'reposts_daily'                        => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'reposts_daily'" : "mc.name = 'reposts_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'total_interactions_daily'             => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'total_interactions_daily'" : "mc.name = 'total_interactions_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'views_daily'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'views_daily'" : "mc.name = 'views_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+
+                // Stock metrics: honor requested period when provided (e.g. lifetime), default daily otherwise.
+                'follows'                              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('follows', 'follows_daily')" : "mc.name IN ('follows', 'follows_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'reposts'                              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reposts', 'reposts_daily')" : "mc.name IN ('reposts', 'reposts_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'profile_activity'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_activity', 'profile_activity_daily')" : "mc.name IN ('profile_activity', 'profile_activity_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'profile_visits'                       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_visits', 'profile_visits_daily')" : "mc.name IN ('profile_visits', 'profile_visits_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'ig_reels_avg_watch_time'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily')" : "mc.name IN ('ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'ig_reels_video_view_total_time'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily')" : "mc.name IN ('ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+
+                // Override core stock-like formulas to respect requested period.
+                'total_interactions'                   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')" : "mc.name IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'comments'                             => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')" : "mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'likes'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')" : "mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'shares'                               => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')" : "mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'saved'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'saves'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'reach'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')" : "mc.name IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'views'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
             ];
+        }
+
+        protected function getMetricPeriodConditionSql(bool $isPostgres, string $defaultPeriod = 'daily'): string
+        {
+            $period = strtolower(trim($this->aggregateRequestedPeriod ?? ''));
+            if ($period === '' || preg_match('/^[a-z0-9_]+$/', $period) !== 1) {
+                $period = strtolower($defaultPeriod);
+            }
+
+            return $isPostgres
+                ? "LOWER(mc.period) = '{$period}'"
+                : "mc.period = '{$period}'";
         }
 
         /**
