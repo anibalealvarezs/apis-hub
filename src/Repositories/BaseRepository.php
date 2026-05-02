@@ -777,18 +777,19 @@
             $finalSelectFields = $grouping['final_select'] !== [] ? implode(",\n                ", $grouping['final_select']) . "," : "";
             $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY " . implode(', ', $grouping['group_by']) : "";
 
-            $sql = "WITH base AS (
+            $sql = "WITH configs AS MATERIALIZED (
+            SELECT 
+                mc.id, mc.page_id, mc.query_id, mc.country_id, mc.device_id, mc.dimension_set_id, mc.name
+            FROM metric_configs mc
+            " . str_replace('mc.', 'mc.', $dimJoinSql) . "
+            WHERE " . str_replace('mc.', 'mc.', $configWhereSql) . "
+        ),
+        base AS (
             SELECT
-                m.metric_date, mc.page_id, mc.query_id, mc.country_id, mc.device_id, mc.dimension_set_id, mc.name, m.value
+                m.metric_date, c.page_id, c.query_id, c.country_id, c.device_id, c.dimension_set_id, c.name, m.value
             FROM metrics m
-            JOIN metric_configs mc ON m.metric_config_id = mc.id
-            WHERE m.metric_config_id IN (
-                SELECT sub_mc.id 
-                FROM metric_configs sub_mc 
-                " . str_replace('mc.', 'sub_mc.', $dimJoinSql) . " 
-                WHERE " . str_replace('mc.', 'sub_mc.', $configWhereSql) . "
-            )
-            AND m.metric_date >= :startDate
+            JOIN configs c ON m.metric_config_id = c.id
+            WHERE m.metric_date >= :startDate
             AND m.metric_date <= :endDate
         ),
         paired AS (
