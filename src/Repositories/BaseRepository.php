@@ -615,10 +615,6 @@
                 return null;
             }
 
-            if (!$isPostgres) {
-                return null;
-            }
-
             if ($startDate === null || $endDate === null) {
                 return null;
             }
@@ -629,6 +625,7 @@
                     $filtersArr[(string)$key] = $value;
                 }
             }
+            $debugSqlEnabled = !empty($filtersArr['debug_sql']);
 
             $allowedFilterKeys = [
                 'page', 'channel', 'debug_sql', '_',
@@ -662,12 +659,13 @@
             }
 
             $normalizedGroupBy = array_values(array_map(static fn($field) => strtolower(trim((string)$field)), $groupBy));
-            if (!$this->isGroupPatternAllowedForWeightedStrategies($normalizedGroupBy, $weightedStrategies)) {
+            $groupPattern = $this->resolveGroupPattern($normalizedGroupBy);
+            if ($groupPattern === null) {
                 return null;
             }
 
-            $groupPattern = $this->resolveGroupPattern($normalizedGroupBy);
-            if ($groupPattern === null) {
+            $groupPatternFields = $this->expandGroupPatternToFields($groupPattern);
+            if (!$this->isGroupPatternAllowedForWeightedStrategies($groupPatternFields, $weightedStrategies)) {
                 return null;
             }
 
@@ -718,42 +716,32 @@
                 $configParams['queryId'] = (int)$query;
             }
 
-            $dimJoinSql = "";
             $dimWhereSql = "";
             foreach ($filtersArr as $key => $value) {
-                if (str_starts_with($key, 'dimensions.') && !in_array(str_replace('dimensions.', '', $key), ['query', 'country', 'device'])) {
-                    $dk = str_replace('dimensions.', '', $key);
-                    $alias = "dsi_" . preg_replace('/[^a-z0-9]/i', '_', $dk);
-                    $dimJoinSql .= " JOIN dimension_set_items $alias ON mc.dimension_set_id = $alias.dimension_set_id
-                                    JOIN dimension_values dv_$alias ON $alias.dimension_value_id = dv_$alias.id
-                                    JOIN dimension_keys dk_$alias ON dv_$alias.dimension_key_id = dk_$alias.id";
-                    $dimWhereSql .= " AND LOWER(dk_$alias.name) = :{$alias}_key AND dv_$alias.value = :{$alias}_val";
-                    $sqlParams["{$alias}_key"] = strtolower($dk);
+                if (str_starts_with($key, 'dimensions.')) {
+                    $dk = $this->normalizeDimensionKey(str_replace('dimensions.', '', $key));
+                    if (in_array($dk, ['query', 'country', 'device'], true)) {
+                        continue;
+                    }
+                    $alias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dk);
+                    $dimWhereSql .= "\n                    AND EXISTS (
+                        SELECT 1
+                        FROM dimension_set_items dsi_$alias
+                        JOIN dimension_values dv_$alias ON dsi_$alias.dimension_value_id = dv_$alias.id
+                        JOIN dimension_keys dk_$alias ON dv_$alias.dimension_key_id = dk_$alias.id
+                        WHERE dsi_$alias.dimension_set_id = mc.dimension_set_id
+                        AND dk_$alias.name = :{$alias}_key
+                        AND dv_$alias.value = :{$alias}_val
+                    )";
+                    $sqlParams["{$alias}_key"] = $dk;
                     $sqlParams["{$alias}_val"] = $value;
                 }
             }
 
             $configWhereSql = implode(' AND ', $configWhere) . $dimWhereSql;
 
-            // GSC Optimization: Pick the most appropriate dimension set to avoid double counting
-            $dsWhere = "";
-            $hasQueryFilter = ($groupPattern === 'dimensions.query' || $query !== null);
-            $hasCountryFilter = ($groupPattern === 'dimensions.country' || $country !== null);
-            $hasDeviceFilter = ($groupPattern === 'dimensions.device' || $device !== null);
-            $hasSearchAppearanceFilter = ($groupPattern === 'dimensions.searchAppearance' || isset($filtersArr['dimensions.searchAppearance']) || isset($filtersArr['dimensions.searchappearance']));
-
-            if ($hasQueryFilter) {
-                $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'query')";
-            } elseif ($hasCountryFilter) {
-                $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'country')";
-            } elseif ($hasDeviceFilter) {
-                $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'device')";
-            } elseif ($hasSearchAppearanceFilter) {
-                 $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'searchAppearance')";
-            } else {
-                // Totals: pick the smallest set (Page only)
-                $dsWhere = " AND mc.dimension_set_id NOT IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name IN ('query', 'country', 'device', 'searchAppearance'))";
-            }
+            $requestedDimensionKeys = $this->resolveOptimizedDimensionKeys($groupPattern, $filtersArr);
+            $dsWhere = $this->buildOptimizedDimensionSetWhereSql($requestedDimensionKeys);
 
             $sqlParams = array_merge($sqlParams, $configParams);
 
@@ -798,11 +786,12 @@
             $finalSelectFields = $grouping['final_select'] !== [] ? implode(",\n                ", $grouping['final_select']) . "," : "";
             $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY " . implode(', ', $grouping['group_by']) : "";
 
-            $sql = "WITH configs AS MATERIALIZED (
+            $configsCteModifier = $isPostgres ? 'MATERIALIZED ' : '';
+
+            $sql = "WITH configs AS {$configsCteModifier}(
             SELECT 
                 mc.id, mc.page_id, mc.query_id, mc.country_id, mc.device_id, mc.dimension_set_id, mc.name
             FROM metric_configs mc
-            " . str_replace('mc.', 'mc.', $dimJoinSql) . "
             WHERE " . str_replace('mc.', 'mc.', $configWhereSql) . " $dsWhere
         ),
         base AS (
@@ -855,7 +844,96 @@
         " . implode("\n            ", $grouping['joins']) . "
         $orderSql";
 
-            return $connection->fetchAllAssociative($sql, $sqlParams);
+            $queryStart = $debugSqlEnabled ? microtime(true) : null;
+            $rows = $connection->fetchAllAssociative($sql, $sqlParams);
+
+            if ($debugSqlEnabled) {
+                $elapsedMs = $queryStart !== null ? (int)round((microtime(true) - $queryStart) * 1000) : -1;
+                error_log("[AggregateDebug] path=optimized_weighted groupPattern={$groupPattern} rows=" . count($rows) . " elapsed_ms={$elapsedMs}");
+            }
+
+            return $rows;
+        }
+
+        protected function normalizeDimensionKey(string $key): string
+        {
+            return match (strtolower(trim($key))) {
+                'searchappearance', 'search_appearance' => 'searchAppearance',
+                'query' => 'query',
+                'country' => 'country',
+                'device' => 'device',
+                default => trim($key),
+            };
+        }
+
+        /**
+         * @return array<int, string>
+         */
+        protected function expandGroupPatternToFields(string $groupPattern): array
+        {
+            return match ($groupPattern) {
+                'none' => [],
+                'dimensions.country+dimensions.device' => ['dimensions.country', 'dimensions.device'],
+                default => [$groupPattern],
+            };
+        }
+
+        /**
+         * @param array<string, mixed> $filtersArr
+         * @return array<int, string>
+         */
+        protected function resolveOptimizedDimensionKeys(string $groupPattern, array $filtersArr): array
+        {
+            $dimensionKeys = [];
+
+            foreach ($this->expandGroupPatternToFields($groupPattern) as $field) {
+                if (str_starts_with($field, 'dimensions.')) {
+                    $dimensionKeys[] = $this->normalizeDimensionKey(substr($field, 11));
+                }
+            }
+
+            foreach (array_keys($filtersArr) as $key) {
+                if (!str_starts_with((string)$key, 'dimensions.')) {
+                    continue;
+                }
+
+                $dimensionKeys[] = $this->normalizeDimensionKey(substr((string)$key, 11));
+            }
+
+            $dimensionKeys = array_values(array_unique(array_filter($dimensionKeys, static fn($key) => $key !== 'page')));
+
+            usort($dimensionKeys, function (string $left, string $right): int {
+                $priority = array_flip($this->getOptimizedDimensionKeyPriority());
+                return ($priority[$left] ?? PHP_INT_MAX) <=> ($priority[$right] ?? PHP_INT_MAX);
+            });
+
+            return $dimensionKeys;
+        }
+
+        /**
+         * @return array<int, string>
+         */
+        protected function getOptimizedDimensionKeyPriority(): array
+        {
+            return ['query', 'country', 'device', 'searchAppearance'];
+        }
+
+        /**
+         * @param array<int, string> $dimensionKeys
+         */
+        protected function buildOptimizedDimensionSetWhereSql(array $dimensionKeys): string
+        {
+            if ($dimensionKeys !== []) {
+                $dimensionKey = $dimensionKeys[0];
+                return " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = '".str_replace("'", "''", $dimensionKey)."')";
+            }
+
+            $excluded = implode(', ', array_map(
+                static fn(string $key): string => "'".str_replace("'", "''", $key)."'",
+                $this->getOptimizedDimensionKeyPriority()
+            ));
+
+            return " AND mc.dimension_set_id NOT IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name IN ({$excluded}))";
         }
 
         /**
@@ -931,7 +1009,13 @@
                     return $map[$field];
                 }
                 if (in_array($field, ['dimensions.query', 'dimensions.page', 'dimensions.country', 'dimensions.device', 'dimensions.searchappearance', 'dimensions.search_appearance'], true)) {
-                    return 'dimensions.searchAppearance';
+                    return match ($field) {
+                        'dimensions.query' => 'dimensions.query',
+                        'dimensions.page' => 'dimensions.page',
+                        'dimensions.country' => 'dimensions.country',
+                        'dimensions.device' => 'dimensions.device',
+                        default => 'dimensions.searchAppearance',
+                    };
                 }
             }
 
