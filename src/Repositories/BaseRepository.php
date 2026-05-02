@@ -724,23 +724,12 @@
                                     JOIN dimension_values dv_$alias ON $alias.dimension_value_id = dv_$alias.id
                                     JOIN dimension_keys dk_$alias ON dv_$alias.dimension_key_id = dk_$alias.id";
                     $dimWhereSql .= " AND LOWER(dk_$alias.name) = :{$alias}_key AND dv_$alias.value = :{$alias}_val";
-                    $configParams["{$alias}_key"] = strtolower($dk);
-                    $configParams["{$alias}_val"] = $value;
+                    $sqlParams["{$alias}_key"] = strtolower($dk);
+                    $sqlParams["{$alias}_val"] = $value;
                 }
             }
 
             $configWhereSql = implode(' AND ', $configWhere) . $dimWhereSql;
-
-            $configIds = $this->getEntityManager()->getConnection()->fetchFirstColumn(
-                "SELECT mc.id FROM metric_configs mc $dimJoinSql WHERE $configWhereSql",
-                $configParams
-            );
-
-            if (empty($configIds)) {
-                return [];
-            }
-
-            $configIdsList = implode(',', array_map('intval', $configIds));
 
             $weightedPairColumns = [];
             $weightedComputedSelect = [];
@@ -783,17 +772,13 @@
             $finalSelectFields = $grouping['final_select'] !== [] ? implode(",\n                ", $grouping['final_select']) . "," : "";
             $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY " . implode(', ', $grouping['group_by']) : "";
 
-            $sqlParams = [
-                'startDate' => $startDate,
-                'endDate'   => $endDate,
-            ];
-
             $sql = "WITH base AS (
             SELECT
                 m.metric_date, mc.page_id, mc.query_id, mc.country_id, mc.device_id, mc.dimension_set_id, mc.name, m.value
             FROM metrics m
             JOIN metric_configs mc ON m.metric_config_id = mc.id
-            WHERE m.metric_config_id IN ($configIdsList)
+            $dimJoinSql
+            WHERE $configWhereSql
             AND m.metric_date >= :startDate
             AND m.metric_date <= :endDate
         ),
@@ -820,10 +805,7 @@
         " . implode("\n            ", $grouping['joins']) . "
         $orderSql";
 
-            return $connection->fetchAllAssociative(
-                $sql,
-                $params
-            );
+            return $connection->fetchAllAssociative($sql, $sqlParams);
         }
 
         /**
