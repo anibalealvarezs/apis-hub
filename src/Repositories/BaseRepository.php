@@ -627,23 +627,17 @@
             }
             $debugSqlEnabled = !empty($filtersArr['debug_sql']);
 
+            // Keep explicit validation only for non-dimension keys.
+            // Any dimensions.* key is accepted and resolved at SQL level.
             $allowedFilterKeys = [
                 'page', 'channel', 'debug_sql', '_',
                 'country', 'device', 'query',
-                'dimensions.country', 'dimensions.device', 'dimensions.query',
-                'dimensions.searchAppearance'
             ];
             foreach (array_keys($filtersArr) as $key) {
                 if (!in_array($key, $allowedFilterKeys, true) && !str_starts_with($key, 'dimensions.')) {
                     return null;
                 }
             }
-
-            $page = $filtersArr['page'] ?? null;
-            $channel = $filtersArr['channel'] ?? null;
-            $country = $filtersArr['country'] ?? $filtersArr['dimensions.country'] ?? null;
-            $device = $filtersArr['device'] ?? $filtersArr['dimensions.device'] ?? null;
-            $query = $filtersArr['query'] ?? $filtersArr['dimensions.query'] ?? null;
 
             $supported = ['clicks', 'impressions', 'ctr'];
             foreach ($aggregations as $expr) {
@@ -675,13 +669,6 @@
                 'endDate'   => $endDate,
             ];
 
-            $valueSource = $this->isChanneledMetric
-                ? 'FROM metric_configs mc
-                   JOIN metrics m ON m.metric_config_id = mc.id
-                   JOIN channeled_metrics e ON e.metric_id = m.id'
-                : 'FROM metric_configs mc
-                   JOIN metrics m ON m.metric_config_id = mc.id';
-
             $baseMetricNames = ['clicks', 'clicks_daily'];
             foreach ($weightedStrategies as $strategy) {
                 $baseMetricNames = array_merge($baseMetricNames, $strategy['source_metric_names'], $strategy['weight_metric_names']);
@@ -695,35 +682,32 @@
             ];
             $configParams = [];
 
-            if ($page !== null) {
+            if ($filtersArr['page'] !== null) {
                 $configWhere[] = 'mc.page_id = :pageId';
-                $configParams['pageId'] = (int)$page;
+                $configParams['pageId'] = (int)$filtersArr['page'];
             }
-            if ($channel !== null) {
+            if ($filtersArr['channel'] !== null) {
                 $configWhere[] = 'mc.channel = :channel';
-                $configParams['channel'] = (int)$channel;
+                $configParams['channel'] = (int)$filtersArr['channel'];
             }
-            if ($country !== null) {
+            if ($filtersArr['country'] !== null) {
                 $configWhere[] = 'mc.country_id = :countryId';
-                $configParams['countryId'] = (int)$country;
+                $configParams['countryId'] = (int)$filtersArr['country'];
             }
-            if ($device !== null) {
+            if ($filtersArr['device'] !== null) {
                 $configWhere[] = 'mc.device_id = :deviceId';
-                $configParams['deviceId'] = (int)$device;
+                $configParams['deviceId'] = (int)$filtersArr['device'];
             }
-            if ($query !== null) {
+            if ($filtersArr['query'] !== null) {
                 $configWhere[] = 'mc.query_id = :queryId';
-                $configParams['queryId'] = (int)$query;
+                $configParams['queryId'] = (int)$filtersArr['query'];
             }
 
             $dimWhereSql = "";
             foreach ($filtersArr as $key => $value) {
                 if (str_starts_with($key, 'dimensions.')) {
-                    $dk = $this->normalizeDimensionKey(str_replace('dimensions.', '', $key));
-                    if (in_array($dk, ['query', 'country', 'device'], true)) {
-                        continue;
-                    }
-                    $alias = "dim_" . preg_replace('/[^a-z0-9]/i', '_', $dk);
+                    $dk = trim((string)str_replace('dimensions.', '', $key));
+                    $alias = "dim_".preg_replace('/[^a-z0-9]/i', '_', $dk);
                     $dimWhereSql .= "\n                    AND EXISTS (
                         SELECT 1
                         FROM dimension_set_items dsi_$alias
@@ -738,7 +722,7 @@
                 }
             }
 
-            $configWhereSql = implode(' AND ', $configWhere) . $dimWhereSql;
+            $configWhereSql = implode(' AND ', $configWhere).$dimWhereSql;
 
             $requestedDimensionKeys = $this->resolveOptimizedDimensionKeys($groupPattern, $filtersArr);
             $dsWhere = $this->buildOptimizedDimensionSetWhereSql($requestedDimensionKeys);
@@ -755,7 +739,10 @@
             }
 
             $grouping = $this->buildWeightedGroupingConfig($groupPattern, $isPostgres, $quoteChar);
-            
+            if ($grouping === null) {
+                return null;
+            }
+
             $selectMetrics = [];
             foreach ($aggregations as $alias => $expr) {
                 $lowerExpr = strtolower(trim((string)$expr));
@@ -783,8 +770,8 @@
             $weightedPairSql = implode(",\n        ", $weightedPairColumns);
             $weightedComputedSql = implode(",\n        ", $weightedComputedSelect);
             $firstWeightNameList = $this->toSqlStringList(array_values($weightedStrategies)[0]['weight_metric_names']);
-            $finalSelectFields = $grouping['final_select'] !== [] ? implode(",\n                ", $grouping['final_select']) . "," : "";
-            $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY " . implode(', ', $grouping['group_by']) : "";
+            $finalSelectFields = $grouping['final_select'] !== [] ? implode(",\n                ", $grouping['final_select'])."," : "";
+            $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY ".implode(', ', $grouping['group_by']) : "";
 
             $configsCteModifier = $isPostgres ? 'MATERIALIZED ' : '';
 
@@ -792,20 +779,21 @@
             SELECT 
                 mc.id, mc.page_id, mc.query_id, mc.country_id, mc.device_id, mc.dimension_set_id, mc.name
             FROM metric_configs mc
-            WHERE " . str_replace('mc.', 'mc.', $configWhereSql) . " $dsWhere
+            WHERE ".str_replace('mc.', 'mc.', $configWhereSql)." $dsWhere
         ),
         base AS (
             SELECT
                 m.metric_date, mc.page_id, mc.query_id, mc.country_id, mc.device_id,
                 SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
                 SUM(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
-                " . implode(",\n                ", array_map(function($strategy) {
+                ".implode(",\n                ", array_map(function ($strategy) {
                     $prefix = $strategy['prefix'];
                     $sourceList = $this->toSqlStringList($strategy['source_metric_names']);
                     $weightList = $this->toSqlStringList($strategy['weight_metric_names']);
+
                     return "MAX(CASE WHEN mc.name IN ($sourceList) THEN m.value END) AS {$prefix}_metric,
                 MAX(CASE WHEN mc.name IN ($weightList) THEN m.value END) AS {$prefix}_weight";
-                }, $weightedStrategies)) . "
+                }, $weightedStrategies))."
             FROM metrics m
             JOIN configs mc ON m.metric_config_id = mc.id
             WHERE m.metric_date >= :startDate
@@ -816,32 +804,34 @@
         paired AS (
             SELECT
                 b.metric_date, 
-                " . ($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'b.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'b.metric_date'))) ? implode(", ", $cols) . ", " : "" : "") . "
+                ".($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'b.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'b.metric_date'))) ? implode(", ", $cols).", " : "" : "")."
                 SUM(b.clicks) AS clicks_value,
                 SUM(b.impressions) AS impressions_value,
-                " . implode(",\n                ", array_map(function($strategy) {
+                ".implode(",\n                ", array_map(function ($strategy) {
                     $prefix = $strategy['prefix'];
+
                     return "SUM(COALESCE(b.{$prefix}_metric, 0) * COALESCE(b.{$prefix}_weight, 0)) AS {$prefix}_weighted_sum,
                 SUM(COALESCE(b.{$prefix}_weight, 0)) AS {$prefix}_total_weight";
-                }, $weightedStrategies)) . "
+                }, $weightedStrategies))."
             FROM base b
-            GROUP BY b.metric_date" . ($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'b.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'b.metric_date'))) ? ", " . implode(", ", $cols) : "" : "") . "
+            GROUP BY b.metric_date".($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'b.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'b.metric_date'))) ? ", ".implode(", ", $cols) : "" : "")."
         ),
         finalized AS (
             SELECT
                 $finalSelectFields
                 SUM(p.clicks_value) AS clicks,
                 SUM(p.impressions_value) AS impressions,
-                SUM(p.clicks_value) / NULLIF(SUM(p.impressions_value), 0) AS ctr" . (count($weightedStrategies) > 0 ? "," : "") . "
-                " . implode(",\n                ", array_map(function($strategy) {
+                SUM(p.clicks_value) / NULLIF(SUM(p.impressions_value), 0) AS ctr".(count($weightedStrategies) > 0 ? "," : "")."
+                ".implode(",\n                ", array_map(function ($strategy) {
                     $prefix = $strategy['prefix'];
+
                     return "SUM(p.{$prefix}_weighted_sum) / NULLIF(SUM(p.{$prefix}_total_weight), 0) AS {$prefix}_value";
-                }, $weightedStrategies)) . "
+                }, $weightedStrategies))."
             FROM paired p
             $finalGroupByFields
         )
-        SELECT " . implode(', ', $selectMetrics) . " FROM finalized f
-        " . implode("\n            ", $grouping['joins']) . "
+        SELECT ".implode(', ', $selectMetrics)." FROM finalized f
+        ".implode("\n            ", $grouping['joins'])."
         $orderSql";
 
             $queryStart = $debugSqlEnabled ? microtime(true) : null;
@@ -849,21 +839,10 @@
 
             if ($debugSqlEnabled) {
                 $elapsedMs = $queryStart !== null ? (int)round((microtime(true) - $queryStart) * 1000) : -1;
-                error_log("[AggregateDebug] path=optimized_weighted groupPattern={$groupPattern} rows=" . count($rows) . " elapsed_ms={$elapsedMs}");
+                error_log("[AggregateDebug] path=optimized_weighted groupPattern={$groupPattern} rows=".count($rows)." elapsed_ms={$elapsedMs}");
             }
 
             return $rows;
-        }
-
-        protected function normalizeDimensionKey(string $key): string
-        {
-            return match (strtolower(trim($key))) {
-                'searchappearance', 'search_appearance' => 'searchAppearance',
-                'query' => 'query',
-                'country' => 'country',
-                'device' => 'device',
-                default => trim($key),
-            };
         }
 
         /**
@@ -871,9 +850,12 @@
          */
         protected function expandGroupPatternToFields(string $groupPattern): array
         {
+            if (str_contains($groupPattern, '+')) {
+                return array_values(array_filter(array_map('trim', explode('+', $groupPattern)), static fn($f) => $f !== ''));
+            }
+
             return match ($groupPattern) {
                 'none' => [],
-                'dimensions.country+dimensions.device' => ['dimensions.country', 'dimensions.device'],
                 default => [$groupPattern],
             };
         }
@@ -888,7 +870,7 @@
 
             foreach ($this->expandGroupPatternToFields($groupPattern) as $field) {
                 if (str_starts_with($field, 'dimensions.')) {
-                    $dimensionKeys[] = $this->normalizeDimensionKey(substr($field, 11));
+                    $dimensionKeys[] = trim(substr($field, 11));
                 }
             }
 
@@ -897,13 +879,19 @@
                     continue;
                 }
 
-                $dimensionKeys[] = $this->normalizeDimensionKey(substr((string)$key, 11));
+                $dimensionKeys[] = trim(substr((string)$key, 11));
             }
 
-            $dimensionKeys = array_values(array_unique(array_filter($dimensionKeys, static fn($key) => $key !== 'page')));
+            // Exclude FK-backed dimensions generically (cross-driver), not by channel-specific hardcoding.
+            $dimensionSetExcludedKeys = $this->getOptimizedDimensionSetExcludedKeys();
+            $dimensionKeys = array_values(array_unique(array_filter(
+                $dimensionKeys,
+                static fn($key) => !in_array($key, $dimensionSetExcludedKeys, true)
+            )));
 
             usort($dimensionKeys, function (string $left, string $right): int {
                 $priority = array_flip($this->getOptimizedDimensionKeyPriority());
+
                 return ($priority[$left] ?? PHP_INT_MAX) <=> ($priority[$right] ?? PHP_INT_MAX);
             });
 
@@ -915,7 +903,37 @@
          */
         protected function getOptimizedDimensionKeyPriority(): array
         {
-            return ['query', 'country', 'device', 'searchAppearance'];
+            return ['query', 'country', 'device'];
+        }
+
+        /**
+         * Build the list of dimension keys that are FK-backed in metric_configs,
+         * therefore they should not be required inside dimension_set_items.
+         *
+         * @return array<int, string>
+         */
+        protected function getOptimizedDimensionSetExcludedKeys(): array
+        {
+            $excluded = [];
+            $dimensionSetBackedKeys = ['page', 'query', 'country', 'device'];
+
+            foreach (self::getRelationMap() as $relationKey => $map) {
+                if (!isset($map['fk']) || !is_string($map['fk']) || !str_ends_with($map['fk'], '_id')) {
+                    continue;
+                }
+
+                $normalizedRelationKey = trim((string)$relationKey);
+                $normalizedFkKey = trim(substr($map['fk'], 0, -3));
+
+                if (!in_array($normalizedRelationKey, $dimensionSetBackedKeys, true)) {
+                    $excluded[] = $normalizedRelationKey;
+                }
+                if (!in_array($normalizedFkKey, $dimensionSetBackedKeys, true)) {
+                    $excluded[] = $normalizedFkKey;
+                }
+            }
+
+            return array_values(array_unique(array_filter($excluded, static fn($key) => $key !== '')));
         }
 
         /**
@@ -925,6 +943,7 @@
         {
             if ($dimensionKeys !== []) {
                 $dimensionKey = $dimensionKeys[0];
+
                 return " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = '".str_replace("'", "''", $dimensionKey)."')";
             }
 
@@ -991,38 +1010,36 @@
             }
 
             $normalized = array_values(array_map(static fn($field) => strtolower(trim((string)$field)), $groupBy));
-            
+
             if (count($normalized) === 1) {
                 $field = $normalized[0];
                 if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
                     return $field;
                 }
-                $map = [
-                    'query' => 'dimensions.query',
-                    'page' => 'dimensions.page',
-                    'country' => 'dimensions.country',
-                    'device' => 'dimensions.device',
-                    'searchappearance' => 'dimensions.searchAppearance',
-                    'search_appearance' => 'dimensions.searchAppearance',
-                ];
-                if (isset($map[$field])) {
-                    return $map[$field];
+
+                if (in_array($field, ['query', 'page', 'country', 'device'], true)) {
+                    return $field;
                 }
-                if (in_array($field, ['dimensions.query', 'dimensions.page', 'dimensions.country', 'dimensions.device', 'dimensions.searchappearance', 'dimensions.search_appearance'], true)) {
-                    return match ($field) {
-                        'dimensions.query' => 'dimensions.query',
-                        'dimensions.page' => 'dimensions.page',
-                        'dimensions.country' => 'dimensions.country',
-                        'dimensions.device' => 'dimensions.device',
-                        default => 'dimensions.searchAppearance',
-                    };
+
+                if (str_starts_with($field, 'dimensions.') && strlen($field) > 11) {
+                    return $field;
                 }
             }
 
-            $canonical = $this->canonicalizeGroupPattern($normalized);
-            if ($canonical === $this->canonicalizeGroupPattern(['dimensions.country', 'dimensions.device']) || 
-                $canonical === $this->canonicalizeGroupPattern(['country', 'device'])) {
-                return 'dimensions.country+dimensions.device';
+            $allDimensions = array_reduce($normalized, static fn(bool $carry, string $field): bool => $carry && str_starts_with($field, 'dimensions.'), true);
+            if ($allDimensions) {
+                sort($normalized);
+
+                return implode('+', $normalized);
+            }
+
+            $knownEntityFields = ['query', 'page', 'country', 'device'];
+            $allEntities = count($normalized) >= 2
+                && array_reduce($normalized, static fn(bool $carry, string $field): bool => $carry && in_array($field, $knownEntityFields, true), true);
+            if ($allEntities) {
+                sort($normalized);
+
+                return implode('+', $normalized);
             }
 
             return null;
@@ -1034,6 +1051,7 @@
          */
         protected function isGroupPatternAllowedForWeightedStrategies(array $groupBy, array $weightedStrategies): bool
         {
+            $normalizedGroup = array_values(array_map(static fn($field) => strtolower(trim((string)$field)), $groupBy));
             $groupCanonical = $this->canonicalizeGroupPattern($groupBy);
 
             foreach ($weightedStrategies as $strategy) {
@@ -1045,7 +1063,7 @@
                 $isAllowed = false;
                 foreach ($allowedPatterns as $pattern) {
                     $normalizedPattern = array_values(array_map(static fn($field) => strtolower(trim((string)$field)), (array)$pattern));
-                    if ($this->canonicalizeGroupPattern($normalizedPattern) === $groupCanonical) {
+                    if ($this->canonicalizeGroupPattern($normalizedPattern) === $groupCanonical || $this->matchesWildcardGroupPattern($normalizedGroup, $normalizedPattern)) {
                         $isAllowed = true;
                         break;
                     }
@@ -1057,6 +1075,49 @@
             }
 
             return true;
+        }
+
+        /**
+         * @param array<int, string> $groupBy
+         * @param array<int, string> $pattern
+         */
+        protected function matchesWildcardGroupPattern(array $groupBy, array $pattern): bool
+        {
+            if (!in_array('dimensions.*', $pattern, true)) {
+                return false;
+            }
+
+            if (count($groupBy) !== count($pattern)) {
+                return false;
+            }
+
+            $remaining = $groupBy;
+            foreach ($pattern as $token) {
+                if ($token === 'dimensions.*') {
+                    $dimIndex = null;
+                    foreach ($remaining as $index => $candidate) {
+                        if (str_starts_with($candidate, 'dimensions.')) {
+                            $dimIndex = $index;
+                            break;
+                        }
+                    }
+
+                    if ($dimIndex === null) {
+                        return false;
+                    }
+
+                    unset($remaining[$dimIndex]);
+                    continue;
+                }
+
+                $exactIndex = array_search($token, $remaining, true);
+                if ($exactIndex === false) {
+                    return false;
+                }
+                unset($remaining[$exactIndex]);
+            }
+
+            return $remaining === [];
         }
 
         /**
@@ -1075,6 +1136,20 @@
          */
         protected function buildWeightedGroupingConfig(string $groupPattern, bool $isPostgres, string $quoteChar): ?array
         {
+            $patternFields = $this->expandGroupPatternToFields($groupPattern);
+            $allDimensions = count($patternFields) >= 1
+                && array_reduce($patternFields, static fn(bool $carry, string $field): bool => $carry && str_starts_with($field, 'dimensions.'), true);
+            if ($allDimensions) {
+                return $this->buildDimensionSetCombinationGroupingConfig($patternFields, $quoteChar);
+            }
+
+            $knownEntityFields = ['query', 'page', 'country', 'device'];
+            $allEntities = count($patternFields) >= 2
+                && array_reduce($patternFields, static fn(bool $carry, string $field): bool => $carry && in_array($field, $knownEntityFields, true), true);
+            if ($allEntities) {
+                return $this->buildEntityCombinationGroupingConfig($patternFields, $quoteChar);
+            }
+
             $dimAlias = static fn(string $name): string => $quoteChar.$name.$quoteChar;
 
             return match ($groupPattern) {
@@ -1136,75 +1211,132 @@
                     'joins'        => [],
                     'order_map'    => ['yearly' => $dimAlias('yearly')],
                 ],
-                'dimensions.query' => [
+                'query' => [
                     'final_select' => ['p.query_id AS group_key'],
                     'group_by'     => ['p.query_id'],
-                    'outer_select' => ["COALESCE(q.query, 'unknown') AS " . $dimAlias('dimensions.query')],
+                    'outer_select' => ["COALESCE(q.query, 'unknown') AS ".$dimAlias('query')],
                     'joins'        => ['LEFT JOIN queries q ON q.id = f.group_key'],
-                    'order_map'    => ['dimensions.query' => "COALESCE(q.query, 'unknown')"],
+                    'order_map'    => ['query' => "COALESCE(q.query, 'unknown')"],
                 ],
-                'dimensions.page' => [
+                'page' => [
                     'final_select' => ['p.page_id AS group_key'],
                     'group_by'     => ['p.page_id'],
-                    'outer_select' => ["COALESCE(dv_page.value, 'unknown') AS " . $dimAlias('dimensions.page')],
-                    'joins'        => [
-                        "LEFT JOIN dimension_values dv_page ON dv_page.id = f.group_key"
-                    ],
-                    'order_map'    => ['dimensions.page' => "COALESCE(dv_page.value, 'unknown')"],
+                    'outer_select' => ["COALESCE(pg.url, 'unknown') AS ".$dimAlias('page')],
+                    'joins'        => ['LEFT JOIN pages pg ON pg.id = f.group_key'],
+                    'order_map'    => ['page' => "COALESCE(pg.url, 'unknown')"],
                 ],
-                'dimensions.searchAppearance' => [
-                    'final_select' => ['p.dimension_set_id AS group_key'],
-                    'group_by'     => ['p.dimension_set_id'],
-                    'outer_select' => ["COALESCE(dv_sa.value, 'unknown') AS " . $dimAlias('dimensions.searchAppearance')],
-                    'joins'        => [
-                        "LEFT JOIN dimension_set_items dsi_sa ON dsi_sa.dimension_set_id = f.group_key
-                            AND dsi_sa.dimension_value_id IN (
-                                SELECT dka_v.id FROM dimension_values dka_v 
-                                JOIN dimension_keys dka_k ON dka_k.id = dka_v.dimension_key_id 
-                                WHERE LOWER(dka_k.name) = 'searchappearance'
-                            )",
-                        "LEFT JOIN dimension_values dv_sa ON dv_sa.id = dsi_sa.dimension_value_id"
-                    ],
-                    'order_map'    => ['dimensions.searchAppearance' => "COALESCE(dv_sa.value, 'unknown')"],
-                ],
-                'dimensions.country' => [
+                'country' => [
                     'final_select' => ['p.country_id AS group_key'],
                     'group_by'     => ['p.country_id'],
-                    'outer_select' => ["COALESCE(c.name, 'unknown') AS " . $dimAlias('dimensions.country')],
+                    'outer_select' => ["COALESCE(c.name, 'unknown') AS ".$dimAlias('country')],
                     'joins'        => ['LEFT JOIN countries c ON c.id = f.group_key'],
-                    'order_map'    => ['dimensions.country' => "COALESCE(c.name, 'unknown')"],
+                    'order_map'    => ['country' => "COALESCE(c.name, 'unknown')"],
                 ],
-                'dimensions.device' => [
+                'device' => [
                     'final_select' => ['p.device_id AS group_key'],
                     'group_by'     => ['p.device_id'],
-                    'outer_select' => ["COALESCE(d.type, 'unknown') AS " . $dimAlias('dimensions.device')],
+                    'outer_select' => ["COALESCE(d.type, 'unknown') AS ".$dimAlias('device')],
                     'joins'        => ['LEFT JOIN devices d ON d.id = f.group_key'],
-                    'order_map'    => ['dimensions.device' => "COALESCE(d.type, 'unknown')"],
-                ],
-                'dimensions.country+dimensions.device' => [
-                    'final_select' => [
-                        "COALESCE(c.name, 'unknown') AS group_country",
-                        "COALESCE(d.type, 'unknown') AS group_device",
-                    ],
-                    'group_by'     => [
-                        "COALESCE(c.name, 'unknown')",
-                        "COALESCE(d.type, 'unknown')",
-                    ],
-                    'outer_select' => [
-                        'f.group_country AS '.$dimAlias('dimensions.country'),
-                        'f.group_device AS '.$dimAlias('dimensions.device'),
-                    ],
-                    'joins'        => [
-                        'LEFT JOIN countries c ON c.id = p.country_id',
-                        'LEFT JOIN devices d ON d.id = p.device_id',
-                    ],
-                    'order_map'    => [
-                        'dimensions.country' => $dimAlias('dimensions.country'),
-                        'dimensions.device'  => $dimAlias('dimensions.device'),
-                    ],
+                    'order_map'    => ['device' => "COALESCE(d.type, 'unknown')"],
                 ],
                 default => null,
             };
+        }
+
+        /**
+         * @param array<int, string> $entityFields
+         * @return array<string, mixed>
+         */
+        protected function buildEntityCombinationGroupingConfig(array $entityFields, string $quoteChar): array
+        {
+            $dimAlias = static fn(string $name): string => $quoteChar.$name.$quoteChar;
+
+            $entityConfig = [
+                'query' => [
+                    'id_expr' => 'p.query_id',
+                    'name_expr' => "COALESCE(q.query, 'unknown')",
+                    'join' => 'LEFT JOIN queries q ON q.id = f.query_id',
+                ],
+                'page' => [
+                    'id_expr' => 'p.page_id',
+                    'name_expr' => "COALESCE(pg.url, 'unknown')",
+                    'join' => 'LEFT JOIN pages pg ON pg.id = f.page_id',
+                ],
+                'country' => [
+                    'id_expr' => 'p.country_id',
+                    'name_expr' => "COALESCE(c.name, 'unknown')",
+                    'join' => 'LEFT JOIN countries c ON c.id = f.country_id',
+                ],
+                'device' => [
+                    'id_expr' => 'p.device_id',
+                    'name_expr' => "COALESCE(d.type, 'unknown')",
+                    'join' => 'LEFT JOIN devices d ON d.id = f.device_id',
+                ],
+            ];
+
+            $finalSelect = [];
+            $groupBy = [];
+            $outerSelect = [];
+            $joins = [];
+            $orderMap = [];
+
+            foreach ($entityFields as $field) {
+                $cfg = $entityConfig[$field];
+                $idAlias = $field.'_id';
+
+                $finalSelect[] = $cfg['id_expr'].' AS '.$idAlias;
+                $groupBy[] = $cfg['id_expr'];
+                $outerSelect[] = $cfg['name_expr'].' AS '.$dimAlias($field);
+                $joins[] = $cfg['join'];
+                $orderMap[$field] = $cfg['name_expr'];
+            }
+
+            return [
+                'final_select' => $finalSelect,
+                'group_by'     => $groupBy,
+                'outer_select' => $outerSelect,
+                'joins'        => $joins,
+                'order_map'    => $orderMap,
+            ];
+        }
+
+        /**
+         * @param array<int, string> $dimensionFields
+         * @return array<string, mixed>
+         */
+        protected function buildDimensionSetCombinationGroupingConfig(array $dimensionFields, string $quoteChar): array
+        {
+            $dimAlias = static fn(string $name): string => $quoteChar.$name.$quoteChar;
+
+            $outerSelect = [];
+            $joins = [];
+            $orderMap = [];
+
+            foreach ($dimensionFields as $field) {
+                $dimensionKey = substr($field, 11);
+                $safeSuffix = preg_replace('/[^a-z0-9_]/i', '_', $dimensionKey);
+                $dsiAlias = 'dsi_'.$safeSuffix;
+                $dvAlias = 'dv_'.$safeSuffix;
+                $outerExpr = "COALESCE({$dvAlias}.value, 'unknown')";
+
+                $outerSelect[] = "{$outerExpr} AS ".$dimAlias($field);
+                $orderMap[$field] = $outerExpr;
+                $joins[] = "LEFT JOIN dimension_set_items {$dsiAlias} ON {$dsiAlias}.dimension_set_id = f.group_key
+                            AND {$dsiAlias}.dimension_value_id IN (
+                                SELECT dk_{$safeSuffix}_v.id FROM dimension_values dk_{$safeSuffix}_v
+                                JOIN dimension_keys dk_{$safeSuffix}_k ON dk_{$safeSuffix}_k.id = dk_{$safeSuffix}_v.dimension_key_id
+                                WHERE dk_{$safeSuffix}_k.name = '{$dimensionKey}'
+                            )";
+                $joins[] = "LEFT JOIN dimension_values {$dvAlias} ON {$dvAlias}.id = {$dsiAlias}.dimension_value_id";
+            }
+
+            return [
+                'final_select' => ['p.dimension_set_id AS group_key'],
+                'group_by'     => ['p.dimension_set_id'],
+                'outer_select' => $outerSelect,
+                'joins'        => $joins,
+                'order_map'    => $orderMap,
+            ];
         }
 
         protected function buildTemporalBucketExpression(string $granularity, bool $isPostgres, string $dateColumn): string
