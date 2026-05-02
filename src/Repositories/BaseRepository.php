@@ -465,7 +465,7 @@
             if ($filters) {
                 foreach ($filters as $key => $value) {
                     // Skip technical/debug parameters
-                    if ($key === 'debug_sql' || $key === '_') continue;
+                    if ($key === 'debug_sql' || $key === '_' || $key === 'latest_snapshot') continue;
 
                     $isDimension = str_starts_with($key, 'dimensions.');
                     $dimKey = $isDimension ? substr($key, 11) : $key;
@@ -544,8 +544,16 @@
                 }
             }
 
+            $latestSnapshot = false;
+            if ($filters && isset($filters->latest_snapshot)) {
+                $latestSnapshot = filter_var($filters->latest_snapshot, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($latestSnapshot === null) {
+                    $latestSnapshot = (bool)$filters->latest_snapshot;
+                }
+            }
+
             // Apply date filters using the correctly mapped column names
-            if ($startDate || $endDate) {
+            if ($startDate || $endDate || $latestSnapshot) {
                 if ($this->isChanneledMetric) {
                     $sqlDateField = 'm.metric_date';
                 } elseif ($isMetric) {
@@ -558,13 +566,40 @@
                     $sqlDateField = $this->mapFieldToSql($dateField);
                 }
 
-                if ($startDate) {
-                    $qb->andWhere("$sqlDateField >= :startDate")
-                        ->setParameter('startDate', $startDate);
-                }
-                if ($endDate) {
-                    $qb->andWhere("$sqlDateField <= :endDate")
-                        ->setParameter('endDate', $endDate);
+                if ($latestSnapshot && $this->isChanneledMetric) {
+                    $nullSafeComparator = $isPostgres ? 'IS NOT DISTINCT FROM' : '<=>';
+                    $latestSnapshotSql = "SELECT MAX(m_ls.metric_date)
+                        FROM metrics m_ls
+                        JOIN metric_configs mc_ls ON m_ls.metric_config_id = mc_ls.id
+                        WHERE mc_ls.channel = mc.channel
+                          AND mc_ls.period = mc.period
+                          AND (mc_ls.channeled_account_id {$nullSafeComparator} mc.channeled_account_id)
+                          AND (mc_ls.page_id {$nullSafeComparator} mc.page_id)
+                          AND (mc_ls.post_id {$nullSafeComparator} mc.post_id)
+                          AND (mc_ls.dimension_set_id {$nullSafeComparator} mc.dimension_set_id)
+                          AND (mc_ls.query_id {$nullSafeComparator} mc.query_id)
+                          AND (mc_ls.country_id {$nullSafeComparator} mc.country_id)
+                          AND (mc_ls.device_id {$nullSafeComparator} mc.device_id)";
+
+                    if ($startDate) {
+                        $latestSnapshotSql .= " AND m_ls.metric_date >= :startDate";
+                        $qb->setParameter('startDate', $startDate);
+                    }
+                    if ($endDate) {
+                        $latestSnapshotSql .= " AND m_ls.metric_date <= :endDate";
+                        $qb->setParameter('endDate', $endDate);
+                    }
+
+                    $qb->andWhere("$sqlDateField = ($latestSnapshotSql)");
+                } else {
+                    if ($startDate) {
+                        $qb->andWhere("$sqlDateField >= :startDate")
+                            ->setParameter('startDate', $startDate);
+                    }
+                    if ($endDate) {
+                        $qb->andWhere("$sqlDateField <= :endDate")
+                            ->setParameter('endDate', $endDate);
+                    }
                 }
             }
 
