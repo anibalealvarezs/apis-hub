@@ -471,6 +471,7 @@
 
                     if ($this->isChanneledMetric && ($isDimension || ($key !== 'account_type' && !in_array($key, $standardRelations) && !in_array($key, $dateFields) && !$this->_class->hasField($key)))) {
                         $dimAlias = "f_dim_".preg_replace('/[^a-z0-9]/i', '_', $dimKey);
+                        $condition = $this->resolveFilterCondition($value);
                         $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
                         SELECT sub_dv.id FROM dimension_values sub_dv 
                         JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
@@ -478,9 +479,19 @@
                     )");
                         $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
 
-                        $qb->setParameter("key_$dimAlias", $dimKey)
-                            ->andWhere("dv_$dimAlias.value = :val_$dimAlias")
-                            ->setParameter("val_$dimAlias", $value);
+                        $qb->setParameter("key_$dimAlias", $dimKey);
+
+                        if ($condition['operator'] === 'eq') {
+                            $qb->andWhere("dv_$dimAlias.value = :val_$dimAlias")
+                                ->setParameter("val_$dimAlias", $condition['value']);
+                        } elseif ($condition['operator'] === 'neq') {
+                            $qb->andWhere("dv_$dimAlias.value <> :val_$dimAlias")
+                                ->setParameter("val_$dimAlias", $condition['value']);
+                        } elseif ($condition['operator'] === 'is_null') {
+                            $qb->andWhere("dv_$dimAlias.value IS NULL");
+                        } elseif ($condition['operator'] === 'is_not_null') {
+                            $qb->andWhere("dv_$dimAlias.value IS NOT NULL");
+                        }
                     } elseif ((str_ends_with($entityName, 'Metric') || $this->isChanneledMetric) && (isset(self::getRelationMap()[$key]) || $key === 'account_type')) {
                         $realKey = ($key === 'account_type') ? 'channeledAccount' : $key;
                         $map = self::getRelationMap()[$realKey];
@@ -515,14 +526,18 @@
                     } else {
                         $sqlKey = $this->mapFieldToSql($key);
                         $paramName = 'f_'.preg_replace('/[^a-z0-9]/i', '_', $key);
+                        $condition = $this->resolveFilterCondition($value);
 
-                        if ($value === 'N/A') {
+                        if ($condition['operator'] === 'is_null') {
                             $qb->andWhere("$sqlKey IS NULL");
-                        } else if ($value === 'NOT_NULL') {
+                        } else if ($condition['operator'] === 'is_not_null') {
                             $qb->andWhere("$sqlKey IS NOT NULL");
+                        } else if ($condition['operator'] === 'neq') {
+                            $qb->andWhere("$sqlKey <> :$paramName")
+                                ->setParameter($paramName, $condition['value']);
                         } else {
                             $qb->andWhere("$sqlKey = :$paramName")
-                                ->setParameter($paramName, $value);
+                                ->setParameter($paramName, $condition['value']);
                         }
                     }
                 }
@@ -708,6 +723,16 @@
                 if (str_starts_with($key, 'dimensions.')) {
                     $dk = trim((string)str_replace('dimensions.', '', $key));
                     $alias = "dim_".preg_replace('/[^a-z0-9]/i', '_', $dk);
+                    $condition = $this->resolveFilterCondition($value);
+
+                    if (!in_array($condition['operator'], ['eq', 'neq'], true)) {
+                        return null;
+                    }
+
+                    $valuePredicate = $condition['operator'] === 'neq'
+                        ? "dv_$alias.value <> :{$alias}_val"
+                        : "dv_$alias.value = :{$alias}_val";
+
                     $dimWhereSql .= "\n                    AND EXISTS (
                         SELECT 1
                         FROM dimension_set_items dsi_$alias
@@ -715,10 +740,10 @@
                         JOIN dimension_keys dk_$alias ON dv_$alias.dimension_key_id = dk_$alias.id
                         WHERE dsi_$alias.dimension_set_id = mc.dimension_set_id
                         AND LOWER(dk_$alias.name) = LOWER(:{$alias}_key)
-                        AND dv_$alias.value = :{$alias}_val
+                        AND {$valuePredicate}
                     )";
                     $sqlParams["{$alias}_key"] = $dk;
-                    $sqlParams["{$alias}_val"] = $value;
+                    $sqlParams["{$alias}_val"] = $condition['value'];
                 }
             }
 
@@ -1361,6 +1386,39 @@
                 'yearly' => "DATE_FORMAT($dateColumn, '%Y')",
                 default => "DATE_FORMAT($dateColumn, '%Y-%m-%d')",
             };
+        }
+
+        /**
+         * @return array{operator: string, value: mixed}
+         */
+        protected function resolveFilterCondition(mixed $rawValue): array
+        {
+            if (is_object($rawValue)) {
+                $operator = strtolower(trim((string)($rawValue->operator ?? 'eq')));
+                $value = $rawValue->value ?? null;
+
+                return match ($operator) {
+                    'neq', 'not_equal', '!=', 'ne' => ['operator' => 'neq', 'value' => $value],
+                    'is_null', 'null' => ['operator' => 'is_null', 'value' => null],
+                    'is_not_null', 'not_null' => ['operator' => 'is_not_null', 'value' => null],
+                    default => ['operator' => 'eq', 'value' => $value],
+                };
+            }
+
+            if (is_string($rawValue)) {
+                $trimmed = trim($rawValue);
+                if ($trimmed === 'N/A' || $trimmed === 'NULL') {
+                    return ['operator' => 'is_null', 'value' => null];
+                }
+                if ($trimmed === 'NOT_NULL') {
+                    return ['operator' => 'is_not_null', 'value' => null];
+                }
+                if (str_starts_with($trimmed, '!=')) {
+                    return ['operator' => 'neq', 'value' => trim(substr($trimmed, 2))];
+                }
+            }
+
+            return ['operator' => 'eq', 'value' => $rawValue];
         }
 
         /**
