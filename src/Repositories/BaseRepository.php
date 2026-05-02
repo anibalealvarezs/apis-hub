@@ -807,20 +807,22 @@
         ),
         base AS (
             SELECT
-                m.metric_date, c.page_id, c.query_id, c.country_id, c.device_id, c.dimension_set_id,
-                MAX(CASE WHEN c.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
-                MAX(CASE WHEN c.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
-                " . implode(",\n                ", array_map(function($strategy, $prefix) use ($isPostgres) {
+                m.metric_date, 
+                " . ($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'mc.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'mc.metric_date'))) ? implode(", ", $cols) . ", " : "" : "") . "
+                MAX(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
+                MAX(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
+                " . implode(",\n                ", array_map(function($strategy, $prefix) {
                     $sourceList = $this->toSqlStringList($strategy['source_metric_names']);
                     $weightList = $this->toSqlStringList($strategy['weight_metric_names']);
-                    return "MAX(CASE WHEN c.name IN ($sourceList) THEN m.value END) AS {$prefix}_metric,
-                MAX(CASE WHEN c.name IN ($weightList) THEN m.value END) AS {$prefix}_weight";
+                    return "MAX(CASE WHEN mc.name IN ($sourceList) THEN m.value END) AS {$prefix}_metric,
+                MAX(CASE WHEN mc.name IN ($weightList) THEN m.value END) AS {$prefix}_weight";
                 }, $weightedStrategies, array_keys($weightedStrategies))) . "
             FROM metrics m
-            JOIN configs c ON m.metric_config_id = c.id
+            JOIN configs mc ON m.metric_config_id = mc.id
             WHERE m.metric_date >= :startDate
             AND m.metric_date <= :endDate
-            GROUP BY m.metric_date, c.page_id, c.query_id, c.country_id, c.device_id, c.dimension_set_id
+            AND mc.dimension_set_id IN (SELECT DISTINCT dimension_set_id FROM configs)
+            GROUP BY m.metric_date" . ($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'mc.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'mc.metric_date'))) ? ", " . implode(", ", $cols) : "" : "") . "
         ),
         paired AS (
             SELECT
