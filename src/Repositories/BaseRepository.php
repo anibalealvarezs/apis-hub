@@ -794,12 +794,13 @@
         ),
         paired AS (
             SELECT
-                b.metric_date, b.page_id, b.query_id, b.country_id, b.device_id, b.dimension_set_id,
+                b.metric_date, 
+                " . ($grouping['final_select'] !== [] ? implode(", ", array_map(fn($s) => explode(' AS ', $s)[0], $grouping['final_select'])) . ", " : "") . "
                 SUM(CASE WHEN b.name IN ('clicks', 'clicks_daily') THEN b.value ELSE 0 END) AS clicks_value,
                 SUM(CASE WHEN b.name IN ($firstWeightNameList) THEN b.value ELSE 0 END) AS impressions_value,
                 $weightedPairSql
             FROM base b
-            GROUP BY b.metric_date, b.page_id, b.query_id, b.country_id, b.device_id, b.dimension_set_id
+            GROUP BY b.metric_date" . ($grouping['final_select'] !== [] ? ", " . implode(", ", array_map(fn($s) => explode(' AS ', $s)[0], $grouping['final_select'])) : "") . "
         ),
         finalized AS (
             SELECT
