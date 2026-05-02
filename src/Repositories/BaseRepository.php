@@ -672,6 +672,10 @@
             }
 
             $quoteChar = $isPostgres ? '"' : '`';
+            $sqlParams = [
+                'startDate' => $startDate,
+                'endDate'   => $endDate,
+            ];
 
             $valueSource = $this->isChanneledMetric
                 ? 'FROM metric_configs mc
