@@ -574,7 +574,7 @@
 
                 if ($latestSnapshot && $this->isChanneledMetric) {
                     $nullSafeComparator = $isPostgres ? 'IS NOT DISTINCT FROM' : '<=>';
-                    $latestSnapshotSql = "SELECT MAX(m_ls.metric_date)
+                    $latestSnapshotBaseSql = "
                         FROM metrics m_ls
                         JOIN metric_configs mc_ls ON m_ls.metric_config_id = mc_ls.id
                         WHERE mc_ls.channel = mc.channel
@@ -585,15 +585,23 @@
                           AND (mc_ls.dimension_set_id {$nullSafeComparator} mc.dimension_set_id)
                           AND (mc_ls.query_id {$nullSafeComparator} mc.query_id)
                           AND (mc_ls.country_id {$nullSafeComparator} mc.country_id)
-                          AND (mc_ls.device_id {$nullSafeComparator} mc.device_id)";
+                          AND (mc_ls.device_id {$nullSafeComparator} mc.device_id)
+                    ";
 
-                    if ($startDate) {
-                        $latestSnapshotSql .= " AND m_ls.metric_date >= :startDate";
-                        $qb->setParameter('startDate', $startDate);
-                    }
-                    if ($endDate) {
-                        $latestSnapshotSql .= " AND m_ls.metric_date <= :endDate";
-                        $qb->setParameter('endDate', $endDate);
+                    $latestSnapshotSql = "SELECT MAX(m_ls.metric_date) {$latestSnapshotBaseSql}";
+                    if ($startDate || $endDate) {
+                        $latestSnapshotRangeSql = $latestSnapshotSql;
+                        if ($startDate) {
+                            $latestSnapshotRangeSql .= " AND m_ls.metric_date >= :startDate";
+                            $qb->setParameter('startDate', $startDate);
+                        }
+                        if ($endDate) {
+                            $latestSnapshotRangeSql .= " AND m_ls.metric_date <= :endDate";
+                            $qb->setParameter('endDate', $endDate);
+                        }
+
+                        // Prefer the latest date within the requested range; fallback to latest available overall.
+                        $latestSnapshotSql = "COALESCE(({$latestSnapshotRangeSql}), ({$latestSnapshotSql}))";
                     }
 
                     $qb->andWhere("$sqlDateField = ($latestSnapshotSql)");
