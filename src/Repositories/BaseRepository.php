@@ -807,29 +807,43 @@
         ),
         base AS (
             SELECT
-                m.metric_date, c.page_id, c.query_id, c.country_id, c.device_id, c.dimension_set_id, c.name, m.value
+                m.metric_date, c.page_id, c.query_id, c.country_id, c.device_id, c.dimension_set_id,
+                MAX(CASE WHEN c.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
+                MAX(CASE WHEN c.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
+                " . implode(",\n                ", array_map(function($strategy, $prefix) use ($isPostgres) {
+                    $sourceList = $this->toSqlStringList($strategy['source_metric_names']);
+                    $weightList = $this->toSqlStringList($strategy['weight_metric_names']);
+                    return "MAX(CASE WHEN c.name IN ($sourceList) THEN m.value END) AS {$prefix}_metric,
+                MAX(CASE WHEN c.name IN ($weightList) THEN m.value END) AS {$prefix}_weight";
+                }, $weightedStrategies, array_keys($weightedStrategies))) . "
             FROM metrics m
             JOIN configs c ON m.metric_config_id = c.id
             WHERE m.metric_date >= :startDate
             AND m.metric_date <= :endDate
+            GROUP BY m.metric_date, c.page_id, c.query_id, c.country_id, c.device_id, c.dimension_set_id
         ),
         paired AS (
             SELECT
                 b.metric_date, 
                 " . ($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'b.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'b.metric_date'))) ? implode(", ", $cols) . ", " : "" : "") . "
-                SUM(CASE WHEN b.name IN ('clicks', 'clicks_daily') THEN b.value ELSE 0 END) AS clicks_value,
-                SUM(CASE WHEN b.name IN ($firstWeightNameList) THEN b.value ELSE 0 END) AS impressions_value,
-                $weightedPairSql
+                SUM(b.clicks) AS clicks_value,
+                SUM(b.impressions) AS impressions_value,
+                " . implode(",\n                ", array_map(function($prefix) {
+                    return "SUM(COALESCE(b.{$prefix}_metric, 0) * COALESCE(b.{$prefix}_weight, 0)) AS {$prefix}_weighted_sum,
+                SUM(COALESCE(b.{$prefix}_weight, 0)) AS {$prefix}_total_weight";
+                }, array_keys($weightedStrategies))) . "
             FROM base b
             GROUP BY b.metric_date" . ($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'b.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'b.metric_date'))) ? ", " . implode(", ", $cols) : "" : "") . "
         ),
         finalized AS (
             SELECT
                 $finalSelectFields
-                SUM(COALESCE(p.clicks_value, 0)) AS clicks,
-                SUM(COALESCE(p.impressions_value, 0)) AS impressions,
-                SUM(COALESCE(p.clicks_value, 0)) / NULLIF(SUM(COALESCE(p.impressions_value, 0)), 0) AS ctr,
-                $weightedComputedSql
+                SUM(p.clicks_value) AS clicks,
+                SUM(p.impressions_value) AS impressions,
+                SUM(p.clicks_value) / NULLIF(SUM(p.impressions_value), 0) AS ctr,
+                " . implode(",\n                ", array_map(function($prefix) {
+                    return "SUM(p.{$prefix}_weighted_sum) / NULLIF(SUM(p.{$prefix}_total_weight), 0) AS {$prefix}_value";
+                }, array_keys($weightedStrategies))) . "
             FROM paired p
             $finalGroupByFields
         )
