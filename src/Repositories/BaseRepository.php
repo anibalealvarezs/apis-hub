@@ -714,7 +714,7 @@
                         JOIN dimension_values dv_$alias ON dsi_$alias.dimension_value_id = dv_$alias.id
                         JOIN dimension_keys dk_$alias ON dv_$alias.dimension_key_id = dk_$alias.id
                         WHERE dsi_$alias.dimension_set_id = mc.dimension_set_id
-                        AND dk_$alias.name = :{$alias}_key
+                        AND LOWER(dk_$alias.name) = LOWER(:{$alias}_key)
                         AND dv_$alias.value = :{$alias}_val
                     )";
                     $sqlParams["{$alias}_key"] = $dk;
@@ -944,7 +944,7 @@
             if ($dimensionKeys !== []) {
                 $dimensionKey = $dimensionKeys[0];
 
-                return " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = '".str_replace("'", "''", $dimensionKey)."')";
+                return " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE LOWER(dk.name) = LOWER('".str_replace("'", "''", $dimensionKey)."'))";
             }
 
             $excluded = implode(', ', array_map(
@@ -1255,25 +1255,25 @@
             $dimAlias = static fn(string $name): string => $quoteChar.$name.$quoteChar;
 
             $entityConfig = [
-                'query' => [
-                    'id_expr' => 'p.query_id',
+                'query'   => [
+                    'id_expr'   => 'p.query_id',
                     'name_expr' => "COALESCE(q.query, 'unknown')",
-                    'join' => 'LEFT JOIN queries q ON q.id = f.query_id',
+                    'join'      => 'LEFT JOIN queries q ON q.id = f.query_id',
                 ],
-                'page' => [
-                    'id_expr' => 'p.page_id',
+                'page'    => [
+                    'id_expr'   => 'p.page_id',
                     'name_expr' => "COALESCE(pg.url, 'unknown')",
-                    'join' => 'LEFT JOIN pages pg ON pg.id = f.page_id',
+                    'join'      => 'LEFT JOIN pages pg ON pg.id = f.page_id',
                 ],
                 'country' => [
-                    'id_expr' => 'p.country_id',
+                    'id_expr'   => 'p.country_id',
                     'name_expr' => "COALESCE(c.name, 'unknown')",
-                    'join' => 'LEFT JOIN countries c ON c.id = f.country_id',
+                    'join'      => 'LEFT JOIN countries c ON c.id = f.country_id',
                 ],
-                'device' => [
-                    'id_expr' => 'p.device_id',
+                'device'  => [
+                    'id_expr'   => 'p.device_id',
                     'name_expr' => "COALESCE(d.type, 'unknown')",
-                    'join' => 'LEFT JOIN devices d ON d.id = f.device_id',
+                    'join'      => 'LEFT JOIN devices d ON d.id = f.device_id',
                 ],
             ];
 
@@ -1328,7 +1328,7 @@
                             AND {$dsiAlias}.dimension_value_id IN (
                                 SELECT dk_{$safeSuffix}_v.id FROM dimension_values dk_{$safeSuffix}_v
                                 JOIN dimension_keys dk_{$safeSuffix}_k ON dk_{$safeSuffix}_k.id = dk_{$safeSuffix}_v.dimension_key_id
-                                WHERE dk_{$safeSuffix}_k.name = '{$dimensionKey}'
+                                WHERE LOWER(dk_{$safeSuffix}_k.name) = LOWER('$dimensionKey')
                             )";
                 $joins[] = "LEFT JOIN dimension_values {$dvAlias} ON {$dvAlias}.id = {$dsiAlias}.dimension_value_id";
             }
