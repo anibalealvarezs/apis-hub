@@ -734,6 +734,26 @@
             }
 
             $configWhereSql = implode(' AND ', $configWhere) . $dimWhereSql;
+
+            // GSC Optimization: Pick the most appropriate dimension set to avoid double counting
+            $dsWhere = "";
+            if ($groupPattern === 'dimensions.query' || $query !== null) {
+                // Set with Query
+                $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'query')";
+            } elseif ($groupPattern === 'dimensions.country' || $country !== null) {
+                // Set with Country
+                $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'country')";
+            } elseif ($groupPattern === 'dimensions.device' || $device !== null) {
+                // Set with Device
+                $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'device')";
+            } elseif ($groupPattern === 'dimensions.searchAppearance') {
+                 // Set with SearchAppearance
+                 $dsWhere = " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name = 'searchAppearance')";
+            } else {
+                // Totals: pick the smallest set (Page only)
+                $dsWhere = " AND mc.dimension_set_id NOT IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name IN ('query', 'country', 'device', 'searchAppearance'))";
+            }
+
             $sqlParams = array_merge($sqlParams, $configParams);
 
             $weightedPairColumns = [];
@@ -782,7 +802,7 @@
                 mc.id, mc.page_id, mc.query_id, mc.country_id, mc.device_id, mc.dimension_set_id, mc.name
             FROM metric_configs mc
             " . str_replace('mc.', 'mc.', $dimJoinSql) . "
-            WHERE " . str_replace('mc.', 'mc.', $configWhereSql) . "
+            WHERE " . str_replace('mc.', 'mc.', $configWhereSql) . " $dsWhere
         ),
         base AS (
             SELECT
