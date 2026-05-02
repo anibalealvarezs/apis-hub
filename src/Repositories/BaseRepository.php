@@ -809,14 +809,24 @@
             SELECT
                 m.metric_date, 
                 " . ($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'mc.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'mc.metric_date'))) ? implode(", ", $cols) . ", " : "" : "") . "
-                MAX(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
-                MAX(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
+                SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
+                SUM(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
                 " . implode(",\n                ", array_map(function($strategy) {
                     $prefix = $strategy['prefix'];
                     $sourceList = $this->toSqlStringList($strategy['source_metric_names']);
                     $weightList = $this->toSqlStringList($strategy['weight_metric_names']);
-                    return "MAX(CASE WHEN mc.name IN ($sourceList) THEN m.value END) AS {$prefix}_metric,
-                MAX(CASE WHEN mc.name IN ($weightList) THEN m.value END) AS {$prefix}_weight";
+                    return "SUM(CASE WHEN mc.name IN ($sourceList) THEN m.value * (
+                        SELECT SUM(m2.value) 
+                        FROM metrics m2 
+                        JOIN configs mc2 ON m2.metric_config_id = mc2.id 
+                        WHERE m2.metric_date = m.metric_date 
+                        AND mc2.name IN ($weightList)
+                        AND mc2.page_id = mc.page_id 
+                        AND mc2.query_id = mc.query_id 
+                        AND mc2.country_id = mc.country_id 
+                        AND mc2.device_id = mc.device_id
+                    ) ELSE 0 END) AS {$prefix}_weighted_sum,
+                SUM(CASE WHEN mc.name IN ($weightList) THEN m.value ELSE 0 END) AS {$prefix}_total_weight";
                 }, $weightedStrategies)) . "
             FROM metrics m
             JOIN configs mc ON m.metric_config_id = mc.id
@@ -833,8 +843,8 @@
                 SUM(b.impressions) AS impressions_value,
                 " . implode(",\n                ", array_map(function($strategy) {
                     $prefix = $strategy['prefix'];
-                    return "SUM(COALESCE(b.{$prefix}_metric, 0) * COALESCE(b.{$prefix}_weight, 0)) AS {$prefix}_weighted_sum,
-                SUM(COALESCE(b.{$prefix}_weight, 0)) AS {$prefix}_total_weight";
+                    return "SUM(COALESCE(b.{$prefix}_weighted_sum, 0)) AS {$prefix}_weighted_sum,
+                SUM(COALESCE(b.{$prefix}_total_weight, 0)) AS {$prefix}_total_weight";
                 }, $weightedStrategies)) . "
             FROM base b
             GROUP BY b.metric_date" . ($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'b.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'b.metric_date'))) ? ", " . implode(", ", $cols) : "" : "") . "
