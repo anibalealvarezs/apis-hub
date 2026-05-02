@@ -32,6 +32,9 @@
         private array $activeAggregateJoins = [];
         private bool $needsImpressionsJoin = false;
         private ?string $aggregateRequestedPeriod = null;
+        private bool $aggregateUseSnapshotDelta = false;
+        private string $aggregateSnapshotFallbackMode = 'resilient';
+        private array $lastAggregateMeta = [];
         protected static array $defaultRelationMap = [
             'query'                => ['table' => 'queries', 'fk' => 'query_id', 'field' => 'query', 'alias' => 'rq'],
             'channeledAccount'     => ['table' => 'channeled_accounts', 'fk' => 'channeled_account_id', 'field' => 'name', 'alias' => 'rca'],
@@ -226,8 +229,18 @@
         ): array
         {
             $this->aggregateRequestedPeriod = null;
+            $this->aggregateUseSnapshotDelta = false;
+            $this->aggregateSnapshotFallbackMode = 'resilient';
+            $this->lastAggregateMeta = [];
             if ($filters !== null && isset($filters->period) && is_string($filters->period) && trim($filters->period) !== '') {
                 $this->aggregateRequestedPeriod = strtolower(trim($filters->period));
+            }
+
+            if ($filters !== null && isset($filters->snapshot_fallback_mode) && is_string($filters->snapshot_fallback_mode)) {
+                $mode = strtolower(trim($filters->snapshot_fallback_mode));
+                if (in_array($mode, ['strict', 'resilient'], true)) {
+                    $this->aggregateSnapshotFallbackMode = $mode;
+                }
             }
 
             $connection = $this->_em->getConnection();
@@ -241,6 +254,25 @@
             $this->isChanneledMetric = str_ends_with($entityName, 'ChanneledMetric');
             $isMetric = str_ends_with($entityName, 'Analytics\Metric');
             $isPostgres = Helpers::isPostgres();
+
+            $snapshotDelta = false;
+            if ($filters && isset($filters->snapshot_delta)) {
+                $snapshotDelta = filter_var($filters->snapshot_delta, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($snapshotDelta === null) {
+                    $snapshotDelta = (bool)$filters->snapshot_delta;
+                }
+            }
+
+            if ($snapshotDelta) {
+                if (!$this->isChanneledMetric) {
+                    throw new InvalidArgumentException('snapshot_delta is only supported for channeled metric aggregates.');
+                }
+                if (!$startDate || !$endDate) {
+                    throw new InvalidArgumentException('snapshot_delta requires both startDate and endDate.');
+                }
+
+                $this->aggregateUseSnapshotDelta = true;
+            }
 
             $optimizedResult = $this->tryOptimizedWeightedMetricAggregate(
                 connection: $connection,
@@ -471,7 +503,7 @@
             if ($filters) {
                 foreach ($filters as $key => $value) {
                     // Skip technical/debug parameters
-                    if ($key === 'debug_sql' || $key === '_' || $key === 'latest_snapshot') continue;
+                    if ($key === 'debug_sql' || $key === '_' || $key === 'latest_snapshot' || $key === 'snapshot_delta' || $key === 'snapshot_fallback_mode') continue;
 
                     $isDimension = str_starts_with($key, 'dimensions.');
                     $dimKey = $isDimension ? substr($key, 11) : $key;
@@ -558,6 +590,10 @@
                 }
             }
 
+            if ($latestSnapshot && $this->aggregateUseSnapshotDelta) {
+                throw new InvalidArgumentException('latest_snapshot and snapshot_delta cannot be used together.');
+            }
+
             // Apply date filters using the correctly mapped column names
             if ($startDate || $endDate || $latestSnapshot) {
                 if ($this->isChanneledMetric) {
@@ -573,6 +609,7 @@
                 }
 
                 if ($latestSnapshot && $this->isChanneledMetric) {
+                    $qb->addSelect("MAX($sqlDateField) AS __snapshot_effective_date");
                     $nullSafeComparator = $isPostgres ? 'IS NOT DISTINCT FROM' : '<=>';
                     $latestSnapshotBaseSql = "
                         FROM metrics m_ls
@@ -600,11 +637,23 @@
                             $qb->setParameter('endDate', $endDate);
                         }
 
-                        // Prefer the latest date within the requested range; fallback to latest available overall.
-                        $latestSnapshotSql = "COALESCE(({$latestSnapshotRangeSql}), ({$latestSnapshotSql}))";
+                        if ($this->aggregateSnapshotFallbackMode === 'resilient') {
+                            // Prefer the latest date within the requested range; fallback to latest available overall.
+                            $latestSnapshotSql = "COALESCE(({$latestSnapshotRangeSql}), ({$latestSnapshotSql}))";
+                        } else {
+                            $latestSnapshotSql = $latestSnapshotRangeSql;
+                        }
                     }
 
                     $qb->andWhere("$sqlDateField = ($latestSnapshotSql)");
+                } elseif ($this->aggregateUseSnapshotDelta && $this->isChanneledMetric) {
+                    $qb->addSelect("MAX($sqlDateField) AS __snapshot_effective_date");
+                    // Delta mode needs historic rows; keep only an end cap to avoid dropping pre-start snapshots.
+                    if ($this->aggregateSnapshotFallbackMode === 'strict') {
+                        $qb->andWhere("$sqlDateField <= :snapshotDeltaEndDate");
+                    }
+                    $qb->setParameter('snapshotDeltaEndDate', $endDate)
+                        ->setParameter('snapshotDeltaStartDate', $startDate);
                 } else {
                     if ($startDate) {
                         $qb->andWhere("$sqlDateField >= :startDate")
@@ -625,6 +674,7 @@
 
             $stmt = $qb->executeQuery();
             $results = $stmt->fetchAllAssociative();
+            $this->extractSnapshotAggregateMeta($results, $startDate, $endDate);
 
             // 4. Smoothing: Fill temporal gaps for time-series data
             if ($startDate && $endDate) {
@@ -644,6 +694,59 @@
             }
 
             return $results;
+        }
+
+        public function getLastAggregateMeta(): array
+        {
+            return $this->lastAggregateMeta;
+        }
+
+        /**
+         * @param array<int, array<string, mixed>> $results
+         */
+        protected function extractSnapshotAggregateMeta(array &$results, ?string $startDate, ?string $endDate): void
+        {
+            $effectiveDates = [];
+            foreach ($results as &$row) {
+                if (!array_key_exists('__snapshot_effective_date', $row)) {
+                    continue;
+                }
+
+                $date = $row['__snapshot_effective_date'];
+                if (is_string($date) && trim($date) !== '') {
+                    $effectiveDates[] = trim($date);
+                }
+                unset($row['__snapshot_effective_date']);
+            }
+            unset($row);
+
+            if ($effectiveDates === []) {
+                return;
+            }
+
+            $effectiveDates = array_values(array_unique($effectiveDates));
+            sort($effectiveDates);
+
+            $this->lastAggregateMeta['snapshot_fallback_mode'] = $this->aggregateSnapshotFallbackMode;
+            $this->lastAggregateMeta['effective_end_date'] = count($effectiveDates) === 1 ? $effectiveDates[0] : $effectiveDates;
+
+            if ($endDate !== null) {
+                $fallbackDates = array_values(array_filter(
+                    $effectiveDates,
+                    static fn(string $d): bool => $d !== $endDate
+                ));
+
+                if ($fallbackDates !== []) {
+                    $this->lastAggregateMeta['fallback_end_date'] = count($fallbackDates) === 1 ? $fallbackDates[0] : $fallbackDates;
+                }
+            }
+
+            if ($startDate !== null) {
+                $this->lastAggregateMeta['requested_start_date'] = $startDate;
+            }
+            if ($endDate !== null) {
+                $this->lastAggregateMeta['requested_end_date'] = $endDate;
+            }
         }
 
         /**
@@ -1713,6 +1816,9 @@
 
             if (($this->isChanneledMetric || $isMetric) && $isAggregate) {
                 $valCol = $this->isChanneledMetric ? 'm.value' : 'e.value';
+                if ($this->isChanneledMetric && $this->aggregateUseSnapshotDelta) {
+                    $valCol = $this->buildSnapshotDeltaValueSql($isPostgres);
+                }
                 $allFormulas = array_merge($this->getDefaultFormulas($valCol, $isPostgres), self::getFormulas());
                 if (isset($allFormulas[$lowerField])) {
                     $formula = $allFormulas[$lowerField];
@@ -1900,6 +2006,37 @@
             }
 
             return "e.$field";
+        }
+
+        protected function buildSnapshotDeltaValueSql(bool $isPostgres): string
+        {
+            $nullSafeComparator = $isPostgres ? 'IS NOT DISTINCT FROM' : '<=>';
+
+            $snapshotContextSql = "
+                FROM metrics m_sd
+                JOIN metric_configs mc_sd ON m_sd.metric_config_id = mc_sd.id
+                WHERE mc_sd.channel = mc.channel
+                  AND mc_sd.period = mc.period
+                  AND (mc_sd.channeled_account_id {$nullSafeComparator} mc.channeled_account_id)
+                  AND (mc_sd.page_id {$nullSafeComparator} mc.page_id)
+                  AND (mc_sd.post_id {$nullSafeComparator} mc.post_id)
+                  AND (mc_sd.dimension_set_id {$nullSafeComparator} mc.dimension_set_id)
+                  AND (mc_sd.query_id {$nullSafeComparator} mc.query_id)
+                  AND (mc_sd.country_id {$nullSafeComparator} mc.country_id)
+                  AND (mc_sd.device_id {$nullSafeComparator} mc.device_id)
+            ";
+
+            $endSnapshotSql = "SELECT MAX(m_sd.metric_date) {$snapshotContextSql} AND m_sd.metric_date <= :snapshotDeltaEndDate";
+            if ($this->aggregateSnapshotFallbackMode === 'resilient') {
+                $endSnapshotSql = "COALESCE(({$endSnapshotSql}), (SELECT MAX(m_sd.metric_date) {$snapshotContextSql}))";
+            }
+            $startSnapshotSql = "SELECT MAX(m_sd.metric_date) {$snapshotContextSql} AND m_sd.metric_date < :snapshotDeltaStartDate";
+
+            return "(CASE
+                WHEN m.metric_date = ({$endSnapshotSql}) THEN m.value
+                WHEN m.metric_date = ({$startSnapshotSql}) THEN -m.value
+                ELSE 0
+            END)";
         }
 
         /**

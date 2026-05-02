@@ -449,16 +449,23 @@ class ChanneledCrudController extends BaseController
                 'orderDir' => $params['orderDir'] ?? 'ASC'
             ], $cacheType) : null;
 
-            if ($cacheKey && ($cachedData = CacheStrategyService::get($cacheKey, $cacheType))) {
+            if ($cacheKey && ($cachedPayload = CacheStrategyService::get($cacheKey, $cacheType))) {
+                $cachedData = $cachedPayload;
+                $aggregateMeta = [];
+                if (is_array($cachedPayload) && array_key_exists('data', $cachedPayload) && array_key_exists('aggregate_meta', $cachedPayload)) {
+                    $cachedData = $cachedPayload['data'];
+                    $aggregateMeta = is_array($cachedPayload['aggregate_meta']) ? $cachedPayload['aggregate_meta'] : [];
+                }
+
                 return $this->createResponse(
                     data: $cachedData,
                     status: 'success',
-                    meta: [
+                    meta: array_merge([
                         'cached' => true,
                         'cache_type' => $cacheType,
                         'cacheable' => true,
                         'cache_key' => $cacheKey
-                    ]
+                    ], $aggregateMeta)
                 );
             }
             // ---------------------------
@@ -472,6 +479,9 @@ class ChanneledCrudController extends BaseController
                 orderBy: $params['orderBy'] ?? null,
                 orderDir: $params['orderDir'] ?? 'ASC'
             );
+            $aggregateMeta = method_exists($repository, 'getLastAggregateMeta')
+                ? (array)$repository->getLastAggregateMeta()
+                : [];
 
             $logger = Helpers::setLogger('api_debug.log');
             $logger->info("=== API AGGREGATE DEBUG ===");
@@ -485,19 +495,22 @@ class ChanneledCrudController extends BaseController
 
             // --- Cache the results ---
             if ($cacheKey) {
-                CacheStrategyService::set($cacheKey, $data, $cacheType);
+                CacheStrategyService::set($cacheKey, [
+                    'data' => $data,
+                    'aggregate_meta' => $aggregateMeta,
+                ], $cacheType);
             }
             // -------------------------
 
             return $this->createResponse(
                 data: $data,
                 status: 'success',
-                meta: [
+                meta: array_merge([
                     'cached' => false,
                     'cache_type' => $cacheType,
                     'cacheable' => (bool) $cacheKey,
                     'cache_key' => $cacheKey
-                ]
+                ], $aggregateMeta)
             );
         } catch (InvalidArgumentException $e) {
             return $this->createResponse(
