@@ -12,7 +12,8 @@ if (php_sapi_name() === 'cli-server') {
     }
     
     // Si la ruta parece un asset estático pero no existe, devolver 404 nativo y evitar bootear la app
-    if (preg_match('/\.(?:png|jpg|jpeg|gif|ico|css|js|txt|base64|woff|woff2|ttf|eot|svg)$/i', $path)) {
+    // EXCEPCIÓN: Las rutas /driver-assets/ son manejadas dinámicamente
+    if (preg_match('/\.(?:png|jpg|jpeg|gif|ico|css|js|txt|base64|woff|woff2|ttf|eot|svg)$/i', $path) && !str_starts_with($path, '/driver-assets/')) {
         return false;
     }
 }

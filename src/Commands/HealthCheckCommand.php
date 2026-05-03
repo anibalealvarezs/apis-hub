@@ -127,8 +127,10 @@ class HealthCheckCommand extends Command
         $output->write("🧠 <comment>MCP Interface (Port 3000):</comment> ");
         $mcpStatus = true;
         try {
-            $mcpPort = getenv('MCP_PORT') ?: 3000;
-            $connection = @fsockopen('127.0.0.1', $mcpPort, $errno, $errstr, 2);
+            $mcpPort = (int) (getenv('MCP_PORT') ?: 3000);
+            $errno = 0;
+            $errstr = '';
+            $connection = @stream_socket_client("tcp://127.0.0.1:$mcpPort", $errno, $errstr, 2);
             if (is_resource($connection)) {
                 $output->writeln("<info>ONLINE (SSE Mode)</info>");
                 fclose($connection);

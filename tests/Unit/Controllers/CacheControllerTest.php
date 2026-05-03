@@ -4,7 +4,7 @@ namespace Tests\Unit\Controllers;
 
 use Controllers\CacheController;
 use Doctrine\ORM\EntityManager;
-use Enums\Channel;
+use Entities\Analytics\Channel;
 use Exception;
 use Tests\Unit\BaseUnitTestCase;
 use ReflectionException;
@@ -48,7 +48,8 @@ class CacheControllerTest extends BaseUnitTestCase
         $body = null;
         $params = ['key' => 'value'];
         $data = ['result' => $this->faker->word];
-        $channelEnum = Channel::shopify;
+        $channelEnum = $this->createMock(Channel::class);
+        $channelEnum->method('getName')->willReturn($channel);
 
         // Mock entities config and channel
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
@@ -77,24 +78,25 @@ class CacheControllerTest extends BaseUnitTestCase
             'filters' => (object) ['key' => 'value', 'other' => 'data', 'extra' => 'param']
         ];
 
-        $result = $this->controller->prepareAnalyticsParams($params, $body, \Classes\Requests\MetricRequests::class, 'getListFromKlaviyo');
+                $result = $this->controller->prepareAnalyticsParams($params, $body, \Classes\Requests\MetricRequests::class, 'getList');
 
         $this->assertEquals($expected, $result);
     }
 
     public function testPrepareAnalyticsParamsHandlesEmptyInputs(): void
     {
-        $result = $this->controller->prepareAnalyticsParams(null, null, \Classes\Requests\MetricRequests::class, 'getListFromKlaviyo');
+                $result = $this->controller->prepareAnalyticsParams(null, null, \Classes\Requests\MetricRequests::class, 'getList');
         $this->assertEquals(['filters' => (object) []], $result);
 
-        $result = $this->controller->prepareAnalyticsParams([], '', \Classes\Requests\MetricRequests::class, 'getListFromKlaviyo');
+                $result = $this->controller->prepareAnalyticsParams([], '', \Classes\Requests\MetricRequests::class, 'getList');
         $this->assertEquals(['filters' => (object) []], $result);
     }
 
     public function testListReturnsSuccessResponse(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $data = ['result' => $this->faker->word];
 
         $this->controller->setMockListData($data);
@@ -112,7 +114,8 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testListHandlesException(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $exceptionMessage = 'Fetch error';
 
         $this->controller->setMockListException(new Exception($exceptionMessage));
@@ -164,12 +167,13 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testFetchDataReturnsDataForValidMethod(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $params = ['key' => 'value'];
         $body = json_encode(['filters' => ['a' => 'b']]);
         $data = ['result' => $this->faker->word];
         $requestsClassName = \Classes\Requests\MetricRequests::class;
-        $methodName = 'getListFrom' . $channel->getCommonName();
+                $methodName = 'getList';
 
         $this->controller->setMockEntitiesConfig([
             strtolower($entity) => [
@@ -192,9 +196,10 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testFetchDataReturnsErrorResponseForInvalidMethod(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $requestsClassName = \Classes\Requests\MetricRequests::class;
-        $methodName = 'getListFrom' . $channel->getCommonName();
+                $methodName = 'getList';
 
         $this->controller->setMockEntitiesConfig([strtolower($entity) => ['class' => 'Entities\\' . $entity]]);
         $this->controller->setMockFetchData($requestsClassName, $methodName, null);
@@ -215,10 +220,11 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testFetchDataReturnsErrorResponseForInvalidParameters(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $params = ['invalid' => 'param'];
         $requestsClassName = \Classes\Requests\MetricRequests::class;
-        $methodName = 'getListFrom' . $channel->getCommonName();
+                $methodName = 'getList';
         $data = ['result' => 'ok']; // Expected data
 
         $this->controller->setMockEntitiesConfig([
@@ -242,10 +248,11 @@ class CacheControllerTest extends BaseUnitTestCase
     public function testFetchDataHandlesExtraParametersGracefully(): void
     {
         $entity = $this->faker->word;
-        $channel = Channel::shopify;
+        $channel = $this->createMock(Channel::class);
+        $channel->method('getName')->willReturn('shopify');
         $params = ['extra' => 'param'];
         $requestsClassName = \Classes\Requests\MetricRequests::class;
-        $methodName = 'getListFrom' . $channel->getCommonName();
+                $methodName = 'getList';
         $data = ['result' => 'ok'];
 
         $this->controller->setMockEntitiesConfig([
@@ -334,7 +341,7 @@ class ConcreteCacheController extends CacheController
             );
         }
 
-        $channelEnum = $this->mockChannels[$channel] ?? Channel::shopify; // Default for tests
+        $channelEnum = $this->mockChannels[$channel] ?? $this->createMock(Channel::class); // Default for tests
         return $this->list($entity, $channelEnum, $body, $params);
     }
 
@@ -343,7 +350,7 @@ class ConcreteCacheController extends CacheController
         return parent::createResponse($data, $status, $error, $httpStatus, $meta);
     }
 
-    public function prepareAnalyticsParams(?array $params, ?string $body, string $className = \Classes\Requests\MetricRequests::class, string $methodName = 'getListFromKlaviyo'): array
+        public function prepareAnalyticsParams(?array $params, ?string $body, string $className = \Classes\Requests\MetricRequests::class, string $methodName = 'getList'): array
     {
         return parent::prepareAnalyticsParams($params, $body, $className, $methodName);
     }

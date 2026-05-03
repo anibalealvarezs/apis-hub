@@ -7,11 +7,13 @@ use Doctrine\ORM\EntityManager;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\ORM\EntityRepository;
 use Tests\Unit\BaseUnitTestCase;
 use Entities\Analytics\Country;
 use Entities\Analytics\Device;
-use Enums\Country as CountryEnum;
-use Enums\Device as DeviceEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Device as DeviceEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 
 class MetricsProcessorTest extends BaseUnitTestCase
 {
@@ -58,7 +60,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
 
     public function testProcessCountriesReturnsMap(): void
     {
-        $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repo = $this->createMock(EntityRepository::class);
         $this->entityManager->method('getRepository')->with(Country::class)->willReturn($repo);
 
         $country = $this->createMock(Country::class);
@@ -67,7 +69,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
 
         $repo->method('findAll')->willReturn([$country]);
 
-        $res = MetricsProcessor::processCountries(new ArrayCollection(), $this->entityManager);
+        $res = MetricsProcessor::processCountries($this->entityManager);
         
         $this->assertArrayHasKey('USA', $res['map']);
         $this->assertSame($country, $res['map']['USA']);
@@ -75,7 +77,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
 
     public function testProcessDevicesReturnsMap(): void
     {
-        $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repo = $this->createMock(EntityRepository::class);
         $this->entityManager->method('getRepository')->with(Device::class)->willReturn($repo);
 
         $device = $this->createMock(Device::class);
@@ -84,7 +86,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
 
         $repo->method('findAll')->willReturn([$device]);
 
-        $res = MetricsProcessor::processDevices(new ArrayCollection(), $this->entityManager);
+        $res = MetricsProcessor::processDevices($this->entityManager);
         
         $this->assertArrayHasKey('desktop', $res['map']);
         $this->assertSame($device, $res['map']['desktop']);
@@ -159,7 +161,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
         $metric = (object)[
             'channel' => 1,
             'name' => 'clicks',
-            'period' => \Enums\Period::Lifetime->value,
+            'period' => Period::Lifetime->value,
             'metricDate' => $metricDate,
             'value' => 100,
             'dimensions' => [],
@@ -170,10 +172,10 @@ class MetricsProcessorTest extends BaseUnitTestCase
         $metrics = new ArrayCollection([$metric]);
 
         // Signature for the lifetime metric
-        $signature = \Classes\KeyGenerator::generateMetricConfigKey(
+        $signature = \Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator::generateMetricConfigKey(
             channel: 1,
             name: 'clicks',
-            period: \Enums\Period::Lifetime->value
+            period: Period::Lifetime->value
         );
 
         $resultMock = $this->createMock(Result::class);
@@ -192,7 +194,7 @@ class MetricsProcessorTest extends BaseUnitTestCase
         $this->assertCount(2, $metrics);
         $daily = $metrics->get(1);
         $this->assertEquals('clicks_daily', $daily->name);
-        $this->assertEquals(\Enums\Period::Daily->value, $daily->period);
+        $this->assertEquals(Period::Daily->value, $daily->period);
         $this->assertEquals(20, $daily->value); // 100 - 80
     }
 }

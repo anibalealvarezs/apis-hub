@@ -6,22 +6,12 @@ namespace Tests\Unit\Classes\Requests;
 
 use Classes\Requests\CampaignRequests;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Tests\Unit\BaseUnitTestCase;
 
 class CampaignRequestsTest extends BaseUnitTestCase
 {
-    public function testSupportedChannels(): void
-    {
-        $channels = CampaignRequests::supportedChannels();
-        $this->assertIsArray($channels);
-        $this->assertContains(Channel::facebook_marketing, $channels);
-    }
 
-    public function testGetListFromFacebookMarketingExists(): void
-    {
-        $this->assertTrue(method_exists(CampaignRequests::class, 'getListFromFacebookMarketing'));
-    }
 
     public function testProcess(): void
     {

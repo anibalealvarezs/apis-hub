@@ -2,9 +2,9 @@
 
 namespace Tests\Integration\Conversions;
 
-use Classes\Conversions\NetSuiteConvert;
+use Anibalealvarezs\NetSuiteHubDriver\Conversions\NetSuiteConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Tests\Integration\BaseIntegrationTestCase;
 use Carbon\Carbon;
 

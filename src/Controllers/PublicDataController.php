@@ -2,7 +2,6 @@
 
 namespace Controllers;
 
-use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -13,46 +12,38 @@ use Symfony\Component\HttpFoundation\Response;
 class PublicDataController extends BaseController
 {
     /**
-     * Get aggregate Facebook campaign data.
+     * Entry point for all public data requests.
      */
-    public function getFacebookCampaigns(Request $request): JsonResponse
+    public function getResourceData(Request $request, string $channel, string $resource): JsonResponse
     {
         try {
-            $conn = $this->em->getConnection();
-            $data = $conn->fetchAllAssociative("SELECT * FROM fb_campaigns ORDER BY id DESC LIMIT 100");
-            
-            return new JsonResponse([
-                'success' => true,
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return new JsonResponse(['success' => false, 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
+            $channelId = $channel;
 
-    /**
-     * Get raw metrics for a specific channel.
-     */
-    public function getMetrics(Request $request, string $channel): JsonResponse
-    {
-        try {
-            $conn = $this->em->getConnection();
-            $table = match(strtolower($channel)) {
-                'facebook' => 'fb_metrics',
-                'google', 'gsc' => 'gsc_metrics',
-                default => null
-            };
-
-            if (!$table) {
-                return new JsonResponse(['success' => false, 'error' => 'Unsupported channel'], Response::HTTP_BAD_REQUEST);
+            $config = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($channelId);
+            if (empty($config)) {
+                return new JsonResponse(['success' => false, 'error' => "Channel $channelId not found"], Response::HTTP_NOT_FOUND);
             }
 
+            $driverClass = $config['driver'];
+            if (! class_exists($driverClass)) {
+                return new JsonResponse(['success' => false, 'error' => "Driver class for $channelId not found"], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $resources = $driverClass::getPublicResources();
+            $table = $resources[$resource] ?? null;
+
+            if (! $table) {
+                return new JsonResponse(['success' => false, 'error' => "Resource $resource not supported for channel $channelId"], Response::HTTP_BAD_REQUEST);
+            }
+
+            $conn = $this->em->getConnection();
             $data = $conn->fetchAllAssociative("SELECT * FROM {$table} ORDER BY id DESC LIMIT 500");
-            
+
             return new JsonResponse([
                 'success' => true,
-                'channel' => $channel,
-                'data' => $data
+                'channel' => $channelId,
+                'resource' => $resource,
+                'data' => $data,
             ]);
         } catch (\Exception $e) {
             return new JsonResponse(['success' => false, 'error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);

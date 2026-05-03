@@ -2,10 +2,11 @@
 
 namespace Tests\Integration\Conversions;
 
-use Classes\Conversions\GoogleSearchConsoleConvert;
+use Anibalealvarezs\GoogleHubDriver\Conversions\GoogleSearchConsoleConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Page;
 use Tests\Integration\BaseIntegrationTestCase;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 
 class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
 {
@@ -41,9 +42,9 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
         // Simulate 2 raw rows returned correctly mapped through Helpers layer
         $rows = [
             [
-                // Keys map to: ['date', 'query', 'country', 'page', 'device']
-                'keys' => [$date, $query, $country, $pageUrl, $device],
-                'subset' => ['date', 'query', 'country', 'page', 'device'],
+                // Keys map to: ['date', 'query', 'page', 'country', 'device']
+                'keys' => [$date, $query, $pageUrl, $country, $device],
+                'subset' => ['date', 'query', 'page', 'country', 'device'],
                 'impressions' => $v1['impressions'],
                 'clicks' => $v1['clicks'],
                 'position' => $v1['position'],
@@ -54,8 +55,8 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
             ],
             [
                 // Perfectly matching keys to force an aggregation scenario!
-                'keys' => [$date, $query, $country, $pageUrl, $device],
-                'subset' => ['date', 'query', 'country', 'page', 'device'],
+                'keys' => [$date, $query, $pageUrl, $country, $device],
+                'subset' => ['date', 'query', 'page', 'country', 'device'],
                 'impressions' => $v2['impressions'],
                 'clicks' => $v2['clicks'],
                 'position' => $v2['position'],
@@ -72,8 +73,7 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
             siteUrl: $siteUrl,
             siteKey: $siteKey,
             logger: null,
-            pageEntity: $pageEntity,
-            em: $this->entityManager
+            page: $pageEntity
         );
 
         // 3. Assert
@@ -90,28 +90,44 @@ class GoogleSearchConsoleConvertTest extends BaseIntegrationTestCase
 
         $metricsMap = [];
         foreach ($collection as $item) {
+            if (!$item) continue;
             $metricsMap[$item->name] = $item;
         }
 
-        $this->assertEquals($totalClicks, $metricsMap['clicks']->value);
-        $this->assertEquals($totalImpressions, $metricsMap['impressions']->value);
-        $this->assertEquals($totalCtr, $metricsMap['ctr']->value);
-        $this->assertEquals($weightedPosition, $metricsMap['position']->value);
+        $this->assertArrayHasKey('clicks', $metricsMap);
+        $clicksMetric = $metricsMap['clicks'];
+        $this->assertNotNull($clicksMetric);
+        $this->assertEquals($totalClicks, $clicksMetric->value);
 
-        $this->assertEquals(\Enums\Channel::google_search_console->value, $metricsMap['impressions']->channel);
-        $this->assertStringStartsWith('gsc_' . $siteKey . '_', $metricsMap['impressions']->platformId);
-        $this->assertEquals($query, $metricsMap['impressions']->query);
-        $this->assertEquals($country, $metricsMap['impressions']->countryCode);
-        $this->assertEquals($device, $metricsMap['impressions']->deviceType);
+        $this->assertArrayHasKey('impressions', $metricsMap);
+        $impressionsMetric = $metricsMap['impressions'];
+        $this->assertNotNull($impressionsMetric);
+        $this->assertEquals($totalImpressions, $impressionsMetric->value);
+
+        $this->assertArrayHasKey('ctr', $metricsMap);
+        $ctrMetric = $metricsMap['ctr'];
+        $this->assertNotNull($ctrMetric);
+        $this->assertEquals($totalCtr, $ctrMetric->value);
+
+        $this->assertArrayHasKey('position', $metricsMap);
+        $positionMetric = $metricsMap['position'];
+        $this->assertNotNull($positionMetric);
+        $this->assertEquals($weightedPosition, $positionMetric->value);
+
+        $this->assertEquals(Channel::google_search_console->value, $impressionsMetric->channel);
+        $this->assertStringStartsWith('gsc_' . $siteKey . '_', $impressionsMetric->platformId);
+        $this->assertEquals($query, $impressionsMetric->query);
+        $this->assertEquals($country, $impressionsMetric->countryCode);
+        $this->assertEquals($device, $impressionsMetric->deviceType);
         
-        $this->assertEquals($pageEntity->getId(), $metricsMap['impressions']->page->getId());
+        $this->assertEquals($pageEntity->getId(), $impressionsMetric->page->getId());
     }
 
     public function testRobustness(): void
     {
         $siteUrl = 'https://example.com';
         $rows = [['keys' => null, 'impressions' => 10, 'clicks' => 1]]; // Missing query/page/etc keys
-        $collection = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, 'example_com', null, null, $this->entityManager);
+        $collection = GoogleSearchConsoleConvert::metrics($rows, $siteUrl, 'example_com', null, null);
         
         // This should run and result in metrics with default values for dimensions
         $this->assertCount(4, $collection);

@@ -2,15 +2,12 @@
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Classes\Conversions\GoogleSearchConsoleConvert;
-use Carbon\Carbon;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Country;
+use Anibalealvarezs\GoogleHubDriver\Conversions\GoogleSearchConsoleConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
 use Entities\Analytics\Page;
-use Enums\Channel;
-use Enums\Country;
-use Enums\Device;
-use Enums\Period;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\Unit\BaseUnitTestCase;
 
@@ -79,7 +76,7 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
                     'test_query',
                     'https://example.com/test',
                     'ESP',
-                    'DESKTOP'
+                    'DESKTOP',
                 ],
                 'clicks' => 5,
                 'impressions' => 100,
@@ -87,8 +84,8 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
                 'position' => 3.5,
                 'subset' => 'subset1',
                 'impressions_difference' => 10,
-                'clicks_difference' => 2
-            ]
+                'clicks_difference' => 2,
+            ],
         ];
 
         $result = GoogleSearchConsoleConvert::metrics(
@@ -96,8 +93,7 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
             siteUrl: 'https://example.com',
             siteKey: 'example',
             logger: null,
-            pageEntity: $this->page,
-            em: $this->entityManager
+            page: $this->page
         );
 
         $this->assertInstanceOf(ArrayCollection::class, $result);
@@ -115,7 +111,7 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
                 'position' => 3.5,
                 // 'keys' is missing here
                 'subset' => 'subset1',
-            ]
+            ],
         ];
 
         $result = GoogleSearchConsoleConvert::metrics(
@@ -123,8 +119,7 @@ class GoogleSearchConsoleConvertTest extends BaseUnitTestCase
             siteUrl: 'https://example.com',
             siteKey: 'example',
             logger: null,
-            pageEntity: $this->page,
-            em: $this->entityManager
+            page: $this->page
         );
 
         $this->assertInstanceOf(ArrayCollection::class, $result);

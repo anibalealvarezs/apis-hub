@@ -9,7 +9,7 @@ use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\Account;
-use Enums\Channel;
+use Entities\Analytics\Channel;
 use Enums\QueryBuilderType;
 
 class AccountRepository extends BaseRepository
@@ -53,6 +53,7 @@ class AccountRepository extends BaseRepository
         return $this->createBaseQueryBuilder()
             ->where('e.name = :name')
             ->setParameter('name', $name)
+            ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
     }

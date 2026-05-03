@@ -50,8 +50,16 @@ class RoutingCore implements HttpKernelInterface
 
 
         try {
-            $trimmedPath = trim(urldecode($request->getPathInfo()), " \t\n\r\0\x0B");
+            $pathInfo = $request->getPathInfo();
+            $trimmedPath = ($pathInfo !== '/' && str_ends_with($pathInfo, '/')) 
+                ? substr($pathInfo, 0, -1) 
+                : $pathInfo;
+            
+            $trimmedPath = trim(urldecode($trimmedPath), " \t\n\r\0\x0B");
+            
+            error_log("RoutingCore::handle - matching path: $trimmedPath");
             $attributes = $matcher->match($trimmedPath);
+            error_log("RoutingCore::handle - matched route: " . ($attributes['_route'] ?? 'none'));
             $isPublic = $attributes['public'] ?? false;
             $isAdminOnly = $attributes['admin'] ?? false;
             $controller = $attributes['controller'];
@@ -69,6 +77,9 @@ class RoutingCore implements HttpKernelInterface
             unset($attributes['controller'], $attributes['_route'], $attributes['html'], $attributes['public'], $attributes['admin']);
             $attributes['body'] = $request->getContent() ?: null;
             $attributes['params'] = $request->query->all() ?: null;
+            $attributes['request'] = $request;
+            $attributes['isDemo'] = \Helpers\Helpers::isDemo();
+            $attributes['channelsConfig'] = \Helpers\Helpers::getChannelsConfig();
 
             $response = call_user_func_array($controller, $attributes);
 
@@ -78,6 +89,12 @@ class RoutingCore implements HttpKernelInterface
         } catch (ResourceNotFoundException) {
             $html = file_get_contents(__DIR__ . '/../views/404.html');
             $response = new Response($html, Response::HTTP_NOT_FOUND, ['Content-Type' => 'text/html']);
+        } catch (\Symfony\Component\Routing\Exception\MethodNotAllowedException $e) {
+            $response = new Response(json_encode([
+                'status' => 'error',
+                'error' => 'Method Not Allowed',
+                'message' => 'The ' . $request->getMethod() . ' method is not supported for this route. Supported methods: ' . implode(', ', $e->getAllowedMethods())
+            ]), Response::HTTP_METHOD_NOT_ALLOWED, ['Content-Type' => 'application/json']);
         } catch (Exception $e) {
             $response = new Response(json_encode([
                 'status' => 'error',
@@ -150,9 +167,35 @@ class RoutingCore implements HttpKernelInterface
      */
     private function shouldRateLimit(Request $request): bool
     {
-        // Don't rate limit health checks or local dev (if needed)
-        if ($request->getPathInfo() === '/api/heartbeat') return false;
+        $path = $request->getPathInfo();
+        // Don't rate limit health checks, local dev, or monitoring dashboard
+        if ($path === '/api/heartbeat') return false;
         if (\Helpers\Helpers::isDemo()) return false;
+
+        // 1. IP Whitelisting Bypass
+        $authorizedIps = \Helpers\Helpers::getAuthorizedIps();
+        if (!empty($authorizedIps)) {
+            $clientIp = $request->getClientIp();
+            if (\Symfony\Component\HttpFoundation\IpUtils::checkIp($clientIp, $authorizedIps)) {
+                return false;
+            }
+        }
+        
+        $whiteList = [
+            '/monitoring',
+            '/api/monitoring',
+            '/config-manager',
+            '/api/config-manager',
+            '/logs',
+            '/api/monitoring/logs',
+            '/docs',
+            '/api/spec'
+        ];
+
+        foreach ($whiteList as $prefix) {
+            if (str_starts_with($path, $prefix)) return false;
+        }
+        
         return true;
     }
 
@@ -165,11 +208,11 @@ class RoutingCore implements HttpKernelInterface
             $redis = \Helpers\Helpers::getRedisClient();
             if (!$redis) return null;
 
-            $ip = $request->getClientIp();
+            $ip = $request->headers->get('CF-Connecting-IP') ?: $request->getClientIp();
             $isAdmin = $this->isAuthorized($request, true);
             
-            // Tiered Limits: Admin/Facade gets 200/min, others 60/min
-            $limit = $isAdmin ? 200 : 60;
+            // Tiered Limits: Admin gets 1000/min, others 500/min
+            $limit = $isAdmin ? 1000 : 500;
             $window = 60; // 1 minute
             
             $key = "rate_limit:{$ip}";
@@ -197,12 +240,21 @@ class RoutingCore implements HttpKernelInterface
     }
 
 
-    public function map(string $path, string $httpMethod, callable $controller, bool $public = false, bool $html = false, bool $admin = false): void
-    {
+    public function map(
+        string $path,
+        string $httpMethod,
+        callable $controller,
+        bool $public = false,
+        bool $html = false,
+        bool $admin = false,
+        array $requirements = [],
+        array $defaults = []
+    ): void {
         $routes = new RouteCollection();
         $routes->add($path, new Route(
             $path,
-            array('controller' => $controller, 'public' => $public, 'html' => $html, 'admin' => $admin)
+            array_merge(['controller' => $controller, 'public' => $public, 'html' => $html, 'admin' => $admin], $defaults),
+            $requirements
         ));
         $routes->setMethods($httpMethod);
         $this->routes->addCollection($routes);
@@ -220,7 +272,9 @@ class RoutingCore implements HttpKernelInterface
                 $data['callable'], 
                 $data['public'] ?? false, 
                 $data['html'] ?? false,
-                $data['admin'] ?? false
+                $data['admin'] ?? false,
+                $data['requirements'] ?? [],
+                $data['defaults'] ?? []
             );
         }
     }

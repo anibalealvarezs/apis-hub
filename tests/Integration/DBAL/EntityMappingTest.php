@@ -3,7 +3,7 @@
 namespace Tests\Integration\DBAL;
 
 use Entities\Analytics\SearchAppearance;
-use Classes\Overrides\GoogleApi\SearchConsoleApi\Enums\SearchAppearance as SearchAppearanceEnum;
+use Anibalealvarezs\GoogleApi\Services\SearchConsole\Enums\SearchAppearance as SearchAppearanceEnum;
 use Tests\Integration\BaseIntegrationTestCase;
 
 class EntityMappingTest extends BaseIntegrationTestCase

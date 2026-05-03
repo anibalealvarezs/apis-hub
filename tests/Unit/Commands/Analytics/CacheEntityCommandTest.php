@@ -37,7 +37,7 @@ class CacheEntityCommandTest extends TestCase
 
         $channelArgument = $definition->getArgument('channel');
         $this->assertTrue($channelArgument->isRequired());
-        $this->assertEquals('The channel to cache from (e.g. shopify, klaviyo)', $channelArgument->getDescription());
+        $this->assertEquals('The channel to cache from', $this->command->getDefinition()->getArgument('channel')->getDescription());
 
         $entityArgument = $definition->getArgument('entity');
         $this->assertTrue($entityArgument->isRequired());

@@ -5,6 +5,7 @@ namespace Classes;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Helpers\Helpers;
 
 class ProductCategoryProcessor
@@ -33,14 +34,18 @@ class ProductCategoryProcessor
         $uCProd = []; // for collects
 
         foreach ($channeledCollection as $cpc) {
-            $chan = (string)$cpc->channel;
-            $catPId = (string)$cpc->platformId;
+            if (!$cpc) continue;
+            $cpcObj = (object)$cpc;
+            /** @var object{channel: string|int, platformId: string|int, isSmartCollection: ?bool, platformCreatedAt: ?mixed, platform_created_at: ?mixed, data: mixed} $cpcObj */
+            
+            $chan = (string)($cpcObj->channel ?? '');
+            $catPId = (string)($cpcObj->platformId ?? '');
 
             $cKey = KeyGenerator::generateProductCategoryKey($catPId);
             if (!isset($uCat[$cKey])) {
                 $uCat[$cKey] = [
                     'product_category_id' => $catPId,
-                    'is_smart_collection' => $cpc->isSmartCollection ?? false,
+                    'is_smart_collection' => $cpcObj->isSmartCollection ?? false,
                 ];
             }
 
@@ -50,9 +55,9 @@ class ProductCategoryProcessor
                     'categoryPId' => $catPId,
                     'channel' => $chan,
                     'platform_id' => $catPId,
-                    'platform_created_at' => isset($cpc->platformCreatedAt) ? $cpc->platformCreatedAt : (isset($cpc->platform_created_at) ? $cpc->platform_created_at : null),
-                    'is_smart_collection' => $cpc->isSmartCollection ?? false,
-                    'data' => is_object($cpc->data) ? clone $cpc->data : (object)($cpc->data ?? []),
+                    'platform_created_at' => $cpcObj->platformCreatedAt ?? ($cpcObj->platform_created_at ?? null),
+                    'is_smart_collection' => $cpcObj->isSmartCollection ?? false,
+                    'data' => is_object($cpcObj->data ?? null) ? clone $cpcObj->data : (object)($cpcObj->data ?? []),
                 ];
             }
 
@@ -187,7 +192,8 @@ class ProductCategoryProcessor
             $pivotInserts = [];
             foreach ($collects as $catPId => $prodIds) {
                 foreach ($prodIds as $prodId) {
-                    $chan = (string)$channeledCollection->first()->channel; // Assuming single channel per run
+                    $first = $channeledCollection->first();
+                    $chan = is_object($first) ? (string)($first->channel ?? '') : '';
 
                     $ccKey = KeyGenerator::generateChanneledProductCategoryKey($chan, (string)$catPId);
                     $cpKey = KeyGenerator::generateChanneledProductKey($chan, (string)$prodId);
@@ -226,33 +232,44 @@ class ProductCategoryProcessor
             $map['mapReverse'] = $map['mapReverse'] + $fetched['mapReverse'];
         }
 
+        // Find and Insert missing in one buffered pass
         $dataArray = $dataSource[0];
         $mappingFn = $dataSource[1];
-        $toInsert = [];
+        
+        $buffer = [];
+        $count = 0;
+        $numCols = count($insertCols);
+        $chunkLimit = floor(30000 / $numCols);
 
         foreach ($dataArray as $key => $item) {
             if (!isset($map['map'][$key])) {
-                $toInsert[] = $mappingFn($item);
+                $row = $mappingFn($item);
+                foreach ($row as $val) {
+                    $buffer[] = $val;
+                }
+                $count++;
+
+                if ($count >= $chunkLimit) {
+                    $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, 'product_category_id', $count);
+                    $conn->executeStatement($sql, $buffer);
+                    $buffer = [];
+                    $count = 0;
+                }
             }
         }
 
-        if (!empty($toInsert)) {
-            $insertChunks = array_chunk($toInsert, 1000);
-            foreach ($insertChunks as $chunk) {
-                $params = [];
-                foreach ($chunk as $row) {
-                    $params = array_merge($params, $row);
-                }
-                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, 'product_category_id', count($chunk));
-                $conn->executeStatement($sql, $params);
-            }
+        if ($count > 0) {
+            $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, 'product_category_id', $count);
+            $conn->executeStatement($sql, $buffer);
+        }
 
-            foreach ($chunks as $chunk) {
-                $sql = $sqlGenerator($chunk);
-                $fetched = $mapGenerator($conn, $sql, $chunk);
-                $map['map'] = array_merge($map['map'], $fetched['map']);
-                $map['mapReverse'] = $map['mapReverse'] + $fetched['mapReverse'];
-            }
+        // Re-fetch EVERYTHING to update the map with all IDs
+        $map = ['map' => [], 'mapReverse' => []];
+        foreach ($chunks as $chunk) {
+            $sql = $sqlGenerator($chunk);
+            $fetched = $mapGenerator($conn, $sql, $chunk);
+            $map['map'] = array_merge($map['map'], $fetched['map']);
+            $map['mapReverse'] = $map['mapReverse'] + $fetched['mapReverse'];
         }
 
         return $map;

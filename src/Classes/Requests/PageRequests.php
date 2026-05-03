@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Classes\Conversions\FacebookOrganicConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Entities\Analytics\Channel;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;
@@ -15,83 +14,42 @@ use Symfony\Component\HttpFoundation\Response;
 class PageRequests implements RequestInterface
 {
     /**
-     * @return Channel[]
-     */
-    public static function supportedChannels(): array
-    {
-        return [
-            Channel::facebook_organic,
-        ];
-    }
-
-    /**
+     * @param Channel|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
-     * @param LoggerInterface|null $logger
+     * @param \Psr\Log\LoggerInterface|null $logger
      * @param int|null $jobId
-     * @return Response
+     * @param object|null $filters
+     * @return \Symfony\Component\HttpFoundation\Response
+     * @throws \Exception
      */
-    public static function getListFromFacebookOrganic(
+    public static function getList(
+        Channel|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
-        ?int $jobId = null
+        ?int $jobId = null,
+        ?object $filters = null
     ): Response {
-        if (!$logger) {
-            $logger = Helpers::setLogger('facebook-entities.log');
-        }
+        $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
+        $chanKey = $chanEnum?->name ?? (string)$channel;
 
-        try {
-            $config = MetricRequests::validateFacebookConfig($logger, 'facebook_organic');
-            $api = MetricRequests::initializeFacebookGraphApi($config, $logger);
-            $manager = Helpers::getManager();
-            $accountRepo = $manager->getRepository(\Entities\Analytics\Account::class);
-
-            $pagesToProcess = $config['pages'] ?? [];
-            $logger->info("Processing " . count($pagesToProcess) . " configured Facebook pages");
-
-            $channeledCollection = new ArrayCollection();
-
-            foreach ($pagesToProcess as $pageCfg) {
-                Helpers::checkJobStatus($jobId);
-
-                if (empty($pageCfg['enabled'])) {
-                    $logger->info("Skipping page sync for page: " . ($pageCfg['name'] ?? $pageCfg['id']) . " (disabled in config)");
-                    continue;
-                }
-
-                $accountName = $pageCfg['account'] ?? $config['accounts_group_name'] ?? null;
-                $account = $accountName ? $accountRepo->findOneBy(['name' => $accountName]) : null;
-                if (!$account) {
-                    $logger->warning("Account not found: " . ($accountName ?? 'null') . " for page " . ($pageCfg['title'] ?? $pageCfg['id']));
-                    continue;
-                }
-
-                // In this case, 'pages' in config are already "entities" we want to ensure exist in DB
-                // But we might want to fetch more info from API if needed
-                // For now, let's just use the config data to sync
-                $channeledCollection->add(FacebookOrganicConvert::pages([$pageCfg], $account->getId())->first());
-            }
-
-            if (!$channeledCollection->isEmpty()) {
-                self::process($channeledCollection);
-            }
-
-            return new Response(json_encode(['Pages synchronized']));
-        } catch (\Exception $e) {
-            $logger->error("Error in PageRequests::getListFromFacebookOrganic: " . $e->getMessage());
-            return new Response(json_encode(['error' => $e->getMessage()]), 500);
-        }
+        return (new \Core\Services\SyncService($logger))->execute($chanKey, $startDate, $endDate, [
+            'jobId' => $jobId,
+            'filters' => $filters,
+            'entity' => 'pages',
+        ]);
     }
 
     /**
      * @param ArrayCollection $channeledCollection
      * @return Response
      */
-    public static function process(ArrayCollection $channeledCollection): Response
+    public static function process(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response
     {
         $manager = Helpers::getManager();
         \Classes\SocialProcessor::processPages($channeledCollection, $manager);
+
         return new Response(json_encode(['Pages processed']));
     }
 }

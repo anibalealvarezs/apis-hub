@@ -13,6 +13,7 @@ use Repositories\Channeled\ChanneledAccountRepository;
 
 #[ORM\Entity(repositoryClass: ChanneledAccountRepository::class)]
 #[ORM\Table(name: 'channeled_accounts')]
+#[ORM\UniqueConstraint(name: 'channeled_accounts_platform_channel_unique', columns: ['platform_id', 'channel'])]
 #[ORM\Index(columns: ['name', 'channel', 'type'], name: 'idx_cha_name_channel_type_idx')]
 #[ORM\Index(columns: ['name', 'channel'], name: 'idx_cha_name_channel_idx')]
 #[ORM\Index(columns: ['platform_id', 'type'], name: 'idx_cha_platform_id_type_idx')]
@@ -24,11 +25,14 @@ use Repositories\Channeled\ChanneledAccountRepository;
 #[ORM\HasLifecycleCallbacks]
 class ChanneledAccount extends ChanneledEntity
 {
-    #[ORM\Column(type: 'string')]
+    #[ORM\Column(type: 'text')]
     protected string $name;
 
-    #[ORM\Column(type: 'string', enumType: AccountEnum::class)]
-    protected AccountEnum $type;
+    #[ORM\Column(type: 'string')]
+    protected string $type;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    protected bool $enabled = true;
 
     // Relationships with non-channeled entities
 
@@ -79,15 +83,33 @@ class ChanneledAccount extends ChanneledEntity
         return $this;
     }
 
-    public function addType(AccountEnum $type): self
+    public function addType(string $type): self
     {
         $this->type = $type;
         return $this;
     }
 
-    public function getType(): AccountEnum
+    public function getType(): string
     {
         return $this->type;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEnabled(): bool
+    {
+        return $this->enabled;
+    }
+
+    /**
+     * @param bool $enabled
+     * @return static
+     */
+    public function setEnabled(bool $enabled): static
+    {
+        $this->enabled = $enabled;
+        return $this;
     }
 
     /**

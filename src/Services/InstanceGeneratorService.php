@@ -2,15 +2,11 @@
 
 namespace Services;
 
-use DateTime;
 use DateTimeImmutable;
 use Exception;
 
 class InstanceGeneratorService
 {
-    private const FB_CHANNELS = ['facebook_marketing', 'facebook_organic'];
-    private const GSC_CHANNELS = ['gsc'];
-    
     /**
      * @param bool $useDependencies
      * @param int $basePort
@@ -23,115 +19,136 @@ class InstanceGeneratorService
         \Helpers\Helpers::getProjectConfig(); // Asegurar que el entorno está cargado
         $today = new DateTimeImmutable('today');
         $yesterday = $today->modify('-1 day');
-        
+
         if (getenv('APP_ENV') === 'demo' || \Helpers\Helpers::isDemo()) {
             return [[
                 'name' => 'demo-entities-sync',
                 'port' => $basePort,
                 'channel' => 'none',
                 'entity' => 'none',
-                'frequency' => '0 0 * * *'
+                'frequency' => '0 0 * * *',
             ]];
         }
 
         $projectConfig = \Helpers\Helpers::getProjectConfig();
-        $channels = $projectConfig['rules'] ?? [];
-
-        if (empty($channels)) {
-            throw new Exception("No instance generation rules found in configuration (instances_rules.yaml)");
-        }
-
+        $overrides = $projectConfig['rules'] ?? [];
+        $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
         $currentPort = $basePort;
 
-        foreach ($channels as $channelName => $rules) {
-            if (isset($rules['enabled']) && !$rules['enabled']) {
+        foreach ($availableChannels as $channelName) {
+            // 0. Get configuration for this channel
+            $chanConfig = [];
+            try {
+                $chanConfig = \Classes\DriverInitializer::validateConfig($channelName);
+            } catch (Exception $e) { 
+                continue; // Skip if driver validation fails
+            }
+
+            $channelEnabled = $chanConfig['enabled'] ?? false;
+
+            // Decision: If channel is not enabled, skip infrastructure generation
+            if (!$channelEnabled) {
                 continue;
+            }
+
+            // Get instance rules from driver or default
+            $driverClass = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($channelName)['driver'] ?? null;
+            $rules = [];
+            if ($driverClass && class_exists($driverClass) && method_exists($driverClass, 'getInstanceRules')) {
+                $rules = $driverClass::getInstanceRules();
+            }
+
+            // Merge with channel-specific infrastructure settings
+            // Priority: Channel Config > Driver Default Rules
+            foreach (['cron_entities_hour', 'cron_entities_minute', 'cron_recent_hour', 'cron_recent_minute', 'cache_history_range'] as $key) {
+                if (isset($chanConfig[$key])) {
+                    $rules[$key] = $chanConfig[$key];
+                }
             }
 
             $channel = $channelName;
             $channelInstances = [];
-            
-            // 0. Get Caching Limits for this channel
-            $channelsConfig = \Helpers\Helpers::getChannelsConfig();
-            $chanKey = $channel;
-            if (!isset($channelsConfig[$chanKey])) {
-                $chanKey = str_replace(['facebook_marketing', 'facebook_organic'], ['facebook', 'facebook'], $channel);
-            }
-            $chanConfig = $channelsConfig[$channel] ?? $channelsConfig[$chanKey] ?? null;
+
             $limitDate = null;
-            if ($chanConfig && !empty($chanConfig['cache_history_range'])) {
+            if (! empty($chanConfig['cache_history_range'])) {
                 try {
                     $limitDate = $today->modify('-' . $chanConfig['cache_history_range']);
-                } catch (Exception $e) { /* ignore malformed ranges */ }
+                } catch (Exception $e) { /* ignore malformed ranges */
+                }
             }
 
             // 1. Entities Sync (if applicable)
-            if ($rules['entities_sync']) {
+            $entitiesSyncValue = $rules['entities_sync'] ?? null;
+            if ($entitiesSyncValue) {
                 $instanceName = str_replace('_', '-', $channel) . '-entities-sync';
                 $channelInstances[] = [
                     'name' => $instanceName,
                     'port' => $currentPort++,
                     'channel' => $channel,
-                    'entity' => $rules['entities_sync'],
-                    'frequency' => '0 2 * * *'
+                    'entity' => $entitiesSyncValue,
+                    'frequency' => '0 2 * * *',
                 ];
             }
 
-            // 2. Historics and Recent (only if has active entities)
-            if ($this->hasActiveEntities($channelName)) {
-                // 2. Historics (Quarters)
-                $historyStart = $today->modify("-{$rules['history_months']} months");
-                
-                // Limit history start by cache history range if stricter
-                if ($limitDate && $historyStart < $limitDate) {
-                    $historyStart = $limitDate;
+            // 2. Historics and Recent (always created if channel is enabled)
+            // 2. Historics (Quarters)
+            $historyMonths = $rules['history_months'] ?? 1;
+            $historyStart = $today->modify("-{$historyMonths} months");
+
+            // Limit history start by cache history range if stricter
+            if ($limitDate && $historyStart < $limitDate) {
+                $historyStart = $limitDate;
+            }
+
+            $tempStart = $historyStart;
+
+            while ($tempStart < $yesterday) {
+                // Calculate end of quarter or just before yesterday
+                $quarterEnd = $this->getEndOfQuarter($tempStart);
+                if ($quarterEnd >= $yesterday) {
+                    $quarterEnd = $yesterday;
                 }
 
-                $tempStart = $historyStart;
-                
-                while ($tempStart < $yesterday) {
-                    // Calculate end of quarter or just before yesterday
-                    $quarterEnd = $this->getEndOfQuarter($tempStart);
-                    if ($quarterEnd >= $yesterday) {
-                        $quarterEnd = $yesterday;
-                    }
-
-                    // If the entire quarter is before the limit date, skip it
-                    if ($limitDate && $quarterEnd < $limitDate) {
-                        $tempStart = $quarterEnd->modify('+1 day');
-                        if ($tempStart >= $yesterday) break;
-                        continue;
-                    }
-
-                    $year = $tempStart->format('Y');
-                    $quarterNumber = ceil($tempStart->format('n') / 3);
-                    $instanceName = sprintf('%s-%s-%s', str_replace('_', '-', $channel), $year, $quarterNumber);
-
-                    $channelInstances[] = [
-                        'name' => $instanceName,
-                        'port' => $currentPort++,
-                        'channel' => $channel,
-                        'entity' => 'metric',
-                        'start_date' => $tempStart->format('Y-m-d'),
-                        'end_date' => $quarterEnd->format('Y-m-d')
-                    ];
-
+                // If the entire quarter is before the limit date, skip it
+                if ($limitDate && $quarterEnd < $limitDate) {
                     $tempStart = $quarterEnd->modify('+1 day');
-                    if ($tempStart >= $yesterday) break;
+                    if ($tempStart >= $yesterday) {
+                        break;
+                    }
+
+                    continue;
                 }
 
-                // 3. Recent Instance
-                $recentName = str_replace('_', '-', $channel) . '-recent';
+                $year = $tempStart->format('Y');
+                $quarterNumber = ceil($tempStart->format('n') / 3);
+                $instanceName = sprintf('%s-%s-%s', str_replace('_', '-', $channel), $year, $quarterNumber);
+
                 $channelInstances[] = [
-                    'name' => $recentName,
+                    'name' => $instanceName,
                     'port' => $currentPort++,
                     'channel' => $channel,
                     'entity' => 'metric',
-                    'start_date' => '-3 days',
-                    'end_date' => 'yesterday',
-                    'frequency' => sprintf('%d %d * * *', $rules['recent_cron_minute'], $rules['recent_cron_hour'])
+                    'start_date' => $tempStart->format('Y-m-d'),
+                    'end_date' => $quarterEnd->format('Y-m-d'),
                 ];
+
+                $tempStart = $quarterEnd->modify('+1 day');
+                if ($tempStart >= $yesterday) {
+                    break;
+                }
             }
+
+            // 3. Recent Instance
+            $recentName = str_replace('_', '-', $channel) . '-recent';
+            $channelInstances[] = [
+                'name' => $recentName,
+                'port' => $currentPort++,
+                'channel' => $channel,
+                'entity' => 'metric',
+                'start_date' => '-3 days',
+                'end_date' => 'yesterday',
+                'frequency' => sprintf('%d %d * * *', $rules['recent_cron_minute'], $rules['recent_cron_hour']),
+            ];
 
             // 4. Handle dependencies (Optional)
             if ($useDependencies) {
@@ -156,28 +173,31 @@ class InstanceGeneratorService
      */
     private function hasActiveEntities(string $channelName): bool
     {
-        $channelConfig = \Helpers\Helpers::getChannelsConfig();
-        
-        // Map rules channel name (from rules section in instances_rules.yaml) 
-        // to actual configuration keys and their target entity lists.
-        $mapping = [
-            'facebook_marketing' => ['channel' => 'facebook_marketing', 'key' => 'ad_accounts'],
-            'facebook_organic'   => ['channel' => 'facebook_organic', 'key' => 'pages'],
-            'gsc'                => ['channel' => 'google_search_console', 'key' => 'sites'],
-            'google_search_console' => ['channel' => 'google_search_console', 'key' => 'sites'],
-        ];
+        $chanKey = $channelName;
 
-        // If we don't have a specific mapping for entity-level validation, 
+        $registryConfig = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chanKey);
+
+        // If the channel is not in the registry, it's definitely not active
+        if (empty($registryConfig)) {
+            return false;
+        }
+
+        $resourceKey = $registryConfig['resource_key'] ?? null;
+
+        // If we don't have a resource key for entity-level validation,
         // we default to true to allow standard processing based on top-level rules.
-        if (!isset($mapping[$channelName])) {
+        if (! $resourceKey) {
             return true;
         }
 
-        $target = $mapping[$channelName];
-        $config = $channelConfig[$target['channel']] ?? null;
+        try {
+            $config = \Classes\DriverInitializer::validateConfig($chanKey);
+        } catch (Exception $e) {
+            return false;
+        }
 
         // If the configuration for the channel is missing or explicitly disabled
-        if (!$config || (isset($config['enabled']) && !$config['enabled'])) {
+        if (! $config || (isset($config['enabled']) && ! $config['enabled'])) {
             return false;
         }
 
@@ -186,8 +206,8 @@ class InstanceGeneratorService
             return true;
         }
 
-        // Check the specific list of entities (pages, ad_accounts, or sites)
-        $entities = $config[$target['key']] ?? [];
+        // Check the specific list of entities
+        $entities = $config[$resourceKey] ?? [];
         if (empty($entities)) {
             return false;
         }
@@ -210,10 +230,10 @@ class InstanceGeneratorService
     {
         $month = (int)$date->format('n');
         $year = (int)$date->format('Y');
-        
+
         $currentQuarter = (int)ceil($month / 3);
         $endMonth = $currentQuarter * 3;
-        
+
         return $date->setDate($year, $endMonth, 1)->modify('last day of this month');
     }
 }

@@ -4,258 +4,55 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
-use Carbon\Carbon;
-use Classes\Conversions\NetSuiteConvert;
-use Classes\Overrides\NetSuiteApi\NetSuiteApi;
-use Classes\Overrides\ShopifyApi\ShopifyApi;
-use Classes\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Exception\NotSupported;
 use Doctrine\ORM\Exception\ORMException;
-use Doctrine\ORM\OptimisticLockException;
-use Entities\Analytics\Channeled\ChanneledCustomer;
-use Entities\Analytics\Channeled\ChanneledDiscount;
-use Entities\Analytics\Channeled\ChanneledOrder;
-use Entities\Analytics\Channeled\ChanneledProduct;
-use Entities\Analytics\Channeled\ChanneledProductVariant;
-use Entities\Analytics\Order;
-use Enums\Channel;
-use Repositories\OrderRepository;
-use Repositories\Channeled\ChanneledOrderRepository;
-use Repositories\Channeled\ChanneledDiscountRepository;
-use Repositories\Channeled\ChanneledProductRepository;
-use Repositories\Channeled\ChanneledProductVariantRepository;
-use Repositories\Channeled\ChanneledCustomerRepository;
-use GuzzleHttp\Exception\GuzzleException;
+use Entities\Analytics\Channel;
 use Helpers\Helpers;
 use Interfaces\RequestInterface;
+use Psr\Log\LoggerInterface;
 use Services\CacheService;
 use Symfony\Component\HttpFoundation\Response;
 
 class OrderRequests implements RequestInterface
 {
-    /**
-     * @return Channel[]
-     */
-    public static function supportedChannels(): array
-    {
-        return [
-            Channel::shopify,
-            Channel::klaviyo,
-            Channel::bigcommerce,
-            Channel::netsuite,
-            Channel::amazon,
-        ];
-    }
+    
 
     /**
-     * @param string|null $processedAtMin
-     * @param string|null $processedAtMax
-     * @param array|null $fields
+     * @param Channel|string $channel
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param \Psr\Log\LoggerInterface|null $logger
+     * @param int|null $jobId
      * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     * @throws Exception
-     * @throws GuzzleException
-     * @throws NotSupported
-     * @throws ORMException
+     * @return \Symfony\Component\HttpFoundation\Response
      */
-    public static function getListFromShopify(
-        ?string $processedAtMin = null,
-        ?string $processedAtMax = null,
-        ?array $fields = null,
-        ?object $filters = null,
-        string|bool $resume = true,
-        ?int $jobId = null
+    public static function getList(
+        Channel|string $channel,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?LoggerInterface $logger = null,
+        ?int $jobId = null,
+        ?object $filters = null
     ): Response {
-        $config = Helpers::getChannelsConfig()['shopify'];
-        $shopifyClient = new ShopifyApi(
-            apiKey: $config['shopify_api_key'],
-            shopName: $config['shopify_shop_name'],
-            version: $config['shopify_last_stable_revision'],
-        );
+        $chanKey = ($channel instanceof Channel) ? $channel->name : (string)$channel;
+        $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
+        $mapping = $driver->getDateFilterMapping();
 
-        $manager = Helpers::getManager();
-        /** @var ChanneledOrderRepository $channeledOrderRepository */
-        $channeledOrderRepository = $manager->getRepository(entityName: ChanneledOrder::class);
-        $lastChanneledOrder = $channeledOrderRepository->getLastByPlatformId(channel: Channel::shopify->value);
-
-        $shopifyClient->getAllOrdersAndProcess(
-            createdAtMin: $filters->createdAtMin ?? null,
-            createdAtMax: $filters->createdAtMax ?? null,
-            fields: $fields, // Example: ["id", "processed_at", "total_price", "total_discounts", "discount_codes", "customer", "line_items"]
-            financialStatus: $filters->financialStatus ?? null,
-            fulfillmentStatus: $filters->fulfillmentStatus ?? null,
-            ids: $filters->ids ?? null,
-            processedAtMin: $processedAtMin,
-            processedAtMax: $processedAtMax,
-            sinceId: $filters->sinceId ?? isset($lastChanneledOrder['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledOrder['platformId'] : null,
-            status: $filters->status ?? null,
-            updatedAtMin: $filters->updatedAtMin ?? null,
-            updatedAtMax: $filters->updatedAtMax ?? null,
-            pageInfo: $filters->pageInfo ?? null,
-            callback: function ($orders) use ($jobId) {
-                Helpers::checkJobStatus($jobId);
-                self::process(ShopifyConvert::orders($orders));
-            }
-        );
-        return new Response(json_encode(['Orders retrieved']));
-    }
-
-    /**
-     * @param array|null $fields
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromKlaviyo(array $fields = null, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromBigCommerce(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param string $fromDate
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     * @throws Exception
-     * @throws GuzzleException
-     * @throws NotSupported
-     * @throws ORMException
-     */
-    public static function getListFromNetsuite(
-        string $fromDate = '01/01/1999',
-        ?object $filters = null,
-        string|bool $resume = true,
-        ?int $jobId = null
-    ): Response {
-        $config = Helpers::getChannelsConfig()['netsuite'];
-        $netsuiteClient = new NetSuiteApi(
-            consumerId: $config['netsuite_consumer_id'],
-            consumerSecret: $config['netsuite_consumer_secret'],
-            token: $config['netsuite_token_id'],
-            tokenSecret: $config['netsuite_token_secret'],
-            accountId: $config['netsuite_account_id'],
-        );
-
-        $manager = Helpers::getManager();
-        /** @var ChanneledOrderRepository $channeledOrderRepository */
-        $channeledOrderRepository = $manager->getRepository(entityName: ChanneledOrder::class);
-        $lastChanneledOrder = $channeledOrderRepository->getLastByPlatformId(channel: Channel::netsuite->value);
-
-        $query = "SELECT
-                transaction.*,
-                entity.customer as CustomerID,
-                customer.email as CustomerEmail,
-                CUSTOMLIST_NLI_STATUS.id as NliStatusID,
-                CUSTOMLIST_SOS_TYPE.id as SosTypeID,
-                Item.id as ItemID,
-                Item.itemid as ItemSku,
-                Item.custitem_web_store_design_item as ItemWebStoreDesignItem,
-                Item.parent as ItemParent,
-                promotionCode.name AS PromotionCodeName,
-                transactionBillingAddress.addr1 AS billingAddress1,
-                transactionBillingAddress.addr2 AS billingAddress2,
-                transactionBillingAddress.addrtext AS billingAddressText,
-                transactionBillingAddress.city AS billingCity,
-                transactionBillingAddress.country AS billingCountry,
-                transactionBillingAddress.dropdownstate AS billingDropdownState,
-                transactionBillingAddress.recordowner AS billingRecordOwner,
-                transactionBillingAddress.state AS billingState,
-                transactionBillingAddress.zip AS billingZip,
-                TransactionLine.actualshipdate as TransactionLineActualShipDate,
-                TransactionLine.closedate as TransactionLineCloseDate,
-                TransactionLine.costestimate as TransactionLineCostEstimate,
-                TransactionLine.costestimaterate as TransactionLineCostEstimateRate,
-                TransactionLine.costestimatetype as TransactionLineCostEstimateType,
-                TransactionLine.creditforeignamount as TransactionLineCreditForeignAmount,
-                TransactionLine.custcol_design_code as TransactionLineDesignCode,
-                TransactionLine.custcol_design_market as TransactionLineDesignMarket,
-                TransactionLine.custcol_promo_code as TransactionLinePromoCode,
-                TransactionLine.estgrossprofit as TransactionLineEstGrossProfit,
-                TransactionLine.estgrossprofitpercent as TransactionLineEstGrossProfitPercent,
-                TransactionLine.expenseaccount as TransactionLineExpenseAccount,
-                TransactionLine.expectedshipdate as TransactionLineExpectedShipDate,
-                TransactionLine.foreignamount as TransactionLineForeignAmount,
-                TransactionLine.id as TransactionLineID,
-                TransactionLine.isclosed as TransactionLineIsClosed,
-                TransactionLine.isfullyshipped as TransactionLineIsFullyShipped,
-                TransactionLine.itemtype as TransactionLineItemType,
-                TransactionLine.linelastmodifieddate as TransactionLineLastModifiedDate,
-                TransactionLine.linesequencenumber as TransactionLineSequenceNumber,
-                TransactionLine.memo as TransactionLineMemo,
-                TransactionLine.netamount as TransactionLineNetAmount,
-                TransactionLine.price as TransactionLinePrice,
-                TransactionLine.quantity as TransactionLineQuantity,
-                TransactionLine.quantitybackordered as TransactionLineQuantityBackordered,
-                TransactionLine.quantitybilled as TransactionLineQuantityBilled,
-                TransactionLine.quantitypacked as TransactionLineQuantityPacked,
-                TransactionLine.quantitypicked as TransactionLineQuantityPicked,
-                TransactionLine.quantityrejected as TransactionLineQuantityRejected,
-                TransactionLine.quantityshiprecv as TransactionLineQuantityShipRecv,
-                TransactionLine.rate as TransactionLineRate,
-                TransactionLine.rateamount as TransactionLineRateAmount,
-                TransactionLine.uniquekey as TransactionLineUniqueKey
-            FROM transaction
-            INNER JOIN TransactionLine
-                ON TransactionLine.Transaction = transaction.ID
-            LEFT JOIN entity
-                ON transaction.entity = entity.id
-            INNER JOIN customer
-                ON entity.customer = customer.id
-            LEFT JOIN transactionBillingAddress
-                ON transaction.billingaddress = transactionBillingAddress.nkey
-            LEFT JOIN Item
-                ON TransactionLine.item = Item.id
-            INNER JOIN tranPromotion
-                ON transaction.id = tranPromotion.transaction
-            INNER JOIN promotionCode
-                ON tranPromotion.promocode = promotionCode.id
-            INNER JOIN CUSTOMLIST_NLI_STATUS
-                ON transaction.custbody_nli_status = CUSTOMLIST_NLI_STATUS.id
-            INNER JOIN CUSTOMLIST_SOS_TYPE
-                ON transaction.custbody_shared_order_type = CUSTOMLIST_SOS_TYPE.id
-            WHERE transaction.Type = 'SalesOrd'
-                AND (TransactionLine.itemtype IN ('Discount', 'ShipItem', 'TaxItem', 'Assembly', 'NonInvtPart'))
-                AND transaction.trandate >= TO_DATE('".Carbon::parse($fromDate)->format('m/d/Y')."', 'mm/dd/yyyy')
-                AND transaction.custbody_division_domain = '".Helpers::getDomain($config['netsuite_store_base_url'])."'
-                AND transaction.id >= " . (isset($lastChanneledOrder['platformId']) && filter_var($resume, FILTER_VALIDATE_BOOLEAN) ? $lastChanneledOrder['platformId'] : 0);
-        if ($filters) {
-            foreach ($filters as $key => $value) {
-                $query .= " AND transaction.$key = '$value'";
-            }
+        // Intelligent date resolution
+        $start = $startDate;
+        $end = $endDate;
+        if (! empty($mapping)) {
+            $start = $filters->{$mapping['start']} ?? $startDate;
+            $end = $filters->{$mapping['end']} ?? $endDate;
         }
-        $query .= " ORDER BY transaction.id ASC";
-        $netsuiteClient->getSuiteQLQueryAllAndProcess(
-            query: $query,
-            callback: function ($orders) use ($jobId) {
-                Helpers::checkJobStatus($jobId);
-                self::process(NetSuiteConvert::orders($orders));
-            }
-        );
-        return new Response(json_encode(['Orders retrieved']));
-    }
 
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute($chanKey, $start, $end, [
+            'jobId' => $jobId,
+            'resume' => $filters->resume ?? true,
+            'type' => 'orders',
+            'filters' => $filters,
+        ]);
     }
 
     /**
@@ -263,14 +60,14 @@ class OrderRequests implements RequestInterface
      * @return Response
      * @throws ORMException
      */
-    public static function process(ArrayCollection $channeledCollection): Response
+    public static function process(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response
     {
         try {
             $manager = Helpers::getManager();
 
             $result = \Classes\OrderProcessor::processOrders($channeledCollection, $manager);
 
-            if (!empty($result)) {
+            if (! empty($result)) {
                 $cacheService = CacheService::getInstance(redisClient: Helpers::getRedisClient());
                 $entities = [
                     'Order' => $result['orders'],
@@ -284,7 +81,7 @@ class OrderRequests implements RequestInterface
                 $channelName = Channel::from(reset($result['channels']))->getName();
 
                 $cacheService->invalidateMultipleEntities(
-                    entities: array_filter($entities, fn ($value) => !empty($value)),
+                    entities: array_filter($entities, fn ($value) => ! empty($value)),
                     channel: $channelName
                 );
             }

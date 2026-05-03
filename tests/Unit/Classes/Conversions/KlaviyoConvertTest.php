@@ -2,10 +2,10 @@
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Classes\Conversions\KlaviyoConvert;
+use Anibalealvarezs\KlaviyoHubDriver\Conversions\KlaviyoConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
-use Enums\Period;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Tests\Unit\BaseUnitTestCase;
 
 class KlaviyoConvertTest extends BaseUnitTestCase

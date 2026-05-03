@@ -6,7 +6,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Entities\Entity;
-use Enums\Country as CountryEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
 use Repositories\CountryRepository;
 
 #[ORM\Entity(repositoryClass: CountryRepository::class)]

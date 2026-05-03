@@ -1,7 +1,15 @@
 instances:
-  - name: example-instance
+  -
+    name: channel-entities-sync
     port: 8081
-    channel: gsc
+    channel: channel_name
+    entity: entities
+    frequency: '0 2 * * *'
+  -
+    name: channel-historical-sync
+    port: 8082
+    channel: channel_name
     entity: metric
-    start_date: "2025-01-01"
-    end_date:   "2025-03-31"
+    start_date: '2025-01-01'
+    end_date: '2025-03-31'
+    requires: channel-entities-sync

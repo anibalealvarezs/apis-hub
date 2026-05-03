@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Integration\Conversions;
 
-use Classes\Conversions\FacebookOrganicMetricConvert;
+use Anibalealvarezs\MetaHubDriver\Conversions\FacebookOrganicMetricConvert;
 use Doctrine\Common\Collections\ArrayCollection;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channeled\ChanneledAccount;
 use Entities\Analytics\Page;
-use Enums\Period;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Tests\Integration\BaseIntegrationTestCase;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 
 class FacebookOrganicMetricIntegrationTest extends BaseIntegrationTestCase
 {
@@ -38,8 +39,8 @@ class FacebookOrganicMetricIntegrationTest extends BaseIntegrationTestCase
             pagePlatformId: $pagePlatformId,
             postPlatformId: '',
             logger: null,
-            pageEntity: $pageEntity,
-            postEntity: null,
+            page: $pageEntity,
+            post: null,
             period: Period::Daily
         );
 
@@ -57,8 +58,8 @@ class FacebookOrganicMetricIntegrationTest extends BaseIntegrationTestCase
         $channeledAccount = new ChanneledAccount();
         $channeledAccount->addPlatformId($igPlatformId);
         $channeledAccount->addName($this->faker->userName);
-        $channeledAccount->addType(\Enums\Account::INSTAGRAM);
-        $channeledAccount->addChannel(\Enums\Channel::facebook_organic->value);
+        $channeledAccount->addType('INSTAGRAM');
+        $channeledAccount->addChannel(Channel::facebook_organic->value);
         $channeledAccount->addAccount($accountEntity);
         $this->entityManager->persist($channeledAccount);
         $this->entityManager->flush();
@@ -87,13 +88,13 @@ class FacebookOrganicMetricIntegrationTest extends BaseIntegrationTestCase
         $collection = FacebookOrganicMetricConvert::igAccountMetrics(
             rows: $rows,
             date: $this->faker->date(),
-            pageEntity: null,
-            accountEntity: $accountEntity,
-            channeledAccountEntity: $channeledAccount,
+            page: null,
+            account: $accountEntity,
+            channeledAccount: $channeledAccount,
             logger: null,
             period: Period::Daily
         );
 
-        $this->assertCount(3, $collection);
+        $this->assertCount(4, $collection);
     }
 }

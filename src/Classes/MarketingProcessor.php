@@ -11,6 +11,23 @@ use Helpers\Helpers;
 
 class MarketingProcessor
 {
+    private static array $channelMap = [];
+
+    private static function resolveChannelId(string $channelName, EntityManager $manager): int
+    {
+        if (isset(self::$channelMap[$channelName])) {
+            return self::$channelMap[$channelName];
+        }
+
+        $channel = $manager->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channelName]);
+        if (!$channel) {
+            throw new \Exception("Channel '$channelName' not found in database during marketing processing.");
+        }
+
+        self::$channelMap[$channelName] = $channel->getId();
+        return self::$channelMap[$channelName];
+    }
+
     private static function getLogger(): \Psr\Log\LoggerInterface
     {
         return Helpers::setLogger('marketing-processor.log');
@@ -33,6 +50,8 @@ class MarketingProcessor
         // 1. Bulk Insert/Update campaigns (Global)
         $campaignIds = [];
         foreach ($campaigns as $c) {
+            if (!is_object($c)) continue;
+            /** @var object{platformId: string|int} $c */
             $campaignIds[] = $c->platformId;
         }
 
@@ -44,10 +63,12 @@ class MarketingProcessor
             foreach (array_chunk($campaigns, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $c) {
+                    if (!is_object($c)) continue;
+                    /** @var object{platformId: string|int, name: string, startDate: ?\Carbon\Carbon, endDate: ?\Carbon\Carbon} $c */
                     $params[] = $c->platformId;
                     $params[] = $c->name;
-                    $params[] = $c->startDate ? $c->startDate->toDateTimeString() : null;
-                    $params[] = $c->endDate ? $c->endDate->toDateTimeString() : null;
+                    $params[] = $c->startDate ? Carbon::parse($c->startDate)->toDateTimeString() : null;
+                    $params[] = $c->endDate ? Carbon::parse($c->endDate)->toDateTimeString() : null;
                 }
                 $sql = Helpers::buildUpsertSql(
                     'campaigns', 
@@ -80,7 +101,9 @@ class MarketingProcessor
             foreach (array_chunk($campaigns, $chunkSize) as $chunk) {
                 $channeledParams = [];
                 foreach ($chunk as $c) {
-                    $channeledParams[] = $c->channel;
+                    if (!is_object($c)) continue;
+                    /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, budget: mixed, status: string, objective: string, buyingType: string, data: mixed} $c */
+                    $channeledParams[] = self::resolveChannelId($c->channel, $manager);
                     $channeledParams[] = $c->platformId;
                     $channeledParams[] = $campaignMap[$c->platformId] ?? null;
                     $channeledParams[] = $c->channeledAccountId;
@@ -144,14 +167,16 @@ class MarketingProcessor
             foreach (array_chunk($adsets, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $a) {
-                    $params[] = $a->channel;
+                    if (!is_object($a)) continue;
+                    /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, channeledCampaignId: string|int, name: string, startDate: ?\Carbon\Carbon, endDate: ?\Carbon\Carbon, status: string, optimizationGoal: string, billingEvent: string, targeting: mixed, data: mixed} $a */
+                    $params[] = self::resolveChannelId($a->channel, $manager);
                     $params[] = $a->platformId;
                     $params[] = $a->channeledAccountId;
                     $params[] = $campaignMap[$a->channeledCampaignId]['global_id'] ?? null;
                     $params[] = $campaignMap[$a->channeledCampaignId]['channeled_id'] ?? null;
                     $params[] = $a->name;
-                    $params[] = $a->startDate ? $a->startDate->toDateTimeString() : null;
-                    $params[] = $a->endDate ? $a->endDate->toDateTimeString() : null;
+                    $params[] = $a->startDate ? Carbon::parse($a->startDate)->toDateTimeString() : null;
+                    $params[] = $a->endDate ? Carbon::parse($a->endDate)->toDateTimeString() : null;
                     $params[] = $a->status ?? null;
                     $params[] = $a->optimizationGoal ?? null;
                     $params[] = $a->billingEvent ?? null;
@@ -230,7 +255,9 @@ class MarketingProcessor
             foreach (array_chunk($ads, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $a) {
-                    $params[] = $a->channel;
+                    if (!is_object($a)) continue;
+                    /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, channeledCampaignId: string|int, channeledAdGroupId: string|int, channeledCreativeId: string|int, name: string, status: string, data: mixed} $a */
+                    $params[] = self::resolveChannelId($a->channel, $manager);
                     $params[] = $a->platformId;
                     $params[] = $a->channeledAccountId;
                     $params[] = $campaignMap[$a->channeledCampaignId] ?? null;
@@ -277,6 +304,8 @@ class MarketingProcessor
             foreach (array_chunk($creatives, $chunkSize) as $chunk) {
                 $params = [];
                 foreach ($chunk as $c) {
+                    if (!is_object($c)) continue;
+                    /** @var object{platformId: string|int, name: string, data: mixed} $c */
                     $params[] = $c->platformId;
                     $params[] = $c->name;
                     $params[] = json_encode($c->data);

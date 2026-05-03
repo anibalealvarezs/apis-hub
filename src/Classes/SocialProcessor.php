@@ -32,23 +32,134 @@ class SocialProcessor
         foreach (array_chunk($pages, $chunkSize) as $chunk) {
             $params = [];
             foreach ($chunk as $p) {
-                $params[] = $p->url;
-                $params[] = $p->canonicalId ?? null;
-                $params[] = $p->title ?? null;
-                $params[] = $p->hostname ?? null;
-                $params[] = $p->platformId;
-                $params[] = $p->accountId;
-                $params[] = json_encode($p->data ?? []);
+                $context = $p->getContext() ?? [];
+                $accountId = self::resolveContextId(
+                    $context,
+                    ['account'],
+                    ['account_id', 'accountId', 'accountPlatformId']
+                );
+
+                $params[] = $p->getUrl();
+                $params[] = $p->getCanonicalId() ?? null;
+                $params[] = $p->getTitle() ?? null;
+                $params[] = $p->getHostname() ?? null;
+                $params[] = $p->getPlatformId();
+                $params[] = $accountId;
+                $params[] = json_encode($p->getData() ?? []);
             }
 
             $sql = Helpers::buildUpsertSql(
                 'pages', 
                 $cols, 
-                ['url', 'title', 'platform_id', 'data'], 
+                ['url', 'title', 'hostname', 'platform_id', 'data', 'account_id'], 
                 'canonical_id', 
                 count($chunk)
             );
             $conn->executeStatement($sql, $params);
+        }
+    }
+
+    /**
+     * @param \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity $entity
+     * @param EntityManager $manager
+     * @return void
+     */
+    public static function processUniversalEntity(\Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity $entity, EntityManager $manager): void
+    {
+        $type = $entity->getType();
+        $channel = $entity->getChannel();
+        $context = $entity->getContext();
+
+        if (in_array($type, ['pages', 'sites']) || !$type) {
+            // It's a Page if it has a URL or is explicitly typed as such
+            if ($entity->getUrl() || $entity->getCanonicalId()) {
+                self::processPageEntity($entity, $manager);
+            }
+        }
+
+        // Always check if it's a ChanneledAccount as well (or exclusively)
+        if ($channel && $type) {
+            self::processChanneledAccount($entity, $manager);
+        }
+    }
+
+    private static function processPageEntity(\Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity $entity, EntityManager $manager): void
+    {
+        $conn = $manager->getConnection();
+        $cols = ['url', 'canonical_id', 'title', 'hostname', 'platform_id', 'account_id', 'data'];
+        
+        $context = $entity->getContext() ?? [];
+        $accountId = self::resolveContextId(
+            $context,
+            ['account'],
+            ['account_id', 'accountId', 'accountPlatformId']
+        );
+
+        $params = [
+            (string)$entity->getUrl(),
+            (string)($entity->getCanonicalId() ?? $entity->getPlatformId()),
+            (string)$entity->getTitle(),
+            (string)$entity->getHostname(),
+            (string)$entity->getPlatformId(),
+            $accountId,
+            json_encode($entity->getData() ?? [])
+        ];
+
+        $sql = Helpers::buildUpsertSql('pages', $cols, ['url', 'title', 'hostname', 'platform_id', 'data', 'account_id'], 'canonical_id', 1);
+        try {
+            error_log("DEBUG: SocialProcessor::processPageEntity - Executing UPSERT on 'pages' for platform_id: " . $entity->getPlatformId());
+            $conn->executeStatement($sql, $params);
+        } catch (\Exception $e) {
+            error_log("ERROR: SocialProcessor::processPageEntity failed: " . $e->getMessage());
+            error_log("SQL: " . $sql);
+            error_log("PARAMS: " . json_encode($params));
+            throw $e;
+        }
+    }
+
+    private static array $channelMap = [];
+
+    private static function resolveChannelId(string $channelName, EntityManager $manager): int
+    {
+        if (isset(self::$channelMap[$channelName])) {
+            return self::$channelMap[$channelName];
+        }
+
+        $channel = $manager->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channelName]);
+        if (!$channel) {
+            throw new \Exception("Channel '$channelName' not found in database during social processing.");
+        }
+
+        self::$channelMap[$channelName] = $channel->getId();
+        return self::$channelMap[$channelName];
+    }
+
+    private static function processChanneledAccount(\Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity $entity, EntityManager $manager): void
+    {
+        $conn = $manager->getConnection();
+        $cols = ['platform_id', 'account_id', 'channel', 'name', 'type', 'data'];
+
+        $account = $entity->getContext()['account'] ?? null;
+        $accountId = is_object($account) ? $account->getId() : $account;
+
+        $params = [
+            (string)$entity->getPlatformId(),
+            $accountId,
+            self::resolveChannelId((string)$entity->getChannel(), $manager),
+            (string)($entity->getTitle() ?? $entity->getPlatformId()),
+            (string)$entity->getType(),
+            json_encode($entity->getData() ?? [])
+        ];
+
+        $sql = Helpers::buildUpsertSql('channeled_accounts', $cols, ['name', 'type', 'data', 'account_id'], ['platform_id', 'channel'], 1);
+        try {
+            error_log("DEBUG: SocialProcessor::processChanneledAccount - Executing UPSERT on 'channeled_accounts' for platform_id: " . $entity->getPlatformId());
+            $conn->executeStatement($sql, $params);
+        } catch (\Exception $e) {
+            error_log("ERROR: SocialProcessor::processChanneledAccount failed: " . $e->getMessage());
+            error_log("SQL: " . $sql);
+            error_log("PARAMS: " . json_encode($params));
+            throw $e;
         }
     }
 
@@ -73,11 +184,29 @@ class SocialProcessor
         foreach (array_chunk($posts, $chunkSize) as $chunk) {
             $params = [];
             foreach ($chunk as $p) {
-                $params[] = $p->platformId;
-                $params[] = $p->pageId;
-                $params[] = $p->accountId;
-                $params[] = $p->channeledAccountId ?? null;
-                $params[] = json_encode($p->data ?? []);
+                $context = $p->getContext() ?? [];
+
+                $accountId = self::resolveContextId(
+                    $context,
+                    ['account'],
+                    ['account_id', 'accountId', 'accountPlatformId']
+                );
+                $pageId = self::resolveContextId(
+                    $context,
+                    ['page'],
+                    ['page_id', 'pageId', 'pagePlatformId']
+                );
+                $channeledAccountId = self::resolveContextId(
+                    $context,
+                    ['channeled_account', 'channeledAccount'],
+                    ['channeled_account_id', 'channeledAccountId']
+                );
+
+                $params[] = $p->getPlatformId();
+                $params[] = $pageId;
+                $params[] = $accountId;
+                $params[] = $channeledAccountId;
+                $params[] = json_encode($p->getData() ?? []);
             }
 
             $sql = Helpers::buildUpsertSql(
@@ -87,7 +216,49 @@ class SocialProcessor
                 ['post_id', 'page_id', 'account_id', 'channeled_account_id'], 
                 count($chunk)
             );
-            $conn->executeStatement($sql, $params);
+            try {
+                error_log("DEBUG: SocialProcessor::processPosts - Executing bulk UPSERT on 'posts' for " . count($chunk) . " items.");
+                $conn->executeStatement($sql, $params);
+            } catch (\Exception $e) {
+                error_log("ERROR: SocialProcessor::processPosts failed: " . $e->getMessage());
+                error_log("SQL: " . $sql);
+                error_log("PARAMS: " . json_encode($params));
+                throw $e;
+            }
         }
+    }
+
+    /**
+     * Resolve relation IDs from mixed context conventions (legacy snake_case and newer camelCase).
+     */
+    private static function resolveContextId(array $context, array $entityKeys, array $scalarKeys): mixed
+    {
+        foreach ($entityKeys as $key) {
+            if (!array_key_exists($key, $context) || $context[$key] === null) {
+                continue;
+            }
+
+            $value = $context[$key];
+            if (is_object($value) && method_exists($value, 'getId')) {
+                return $value->getId();
+            }
+
+            if (!is_object($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        foreach ($scalarKeys as $key) {
+            if (!array_key_exists($key, $context)) {
+                continue;
+            }
+
+            $value = $context[$key];
+            if ($value !== null && $value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 }

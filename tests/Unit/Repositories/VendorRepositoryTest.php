@@ -55,6 +55,7 @@ class VendorRepositoryTest extends TestCase
         $this->queryBuilder->method('setParameter')->willReturnCallback(function ($key, $value) {
             return $this->queryBuilder;
         });
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $this->queryBuilder->method('getQuery')->willReturn($this->query);
 
         $classMetadata = $this->createMock(ClassMetadata::class);

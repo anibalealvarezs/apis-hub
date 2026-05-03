@@ -66,7 +66,7 @@ class CacheService
      */
     public function delete(string $key): void
     {
-        $this->redisClient->del([$key]);
+        $this->redisClient->del($key);
     }
 
     /**
@@ -92,7 +92,7 @@ class CacheService
             $cursor = (int) $scan[0];
             $keys = $scan[1];
             if (!empty($keys)) {
-                $this->redisClient->del($keys);
+                $this->redisClient->del(...$keys);
             }
         } while ($cursor !== 0);
     }
@@ -130,7 +130,7 @@ class CacheService
                     fn ($id) => $cacheKeyGenerator->forEntity(entityType: $entity, id: $id),
                     $ids
                 );
-                $this->redisClient->del($cacheKeys);
+                $this->redisClient->del(...$cacheKeys);
             }
 
             // Invalidate list and count caches for both cases
@@ -150,7 +150,7 @@ class CacheService
                             fn ($id) => $cacheKeyGenerator->forChanneledEntity(channel: $channel, entityType: $channeledEntity, id: $id),
                             $channeledIds
                         );
-                        $this->redisClient->del($channeledCacheKeys);
+                        $this->redisClient->del(...$channeledCacheKeys);
                     }
                     $channeledEntityLower = strtolower($channeledEntity);
                     $channeledEntityUpper = ucfirst($channeledEntity);
@@ -182,7 +182,7 @@ class CacheService
                 $ids = array_filter($ids);
                 if (!empty($ids)) {
                     $keys = array_map(fn ($id) => $cacheKeyGenerator->forEntity($entity, $id), $ids);
-                    $this->redisClient->del($keys);
+                    $this->redisClient->del(...$keys);
                 }
             }
 
@@ -199,7 +199,7 @@ class CacheService
                         fn ($id) => $cacheKeyGenerator->forChanneledEntity($channel, $entity, $id),
                         $ids
                     );
-                    $this->redisClient->del($channeledKeys);
+                    $this->redisClient->del(...$channeledKeys);
                 }
 
                 if ($includeListAndCount) {

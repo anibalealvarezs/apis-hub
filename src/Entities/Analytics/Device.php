@@ -6,7 +6,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Entities\Entity;
-use Enums\Device as DeviceEnum;
+use Anibalealvarezs\ApiSkeleton\Enums\Device as DeviceEnum;
 use Repositories\DeviceRepository;
 
 #[ORM\Entity(repositoryClass: DeviceRepository::class)]

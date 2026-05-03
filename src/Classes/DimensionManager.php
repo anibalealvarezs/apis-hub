@@ -5,16 +5,22 @@ namespace Classes;
 use Entities\Analytics\Channeled\DimensionKey;
 use Entities\Analytics\Channeled\DimensionSet;
 use Entities\Analytics\Channeled\DimensionValue;
-use Doctrine\ORM\EntityManager;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
+use Anibalealvarezs\ApiDriverCore\Interfaces\DimensionManagerInterface;
+use Doctrine\ORM\EntityManagerInterface;
 
-class DimensionManager
+class DimensionManager implements DimensionManagerInterface
 {
     private array $keyCache = [];
     private array $valueCache = [];
     private array $setCache = [];
 
-    public function __construct(private EntityManager $em)
+    /** @var EntityManagerInterface */
+    private $em;
+
+    public function __construct($em)
     {
+        $this->em = $em;
     }
 
     public function clearCaches(): void

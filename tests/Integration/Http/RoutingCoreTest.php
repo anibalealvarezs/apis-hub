@@ -16,7 +16,7 @@ class RoutingCoreTest extends BaseIntegrationTestCase
         putenv('APP_API_KEY=' . $apiKey);
 
         $router = new RoutingCore();
-        $router->map('/test-route', 'GET', function (?string $body, ?array $params) {
+        $router->map('/test-route', 'GET', function (?string $body, ?array $params, ...$args) {
             return new Response(json_encode(['success' => true]));
         });
 

@@ -2,9 +2,9 @@
 
 namespace Tests\Unit\Classes\Conversions;
 
-use Classes\Conversions\ShopifyConvert;
+use Anibalealvarezs\ShopifyHubDriver\Conversions\ShopifyConvert;
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Tests\Unit\BaseUnitTestCase;
 
 class ShopifyConvertTest extends BaseUnitTestCase

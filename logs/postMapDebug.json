@@ -1,0 +1,152 @@
+{
+    "count": 471,
+    "first5": {
+        "ig_media_1_0": 3593,
+        "ig_media_1_1": 3594,
+        "ig_media_1_2": 3595,
+        "ig_media_1_3": 3596,
+        "ig_media_1_4": 3597
+    },
+    "sample_metrics": [
+        {
+            "name": "saved_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_86",
+            "map_match": 3942
+        },
+        {
+            "name": "shares_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_86",
+            "map_match": 3942
+        },
+        {
+            "name": "views_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_86",
+            "map_match": 3942
+        },
+        {
+            "name": "total_interactions_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_86",
+            "map_match": 3942
+        },
+        {
+            "name": "reach_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_87",
+            "map_match": 3943
+        },
+        {
+            "name": "impressions_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_87",
+            "map_match": 3943
+        },
+        {
+            "name": "likes_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_87",
+            "map_match": 3943
+        },
+        {
+            "name": "comments_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_87",
+            "map_match": 3943
+        },
+        {
+            "name": "saved_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_87",
+            "map_match": 3943
+        },
+        {
+            "name": "shares_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_87",
+            "map_match": 3943
+        },
+        {
+            "name": "views_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_87",
+            "map_match": 3943
+        },
+        {
+            "name": "total_interactions_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_87",
+            "map_match": 3943
+        },
+        {
+            "name": "reach_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_88",
+            "map_match": 3944
+        },
+        {
+            "name": "impressions_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_88",
+            "map_match": 3944
+        },
+        {
+            "name": "likes_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_88",
+            "map_match": 3944
+        },
+        {
+            "name": "comments_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_88",
+            "map_match": 3944
+        },
+        {
+            "name": "saved_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_88",
+            "map_match": 3944
+        },
+        {
+            "name": "shares_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_88",
+            "map_match": 3944
+        },
+        {
+            "name": "views_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_88",
+            "map_match": 3944
+        },
+        {
+            "name": "total_interactions_daily",
+            "period": "daily",
+            "post_field_type": "Entities\\Analytics\\Post",
+            "post_id_val": "ig_media_3_88",
+            "map_match": 3944
+        }
+    ]
+}

@@ -5,7 +5,7 @@ use Controllers\ChanneledCrudController;
 return [
     '/{channel}/{entity}/count' => [
         'httpMethod' => 'GET',
-        'callable' => function (string $channel, string $entity, ?string $body = null, ?array $params = null) {
+        'callable' => function (string $channel, string $entity, ?string $body = null, ?array $params = null, ...$args) {
             return (new ChanneledCrudController())(
                 entity: $entity,
                 channel: $channel,
@@ -18,7 +18,7 @@ return [
     ],
     '/{channel}/{entity}/aggregate' => [
         'httpMethod' => 'POST',
-        'callable' => function (string $channel, string $entity, ?string $body = null, ?array $params = null) {
+        'callable' => function (string $channel, string $entity, ?string $body = null, ?array $params = null, ...$args) {
             return (new ChanneledCrudController())(
                 entity: $entity,
                 channel: $channel,
@@ -31,7 +31,7 @@ return [
     ],
     '/{channel}/{entity}/range' => [
         'httpMethod' => 'GET',
-        'callable' => function (string $channel, string $entity, ?string $body = null, ?array $params = null) {
+        'callable' => function (string $channel, string $entity, ?string $body = null, ?array $params = null, ...$args) {
             return (new ChanneledCrudController())(
                 entity: $entity,
                 channel: $channel,
@@ -44,7 +44,7 @@ return [
     ],
     '/{channel}/{entity}/{id}' => [
         'httpMethod' => 'GET',
-        'callable' => function (string $channel, string $entity, string|int $id, ?string $body = null, ?array $params = null) {
+        'callable' => function (string $channel, string $entity, string|int $id, ?string $body = null, ?array $params = null, ...$args) {
             return (new ChanneledCrudController())(
                 entity: $entity,
                 channel: $channel,
@@ -56,7 +56,7 @@ return [
     ],
     '/{channel}/{entity}' => [
         'httpMethod' => 'GET',
-        'callable' => function (string $channel, string $entity, ?string $body = null, ?array $params = null) {
+        'callable' => function (string $channel, string $entity, ?string $body = null, ?array $params = null, ...$args) {
             return (new ChanneledCrudController())(
                 entity: $entity,
                 channel: $channel,

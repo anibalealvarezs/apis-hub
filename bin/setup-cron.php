@@ -23,7 +23,7 @@ $envVars = [
     'SHELL' => '/bin/bash'
 ];
 
-$keep = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'DB_DRIVER', 'PROJECT_CONFIG_FILE', 'APP_ENV', 'REDIS_HOST', 'REDIS_PORT', 'API_SOURCE', 'API_ENTITY', 'START_DATE', 'END_DATE', 'INSTANCE_NAME'];
+$keep = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'DB_DRIVER', 'PROJECT_CONFIG_FILE', 'APP_ENV', 'REDIS_HOST', 'REDIS_PORT', 'API_SOURCE', 'API_ENTITY', 'START_DATE', 'END_DATE', 'INSTANCE_NAME', 'CONFIG_DIR'];
 foreach ($keep as $key) {
     if ($val = getenv($key)) {
         $envVars[$key] = $val;
@@ -104,14 +104,14 @@ foreach ($instances as $instance) {
     }
 
     // Command to schedule the job in the database
-    $cronLines[] = "{$frequency} cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} >> /app/logs/cron.log 2>&1";
+    $cronLines[] = "{$frequency} cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
 }
 
 // Also add the job processor cron (runs every minute)
-$cronLines[] = "* * * * * cd /app && /usr/local/bin/php bin/cli.php jobs:process >> /app/logs/jobs.log 2>&1";
+$cronLines[] = "* * * * * cd /app && /usr/local/bin/php bin/cli.php jobs:process > /dev/null 2>&1";
 
 // Add the scale-down cron (runs every 15 minutes)
-$cronLines[] = "*/15 * * * * cd /app && /usr/local/bin/php bin/cli.php app:scale-down >> /app/logs/management.log 2>&1";
+$cronLines[] = "*/15 * * * * cd /app && /usr/local/bin/php bin/cli.php app:scale-down > /dev/null 2>&1";
 
 
 $cronFile = '/tmp/apis-hub-cron';

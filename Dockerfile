@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 
 # Instalar extensiones PHP (maneja automáticamente dependencias complejas como IMAP)
-RUN install-php-extensions pdo_mysql pdo_pgsql zip imap redis xdebug
+RUN install-php-extensions pdo_mysql pdo_pgsql zip imap redis xdebug swoole
 
 # Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -30,13 +30,8 @@ WORKDIR /app
 # Copiar archivos de requerimientos
 COPY composer.json composer.lock ./
 
-# Limpiar repositorios de tipo 'path' que no existen en el contexto de Docker
-# Y borrar el composer.lock para forzar el uso de Satis/Packagist
-RUN php -r '$j=json_decode(file_get_contents("composer.json"), true); if(isset($j["repositories"])) { $j["repositories"] = array_filter($j["repositories"], function($r){ return $r["type"] !== "path"; }); $j["repositories"] = array_values($j["repositories"]); } file_put_contents("composer.json", json_encode($j, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));' \
-    && rm -f composer.lock
-
 # Instalar dependencias PHP
-RUN composer install --no-scripts --no-interaction --prefer-dist --optimize-autoloader --verbose
+RUN composer install --ignore-platform-reqs --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader --verbose
 
 # Copiar el resto de la aplicación
 COPY . /app
@@ -59,5 +54,4 @@ ENV PORT=8080
 ENTRYPOINT ["bash", "/app/entrypoint.sh"]
 
 # El servidor PHP se ejecuta en el entrypoint.sh final.
-# El servidor PHP se ejecuta en el entrypoint.sh final, pero por consistencia el CMD default será este:
-CMD ["php", "-S", "0.0.0.0:8080", "-t", ".", "bin/index.php"]
+CMD []

@@ -8,6 +8,7 @@ use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
+use Entities\Analytics\Channel;
 
 class MonitoringController extends BaseController
 {
@@ -25,14 +26,14 @@ class MonitoringController extends BaseController
         // 1. Direct match by instance_name (the most reliable)
         if (isset($payload['instance_name'])) return $payload['instance_name'];
 
-        $chanRaw = $job instanceof Job ? $job->getChannel() : $row['channel'] ?? $job['channel'];
+        $chanRaw = $job instanceof Job ? $job->getChannel() : $job['channel'] ?? null;
         
         // Canonical Channel Name (always lowercase string)
         $chan = null;
         if (is_numeric($chanRaw)) {
-            $chan = strtolower(\Enums\Channel::tryFrom((int)$chanRaw)?->name ?? (string)$chanRaw);
+            $chan = strtolower(Channel::tryFrom((int)$chanRaw)?->name ?? (string)$chanRaw);
         } else {
-            $chan = strtolower(\Enums\Channel::tryFromName((string)$chanRaw)?->name ?? (string)$chanRaw);
+            $chan = strtolower(Channel::tryFromName((string)$chanRaw)?->name ?? (string)$chanRaw);
         }
 
         $ent = strtolower(trim($job instanceof Job ? $job->getEntity() : $job['entity']));
@@ -47,7 +48,7 @@ class MonitoringController extends BaseController
         // 2. Fallback to channel/entity/date match
         foreach ($instances as $instance) {
             $instChanRaw = $instance['channel'] ?? '';
-            $instChan = strtolower(\Enums\Channel::tryFromName($instChanRaw)?->name ?? $instChanRaw);
+            $instChan = strtolower(Channel::tryFromName($instChanRaw)?->name ?? $instChanRaw);
             $instEnt = strtolower($instance['entity'] ?? '');
             
             if ($chan === $instChan && $ent === $instEnt) {
@@ -219,26 +220,26 @@ class MonitoringController extends BaseController
         }
 
         $statsConfig = [
-            'Accounts' => ['class' => 'Analytics\Account', 'channeled' => 'Analytics\Channeled\ChanneledAccount'],
-            'Metrics' => ['class' => 'Analytics\Metric', 'channeled' => 'Analytics\Channeled\ChanneledMetric'],
-            'Campaigns' => ['class' => 'Analytics\Campaign', 'channeled' => 'Analytics\Channeled\ChanneledCampaign'],
-            'Ad Groups' => ['class' => null, 'channeled' => 'Analytics\Channeled\ChanneledAdGroup'],
-            'Ads' => ['class' => null, 'channeled' => 'Analytics\Channeled\ChanneledAd'],
-            'Creatives' => ['class' => 'Analytics\Creative', 'channeled' => null],
-            'Orders' => ['class' => 'Analytics\Order', 'channeled' => 'Analytics\Channeled\ChanneledOrder'],
-            'Customers' => ['class' => 'Analytics\Customer', 'channeled' => 'Analytics\Channeled\ChanneledCustomer'],
-            'Products' => ['class' => 'Analytics\Product', 'channeled' => 'Analytics\Channeled\ChanneledProduct'],
-            'Variants' => ['class' => 'Analytics\ProductVariant', 'channeled' => 'Analytics\Channeled\ChanneledProductVariant'],
-            'Categories' => ['class' => 'Analytics\ProductCategory', 'channeled' => 'Analytics\Channeled\ChanneledProductCategory'],
-            'Discounts' => ['class' => 'Analytics\Discount', 'channeled' => 'Analytics\Channeled\ChanneledDiscount'],
-            'Price Rules' => ['class' => 'Analytics\PriceRule', 'channeled' => 'Analytics\Channeled\ChanneledPriceRule'],
-            'Vendors' => ['class' => 'Analytics\Vendor', 'channeled' => 'Analytics\Channeled\ChanneledVendor'],
-            'Pages' => ['class' => 'Analytics\Page', 'channeled' => 'Analytics\Page'],
-            'Posts' => ['class' => 'Analytics\Post', 'channeled' => 'Analytics\Post'],
-            'Queries' => ['class' => 'Analytics\Query', 'channeled' => null],
-            'Countries' => ['class' => 'Analytics\Country', 'channeled' => null],
-            'Devices' => ['class' => 'Analytics\Device', 'channeled' => null],
-            'Jobs' => ['class' => 'Job', 'channeled' => 'Job']
+            'Accounts' => ['class' => 'Entities\Analytics\Account', 'channeled' => 'Entities\Analytics\Channeled\ChanneledAccount'],
+            'Metrics' => ['class' => 'Entities\Analytics\Metric', 'channeled' => 'Entities\Analytics\Channeled\ChanneledMetric'],
+            'Campaigns' => ['class' => 'Entities\Analytics\Campaign', 'channeled' => 'Entities\Analytics\Channeled\ChanneledCampaign'],
+            'Ad Groups' => ['class' => null, 'channeled' => 'Entities\Analytics\Channeled\ChanneledAdGroup'],
+            'Ads' => ['class' => null, 'channeled' => 'Entities\Analytics\Channeled\ChanneledAd'],
+            'Creatives' => ['class' => 'Entities\Analytics\Creative', 'channeled' => null],
+            'Orders' => ['class' => 'Entities\Analytics\Order', 'channeled' => 'Entities\Analytics\Channeled\ChanneledOrder'],
+            'Customers' => ['class' => 'Entities\Analytics\Customer', 'channeled' => 'Entities\Analytics\Channeled\ChanneledCustomer'],
+            'Products' => ['class' => 'Entities\Analytics\Product', 'channeled' => 'Entities\Analytics\Channeled\ChanneledProduct'],
+            'Variants' => ['class' => 'Entities\Analytics\ProductVariant', 'channeled' => 'Entities\Analytics\Channeled\ChanneledProductVariant'],
+            'Categories' => ['class' => 'Entities\Analytics\ProductCategory', 'channeled' => 'Entities\Analytics\Channeled\ChanneledProductCategory'],
+            'Discounts' => ['class' => 'Entities\Analytics\Discount', 'channeled' => 'Entities\Analytics\Channeled\ChanneledDiscount'],
+            'Price Rules' => ['class' => 'Entities\Analytics\PriceRule', 'channeled' => 'Entities\Analytics\Channeled\ChanneledPriceRule'],
+            'Vendors' => ['class' => 'Entities\Analytics\Vendor', 'channeled' => 'Entities\Analytics\Channeled\ChanneledVendor'],
+            'Pages' => ['class' => 'Entities\Analytics\Page', 'channeled' => 'Entities\Analytics\Page'],
+            'Posts' => ['class' => 'Entities\Analytics\Post', 'channeled' => 'Entities\Analytics\Post'],
+            'Queries' => ['class' => 'Entities\Analytics\Query', 'channeled' => null],
+            'Countries' => ['class' => 'Entities\Analytics\Country', 'channeled' => null],
+            'Devices' => ['class' => 'Entities\Analytics\Device', 'channeled' => null],
+            'Jobs' => ['class' => 'Entities\Job', 'channeled' => 'Entities\Job']
         ];
 
         $dbTotals = [];
@@ -284,7 +285,8 @@ class MonitoringController extends BaseController
                                   LEFT JOIN channeled_accounts ca ON e.channeled_account_id = ca.id 
                                   GROUP BY e.channel, ca.type";
                         } else {
-                            $columns = $conn->fetchFirstColumn("DESCRIBE $tableName");
+                            $sm = $conn->createSchemaManager();
+                            $columns = array_keys($sm->listTableColumns($tableName));
                             if (in_array('channeled_account_id', $columns)) {
                                 $sql = "SELECT e.channel, ca.type, COUNT(*) as count 
                                       FROM $tableName e 
@@ -305,13 +307,17 @@ class MonitoringController extends BaseController
                             try {
                                 $results = $conn->fetchAllAssociative($sql);
                                 foreach ($results as $res) {
-                                    $channelId = (int)($res['channel'] ?? 0);
-                                    $channelLabel = $channelId ? (\Enums\Channel::tryFrom($channelId)?->getCommonName() ?? "Ch $channelId") : "Unidentified Channel";
+                                    $chanRaw = $res['channel'] ?? null;
+                                    $channelLabel = "Unidentified Channel";
+                                    if ($chanRaw) {
+                                        $channelEntity = is_numeric($chanRaw) ? Channel::tryFrom((int)$chanRaw) : Channel::tryFromName((string)$chanRaw);
+                                        $channelLabel = $channelEntity ? $channelEntity->getCommonName() : (string)$chanRaw;
+                                    }
                                     $typeValue = $res['type'] ?? '';
                                     $typeName = $typeValue;
-                                    if ($typeValue && class_exists('\Enums\Account')) {
-                                        $enum = \Enums\Account::tryFrom($typeValue);
-                                        $typeName = $enum ? ucwords(str_replace('_', ' ', $enum->value)) : $typeValue;
+                                    if ($typeValue) {
+                                        $label = \Anibalealvarezs\ApiDriverCore\Classes\AccountTypeRegistry::getLabel($typeValue);
+                                        $typeName = $label ?: ucwords(str_replace('_', ' ', $typeValue));
                                     }
                                     
                                     $label = $channelLabel . ($typeName ? " • $typeName" : "");
@@ -328,7 +334,7 @@ class MonitoringController extends BaseController
                                     $results = $conn->fetchAllAssociative("SELECT channel, COUNT(*) as count FROM $tableName GROUP BY channel");
                                     foreach ($results as $res) {
                                         $resItems[] = [
-                                            'name' => \Enums\Channel::tryFrom((int)$res['channel'])?->getCommonName() ?? "Channel " . $res['channel'],
+                                            'name' => Channel::tryFrom((int)$res['channel'])?->getCommonName() ?? "Channel " . $res['channel'],
                                             'count' => (int)$res['count']
                                         ];
                                     }
@@ -486,54 +492,45 @@ class MonitoringController extends BaseController
             return "File not found or not readable.";
         }
 
+        $size = filesize($filename);
+        if ($size === 0) return "Empty log file.";
+
         $file = fopen($filename, "rb");
         if (!$file) return "Could not open file.";
 
-        $lineCount = 0;
-        $pos = -2; // Start from end of file
-        $t = " ";
-        $data = "";
-
-        fseek($file, $pos, SEEK_END);
-
-        while ($lineCount < $lines) {
-            try {
-                if (fseek($file, $pos, SEEK_END) == -1) break;
-                $t = fgetc($file);
-                if ($t == "\n") $lineCount++;
-                $pos--;
-            } catch (\Exception $e) {
-                break;
-            }
-        }
-
-        $data = fread($file, abs($pos));
+        // Read the last 1MB or the whole file if smaller
+        $readSize = min($size, 1024 * 1024);
+        fseek($file, -$readSize, SEEK_END);
+        $data = fread($file, $readSize);
         fclose($file);
 
-        return $data ?: "Empty log file.";
+        if (!$data) return "Empty log file.";
+
+        $linesArray = explode("\n", $data);
+        if (count($linesArray) > $lines) {
+            $linesArray = array_slice($linesArray, -$lines);
+        }
+
+        return implode("\n", $linesArray);
     }
 
     private function sortInstancesByDependency(array $instances): array
     {
-        // 1. Define channel mapping for grouping
-        $channelMap = [
-            'gsc' => 'GoogleSearchConsole',
-            'google_search_console' => 'GoogleSearchConsole',
-            'google-search-console' => 'GoogleSearchConsole',
-            'fb-ads' => 'FacebookMarketing',
-            'facebook' => 'FacebookOrganic',
-            'facebook-ads' => 'FacebookMarketing',
-            'facebook_marketing' => 'FacebookMarketing',
-            'facebook_organic' => 'FacebookOrganic',
-            'fb-organic' => 'FacebookOrganic',
-        ];
-
-        // 2. Group instances by mapped channel
+        // 1. Group instances by channel display label (dynamic)
         $grouped = [];
         foreach ($instances as $instance) {
-            $rawChan = $instance['channel'] ?? 'Other';
-            $groupKey = $channelMap[$rawChan] ?? ucwords($rawChan);
-            $grouped[$groupKey][] = $instance;
+            $chan = $instance['channel'] ?? 'Other';
+            $config = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chan);
+            
+            $groupName = ucwords($chan); // Fallback
+            if (!empty($config) && class_exists($config['driver'])) {
+                $driverClass = $config['driver'];
+                if (method_exists($driverClass, 'getChannelLabel')) {
+                    $groupName = $driverClass::getChannelLabel();
+                }
+            }
+            
+            $grouped[$groupName][] = $instance;
         }
 
         $allSorted = [];
@@ -576,37 +573,37 @@ class MonitoringController extends BaseController
     private static function getTableNameForEntity(string $entityPath): ?string
     {
         $map = [
-            'Analytics\Account' => 'accounts',
-            'Analytics\Metric' => 'metrics',
-            'Analytics\Campaign' => 'campaigns',
-            'Analytics\Creative' => 'creatives',
-            'Analytics\Order' => 'orders',
-            'Analytics\Customer' => 'customers',
-            'Analytics\Product' => 'products',
-            'Analytics\ProductVariant' => 'product_variants',
-            'Analytics\ProductCategory' => 'product_categories',
-            'Analytics\Discount' => 'discounts',
-            'Analytics\PriceRule' => 'price_rules',
-            'Analytics\Vendor' => 'vendors',
-            'Analytics\Page' => 'pages',
-            'Analytics\Post' => 'posts',
-            'Analytics\Query' => 'queries',
-            'Analytics\Country' => 'countries',
-            'Analytics\Device' => 'devices',
-            'Job' => 'jobs',
-            'Analytics\Channeled\ChanneledAccount' => 'channeled_accounts',
-            'Analytics\Channeled\ChanneledMetric' => 'channeled_metrics',
-            'Analytics\Channeled\ChanneledCampaign' => 'channeled_campaigns',
-            'Analytics\Channeled\ChanneledAdGroup' => 'channeled_ad_groups',
-            'Analytics\Channeled\ChanneledAd' => 'channeled_ads',
-            'Analytics\Channeled\ChanneledOrder' => 'channeled_orders',
-            'Analytics\Channeled\ChanneledCustomer' => 'channeled_customers',
-            'Analytics\Channeled\ChanneledProduct' => 'channeled_products',
-            'Analytics\Channeled\ChanneledProductVariant' => 'channeled_product_variants',
-            'Analytics\Channeled\ChanneledProductCategory' => 'channeled_product_categories',
-            'Analytics\Channeled\ChanneledDiscount' => 'channeled_discounts',
-            'Analytics\Channeled\ChanneledPriceRule' => 'channeled_price_rules',
-            'Analytics\Channeled\ChanneledVendor' => 'channeled_vendors',
+            'Entities\Analytics\Account' => 'accounts',
+            'Entities\Analytics\Metric' => 'metrics',
+            'Entities\Analytics\Campaign' => 'campaigns',
+            'Entities\Analytics\Creative' => 'creatives',
+            'Entities\Analytics\Order' => 'orders',
+            'Entities\Analytics\Customer' => 'customers',
+            'Entities\Analytics\Product' => 'products',
+            'Entities\Analytics\ProductVariant' => 'product_variants',
+            'Entities\Analytics\ProductCategory' => 'product_categories',
+            'Entities\Analytics\Discount' => 'discounts',
+            'Entities\Analytics\PriceRule' => 'price_rules',
+            'Entities\Analytics\Vendor' => 'vendors',
+            'Entities\Analytics\Page' => 'pages',
+            'Entities\Analytics\Post' => 'posts',
+            'Entities\Analytics\Query' => 'queries',
+            'Entities\Analytics\Country' => 'countries',
+            'Entities\Analytics\Device' => 'devices',
+            'Entities\Job' => 'jobs',
+            'Entities\Analytics\Channeled\ChanneledAccount' => 'channeled_accounts',
+            'Entities\Analytics\Channeled\ChanneledMetric' => 'channeled_metrics',
+            'Entities\Analytics\Channeled\ChanneledCampaign' => 'channeled_campaigns',
+            'Entities\Analytics\Channeled\ChanneledAdGroup' => 'channeled_ad_groups',
+            'Entities\Analytics\Channeled\ChanneledAd' => 'channeled_ads',
+            'Entities\Analytics\Channeled\ChanneledOrder' => 'channeled_orders',
+            'Entities\Analytics\Channeled\ChanneledCustomer' => 'channeled_customers',
+            'Entities\Analytics\Channeled\ChanneledProduct' => 'channeled_products',
+            'Entities\Analytics\Channeled\ChanneledProductVariant' => 'channeled_product_variants',
+            'Entities\Analytics\Channeled\ChanneledProductCategory' => 'channeled_product_categories',
+            'Entities\Analytics\Channeled\ChanneledDiscount' => 'channeled_discounts',
+            'Entities\Analytics\Channeled\ChanneledPriceRule' => 'channeled_price_rules',
+            'Entities\Analytics\Channeled\ChanneledVendor' => 'channeled_vendors',
         ];
         return $map[$entityPath] ?? null;
     }

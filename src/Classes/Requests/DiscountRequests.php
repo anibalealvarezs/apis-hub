@@ -5,77 +5,46 @@ declare(strict_types=1);
 namespace Classes\Requests;
 
 use Doctrine\Common\Collections\ArrayCollection;
-use Enums\Channel;
+use Entities\Analytics\Channel;
 use Interfaces\RequestInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class DiscountRequests implements RequestInterface
 {
     /**
-     * @return \Enums\Channel[]
-     */
-    public static function supportedChannels(): array
-    {
-        return [
-            Channel::shopify,
-            Channel::klaviyo,
-            Channel::bigcommerce,
-            Channel::netsuite,
-            Channel::amazon,
-        ];
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
+     * @param Channel|string $channel
+     * @param string|null $startDate
+     * @param string|null $endDate
+     * @param \Psr\Log\LoggerInterface|null $logger
+     * @param int|null $jobId
      * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
+     * @return \Symfony\Component\HttpFoundation\Response
+     * @throws \Exception
      */
-    public static function getListFromShopify(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode(['Discounts are retrieved along with Price Rules.']));
-    }
+    public static function getList(
+        Channel|string $channel,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?LoggerInterface $logger = null,
+        ?int $jobId = null,
+        ?object $filters = null
+    ): Response {
+        $chanKey = ($channel instanceof Channel) ? $channel->name : (string)$channel;
 
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromBigCommerce(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param int $limit
-     * @param int $pagination
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromNetsuite(int $limit = 10, int $pagination = 0, object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
-    }
-
-    /**
-     * @param object|null $filters
-     * @param string|bool $resume
-     * @return Response
-     */
-    public static function getListFromAmazon(object $filters = null, string|bool $resume = true, ?int $jobId = null): Response
-    {
-        return new Response(json_encode([]));
+        return (new \Core\Services\SyncService())->execute($chanKey, $startDate, $endDate, [
+            'jobId' => $jobId,
+            'resume' => $filters->resume ?? true,
+            'type' => 'discounts',
+            'filters' => $filters,
+        ]);
     }
 
     /**
      * @param ArrayCollection $channeledCollection
      * @return Response
      */
-    public static function process(ArrayCollection $channeledCollection): Response
+    public static function process(ArrayCollection $channeledCollection, ?LoggerInterface $logger = null): Response
     {
         // TODO: Implement process() method.
 

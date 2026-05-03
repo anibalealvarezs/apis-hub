@@ -2,7 +2,7 @@
 
 namespace Controllers;
 
-use Enums\Channel;
+use Entities\Analytics\Channel;
 use Exception;
 use Helpers\Helpers;
 use InvalidArgumentException;
@@ -10,7 +10,7 @@ use ReflectionEnum;
 use ReflectionException;
 use Services\CacheKeyGenerator;
 use Services\CacheService;
-use Services\CacheStrategyService;
+use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
 use stdClass;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -181,6 +181,26 @@ class ChanneledCrudController extends BaseController
             $params['filters']->channel = $channel->value;
         }
 
+        // Logic for global entities (like Page) that don't have a 'channel' field but are linked via Account
+        if ($entity === 'page' && !isset($params['filters']->channel) && !isset($params['filters']->account)) {
+            $config = Helpers::getEntitiesConfig();
+            $chaClass = $config['channeled_account']['class'] ?? \Entities\Analytics\Channeled\ChanneledAccount::class;
+            $chanAccRepo = $this->em->getRepository($chaClass);
+            $chanAccs = $chanAccRepo->findBy(['channel' => $channel->value]);
+            if (!empty($chanAccs)) {
+                $accIds = array_map(fn($ca) => $ca->getAccount()->getId(), $chanAccs);
+                $params['filters']->account = array_unique($accIds);
+            } else {
+                // If no accounts found for this channel, we only filter if it's explicitly a channeled request
+                // In aggregated metric queries, we don't want to break the join unless necessary
+                if (str_contains($_SERVER['REQUEST_URI'] ?? '', 'aggregate')) {
+                    // Do nothing, let the channel filter on mc handle it
+                } else {
+                    $params['filters']->id = 0; 
+                }
+            }
+        }
+
         return $params;
     }
 
@@ -190,7 +210,7 @@ class ChanneledCrudController extends BaseController
      * @param int|null $id
      * @return Response
      */
-    protected function read(string $entity, \Enums\Channel $channel, int|string|null $id = null, bool $rawData = false, array $hideFields = []): Response
+    protected function read(string $entity, Channel $channel, int|string|null $id = null, bool $rawData = false, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository(entity: $entity, configKey: 'channeled_class');
@@ -415,9 +435,8 @@ class ChanneledCrudController extends BaseController
                 );
             }
 
-            // --- Redis Caching Logic ---
-            // Force skip cache for organic in development/demo to prevent stale results during dashboard tuning
-            $isCacheable = $endDate && CacheStrategyService::isCacheable($channelKey) && $channelKey !== 'facebook_organic';
+            // Force skip cache for certain channels can be done via YAML config (cache_aggregations: false)
+            $isCacheable = $endDate && CacheStrategyService::isCacheable($channelKey);
             $cacheType = $isCacheable ? CacheStrategyService::getTargetCacheType($endDate) : null;
             $cacheKey = $cacheType ? CacheStrategyService::generateKey($channelKey, [
                 'entity' => $entity,
@@ -430,11 +449,23 @@ class ChanneledCrudController extends BaseController
                 'orderDir' => $params['orderDir'] ?? 'ASC'
             ], $cacheType) : null;
 
-            if ($cacheKey && ($cachedData = CacheStrategyService::get($cacheKey, $cacheType))) {
+            if ($cacheKey && ($cachedPayload = CacheStrategyService::get($cacheKey, $cacheType))) {
+                $cachedData = $cachedPayload;
+                $aggregateMeta = [];
+                if (is_array($cachedPayload) && array_key_exists('data', $cachedPayload) && array_key_exists('aggregate_meta', $cachedPayload)) {
+                    $cachedData = $cachedPayload['data'];
+                    $aggregateMeta = is_array($cachedPayload['aggregate_meta']) ? $cachedPayload['aggregate_meta'] : [];
+                }
+
                 return $this->createResponse(
                     data: $cachedData,
                     status: 'success',
-                    meta: ['cached' => true, 'cache_type' => $cacheType]
+                    meta: array_merge([
+                        'cached' => true,
+                        'cache_type' => $cacheType,
+                        'cacheable' => true,
+                        'cache_key' => $cacheKey
+                    ], $aggregateMeta)
                 );
             }
             // ---------------------------
@@ -448,6 +479,9 @@ class ChanneledCrudController extends BaseController
                 orderBy: $params['orderBy'] ?? null,
                 orderDir: $params['orderDir'] ?? 'ASC'
             );
+            $aggregateMeta = method_exists($repository, 'getLastAggregateMeta')
+                ? (array)$repository->getLastAggregateMeta()
+                : [];
 
             $logger = Helpers::setLogger('api_debug.log');
             $logger->info("=== API AGGREGATE DEBUG ===");
@@ -460,14 +494,23 @@ class ChanneledCrudController extends BaseController
             $logger->info("===========================");
 
             // --- Cache the results ---
-            if ($cacheKey && !empty($data)) {
-                CacheStrategyService::set($cacheKey, $data, $cacheType);
+            if ($cacheKey) {
+                CacheStrategyService::set($cacheKey, [
+                    'data' => $data,
+                    'aggregate_meta' => $aggregateMeta,
+                ], $cacheType);
             }
             // -------------------------
 
             return $this->createResponse(
                 data: $data,
-                status: 'success'
+                status: 'success',
+                meta: array_merge([
+                    'cached' => false,
+                    'cache_type' => $cacheType,
+                    'cacheable' => (bool) $cacheKey,
+                    'cache_key' => $cacheKey
+                ], $aggregateMeta)
             );
         } catch (InvalidArgumentException $e) {
             return $this->createResponse(
@@ -549,7 +592,7 @@ class ChanneledCrudController extends BaseController
      * @param string|null $body
      * @return Response
      */
-    protected function update(string $entity, \Enums\Channel $channel, int|string|null $id = null, ?string $body = null): Response
+    protected function update(string $entity, Channel $channel, int|string|null $id = null, ?string $body = null): Response
     {
         try {
             if (!$id) {
@@ -610,7 +653,7 @@ class ChanneledCrudController extends BaseController
      * @param int|null $id
      * @return Response
      */
-    protected function delete(string $entity, \Enums\Channel $channel, int|string|null $id = null): Response
+    protected function delete(string $entity, Channel $channel, int|string|null $id = null): Response
     {
         try {
             if (!$id) {

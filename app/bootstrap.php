@@ -8,8 +8,10 @@ require_once __DIR__ . "/../vendor/autoload.php";
 // Set timezone from config
 Helpers::applyTimezone();
 
+// Boot modular drivers
+\Classes\DriverInitializer::bootDrivers();
+
 // Return the entity manager
-// return Helpers::getSingletonManager();
 try {
     return Helpers::getManager();
 } catch (\Doctrine\DBAL\Exception|ORMException $e) {

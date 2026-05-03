@@ -28,14 +28,15 @@ class ScaleDownCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        if (!Helpers::isMaster()) {
+        if (! Helpers::isMaster()) {
             $output->writeln("<error>Scale Down can only be executed from the Master container.</error>");
+
             return Command::FAILURE;
         }
 
         $config = Helpers::getProjectConfig();
         $instances = $config['instances'] ?? [];
-        
+
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
 
@@ -43,9 +44,9 @@ class ScaleDownCommand extends Command
 
         foreach ($instances as $instance) {
             $name = $instance['name'];
-            
-            // Rule: Only historical containers (e.g. facebook-2023-12)
-            if (!preg_match('/-[0-9]{4}-[0-9]{2}$/', $name)) {
+
+            // Rule: Only historical containers (format: [channel]-YYYY-MM)
+            if (! preg_match('/-[0-9]{4}-[0-9]{2}$/', $name)) {
                 continue;
             }
 
@@ -58,9 +59,9 @@ class ScaleDownCommand extends Command
             // 2. Check for active/pending jobs
             $pendingCount = $jobRepo->count([
                 'status' => [JobStatus::scheduled->value, JobStatus::processing->value, JobStatus::delayed->value],
-                'payload' => ['instance_name' => $name] // Note: Repository filter might need JSON support
+                'payload' => ['instance_name' => $name], // Note: Repository filter might need JSON support
             ]);
-            
+
             // If getByStatus is more reliable for JSON payload filtering:
             $remaining = $jobRepo->getJobsByStatus(
                 status: JobStatus::scheduled->value,
@@ -71,8 +72,9 @@ class ScaleDownCommand extends Command
                 instanceName: $name
             );
 
-            if (!empty($remaining) || !empty($processing)) {
+            if (! empty($remaining) || ! empty($processing)) {
                 $output->writeln("<comment>Container {$name} is BUSY (" . (count($remaining) + count($processing)) . " jobs).</comment>");
+
                 continue;
             }
 
@@ -83,12 +85,13 @@ class ScaleDownCommand extends Command
             );
             // Wait, we need the last job FOR THIS INSTANCE.
             // Since we're iterating instances, let's query specific to the instance.
-            
+
             $lastJobTime = $jobRepo->getLastSuccessfulJobTime($name);
             if ($lastJobTime) {
                 $elapsed = time() - $lastJobTime->getTimestamp();
                 if ($elapsed < 900) { // 15 minutes
                     $output->writeln("<comment>Container {$name} is IDLE but in 15m cooldown.</comment>");
+
                     continue;
                 }
             }
@@ -99,6 +102,7 @@ class ScaleDownCommand extends Command
         }
 
         $output->writeln("Scale Down check complete.");
+
         return Command::SUCCESS;
     }
 }

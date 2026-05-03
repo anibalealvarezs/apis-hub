@@ -20,19 +20,23 @@ async function initConfig() {
 }
 
 function setupTabSystem() {
-    const tabs = document.querySelectorAll('.tab');
-    const contents = document.querySelectorAll('.tab-content');
+    const nav = document.getElementById('main-tab-nav');
+    if (!nav) return;
 
-    tabs.forEach(tab => {
-        tab.onclick = () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            contents.forEach(c => c.style.display = 'none');
-            
-            tab.classList.add('active');
-            const target = document.getElementById('tab-' + tab.dataset.tab);
-            if (target) target.style.display = 'block';
-        };
-    });
+    nav.onclick = (e) => {
+        const tab = e.target.closest('.tab');
+        if (!tab) return;
+        
+        const tabs = document.querySelectorAll('.tab');
+        const contents = document.querySelectorAll('.tab-content');
+
+        tabs.forEach(t => t.classList.remove('active'));
+        contents.forEach(c => c.style.display = 'none');
+        
+        tab.classList.add('active');
+        const target = document.getElementById('tab-' + tab.dataset.tab);
+        if (target) target.style.display = 'block';
+    };
 }
 
 function getAdminHeaders() {
@@ -68,6 +72,100 @@ function getAdminHeaders() {
     };
 }
 
+function renderDynamicTabs(channels) {
+    const nav = document.getElementById('main-tab-nav');
+    const container = document.getElementById('dynamic-tabs-container');
+    if (!nav || !container) return;
+
+    // Infrastructure is always there static but we clear dynamic ones
+    nav.querySelectorAll('.tab:not([data-tab="infrastructure"])').forEach(t => t.remove());
+    container.innerHTML = '';
+    
+    channels.forEach(chan => {
+        const tab = document.createElement('div');
+        tab.className = 'tab';
+        tab.dataset.tab = (chan === 'google_search_console' ? 'google' : (chan === 'facebook_organic' ? 'facebook' : (chan === 'facebook_marketing' ? 'facebook-marketing' : chan)));
+        
+        let icon = 'layers';
+        let label = chan;
+        
+        const map = {
+            'google_search_console': { icon: 'search', label: 'Google Search Console' },
+            'google_analytics': { icon: 'bar-chart', label: 'Google Analytics' },
+            'facebook_organic': { icon: 'facebook', label: 'Meta Organic' },
+            'facebook_marketing': { icon: 'trending-up', label: 'Meta Marketing' },
+            'shopify': { icon: 'shopping-bag', label: 'Shopify' },
+            'klaviyo': { icon: 'mail', label: 'Klaviyo' },
+            'netsuite': { icon: 'box', label: 'NetSuite' },
+            'amazon': { icon: 'shopping-cart', label: 'Amazon SP-API' },
+            'bigcommerce': { icon: 'shopping-cart', label: 'BigCommerce' },
+            'tiktok': { icon: 'music', label: 'TikTok' },
+            'triplewhale': { icon: 'whale', label: 'TripleWhale' }
+        };
+
+        if (map[chan]) {
+            icon = map[chan].icon;
+            label = map[chan].label;
+        }
+
+        tab.innerHTML = `<i data-lucide="${icon}"></i> ${label}`;
+        nav.appendChild(tab);
+
+        // Specialized tabs are already in HTML, we only add others to dynamic-tabs-container
+        const tabId = 'tab-' + tab.dataset.tab;
+        if (!document.getElementById(tabId)) {
+             const content = document.createElement('div');
+             content.id = tabId;
+             content.className = 'tab-content';
+             content.style.display = 'none';
+             content.innerHTML = renderGenericChannelUI(chan, label, icon);
+             container.appendChild(content);
+        }
+    });
+
+    lucide.createIcons();
+}
+
+function renderGenericChannelUI(chan, label, icon) {
+    return `
+        <div class="settings-horizontal-grid">
+            <div class="card compact-card" style="flex-direction:row; justify-content:space-between; align-items:center;">
+                <div>
+                    <div class="section-title small" style="margin-bottom:5px; border:none; padding:0;"><i data-lucide="power"></i> Channel Status</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim);">Enable ${label} Integration</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="${chan}-channel-enabled">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="card compact-card">
+                <div class="section-title small"><i data-lucide="calendar"></i> History Range</div>
+                <div style="margin-top:auto">
+                    <select id="${chan}-history-range" class="control-select" style="width:100%">
+                        <option value="1 month">Last Month</option>
+                        <option value="3 months">Last 3 Months</option>
+                        <option value="6 months">Last 6 Months</option>
+                        <option value="1 year" selected>Last 12 Months</option>
+                        <option value="2 years">Last 2 Years</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title small" style="display:flex; justify-content:space-between; align-items:center;">
+                <span><i data-lucide="${icon}"></i> ${label} assets</span>
+                <button class="btn btn-mini" onclick="forceRefresh('${chan}')" style="background:var(--primary);"><i data-lucide="refresh-cw" size="14"></i> Sync from Provider</button>
+            </div>
+            <div id="${chan}-list" class="asset-grid">
+                 <div class="empty-state">No assets found for ${label}. Click Sync to fetch them.</div>
+            </div>
+        </div>
+        <button class="btn btn-save-fixed" onclick="updateConfig('${chan}')"><i data-lucide="save"></i> Save ${label} Settings</button>
+    `;
+}
+
 async function fetchConfig() {
     try {
         const response = await fetch('/api/config-manager/assets', { headers: getAdminHeaders() });
@@ -86,9 +184,10 @@ async function fetchConfig() {
         
         currentConfig = data.config;
 
+        renderDynamicTabs(data.available_channels);
         populateGlobalFields();
         renderAssets(data.assets);
-        validateTokens(false);
+        // validateTokens(false); // DEFERRED: Avoid sequential API calls on initial load for better performance.
         
     } catch (error) {
         console.error("Fetch Config Error:", error);
@@ -115,6 +214,11 @@ function populateGlobalFields() {
         // Status Toggles
         const gscStatus = document.getElementById('gsc-channel-enabled');
         if (gscStatus) gscStatus.checked = !!currentConfig.gsc_enabled;
+
+        const gscCalcSynth = document.getElementById('gsc-calculate-synthetics');
+        if (gscCalcSynth) {
+            gscCalcSynth.checked = !!(currentConfig.gsc_calculate_synthetics || currentConfig.google_search_console?.calculate_synthetics);
+        }
 
         const fbOrganicStatus = document.getElementById('fb-organic-enabled');
         if (fbOrganicStatus) fbOrganicStatus.checked = !!currentConfig.fb_organic_enabled;
@@ -253,6 +357,17 @@ function populateGlobalFields() {
         handleFbOrganicLevelChange();
         handleFbStrategyChange();
         renderCustomMetricsGrid();
+
+        // Dynamic Channel Settings
+        if (currentConfig.available_channels) {
+            currentConfig.available_channels.forEach(chan => {
+                const statusEl = document.getElementById(chan + '-channel-enabled');
+                if (statusEl) statusEl.checked = !!currentConfig[chan + '_enabled'];
+                
+                const rangeEl = document.getElementById(chan + '-history-range');
+                if (rangeEl) rangeEl.value = currentConfig[chan + '_history_range'] || '1 year';
+            });
+        }
         
     } catch (e) {
         console.error("Error in populateGlobalFields:", e);
@@ -582,8 +697,28 @@ function addMetricRule(metric, rule = null) {
     lucide.createIcons();
 }
 
+let availableAssetsMaps = { pages: {}, ad_accounts: {}, gsc: {} };
+
 function renderAssets(assets) {
     if (!assets) return;
+
+    // Reset maps
+    availableAssetsMaps = { pages: {}, ad_accounts: {}, gsc: {} };
+    
+    const getAssetArray = (key) => {
+        const data = assets[key];
+        if (!data) return [];
+        return Array.isArray(data) ? data : Object.values(data);
+    };
+
+    // Standardize assets for indexing
+    const fbPages = [...getAssetArray('facebook_pages'), ...getAssetArray('pages'), ...getAssetArray('fb_pages_full_config')];
+    const fbAdAccounts = [...getAssetArray('facebook_ad_accounts'), ...getAssetArray('ad_accounts'), ...getAssetArray('fb_ad_accounts_full_config')];
+    const gscAssets = [...getAssetArray('gsc'), ...getAssetArray('sites')];
+
+    fbPages.forEach(p => { if (p && p.id) availableAssetsMaps.pages[String(p.id).trim()] = p; });
+    fbAdAccounts.forEach(a => { if (a && a.id) availableAssetsMaps.ad_accounts[String(a.id).trim()] = a; });
+    gscAssets.forEach(g => { if (g && g.url) availableAssetsMaps.gsc[String(g.url).trim()] = g; });
     
     const gscList = document.getElementById('gsc-list');
     const fbOrganicList = document.getElementById('fb-pages-list');
@@ -591,25 +726,36 @@ function renderAssets(assets) {
     
     if (gscList) {
         gscList.innerHTML = '';
-        const props = assets.gsc || [];
+        const props = gscAssets;
         if (props.length === 0) gscList.innerHTML = '<div class="empty-state">No GSC properties found.</div>';
         props.forEach(p => {
-            const configGsc = currentConfig?.gsc || {};
-            const isSynced = configGsc[p.url] !== undefined && !p.lost_access;
+            if (!p || !p.url) return;
+            const cfgGsc = currentConfig?.gsc || currentConfig?.sites || currentConfig?.google_search_console?.sites || {};
+            // Convert to map if it's an array for faster lookup
+            const gscMap = Array.isArray(cfgGsc) ? Object.fromEntries(cfgGsc.map(s => [s.url, s])) : cfgGsc;
+            const savedItem = gscMap[p.url];
+            const isInConfig = savedItem !== undefined;
+            const isSynced = isInConfig && savedItem.enabled !== false && !p.lost_access;
             const displayUrl = p.url.replace('sc-domain:', '');
             const div = document.createElement('div');
             
             let itemClass = 'asset-item';
             if (isSynced) itemClass += ' synced';
+            if (isInConfig) itemClass += ' in-config';
             if (p.is_new) itemClass += ' is-new';
             if (p.lost_access) itemClass += ' lost-access';
 
             div.className = itemClass;
             div.innerHTML = `
+                ${p.is_new ? '<div class="asset-badge-new">NEW</div>' : ''}
+                ${p.lost_access ? '<div class="asset-badge-lost">LOST ACCESS</div>' : ''}
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                   <div class="asset-text-truncate" title="${displayUrl}" style="font-size:0.75rem; font-weight:600; color:#fff; flex:1; min-width:0;">${displayUrl}</div>
+                   <div style="flex:1; min-width:0;">
+                       <div class="asset-text-truncate" title="${displayUrl}" style="font-size:0.75rem; font-weight:600; color:#fff;">${displayUrl}</div>
+                       ${p.data ? `<div style="font-size:0.55rem; color:var(--primary); opacity:0.8;">Metadata Available (OK)</div>` : ''}
+                   </div>
                    <label class="switch-mini">
-                       <input type="checkbox" class="gsc-asset-sync" value="${p.url}" ${isSynced ? 'checked' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
+                       <input type="checkbox" class="gsc-asset-sync" value="${p.url}" ${isSynced && !p.lost_access ? 'checked' : ''} ${p.lost_access ? 'disabled' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
                        <span class="slider-mini"></span>
                    </label>
                 </div>
@@ -620,12 +766,14 @@ function renderAssets(assets) {
 
     if (fbOrganicList) {
         fbOrganicList.innerHTML = '';
-        const pages = assets.facebook_pages || [];
+        const pages = fbPages;
         if (pages.length === 0) fbOrganicList.innerHTML = '<div class="empty-state">No Facebook pages found.</div>';
         
         pages.forEach(p => {
+            if (!p || !p.id) return;
             const getCfg = (key, def = true) => {
-                const savedPages = currentConfig.fb_pages_full_config || [];
+                const rawSaved = currentConfig.fb_pages_full_config || currentConfig.pages || [];
+                const savedPages = Array.isArray(rawSaved) ? rawSaved : Object.values(rawSaved);
                 const pId = String(p.id).trim();
                 const saved = savedPages.find(pg => String(pg.id).trim() === pId);
                 
@@ -658,17 +806,21 @@ function renderAssets(assets) {
                         </div>
                         <div>
                             <div style="font-weight:700; color:white; font-size:0.9rem;">${p.title || 'Untitled Page'}</div>
-                            <div style="font-size:0.65rem; color:var(--text-dim);">ID: ${p.id}</div>
+                            <div style="display:flex; gap:8px; align-items:center; min-width: 0; flex-wrap: nowrap;">
+                                <div style="font-size:0.6rem; color:var(--text-dim); flex-shrink: 0;">ID: ${p.id}</div>
+                                ${p.created_time ? `<div style="font-size:0.6rem; color:var(--primary); padding:1px 5px; background:rgba(0,255,150,0.05); border-radius:4px; flex-shrink: 0;">${new Date(p.created_time).toLocaleDateString()}</div>` : ''}
+                                ${p.hostname ? `<div style="font-size:0.6rem; color:var(--secondary); padding:1px 5px; background:rgba(0,150,255,0.05); border-radius:4px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.hostname}">${p.hostname}</div>` : ''}
+                            </div>
                         </div>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" class="fb-page-main-toggle" data-id="${p.id}" ${getCfg('enabled') ? 'checked' : ''} onchange="toggleOrganicHierarchy('${p.id}', this.checked)">
+                        <input type="checkbox" class="fb-page-main-toggle" data-id="${p.id}" ${getCfg('enabled') && !lostAccess ? 'checked' : ''} ${lostAccess ? 'disabled' : ''} onchange="toggleOrganicHierarchy('${p.id}', this.checked)">
                         <span class="slider"></span>
                     </label>
                 </div>
 
                 <!-- Page Options Hierarchy -->
-                <div id="hierarchy-${p.id}" style="display:${getCfg('enabled') ? 'grid' : 'none'}; grid-template-columns: 1fr 1fr; gap:20px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+                <div id="hierarchy-${p.id}" style="display:${getCfg('enabled') ? 'grid' : 'none'}; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap:20px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
                     
                     <!-- FB Section -->
                     <div class="hierarchy-col">
@@ -676,7 +828,7 @@ function renderAssets(assets) {
                         
                         <div class="hierarchy-item-premium">
                             <label class="switch-inline">
-                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="page_metrics" ${getCfg('page_metrics') ? 'checked' : ''}>
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="page_metrics" ${getCfg('page_metrics') ? 'checked' : ''} ${lostAccess ? 'disabled' : ''}>
                                 <span class="slider-sm"></span>
                                 <span class="lbl">Page Metrics</span>
                             </label>
@@ -684,7 +836,7 @@ function renderAssets(assets) {
                         
                         <div class="hierarchy-item-premium">
                             <label class="switch-inline">
-                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="posts" ${getCfg('posts') ? 'checked' : ''}>
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="posts" ${getCfg('posts') ? 'checked' : ''} ${lostAccess ? 'disabled' : ''}>
                                 <span class="slider-sm"></span>
                                 <span class="lbl">Posts Content</span>
                             </label>
@@ -692,7 +844,7 @@ function renderAssets(assets) {
                         
                         <div class="hierarchy-item-premium" style="margin-left: 20px; border-left: 1px solid rgba(255,255,255,0.1); padding-left:12px;">
                             <label class="switch-inline">
-                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="post_metrics" ${getCfg('post_metrics') ? 'checked' : ''}>
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="post_metrics" ${getCfg('post_metrics') ? 'checked' : ''} ${lostAccess ? 'disabled' : ''}>
                                 <span class="slider-sm"></span>
                                 <span class="lbl">Post Insights</span>
                             </label>
@@ -701,16 +853,16 @@ function renderAssets(assets) {
 
                     <!-- IG Section -->
                     ${p.ig_account ? `
-                    <div class="hierarchy-col" style="border-left: 1px solid rgba(255,255,255,0.05); padding-left: 20px;">
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
-                            <div style="background:rgba(225, 48, 108, 0.1); color:#E1306C; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:700; text-transform:uppercase; display:flex; align-items:center; gap:5px;">
-                                <i data-lucide="instagram" size="10"></i> ${p.ig_account_name || p.ig_account}
+                    <div class="hierarchy-col" style="border-left: 1px solid rgba(255,255,255,0.05); padding-left: 28px; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:16px; min-width: 0;">
+                            <div style="background:rgba(225, 48, 108, 0.1); color:#E1306C; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:700; text-transform:uppercase; display:flex; align-items:center; gap:5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${p.ig_account_name || p.ig_account}">
+                                <i data-lucide="instagram" size="10" style="flex-shrink: 0;"></i> <span style="overflow: hidden; text-overflow: ellipsis;">${p.ig_account_name || p.ig_account}</span>
                             </div>
                         </div>
                         
                         <div class="hierarchy-item-premium">
                             <label class="switch-inline">
-                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_accounts" ${getCfg('ig_accounts', false) ? 'checked' : ''} onchange="toggleSubOpt('${p.id}', 'ig_accounts', this.checked)">
+                                <input type="checkbox" class="fb-page-opt" data-page="${p.id}" data-opt="ig_accounts" ${getCfg('ig_accounts', false) ? 'checked' : ''} ${lostAccess ? 'disabled' : ''} onchange="toggleSubOpt('${p.id}', 'ig_accounts', this.checked)">
                                 <span class="slider-sm"></span>
                                 <span class="lbl">Sync Instagram</span>
                             </label>
@@ -758,30 +910,40 @@ function renderAssets(assets) {
 
     if (fbMarketingList) {
         fbMarketingList.innerHTML = '';
-        const accounts = assets.facebook_ad_accounts || [];
+        const accounts = fbAdAccounts;
         // Sort alphabetically by name
         accounts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         
         if (accounts.length === 0) fbMarketingList.innerHTML = '<div class="empty-state">No Ad accounts found.</div>';
         accounts.forEach(a => {
-            const syncedIds = currentConfig?.fb_ad_account_ids || [];
-            const isSynced = syncedIds.includes(String(a.id)) && !a.lost_access;
+            if (!a || !a.id) return;
+            const rawAccs = currentConfig.fb_ad_accounts_full_config || currentConfig.ad_accounts || currentConfig.facebook_marketing?.ad_accounts || [];
+            const savedAccs = Array.isArray(rawAccs) ? rawAccs : Object.values(rawAccs);
+            const saved = savedAccs.find(acc => String(acc.id) === String(a.id));
+            const isInConfig = !!saved;
+            const isSynced = isInConfig && saved.enabled !== false && !a.lost_access;
             const div = document.createElement('div');
             
             let itemClass = 'asset-item';
             if (isSynced) itemClass += ' synced';
+            if (isInConfig) itemClass += ' in-config';
             if (a.is_new) itemClass += ' is-new';
             if (a.lost_access) itemClass += ' lost-access';
 
             div.className = itemClass;
             div.innerHTML = `
+                ${a.is_new ? '<div class="asset-badge-new">NEW</div>' : ''}
+                ${a.lost_access ? '<div class="asset-badge-lost" style="font-size: 0.5rem; padding: 1px 5px;">LOST ACCESS</div>' : ''}
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                    <div>
                        <div style="font-size:0.75rem; font-weight:600; color:#fff;">${a.name}</div>
-                       <div style="font-size:0.6rem; color:var(--text-dim); font-family:'Fira Code';">${a.id}</div>
+                       <div style="display:flex; gap:8px; align-items:center;">
+                           <div style="font-size:0.6rem; color:var(--text-dim); font-family:'Fira Code';">${a.id}</div>
+                           ${a.created_time ? `<div style="font-size:0.6rem; color:var(--primary); opacity:0.8;">Created: ${new Date(a.created_time).toLocaleDateString()}</div>` : ''}
+                       </div>
                    </div>
                    <label class="switch-mini">
-                       <input type="checkbox" class="fb-marketing-asset-sync" value="${a.id}" ${isSynced ? 'checked' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
+                       <input type="checkbox" class="fb-marketing-asset-sync" value="${a.id}" ${isSynced && !a.lost_access ? 'checked' : ''} ${a.lost_access ? 'disabled' : ''} onchange="this.closest('.asset-item').classList.toggle('synced', this.checked)">
                        <span class="slider-mini"></span>
                    </label>
                 </div>
@@ -812,9 +974,21 @@ async function updateConfig(typeArg) {
             feature_toggles: {}
         };
 
-        // Assets Sync Status
-        document.querySelectorAll('.gsc-asset-sync:checked').forEach(el => {
-            payload.assets.gsc.push({ url: el.value, target_countries: [], target_keywords: [] });
+        // Assets Sync Status (GSC)
+        document.querySelectorAll('.asset-item').forEach(item => {
+            const cb = item.querySelector('.gsc-asset-sync');
+            if (cb && (cb.checked || item.classList.contains('in-config') || item.classList.contains('lost-access'))) {
+                const url = cb.value;
+                const original = availableAssetsMaps.gsc[url] || {};
+                payload.assets.gsc.push({ 
+                    url: url, 
+                    enabled: cb.checked,
+                    target_countries: original.target_countries || [], 
+                    target_keywords: original.target_keywords || [],
+                    lost_access: item.classList.contains('lost-access'),
+                    data: original.data || []
+                });
+            }
         });
 
         // 1. Collect FB Organic Pages (All of them, enabled or not, for granularity preservation)
@@ -824,11 +998,21 @@ async function updateConfig(typeArg) {
             
             const pageId = String(mainToggle.dataset.id);
             const igId = card.dataset.ig || null;
+            const original = availableAssetsMaps.pages[pageId] || {};
             
             const pageData = {
                 id: pageId,
-                enabled: mainToggle.checked,
-                ig_account: igId
+                enabled: !card.classList.contains('lost-access') && mainToggle.checked, // Force disabled if lost access
+                ig_account: igId,
+                lost_access: card.classList.contains('lost-access'),
+                hostname: original.hostname || null,
+                url: original.url || original.link || null,
+                link: original.link || null,
+                created_time: original.created_time || null,
+                data: original.data || [],
+                ig_hostname: original.ig_hostname || null,
+                ig_created_time: original.ig_created_time || null,
+                ig_data: original.ig_data || []
             };
             
             card.querySelectorAll('.fb-page-opt').forEach(opt => {
@@ -845,28 +1029,39 @@ async function updateConfig(typeArg) {
             payload.assets.pages.push(pageData);
         });
 
-        document.querySelectorAll('.fb-marketing-asset-sync:checked').forEach(el => {
-            const item = el.closest('.asset-item');
-            const nameEl = item ? item.querySelector('[style*="font-weight:600"]') : null;
-            payload.assets.ad_accounts.push({ 
-                id: el.value,
-                name: nameEl ? nameEl.textContent.trim() : null
-            });
+        document.querySelectorAll('.asset-item').forEach(item => {
+            const cb = item.querySelector('.fb-marketing-asset-sync');
+            if (cb && (cb.checked || item.classList.contains('in-config') || item.classList.contains('lost-access'))) {
+                const accId = String(cb.value);
+                const original = availableAssetsMaps.ad_accounts[accId] || {};
+                const nameEl = item.querySelector('[style*="font-weight:600"]');
+                payload.assets.ad_accounts.push({ 
+                    id: accId,
+                    enabled: cb.checked,
+                    name: nameEl ? nameEl.textContent.trim() : null,
+                    lost_access: item.classList.contains('lost-access'),
+                    created_time: original.created_time || null,
+                    data: original.data || []
+                });
+            }
         });
 
-        if (typeArg === 'gsc') {
+        if (typeArg === 'google_search_console') {
             payload.enabled = document.getElementById('gsc-channel-enabled')?.checked;
             payload.cache_history_range = document.getElementById('gsc-history-range')?.value;
             payload.feature_toggles.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
             payload.feature_toggles.cron_recent_minute = document.getElementById('gsc-cron-minute')?.value;
-        } else if (typeArg === 'facebook-organic') {
+            
+            const calcSynthEl = document.getElementById('gsc-calculate-synthetics');
+            payload.feature_toggles.calculate_synthetics = calcSynthEl ? calcSynthEl.checked : false;
+        } else if (typeArg === 'facebook_organic') {
             payload.enabled = document.getElementById('fb-organic-enabled').checked;
             payload.organic_history_range = document.getElementById('fb-organic-history-range').value;
             payload.feature_toggles.cron_entities_hour = document.getElementById('fb-organic-entities-cron-hour')?.value;
             payload.feature_toggles.cron_entities_minute = document.getElementById('fb-organic-entities-cron-minute')?.value;
             payload.feature_toggles.cron_recent_hour = document.getElementById('fb-organic-recent-cron-hour')?.value;
             payload.feature_toggles.cron_recent_minute = document.getElementById('fb-organic-recent-cron-minute')?.value;
-        } else if (typeArg === 'facebook-marketing') {
+        } else if (typeArg === 'facebook_marketing') {
             payload.enabled = document.getElementById('fb-marketing-enabled').checked;
             payload.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
             payload.feature_toggles.cron_entities_hour = document.getElementById('fb-marketing-entities-cron-hour')?.value;
@@ -935,10 +1130,14 @@ async function updateConfig(typeArg) {
                     }
                 };
             });
+        } else if (typeArg !== 'global') {
+            // Generic Channel Update
+            payload.enabled = document.getElementById(typeArg + '-channel-enabled')?.checked;
+            payload.cache_history_range = document.getElementById(typeArg + '-history-range')?.value;
         }
 
         // Feature Toggles (Organic Tiers - Derived from Selectors)
-        if (typeArg === 'facebook-organic' || typeArg === 'global') {
+        if (typeArg === 'facebook_organic' || typeArg === 'global') {
             const fbLvl = document.getElementById('fb-organic-level')?.value || 'page';
             const igLvl = document.getElementById('fb-ig-level')?.value || 'accounts';
 
@@ -994,7 +1193,7 @@ async function validateTokens(isManual = true) {
         const fbStatusBadge = document.getElementById('fb-token-status-main');
 
         if (gscStatusBadge) {
-            const gscRes = res.results?.gsc;
+            const gscRes = res.results?.google_search_console || res.results?.gsc;
             if (gscRes && gscRes.status === 'valid') {
                 gscStatusBadge.innerHTML = '<span style="color:#238636; vertical-align:middle;"><i data-lucide="check-circle" size="12" style="margin-bottom:2px"></i> GSC</span>';
                 gscStatusBadge.style.display = 'inline-block';
@@ -1005,8 +1204,11 @@ async function validateTokens(isManual = true) {
         }
 
         if (fbStatusBadge) {
-            const fbRes = res.results?.facebook;
-            if (fbRes && fbRes.status === 'valid') {
+            const fbMarkRes = res.results?.facebook_marketing || res.results?.facebook;
+            const fbOrgRes = res.results?.facebook_organic;
+            const isFbValid = (fbMarkRes && fbMarkRes.status === 'valid') && (fbOrgRes && fbOrgRes.status === 'valid');
+            
+            if (isFbValid) {
                 fbStatusBadge.innerHTML = '<span style="color:#238636; vertical-align:middle;"><i data-lucide="check-circle" size="12" style="margin-bottom:2px"></i> FB Graph</span>';
                 fbStatusBadge.style.display = 'inline-block';
             } else {
@@ -1204,4 +1406,16 @@ function toggleRawMetricsWarning(show) {
             ], { duration: 500, iterations: 2 });
         }
     }
+}
+
+function selectUnselectAllOrganicPages(enable) {
+    const toggles = document.querySelectorAll('.fb-page-main-toggle');
+    toggles.forEach(toggle => {
+        if (!toggle.disabled) {
+            toggle.checked = enable;
+            const pageId = toggle.dataset.id;
+            toggleOrganicHierarchy(pageId, enable);
+        }
+    });
+    showToast(`${enable ? 'Selected' : 'Unselected'} all accessible pages.`, false);
 }

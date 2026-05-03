@@ -9,7 +9,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use Faker\Generator;
@@ -44,6 +44,7 @@ class ChanneledProductVariantRepositoryTest extends TestCase
         $entityManager->expects($this->any())
             ->method('createQueryBuilder')
             ->willReturn($this->queryBuilder);
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $this->repository = new ChanneledProductVariantRepository($entityManager, $classMetadata);
         $this->faker = Factory::create();
     }

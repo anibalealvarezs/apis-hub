@@ -6,7 +6,7 @@ use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\QueryBuilder;
-use Enums\Period;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Enums\QueryBuilderType;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -41,6 +41,7 @@ class MetricRepositoryTest extends TestCase
         $this->queryBuilder->method('andWhere')->willReturnSelf();
         $this->queryBuilder->method('setParameter')->willReturnSelf();
         $this->queryBuilder->method('setParameters')->willReturnSelf();
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $this->queryBuilder->method('getQuery')->willReturn($this->query);
 
         $classMetadata = $this->createMock(ClassMetadata::class);

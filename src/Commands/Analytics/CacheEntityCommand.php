@@ -35,7 +35,7 @@ class CacheEntityCommand extends Command
         $this
             ->setDescription('Schedule a caching job for an analytics entity.')
             ->setHelp('This command allows you to schedule a caching job for a specific entity and channel, identical to the API endpoint logic.')
-            ->addArgument('channel', InputArgument::REQUIRED, 'The channel to cache from (e.g. shopify, klaviyo)')
+            ->addArgument('channel', InputArgument::REQUIRED, 'The channel to cache from')
             ->addArgument('entity', InputArgument::REQUIRED, 'The entity to cache (e.g. products, customers)')
             ->addOption('data', 'd', InputOption::VALUE_OPTIONAL, 'The JSON body data to pass to the request')
             ->addOption('params', 'p', InputOption::VALUE_OPTIONAL, 'The JSON or query string parameters to pass to the request')

@@ -38,7 +38,7 @@ fi
 
 # Run the standard deployment with the demo env
 # This will trigger InstanceGeneratorService to create only 1 master instance
-sh bin/full-deploy.sh
+sh bin/full-deploy.sh "$@"
 
 # Seeding is now handled automatically by the master instance during bootstrap (app:setup-db)
 # We just wait a few seconds and show the status.

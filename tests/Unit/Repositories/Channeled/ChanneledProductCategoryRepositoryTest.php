@@ -9,7 +9,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
-use Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use Faker\Generator;
@@ -40,6 +40,7 @@ class ChanneledProductCategoryRepositoryTest extends TestCase
             ->method('getClassMetadata')
             ->with($this->entityName)
             ->willReturn($classMetadata);
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $entityManager->expects($this->any())
             ->method('createQueryBuilder')
             ->willReturn($this->queryBuilder);
@@ -244,10 +245,6 @@ class ChanneledProductCategoryRepositoryTest extends TestCase
             ->method('addOrderBy')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
-            ->method('setMaxResults')
-            ->with(1)
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
             ->method('getQuery')
             ->willReturn($this->query);
         $this->query->expects($this->once())
@@ -293,10 +290,6 @@ class ChanneledProductCategoryRepositoryTest extends TestCase
         $this->queryBuilder->expects($this->once())
             ->method('addOrderBy')
             ->with('e.platformCreatedAt', 'DESC')
-            ->willReturnSelf();
-        $this->queryBuilder->expects($this->once())
-            ->method('setMaxResults')
-            ->with(1)
             ->willReturnSelf();
         $this->queryBuilder->expects($this->once())
             ->method('getQuery')

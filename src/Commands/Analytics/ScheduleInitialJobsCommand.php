@@ -10,6 +10,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Entities\Analytics\Channel;
 
 #[AsCommand(
     name: 'app:schedule-initial-jobs',
@@ -58,7 +59,7 @@ class ScheduleInitialJobsCommand extends Command
             $channel = $instance['channel'] ?? null;
             $entity = $instance['entity'] ?? null;
 
-            if ($channel && ($chanEnum = \Enums\Channel::tryFromName($channel))) {
+            if ($channel && ($chanEnum = Channel::tryFromName($channel))) {
                 $channel = $chanEnum->name;
             }
 
@@ -70,10 +71,16 @@ class ScheduleInitialJobsCommand extends Command
             // Check if channel is enabled and history range
             $channelsConfig = Helpers::getChannelsConfig();
             $chanKey = $channel;
-            if (!isset($channelsConfig[$chanKey])) {
-                $chanKey = str_replace(['facebook_marketing', 'facebook_organic'], ['facebook', 'facebook'], $channel);
+            try {
+                $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
+                $commonKey = $driver::getCommonConfigKey();
+                if ($commonKey && !isset($channelsConfig[$channel])) {
+                    $chanKey = $commonKey;
+                }
+            } catch (\Exception $e) {
+                // If no driver found, fall back to literal channel name
             }
-            // Specific check for split facebook configs
+            
             $chanConfig = $channelsConfig[$channel] ?? $channelsConfig[$chanKey] ?? null;
 
             if ($chanConfig) {

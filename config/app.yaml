@@ -4,7 +4,7 @@ debug: true
 jobs:
   timeout_hours: 12
 analytics:
-  cache_raw_metrics: true
+  cache_raw_metrics: false
   marketing_debug_logs: false
 cron:
   entities_hour: 2

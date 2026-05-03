@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Traits;
 
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Carbon\Carbon;
-use Classes\KeyGenerator;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
-use Enums\Period;
 use stdClass;
 
 trait CalculatesMetricDeltas
@@ -24,7 +24,9 @@ trait CalculatesMetricDeltas
     {
         $lifetimeMetrics = [];
         foreach ($metrics as $metric) {
-            // Only process lifetime metrics that don't have a virtual counterpart yet
+            if (! is_object($metric)) {
+                continue;
+            }
             if (($metric->period ?? null) === Period::Lifetime->value) {
                 $lifetimeMetrics[] = $metric;
             }
@@ -38,28 +40,29 @@ trait CalculatesMetricDeltas
         $signatures = [];
         foreach ($lifetimeMetrics as $metric) {
             $yesterdayDate = Carbon::parse($metric->metricDate)->subDay()->toDateString();
-            
+
             $signature = KeyGenerator::generateMetricConfigKey(
                 channel: $metric->channel,
                 name: $metric->name,
                 period: $metric->period,
-                account: isset($metric->account) ? $metric->account->getName() : null,
-                channeledAccount: isset($metric->channeledAccount) ? (string) $metric->channeledAccount->getPlatformId() : (isset($metric->channeledAccountPlatformId) ? (string)$metric->channeledAccountPlatformId : null),
-                campaign: isset($metric->campaign) ? (string) $metric->campaign->getCampaignId() : (isset($metric->campaignPlatformId) ? (string)$metric->campaignPlatformId : null),
-                channeledCampaign: isset($metric->channeledCampaign) ? (string) $metric->channeledCampaign->getPlatformId() : (isset($metric->channeledCampaignPlatformId) ? (string)$metric->channeledCampaignPlatformId : null),
-                channeledAdGroup: isset($metric->channeledAdGroup) ? $metric->channeledAdGroup->getPlatformId() : (isset($metric->channeledAdGroupPlatformId) ? (string)$metric->channeledAdGroupPlatformId : null),
-                channeledAd: isset($metric->channeledAd) ? $metric->channeledAd->getPlatformId() : (isset($metric->channeledAdPlatformId) ? (string)$metric->channeledAdPlatformId : null),
-                page: isset($metric->page) ? $metric->page->getUrl() : null,
+                account: ($rowAccount = $metric->account ?? $metric->accountPlatformId ?? null) ? (is_object($rowAccount) ? $rowAccount->getName() : (string)$rowAccount) : null,
+                channeledAccount: ($rowCa = $metric->channeledAccount ?? $metric->channeledAccountPlatformId ?? null) ? (is_object($rowCa) ? (string)$rowCa->getPlatformId() : (string)$rowCa) : null,
+                campaign: ($rowC = $metric->campaign ?? $metric->campaignPlatformId ?? null) ? (is_object($rowC) ? (string)$rowC->getCampaignId() : (string)$rowC) : null,
+                channeledCampaign: ($rowCc = $metric->channeledCampaign ?? $metric->channeledCampaignPlatformId ?? null) ? (is_object($rowCc) ? (string)$rowCc->getPlatformId() : (string)$rowCc) : null,
+                channeledAdGroup: ($rowCag = $metric->channeledAdGroup ?? $metric->channeledAdGroupPlatformId ?? null) ? (is_object($rowCag) ? $rowCag->getPlatformId() : (string)$rowCag) : null,
+                channeledAd: ($rowCad = $metric->channeledAd ?? $metric->channeledAdPlatformId ?? null) ? (is_object($rowCad) ? $rowCad->getPlatformId() : (string)$rowCad) : null,
+                page: ($rowP = $metric->page ?? $metric->pagePlatformId ?? null) ? (is_object($rowP) ? $rowP->getUrl() : (string)$rowP) : null,
                 query: $metric->query ?? null,
-                post: isset($metric->post) ? $metric->post->getPostId() : null,
-                product: isset($metric->product) ? $metric->product->getProductId() : null,
-                customer: isset($metric->customer) ? $metric->customer->getEmail() : null,
-                order: isset($metric->order) ? $metric->order->getOrderId() : null,
-                country: $metric->countryCode ?? null,
-                device: $metric->deviceType ?? null,
-                creative: isset($metric->creative) ? $metric->creative->getCreativeId() : null,
+                post: ($rowPost = $metric->post ?? $metric->postPlatformId ?? null) ? (is_object($rowPost) ? (method_exists($rowPost, 'getPostId') ? $rowPost->getPostId() : (method_exists($rowPost, 'getPlatformId') ? $rowPost->getPlatformId() : (string)$rowPost)) : (string)$rowPost) : null,
+                product: ($rowPr = $metric->product ?? $metric->productPlatformId ?? null) ? (is_object($rowPr) ? $rowPr->getProductId() : (string)$rowPr) : null,
+                customer: ($rowCu = $metric->customer ?? $metric->customerPlatformId ?? null) ? (is_object($rowCu) ? $rowCu->getEmail() : (string)$rowCu) : null,
+                order: ($rowO = $metric->order ?? $metric->orderPlatformId ?? null) ? (is_object($rowO) ? $rowO->getOrderId() : (string)$rowO) : null,
+                country: $metric->countryCode ?? $metric->country ?? null,
+                device: $metric->deviceType ?? $metric->device ?? null,
+                creative: ($rowCre = $metric->creative ?? $metric->creativePlatformId ?? null) ? (is_object($rowCre) ? $rowCre->getCreativeId() : (string)$rowCre) : null,
+                dimensionSet: $metric->dimensionsHash ?? null,
             );
-            
+
             $metric->atemporalSignature = $signature;
             $metric->yesterdayDate = $yesterdayDate;
             $signatures[] = $signature;
@@ -67,7 +70,7 @@ trait CalculatesMetricDeltas
 
         // 2. Batch lookup previous values from database
         $previousValuesMap = [];
-        if (!empty($signatures)) {
+        if (! empty($signatures)) {
             $chunks = array_chunk($lifetimeMetrics, 1000);
             foreach ($chunks as $chunk) {
                 $params = [];
@@ -82,7 +85,7 @@ trait CalculatesMetricDeltas
                         FROM metrics m 
                         JOIN metric_configs mc ON m.metric_config_id = mc.id 
                         WHERE (mc.config_signature, m.metric_date) IN ($placeholders)";
-                
+
                 $results = $manager->getConnection()->executeQuery($sql, $params)->fetchAllAssociative();
                 foreach ($results as $row) {
                     $key = $row['config_signature'] . '|' . $row['metric_date'];
@@ -96,34 +99,47 @@ trait CalculatesMetricDeltas
             $lookupKey = $metric->atemporalSignature . '|' . $metric->yesterdayDate;
             $prevValue = $previousValuesMap[$lookupKey] ?? 0;
             $delta = (float)$metric->value - $prevValue;
-            
+
             // Create daily virtual metric
             $virtual = clone $metric;
             $virtual->name = $metric->name . '_daily';
             $virtual->period = Period::Daily->value;
             $virtual->value = max(0, $delta);
             $virtual->isVirtualDelta = true;
-            
+            $rowPost = $virtual->post ?? $virtual->postPlatformId ?? null;
+            $pVal = $rowPost ? (is_object($rowPost) ? (method_exists($rowPost, 'getPostId') ? $rowPost->getPostId() : (method_exists($rowPost, 'getPlatformId') ? $rowPost->getPlatformId() : (string)$rowPost)) : (string)$rowPost) : null;
+
+            // Important: Explicitly set these as public properties to survive (object) casting in MetricsProcessor
+            $virtual->post = $rowPost;
+            $virtual->page = $virtual->page ?? $virtual->pagePlatformId ?? null;
+            $virtual->account = $virtual->account ?? $virtual->accountPlatformId ?? null;
+            $virtual->channeledAccount = $virtual->channeledAccount ?? $virtual->channeledAccountPlatformId ?? null;
+            $virtual->campaign = $virtual->campaign ?? $virtual->campaignPlatformId ?? null;
+            $virtual->channeledCampaign = $virtual->channeledCampaign ?? $virtual->channeledCampaignPlatformId ?? null;
+            $virtual->channeledAdGroup = $virtual->channeledAdGroup ?? $virtual->channeledAdGroupPlatformId ?? null;
+            $virtual->channeledAd = $virtual->channeledAd ?? $virtual->channeledAdPlatformId ?? null;
+
             // Re-generate the config key for the new daily metric
             $virtual->metricConfigKey = KeyGenerator::generateMetricConfigKey(
                 channel: $virtual->channel,
                 name: $virtual->name,
                 period: $virtual->period,
-                account: isset($virtual->account) ? $virtual->account->getName() : null,
-                channeledAccount: isset($virtual->channeledAccount) ? (string) $virtual->channeledAccount->getPlatformId() : (isset($virtual->channeledAccountPlatformId) ? (string)$virtual->channeledAccountPlatformId : null),
-                campaign: isset($virtual->campaign) ? (string) $virtual->campaign->getCampaignId() : (isset($virtual->campaignPlatformId) ? (string)$virtual->campaignPlatformId : null),
-                channeledCampaign: isset($virtual->channeledCampaign) ? (string) $virtual->channeledCampaign->getPlatformId() : (isset($virtual->channeledCampaignPlatformId) ? (string)$virtual->channeledCampaignPlatformId : null),
-                channeledAdGroup: isset($virtual->channeledAdGroup) ? $virtual->channeledAdGroup->getPlatformId() : (isset($virtual->channeledAdGroupPlatformId) ? (string)$virtual->channeledAdGroupPlatformId : null),
-                channeledAd: isset($virtual->channeledAd) ? $virtual->channeledAd->getPlatformId() : (isset($virtual->channeledAdPlatformId) ? (string)$virtual->channeledAdPlatformId : null),
-                page: isset($virtual->page) ? $virtual->page->getUrl() : null,
+                account: ($rowAccount = $virtual->account) ? (is_object($rowAccount) ? $rowAccount->getName() : (string)$rowAccount) : null,
+                channeledAccount: ($rowCa = $virtual->channeledAccount) ? (is_object($rowCa) ? (string)$rowCa->getPlatformId() : (string)$rowCa) : null,
+                campaign: ($rowC = $virtual->campaign) ? (is_object($rowC) ? (string)$rowC->getCampaignId() : (string)$rowC) : null,
+                channeledCampaign: ($rowCc = $virtual->channeledCampaign) ? (is_object($rowCc) ? (string)$rowCc->getPlatformId() : (string)$rowCc) : null,
+                channeledAdGroup: ($rowCag = $virtual->channeledAdGroup) ? (is_object($rowCag) ? $rowCag->getPlatformId() : (string)$rowCag) : null,
+                channeledAd: ($rowCad = $virtual->channeledAd) ? (is_object($rowCad) ? $rowCad->getPlatformId() : (string)$rowCad) : null,
+                page: ($rowP = $virtual->page) ? (is_object($rowP) ? $rowP->getUrl() : (string)$rowP) : null,
                 query: $virtual->query ?? null,
-                post: isset($virtual->post) ? $virtual->post->getPostId() : null,
-                product: isset($virtual->product) ? $virtual->product->getProductId() : null,
-                customer: isset($virtual->customer) ? $virtual->customer->getEmail() : null,
-                order: isset($virtual->order) ? $virtual->order->getOrderId() : null,
-                country: $virtual->countryCode ?? null,
-                device: $virtual->deviceType ?? null,
-                creative: isset($virtual->creative) ? $virtual->creative->getCreativeId() : null,
+                post: $pVal,
+                product: ($rowPr = $virtual->product ?? $virtual->productPlatformId ?? null) ? (is_object($rowPr) ? $rowPr->getProductId() : (string)$rowPr) : null,
+                customer: ($rowCu = $virtual->customer ?? $virtual->customerPlatformId ?? null) ? (is_object($rowCu) ? $rowCu->getEmail() : (string)$rowCu) : null,
+                order: ($rowO = $virtual->order ?? $virtual->orderPlatformId ?? null) ? (is_object($rowO) ? $rowO->getOrderId() : (string)$rowO) : null,
+                country: $virtual->countryCode ?? $virtual->country ?? null,
+                device: $virtual->deviceType ?? $virtual->device ?? null,
+                creative: ($rowCre = $virtual->creative ?? $virtual->creativePlatformId ?? null) ? (is_object($rowCre) ? $rowCre->getCreativeId() : (string)$rowCre) : null,
+                dimensionSet: $virtual->dimensionsHash ?? null,
             );
 
             $metrics->add($virtual);

@@ -3,14 +3,29 @@
 use Controllers\ConfigManagerController;
 use Controllers\MonitoringController;
 use Controllers\PageController;
-use Controllers\FacebookAuthController;
 use Controllers\PrivacyController;
 use Controllers\ManagementController;
 use Controllers\PublicDataController;
+use Controllers\SocialAuthController;
+use Controllers\OAuthDispatcherController;
 use Symfony\Component\HttpFoundation\Request;
 
 
-return [
+$driverRoutes = (function() {
+    $registry = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getRegistry();
+    $routes = [];
+    foreach ($registry as $config) {
+        $driver = $config['driver'] ?? '';
+        if (class_exists($driver) && method_exists($driver, 'getRoutes')) {
+            $routes = array_replace($routes, $driver::getRoutes());
+        }
+    }
+    return $routes;
+})();
+
+$assetRoutes = \Anibalealvarezs\ApiDriverCore\Routes\AssetRoutes::get();
+
+return array_merge($driverRoutes, $assetRoutes, [
     '/' => [
         'httpMethod' => 'GET',
         'callable' => fn (...$args) => (new PageController())->home(),
@@ -35,31 +50,32 @@ return [
         'public' => true,
         'html' => true
     ],
-    '/fb-login' => [
-        'httpMethod' => 'GET',
-        'callable' => fn (...$args) => (new FacebookAuthController())->login(),
-        'public' => true,
-        'html' => true
-    ],
-    '/fb-auth-start' => [
-        'httpMethod' => 'GET',
-        'callable' => fn (...$args) => (new FacebookAuthController())->start(),
-        'public' => true,
-        'html' => true
-    ],
-    '/fb-callback' => [
+    '/auth/start/{channel}' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
-            return (new FacebookAuthController())->callback(Request::createFromGlobals());
+            $request = Request::createFromGlobals();
+            $channel = $args['channel'] ?? '';
+            return (new OAuthDispatcherController())->start($request, $channel);
         },
         'public' => true,
         'html' => true
     ],
-    '/api/auth/facebook/import' => [
-        'httpMethod' => 'POST',
-        'callable' => function (?string $body = null, ?array $params = null) {
+    '/auth/callback/{channel}' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
             $request = Request::createFromGlobals();
-            return (new FacebookAuthController())->importCredentials($request);
+            $channel = $args['channel'] ?? '';
+            return (new OAuthDispatcherController())->callback($request, $channel);
+        },
+        'public' => true,
+        'html' => true
+    ],
+    '/api/auth/{channel}/import' => [
+        'httpMethod' => 'POST',
+        'callable' => function (...$args) {
+            $request = $args['request'] ?? Request::createFromGlobals();
+            $channel = $args['channel'] ?? '';
+            return (new SocialAuthController())->importCredentials($request, $channel);
         },
         'public' => true,
         'html' => false,
@@ -114,7 +130,7 @@ return [
     '/api/monitoring/jobs/action' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new MonitoringController())->jobAction($request);
         },
         'public' => false,
@@ -124,7 +140,7 @@ return [
     '/api/monitoring/logs' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new MonitoringController())->logs($request);
         },
         'public' => false,
@@ -150,7 +166,7 @@ return [
     '/api/config-manager/assets' => [
         'httpMethod' => 'GET',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ConfigManagerController())->fetchAssets($request);
         },
         'public' => false,
@@ -160,7 +176,7 @@ return [
     '/api/config-manager/update' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ConfigManagerController())->updateConfig($request);
         },
         'public' => false,
@@ -170,7 +186,7 @@ return [
     '/api/config-manager/validate-tokens' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ConfigManagerController())->validateTokens($request);
         },
         'public' => false,
@@ -180,7 +196,7 @@ return [
     '/api/config-manager/export' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ConfigManagerController())->exportConfig($request);
         },
         'public' => false,
@@ -190,38 +206,17 @@ return [
     '/api/config-manager/flush-cache' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ConfigManagerController())->flushCache($request);
         },
         'public' => false,
         'html' => false,
         'admin' => true
     ],
-    '/fb-reports' => [
-        'httpMethod' => 'GET',
-        'callable' => fn (...$args) => (new PageController())->facebookReports(),
-        'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
-        'html' => true,
-        'admin' => false
-    ],
-    '/fb-organic-reports' => [
-        'httpMethod' => 'GET',
-        'callable' => fn (...$args) => (new PageController())->facebookOrganicReports(),
-        'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
-        'html' => true,
-        'admin' => false
-    ],
-    '/gsc-reports' => [
-        'httpMethod' => 'GET',
-        'callable' => fn (...$args) => (new PageController())->gscReports(),
-        'public' => ($_ENV['APP_ENV'] ?? '') === 'testing' || str_contains(strtolower($_ENV['PROJECT_NAME'] ?? ''), 'demo'),
-        'html' => true,
-        'admin' => false
-    ],
     '/api/management/update-credentials' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ManagementController())->updateCredentials($request);
         },
         'public' => false,
@@ -231,7 +226,7 @@ return [
     '/api/management/redeploy' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ManagementController())->triggerRedeploy($request);
         },
         'public' => false,
@@ -241,7 +236,7 @@ return [
     '/api/management/reset-channel' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ManagementController())->resetChannel($request);
         },
         'public' => false,
@@ -260,7 +255,7 @@ return [
     '/api/management/container/action' => [
         'httpMethod' => 'POST',
         'callable' => function (...$args) {
-            $request = Request::createFromGlobals();
+            $request = $args['request'] ?? Request::createFromGlobals();
             return (new ManagementController())->containerAction($request);
         },
         'public' => false,
@@ -280,23 +275,16 @@ return [
 
     // --- Public API v1 (Phase 6) ---
 
-    '/api/v1/public/facebook/campaigns' => [
+    '/api/v1/public/{channel}/{resource}' => [
         'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getFacebookCampaigns(Request::createFromGlobals()),
+        'callable' => function(...$args) {
+            $request = $args['request'] ?? Request::createFromGlobals();
+            $channel = $args['channel'] ?? '';
+            $resource = $args['resource'] ?? '';
+            return (new PublicDataController())->getResourceData($request, $channel, $resource);
+        },
         'public' => true,
         'admin' => false
     ],
-    '/api/v1/public/facebook/metrics' => [
-        'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getMetrics(Request::createFromGlobals(), 'facebook'),
-        'public' => true,
-        'admin' => false
-    ],
-    '/api/v1/public/gsc/metrics' => [
-        'httpMethod' => 'GET',
-        'callable' => fn(...$args) => (new PublicDataController())->getMetrics(Request::createFromGlobals(), 'gsc'),
-        'public' => true,
-        'admin' => false
-    ]
-];
+]);
 

@@ -1,0 +1,6 @@
+# APIs Hub
+## SaaS Role: Orchestration (Worker)
+- **Parent Context:** Refer to `D:\laragon\www\_shared\AGENTS.md` for global protocols.
+- **Local Memory:** Refer to `MEMORY.md` in this package for repository-specific history, decisions, and follow-up notes; consult it before making local changes.
+- **Position:** This package operates within the Orchestration (Worker) layer of the APIs Hub SaaS hierarchy, coordinating caching, normalization, persistence, and data aggregation across source integrations.
+- **Dependencies:** Consumes `anibalealvarezs/api-client-skeleton`, `anibalealvarezs/api-driver-core`, `anibalealvarezs/facebook-graph-api`, `anibalealvarezs/google-api`, `anibalealvarezs/google-hub-driver`, `anibalealvarezs/meta-hub-driver`, `anibalealvarezs/klaviyo-hub-driver`, `anibalealvarezs/shopify-hub-driver`, `anibalealvarezs/netsuite-hub-driver`, `anibalealvarezs/amazon-hub-driver`, `anibalealvarezs/bigcommerce-hub-driver`, `anibalealvarezs/pinterest-hub-driver`, `anibalealvarezs/linkedin-hub-driver`, `anibalealvarezs/tiktok-hub-driver`, `anibalealvarezs/x-hub-driver`, and `anibalealvarezs/triple-whale-hub-driver`; serves the APIs Hub Facade and cached-data consumers.

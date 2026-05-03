@@ -5,6 +5,7 @@ namespace Classes;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Exception;
 use Doctrine\ORM\EntityManager;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 use Helpers\Helpers;
 use Entities\Analytics\Channeled\ChanneledPriceRule;
 
@@ -31,6 +32,8 @@ class PriceRuleProcessor
         $uCPR = [];
 
         foreach ($channeledCollection as $cpr) {
+            if (!is_object($cpr)) continue;
+            /** @var object{channel: string|int, platformId: string|int, platformCreatedAt: ?mixed, data: mixed} $cpr */
             $chan = (string)$cpr->channel;
             $pId = (string)$cpr->platformId;
 
@@ -123,9 +126,29 @@ class PriceRuleProcessor
 
         // We return the database ID of ChanneledPriceRule so we can use it to attach discounts
         $channeledEntities = [];
+        $totalDiscountCodes = [];
+        $totalChanneledDiscountCodes = [];
+
         foreach ($uCPR as $k => $cprRow) {
             if (isset($cprMap[$k])) {
-                $channeledEntities[$cprRow['platform_id']] = $cprMap[$k]['id'];
+                $dbId = $cprMap[$k]['id'];
+                $channeledEntities[$cprRow['platform_id']] = $dbId;
+
+                // CHECK FOR EMBEDDED DISCOUNTS (Modular behavior)
+                if (isset($cprRow['data']->_discounts) && ($cprRow['data']->_discounts instanceof ArrayCollection)) {
+                    $discResult = self::processDiscounts(
+                        channeledCollection: $cprRow['data']->_discounts,
+                        priceRulePlatformId: (string)$cprRow['platform_id'],
+                        channeledPriceRuleDbId: $dbId,
+                        manager: $manager
+                    );
+                    if (!empty($discResult['discountCodes'])) {
+                        $totalDiscountCodes = array_merge($totalDiscountCodes, $discResult['discountCodes']);
+                    }
+                    if (!empty($discResult['channeledDiscountCodes'])) {
+                        $totalChanneledDiscountCodes = array_merge($totalChanneledDiscountCodes, $discResult['channeledDiscountCodes']);
+                    }
+                }
             }
         }
 
@@ -134,6 +157,8 @@ class PriceRuleProcessor
             'channeledPriceRules' => array_column($uCPR, 'platform_id'),
             'channels' => array_unique(array_column($uCPR, 'channel')),
             'cprDbIds' => $channeledEntities,
+            'discountCodes' => $totalDiscountCodes,
+            'channeledDiscountCodes' => $totalChanneledDiscountCodes,
         ];
     }
 
@@ -164,8 +189,12 @@ class PriceRuleProcessor
         $uCDisc = [];
 
         foreach ($channeledCollection as $cd) {
-            $chan = (string)$cd->channel;
-            $code = (string)$cd->code;
+            if (!$cd) continue;
+            $cdObj = (object)$cd;
+            /** @var object{channel: string|int, code: string, platformId: string|int, platformCreatedAt: ?mixed, data: mixed} $cdObj */
+            
+            $chan = (string)($cdObj->channel ?? '');
+            $code = (string)($cdObj->code ?? '');
 
             $dKey = KeyGenerator::generateDiscountKey($code);
             if (!isset($uDisc[$dKey])) {
@@ -177,9 +206,9 @@ class PriceRuleProcessor
                 $uCDisc[$cdKey] = [
                     'code' => $code,
                     'channel' => $chan,
-                    'platform_id' => (string)$cd->platformId,
-                    'platform_created_at' => isset($cd->platformCreatedAt) ? $cd->platformCreatedAt : null,
-                    'data' => is_object($cd->data) ? clone $cd->data : (object)($cd->data ?? []),
+                    'platform_id' => (string)($cdObj->platformId ?? ''),
+                    'platform_created_at' => $cdObj->platformCreatedAt ?? null,
+                    'data' => is_object($cdObj->data ?? null) ? clone $cdObj->data : (object)($cdObj->data ?? []),
                 ];
             }
         }
@@ -268,31 +297,41 @@ class PriceRuleProcessor
 
         $dataArray = $dataSource[0];
         $mappingFn = $dataSource[1];
-        $toInsert = [];
+        
+        $buffer = [];
+        $count = 0;
+        $numCols = count($insertCols);
+        $chunkLimit = floor(30000 / $numCols);
 
         foreach ($dataArray as $key => $item) {
             if (!isset($map['map'][$key])) {
-                $toInsert[] = $mappingFn($item);
+                $row = $mappingFn($item);
+                foreach ($row as $val) {
+                    $buffer[] = $val;
+                }
+                $count++;
+
+                if ($count >= $chunkLimit) {
+                    $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'price_rules' ? 'price_rule_id' : 'code'), $count);
+                    $conn->executeStatement($sql, $buffer);
+                    $buffer = [];
+                    $count = 0;
+                }
             }
         }
 
-        if (!empty($toInsert)) {
-            $insertChunks = array_chunk($toInsert, 1000);
-            foreach ($insertChunks as $chunk) {
-                $params = [];
-                foreach ($chunk as $row) {
-                    $params = array_merge($params, $row);
-                }
-                $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'price_rules' ? 'price_rule_id' : 'code'), count($chunk));
-                $conn->executeStatement($sql, $params);
-            }
+        if ($count > 0) {
+            $sql = Helpers::buildInsertIgnoreSql($table, $insertCols, ($table === 'price_rules' ? 'price_rule_id' : 'code'), $count);
+            $conn->executeStatement($sql, $buffer);
+        }
 
-            foreach ($chunks as $chunk) {
-                $sql = $sqlGenerator($chunk);
-                $fetched = $mapGenerator($conn, $sql, $chunk);
-                $map['map'] = array_merge($map['map'], $fetched['map']);
-                $map['mapReverse'] = $map['mapReverse'] + $fetched['mapReverse'];
-            }
+        // Re-fetch EVERYTHING to update the map with all IDs
+        $map = ['map' => [], 'mapReverse' => []];
+        foreach ($chunks as $chunk) {
+            $sql = $sqlGenerator($chunk);
+            $fetched = $mapGenerator($conn, $sql, $chunk);
+            $map['map'] = array_merge($map['map'], $fetched['map']);
+            $map['mapReverse'] = $map['mapReverse'] + $fetched['mapReverse'];
         }
 
         return $map;

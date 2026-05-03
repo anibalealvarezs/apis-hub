@@ -9,7 +9,7 @@ use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Analytics\Channeled\ChanneledPriceRule;
-use Enums\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use Faker\Generator;
@@ -41,6 +41,7 @@ class ChanneledPriceRuleRepositoryTest extends TestCase
             ->method('getClassMetadata')
             ->with($this->entityName)
             ->willReturn($classMetadata);
+        $this->queryBuilder->method('setMaxResults')->willReturnSelf();
         $this->entityManager->expects($this->any())
             ->method('createQueryBuilder')
             ->willReturn($this->queryBuilder);

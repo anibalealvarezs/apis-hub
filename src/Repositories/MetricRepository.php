@@ -3,6 +3,7 @@
 namespace Repositories;
 
 use DateTime;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\OptimisticLockException;
@@ -14,12 +15,13 @@ use Entities\Analytics\Metric;
 use Entities\Analytics\Page;
 use Entities\Analytics\Query;
 use Entities\Entity;
-use Enums\Channel;
-use Enums\Period;
+use Entities\Analytics\Channel;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
 use Enums\QueryBuilderType;
 use Exception;
 use Helpers\Helpers;
 use ReflectionException;
+use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
 
 class MetricRepository extends BaseRepository
 {
@@ -254,10 +256,10 @@ class MetricRepository extends BaseRepository
             ->join('e.metricConfig', 'mc')
             ->where('mc.channel = :channel')
             ->andWhere('IDENTITY(mc.channeledAccount) = :channeledAccount')
-            ->setParameters([
+            ->setParameters(new ArrayCollection([
                 'channel' => $channel,
                 'channeledAccount' => $channeledAccountId,
-            ])
+            ]))
             ->getQuery();
 
         try {
@@ -279,10 +281,10 @@ class MetricRepository extends BaseRepository
             ->join('e.metricConfig', 'mc')
             ->where('mc.channel = :channel')
             ->andWhere('IDENTITY(mc.page) = :page')
-            ->setParameters([
+            ->setParameters(new ArrayCollection([
                 'channel' => $channel,
                 'page' => $pageId,
-            ])
+            ]))
             ->getQuery();
 
         try {
@@ -306,12 +308,12 @@ class MetricRepository extends BaseRepository
             ->andWhere('mc.name = :name')
             ->andWhere('mc.period = :period')
             ->andWhere('e.metricDate = :metricDate')
-            ->setParameters([
+            ->setParameters(new ArrayCollection([
                 'channel' => $channel,
                 'name' => $name,
                 'period' => $period->value,
                 'metricDate' => $metricDate,
-            ])
+            ]))
             ->getQuery();
 
         try {
@@ -383,12 +385,12 @@ class MetricRepository extends BaseRepository
             ->andWhere('mc.name = :name')
             ->andWhere('mc.period = :period')
             ->andWhere('m.metricDate = :metricDate')
-            ->setParameters([
+            ->setParameters(new ArrayCollection([
                 'channel' => $channel,
                 'name' => $name,
                 'period' => $period->value,
                 'metricDate' => $metricDate,
-            ])
+            ]))
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -402,13 +404,13 @@ class MetricRepository extends BaseRepository
             ->andWhere('mc.name = :name')
             ->andWhere('mc.period = :period')
             ->andWhere('m.metricDate BETWEEN :start AND :end')
-            ->setParameters([
+            ->setParameters(new ArrayCollection([
                 'channel' => $channel,
                 'name' => $name,
                 'period' => $period->value,
                 'start' => $start,
                 'end' => $end,
-            ])
+            ]))
             ->getQuery()
             ->getResult();
     }
@@ -428,10 +430,10 @@ class MetricRepository extends BaseRepository
         ?Device $device = null
     ): ?Metric {
         try {
-            $configSignature = \Classes\KeyGenerator::generateMetricConfigKey(
+            $configSignature = KeyGenerator::generateMetricConfigKey(
                 channel: $channel,
                 name: $name,
-                period: $period,
+                period: $period->value,
                 query: $queryEntity,
                 page: $page,
                 country: $country,
@@ -445,12 +447,12 @@ class MetricRepository extends BaseRepository
                 ->andWhere('mc.name = :name')
                 ->andWhere('mc.period = :period')
                 ->andWhere('m.metricDate = :metricDate')
-                ->setParameters([
+                ->setParameters(new ArrayCollection([
                     'channel' => $channel,
                     'name' => $name,
                     'period' => $period->value,
                     'metricDate' => $metricDate->format('Y-m-d'),
-                ]);
+                ]));
 
             if ($queryEntity) {
                 $qb->andWhere('mc.query = :query')
@@ -537,13 +539,13 @@ class MetricRepository extends BaseRepository
             ->andWhere('mc.name = :name')
             ->andWhere('mc.period = :period')
             ->andWhere('m.metricDate BETWEEN :start AND :end')
-            ->setParameters([
+            ->setParameters(new ArrayCollection([
                 'channel' => $channel,
                 'name' => $name,
                 'period' => $period->value,
                 'start' => $start,
                 'end' => $end,
-            ]);
+            ]));
 
         if (!empty($dimensions)) {
             $i = 0;
