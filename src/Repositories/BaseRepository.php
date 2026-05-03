@@ -485,6 +485,11 @@
                         $sqlField = $this->mapFieldToSql($field);
                         $qb->addSelect("COALESCE($sqlField, 'N/A') AS $quotedField")
                             ->addGroupBy($sqlField);
+                    } elseif (!empty($map['isAttribute'])) {
+                        // Attribute relations must expose the real attribute value only (never FK fallback like page_id).
+                        $sqlField = $this->mapFieldToSql($field);
+                        $qb->addSelect("COALESCE(CAST($sqlField AS $castType), 'N/A') AS $quotedField")
+                            ->addGroupBy($sqlField);
                     } else {
                         $quotedFieldId = $quoteChar.$field."_id".$quoteChar;
                         $qb->addSelect("COALESCE(CAST({$map['alias']}.{$map['field']} AS $castType), CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS $quotedField")
@@ -551,6 +556,25 @@
                             $typeFilter = $isPostgres ? "LOWER({$map['alias']}.type) = LOWER(:f_$key)" : "{$map['alias']}.type = :f_$key";
                             $qb->andWhere($typeFilter)
                                 ->setParameter("f_$key", $value);
+                        } elseif (!empty($map['isAttribute'])) {
+                            // Attribute relations (e.g. page_platform_id, linked_fb_page_id) must filter by attribute value, not FK identity.
+                            $joinRelation($realKey);
+                            $sqlKey = $this->mapFieldToSql($key);
+                            $sqlKeyComparable = $isPostgres ? "CAST($sqlKey AS TEXT)" : "CAST($sqlKey AS CHAR)";
+                            $paramName = 'f_'.preg_replace('/[^a-z0-9]/i', '_', $key);
+                            $condition = $this->resolveFilterCondition($value);
+
+                            if ($condition['operator'] === 'is_null') {
+                                $qb->andWhere("$sqlKey IS NULL");
+                            } else if ($condition['operator'] === 'is_not_null') {
+                                $qb->andWhere("$sqlKey IS NOT NULL");
+                            } else if ($condition['operator'] === 'neq') {
+                                $qb->andWhere("$sqlKeyComparable <> :$paramName")
+                                    ->setParameter($paramName, (string)$condition['value']);
+                            } else {
+                                $qb->andWhere("$sqlKeyComparable = :$paramName")
+                                    ->setParameter($paramName, (string)$condition['value']);
+                            }
                         } else {
                             // Strict Relation Identity Model (Professional ID-only)
                             $targetCol = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
