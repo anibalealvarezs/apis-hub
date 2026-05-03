@@ -23,8 +23,6 @@
     #[ORM\HasLifecycleCallbacks]
     class ChanneledProduct extends ChanneledEntity
     {
-        #[ORM\Column(name: 'platform_id', type: 'string')]
-        protected int|string $platformId;
 
         #[ORM\Column(type: 'string', nullable: true)]
         protected int|string|null $sku;
