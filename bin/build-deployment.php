@@ -144,6 +144,7 @@ if (true) { // Always create DB service in this master/worker architecture
     $services['db'] = [
         'container_name' => "{$deploymentName}-db",
         'image'         => ($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'postgres:16-alpine' : 'mysql:8.0',
+        'shm_size'      => '2g',
         'restart'       => 'always',
         'environment'   => [
             (($db['driver'] ?? 'pdo_pgsql') === 'pdo_pgsql' ? 'POSTGRES_USER' : 'MYSQL_USER') => "\${DB_USER_".strtoupper(str_replace('-','_',$deploymentName)).":-" . ($db['user'] ?? 'postgres') . "}",

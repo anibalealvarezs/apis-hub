@@ -215,6 +215,11 @@ function populateGlobalFields() {
         const gscStatus = document.getElementById('gsc-channel-enabled');
         if (gscStatus) gscStatus.checked = !!currentConfig.gsc_enabled;
 
+        const gscCalcSynth = document.getElementById('gsc-calculate-synthetics');
+        if (gscCalcSynth) {
+            gscCalcSynth.checked = !!(currentConfig.gsc_calculate_synthetics || currentConfig.google_search_console?.calculate_synthetics);
+        }
+
         const fbOrganicStatus = document.getElementById('fb-organic-enabled');
         if (fbOrganicStatus) fbOrganicStatus.checked = !!currentConfig.fb_organic_enabled;
 
@@ -699,9 +704,21 @@ function renderAssets(assets) {
 
     // Reset maps
     availableAssetsMaps = { pages: {}, ad_accounts: {}, gsc: {} };
-    if (assets.facebook_pages) assets.facebook_pages.forEach(p => availableAssetsMaps.pages[String(p.id)] = p);
-    if (assets.facebook_ad_accounts) assets.facebook_ad_accounts.forEach(a => availableAssetsMaps.ad_accounts[String(a.id)] = a);
-    if (assets.gsc) assets.gsc.forEach(g => availableAssetsMaps.gsc[String(g.url)] = g);
+    
+    const getAssetArray = (key) => {
+        const data = assets[key];
+        if (!data) return [];
+        return Array.isArray(data) ? data : Object.values(data);
+    };
+
+    // Standardize assets for indexing
+    const fbPages = [...getAssetArray('facebook_pages'), ...getAssetArray('pages'), ...getAssetArray('fb_pages_full_config')];
+    const fbAdAccounts = [...getAssetArray('facebook_ad_accounts'), ...getAssetArray('ad_accounts'), ...getAssetArray('fb_ad_accounts_full_config')];
+    const gscAssets = [...getAssetArray('gsc'), ...getAssetArray('sites')];
+
+    fbPages.forEach(p => { if (p && p.id) availableAssetsMaps.pages[String(p.id).trim()] = p; });
+    fbAdAccounts.forEach(a => { if (a && a.id) availableAssetsMaps.ad_accounts[String(a.id).trim()] = a; });
+    gscAssets.forEach(g => { if (g && g.url) availableAssetsMaps.gsc[String(g.url).trim()] = g; });
     
     const gscList = document.getElementById('gsc-list');
     const fbOrganicList = document.getElementById('fb-pages-list');
@@ -709,21 +726,29 @@ function renderAssets(assets) {
     
     if (gscList) {
         gscList.innerHTML = '';
-        const props = assets.gsc || [];
+        const props = gscAssets;
         if (props.length === 0) gscList.innerHTML = '<div class="empty-state">No GSC properties found.</div>';
         props.forEach(p => {
-            const configGsc = currentConfig?.gsc || {};
-            const isSynced = configGsc[p.url] !== undefined && !p.lost_access;
+            if (!p || !p.url) return;
+            const cfgGsc = currentConfig?.gsc || currentConfig?.sites || currentConfig?.google_search_console?.sites || {};
+            // Convert to map if it's an array for faster lookup
+            const gscMap = Array.isArray(cfgGsc) ? Object.fromEntries(cfgGsc.map(s => [s.url, s])) : cfgGsc;
+            const savedItem = gscMap[p.url];
+            const isInConfig = savedItem !== undefined;
+            const isSynced = isInConfig && savedItem.enabled !== false && !p.lost_access;
             const displayUrl = p.url.replace('sc-domain:', '');
             const div = document.createElement('div');
             
             let itemClass = 'asset-item';
             if (isSynced) itemClass += ' synced';
+            if (isInConfig) itemClass += ' in-config';
             if (p.is_new) itemClass += ' is-new';
             if (p.lost_access) itemClass += ' lost-access';
 
             div.className = itemClass;
             div.innerHTML = `
+                ${p.is_new ? '<div class="asset-badge-new">NEW</div>' : ''}
+                ${p.lost_access ? '<div class="asset-badge-lost">LOST ACCESS</div>' : ''}
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                    <div style="flex:1; min-width:0;">
                        <div class="asset-text-truncate" title="${displayUrl}" style="font-size:0.75rem; font-weight:600; color:#fff;">${displayUrl}</div>
@@ -741,12 +766,14 @@ function renderAssets(assets) {
 
     if (fbOrganicList) {
         fbOrganicList.innerHTML = '';
-        const pages = assets.facebook_pages || [];
+        const pages = fbPages;
         if (pages.length === 0) fbOrganicList.innerHTML = '<div class="empty-state">No Facebook pages found.</div>';
         
         pages.forEach(p => {
+            if (!p || !p.id) return;
             const getCfg = (key, def = true) => {
-                const savedPages = currentConfig.fb_pages_full_config || [];
+                const rawSaved = currentConfig.fb_pages_full_config || currentConfig.pages || [];
+                const savedPages = Array.isArray(rawSaved) ? rawSaved : Object.values(rawSaved);
                 const pId = String(p.id).trim();
                 const saved = savedPages.find(pg => String(pg.id).trim() === pId);
                 
@@ -779,10 +806,10 @@ function renderAssets(assets) {
                         </div>
                         <div>
                             <div style="font-weight:700; color:white; font-size:0.9rem;">${p.title || 'Untitled Page'}</div>
-                            <div style="display:flex; gap:8px; align-items:center;">
-                                <div style="font-size:0.65rem; color:var(--text-dim);">ID: ${p.id}</div>
-                                ${p.created_time ? `<div style="font-size:0.65rem; color:var(--primary); padding:1px 5px; background:rgba(0,255,150,0.05); border-radius:4px;">Created: ${new Date(p.created_time).toLocaleDateString()}</div>` : ''}
-                                ${p.hostname ? `<div style="font-size:0.65rem; color:var(--secondary); padding:1px 5px; background:rgba(0,150,255,0.05); border-radius:4px;">Host: ${p.hostname}</div>` : ''}
+                            <div style="display:flex; gap:8px; align-items:center; min-width: 0; flex-wrap: nowrap;">
+                                <div style="font-size:0.6rem; color:var(--text-dim); flex-shrink: 0;">ID: ${p.id}</div>
+                                ${p.created_time ? `<div style="font-size:0.6rem; color:var(--primary); padding:1px 5px; background:rgba(0,255,150,0.05); border-radius:4px; flex-shrink: 0;">${new Date(p.created_time).toLocaleDateString()}</div>` : ''}
+                                ${p.hostname ? `<div style="font-size:0.6rem; color:var(--secondary); padding:1px 5px; background:rgba(0,150,255,0.05); border-radius:4px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.hostname}">${p.hostname}</div>` : ''}
                             </div>
                         </div>
                     </div>
@@ -793,7 +820,7 @@ function renderAssets(assets) {
                 </div>
 
                 <!-- Page Options Hierarchy -->
-                <div id="hierarchy-${p.id}" style="display:${getCfg('enabled') ? 'grid' : 'none'}; grid-template-columns: 1fr 1fr; gap:20px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+                <div id="hierarchy-${p.id}" style="display:${getCfg('enabled') ? 'grid' : 'none'}; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap:20px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
                     
                     <!-- FB Section -->
                     <div class="hierarchy-col">
@@ -826,10 +853,10 @@ function renderAssets(assets) {
 
                     <!-- IG Section -->
                     ${p.ig_account ? `
-                    <div class="hierarchy-col" style="border-left: 1px solid rgba(255,255,255,0.05); padding-left: 20px;">
-                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:12px;">
-                            <div style="background:rgba(225, 48, 108, 0.1); color:#E1306C; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:700; text-transform:uppercase; display:flex; align-items:center; gap:5px;">
-                                <i data-lucide="instagram" size="10"></i> ${p.ig_account_name || p.ig_account}
+                    <div class="hierarchy-col" style="border-left: 1px solid rgba(255,255,255,0.05); padding-left: 28px; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:16px; min-width: 0;">
+                            <div style="background:rgba(225, 48, 108, 0.1); color:#E1306C; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:700; text-transform:uppercase; display:flex; align-items:center; gap:5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${p.ig_account_name || p.ig_account}">
+                                <i data-lucide="instagram" size="10" style="flex-shrink: 0;"></i> <span style="overflow: hidden; text-overflow: ellipsis;">${p.ig_account_name || p.ig_account}</span>
                             </div>
                         </div>
                         
@@ -883,23 +910,30 @@ function renderAssets(assets) {
 
     if (fbMarketingList) {
         fbMarketingList.innerHTML = '';
-        const accounts = assets.facebook_ad_accounts || [];
+        const accounts = fbAdAccounts;
         // Sort alphabetically by name
         accounts.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         
         if (accounts.length === 0) fbMarketingList.innerHTML = '<div class="empty-state">No Ad accounts found.</div>';
         accounts.forEach(a => {
-            const syncedIds = currentConfig?.fb_ad_account_ids || [];
-            const isSynced = syncedIds.includes(String(a.id)) && !a.lost_access;
+            if (!a || !a.id) return;
+            const rawAccs = currentConfig.fb_ad_accounts_full_config || currentConfig.ad_accounts || currentConfig.facebook_marketing?.ad_accounts || [];
+            const savedAccs = Array.isArray(rawAccs) ? rawAccs : Object.values(rawAccs);
+            const saved = savedAccs.find(acc => String(acc.id) === String(a.id));
+            const isInConfig = !!saved;
+            const isSynced = isInConfig && saved.enabled !== false && !a.lost_access;
             const div = document.createElement('div');
             
             let itemClass = 'asset-item';
             if (isSynced) itemClass += ' synced';
+            if (isInConfig) itemClass += ' in-config';
             if (a.is_new) itemClass += ' is-new';
             if (a.lost_access) itemClass += ' lost-access';
 
             div.className = itemClass;
             div.innerHTML = `
+                ${a.is_new ? '<div class="asset-badge-new">NEW</div>' : ''}
+                ${a.lost_access ? '<div class="asset-badge-lost" style="font-size: 0.5rem; padding: 1px 5px;">LOST ACCESS</div>' : ''}
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                    <div>
                        <div style="font-size:0.75rem; font-weight:600; color:#fff;">${a.name}</div>
@@ -940,16 +974,17 @@ async function updateConfig(typeArg) {
             feature_toggles: {}
         };
 
-        // Assets Sync Status
+        // Assets Sync Status (GSC)
         document.querySelectorAll('.asset-item').forEach(item => {
             const cb = item.querySelector('.gsc-asset-sync');
-            if (cb && (cb.checked || item.classList.contains('lost-access'))) {
+            if (cb && (cb.checked || item.classList.contains('in-config') || item.classList.contains('lost-access'))) {
                 const url = cb.value;
                 const original = availableAssetsMaps.gsc[url] || {};
                 payload.assets.gsc.push({ 
                     url: url, 
-                    target_countries: [], 
-                    target_keywords: [],
+                    enabled: cb.checked,
+                    target_countries: original.target_countries || [], 
+                    target_keywords: original.target_keywords || [],
                     lost_access: item.classList.contains('lost-access'),
                     data: original.data || []
                 });
@@ -971,6 +1006,8 @@ async function updateConfig(typeArg) {
                 ig_account: igId,
                 lost_access: card.classList.contains('lost-access'),
                 hostname: original.hostname || null,
+                url: original.url || original.link || null,
+                link: original.link || null,
                 created_time: original.created_time || null,
                 data: original.data || [],
                 ig_hostname: original.ig_hostname || null,
@@ -994,12 +1031,13 @@ async function updateConfig(typeArg) {
 
         document.querySelectorAll('.asset-item').forEach(item => {
             const cb = item.querySelector('.fb-marketing-asset-sync');
-            if (cb && (cb.checked || item.classList.contains('lost-access'))) {
+            if (cb && (cb.checked || item.classList.contains('in-config') || item.classList.contains('lost-access'))) {
                 const accId = String(cb.value);
                 const original = availableAssetsMaps.ad_accounts[accId] || {};
                 const nameEl = item.querySelector('[style*="font-weight:600"]');
                 payload.assets.ad_accounts.push({ 
                     id: accId,
+                    enabled: cb.checked,
                     name: nameEl ? nameEl.textContent.trim() : null,
                     lost_access: item.classList.contains('lost-access'),
                     created_time: original.created_time || null,
@@ -1013,6 +1051,9 @@ async function updateConfig(typeArg) {
             payload.cache_history_range = document.getElementById('gsc-history-range')?.value;
             payload.feature_toggles.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
             payload.feature_toggles.cron_recent_minute = document.getElementById('gsc-cron-minute')?.value;
+            
+            const calcSynthEl = document.getElementById('gsc-calculate-synthetics');
+            payload.feature_toggles.calculate_synthetics = calcSynthEl ? calcSynthEl.checked : false;
         } else if (typeArg === 'facebook_organic') {
             payload.enabled = document.getElementById('fb-organic-enabled').checked;
             payload.organic_history_range = document.getElementById('fb-organic-history-range').value;

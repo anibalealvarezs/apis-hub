@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace Core\Conversions;
 
-use Carbon\Carbon;
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
-use Doctrine\Common\Collections\ArrayCollection;
-use Entities\Analytics\Channel;
 use Anibalealvarezs\ApiSkeleton\Enums\Period;
+use Carbon\Carbon;
+use Doctrine\Common\Collections\ArrayCollection;
 use Psr\Log\LoggerInterface;
 use stdClass;
 
 /**
  * UniversalMetricConverter
- * 
+ *
  * Standardizes the conversion of raw provider data into APIs Hub metric objects.
  * Uses a configuration-driven approach to map fields and dimensions.
  */
@@ -32,20 +31,20 @@ class UniversalMetricConverter
     {
         $startTime = microtime(true);
         $collection = new ArrayCollection();
-        
+
         // Configuration defaults
         $channel = $config['channel'] ?? null;
-        if (!$channel) {
+        if (! $channel) {
             throw new \InvalidArgumentException("Channel is required for UniversalMetricConverter");
         }
 
         $period = $config['period'] ?? Period::Daily->value;
         $platformIdField = $config['platform_id_field'] ?? 'id';
         $dateField = $config['date_field'] ?? 'date';
-        
+
         // Metric Mappings: [provider_field => system_name]
         $metricsMap = $config['metrics'] ?? [];
-        
+
         // Dimension Mappings: [breakdown_key]
         $dimensionsKeys = $config['dimensions'] ?? [];
 
@@ -57,12 +56,12 @@ class UniversalMetricConverter
             $dimensions = [];
             foreach ($dimensionsKeys as $dimKey) {
                 if (is_array($dimKey)) {
-                    // Support pre-calculated dimensions (e.g. from GSC aggregation)
+                    // Support pre-calculated dimensions
                     $dimensions[] = $dimKey;
                 } elseif (isset($row[$dimKey])) {
                     $dimensions[] = [
                         'dimensionKey' => $dimKey,
-                        'dimensionValue' => (string) $row[$dimKey]
+                        'dimensionValue' => (string) $row[$dimKey],
                     ];
                 }
             }
@@ -85,13 +84,15 @@ class UniversalMetricConverter
                 $nDate = $metricDate;
                 if (isset($config['nested_date_field'])) {
                     $rawNDate = self::getValueByPath($nRow, $config['nested_date_field']);
-                    if ($rawNDate) $nDate = Carbon::parse((string) $rawNDate)->toDateString();
+                    if ($rawNDate) {
+                        $nDate = Carbon::parse((string) $rawNDate)->toDateString();
+                    }
                 }
 
                 // 4. Process each mapped metric
                 foreach ($metricsMap as $providerField => $systemName) {
                     $rawValue = self::getValueByPath($nRow, $providerField);
-                    if (is_null($rawValue) && !isset($config['include_nulls'])) {
+                    if (is_null($rawValue) && ! isset($config['include_nulls'])) {
                         continue;
                     }
 
@@ -107,12 +108,12 @@ class UniversalMetricConverter
                         'device' => $row['device'] ?? null,
                     ]);
 
-                    $keyParams = array_filter($keyParams, function($v, $k) {
-                        return !is_null($v) && in_array($k, [
+                    $keyParams = array_filter($keyParams, function ($v, $k) {
+                        return ! is_null($v) && in_array($k, [
                             'channel', 'name', 'period', 'account', 'channeledAccount', 'campaign',
                             'channeledCampaign', 'channeledAdGroup', 'channeledAd', 'creative',
                             'page', 'query', 'post', 'product', 'customer', 'order', 'country',
-                            'device', 'dimensionSet'
+                            'device', 'dimensionSet',
                         ]);
                     }, ARRAY_FILTER_USE_BOTH);
 
@@ -135,12 +136,12 @@ class UniversalMetricConverter
 
                     // Metadata filtering (optional)
                     $metadataFields = $config['metadata_fields'] ?? [];
-                    if (!empty($metadataFields)) {
-                        $metric->metadata = array_filter($row, fn($key) => in_array($key, $metadataFields), ARRAY_FILTER_USE_KEY);
+                    if (! empty($metadataFields)) {
+                        $metric->metadata = array_filter($row, fn ($key) => in_array($key, $metadataFields), ARRAY_FILTER_USE_KEY);
                     } else {
                         $metric->metadata = [];
                     }
-                    
+
                     // Inject Context Values (mostly strings for KeyGenerator reference)
                     foreach ($context as $key => $val) {
                         $metric->$key = $val;
@@ -175,11 +176,12 @@ class UniversalMetricConverter
     {
         $keys = explode('.', $path);
         foreach ($keys as $key) {
-            if (!isset($data[$key])) {
+            if (! isset($data[$key])) {
                 return null;
             }
             $data = $data[$key];
         }
+
         return $data;
     }
 

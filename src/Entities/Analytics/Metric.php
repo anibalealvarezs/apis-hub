@@ -22,6 +22,8 @@ use Repositories\MetricRepository;
     columns: ['metric_config_id'],
     name: 'idx_metrics_metric_config_lookup_idx'
 )]
+#[ORM\Index(columns: ['metric_date'], name: 'idx_metrics_metric_date_idx')]
+#[ORM\Index(columns: ['metric_config_id', 'metric_date'], name: 'idx_metrics_config_date_idx')]
 #[ORM\UniqueConstraint(name: 'metric_unique', columns: ['metric_config_id', 'dimensions_hash', 'metric_date'])]
 #[ORM\HasLifecycleCallbacks]
 class Metric extends Entity

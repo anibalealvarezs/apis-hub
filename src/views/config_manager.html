@@ -333,6 +333,31 @@
               <span class="slider"></span>
             </label>
           </div>
+
+          <div
+            class="card compact-card"
+            style="
+              flex-direction: row;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <div>
+              <div
+                class="section-title small"
+                style="margin-bottom: 5px; border: none; padding: 0"
+              >
+                <i data-lucide="calculator"></i> Calculate Synthetics
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-dim)">
+                Generate synthetic records
+              </div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="gsc-calculate-synthetics" />
+              <span class="slider"></span>
+            </label>
+          </div>
           <div class="card compact-card">
             <div class="section-title small">
               <i data-lucide="clock"></i> Dawn Resync Hour
@@ -1406,6 +1431,6 @@
       <script src="/driver-assets/core/footer.js"></script>
     </main>
 
-    <script src="/assets/views/config-manager.js"></script>
+    <script src="/assets/views/config-manager.js?v=3"></script>
   </body>
 </html>

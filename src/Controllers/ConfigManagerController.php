@@ -2,22 +2,22 @@
 
 namespace Controllers;
 
+use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
 use Anibalealvarezs\ApiDriverCore\Services\CacheStrategyService;
+use DateTime;
 use Entities\Analytics\Account;
 use Entities\Analytics\Channel;
 use Entities\Analytics\Channeled\ChanneledAccount;
+use Entities\Analytics\Page;
 use Exception;
 use Helpers\Helpers;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Yaml\Yaml;
+use Throwable;
 
 class ConfigManagerController extends BaseController
 {
-    private string $gscConfigPath;
-    private string $fbConfigPath;
-    private string $fbOrganicPath;
-    private string $fbMarketingPath;
     private string $assetsBackupPath;
 
     public function __construct()
@@ -33,17 +33,17 @@ class ConfigManagerController extends BaseController
         $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
 
         try {
-            $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
+            $driver = DriverFactory::get($channel);
             // We use the common config key from the driver if it exists
             $common = $driver::getCommonConfigKey();
 
             return [
-                'path' => $configDir . "/channels/{$channel}.yaml",
+                'path' => $configDir . "/channels/$channel.yaml",
                 'common' => $common,
             ];
-        } catch (Exception $e) {
+        } catch (Exception) {
             return [
-                'path' => $configDir . "/channels/{$channel}.yaml",
+                'path' => $configDir . "/channels/$channel.yaml",
                 'common' => null,
             ];
         }
@@ -66,7 +66,7 @@ class ConfigManagerController extends BaseController
             $requestedType = $request->query->get('type');
             $forceRefresh = $request->query->get('refresh') === '1';
 
-            $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
+            $availableChannels = DriverFactory::getAvailableChannels();
             $systemConfig = Helpers::getProjectConfig();
 
             // Initial generic config
@@ -93,12 +93,14 @@ class ConfigManagerController extends BaseController
                 try {
                     $backup = Yaml::parseFile($this->assetsBackupPath);
                     $previousAssets = $backup['assets'] ?? [];
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $logger->warning("Failed to load assets backup: " . $e->getMessage());
                 }
             }
 
             foreach ($availableChannels as $chan) {
+                $driver = DriverFactory::get($chan);
+
                 try {
                     $chanConfig = $systemConfig['channels'][$chan] ?? [];
 
@@ -106,25 +108,19 @@ class ConfigManagerController extends BaseController
                     $isRequestedType = $requestedType && ($chan === $requestedType || str_contains($chan, $requestedType));
 
                     if (! empty($chanConfig) || $isRequestedType || $forceRefresh) {
-                        $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
                         $uiConfig = $driver->prepareUiConfig($chanConfig);
                         $currentConfig = array_replace_recursive($currentConfig, $uiConfig);
                     }
 
-                    // Fast Load Logic for Assets: Populate basic asset lists without full discovery
+                    // Fast Load Logic for Assets: Populate basic asset lists from config without full discovery
                     if (! $forceRefresh) {
-                        if ($chan === 'google_search_console') {
-                            if (isset($chanConfig['sites'])) {
-                                $allAssets['gsc'] = array_values($chanConfig['sites']);
-                            }
-                        } elseif (str_contains($chan, 'facebook_organic')) {
-                            if (isset($chanConfig['pages'])) {
-                                $allAssets['facebook_pages'] = array_merge($allAssets['facebook_pages'] ?? [], array_values($chanConfig['pages']));
-                            }
-                        } elseif ($chan === 'facebook_marketing') {
-                            if (isset($chanConfig['ad_accounts'])) {
-                                $allAssets['facebook_ad_accounts'] = array_values($chanConfig['ad_accounts']);
-                            }
+                        $resourceKey = $systemConfig[$chan]['resource_key'] ?? null;
+                        if ($resourceKey && isset($chanConfig[$resourceKey])) {
+                            // Merge with existing assets if the key is already present (e.g. across multiple social channels)
+                            $allAssets[$resourceKey] = array_merge(
+                                $allAssets[$resourceKey] ?? [],
+                                array_values($chanConfig[$resourceKey])
+                            );
                         }
 
                         // If it's not a requested type for asset discovery, we skip the slow Discovery part
@@ -139,18 +135,18 @@ class ConfigManagerController extends BaseController
                         // Mix with previous assets to detect "NEW" and "LOST ACCESS"
                         foreach ($driverAssets as $assetKey => $assetList) {
                             $prevList = $previousAssets[$assetKey] ?? [];
-                            $prevIds = array_map(fn ($a) => (string)($a['id'] ?? ''), $prevList);
-                            $freshIds = array_map(fn ($a) => (string)($a['id'] ?? ''), $assetList);
+                            $prevIds = array_map(fn ($a) => (string)($a['id'] ?? $a['url'] ?? ''), $prevList);
+                            $freshIds = array_map(fn ($a) => (string)($a['id'] ?? $a['url'] ?? ''), $assetList);
 
                             // Mark newly discovered assets
                             foreach ($assetList as &$asset) {
-                                $asset['is_new'] = ! empty($prevIds) && ! in_array((string)($asset['id'] ?? ''), $prevIds);
+                                $asset['is_new'] = ! empty($prevIds) && ! in_array((string)($asset['id'] ?? $asset['url'] ?? ''), $prevIds);
                             }
                             unset($asset);
 
                             // Append previously-known assets that Meta no longer returns → lost_access
                             foreach ($prevList as $prevAsset) {
-                                $prevId = (string)($prevAsset['id'] ?? '');
+                                $prevId = (string)($prevAsset['id'] ?? $prevAsset['url'] ?? '');
                                 if ($prevId && ! in_array($prevId, $freshIds)) {
                                     $prevAsset['lost_access'] = true;
                                     $prevAsset['enabled'] = false;
@@ -187,11 +183,11 @@ class ConfigManagerController extends BaseController
 
     public function updateConfig(Request $request): Response
     {
+        $logger = Helpers::setLogger('config-manager.log');
+
         try {
-            $logger = Helpers::setLogger('config-manager.log');
             $data = json_decode($request->getContent(), true);
             $type = $data['type'] ?? '';
-            $assets = $data['assets'] ?? [];
 
             $logger->info("Update config request received for type: " . $type, ['payload' => $data]);
 
@@ -227,7 +223,7 @@ class ConfigManagerController extends BaseController
                 $logger->info("Global config updated successfully");
             } else {
                 // GENERIC CHANNEL UPDATE (MODULAR)
-                $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
+                $availableChannels = DriverFactory::getAvailableChannels();
                 $channels = array_filter($availableChannels, function ($c) use ($type) {
                     $cNorm = str_replace('-', '_', $c);
                     $typeNorm = str_replace('-', '_', $type);
@@ -241,7 +237,7 @@ class ConfigManagerController extends BaseController
 
                 foreach ($channels as $chan) {
                     try {
-                        $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan);
+                        $driver = DriverFactory::get($chan);
                         $attrs = $this->getChannelAttributes($chan);
 
                         // 1. Update Common Config if applicable
@@ -261,7 +257,7 @@ class ConfigManagerController extends BaseController
                         // (Now handled implicitly by the enabled flag in the same file)
 
                         // 3. Optional: Database Provisioning (Monolith concern)
-                        $this->syncAssetsToDatabase($chan, $updatedConfig, $logger);
+                        $this->syncAssetsToDatabase($chan, $logger);
 
                         $logger->info("Config updated successfully for channel: " . $chan);
                     } catch (Exception $e) {
@@ -279,7 +275,7 @@ class ConfigManagerController extends BaseController
             Helpers::resetConfigs();
 
             return new Response(json_encode(['success' => true]), 200, ['Content-Type' => 'application/json']);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $logger->error("Error updating config: " . $e->getMessage());
 
             return new Response(json_encode(['error' => $e->getMessage()]), 500, ['Content-Type' => 'application/json']);
@@ -293,7 +289,7 @@ class ConfigManagerController extends BaseController
             $data = json_decode($request->getContent(), true);
             $type = $data['type'] ?? 'all';
             $logger->info("Validation request received for type: " . $type, ['payload' => $data]);
-            $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
+            $availableChannels = DriverFactory::getAvailableChannels();
 
             $results = [];
 
@@ -306,13 +302,13 @@ class ConfigManagerController extends BaseController
                 }
             }
 
-            $allConfigs = \Helpers\Helpers::getChannelsConfig();
+            $allConfigs = Helpers::getChannelsConfig();
             $providerResults = [];
 
             foreach ($channelsToValidate as $chan) {
                 try {
                     // Identify the provider (commonKey)
-                    $registryConfig = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chan);
+                    $registryConfig = DriverFactory::getChannelConfig($chan);
                     $driverClass = $registryConfig['driver'] ?? null;
                     $commonKey = ($driverClass && class_exists($driverClass)) ? $driverClass::getCommonConfigKey() : $chan;
 
@@ -330,7 +326,7 @@ class ConfigManagerController extends BaseController
                         }
                     }
 
-                    $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chan, $logger, $chanConfig);
+                    $driver = DriverFactory::get($chan, $logger, $chanConfig);
                     $validation = $driver->validateAuthentication();
 
                     $result = [
@@ -365,7 +361,7 @@ class ConfigManagerController extends BaseController
             }
 
             $configs = [];
-            $allChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
+            $allChannels = DriverFactory::getAvailableChannels();
             $configDir = getenv('CONFIG_DIR') ?: __DIR__ . '/../../config';
 
             foreach ($allChannels as $chan) {
@@ -386,187 +382,180 @@ class ConfigManagerController extends BaseController
         }
     }
 
-    private function syncAssetsToDatabase(string $channel, array $config, $logger): void
+    private function syncAssetsToDatabase(string $channel, $logger): void
     {
-        $logger->info("DEBUG: syncAssetsToDatabase START for $channel");
+        // 1. Get Registry and dynamic keys
+        $systemConfig = Helpers::getProjectConfig();
+        $resourceKey = $systemConfig[$channel]['resource_key'] ?? null;
 
         try {
-            $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($channel);
-            $patterns = $driver->getAssetPatterns();
-            $logger->info("DEBUG: Patterns loaded: " . implode(', ', array_keys($patterns)));
+            $driver = DriverFactory::get($channel);
             // Read channel config directly from disk (already saved before this method is called).
-            // Do NOT call resetConfigs() here — it nulls the EntityManager and corrupts the persistence flow.
-            $configDir = Helpers::getConfigDir();
-            $chanYaml = $configDir . '/channels/' . $channel . '.yaml';
-            $rawConfig = file_exists($chanYaml) ? (\Symfony\Component\Yaml\Yaml::parseFile($chanYaml) ?: []) : [];
+            $chanYaml = Helpers::getConfigDir() . '/channels/' . $channel . '.yaml';
+            $rawConfig = file_exists($chanYaml) ? (Yaml::parseFile($chanYaml) ?: []) : [];
             $chanConfig = $rawConfig['channels'][$channel] ?? $rawConfig;
             $logger->info("DEBUG: Config loaded from disk for $channel");
-
-            // 1. Get Channel Entity (Fast lookup)
             $channelEntity = $this->em->getRepository(Channel::class)->findOneBy(['name' => $channel]);
-            if (! $channelEntity) {
-                $logger->warning("Unknown channel encountered during database sync: $channel");
 
-                return;
-            }
-            // End Get Channel Entity
-
-            // 2. Bulk Load ALL ChanneledAccounts for this channel to avoid N+1 queries
-            $existingEntities = $this->em->getRepository(ChanneledAccount::class)->findBy(['channel' => $channelEntity->getId()]);
-            $entitiesMap = [];
-            foreach ($existingEntities as $e) {
-                $entitiesMap[(string)$e->getPlatformId()] = $e;
-            }
-
-            // 3. Pre-collect all potential canonical IDs from ALL patterns to bulk load Pages
-            $allCanonicalIds = [];
-            foreach ($patterns as $assetKey => $pattern) {
-                $assets = $chanConfig[$pattern['key']] ?? [];
-                foreach ($assets as $asset) {
-                    if (isset($pattern['page'])) {
-                        $rawPlatformId = match($pattern['page']['platform_id']['type']) {
-                            'md5' => md5($asset[$pattern['page']['platform_id']['key']]),
-                            'raw' => $asset[$pattern['page']['platform_id']['key']],
-                            default => $asset[$pattern['page']['platform_id']['key']]
-                        };
-                        if (method_exists($driver, 'getCleanId')) {
-                            $platformId = $driver->getCleanId($rawPlatformId);
-                        } else {
-                            $platformId = $rawPlatformId;
-                        }
-                        $hostname = method_exists($driver, 'getCleanHostname') ? $driver->getCleanHostname($asset[$pattern['page']['hostname_key']]) : ($asset[$pattern['page']['hostname_key']] ?? null);
-                        $canSource = $pattern['page']['canonical_id']['field'];
-                        $canValue = match($canSource) {
-                            'platformId' => $platformId,
-                            'hostname' => $hostname,
-                            default => $asset[$canSource] ?? null
-                        };
-                        if (! empty($canValue)) {
-                            $allCanonicalIds[] = $pattern['page']['canonical_id']['preffix'] . ':' . $canValue;
-                        }
-                    }
-                }
-            }
-
-            $pagesMap = [];
-            if (! empty($allCanonicalIds)) {
-                $existingPages = $this->em->getRepository(\Entities\Analytics\Page::class)->findBy(['canonicalId' => $allCanonicalIds]);
-                foreach ($existingPages as $p) {
-                    $pagesMap[$p->getCanonicalId()] = $p;
-                }
-            }
-            // End Get Entities
-
-            // 4. Identify common account group
+            // 2. Identify common account group
             $commonKey = $driver::getCommonConfigKey();
             $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
             $groupName = $chanConfig['accounts_group_name'] ?? ($rawConfig['channels'][$commonKey]['accounts_group_name'] ?? $defaultGroupName);
             $accountEntity = $this->getOrCreateAccount($groupName);
-            // End Identify common account group
 
-            foreach ($patterns as $assetKey => $pattern) {
-                $assets = $chanConfig[$pattern['key']] ?? [];
-                if (empty($assets)) {
-                    $logger->info("No assets found for key: $assetKey");
+            // 4. Get all pages to be persisted with their related channeled accounts (if defined)
+            $allPages = [];
+            $allChaneledAccounts = [];
 
-                    continue;
-                }
+            $assets = ($resourceKey && isset($chanConfig[$resourceKey])) ? $chanConfig[$resourceKey] : [];
+
+            if (empty($assets)) {
+                $logger->info("No assets found for channel: $channel under key: $resourceKey");
+            } else {
                 foreach ($assets as $asset) {
-                    if (isset($pattern['channeled_account'])) {
-                        // Prepare channeled account for processing
-                        $rawPlatformId = match($pattern['channeled_account']['platform_id']['type']) {
-                            'md5' => md5($asset[$pattern['channeled_account']['platform_id']['key']]),
-                            'raw' => $asset[$pattern['channeled_account']['platform_id']['key']],
-                            default => $asset[$pattern['channeled_account']['platform_id']['key']]
-                        };
-                        if (method_exists($driver, 'getCleanId')) {
-                            $platformId = $driver->getCleanId($rawPlatformId);
-                        } else {
-                            $platformId = $rawPlatformId;
+                    if (method_exists($driver, 'getPages')) {
+                        $allPages = [...$allPages, ...$driver::getPages($asset)];
+                    }
+                    if (method_exists($driver, 'getChanneledAccounts')) {
+                        $allChaneledAccounts = [...$allChaneledAccounts, ...$driver::getChanneledAccounts($asset)];
+                    }
+                }
+            }
+
+            // Also check for ad_accounts if not already the primary resource key (secondary assets)
+            if (! empty($chanConfig['ad_accounts']) && $resourceKey !== 'ad_accounts') {
+                foreach ($chanConfig['ad_accounts'] as $asset) {
+                    if (method_exists($driver, 'getChanneledAccounts')) {
+                        $allChaneledAccounts = [...$allChaneledAccounts, ...$driver::getChanneledAccounts($asset)];
+                    }
+                }
+            }
+
+            $logger->info("DEBUG: Counted pages: " . count($allPages));
+            $logger->info("DEBUG: Counted channeled accounts: " . count($allChaneledAccounts));
+
+            // 4. Pre-collect all potential pages IDs to bulk load Pages
+            $pagesMap = [];
+            if (! empty($allPages)) {
+                $existingPages = $this->em->getRepository(Page::class)->findBy(['canonicalId' => array_map(fn ($p) => $p['canonicalId'], $allPages)]);
+                foreach ($existingPages as $p) {
+                    $pagesMap[$p->getCanonicalId()] = $p;
+                }
+            }
+
+            // 5. Pre-collect all potential channeled accounts IDs to bulk load ChanneledAccounts
+            $channeledAccountsMap = [];
+            if (! empty($allChaneledAccounts)) {
+                $existingChanneledAccounts = $this->em->getRepository(ChanneledAccount::class)->findBy([
+                    'platformId' => array_map(fn ($a) => $a['platformId'], $allChaneledAccounts),
+                    'channel' => $channelEntity,
+                ]);
+                foreach ($existingChanneledAccounts as $c) {
+                    $channeledAccountsMap[(string)$c->getPlatformId()] = $c;
+                }
+            }
+
+            // 6. Persist assets with nested logic using dynamic resource key
+            foreach ($assets as $asset) {
+                $groupPages = method_exists($driver, 'getPages') ? $driver::getPages($asset) : [];
+                $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
+
+                $anyEnabled = false;
+                foreach ($groupPages as $p) {
+                    if ($p['enabled'] ?? true) {
+                        $anyEnabled = true;
+
+                        break;
+                    }
+                }
+                if (! $anyEnabled) {
+                    foreach ($groupAccounts as $a) {
+                        if ($a['enabled'] ?? true) {
+                            $anyEnabled = true;
+
+                            break;
                         }
+                    }
+                }
 
-                        if (empty($platformId)) {
-                            continue;
+                foreach ($groupPages as $page) {
+                    $dbPage = $pagesMap[$page['canonicalId']] ?? null;
+                    if (! $dbPage && ! $anyEnabled) {
+                        continue;
+                    }
+                    if (! $dbPage) {
+                        $dbPage = new Page();
+                        $dbPage->addCanonicalId($page['canonicalId']);
+                    }
+                    $dbPage->addUrl($page['url'])
+                        ->addTitle($page['title'])
+                        ->addAccount($accountEntity)
+                        ->addPlatformId($page['platformId'])
+                        ->addHostname($page['hostname'])
+                        ->addData($page['data']);
+                    $this->em->persist($dbPage);
+                    $pagesMap[$page['canonicalId']] = $dbPage;
+                }
+
+                foreach ($groupAccounts as $account) {
+                    $dbChanneledAccount = $channeledAccountsMap[$account['platformId']] ?? null;
+                    if (! $dbChanneledAccount && ! $anyEnabled) {
+                        continue;
+                    }
+                    if (! $dbChanneledAccount) {
+                        $dbChanneledAccount = new ChanneledAccount();
+                        $dbChanneledAccount->addPlatformId($account['platformId']);
+                    }
+                    $dbChanneledAccount->addAccount($accountEntity)
+                        ->addType($account['type'])
+                        ->addChannel($channelEntity)
+                        ->addName($account['name'])
+                        ->addPlatformCreatedAt(is_string($account['platformCreatedAt']) ? new DateTime($account['platformCreatedAt']) : null)
+                        ->addData($account['data'])
+                        ->setEnabled($account['enabled'] ?? true);
+                    $this->em->persist($dbChanneledAccount);
+                    $channeledAccountsMap[$account['platformId']] = $dbChanneledAccount;
+                }
+            }
+
+            // 7. Persist ad accounts (if not already handled by resourceKey logic)
+            if (! empty($chanConfig['ad_accounts']) && $resourceKey !== 'ad_accounts') {
+                foreach ($chanConfig['ad_accounts'] as $asset) {
+                    $groupAccounts = method_exists($driver, 'getChanneledAccounts') ? $driver::getChanneledAccounts($asset) : [];
+                    $anyEnabled = false;
+                    foreach ($groupAccounts as $a) {
+                        if ($a['enabled'] ?? true) {
+                            $anyEnabled = true;
+
+                            break;
                         }
-
-                        $platformCreatedAt = $asset[$pattern['channeled_account']['platform_created_at_key']] ?? null;
-                        $typeMark = $pattern['channeled_account']['type'];
-                        $name = $asset[$pattern['channeled_account']['name_key']] ?? null;
-                        $data = $asset[$pattern['channeled_account']['data_key']] ?? [];
-
-                        $dbChanneled = $entitiesMap[$platformId] ?? null;
-                        if (! $dbChanneled) {
-                            $dbChanneled = new ChanneledAccount();
-                            $dbChanneled->addPlatformId($platformId);
-                        }
-
-                        // Process channeled account
-                        $dbChanneled->addAccount($accountEntity)
-                            ->addType($typeMark)
-                            ->addChannel($channelEntity)
-                            ->addName($name)
-                            ->addPlatformCreatedAt(is_string($platformCreatedAt) ? new \DateTime($platformCreatedAt) : null)
-                            ->addData($data);
-                        $this->em->persist($dbChanneled);
-                        $entitiesMap[$platformId] = $dbChanneled;
                     }
 
-                    if (isset($pattern['page'])) {
-                        // Prepare channeled account for processing
-                        $rawPlatformId = match($pattern['page']['platform_id']['type']) {
-                            'md5' => md5($asset[$pattern['page']['platform_id']['key']]),
-                            'raw' => $asset[$pattern['page']['platform_id']['key']],
-                            default => $asset[$pattern['page']['platform_id']['key']]
-                        };
-                        if (method_exists($driver, 'getCleanId')) {
-                            $platformId = $driver->getCleanId($rawPlatformId);
-                        } else {
-                            $platformId = $rawPlatformId;
-                        }
-                        $hostname = method_exists($driver, 'getCleanHostname') ? $driver->getCleanHostname($asset[$pattern['page']['hostname_key']]) : ($asset[$pattern['page']['hostname_key']] ?? null);
-                        $title = $asset[$pattern['page']['title_key']] ?? null;
-                        $url = match($pattern['page']['url']['type']) {
-                            'custom' => $pattern['page']['url']['preffix'] . $asset[$pattern['page']['url']['key']],
-                            'default' => $asset['url'] ?? null,
-                            'normal' => $asset['url'] ?? null,
-                            default => $asset['url'] ?? null
-                        };
-                        $canSource = $pattern['page']['canonical_id']['field'];
-                        $canValue = match($canSource) {
-                            'platformId' => $platformId,
-                            'hostname' => $hostname,
-                            default => $asset[$canSource] ?? null
-                        };
-
-                        if (empty($canValue)) {
+                    foreach ($groupAccounts as $account) {
+                        $dbChanneledAccount = $channeledAccountsMap[$account['platformId']] ?? null;
+                        if (! $dbChanneledAccount && ! $anyEnabled) {
                             continue;
                         }
-
-                        $canonicalId = $pattern['page']['canonical_id']['preffix'] . ':' . $canValue;
-                        $data = $asset[$pattern['page']['data_key']] ?? [];
-
-                        $dbPage = $pagesMap[$canonicalId] ?? null;
-
-                        if (! $dbPage) {
-                            $dbPage = new \Entities\Analytics\Page();
-                            $dbPage->addCanonicalId($canonicalId);
-                            $pagesMap[$canonicalId] = $dbPage;
+                        if (! $dbChanneledAccount) {
+                            $dbChanneledAccount = new ChanneledAccount();
+                            $dbChanneledAccount->addPlatformId($account['platformId']);
                         }
-
-                        $dbPage->addUrl($url)
-                                ->addTitle($title)
-                                ->addAccount($accountEntity)
-                                ->addPlatformId($platformId)
-                                ->addHostname($hostname)
-                                ->addData($data);
-                        $this->em->persist($dbPage);
+                        $dbChanneledAccount->addAccount($accountEntity)
+                            ->addType($account['type'])
+                            ->addChannel($channelEntity)
+                            ->addName($account['name'])
+                            ->addPlatformCreatedAt(is_string($account['platformCreatedAt']) ? new DateTime($account['platformCreatedAt']) : null)
+                            ->addData($account['data'])
+                            ->setEnabled($account['enabled'] ?? true);
+                        $this->em->persist($dbChanneledAccount);
+                        $channeledAccountsMap[$account['platformId']] = $dbChanneledAccount;
                     }
                 }
             }
             $logger->info("DEBUG: Attempting final flush for $channel");
             $this->em->flush();
             $logger->info("DEBUG: syncAssetsToDatabase FINISHED for $channel");
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $logger->error("Sync Assets Error for $channel: " . $e->getMessage());
         }
     }
@@ -589,31 +578,6 @@ class ConfigManagerController extends BaseController
             'success' => true,
             'message' => "All aggregation caches for '$channel' cleared.",
         ]));
-    }
-
-    public static function getCountryList(): array
-    {
-        return [
-            'usa' => 'United States',
-            'esp' => 'Spain',
-            'mex' => 'Mexico',
-            'col' => 'Colombia',
-            'arg' => 'Argentina',
-            'ven' => 'Venezuela',
-            'per' => 'Peru',
-            'chi' => 'Chile',
-            'ecu' => 'Ecuador',
-            'gua' => 'Guatemala',
-            'pan' => 'Panama',
-            'dom' => 'Dominican Republic',
-            'cos' => 'Costa Rica',
-            'can' => 'Canada',
-            'gbr' => 'United Kingdom',
-            'fra' => 'France',
-            'deu' => 'Germany',
-            'ita' => 'Italy',
-            'bra' => 'Brazil',
-        ];
     }
 
     private function getEffectiveCronSchedules(): array
@@ -641,12 +605,17 @@ class ConfigManagerController extends BaseController
                 }
                 $schedules[$key] = ['minute' => $minute, 'hour' => $hour, 'time' => "$minute $hour"];
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
         }
 
         return $schedules;
     }
 
+    /**
+     * @throws OptimisticLockException
+     * @throws NotSupported
+     * @throws ORMException
+     */
     private function getOrCreateAccount(string $name): Account
     {
         $accountEntity = $this->em->getRepository(Account::class)->findOneBy(['name' => $name]);

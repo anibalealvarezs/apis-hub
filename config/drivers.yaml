@@ -4,7 +4,7 @@ google_search_console:
   driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver'
   auth: 'Anibalealvarezs\GoogleHubDriver\Auth\GoogleAuthProvider'
   processor: ['Classes\Requests\MetricRequests', "persist"]
-  entities: ["metrics", "queries"]
+  entities: ["metrics", "queries", "entities"]
 google_analytics:
   parent: google
   driver: 'Anibalealvarezs\GoogleHubDriver\Drivers\GoogleAnalyticsDriver'
@@ -16,15 +16,14 @@ facebook_marketing:
   driver: 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver'
   auth: 'Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider'
   processor: ['Classes\Requests\MetricRequests', "persist"]
-  entities:
-    ["metrics", "campaigns", "ad_groups", "ads", "creatives", "customers"]
+  entities: ["metrics", "campaigns", "ad_groups", "ads", "creatives", "customers", "entities"]
 facebook_organic:
   parent: facebook
   resource_key: pages
   driver: 'Anibalealvarezs\MetaHubDriver\Drivers\FacebookOrganicDriver'
   auth: 'Anibalealvarezs\MetaHubDriver\Auth\FacebookAuthProvider'
   processor: ['Classes\Requests\MetricRequests', "persist"]
-  entities: ["metrics", "pages", "posts", "customers"]
+  entities: ["metrics", "pages", "posts", "customers", "entities"]
 shopify:
   resource_key: stores
   driver: 'Anibalealvarezs\ShopifyHubDriver\Drivers\ShopifyDriver'

@@ -3,8 +3,13 @@
 namespace Commands;
 
 use Anibalealvarezs\ApiDriverCore\Classes\KeyGenerator;
+use Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity;
 use Anibalealvarezs\ApiDriverCore\Interfaces\DimensionManagerInterface;
 use Anibalealvarezs\ApiDriverCore\Interfaces\SeederInterface;
+use Anibalealvarezs\ApiSkeleton\Enums\Period;
+use Classes\MetricsProcessor;
+use Doctrine\Common\Collections\Collection;
+use Doctrine\ORM\Exception\ORMException;
 use Entities\Analytics\Channel;
 use Anibalealvarezs\ApiSkeleton\Enums\Country as CountryEnum;
 use Classes\DimensionManager;
@@ -21,6 +26,7 @@ use Entities\Analytics\Device;
 use Entities\Analytics\Page;
 use Entities\Analytics\Post;
 use Entities\Analytics\Query;
+use Exception;
 use Faker\Factory;
 use Helpers\Helpers;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -81,9 +87,12 @@ class SeedDemoDataCommand extends Command implements SeederInterface
         return $this->dimensionSetCache["$age|$gen"] ?? ['id' => 0, 'hash' => 'none'];
     }
 
-    public function getEntityClass(string $type): string
+    /**
+     * @throws Exception
+     */
+    public function getEntityClass(string $shortName): string
     {
-        return match($type) {
+        return match($shortName) {
             'account' => Account::class,
             'channeled_account' => ChanneledAccount::class,
             'campaign' => Campaign::class,
@@ -95,23 +104,30 @@ class SeedDemoDataCommand extends Command implements SeederInterface
             'query' => Query::class,
             'country' => Country::class,
             'device' => Device::class,
-            default => throw new \Exception("Unknown entity type: $type")
+            default => throw new Exception("Unknown entity type: $shortName")
         };
     }
 
-    public function getEnumClass(string $type): string
+    /**
+     * @throws Exception
+     */
+    public function getEnumClass(string $shortName): string
     {
-        return match($type) {
+        return match($shortName) {
             'channel' => Channel::class,
             'account_type' => \Enums\Account::class,
-            'country' => \Anibalealvarezs\ApiSkeleton\Enums\Country::class,
+            'country' => CountryEnum::class,
             'device' => \Anibalealvarezs\ApiSkeleton\Enums\Device::class,
-            'period' => \Anibalealvarezs\ApiSkeleton\Enums\Period::class,
-            default => throw new \Exception("Unknown enum type: $type")
+            'period' => Period::class,
+            default => throw new Exception("Unknown enum type: $shortName")
         };
     }
 
-    public function resolveEntity(string $type, array $params): mixed
+    /**
+     * @throws ORMException
+     * @throws Exception
+     */
+    public function resolveEntity(string $type, array $params): UniversalEntity
     {
         $class = $this->getEntityClass($type);
         $repo = $this->entityManager->getRepository($class);
@@ -125,7 +141,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
         if (isset($params['channel'])) $criteria['channel'] = $params['channel'];
         if (isset($params['channeledAccount'])) {
             $ca = $params['channeledAccount'];
-            $criteria['channeledAccount'] = ($ca instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity) ? $this->entityManager->getReference($this->getEntityClass('channeled_account'), $ca->id) : $ca;
+            $criteria['channeledAccount'] = ($ca instanceof UniversalEntity) ? $this->entityManager->getReference($this->getEntityClass('channeled_account'), $ca->getPlatformId()) : $ca;
         }
 
         $entity = empty($criteria) ? null : $repo->findOneBy($criteria);
@@ -154,7 +170,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
             foreach ($params as $key => $val) {
                 if (isset($setters[$key]) && method_exists($entity, $setters[$key])) {
                     $method = $setters[$key];
-                    if ($val instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity) {
+                    if ($val instanceof UniversalEntity) {
                         $relType = match($key) {
                             'account' => 'account',
                             'channeledAccount' => 'channeled_account',
@@ -164,7 +180,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
                             default => null
                         };
                         if ($relType) {
-                            $val = $this->entityManager->getReference($this->getEntityClass($relType), $val->id);
+                            $val = $this->entityManager->getReference($this->getEntityClass($relType), $val->getPlatformId());
                         }
                     }
                     $entity->$method($val);
@@ -175,7 +191,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
             $this->entityManager->flush();
         }
 
-        $ue = new \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity();
+        $ue = new UniversalEntity();
         $ue->setPlatformId($entity->getPlatformId() ?? (method_exists($entity, 'getCampaignId') ? $entity->getCampaignId() : null))
            ->setChannel($entity->getChannel())
            ->setTitle(method_exists($entity, 'getName') ? $entity->getName() : (method_exists($entity, 'getTitle') ? $entity->getTitle() : null))
@@ -186,7 +202,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
         return $ue;
     }
 
-    public function processMetricsMassive(\Doctrine\Common\Collections\Collection $metrics): void
+    public function processMetricsMassive(Collection $metrics): void
     {
         if ($metrics->isEmpty()) {
             return;
@@ -209,7 +225,7 @@ class SeedDemoDataCommand extends Command implements SeederInterface
 
             $accountMap = ['map' => [], 'mapReverse' => []];
 
-            $metricConfigMap = \Classes\MetricsProcessor::processMetricConfigs(
+            $metricConfigMap = MetricsProcessor::processMetricConfigs(
                 metrics: $metrics,
                 manager: $this->entityManager,
                 processQueries: true,
@@ -232,14 +248,14 @@ class SeedDemoDataCommand extends Command implements SeederInterface
                 logger: null
             );
 
-            $metricMap = \Classes\MetricsProcessor::processMetrics(
+            $metricMap = MetricsProcessor::processMetrics(
                 metrics: $metrics,
                 manager: $this->entityManager,
                 metricConfigMap: $metricConfigMap,
                 logger: null
             );
 
-            \Classes\MetricsProcessor::processChanneledMetrics(
+            MetricsProcessor::processChanneledMetrics(
                 metrics: $metrics,
                 manager: $this->entityManager,
                 metricMap: $metricMap,

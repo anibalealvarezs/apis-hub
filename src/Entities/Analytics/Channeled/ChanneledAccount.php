@@ -31,6 +31,9 @@ class ChanneledAccount extends ChanneledEntity
     #[ORM\Column(type: 'string')]
     protected string $type;
 
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    protected bool $enabled = true;
+
     // Relationships with non-channeled entities
 
     #[ORM\ManyToOne(targetEntity: Account::class, inversedBy: 'channeledAccounts')]
@@ -89,6 +92,24 @@ class ChanneledAccount extends ChanneledEntity
     public function getType(): string
     {
         return $this->type;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isEnabled(): bool
+    {
+        return $this->enabled;
+    }
+
+    /**
+     * @param bool $enabled
+     * @return static
+     */
+    public function setEnabled(bool $enabled): static
+    {
+        $this->enabled = $enabled;
+        return $this;
     }
 
     /**

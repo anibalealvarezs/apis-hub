@@ -73,7 +73,7 @@ class InstallDriversCommand extends Command
                 // Get Channel Info
                 $channelLabel = method_exists($driverClass, 'getChannelLabel') ? $driverClass::getChannelLabel() : ucfirst($channelName);
                 $channelIcon = method_exists($driverClass, 'getChannelIcon') ? $driverClass::getChannelIcon() : substr($channelLabel, 0, 1);
-                $cooldown = method_exists($driverClass, 'getCooldown') ? $driverClass::getCooldown() : (str_contains($channelName, 'facebook') || str_contains($channelName, 'instagram') ? 3600 : 600);
+                $cooldown = method_exists($driverClass, 'getCooldown') ? $driverClass::getCooldown() : 600;
 
                 // For validation, we use the static label or just the registry key
                 // Instantiating the driver here is dangerous as it may have dependencies
