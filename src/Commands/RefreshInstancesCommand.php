@@ -18,6 +18,7 @@ class RefreshInstancesCommand extends Command
     {
         $defaultPort = getenv('STARTING_HOST_PORT') ?: 8081;
         $this
+            ->setName('app:refresh-instances')
             ->setDescription('Regenerates config/instances.yaml based on business rules.')
             ->addOption('no-deps', null, InputOption::VALUE_NONE, 'Do not add dependency chains between instances')
             ->addOption('base-port', 'p', InputOption::VALUE_REQUIRED, 'Base port to start from', (string) $defaultPort);
