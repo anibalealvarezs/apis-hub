@@ -1,150 +1,150 @@
 <?php
 
-namespace Entities\Analytics\Channeled;
+    namespace Entities\Analytics\Channeled;
 
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-use Doctrine\ORM\Mapping as ORM;
-use Entities\Analytics\Vendor;
-use Repositories\Channeled\ChanneledVendorRepository;
+    use Doctrine\Common\Collections\ArrayCollection;
+    use Doctrine\Common\Collections\Collection;
+    use Doctrine\ORM\Mapping as ORM;
+    use Entities\Analytics\Vendor;
+    use Repositories\Channeled\ChanneledVendorRepository;
 
-#[ORM\Entity(repositoryClass: ChanneledVendorRepository::class)]
-#[ORM\Table(name: 'channeled_vendors')]
-#[ORM\Index(columns: ['name', 'platform_id', 'channel'], name: 'idx_cv_full')]
-#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_cv_platform_channel')]
-#[ORM\Index(columns: ['name', 'channel'], name: 'idx_cv_name_channel')]
-#[ORM\Index(columns: ['platform_id'], name: 'idx_cv_platform_id_idx')]
-#[ORM\Index(columns: ['platform_created_at'], name: 'idx_cv_platform_created_at_idx')]
-#[ORM\Index(columns: ['name'], name: 'idx_cv_name')]
-#[ORM\UniqueConstraint(name: 'channeled_vendors_full_unique', columns: ['name', 'channel'])]
-#[ORM\HasLifecycleCallbacks]
-class ChanneledVendor extends ChanneledEntity
-{
-    #[ORM\Column(type: 'string')]
-    protected string $name;
-
-    // Relationships with channeled entities
-
-    #[ORM\OneToMany(mappedBy: 'channeledVendor', targetEntity: ChanneledProduct::class, orphanRemoval: true)]
-    protected Collection $channeledProducts;
-
-    // Relationships with non-channeled entities
-
-    #[ORM\ManyToOne(targetEntity: Vendor::class, inversedBy: 'channeledVendors')]
-    #[ORM\JoinColumn(name: 'vendor_id', onDelete: 'cascade')]
-    protected Vendor $vendor;
-
-    public function __construct()
+    #[ORM\Entity(repositoryClass: ChanneledVendorRepository::class)]
+    #[ORM\Table(name: 'channeled_vendors')]
+    #[ORM\Index(name: 'idx_cv_full', columns: ['name', 'platform_id', 'channel'])]
+    #[ORM\Index(name: 'idx_cv_platform_channel', columns: ['platform_id', 'channel'])]
+    #[ORM\Index(name: 'idx_cv_name_channel', columns: ['name', 'channel'])]
+    #[ORM\Index(name: 'idx_cv_platform_id_idx', columns: ['platform_id'])]
+    #[ORM\Index(name: 'idx_cv_platform_created_at_idx', columns: ['platform_created_at'])]
+    #[ORM\Index(name: 'idx_cv_name', columns: ['name'])]
+    #[ORM\UniqueConstraint(name: 'channeled_vendors_full_unique', columns: ['name', 'channel'])]
+    #[ORM\HasLifecycleCallbacks]
+    class ChanneledVendor extends ChanneledEntity
     {
-        $this->channeledProducts = new ArrayCollection();
-    }
+        #[ORM\Column(type: 'string')]
+        protected string $name;
 
-    /**
-     * @return string
-     */
-    public function getName(): string
-    {
-        return $this->name;
-    }
+        // Relationships with channeled entities
 
-    /**
-     * @param string $name
-     * @return ChanneledVendor
-     */
-    public function addName(string $name): self
-    {
-        $this->name = $name;
+        #[ORM\OneToMany(targetEntity: ChanneledProduct::class, mappedBy: 'channeledVendor', orphanRemoval: true)]
+        protected Collection $channeledProducts;
 
-        return $this;
-    }
+        // Relationships with non-channeled entities
 
-    /**
-     * @return Collection|null
-     */
-    public function getChanneledProducts(): ?Collection
-    {
-        return $this->channeledProducts;
-    }
+        #[ORM\ManyToOne(targetEntity: Vendor::class, inversedBy: 'channeledVendors')]
+        #[ORM\JoinColumn(name: 'vendor_id', onDelete: 'cascade')]
+        protected Vendor $vendor;
 
-    /**
-     * @param ChanneledProduct $channeledProduct
-     * @return ChanneledVendor
-     */
-    public function addChanneledProduct(ChanneledProduct $channeledProduct): self
-    {
-        if ($this->channeledProducts->contains($channeledProduct)) {
+        public function __construct()
+        {
+            $this->channeledProducts = new ArrayCollection();
+        }
+
+        /**
+         * @return string
+         */
+        public function getName(): string
+        {
+            return $this->name;
+        }
+
+        /**
+         * @param string $name
+         * @return ChanneledVendor
+         */
+        public function addName(string $name): self
+        {
+            $this->name = $name;
+
             return $this;
         }
 
-        $this->channeledProducts->add($channeledProduct);
-        $channeledProduct->addChanneledVendor($this);
-
-        return $this;
-    }
-
-    /**
-     * @param Collection $channeledProducts
-     * @return ChanneledVendor
-     */
-    public function addChanneledProducts(Collection $channeledProducts): self
-    {
-        foreach ($channeledProducts as $channeledProduct) {
-            $this->addChanneledProduct($channeledProduct);
+        /**
+         * @return Collection|null
+         */
+        public function getChanneledProducts(): ?Collection
+        {
+            return $this->channeledProducts;
         }
 
-        return $this;
-    }
+        /**
+         * @param ChanneledProduct $channeledProduct
+         * @return ChanneledVendor
+         */
+        public function addChanneledProduct(ChanneledProduct $channeledProduct): self
+        {
+            if ($this->channeledProducts->contains($channeledProduct)) {
+                return $this;
+            }
 
-    /**
-     * @param ChanneledProduct $channeledProduct
-     * @return ChanneledVendor
-     */
-    public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
-    {
-        if (!$this->channeledProducts->contains($channeledProduct)) {
+            $this->channeledProducts->add($channeledProduct);
+            $channeledProduct->addChanneledVendor($this);
+
             return $this;
         }
 
-        $this->channeledProducts->removeElement($channeledProduct);
+        /**
+         * @param Collection $channeledProducts
+         * @return ChanneledVendor
+         */
+        public function addChanneledProducts(Collection $channeledProducts): self
+        {
+            foreach ($channeledProducts as $channeledProduct) {
+                $this->addChanneledProduct($channeledProduct);
+            }
 
-        if ($channeledProduct->getChanneledVendor() !== $this) {
             return $this;
         }
 
-        $channeledProduct->addChanneledVendor(channeledVendor: null);
+        /**
+         * @param ChanneledProduct $channeledProduct
+         * @return ChanneledVendor
+         */
+        public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
+        {
+            if (!$this->channeledProducts->contains($channeledProduct)) {
+                return $this;
+            }
 
-        return $this;
-    }
+            $this->channeledProducts->removeElement($channeledProduct);
 
-    /**
-     * @param Collection $channeledProducts
-     * @return ChanneledVendor
-     */
-    public function removeChanneledProducts(Collection $channeledProducts): self
-    {
-        foreach ($channeledProducts as $channeledProduct) {
-            $this->removeChanneledProduct($channeledProduct);
+            if ($channeledProduct->getChanneledVendor() !== $this) {
+                return $this;
+            }
+
+            $channeledProduct->addChanneledVendor(channeledVendor: null);
+
+            return $this;
         }
 
-        return $this;
-    }
+        /**
+         * @param Collection $channeledProducts
+         * @return ChanneledVendor
+         */
+        public function removeChanneledProducts(Collection $channeledProducts): self
+        {
+            foreach ($channeledProducts as $channeledProduct) {
+                $this->removeChanneledProduct($channeledProduct);
+            }
 
-    /**
-     * @return Vendor
-     */
-    public function getVendor(): Vendor
-    {
-        return $this->vendor;
-    }
+            return $this;
+        }
 
-    /**
-     * @param Vendor|null $vendor
-     * @return ChanneledVendor
-     */
-    public function addVendor(?Vendor $vendor): self
-    {
-        $this->vendor = $vendor;
+        /**
+         * @return Vendor
+         */
+        public function getVendor(): Vendor
+        {
+            return $this->vendor;
+        }
 
-        return $this;
+        /**
+         * @param Vendor|null $vendor
+         * @return ChanneledVendor
+         */
+        public function addVendor(?Vendor $vendor): self
+        {
+            $this->vendor = $vendor;
+
+            return $this;
+        }
     }
-}
