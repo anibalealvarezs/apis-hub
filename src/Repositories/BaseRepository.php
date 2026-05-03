@@ -1261,6 +1261,10 @@
                 return implode('+', $normalized);
             }
 
+            if (count($normalized) === 2 && in_array('daily', $normalized) && in_array('channeledcampaign', $normalized)) {
+                return 'daily+channeledCampaign';
+            }
+
             return null;
         }
 
@@ -1457,6 +1461,13 @@
                     'outer_select' => ["COALESCE(d.type, 'unknown') AS ".$dimAlias('device')],
                     'joins'        => ['LEFT JOIN devices d ON d.id = f.group_key'],
                     'order_map'    => ['device' => "COALESCE(d.type, 'unknown')"],
+                ],
+                'daily+channeledCampaign' => [
+                    'final_select' => ['p.metric_date AS date', 'p.channeled_campaign_id AS group_key'],
+                    'group_by'     => ['p.metric_date', 'p.channeled_campaign_id'],
+                    'outer_select' => ['f.date AS '.$dimAlias('daily'), "COALESCE(cc.name, 'unknown') AS ".$dimAlias('channeledCampaign')],
+                    'joins'        => ['LEFT JOIN channeled_campaigns cc ON cc.id = f.group_key'],
+                    'order_map'    => ['daily' => $dimAlias('daily'), 'channeledCampaign' => "COALESCE(cc.name, 'unknown')"],
                 ],
                 default => null,
             };
