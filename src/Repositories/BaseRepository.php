@@ -62,8 +62,8 @@
             'creative'             => ['table' => 'creatives', 'fk' => 'creative_id', 'field' => 'name', 'alias' => 'rcre'],
             'country'              => ['table' => 'countries', 'fk' => 'country_id', 'field' => 'name', 'alias' => 'rcty'],
             'device'               => ['table' => 'devices', 'fk' => 'device_id', 'field' => 'type', 'alias' => 'rd'],
-            'page_title'           => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'title', 'alias' => 'rp_t', 'isAttribute' => true],
-            'page_platform_id'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rp_p', 'isAttribute' => true],
+            'page_title'           => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'title', 'alias' => 'rpa', 'isAttribute' => true],
+            'page_platform_id'     => ['table' => 'pages', 'fk' => 'page_id', 'field' => 'platform_id', 'alias' => 'rpa', 'isAttribute' => true],
         ];
 
         /**

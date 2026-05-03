@@ -504,8 +504,7 @@ class JobRepository extends BaseRepository
 
             $sql = "SELECT count(j.id) FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :completed AND j.updated_at >= :since";
 
-            $stmt = $this->_em->getConnection()->prepare($sql);
-            $result = $stmt->executeQuery([
+            $result = $this->_em->getConnection()->executeQuery($sql, [
                 'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
                 'completed' => JobStatus::completed->value,
                 'since' => $since->format('Y-m-d H:i:s'),
@@ -543,8 +542,7 @@ class JobRepository extends BaseRepository
         if (Helpers::isPostgres()) {
             $sql = "SELECT j.updated_at FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :completed ORDER BY j.updated_at DESC LIMIT 1";
 
-            $stmt = $this->_em->getConnection()->prepare($sql);
-            $result = $stmt->executeQuery([
+            $result = $this->_em->getConnection()->executeQuery($sql, [
                 'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
                 'completed' => JobStatus::completed->value,
             ]);
@@ -590,8 +588,7 @@ class JobRepository extends BaseRepository
                 $params['excludeId'] = $excludeJobId;
             }
 
-            $stmt = $this->_em->getConnection()->prepare($sql);
-            $result = $stmt->executeQuery($params);
+            $result = $this->_em->getConnection()->executeQuery($sql, $params);
 
             return (int)$result->fetchOne() > 0;
         }

@@ -132,8 +132,7 @@ class ScheduleInitialJobsCommand extends Command
                     // Look specifically for a job with this instance name in its payload
                     if (Helpers::isPostgres()) {
                         $sql = "SELECT count(j.id) FROM jobs j WHERE j.channel = :channel AND j.entity = :entity AND CAST(j.payload AS text) LIKE :instance_pattern";
-                        $stmt = $this->entityManager->getConnection()->prepare($sql);
-                        $count = $stmt->executeQuery([
+                        $count = $this->entityManager->getConnection()->executeQuery($sql, [
                             'channel' => $channel,
                             'entity' => $entity,
                             'instance_pattern' => '%instance_name%' . $name . '%',
