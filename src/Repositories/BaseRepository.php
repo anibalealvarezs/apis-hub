@@ -560,6 +560,7 @@
                             // Attribute relations (e.g. page_platform_id, linked_fb_page_id) must filter by attribute value, not FK identity.
                             $joinRelation($realKey);
                             $sqlKey = $this->mapFieldToSql($key);
+                            $sqlKeyComparable = $isPostgres ? "CAST($sqlKey AS TEXT)" : "CAST($sqlKey AS CHAR)";
                             $paramName = 'f_'.preg_replace('/[^a-z0-9]/i', '_', $key);
                             $condition = $this->resolveFilterCondition($value);
 
@@ -568,11 +569,11 @@
                             } else if ($condition['operator'] === 'is_not_null') {
                                 $qb->andWhere("$sqlKey IS NOT NULL");
                             } else if ($condition['operator'] === 'neq') {
-                                $qb->andWhere("$sqlKey <> :$paramName")
-                                    ->setParameter($paramName, $condition['value']);
+                                $qb->andWhere("$sqlKeyComparable <> :$paramName")
+                                    ->setParameter($paramName, (string)$condition['value']);
                             } else {
-                                $qb->andWhere("$sqlKey = :$paramName")
-                                    ->setParameter($paramName, $condition['value']);
+                                $qb->andWhere("$sqlKeyComparable = :$paramName")
+                                    ->setParameter($paramName, (string)$condition['value']);
                             }
                         } else {
                             // Strict Relation Identity Model (Professional ID-only)
