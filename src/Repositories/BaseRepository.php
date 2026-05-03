@@ -6,7 +6,9 @@
     use Doctrine\Common\Collections\ArrayCollection;
     use Doctrine\DBAL\Connection;
     use Doctrine\ORM\AbstractQuery;
+    use Doctrine\ORM\EntityManagerInterface;
     use Doctrine\ORM\EntityRepository;
+    use Doctrine\ORM\Mapping\ClassMetadata;
     use Doctrine\ORM\NonUniqueResultException;
     use Doctrine\ORM\NoResultException;
     use Doctrine\ORM\OptimisticLockException;
@@ -23,6 +25,18 @@
 
     class BaseRepository extends EntityRepository
     {
+        // Doctrine ORM 3 no longer exposes these internals on EntityRepository,
+        // but many repositories in this codebase still rely on them.
+        protected EntityManagerInterface $_em;
+        protected ClassMetadata $_class;
+
+        public function __construct(EntityManagerInterface $em, ClassMetadata $class)
+        {
+            parent::__construct($em, $class);
+            $this->_em = $em;
+            $this->_class = $class;
+        }
+
         /**
          * List of top-level result fields to strip before returning the response.
          * Set via setHideFields() from the controller layer.
