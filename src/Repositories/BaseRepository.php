@@ -2,6 +2,7 @@
 
     namespace Repositories;
 
+    use Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry;
     use DateTime;
     use Doctrine\Common\Collections\ArrayCollection;
     use Doctrine\DBAL\Connection;
@@ -71,7 +72,7 @@
          */
         protected static function getRelationMap(): array
         {
-            return array_merge(self::$defaultRelationMap, \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::getRelations());
+            return array_merge(self::$defaultRelationMap, RepositoryRegistry::getRelations());
         }
 
         /**
@@ -79,7 +80,7 @@
          */
         protected static function getFormulas(): array
         {
-            return \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::getFormulas();
+            return RepositoryRegistry::getFormulas();
         }
 
         /**
@@ -87,7 +88,7 @@
          */
         public static function registerRelation(string $key, array $mapping): void
         {
-            \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::registerRelation($key, $mapping);
+            RepositoryRegistry::registerRelation($key, $mapping);
         }
 
         /**
@@ -95,7 +96,7 @@
          */
         public static function registerRelations(array $relations): void
         {
-            \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::registerRelations($relations);
+            RepositoryRegistry::registerRelations($relations);
         }
 
         /**
@@ -103,7 +104,7 @@
          */
         public static function registerFormula(string $name, string|callable $formula): void
         {
-            \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::registerFormula($name, $formula);
+            RepositoryRegistry::registerFormula($name, $formula);
         }
 
         /**
@@ -111,7 +112,7 @@
          */
         public static function registerFormulas(array $formulas): void
         {
-            \Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry::registerFormulas($formulas);
+            RepositoryRegistry::registerFormulas($formulas);
         }
 
         /**
@@ -230,7 +231,7 @@
          * @param string|null $orderBy
          * @param string|null $orderDir
          * @return array
-         * @throws ConfigurationException
+         * @throws ConfigurationException|\Doctrine\DBAL\Exception
          */
         public function aggregate(
             array   $aggregations,
@@ -714,13 +715,13 @@
                         JOIN metric_configs mc_ls ON m_ls.metric_config_id = mc_ls.id
                         WHERE mc_ls.channel = mc.channel
                           AND mc_ls.period = mc.period
-                          AND (mc_ls.channeled_account_id {$nullSafeComparator} mc.channeled_account_id)
-                          AND (mc_ls.page_id {$nullSafeComparator} mc.page_id)
-                          AND (mc_ls.post_id {$nullSafeComparator} mc.post_id)
-                          AND (mc_ls.dimension_set_id {$nullSafeComparator} mc.dimension_set_id)
-                          AND (mc_ls.query_id {$nullSafeComparator} mc.query_id)
-                          AND (mc_ls.country_id {$nullSafeComparator} mc.country_id)
-                          AND (mc_ls.device_id {$nullSafeComparator} mc.device_id)
+                          AND (mc_ls.channeled_account_id $nullSafeComparator mc.channeled_account_id)
+                          AND (mc_ls.page_id $nullSafeComparator mc.page_id)
+                          AND (mc_ls.post_id $nullSafeComparator mc.post_id)
+                          AND (mc_ls.dimension_set_id $nullSafeComparator mc.dimension_set_id)
+                          AND (mc_ls.query_id $nullSafeComparator mc.query_id)
+                          AND (mc_ls.country_id $nullSafeComparator mc.country_id)
+                          AND (mc_ls.device_id $nullSafeComparator mc.device_id)
                     ";
 
                     $latestSnapshotSql = "SELECT MAX(m_ls.metric_date) {$latestSnapshotBaseSql}";
@@ -737,7 +738,7 @@
 
                         if ($this->aggregateSnapshotFallbackMode === 'resilient') {
                             // Prefer the latest date within the requested range; fallback to latest available overall.
-                            $latestSnapshotSql = "COALESCE(({$latestSnapshotRangeSql}), ({$latestSnapshotSql}))";
+                            $latestSnapshotSql = "COALESCE(($latestSnapshotRangeSql), ($latestSnapshotSql))";
                         } else {
                             $latestSnapshotSql = $latestSnapshotRangeSql;
                         }
@@ -905,19 +906,19 @@
                 : 'CAST(p.platform_id AS CHAR)';
 
             $metricSqlByExpr = [
-                'likes' => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'comments' => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'reach' => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'views' => "SUM(CASE WHEN {$nameCol} IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'profile_views' => "SUM(CASE WHEN {$nameCol} IN ('profile_views', 'profile_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'website_clicks' => "SUM(CASE WHEN {$nameCol} IN ('website_clicks', 'website_clicks_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'profile_links_taps' => "SUM(CASE WHEN {$nameCol} IN ('profile_links_taps', 'profile_links_taps_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'likes'                 => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'comments'              => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'reach'                 => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'views'                 => "SUM(CASE WHEN {$nameCol} IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'profile_views'         => "SUM(CASE WHEN {$nameCol} IN ('profile_views', 'profile_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'website_clicks'        => "SUM(CASE WHEN {$nameCol} IN ('website_clicks', 'website_clicks_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'profile_links_taps'    => "SUM(CASE WHEN {$nameCol} IN ('profile_links_taps', 'profile_links_taps_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
                 'follows_and_unfollows' => "SUM(CASE WHEN {$nameCol} IN ('follows_and_unfollows', 'follows_and_unfollows_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'saves' => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'shares' => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'total_interactions' => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'replies' => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'accounts_engaged' => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'saves'                 => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'shares'                => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'replies'               => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'accounts_engaged'      => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
             ];
 
             $selectFields = [
@@ -926,8 +927,8 @@
                 "COALESCE(p.title, 'N/A') AS {$quoteChar}page_title{$quoteChar}",
             ];
             $orderMap = [
-                'page' => "COALESCE(p.url, 'N/A')",
-                'page_id' => 'mc.page_id',
+                'page'       => "COALESCE(p.url, 'N/A')",
+                'page_id'    => 'mc.page_id',
                 'page_title' => "COALESCE(p.title, 'N/A')",
             ];
 
@@ -944,9 +945,9 @@
             }
 
             $sqlParams = [
-                'startDate' => $startDate,
-                'endDate' => $endDate,
-                'accountType' => $accountType,
+                'startDate'      => $startDate,
+                'endDate'        => $endDate,
+                'accountType'    => $accountType,
                 'pagePlatformId' => $pagePlatformId,
             ];
 
@@ -1060,19 +1061,19 @@
             };
 
             $metricSqlByExpr = [
-                'comments' => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') THEN s.value ELSE 0 END)",
-                'follows' => "SUM(CASE WHEN {$nameCol} IN ('follows', 'follows_daily') THEN s.value ELSE 0 END)",
-                'ig_reels_avg_watch_time' => "SUM(CASE WHEN {$nameCol} IN ('ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily') THEN s.value ELSE 0 END)",
+                'comments'                       => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') THEN s.value ELSE 0 END)",
+                'follows'                        => "SUM(CASE WHEN {$nameCol} IN ('follows', 'follows_daily') THEN s.value ELSE 0 END)",
+                'ig_reels_avg_watch_time'        => "SUM(CASE WHEN {$nameCol} IN ('ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily') THEN s.value ELSE 0 END)",
                 'ig_reels_video_view_total_time' => "SUM(CASE WHEN {$nameCol} IN ('ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily') THEN s.value ELSE 0 END)",
-                'likes' => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') THEN s.value ELSE 0 END)",
-                'profile_activity' => "SUM(CASE WHEN {$nameCol} IN ('profile_activity', 'profile_activity_daily') THEN s.value ELSE 0 END)",
-                'profile_visits' => "SUM(CASE WHEN {$nameCol} IN ('profile_visits', 'profile_visits_daily') THEN s.value ELSE 0 END)",
-                'reach' => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') THEN s.value ELSE 0 END)",
-                'reposts' => "SUM(CASE WHEN {$nameCol} IN ('reposts', 'reposts_daily') THEN s.value ELSE 0 END)",
-                'saved' => "SUM(CASE WHEN {$nameCol} IN ('saved', 'saved_daily', 'saves', 'saves_daily') THEN s.value ELSE 0 END)",
-                'shares' => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') THEN s.value ELSE 0 END)",
-                'total_interactions' => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'post_engagements', 'post_engagements_daily') THEN s.value ELSE 0 END)",
-                'views' => "SUM(CASE WHEN {$nameCol} IN ('views', 'views_daily', 'post_video_views', 'post_video_views_daily') THEN s.value ELSE 0 END)",
+                'likes'                          => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') THEN s.value ELSE 0 END)",
+                'profile_activity'               => "SUM(CASE WHEN {$nameCol} IN ('profile_activity', 'profile_activity_daily') THEN s.value ELSE 0 END)",
+                'profile_visits'                 => "SUM(CASE WHEN {$nameCol} IN ('profile_visits', 'profile_visits_daily') THEN s.value ELSE 0 END)",
+                'reach'                          => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') THEN s.value ELSE 0 END)",
+                'reposts'                        => "SUM(CASE WHEN {$nameCol} IN ('reposts', 'reposts_daily') THEN s.value ELSE 0 END)",
+                'saved'                          => "SUM(CASE WHEN {$nameCol} IN ('saved', 'saved_daily', 'saves', 'saves_daily') THEN s.value ELSE 0 END)",
+                'shares'                         => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') THEN s.value ELSE 0 END)",
+                'total_interactions'             => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'post_engagements', 'post_engagements_daily') THEN s.value ELSE 0 END)",
+                'views'                          => "SUM(CASE WHEN {$nameCol} IN ('views', 'views_daily', 'post_video_views', 'post_video_views_daily') THEN s.value ELSE 0 END)",
             ];
 
             $postExpr = "COALESCE(p.post_id, 'N/A')";
@@ -1096,15 +1097,15 @@
                 "{$createdTimeExpr} AS {$quoteChar}created_time{$quoteChar}",
             ];
             $orderMap = [
-                'post' => $postExpr,
-                'post_id' => 's.post_id',
-                'caption' => $captionExpr,
-                'message' => $messageExpr,
-                'media_type' => $mediaTypeExpr,
-                'permalink' => $permalinkExpr,
+                'post'          => $postExpr,
+                'post_id'       => 's.post_id',
+                'caption'       => $captionExpr,
+                'message'       => $messageExpr,
+                'media_type'    => $mediaTypeExpr,
+                'permalink'     => $permalinkExpr,
                 'permalink_url' => $permalinkUrlExpr,
-                'timestamp' => $timestampExpr,
-                'created_time' => $createdTimeExpr,
+                'timestamp'     => $timestampExpr,
+                'created_time'  => $createdTimeExpr,
             ];
 
             foreach ($aggregations as $alias => $expr) {
@@ -1120,10 +1121,10 @@
             }
 
             $sqlParams = [
-                'startDate' => $startDate,
-                'endDate' => $endDate,
-                'accountType' => $accountType,
-                'period' => $period,
+                'startDate'          => $startDate,
+                'endDate'            => $endDate,
+                'accountType'        => $accountType,
+                'period'             => $period,
                 'channeledAccountId' => (int)$channeledAccountId,
             ];
 
@@ -1251,19 +1252,19 @@
                 : "COALESCE(CAST(p.platform_id AS CHAR), 'N/A')";
 
             $metricSqlByExpr = [
-                'likes' => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'comments' => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'reach' => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'views' => "SUM(CASE WHEN {$nameCol} IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'profile_views' => "SUM(CASE WHEN {$nameCol} IN ('profile_views', 'profile_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'website_clicks' => "SUM(CASE WHEN {$nameCol} IN ('website_clicks', 'website_clicks_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'profile_links_taps' => "SUM(CASE WHEN {$nameCol} IN ('profile_links_taps', 'profile_links_taps_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'likes'                 => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'comments'              => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'reach'                 => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'views'                 => "SUM(CASE WHEN {$nameCol} IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'profile_views'         => "SUM(CASE WHEN {$nameCol} IN ('profile_views', 'profile_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'website_clicks'        => "SUM(CASE WHEN {$nameCol} IN ('website_clicks', 'website_clicks_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'profile_links_taps'    => "SUM(CASE WHEN {$nameCol} IN ('profile_links_taps', 'profile_links_taps_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
                 'follows_and_unfollows' => "SUM(CASE WHEN {$nameCol} IN ('follows_and_unfollows', 'follows_and_unfollows_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'saves' => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'shares' => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'total_interactions' => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'replies' => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'accounts_engaged' => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'saves'                 => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'shares'                => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'replies'               => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'accounts_engaged'      => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
             ];
 
             $selectFields = [
@@ -1273,10 +1274,10 @@
                 "{$linkedFbPageExpr} AS {$quoteChar}linked_fb_page_id{$quoteChar}",
             ];
             $orderMap = [
-                'channeledaccount' => "COALESCE(ca.name, 'Unknown')",
+                'channeledaccount'     => "COALESCE(ca.name, 'Unknown')",
                 'channeled_account_id' => 'mc.channeled_account_id',
-                'page_platform_id' => $pagePlatformExpr,
-                'linked_fb_page_id' => $linkedFbPageExpr,
+                'page_platform_id'     => $pagePlatformExpr,
+                'linked_fb_page_id'    => $linkedFbPageExpr,
             ];
 
             foreach ($aggregations as $alias => $expr) {
@@ -1292,8 +1293,8 @@
             }
 
             $sqlParams = [
-                'startDate' => $startDate,
-                'endDate' => $endDate,
+                'startDate'   => $startDate,
+                'endDate'     => $endDate,
                 'accountType' => $accountType,
             ];
 
