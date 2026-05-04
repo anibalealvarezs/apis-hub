@@ -23,6 +23,19 @@
     use Anibalealvarezs\ApiDriverCore\Classes\MetricAggregationStrategyRegistry;
     use InvalidArgumentException;
     use ReflectionException;
+    use Services\Aggregation\AggregationExecutionResult;
+    use Services\Aggregation\AggregationExecutor;
+    use Services\Aggregation\AggregationPlan;
+    use Services\Aggregation\AggregationPlanner;
+    use Services\Aggregation\LegacyAggregateExecutionContext;
+    use Services\Aggregation\Stages\LegacyAggregateDateStage;
+    use Services\Aggregation\Stages\LegacyAggregateFinalizeStage;
+    use Services\Aggregation\Stages\LegacyAggregateFilterStage;
+    use Services\Aggregation\Stages\LegacyAggregateGroupingStage;
+    use Services\Aggregation\Stages\LegacyAggregateOrderingStage;
+    use Services\Aggregation\Stages\LegacyAggregateRelationContextStage;
+    use Services\Aggregation\Stages\LegacyAggregateScopeStage;
+    use Services\Aggregation\Stages\LegacyAggregateSelectStage;
 
     class BaseRepository extends EntityRepository
     {
@@ -243,10 +256,45 @@
             ?string $orderDir = 'ASC'
         ): array
         {
+            $this->initializeAggregateExecutionContext($filters, $startDate, $endDate);
+
+            $planner = new AggregationPlanner();
+            $executor = new AggregationExecutor();
+            $plan = $planner->plan(
+                repository: $this,
+                aggregations: $aggregations,
+                groupBy: $groupBy,
+                filters: $filters,
+                startDate: $startDate,
+                endDate: $endDate,
+                orderBy: $orderBy,
+                orderDir: $orderDir,
+            );
+
+            $plannerMeta = [
+                'planned_execution_path' => $plan->getPreferredExecutionPath(),
+            ];
+            if ($plan->getCandidateOptimizedStrategies() !== []) {
+                $plannerMeta['candidate_optimized_strategies'] = $plan->getCandidateOptimizedStrategies();
+            }
+            $this->appendAggregateMeta($plannerMeta);
+
+            $executionResult = $executor->execute($this, $plan);
+
+            return $executionResult->getRows();
+        }
+
+        protected function initializeAggregateExecutionContext(?object $filters, ?string $startDate, ?string $endDate): void
+        {
             $this->aggregateRequestedPeriod = null;
             $this->aggregateUseSnapshotDelta = false;
             $this->aggregateSnapshotFallbackMode = 'resilient';
             $this->lastAggregateMeta = [];
+            $this->activeAggregateJoins = [];
+
+            $entityName = $this->getEntityName();
+            $this->isChanneledMetric = str_ends_with($entityName, 'ChanneledMetric');
+
             if ($filters !== null && isset($filters->period) && is_string($filters->period) && trim($filters->period) !== '') {
                 $this->aggregateRequestedPeriod = strtolower(trim($filters->period));
             }
@@ -257,18 +305,6 @@
                     $this->aggregateSnapshotFallbackMode = $mode;
                 }
             }
-
-            $connection = $this->_em->getConnection();
-            $qb = $connection->createQueryBuilder();
-            $tableName = $this->_class->getTableName();
-            $qb->from($tableName, 'e');
-
-            // Specialized logic for Metric entities (Metric or ChanneledMetric) to support deep joins
-            $this->activeAggregateJoins = [];
-            $entityName = $this->getEntityName();
-            $this->isChanneledMetric = str_ends_with($entityName, 'ChanneledMetric');
-            $isMetric = str_ends_with($entityName, 'Analytics\Metric');
-            $isPostgres = Helpers::isPostgres();
 
             $snapshotDelta = false;
             if ($filters && isset($filters->snapshot_delta)) {
@@ -288,511 +324,271 @@
 
                 $this->aggregateUseSnapshotDelta = true;
             }
+        }
 
-            $optimizedResult = $this->tryOptimizedFacebookOrganicPageSummaryAggregate(
-                connection: $connection,
-                aggregations: $aggregations,
-                groupBy: $groupBy,
-                filters: $filters,
-                startDate: $startDate,
-                endDate: $endDate,
-                orderBy: $orderBy,
-                orderDir: $orderDir,
-                isPostgres: $isPostgres,
+        /**
+         * @param array<string, mixed> $meta
+         */
+        protected function appendAggregateMeta(array $meta): void
+        {
+            $this->lastAggregateMeta = array_merge($this->lastAggregateMeta, $meta);
+        }
+
+        /**
+         * @param array<int, array<string, mixed>> $rows
+         * @param array<string, mixed> $meta
+         */
+        protected function buildAggregateExecutionResult(array $rows, array $meta = []): AggregationExecutionResult
+        {
+            $this->appendAggregateMeta($meta);
+
+            return new AggregationExecutionResult($rows, $this->lastAggregateMeta);
+        }
+
+        public function executeOptimizedAggregationPlan(AggregationPlan $plan): ?AggregationExecutionResult
+        {
+            $connection = $this->_em->getConnection();
+            $context = $plan->getContext();
+            $isMetric = (bool)($context['is_metric'] ?? false);
+            $isPostgres = (bool)($context['is_postgres'] ?? Helpers::isPostgres());
+
+            foreach ($plan->getCandidateOptimizedStrategies() as $strategy) {
+                $optimizedResult = match ($strategy) {
+                    'facebook_organic_page_summary' => $this->tryOptimizedFacebookOrganicPageSummaryAggregate(
+                        connection: $connection,
+                        aggregations: $plan->getAggregations(),
+                        groupBy: $plan->getGroupBy(),
+                        filters: $plan->getFilters(),
+                        startDate: $plan->getStartDate(),
+                        endDate: $plan->getEndDate(),
+                        orderBy: $plan->getOrderBy(),
+                        orderDir: $plan->getOrderDir(),
+                        isPostgres: $isPostgres,
+                    ),
+                    'facebook_organic_linked_pages' => $this->tryOptimizedFacebookOrganicLinkedPagesAggregate(
+                        connection: $connection,
+                        aggregations: $plan->getAggregations(),
+                        groupBy: $plan->getGroupBy(),
+                        filters: $plan->getFilters(),
+                        startDate: $plan->getStartDate(),
+                        endDate: $plan->getEndDate(),
+                        orderBy: $plan->getOrderBy(),
+                        orderDir: $plan->getOrderDir(),
+                        isPostgres: $isPostgres,
+                    ),
+                    'facebook_organic_post_snapshot' => $this->tryOptimizedFacebookOrganicPostSnapshotAggregate(
+                        connection: $connection,
+                        aggregations: $plan->getAggregations(),
+                        groupBy: $plan->getGroupBy(),
+                        filters: $plan->getFilters(),
+                        startDate: $plan->getStartDate(),
+                        endDate: $plan->getEndDate(),
+                        orderBy: $plan->getOrderBy(),
+                        orderDir: $plan->getOrderDir(),
+                        isPostgres: $isPostgres,
+                    ),
+                    'marketing_hierarchy' => $this->tryOptimizedMarketingHierarchyAggregate(
+                        connection: $connection,
+                        aggregations: $plan->getAggregations(),
+                        groupBy: $plan->getGroupBy(),
+                        filters: $plan->getFilters(),
+                        startDate: $plan->getStartDate(),
+                        endDate: $plan->getEndDate(),
+                        orderBy: $plan->getOrderBy(),
+                        orderDir: $plan->getOrderDir(),
+                        isPostgres: $isPostgres,
+                    ),
+                    'weighted_metric' => $this->tryOptimizedWeightedMetricAggregate(
+                        connection: $connection,
+                        aggregations: $plan->getAggregations(),
+                        groupBy: $plan->getGroupBy(),
+                        filters: $plan->getFilters(),
+                        startDate: $plan->getStartDate(),
+                        endDate: $plan->getEndDate(),
+                        orderBy: $plan->getOrderBy(),
+                        orderDir: $plan->getOrderDir(),
+                        isMetric: $isMetric,
+                        isPostgres: $isPostgres,
+                    ),
+                    default => null,
+                };
+
+                if ($optimizedResult !== null) {
+                    return $this->buildAggregateExecutionResult($optimizedResult, [
+                        'execution_path' => 'optimized',
+                        'optimized_strategy' => $strategy,
+                    ]);
+                }
+            }
+
+            return null;
+        }
+
+        public function executeLegacyAggregationPlan(AggregationPlan $plan, ?string $fallbackReason = null): AggregationExecutionResult
+        {
+            $connection = $this->_em->getConnection();
+            $qb = $this->createLegacyAggregateQueryBuilder($connection);
+            $context = $this->createLegacyExecutionContext($qb, $plan);
+            $results = $this->runLegacyAggregatePipeline($context);
+
+            return $this->buildAggregateExecutionResult($results, [
+                'execution_path' => 'legacy',
+                'fallback_reason' => $fallbackReason,
+            ]);
+        }
+
+        /**
+         * Phase 1 closure: keep legacy execution as stage-driven orchestration.
+         *
+         * @return array<int, array<string, mixed>>
+         */
+        protected function runLegacyAggregatePipeline(LegacyAggregateExecutionContext $context): array
+        {
+            $this->applyLegacyAggregateScopeJoins($context);
+            $this->applyLegacyAggregateSelects($context);
+            $context = $context->withRelationContext($this->createLegacyAggregateRelationContext($context));
+            $this->applyLegacyAggregateGrouping($context);
+            $this->applyLegacyAggregateFilters($context);
+            $this->applyLegacyAggregateDateConstraints($context);
+            $this->applyLegacyAggregateOrdering($context);
+
+            return $this->finalizeLegacyAggregateRows($context);
+        }
+
+        protected function createLegacyAggregateQueryBuilder(Connection $connection): \Doctrine\DBAL\Query\QueryBuilder
+        {
+            $qb = $connection->createQueryBuilder();
+            $qb->from($this->_class->getTableName(), 'e');
+
+            return $qb;
+        }
+
+        protected function createLegacyExecutionContext(\Doctrine\DBAL\Query\QueryBuilder $qb, AggregationPlan $plan): LegacyAggregateExecutionContext
+        {
+            $entityName = (string)$plan->getContextValue('entity_name', $this->getEntityName());
+
+            return new LegacyAggregateExecutionContext(
+                queryBuilder: $qb,
+                plan: $plan,
+                aggregations: $plan->getAggregations(),
+                filters: $plan->getFilters(),
+                startDate: $plan->getStartDate(),
+                endDate: $plan->getEndDate(),
+                groupBy: $plan->getStageValue('grouping', 'group_by', $plan->getGroupBy()),
+                orderBy: $plan->getStageValue('post', 'order_by', $plan->getOrderBy()),
+                orderDir: $plan->getStageValue('post', 'order_dir', $plan->getOrderDir()),
+                entityName: $entityName,
+                isMetric: (bool)$plan->getContextValue('is_metric', str_ends_with($entityName, 'Analytics\Metric')),
+                isPostgres: (bool)$plan->getContextValue('is_postgres', Helpers::isPostgres()),
             );
-            if ($optimizedResult !== null) {
-                return $optimizedResult;
-            }
+        }
 
-            $optimizedResult = $this->tryOptimizedFacebookOrganicLinkedPagesAggregate(
-                connection: $connection,
-                aggregations: $aggregations,
-                groupBy: $groupBy,
-                filters: $filters,
-                startDate: $startDate,
-                endDate: $endDate,
-                orderBy: $orderBy,
-                orderDir: $orderDir,
-                isPostgres: $isPostgres,
+        protected function applyLegacyAggregateScopeJoins(LegacyAggregateExecutionContext $context): void
+        {
+            $activeAggregateJoins = &$this->activeAggregateJoins;
+            (new LegacyAggregateScopeStage())->apply(
+                context: $context,
+                isChanneledMetric: $this->isChanneledMetric,
+                activeAggregateJoins: $activeAggregateJoins,
             );
-            if ($optimizedResult !== null) {
-                return $optimizedResult;
-            }
+        }
 
-            $optimizedResult = $this->tryOptimizedFacebookOrganicPostSnapshotAggregate(
-                connection: $connection,
-                aggregations: $aggregations,
-                groupBy: $groupBy,
-                filters: $filters,
-                startDate: $startDate,
-                endDate: $endDate,
-                orderBy: $orderBy,
-                orderDir: $orderDir,
-                isPostgres: $isPostgres,
+        /**
+         * @param array<string, string> $aggregations
+         */
+        protected function applyLegacyAggregateSelects(LegacyAggregateExecutionContext $context): void
+        {
+            $this->needsImpressionsJoin = (new LegacyAggregateSelectStage())->apply(
+                context: $context,
+                isChanneledMetric: $this->isChanneledMetric,
+                mapFieldToSql: fn(string $expr, bool $isAggregate = false): string => $this->mapFieldToSql($expr, $isAggregate),
+                resolveWeightedAggregationStrategies: fn(array $aggregations): array => $this->resolveWeightedAggregationStrategies($aggregations),
             );
-            if ($optimizedResult !== null) {
-                return $optimizedResult;
-            }
+        }
 
-            $optimizedResult = $this->tryOptimizedMarketingHierarchyAggregate(
-                connection: $connection,
-                aggregations: $aggregations,
-                groupBy: $groupBy,
-                filters: $filters,
-                startDate: $startDate,
-                endDate: $endDate,
-                orderBy: $orderBy,
-                orderDir: $orderDir,
-                isPostgres: $isPostgres,
+        /**
+         * @return array<string, mixed>
+         */
+        protected function createLegacyAggregateRelationContext(LegacyAggregateExecutionContext $context): array
+        {
+            $relationMap = self::getRelationMap();
+            $activeAggregateJoins = &$this->activeAggregateJoins;
+
+            return (new LegacyAggregateRelationContextStage())->apply(
+                context: $context,
+                qb: $context->getQueryBuilder(),
+                relationMap: $relationMap,
+                isChanneledMetric: $this->isChanneledMetric,
+                activeAggregateJoins: $activeAggregateJoins,
             );
-            if ($optimizedResult !== null) {
-                return $optimizedResult;
-            }
+        }
 
-            $optimizedResult = $this->tryOptimizedWeightedMetricAggregate(
-                connection: $connection,
-                aggregations: $aggregations,
-                groupBy: $groupBy,
-                filters: $filters,
-                startDate: $startDate,
-                endDate: $endDate,
-                orderBy: $orderBy,
-                orderDir: $orderDir,
-                isMetric: $isMetric,
-                isPostgres: $isPostgres,
+        /**
+         * @param array<int, string> $groupBy
+         * @param array<string, mixed> $context
+         */
+        protected function applyLegacyAggregateGrouping(LegacyAggregateExecutionContext $context): void {
+            (new LegacyAggregateGroupingStage())->apply(
+                context: $context,
+                relationMap: self::getRelationMap(),
+                isChanneledMetric: $this->isChanneledMetric,
+                mapFieldToSql: fn(string $expr, bool $isAggregate = false): string => $this->mapFieldToSql($expr, $isAggregate),
+                hasEntityField: fn(string $field): bool => $this->_class->hasField($field),
             );
-            if ($optimizedResult !== null) {
-                return $optimizedResult;
-            }
+        }
 
-            if ($this->isChanneledMetric) {
-                $qb->join('e', 'metrics', 'm', 'e.metric_id = m.id')
-                    ->join('m', 'metric_configs', 'mc', 'm.metric_config_id = mc.id');
+        /**
+         * @param array<string, mixed> $context
+         */
+        protected function applyLegacyAggregateFilters(LegacyAggregateExecutionContext $context): void {
+            (new LegacyAggregateFilterStage())->apply(
+                context: $context,
+                relationMap: self::getRelationMap(),
+                isChanneledMetric: $this->isChanneledMetric,
+                mapFieldToSql: fn(string $expr, bool $isAggregate = false): string => $this->mapFieldToSql($expr, $isAggregate),
+                resolveFilterCondition: fn(mixed $rawValue): array => $this->resolveFilterCondition($rawValue),
+                hasEntityField: fn(string $field): bool => $this->_class->hasField($field),
+            );
+        }
 
-                $this->activeAggregateJoins['m'] = true;
-                $this->activeAggregateJoins['mc'] = true;
-            } elseif ($isMetric) {
-                $qb->join('e', 'metric_configs', 'mc', 'e.metric_config_id = mc.id');
-                $this->activeAggregateJoins['mc'] = true;
-            }
+        protected function applyLegacyAggregateDateConstraints(LegacyAggregateExecutionContext $context): void {
+            (new LegacyAggregateDateStage())->apply(
+                context: $context,
+                isChanneledMetric: $this->isChanneledMetric,
+                aggregateUseSnapshotDelta: $this->aggregateUseSnapshotDelta,
+                aggregateSnapshotFallbackMode: $this->aggregateSnapshotFallbackMode,
+                mapFieldToSql: fn(string $expr, bool $isAggregate = false): string => $this->mapFieldToSql($expr, $isAggregate),
+                hasEntityField: fn(string $field): bool => $this->_class->hasField($field),
+            );
+        }
 
-            // Selects with aggregation functions
-            $weightedStrategies = $this->resolveWeightedAggregationStrategies($aggregations);
-            $this->needsImpressionsJoin = $weightedStrategies !== [];
+        protected function applyLegacyAggregateOrdering(LegacyAggregateExecutionContext $context): void
+        {
+            (new LegacyAggregateOrderingStage())->apply($context);
+        }
 
-            if ($this->needsImpressionsJoin && $this->isChanneledMetric) {
-                // Reverted JOIN due to performance impact on non-indexed tables
-            }
-
-            foreach ($aggregations as $alias => $expr) {
-                $parsedExpr = $this->mapFieldToSql($expr, true);
-
-                // Safety check for ChanneledMetric to prevent raw 'value' aggregation
-                // We only allow m.value if it's wrapped in a CASE WHEN (our formulas)
-                if ($this->isChanneledMetric && preg_match('/\bm\.value\b/i', $parsedExpr) && !str_contains($parsedExpr, 'CASE WHEN')) {
-                    throw new InvalidArgumentException(
-                        "Direct aggregation of 'value' field is restricted for ChanneledMetrics to prevent data corruption. ".
-                        "Please use intelligent formulas (e.g., 'spend', 'clicks', 'ctr', 'cpc', 'cpm', 'frequency', 'position') ".
-                        "or filter specifically by 'name' before aggregating."
-                    );
-                }
-
-                $qb->addSelect("$parsedExpr AS $alias");
-            }
-
-            $standardRelations = array_keys(self::getRelationMap());
-            $dateFields = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'year', 'month', 'day', 'week', 'quarter', 'dayofweek', 'dayname', 'monthname', 'metricDate', 'platformCreatedAt', 'createdAt', 'date'];
-
-            $safeLeftJoin = function (string $from, string $table, string $alias, string $condition) use ($qb) {
-                $currentJoins = $qb->getQueryPart('join');
-                foreach ($currentJoins as $joins) {
-                    foreach ($joins as $join) {
-                        if ($join['joinAlias'] === $alias) return;
-                    }
-                }
-                $qb->leftJoin($from, $table, $alias, $condition);
-            };
-
-            $rootAlias = ($this->isChanneledMetric || $isMetric) ? 'mc' : 'm';
-
-            $joinRelation = function (string $field, bool $enforceExistence = false) use (&$activeAggregateJoins, $safeLeftJoin, $qb, $rootAlias, &$joinRelation) {
-                if (!isset(self::getRelationMap()[$field])) return;
-                $map = self::getRelationMap()[$field];
-
-                if (isset($activeAggregateJoins[$map['alias']])) {
-                    // If already joined as LEFT, but now we need INNER, we transform it
-                    if ($enforceExistence) {
-                        $joins = $qb->getQueryPart('join');
-                        // Logic to upgrade join if necessary can go here, but for now we enforce at first call
-                    }
-
-                    return;
-                }
-
-                // Recurse to join source mapping if defined
-                $sourceAlias = $rootAlias;
-                if (isset($map['from'])) {
-                    $joinRelation($map['from'], $enforceExistence);
-                    $sourceAlias = self::getRelationMap()[$map['from']]['alias'];
-                }
-
-                // Ensure join only happens once. Use INNER JOIN if we need to filter out orphans (Ghost entities)
-                if ($enforceExistence) {
-                    $qb->innerJoin($sourceAlias, $map['table'], $map['alias'], "$sourceAlias.{$map['fk']} = {$map['alias']}.id");
-                } else {
-                    $safeLeftJoin($sourceAlias, $map['table'], $map['alias'], "$sourceAlias.{$map['fk']} = {$map['alias']}.id");
-                }
-                $activeAggregateJoins[$map['alias']] = true;
-            };
-
-            // Grouping and dimension handling
-            foreach ($groupBy as $field) {
-                $isPostgres = Helpers::isPostgres();
-                $quoteChar = $isPostgres ? '"' : '`';
-
-                // Virtual aliases like linked_fb_page_id shouldn't be quoted for result mapping consistency
-                $quotedField = $field;
-                if (!preg_match('/^[a-zA-Z0-9_]+$/', $field)) {
-                    $quotedField = $quoteChar.$field.$quoteChar;
-                }
-                $isDimension = str_starts_with($field, 'dimensions.');
-                $dimKey = $isDimension ? substr($field, 11) : $field;
-
-                // Automatic dimension detection: if it's a ChanneledMetric taxonomy and not a standard relation/date/field
-                if (($isMetric || $this->isChanneledMetric) && ($isDimension || ($field !== 'account_type' && !in_array($field, $standardRelations) && !str_ends_with($field, '_id') && !in_array($field, $dateFields) && !$this->_class->hasField($field)))) {
-                    $dimRootAlias = ($this->isChanneledMetric) ? 'e' : 'mc';
-                    $dimAlias = "dim_".preg_replace('/[^a-z0-9]/i', '_', $dimKey);
-                    $qb->setParameter("key_$dimAlias", $dimKey);
-
-                    $safeLeftJoin($dimRootAlias, 'dimension_set_items', "dsi_$dimAlias", "$dimRootAlias.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
-                    SELECT sub_dv.id FROM dimension_values sub_dv 
-                    JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
-                    WHERE sub_dk.name = :key_$dimAlias
-                )");
-                    $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
-
-                    $qb->addSelect("dv_$dimAlias.value AS $quotedField")
-                        ->addGroupBy("dv_$dimAlias.value");
-                } elseif (in_array($field, $standardRelations) || str_ends_with($field, '_id')) {
-                    // Handling Relations and strict FKs
-                    $relationKey = $field;
-                    $isExplicitId = str_ends_with($field, '_id');
-                    if ($isExplicitId && !isset(self::getRelationMap()[$field])) {
-                        $relationKey = substr($field, 0, -3);
-                        if ($relationKey === 'channeled_account') $relationKey = 'channeledAccount';
-                        if ($relationKey === 'channeled_campaign') $relationKey = 'channeledCampaign';
-                    }
-
-                    if (isset(self::getRelationMap()[$relationKey])) {
-                        // Critical Fix: Enforce existence for primary groupings (channeledAccount, campaign, channeledCampaign) to avoid ghost duplicates
-                        // Removed 'page' and 'account' to allow records with NULL links (e.g. IG accounts) to appear in results
-                        $isPrimaryRelation = in_array($relationKey, ['channeledAccount', 'campaign', 'channeledCampaign']);
-                        $joinRelation($relationKey, $isPrimaryRelation);
-                        $map = self::getRelationMap()[$relationKey];
-
-                        if ($isExplicitId || $field === $map['fk']) {
-                            $qb->addSelect("$rootAlias.{$map['fk']} AS $quotedField")
-                                ->addGroupBy("$rootAlias.{$map['fk']}");
-                        } else {
-                            // Use mapFieldToSql to handle JSON extraction or complex fields correctly
-                            $parsedIdField = $this->mapFieldToSql($field);
-                            $qb->addSelect("$parsedIdField AS $quotedField")
-                                ->addGroupBy($parsedIdField);
-
-                            // Only add shadow ID for primary relation concepts (post, account, etc.), not for secondary attributes
-                            if ($field === $relationKey && !isset($map['isAttribute'])) {
-                                $shadowId = $quoteChar.$field."_id".$quoteChar;
-                                $qb->addSelect("$rootAlias.{$map['fk']} AS $shadowId")
-                                    ->addGroupBy("$rootAlias.{$map['fk']}");
-                            }
-                        }
-                    } else {
-                        // Raw Column Fallback
-                        $qb->addSelect("$rootAlias.$field AS $quotedField")
-                            ->addGroupBy("$rootAlias.$field");
-                    }
-                } elseif (($isMetric || $this->isChanneledMetric) && in_array($field, ['account', 'campaign'])) {
-                    // Keep existing legacy account/campaign logic for cross-channel merging
-                    $isAccount = $field === 'account';
-                    $genericKey = $isAccount ? 'account' : 'campaign';
-                    $channeledKey = $isAccount ? 'channeledAccount' : 'channeledCampaign';
-                    $genericMap = self::getRelationMap()[$genericKey];
-                    $channeledMap = self::getRelationMap()[$channeledKey];
-                    $joinRelation($genericKey);
-                    $joinRelation($channeledKey);
-
-                    if ($isAccount) {
-                        $joinRelation('channeledCampaign');
-                        $campaignAlias = self::getRelationMap()['channeledCampaign']['alias'];
-                        $safeLeftJoin($campaignAlias, 'channeled_accounts', 'rca_fallback', "{$campaignAlias}.channeled_account_id = rca_fallback.id");
-
-                        $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                        $quotedFieldId = $quoteChar.$field."_id".$quoteChar;
-                        $qb->addSelect("COALESCE(CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST(rca_fallback.name AS $castType), CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), 'Unknown') AS $quotedField")
-                            ->addSelect("mc.{$channeledMap['fk']} AS $quotedFieldId")
-                            ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
-                            ->addGroupBy("rca_fallback.name")
-                            ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
-                            ->addGroupBy("{$channeledMap['alias']}.platform_id")
-                            ->addGroupBy("mc.{$channeledMap['fk']}");
-                    } else {
-                        if (isset($genericMap['isJSON']) && $genericMap['isJSON']) {
-                            $sqlField = $this->mapFieldToSql($field);
-                            $qb->addSelect("COALESCE($sqlField, 'N/A') AS $quotedField")
-                                ->addGroupBy($sqlField);
-                        } else {
-                            $quotedFieldId = $quoteChar.$field."_id".$quoteChar;
-                            $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                            $qb->addSelect("COALESCE(CAST({$channeledMap['alias']}.{$channeledMap['field']} AS $castType), CAST({$genericMap['alias']}.{$genericMap['field']} AS $castType), CAST({$channeledMap['alias']}.platform_id AS $castType), CAST(mc.{$channeledMap['fk']} AS $castType), 'Unknown') AS $quotedField")
-                                ->addSelect("mc.{$channeledMap['fk']} AS $quotedFieldId")
-                                ->addGroupBy("{$channeledMap['alias']}.{$channeledMap['field']}")
-                                ->addGroupBy("{$genericMap['alias']}.{$genericMap['field']}")
-                                ->addGroupBy("{$channeledMap['alias']}.platform_id")
-                                ->addGroupBy("mc.{$channeledMap['fk']}");
-                        }
-                    }
-                } elseif (($isMetric || $this->isChanneledMetric) && isset(self::getRelationMap()[$field])) {
-                    $joinRelation($field);
-                    $map = self::getRelationMap()[$field];
-
-                    $castType = Helpers::isPostgres() ? 'VARCHAR' : 'CHAR';
-                    if (isset($map['isJSON']) && $map['isJSON']) {
-                        $sqlField = $this->mapFieldToSql($field);
-                        $qb->addSelect("COALESCE($sqlField, 'N/A') AS $quotedField")
-                            ->addGroupBy($sqlField);
-                    } elseif (!empty($map['isAttribute'])) {
-                        // Attribute relations must expose the real attribute value only (never FK fallback like page_id).
-                        $sqlField = $this->mapFieldToSql($field);
-                        $qb->addSelect("COALESCE(CAST($sqlField AS $castType), 'N/A') AS $quotedField")
-                            ->addGroupBy($sqlField);
-                    } else {
-                        $quotedFieldId = $quoteChar.$field."_id".$quoteChar;
-                        $qb->addSelect("COALESCE(CAST({$map['alias']}.{$map['field']} AS $castType), CAST(mc.{$map['fk']} AS $castType), 'Unknown') AS $quotedField")
-                            ->addSelect("mc.{$map['fk']} AS $quotedFieldId")
-                            ->addGroupBy("{$map['alias']}.{$map['field']}")
-                            ->addGroupBy("mc.{$map['fk']}");
-                    }
-                } else {
-                    $sqlField = $this->mapFieldToSql($field);
-                    $qb->addSelect("$sqlField AS $quotedField")
-                        ->addGroupBy($sqlField);
-                }
-            }
-
-            // Apply filters
-            if ($filters) {
-                foreach ($filters as $key => $value) {
-                    // Skip technical/debug parameters
-                    if ($key === 'debug_sql' || $key === '_' || $key === 'latest_snapshot' || $key === 'snapshot_delta' || $key === 'snapshot_fallback_mode') continue;
-
-                    $isDimension = str_starts_with($key, 'dimensions.');
-                    $dimKey = $isDimension ? substr($key, 11) : $key;
-
-                    if ($this->isChanneledMetric && ($isDimension || ($key !== 'account_type' && !in_array($key, $standardRelations) && !in_array($key, $dateFields) && !$this->_class->hasField($key)))) {
-                        $dimAlias = "f_dim_".preg_replace('/[^a-z0-9]/i', '_', $dimKey);
-                        $condition = $this->resolveFilterCondition($value);
-                        $safeLeftJoin('e', 'dimension_set_items', "dsi_$dimAlias", "e.dimension_set_id = dsi_$dimAlias.dimension_set_id AND dsi_$dimAlias.dimension_value_id IN (
-                        SELECT sub_dv.id FROM dimension_values sub_dv 
-                        JOIN dimension_keys sub_dk ON sub_dv.dimension_key_id = sub_dk.id 
-                        WHERE sub_dk.name = :key_$dimAlias
-                    )");
-                        $safeLeftJoin("dsi_$dimAlias", 'dimension_values', "dv_$dimAlias", "dsi_$dimAlias.dimension_value_id = dv_$dimAlias.id");
-
-                        $qb->setParameter("key_$dimAlias", $dimKey);
-
-                        if ($condition['operator'] === 'eq') {
-                            $qb->andWhere("dv_$dimAlias.value = :val_$dimAlias")
-                                ->setParameter("val_$dimAlias", $condition['value']);
-                        } elseif ($condition['operator'] === 'neq') {
-                            $qb->andWhere("dv_$dimAlias.value <> :val_$dimAlias")
-                                ->setParameter("val_$dimAlias", $condition['value']);
-                        } elseif ($condition['operator'] === 'is_null') {
-                            $qb->andWhere("dv_$dimAlias.value IS NULL");
-                        } elseif ($condition['operator'] === 'is_not_null') {
-                            $qb->andWhere("dv_$dimAlias.value IS NOT NULL");
-                        }
-                    } elseif ((str_ends_with($entityName, 'Metric') || $this->isChanneledMetric) && (isset(self::getRelationMap()[$key]) || $key === 'account_type')) {
-                        $realKey = ($key === 'account_type') ? 'channeledAccount' : $key;
-                        $map = self::getRelationMap()[$realKey];
-                        $fk = $map['fk'] ?? null;
-
-                        // Perf: avoid joining relation tables when filtering by FK/nullability only.
-                        if ($key === 'account_type') {
-                            $joinRelation($realKey);
-                        }
-
-                        if ($value === 'N/A' || $value === 'NULL') {
-                            $nullTarget = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
-                            $qb->andWhere("$nullTarget IS NULL");
-                        } elseif ($value === 'NOT_NULL') {
-                            $nullTarget = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
-                            $qb->andWhere("$nullTarget IS NOT NULL");
-                        } elseif ($key === 'account_type') {
-                            $typeFilter = $isPostgres ? "LOWER({$map['alias']}.type) = LOWER(:f_$key)" : "{$map['alias']}.type = :f_$key";
-                            $qb->andWhere($typeFilter)
-                                ->setParameter("f_$key", $value);
-                        } elseif (!empty($map['isAttribute'])) {
-                            // Attribute relations (e.g. page_platform_id, linked_fb_page_id) must filter by attribute value, not FK identity.
-                            $joinRelation($realKey);
-                            $sqlKey = $this->mapFieldToSql($key);
-                            $sqlKeyComparable = $isPostgres ? "CAST($sqlKey AS TEXT)" : "CAST($sqlKey AS CHAR)";
-                            $paramName = 'f_'.preg_replace('/[^a-z0-9]/i', '_', $key);
-                            $condition = $this->resolveFilterCondition($value);
-
-                            if ($condition['operator'] === 'is_null') {
-                                $qb->andWhere("$sqlKey IS NULL");
-                            } else if ($condition['operator'] === 'is_not_null') {
-                                $qb->andWhere("$sqlKey IS NOT NULL");
-                            } else if ($condition['operator'] === 'neq') {
-                                $qb->andWhere("$sqlKeyComparable <> :$paramName")
-                                    ->setParameter($paramName, (string)$condition['value']);
-                            } else {
-                                $qb->andWhere("$sqlKeyComparable = :$paramName")
-                                    ->setParameter($paramName, (string)$condition['value']);
-                            }
-                        } else {
-                            // Strict Relation Identity Model (Professional ID-only)
-                            $targetCol = ($key === 'page') ? 'mc.page_id' : "mc.$fk";
-                            if (is_numeric($value)) {
-                                $qb->andWhere("$targetCol = :f_$key")
-                                    ->setParameter("f_$key", (int)$value);
-                            } else {
-                                // If identifier is not an ID, no results (Correct behavior for relations)
-                                $qb->andWhere('1 = 0');
-                            }
-                        }
-                    } else {
-                        $sqlKey = $this->mapFieldToSql($key);
-                        $paramName = 'f_'.preg_replace('/[^a-z0-9]/i', '_', $key);
-                        $condition = $this->resolveFilterCondition($value);
-
-                        if ($condition['operator'] === 'is_null') {
-                            $qb->andWhere("$sqlKey IS NULL");
-                        } else if ($condition['operator'] === 'is_not_null') {
-                            $qb->andWhere("$sqlKey IS NOT NULL");
-                        } else if ($condition['operator'] === 'neq') {
-                            $qb->andWhere("$sqlKey <> :$paramName")
-                                ->setParameter($paramName, $condition['value']);
-                        } else {
-                            $qb->andWhere("$sqlKey = :$paramName")
-                                ->setParameter($paramName, $condition['value']);
-                        }
-                    }
-                }
-            }
-
-            $latestSnapshot = false;
-            if ($filters && isset($filters->latest_snapshot)) {
-                $latestSnapshot = filter_var($filters->latest_snapshot, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-                if ($latestSnapshot === null) {
-                    $latestSnapshot = (bool)$filters->latest_snapshot;
-                }
-            }
-
-            if ($latestSnapshot && $this->aggregateUseSnapshotDelta) {
-                throw new InvalidArgumentException('latest_snapshot and snapshot_delta cannot be used together.');
-            }
-
-            // Apply date filters using the correctly mapped column names
-            if ($startDate || $endDate || $latestSnapshot) {
-                if ($this->isChanneledMetric) {
-                    $sqlDateField = 'm.metric_date';
-                } elseif ($isMetric) {
-                    $sqlDateField = 'e.metric_date';
-                } else {
-                    $dateField = 'platformCreatedAt';
-                    if (!$this->_class->hasField($dateField)) {
-                        $dateField = $this->_class->hasField('createdAt') ? 'createdAt' : 'date';
-                    }
-                    $sqlDateField = $this->mapFieldToSql($dateField);
-                }
-
-                if ($latestSnapshot && $this->isChanneledMetric) {
-                    $qb->addSelect("MAX($sqlDateField) AS __snapshot_effective_date");
-                    $nullSafeComparator = $isPostgres ? 'IS NOT DISTINCT FROM' : '<=>';
-                    $latestSnapshotBaseSql = "
-                        FROM metrics m_ls
-                        JOIN metric_configs mc_ls ON m_ls.metric_config_id = mc_ls.id
-                        WHERE mc_ls.channel = mc.channel
-                          AND mc_ls.period = mc.period
-                          AND (mc_ls.channeled_account_id $nullSafeComparator mc.channeled_account_id)
-                          AND (mc_ls.page_id $nullSafeComparator mc.page_id)
-                          AND (mc_ls.post_id $nullSafeComparator mc.post_id)
-                          AND (mc_ls.dimension_set_id $nullSafeComparator mc.dimension_set_id)
-                          AND (mc_ls.query_id $nullSafeComparator mc.query_id)
-                          AND (mc_ls.country_id $nullSafeComparator mc.country_id)
-                          AND (mc_ls.device_id $nullSafeComparator mc.device_id)
-                    ";
-
-                    $latestSnapshotSql = "SELECT MAX(m_ls.metric_date) {$latestSnapshotBaseSql}";
-                    if ($startDate || $endDate) {
-                        $latestSnapshotRangeSql = $latestSnapshotSql;
-                        if ($startDate) {
-                            $latestSnapshotRangeSql .= " AND m_ls.metric_date >= :startDate";
-                            $qb->setParameter('startDate', $startDate);
-                        }
-                        if ($endDate) {
-                            $latestSnapshotRangeSql .= " AND m_ls.metric_date <= :endDate";
-                            $qb->setParameter('endDate', $endDate);
-                        }
-
-                        if ($this->aggregateSnapshotFallbackMode === 'resilient') {
-                            // Prefer the latest date within the requested range; fallback to latest available overall.
-                            $latestSnapshotSql = "COALESCE(($latestSnapshotRangeSql), ($latestSnapshotSql))";
-                        } else {
-                            $latestSnapshotSql = $latestSnapshotRangeSql;
-                        }
-                    }
-
-                    $qb->andWhere("$sqlDateField = ($latestSnapshotSql)");
-                } elseif ($this->aggregateUseSnapshotDelta && $this->isChanneledMetric) {
-                    $qb->addSelect("MAX($sqlDateField) AS __snapshot_effective_date");
-                    // Delta mode needs historic rows; keep only an end cap to avoid dropping pre-start snapshots.
-                    if ($this->aggregateSnapshotFallbackMode === 'strict') {
-                        $qb->andWhere("$sqlDateField <= :snapshotDeltaEndDate");
-                    }
-                    $qb->setParameter('snapshotDeltaEndDate', $endDate)
-                        ->setParameter('snapshotDeltaStartDate', $startDate);
-                } else {
-                    if ($startDate) {
-                        $qb->andWhere("$sqlDateField >= :startDate")
-                            ->setParameter('startDate', $startDate);
-                    }
-                    if ($endDate) {
-                        $qb->andWhere("$sqlDateField <= :endDate")
-                            ->setParameter('endDate', $endDate);
-                    }
-                }
-            }
-
-            // Apply ordering
-            if ($orderBy) {
-                $direction = (strtoupper($orderDir) === 'DESC') ? 'DESC' : 'ASC';
-                $qb->orderBy($orderBy, $direction);
-            }
-
-            $stmt = $qb->executeQuery();
-            $results = $stmt->fetchAllAssociative();
-            $this->extractSnapshotAggregateMeta($results, $startDate, $endDate);
-
-            // 4. Smoothing: Fill temporal gaps for time-series data
-            if ($startDate && $endDate) {
-                $temporalField = null;
-                $temporalType = null;
-                foreach ($groupBy as $field) {
-                    if (in_array(strtolower($field), ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'])) {
-                        $temporalField = $field;
-                        $temporalType = strtolower($field);
-                        break;
-                    }
-                }
-
-                if ($temporalField) {
-                    $results = $this->fillTemporalGaps($results, $temporalField, $temporalType, $startDate, $endDate, $aggregations, $groupBy);
-                }
-            }
-
-            return $results;
+        /**
+         * @param array<string, string> $aggregations
+         * @return array<int, array<string, mixed>>
+         */
+        protected function finalizeLegacyAggregateRows(LegacyAggregateExecutionContext $context): array {
+            return (new LegacyAggregateFinalizeStage())->apply(
+                context: $context,
+                extractSnapshotAggregateMeta: function (array &$results, ?string $startDate, ?string $endDate): void {
+                    $this->extractSnapshotAggregateMeta($results, $startDate, $endDate);
+                },
+                fillTemporalGaps: function (
+                    array $results,
+                    string $temporalField,
+                    string $temporalType,
+                    string $startDate,
+                    string $endDate,
+                    array $aggregations,
+                    array $groupBy
+                ): array {
+                    return $this->fillTemporalGaps($results, $temporalField, $temporalType, $startDate, $endDate, $aggregations, $groupBy);
+                },
+            );
         }
 
         public function getLastAggregateMeta(): array
@@ -2546,11 +2342,7 @@
                 'ctr'                                  => "SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END), 0)",
                 'cpc'                                  => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('clicks', 'clicks_daily')" : "mc.name IN ('clicks', 'clicks_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0)",
                 'cpm'                                  => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / (NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'impressions_daily')" : "mc.name IN ('impressions', 'impressions_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0) / 1000)",
-                'position'                             => $this->needsImpressionsJoin ?
-                    "SUM(CASE WHEN mc.name = 'position' THEN $valCol * (SELECT m2.value FROM metrics m2 JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id WHERE mc2.name IN ('impressions', 'page_media_view', 'post_media_view') AND m2.metric_date = ".($this->isChanneledMetric ? "m.metric_date" : "e.metric_date")." AND mc2.channel = mc.channel AND (mc2.dimension_set_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.dimension_set_id) AND (mc2.query_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.query_id) AND (mc2.page_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.page_id) AND (mc2.country_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.country_id) AND (mc2.device_id ".($isPostgres ? "IS NOT DISTINCT FROM" : "<=>")." mc.device_id) LIMIT 1) ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'page_media_view', 'post_media_view') THEN $valCol ELSE 0 END), 0)" :
-                    "NULL",
-                'unique_clicks'                        => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'unique_clicks'" : "mc.name = 'unique_clicks'")." THEN $valCol ELSE 0 END)",
-                'results'                              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END)",
+                'results'         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END)",
                 'cost_per_result'                      => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'spend'" : "mc.name = 'spend'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END), 0)",
                 'result_rate'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'page_media_view', 'post_media_view')" : "mc.name IN ('impressions', 'page_media_view', 'post_media_view')")." THEN $valCol ELSE 0 END), 0)",
                 'roas'                                 => "AVG(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'purchase_roas'" : "mc.name = 'purchase_roas'")." THEN $valCol ELSE NULL END)",
@@ -2564,7 +2356,7 @@
                 'total_interactions'                   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')" : "mc.name IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'profile_views'                        => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_views', 'profile_views_daily')" : "mc.name IN ('profile_views', 'profile_views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'follower_count'                       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('follower_count', 'follower_count_daily', 'page_fans', 'page_fans_daily')" : "mc.name IN ('follower_count', 'follower_count_daily', 'page_fans', 'page_fans_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'page_impressions'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_impressions', 'page_impressions_daily', 'page_media_view', 'page_media_view_daily')" : "mc.name IN ('page_impressions', 'page_impressions_daily', 'page_media_view', 'page_media_view_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'page_impressions'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily')" : "mc.name IN ('page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'page_post_engagements'                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_post_engagements', 'page_post_engagements_daily')" : "mc.name IN ('page_post_engagements', 'page_post_engagements_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'page_views_total'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_views_total', 'page_views_total_daily')" : "mc.name IN ('page_views_total', 'page_views_total_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'page_fans'                            => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_fans', 'page_fans_daily')" : "mc.name IN ('page_fans', 'page_fans_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
@@ -2577,62 +2369,23 @@
                 'saved'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'plays'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'views'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'replies'                              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('replies', 'replies_daily')" : "mc.name IN ('replies', 'replies_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'accounts_engaged'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('accounts_engaged', 'accounts_engaged_daily')" : "mc.name IN ('accounts_engaged', 'accounts_engaged_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'website_clicks'                       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('website_clicks', 'website_clicks_daily')" : "mc.name IN ('website_clicks', 'website_clicks_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'profile_links_taps'                   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_links_taps', 'profile_links_taps_daily')" : "mc.name IN ('profile_links_taps', 'profile_links_taps_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'follows_and_unfollows'                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('follows_and_unfollows', 'follows_and_unfollows_daily')" : "mc.name IN ('follows_and_unfollows', 'follows_and_unfollows_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-
-                // Mappings for exact _daily metric fields (Post Level Content)
-                'reach_daily'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'reach_daily'" : "mc.name = 'reach_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'impressions_daily'                    => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'impressions_daily'" : "mc.name = 'impressions_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'likes_daily'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'likes_daily'" : "mc.name = 'likes_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'comments_daily'                       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'comments_daily'" : "mc.name = 'comments_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'follows_daily'                        => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'follows_daily'" : "mc.name = 'follows_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'ig_reels_avg_watch_time_daily'        => $this->buildCompanionTimeWeightedAverageFormula(
-                    sourceMetricNames: ['ig_reels_avg_watch_time_daily'],
-                    totalTimeMetricNames: ['ig_reels_video_view_total_time_daily'],
-                    valCol: $valCol,
-                    isPostgres: $isPostgres,
-                    periodCondition: $isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'"
-                ),
-                'ig_reels_video_view_total_time_daily' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'ig_reels_video_view_total_time_daily'" : "mc.name = 'ig_reels_video_view_total_time_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'shares_daily'                         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'shares_daily'" : "mc.name = 'shares_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'saved_daily'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'saved_daily'" : "mc.name = 'saved_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'post_clicks_daily'                    => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'post_clicks_daily'" : "mc.name = 'post_clicks_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'post_engagements_daily'               => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'post_engagements_daily'" : "mc.name = 'post_engagements_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'post_impressions_unique_daily'        => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'post_impressions_unique_daily'" : "mc.name = 'post_impressions_unique_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'post_media_view_daily'                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'post_media_view_daily'" : "mc.name = 'post_media_view_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'post_reactions_by_type_total_daily'   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'post_reactions_by_type_total_daily'" : "mc.name = 'post_reactions_by_type_total_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'post_video_avg_time_watched_daily'    => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'post_video_avg_time_watched_daily'" : "mc.name = 'post_video_avg_time_watched_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'post_video_views_daily'               => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'post_video_views_daily'" : "mc.name = 'post_video_views_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'profile_activity_daily'               => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'profile_activity_daily'" : "mc.name = 'profile_activity_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'profile_visits_daily'                 => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'profile_visits_daily'" : "mc.name = 'profile_visits_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'reposts_daily'                        => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'reposts_daily'" : "mc.name = 'reposts_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'total_interactions_daily'             => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'total_interactions_daily'" : "mc.name = 'total_interactions_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'views_daily'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'views_daily'" : "mc.name = 'views_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-
-                // Stock metrics: honor requested period when provided (e.g. lifetime), default daily otherwise.
-                'follows'                              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('follows', 'follows_daily')" : "mc.name IN ('follows', 'follows_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'reposts'                              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reposts', 'reposts_daily')" : "mc.name IN ('reposts', 'reposts_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'profile_activity'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_activity', 'profile_activity_daily')" : "mc.name IN ('profile_activity', 'profile_activity_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'profile_visits'                       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_visits', 'profile_visits_daily')" : "mc.name IN ('profile_visits', 'profile_visits_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'ig_reels_avg_watch_time'              => $this->buildCompanionTimeWeightedAverageFormula(
-                    sourceMetricNames: ['ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily'],
-                    totalTimeMetricNames: ['ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily'],
-                    valCol: $valCol,
-                    isPostgres: $isPostgres,
-                    periodCondition: $periodCondition
-                ),
-                'ig_reels_video_view_total_time'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily')" : "mc.name IN ('ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'post_clicks'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_clicks', 'post_clicks_daily')" : "mc.name IN ('post_clicks', 'post_clicks_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'post_engagements'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_engagements', 'post_engagements_daily', 'post_engagement', 'post_engagement_daily')" : "mc.name IN ('post_engagements', 'post_engagements_daily', 'post_engagement', 'post_engagement_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'post_impressions_unique'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_impressions_unique', 'post_impressions_unique_daily')" : "mc.name IN ('post_impressions_unique', 'post_impressions_unique_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'post_media_view'                      => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_media_view', 'post_media_view_daily')" : "mc.name IN ('post_media_view', 'post_media_view_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'post_reactions_by_type_total'         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_reactions_by_type_total', 'post_reactions_by_type_total_daily')" : "mc.name IN ('post_reactions_by_type_total', 'post_reactions_by_type_total_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'post_video_avg_time_watched'          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_video_avg_time_watched', 'post_video_avg_time_watched_daily')" : "mc.name IN ('post_video_avg_time_watched', 'post_video_avg_time_watched_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'post_video_views'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_video_views', 'post_video_views_daily')" : "mc.name IN ('post_video_views', 'post_video_views_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-
+                // Legacy stock metrics (pre-aggregation refactor)
+                'impressions'                          => "SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily', 'page_impressions', 'page_impressions_daily', 'post_impressions', 'post_impressions_daily') THEN $valCol ELSE 0 END)",
+                'reach'                                => "SUM(CASE WHEN mc.name IN ('reach', 'reach_daily', 'page_reach', 'page_reach_daily', 'post_reach', 'post_reach_daily') THEN $valCol ELSE 0 END)",
+                'engagement'                           => "SUM(CASE WHEN mc.name IN ('engagement', 'engagement_daily', 'post_engagement', 'post_engagement_daily', 'page_engagements', 'page_engagements_daily') THEN $valCol ELSE 0 END)",
+                'video_views'                          => "SUM(CASE WHEN mc.name IN ('video_views', 'video_views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') THEN $valCol ELSE 0 END)",
+                'page_fans'                            => "SUM(CASE WHEN mc.name IN ('page_fans', 'page_fans_daily') THEN $valCol ELSE 0 END)",
+                'follower_count'                       => "SUM(CASE WHEN mc.name IN ('follower_count', 'follower_count_daily') THEN $valCol ELSE 0 END)",
+                'profile_views'                        => "SUM(CASE WHEN mc.name IN ('profile_views', 'profile_views_daily') THEN $valCol ELSE 0 END)",
+                'website_clicks'                       => "SUM(CASE WHEN mc.name IN ('website_clicks', 'website_clicks_daily') THEN $valCol ELSE 0 END)",
+                'profile_links_taps'                   => "SUM(CASE WHEN mc.name IN ('profile_links_taps', 'profile_links_taps_daily') THEN $valCol ELSE 0 END)",
+                'follows_and_unfollows'                => "SUM(CASE WHEN mc.name IN ('follows_and_unfollows', 'follows_and_unfollows_daily') THEN $valCol ELSE 0 END)",
+                'saves'                                => "SUM(CASE WHEN mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily') THEN $valCol ELSE 0 END)",
+                'shares'                               => "SUM(CASE WHEN mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') THEN $valCol ELSE 0 END)",
+                'comments'                             => "SUM(CASE WHEN mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') THEN $valCol ELSE 0 END)",
+                'likes'                                => "SUM(CASE WHEN mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') THEN $valCol ELSE 0 END)",
+                'replies'                              => "SUM(CASE WHEN mc.name IN ('replies', 'replies_daily') THEN $valCol ELSE 0 END)",
+                'accounts_engaged'                     => "SUM(CASE WHEN mc.name IN ('accounts_engaged', 'accounts_engaged_daily') THEN $valCol ELSE 0 END)",
             ];
 
             // Override core stock-like formulas to respect requested period.
@@ -2645,6 +2398,22 @@
                 'saves'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
                 'reach'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')" : "mc.name IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
                 'views'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'impressions'                          => "SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily', 'page_impressions', 'page_impressions_daily', 'post_impressions', 'post_impressions_daily') THEN $valCol ELSE 0 END)",
+                'reach'                                => "SUM(CASE WHEN mc.name IN ('reach', 'reach_daily', 'page_reach', 'page_reach_daily', 'post_reach', 'post_reach_daily') THEN $valCol ELSE 0 END)",
+                'engagement'                           => "SUM(CASE WHEN mc.name IN ('engagement', 'engagement_daily', 'post_engagement', 'post_engagement_daily', 'page_engagements', 'page_engagements_daily') THEN $valCol ELSE 0 END)",
+                'video_views'                          => "SUM(CASE WHEN mc.name IN ('video_views', 'video_views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') THEN $valCol ELSE 0 END)",
+                'page_fans'                            => "SUM(CASE WHEN mc.name IN ('page_fans', 'page_fans_daily') THEN $valCol ELSE 0 END)",
+                'follower_count'                       => "SUM(CASE WHEN mc.name IN ('follower_count', 'follower_count_daily') THEN $valCol ELSE 0 END)",
+                'profile_views'                        => "SUM(CASE WHEN mc.name IN ('profile_views', 'profile_views_daily') THEN $valCol ELSE 0 END)",
+                'website_clicks'                       => "SUM(CASE WHEN mc.name IN ('website_clicks', 'website_clicks_daily') THEN $valCol ELSE 0 END)",
+                'profile_links_taps'                   => "SUM(CASE WHEN mc.name IN ('profile_links_taps', 'profile_links_taps_daily') THEN $valCol ELSE 0 END)",
+                'follows_and_unfollows'                => "SUM(CASE WHEN mc.name IN ('follows_and_unfollows', 'follows_and_unfollows_daily') THEN $valCol ELSE 0 END)",
+                'saves'                                => "SUM(CASE WHEN mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily') THEN $valCol ELSE 0 END)",
+                'shares'                               => "SUM(CASE WHEN mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') THEN $valCol ELSE 0 END)",
+                'comments'                             => "SUM(CASE WHEN mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') THEN $valCol ELSE 0 END)",
+                'likes'                                => "SUM(CASE WHEN mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') THEN $valCol ELSE 0 END)",
+                'replies'                              => "SUM(CASE WHEN mc.name IN ('replies', 'replies_daily') THEN $valCol ELSE 0 END)",
+                'accounts_engaged'                     => "SUM(CASE WHEN mc.name IN ('accounts_engaged', 'accounts_engaged_daily') THEN $valCol ELSE 0 END)",
             ];
 
             return array_merge($formulas, $periodAwareOverrides);
@@ -2780,7 +2549,7 @@
                     return "$source->>'$path'";
                 }
 
-                return "JSON_UNQUOTE(JSON_EXTRACT($source, '$.$path'))";
+                return "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT($source, '$.$path')) AS CHAR), 'N/A')";
             }
 
             // Relation metadata extraction (relationName.metadata.field)
