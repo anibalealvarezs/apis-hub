@@ -825,7 +825,16 @@
             }
 
             $groupCanonical = $this->canonicalizeGroupPattern($groupBy);
-            if (!in_array($groupCanonical, ['adgroup|adgroup_id', 'age|gender', 'adgroup|adgroup_id|daily', 'age|daily|gender'], true)) {
+            if (!in_array($groupCanonical, [
+                'age',
+                'age|gender',
+                'ad|ad_id',
+                'adgroup|adgroup_id',
+                'age|daily',
+                'age|daily|gender',
+                'ad|ad_id|daily',
+                'adgroup|adgroup_id|daily',
+            ], true)) {
                 return null;
             }
 
@@ -836,14 +845,20 @@
                 }
             }
 
-            $allowedFilterKeys = ['channeledCampaign', 'channel', 'debug_sql', '_'];
+            $allowedFilterKeys = ['channeledCampaign', 'adGroup', 'channel', 'debug_sql', '_'];
             foreach (array_keys($filtersArr) as $key) {
                 if (!in_array($key, $allowedFilterKeys, true)) {
                     return null;
                 }
             }
 
-            if (!isset($filtersArr['channeledCampaign']) || !is_numeric((string)$filtersArr['channeledCampaign'])) {
+            if (isset($filtersArr['channeledCampaign']) && !is_numeric((string)$filtersArr['channeledCampaign'])) {
+                return null;
+            }
+            if (isset($filtersArr['adGroup']) && !is_numeric((string)$filtersArr['adGroup'])) {
+                return null;
+            }
+            if (!isset($filtersArr['channeledCampaign']) && !isset($filtersArr['adGroup'])) {
                 return null;
             }
             if (isset($filtersArr['channel']) && !is_numeric((string)$filtersArr['channel'])) {
@@ -870,63 +885,72 @@
                 'actions'         => 'f.sum_actions',
             ];
 
+            $isDailyGrouping = str_contains($groupCanonical, 'daily');
             $selectFields = [];
             $orderMap = [];
-            $groupingSelectSql = '';
-            $groupingGroupBySql = '';
+            $groupingSelectParts = [];
+            $groupingGroupByParts = [];
+            $baseJoinClauses = [];
             $outerJoinClauses = [];
 
-            $isDailyGrouping = str_contains($groupCanonical, 'daily');
+            if ($isDailyGrouping) {
+                $groupingSelectParts[] = 'm.metric_date AS daily';
+                $groupingGroupByParts[] = 'm.metric_date';
+                $selectFields[] = 'f.daily AS '.$quoteChar.'daily'.$quoteChar;
+                $orderMap['daily'] = 'f.daily';
+            }
 
             if ($groupCanonical === 'adgroup|adgroup_id' || $groupCanonical === 'adgroup|adgroup_id|daily') {
-                $groupingSelectSql = $isDailyGrouping
-                    ? 'm.metric_date AS daily, mc.channeled_ad_group_id AS ad_group_id,'
-                    : 'mc.channeled_ad_group_id AS ad_group_id,';
-                $groupingGroupBySql = $isDailyGrouping
-                    ? 'm.metric_date, mc.channeled_ad_group_id'
-                    : 'mc.channeled_ad_group_id';
-                $selectFields = [
-                    ...($isDailyGrouping ? ['f.daily AS '.$quoteChar.'daily'.$quoteChar] : []),
-                    'f.ad_group_id AS '.$quoteChar.'adGroup_id'.$quoteChar,
-                    "COALESCE(cag.name, 'unknown') AS ".$quoteChar.'adGroup'.$quoteChar,
-                ];
-                $orderMap = [
-                    ...($isDailyGrouping ? ['daily' => 'f.daily'] : []),
-                    'adgroup_id' => 'f.ad_group_id',
-                    'adgroup'    => "COALESCE(cag.name, 'unknown')",
-                ];
+                $groupingSelectParts[] = 'mc.channeled_ad_group_id AS ad_group_id';
+                $groupingGroupByParts[] = 'mc.channeled_ad_group_id';
+                $selectFields[] = 'f.ad_group_id AS '.$quoteChar.'adGroup_id'.$quoteChar;
+                $selectFields[] = "COALESCE(cag.name, 'unknown') AS ".$quoteChar.'adGroup'.$quoteChar;
+                $orderMap['adgroup_id'] = 'f.ad_group_id';
+                $orderMap['adgroup'] = "COALESCE(cag.name, 'unknown')";
                 $outerJoinClauses[] = 'LEFT JOIN channeled_ad_groups cag ON cag.id = f.ad_group_id';
-            } elseif ($groupCanonical === 'age|gender' || $groupCanonical === 'age|daily|gender') {
-                $groupingSelectSql = $isDailyGrouping
-                    ? 'm.metric_date AS daily, mc.dimension_set_id AS dimension_set_id,'
-                    : 'mc.dimension_set_id AS dimension_set_id,';
-                $groupingGroupBySql = $isDailyGrouping
-                    ? 'm.metric_date, mc.dimension_set_id'
-                    : 'mc.dimension_set_id';
-                $selectFields = [
-                    ...($isDailyGrouping ? ['f.daily AS '.$quoteChar.'daily'.$quoteChar] : []),
-                    "COALESCE(dv_gender.value, 'unknown') AS ".$quoteChar.'gender'.$quoteChar,
-                    "COALESCE(dv_age.value, 'unknown') AS ".$quoteChar.'age'.$quoteChar,
-                ];
-                $orderMap = [
-                    ...($isDailyGrouping ? ['daily' => 'f.daily'] : []),
-                    'gender' => "COALESCE(dv_gender.value, 'unknown')",
-                    'age'    => "COALESCE(dv_age.value, 'unknown')",
-                ];
-                $outerJoinClauses[] = "LEFT JOIN dimension_set_items dsi_gender ON dsi_gender.dimension_set_id = f.dimension_set_id
-                    AND dsi_gender.dimension_value_id IN (
-                        SELECT dvg.id FROM dimension_values dvg
-                        JOIN dimension_keys dkg ON dkg.id = dvg.dimension_key_id
-                        WHERE LOWER(dkg.name) = LOWER('gender')
-                    )";
-                $outerJoinClauses[] = 'LEFT JOIN dimension_values dv_gender ON dv_gender.id = dsi_gender.dimension_value_id';
-                $outerJoinClauses[] = "LEFT JOIN dimension_set_items dsi_age ON dsi_age.dimension_set_id = f.dimension_set_id
+            } elseif ($groupCanonical === 'ad|ad_id' || $groupCanonical === 'ad|ad_id|daily') {
+                $groupingSelectParts[] = 'mc.channeled_ad_id AS ad_id';
+                $groupingGroupByParts[] = 'mc.channeled_ad_id';
+                $selectFields[] = 'f.ad_id AS '.$quoteChar.'ad_id'.$quoteChar;
+                $selectFields[] = "COALESCE(cad.name, 'unknown') AS ".$quoteChar.'ad'.$quoteChar;
+                $orderMap['ad_id'] = 'f.ad_id';
+                $orderMap['ad'] = "COALESCE(cad.name, 'unknown')";
+                $outerJoinClauses[] = 'LEFT JOIN channeled_ads cad ON cad.id = f.ad_id';
+            } elseif ($groupCanonical === 'age' || $groupCanonical === 'age|daily') {
+                $baseJoinClauses[] = "LEFT JOIN dimension_set_items dsi_age ON dsi_age.dimension_set_id = mc.dimension_set_id
                     AND dsi_age.dimension_value_id IN (
                         SELECT dva.id FROM dimension_values dva
                         JOIN dimension_keys dka ON dka.id = dva.dimension_key_id
                         WHERE LOWER(dka.name) = LOWER('age')
                     )";
-                $outerJoinClauses[] = 'LEFT JOIN dimension_values dv_age ON dv_age.id = dsi_age.dimension_value_id';
+                $baseJoinClauses[] = 'LEFT JOIN dimension_values dv_age ON dv_age.id = dsi_age.dimension_value_id';
+                $groupingSelectParts[] = "COALESCE(dv_age.value, 'unknown') AS age";
+                $groupingGroupByParts[] = "COALESCE(dv_age.value, 'unknown')";
+                $selectFields[] = 'f.age AS '.$quoteChar.'age'.$quoteChar;
+                $orderMap['age'] = 'f.age';
+            } elseif ($groupCanonical === 'age|gender' || $groupCanonical === 'age|daily|gender') {
+                $baseJoinClauses[] = "LEFT JOIN dimension_set_items dsi_gender ON dsi_gender.dimension_set_id = mc.dimension_set_id
+                    AND dsi_gender.dimension_value_id IN (
+                        SELECT dvg.id FROM dimension_values dvg
+                        JOIN dimension_keys dkg ON dkg.id = dvg.dimension_key_id
+                        WHERE LOWER(dkg.name) = LOWER('gender')
+                    )";
+                $baseJoinClauses[] = 'LEFT JOIN dimension_values dv_gender ON dv_gender.id = dsi_gender.dimension_value_id';
+                $baseJoinClauses[] = "LEFT JOIN dimension_set_items dsi_age ON dsi_age.dimension_set_id = mc.dimension_set_id
+                    AND dsi_age.dimension_value_id IN (
+                        SELECT dva.id FROM dimension_values dva
+                        JOIN dimension_keys dka ON dka.id = dva.dimension_key_id
+                        WHERE LOWER(dka.name) = LOWER('age')
+                    )";
+                $baseJoinClauses[] = 'LEFT JOIN dimension_values dv_age ON dv_age.id = dsi_age.dimension_value_id';
+                $groupingSelectParts[] = "COALESCE(dv_gender.value, 'unknown') AS gender";
+                $groupingSelectParts[] = "COALESCE(dv_age.value, 'unknown') AS age";
+                $groupingGroupByParts[] = "COALESCE(dv_gender.value, 'unknown')";
+                $groupingGroupByParts[] = "COALESCE(dv_age.value, 'unknown')";
+                $selectFields[] = 'f.gender AS '.$quoteChar.'gender'.$quoteChar;
+                $selectFields[] = 'f.age AS '.$quoteChar.'age'.$quoteChar;
+                $orderMap['gender'] = 'f.gender';
+                $orderMap['age'] = 'f.age';
             }
 
             foreach ($aggregations as $alias => $expr) {
@@ -945,14 +969,24 @@
             }
 
             $sqlParams = [
-                'startDate'           => $startDate,
-                'endDate'             => $endDate,
-                'channeledCampaignId' => (int)$filtersArr['channeledCampaign'],
+                'startDate' => $startDate,
+                'endDate'   => $endDate,
             ];
 
-            $extraWhereSql = '';
+            $whereClauses = [
+                'm.metric_date >= :startDate',
+                'm.metric_date <= :endDate',
+            ];
+            if (isset($filtersArr['channeledCampaign'])) {
+                $whereClauses[] = 'mc.channeled_campaign_id = :channeledCampaignId';
+                $sqlParams['channeledCampaignId'] = (int)$filtersArr['channeledCampaign'];
+            }
+            if (isset($filtersArr['adGroup'])) {
+                $whereClauses[] = 'mc.channeled_ad_group_id = :adGroupId';
+                $sqlParams['adGroupId'] = (int)$filtersArr['adGroup'];
+            }
             if (isset($filtersArr['channel'])) {
-                $extraWhereSql .= ' AND mc.channel = :channel';
+                $whereClauses[] = 'mc.channel = :channel';
                 $sqlParams['channel'] = (int)$filtersArr['channel'];
             }
 
@@ -966,27 +1000,30 @@
                 }
             }
 
+            $groupingSelectSql = implode(",\n                    ", $groupingSelectParts);
+            $groupingGroupBySql = implode(', ', $groupingGroupByParts);
+            $baseJoinSql = $baseJoinClauses !== [] ? "\n                ".implode("\n                ", $baseJoinClauses) : '';
+            $outerJoinSql = $outerJoinClauses !== [] ? "\n            ".implode("\n            ", $outerJoinClauses) : '';
+
             $sql = "WITH finalized AS (
                 SELECT
-                    {$groupingSelectSql}
-                    SUM(CASE WHEN {$nameCol} IN ('spend', 'spend_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_spend,
-                    SUM(CASE WHEN {$nameCol} IN ('clicks', 'clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_clicks,
-                    SUM(CASE WHEN {$nameCol} IN ('impressions', 'impressions_daily', 'post_impressions', 'post_impressions_daily', 'page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END) AS sum_impressions,
-                    SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_reach,
-                    SUM(CASE WHEN {$nameCol} = 'results' THEN m.value ELSE 0 END) AS sum_results,
-                    AVG(CASE WHEN {$nameCol} = 'purchase_roas' THEN m.value ELSE NULL END) AS avg_purchase_roas,
-                    SUM(CASE WHEN {$nameCol} = 'actions' THEN m.value ELSE 0 END) AS sum_actions
+                    {$groupingSelectSql},
+                    SUM(CASE WHEN $nameCol IN ('spend', 'spend_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_spend,
+                    SUM(CASE WHEN $nameCol IN ('clicks', 'clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_clicks,
+                    SUM(CASE WHEN $nameCol IN ('impressions', 'impressions_daily', 'post_impressions', 'post_impressions_daily', 'page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END) AS sum_impressions,
+                    SUM(CASE WHEN $nameCol IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_reach,
+                    SUM(CASE WHEN $nameCol = 'results' THEN m.value ELSE 0 END) AS sum_results,
+                    AVG(CASE WHEN $nameCol = 'purchase_roas' THEN m.value ELSE NULL END) AS avg_purchase_roas,
+                    SUM(CASE WHEN $nameCol = 'actions' THEN m.value ELSE 0 END) AS sum_actions
                 FROM metrics m
                 JOIN metric_configs mc ON m.metric_config_id = mc.id
-                WHERE m.metric_date >= :startDate
-                  AND m.metric_date <= :endDate
-                  AND mc.channeled_campaign_id = :channeledCampaignId
-                  {$extraWhereSql}
+                {$baseJoinSql}
+                WHERE ".implode("\n                  AND ", $whereClauses)."
                 GROUP BY {$groupingGroupBySql}
             )
             SELECT ".implode(', ', $selectFields)."
             FROM finalized f
-            ".implode("\n            ", $outerJoinClauses)."
+            {$outerJoinSql}
             $orderSql";
 
             return $connection->fetchAllAssociative($sql, $sqlParams);
