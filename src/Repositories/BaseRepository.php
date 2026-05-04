@@ -288,6 +288,21 @@
                 $this->aggregateUseSnapshotDelta = true;
             }
 
+            $optimizedResult = $this->tryOptimizedMarketingHierarchyAggregate(
+                connection: $connection,
+                aggregations: $aggregations,
+                groupBy: $groupBy,
+                filters: $filters,
+                startDate: $startDate,
+                endDate: $endDate,
+                orderBy: $orderBy,
+                orderDir: $orderDir,
+                isPostgres: $isPostgres,
+            );
+            if ($optimizedResult !== null) {
+                return $optimizedResult;
+            }
+
             $optimizedResult = $this->tryOptimizedWeightedMetricAggregate(
                 connection: $connection,
                 aggregations: $aggregations,
@@ -788,6 +803,182 @@
         }
 
         /**
+         * Optimized path for Facebook Marketing hierarchy payloads grouped by ad group.
+         *
+         * @return array<int, array<string, mixed>>|null
+         * @throws \Doctrine\DBAL\Exception
+         */
+        protected function tryOptimizedMarketingHierarchyAggregate(
+            Connection $connection,
+            array      $aggregations,
+            array      $groupBy,
+            ?object    $filters,
+            ?string    $startDate,
+            ?string    $endDate,
+            ?string    $orderBy,
+            ?string    $orderDir,
+            bool       $isPostgres
+        ): ?array
+        {
+            if (!$this->isChanneledMetric || $startDate === null || $endDate === null) {
+                return null;
+            }
+
+            $groupCanonical = $this->canonicalizeGroupPattern($groupBy);
+            if (!in_array($groupCanonical, ['adgroup|adgroup_id', 'age|gender'], true)) {
+                return null;
+            }
+
+            $filtersArr = [];
+            if ($filters !== null) {
+                foreach ($filters as $key => $value) {
+                    $filtersArr[(string)$key] = $value;
+                }
+            }
+
+            $allowedFilterKeys = ['channeledCampaign', 'channel', 'debug_sql', '_'];
+            foreach (array_keys($filtersArr) as $key) {
+                if (!in_array($key, $allowedFilterKeys, true)) {
+                    return null;
+                }
+            }
+
+            if (!isset($filtersArr['channeledCampaign']) || !is_numeric((string)$filtersArr['channeledCampaign'])) {
+                return null;
+            }
+            if (isset($filtersArr['channel']) && !is_numeric((string)$filtersArr['channel'])) {
+                return null;
+            }
+
+            $nameCol = $isPostgres ? 'LOWER(mc.name)' : 'mc.name';
+            $periodCol = $isPostgres ? 'LOWER(mc.period)' : 'mc.period';
+            $quoteChar = $isPostgres ? '"' : '`';
+
+            $metricSqlByExpr = [
+                'spend'           => 'f.sum_spend',
+                'clicks'          => 'f.sum_clicks',
+                'impressions'     => 'f.sum_impressions',
+                'reach'           => 'f.sum_reach',
+                'frequency'       => 'f.sum_impressions / NULLIF(f.sum_reach, 0)',
+                'ctr'             => 'f.sum_clicks / NULLIF(f.sum_impressions, 0)',
+                'cpc'             => 'f.sum_spend / NULLIF(f.sum_clicks, 0)',
+                'cpm'             => '(f.sum_spend / NULLIF(f.sum_impressions, 0)) * 1000',
+                'results'         => 'f.sum_results',
+                'cost_per_result' => 'f.sum_spend / NULLIF(f.sum_results, 0)',
+                'result_rate'     => 'f.sum_results / NULLIF(f.sum_impressions, 0)',
+                'purchase_roas'   => 'f.avg_purchase_roas',
+                'actions'         => 'f.sum_actions',
+            ];
+
+            $selectFields = [];
+            $orderMap = [];
+            $groupingSelectSql = '';
+            $groupingGroupBySql = '';
+            $outerJoinClauses = [];
+
+            if ($groupCanonical === 'adgroup|adgroup_id') {
+                $groupingSelectSql = 'mc.channeled_ad_group_id AS ad_group_id,';
+                $groupingGroupBySql = 'mc.channeled_ad_group_id';
+                $selectFields = [
+                    'f.ad_group_id AS '.$quoteChar.'adGroup_id'.$quoteChar,
+                    "COALESCE(cag.name, 'unknown') AS ".$quoteChar.'adGroup'.$quoteChar,
+                ];
+                $orderMap = [
+                    'adgroup_id' => 'f.ad_group_id',
+                    'adgroup'    => "COALESCE(cag.name, 'unknown')",
+                ];
+                $outerJoinClauses[] = 'LEFT JOIN channeled_ad_groups cag ON cag.id = f.ad_group_id';
+            } elseif ($groupCanonical === 'age|gender') {
+                $groupingSelectSql = 'mc.dimension_set_id AS dimension_set_id,';
+                $groupingGroupBySql = 'mc.dimension_set_id';
+                $selectFields = [
+                    "COALESCE(dv_gender.value, 'unknown') AS ".$quoteChar.'gender'.$quoteChar,
+                    "COALESCE(dv_age.value, 'unknown') AS ".$quoteChar.'age'.$quoteChar,
+                ];
+                $orderMap = [
+                    'gender' => "COALESCE(dv_gender.value, 'unknown')",
+                    'age'    => "COALESCE(dv_age.value, 'unknown')",
+                ];
+                $outerJoinClauses[] = "LEFT JOIN dimension_set_items dsi_gender ON dsi_gender.dimension_set_id = f.dimension_set_id
+                    AND dsi_gender.dimension_value_id IN (
+                        SELECT dvg.id FROM dimension_values dvg
+                        JOIN dimension_keys dkg ON dkg.id = dvg.dimension_key_id
+                        WHERE LOWER(dkg.name) = LOWER('gender')
+                    )";
+                $outerJoinClauses[] = 'LEFT JOIN dimension_values dv_gender ON dv_gender.id = dsi_gender.dimension_value_id';
+                $outerJoinClauses[] = "LEFT JOIN dimension_set_items dsi_age ON dsi_age.dimension_set_id = f.dimension_set_id
+                    AND dsi_age.dimension_value_id IN (
+                        SELECT dva.id FROM dimension_values dva
+                        JOIN dimension_keys dka ON dka.id = dva.dimension_key_id
+                        WHERE LOWER(dka.name) = LOWER('age')
+                    )";
+                $outerJoinClauses[] = 'LEFT JOIN dimension_values dv_age ON dv_age.id = dsi_age.dimension_value_id';
+            }
+
+            foreach ($aggregations as $alias => $expr) {
+                $normalizedExpr = strtolower(trim((string)$expr));
+                if (MetricAggregationStrategyRegistry::resolve($normalizedExpr) !== null) {
+                    return null;
+                }
+                if (!isset($metricSqlByExpr[$normalizedExpr])) {
+                    return null;
+                }
+
+                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+                $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
+                $selectFields[] = $metricSqlByExpr[$normalizedExpr].' AS '.$quotedAlias;
+                $orderMap[strtolower($safeAlias)] = $quotedAlias;
+            }
+
+            $sqlParams = [
+                'startDate'           => $startDate,
+                'endDate'             => $endDate,
+                'channeledCampaignId' => (int)$filtersArr['channeledCampaign'],
+            ];
+
+            $extraWhereSql = '';
+            if (isset($filtersArr['channel'])) {
+                $extraWhereSql .= ' AND mc.channel = :channel';
+                $sqlParams['channel'] = (int)$filtersArr['channel'];
+            }
+
+            $orderSql = '';
+            if ($orderBy !== null && trim($orderBy) !== '') {
+                $direction = strtoupper((string)$orderDir) === 'DESC' ? 'DESC' : 'ASC';
+                $safeOrderBy = strtolower((string)preg_replace('/[^a-z0-9_]/i', '', $orderBy));
+                $orderField = $orderMap[$safeOrderBy] ?? null;
+                if ($orderField !== null) {
+                    $orderSql = " ORDER BY $orderField $direction";
+                }
+            }
+
+            $sql = "WITH finalized AS (
+                SELECT
+                    {$groupingSelectSql}
+                    SUM(CASE WHEN {$nameCol} IN ('spend', 'spend_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_spend,
+                    SUM(CASE WHEN {$nameCol} IN ('clicks', 'clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_clicks,
+                    SUM(CASE WHEN {$nameCol} IN ('impressions', 'impressions_daily', 'post_impressions', 'post_impressions_daily', 'page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END) AS sum_impressions,
+                    SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_reach,
+                    SUM(CASE WHEN {$nameCol} = 'results' THEN m.value ELSE 0 END) AS sum_results,
+                    AVG(CASE WHEN {$nameCol} = 'purchase_roas' THEN m.value ELSE NULL END) AS avg_purchase_roas,
+                    SUM(CASE WHEN {$nameCol} = 'actions' THEN m.value ELSE 0 END) AS sum_actions
+                FROM metrics m
+                JOIN metric_configs mc ON m.metric_config_id = mc.id
+                WHERE m.metric_date >= :startDate
+                  AND m.metric_date <= :endDate
+                  AND mc.channeled_campaign_id = :channeledCampaignId
+                  {$extraWhereSql}
+                GROUP BY {$groupingGroupBySql}
+            )
+            SELECT ".implode(', ', $selectFields)."
+            FROM finalized f
+            ".implode("\n            ", $outerJoinClauses)."
+            $orderSql";
+
+            return $connection->fetchAllAssociative($sql, $sqlParams);
+        }
+
+        /**
          * Optimized path for query-level weighted metric aggregation.
          * Avoids correlated subqueries by pre-aggregating weight metrics in a CTE.
          * @param Connection $connection
@@ -983,8 +1174,6 @@
                 $orderSql = " ORDER BY $orderField $direction";
             }
 
-            $weightedPairSql = implode(",\n        ", $weightedPairColumns);
-            $weightedComputedSql = implode(",\n        ", $weightedComputedSelect);
             $firstWeightNameList = $this->toSqlStringList(array_values($weightedStrategies)[0]['weight_metric_names']);
             $finalSelectFields = $grouping['final_select'] !== [] ? implode(",\n                ", $grouping['final_select'])."," : "";
             $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY ".implode(', ', $grouping['group_by']) : "";
