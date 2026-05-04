@@ -288,7 +288,37 @@
                 $this->aggregateUseSnapshotDelta = true;
             }
 
+            $optimizedResult = $this->tryOptimizedFacebookOrganicPageSummaryAggregate(
+                connection: $connection,
+                aggregations: $aggregations,
+                groupBy: $groupBy,
+                filters: $filters,
+                startDate: $startDate,
+                endDate: $endDate,
+                orderBy: $orderBy,
+                orderDir: $orderDir,
+                isPostgres: $isPostgres,
+            );
+            if ($optimizedResult !== null) {
+                return $optimizedResult;
+            }
+
             $optimizedResult = $this->tryOptimizedFacebookOrganicLinkedPagesAggregate(
+                connection: $connection,
+                aggregations: $aggregations,
+                groupBy: $groupBy,
+                filters: $filters,
+                startDate: $startDate,
+                endDate: $endDate,
+                orderBy: $orderBy,
+                orderDir: $orderDir,
+                isPostgres: $isPostgres,
+            );
+            if ($optimizedResult !== null) {
+                return $optimizedResult;
+            }
+
+            $optimizedResult = $this->tryOptimizedFacebookOrganicPostSnapshotAggregate(
                 connection: $connection,
                 aggregations: $aggregations,
                 groupBy: $groupBy,
@@ -815,6 +845,350 @@
             if ($endDate !== null) {
                 $this->lastAggregateMeta['requested_end_date'] = $endDate;
             }
+        }
+
+        /**
+         * Optimized path for FB Organic page summary payload (facebook_page).
+         *
+         * @return array<int, array<string, mixed>>|null
+         * @throws \Doctrine\DBAL\Exception
+         */
+        protected function tryOptimizedFacebookOrganicPageSummaryAggregate(
+            Connection $connection,
+            array      $aggregations,
+            array      $groupBy,
+            ?object    $filters,
+            ?string    $startDate,
+            ?string    $endDate,
+            ?string    $orderBy,
+            ?string    $orderDir,
+            bool       $isPostgres
+        ): ?array
+        {
+            if (!$this->isChanneledMetric || $startDate === null || $endDate === null) {
+                return null;
+            }
+
+            $groupCanonical = $this->canonicalizeGroupPattern($groupBy);
+            if ($groupCanonical !== 'page|page_id|page_title') {
+                return null;
+            }
+
+            $filtersArr = [];
+            if ($filters !== null) {
+                foreach ($filters as $key => $value) {
+                    $filtersArr[(string)$key] = $value;
+                }
+            }
+
+            $allowedFilterKeys = ['page_platform_id', 'account_type', 'channel', 'debug_sql', '_'];
+            foreach (array_keys($filtersArr) as $key) {
+                if (!in_array($key, $allowedFilterKeys, true)) {
+                    return null;
+                }
+            }
+
+            $accountType = strtolower(trim((string)($filtersArr['account_type'] ?? '')));
+            $pagePlatformId = trim((string)($filtersArr['page_platform_id'] ?? ''));
+            if ($accountType !== 'facebook_page' || $pagePlatformId === '') {
+                return null;
+            }
+            if (isset($filtersArr['channel']) && !is_numeric((string)$filtersArr['channel'])) {
+                return null;
+            }
+
+            $quoteChar = $isPostgres ? '"' : '`';
+            $nameCol = $isPostgres ? 'LOWER(mc.name)' : 'mc.name';
+            $periodCol = $isPostgres ? 'LOWER(mc.period)' : 'mc.period';
+            $pagePlatformExpr = $isPostgres
+                ? 'CAST(p.platform_id AS TEXT)'
+                : 'CAST(p.platform_id AS CHAR)';
+
+            $metricSqlByExpr = [
+                'likes' => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'comments' => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'reach' => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'views' => "SUM(CASE WHEN {$nameCol} IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'profile_views' => "SUM(CASE WHEN {$nameCol} IN ('profile_views', 'profile_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'website_clicks' => "SUM(CASE WHEN {$nameCol} IN ('website_clicks', 'website_clicks_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'profile_links_taps' => "SUM(CASE WHEN {$nameCol} IN ('profile_links_taps', 'profile_links_taps_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'follows_and_unfollows' => "SUM(CASE WHEN {$nameCol} IN ('follows_and_unfollows', 'follows_and_unfollows_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'saves' => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'shares' => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'total_interactions' => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'replies' => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'accounts_engaged' => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+            ];
+
+            $selectFields = [
+                "COALESCE(p.url, 'N/A') AS {$quoteChar}page{$quoteChar}",
+                "mc.page_id AS {$quoteChar}page_id{$quoteChar}",
+                "COALESCE(p.title, 'N/A') AS {$quoteChar}page_title{$quoteChar}",
+            ];
+            $orderMap = [
+                'page' => "COALESCE(p.url, 'N/A')",
+                'page_id' => 'mc.page_id',
+                'page_title' => "COALESCE(p.title, 'N/A')",
+            ];
+
+            foreach ($aggregations as $alias => $expr) {
+                $normalizedExpr = strtolower(trim((string)$expr));
+                if (!isset($metricSqlByExpr[$normalizedExpr])) {
+                    return null;
+                }
+
+                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+                $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
+                $selectFields[] = $metricSqlByExpr[$normalizedExpr].' AS '.$quotedAlias;
+                $orderMap[strtolower($safeAlias)] = $quotedAlias;
+            }
+
+            $sqlParams = [
+                'startDate' => $startDate,
+                'endDate' => $endDate,
+                'accountType' => $accountType,
+                'pagePlatformId' => $pagePlatformId,
+            ];
+
+            $whereClauses = [
+                'm.metric_date >= :startDate',
+                'm.metric_date <= :endDate',
+                'LOWER(ca.type) = LOWER(:accountType)',
+                "{$pagePlatformExpr} = :pagePlatformId",
+            ];
+            if (isset($filtersArr['channel'])) {
+                $whereClauses[] = 'mc.channel = :channel';
+                $sqlParams['channel'] = (int)$filtersArr['channel'];
+            }
+
+            $orderSql = '';
+            if ($orderBy !== null && trim($orderBy) !== '') {
+                $direction = strtoupper((string)$orderDir) === 'DESC' ? 'DESC' : 'ASC';
+                $safeOrderBy = strtolower((string)preg_replace('/[^a-z0-9_]/i', '', $orderBy));
+                $orderField = $orderMap[$safeOrderBy] ?? null;
+                if ($orderField !== null) {
+                    $orderSql = " ORDER BY $orderField $direction";
+                }
+            }
+
+            $sql = "SELECT
+                ".implode(",\n                ", $selectFields)."
+            FROM metrics m
+            JOIN metric_configs mc ON m.metric_config_id = mc.id
+            LEFT JOIN channeled_accounts ca ON ca.id = mc.channeled_account_id
+            LEFT JOIN pages p ON p.id = mc.page_id
+            WHERE ".implode("\n              AND ", $whereClauses)."
+            GROUP BY
+                mc.page_id,
+                COALESCE(p.url, 'N/A'),
+                COALESCE(p.title, 'N/A')
+            {$orderSql}";
+
+            return $connection->fetchAllAssociative($sql, $sqlParams);
+        }
+
+        /**
+         * Optimized path for FB Organic post breakdown using latest_snapshot over lifetime metrics.
+         *
+         * @return array<int, array<string, mixed>>|null
+         * @throws \Doctrine\DBAL\Exception
+         */
+        protected function tryOptimizedFacebookOrganicPostSnapshotAggregate(
+            Connection $connection,
+            array      $aggregations,
+            array      $groupBy,
+            ?object    $filters,
+            ?string    $startDate,
+            ?string    $endDate,
+            ?string    $orderBy,
+            ?string    $orderDir,
+            bool       $isPostgres
+        ): ?array
+        {
+            if (!$this->isChanneledMetric || $startDate === null || $endDate === null) {
+                return null;
+            }
+
+            $groupCanonical = $this->canonicalizeGroupPattern($groupBy);
+            if ($groupCanonical !== 'caption|created_time|media_type|message|permalink|permalink_url|post|post_id|timestamp') {
+                return null;
+            }
+
+            $filtersArr = [];
+            if ($filters !== null) {
+                foreach ($filters as $key => $value) {
+                    $filtersArr[(string)$key] = $value;
+                }
+            }
+
+            $allowedFilterKeys = ['channeledAccount', 'account_type', 'post', 'snapshot_fallback_mode', 'period', 'latest_snapshot', 'channel', 'debug_sql', '_'];
+            foreach (array_keys($filtersArr) as $key) {
+                if (!in_array($key, $allowedFilterKeys, true)) {
+                    return null;
+                }
+            }
+
+            $channeledAccountId = $filtersArr['channeledAccount'] ?? null;
+            $accountType = strtolower(trim((string)($filtersArr['account_type'] ?? '')));
+            $postFilter = strtoupper(trim((string)($filtersArr['post'] ?? '')));
+            $period = strtolower(trim((string)($filtersArr['period'] ?? '')));
+            $fallbackMode = strtolower(trim((string)($filtersArr['snapshot_fallback_mode'] ?? 'resilient')));
+            $latestSnapshot = filter_var($filtersArr['latest_snapshot'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            $latestSnapshot = $latestSnapshot ?? (bool)($filtersArr['latest_snapshot'] ?? false);
+
+            if (!is_numeric((string)$channeledAccountId)) {
+                return null;
+            }
+            if ($accountType !== 'instagram_account' || $postFilter !== 'NOT_NULL' || $period !== 'lifetime' || !$latestSnapshot) {
+                return null;
+            }
+            if (!in_array($fallbackMode, ['strict', 'resilient'], true)) {
+                return null;
+            }
+            if (isset($filtersArr['channel']) && !is_numeric((string)$filtersArr['channel'])) {
+                return null;
+            }
+
+            $quoteChar = $isPostgres ? '"' : '`';
+            $nameCol = $isPostgres ? 'LOWER(s.name)' : 's.name';
+            $jsonExtract = function (string $key) use ($isPostgres): string {
+                if ($isPostgres) {
+                    return "COALESCE(p.data->>'{$key}', 'N/A')";
+                }
+
+                return "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.data, '$.{$key}')), 'N/A')";
+            };
+
+            $metricSqlByExpr = [
+                'comments' => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') THEN s.value ELSE 0 END)",
+                'follows' => "SUM(CASE WHEN {$nameCol} IN ('follows', 'follows_daily') THEN s.value ELSE 0 END)",
+                'ig_reels_avg_watch_time' => "SUM(CASE WHEN {$nameCol} IN ('ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily') THEN s.value ELSE 0 END)",
+                'ig_reels_video_view_total_time' => "SUM(CASE WHEN {$nameCol} IN ('ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily') THEN s.value ELSE 0 END)",
+                'likes' => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') THEN s.value ELSE 0 END)",
+                'profile_activity' => "SUM(CASE WHEN {$nameCol} IN ('profile_activity', 'profile_activity_daily') THEN s.value ELSE 0 END)",
+                'profile_visits' => "SUM(CASE WHEN {$nameCol} IN ('profile_visits', 'profile_visits_daily') THEN s.value ELSE 0 END)",
+                'reach' => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') THEN s.value ELSE 0 END)",
+                'reposts' => "SUM(CASE WHEN {$nameCol} IN ('reposts', 'reposts_daily') THEN s.value ELSE 0 END)",
+                'saved' => "SUM(CASE WHEN {$nameCol} IN ('saved', 'saved_daily', 'saves', 'saves_daily') THEN s.value ELSE 0 END)",
+                'shares' => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') THEN s.value ELSE 0 END)",
+                'total_interactions' => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'post_engagements', 'post_engagements_daily') THEN s.value ELSE 0 END)",
+                'views' => "SUM(CASE WHEN {$nameCol} IN ('views', 'views_daily', 'post_video_views', 'post_video_views_daily') THEN s.value ELSE 0 END)",
+            ];
+
+            $postExpr = "COALESCE(p.post_id, 'N/A')";
+            $captionExpr = $jsonExtract('caption');
+            $messageExpr = $jsonExtract('message');
+            $mediaTypeExpr = $jsonExtract('media_type');
+            $permalinkExpr = $jsonExtract('permalink');
+            $permalinkUrlExpr = $jsonExtract('permalink_url');
+            $timestampExpr = $jsonExtract('timestamp');
+            $createdTimeExpr = $jsonExtract('created_time');
+
+            $selectFields = [
+                "{$postExpr} AS {$quoteChar}post{$quoteChar}",
+                "s.post_id AS {$quoteChar}post_id{$quoteChar}",
+                "{$captionExpr} AS {$quoteChar}caption{$quoteChar}",
+                "{$messageExpr} AS {$quoteChar}message{$quoteChar}",
+                "{$mediaTypeExpr} AS {$quoteChar}media_type{$quoteChar}",
+                "{$permalinkExpr} AS {$quoteChar}permalink{$quoteChar}",
+                "{$permalinkUrlExpr} AS {$quoteChar}permalink_url{$quoteChar}",
+                "{$timestampExpr} AS {$quoteChar}timestamp{$quoteChar}",
+                "{$createdTimeExpr} AS {$quoteChar}created_time{$quoteChar}",
+            ];
+            $orderMap = [
+                'post' => $postExpr,
+                'post_id' => 's.post_id',
+                'caption' => $captionExpr,
+                'message' => $messageExpr,
+                'media_type' => $mediaTypeExpr,
+                'permalink' => $permalinkExpr,
+                'permalink_url' => $permalinkUrlExpr,
+                'timestamp' => $timestampExpr,
+                'created_time' => $createdTimeExpr,
+            ];
+
+            foreach ($aggregations as $alias => $expr) {
+                $normalizedExpr = strtolower(trim((string)$expr));
+                if (!isset($metricSqlByExpr[$normalizedExpr])) {
+                    return null;
+                }
+
+                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+                $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
+                $selectFields[] = $metricSqlByExpr[$normalizedExpr].' AS '.$quotedAlias;
+                $orderMap[strtolower($safeAlias)] = $quotedAlias;
+            }
+
+            $sqlParams = [
+                'startDate' => $startDate,
+                'endDate' => $endDate,
+                'accountType' => $accountType,
+                'period' => $period,
+                'channeledAccountId' => (int)$channeledAccountId,
+            ];
+
+            $configWhereClauses = [
+                'mc.channeled_account_id = :channeledAccountId',
+                'mc.post_id IS NOT NULL',
+                'LOWER(ca.type) = LOWER(:accountType)',
+                'LOWER(mc.period) = LOWER(:period)',
+            ];
+            if (isset($filtersArr['channel'])) {
+                $configWhereClauses[] = 'mc.channel = :channel';
+                $sqlParams['channel'] = (int)$filtersArr['channel'];
+            }
+
+            $effectiveDateExpr = $fallbackMode === 'strict'
+                ? 'MAX(CASE WHEN m.metric_date >= :startDate AND m.metric_date <= :endDate THEN m.metric_date END)'
+                : 'COALESCE(MAX(CASE WHEN m.metric_date >= :startDate AND m.metric_date <= :endDate THEN m.metric_date END), MAX(m.metric_date))';
+
+            $orderSql = '';
+            if ($orderBy !== null && trim($orderBy) !== '') {
+                $direction = strtoupper((string)$orderDir) === 'DESC' ? 'DESC' : 'ASC';
+                $safeOrderBy = strtolower((string)preg_replace('/[^a-z0-9_]/i', '', $orderBy));
+                $orderField = $orderMap[$safeOrderBy] ?? null;
+                if ($orderField !== null) {
+                    $orderSql = " ORDER BY $orderField $direction";
+                }
+            }
+
+            $sql = "WITH latest_per_config AS (
+                SELECT
+                    mc.id AS metric_config_id,
+                    {$effectiveDateExpr} AS effective_date
+                FROM metric_configs mc
+                JOIN metrics m ON m.metric_config_id = mc.id
+                LEFT JOIN channeled_accounts ca ON ca.id = mc.channeled_account_id
+                WHERE ".implode("\n                  AND ", $configWhereClauses)."
+                GROUP BY mc.id
+            ),
+            snap AS (
+                SELECT
+                    mc.post_id,
+                    mc.name,
+                    m.value
+                FROM latest_per_config lpc
+                JOIN metric_configs mc ON mc.id = lpc.metric_config_id
+                JOIN metrics m ON m.metric_config_id = mc.id AND m.metric_date = lpc.effective_date
+                WHERE lpc.effective_date IS NOT NULL
+            )
+            SELECT
+                ".implode(",\n                ", $selectFields)."
+            FROM snap s
+            LEFT JOIN posts p ON p.id = s.post_id
+            GROUP BY
+                s.post_id,
+                {$postExpr},
+                {$captionExpr},
+                {$messageExpr},
+                {$mediaTypeExpr},
+                {$permalinkExpr},
+                {$permalinkUrlExpr},
+                {$timestampExpr},
+                {$createdTimeExpr}
+            {$orderSql}";
+
+            return $connection->fetchAllAssociative($sql, $sqlParams);
         }
 
         /**
