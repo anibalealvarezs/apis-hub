@@ -825,7 +825,7 @@
             }
 
             $groupCanonical = $this->canonicalizeGroupPattern($groupBy);
-            if (!in_array($groupCanonical, ['adgroup|adgroup_id', 'age|gender'], true)) {
+            if (!in_array($groupCanonical, ['adgroup|adgroup_id', 'age|gender', 'adgroup|adgroup_id|daily', 'age|daily|gender'], true)) {
                 return null;
             }
 
@@ -876,26 +876,40 @@
             $groupingGroupBySql = '';
             $outerJoinClauses = [];
 
-            if ($groupCanonical === 'adgroup|adgroup_id') {
-                $groupingSelectSql = 'mc.channeled_ad_group_id AS ad_group_id,';
-                $groupingGroupBySql = 'mc.channeled_ad_group_id';
+            $isDailyGrouping = str_contains($groupCanonical, 'daily');
+
+            if ($groupCanonical === 'adgroup|adgroup_id' || $groupCanonical === 'adgroup|adgroup_id|daily') {
+                $groupingSelectSql = $isDailyGrouping
+                    ? 'm.metric_date AS daily, mc.channeled_ad_group_id AS ad_group_id,'
+                    : 'mc.channeled_ad_group_id AS ad_group_id,';
+                $groupingGroupBySql = $isDailyGrouping
+                    ? 'm.metric_date, mc.channeled_ad_group_id'
+                    : 'mc.channeled_ad_group_id';
                 $selectFields = [
+                    ...($isDailyGrouping ? ['f.daily AS '.$quoteChar.'daily'.$quoteChar] : []),
                     'f.ad_group_id AS '.$quoteChar.'adGroup_id'.$quoteChar,
                     "COALESCE(cag.name, 'unknown') AS ".$quoteChar.'adGroup'.$quoteChar,
                 ];
                 $orderMap = [
+                    ...($isDailyGrouping ? ['daily' => 'f.daily'] : []),
                     'adgroup_id' => 'f.ad_group_id',
                     'adgroup'    => "COALESCE(cag.name, 'unknown')",
                 ];
                 $outerJoinClauses[] = 'LEFT JOIN channeled_ad_groups cag ON cag.id = f.ad_group_id';
-            } elseif ($groupCanonical === 'age|gender') {
-                $groupingSelectSql = 'mc.dimension_set_id AS dimension_set_id,';
-                $groupingGroupBySql = 'mc.dimension_set_id';
+            } elseif ($groupCanonical === 'age|gender' || $groupCanonical === 'age|daily|gender') {
+                $groupingSelectSql = $isDailyGrouping
+                    ? 'm.metric_date AS daily, mc.dimension_set_id AS dimension_set_id,'
+                    : 'mc.dimension_set_id AS dimension_set_id,';
+                $groupingGroupBySql = $isDailyGrouping
+                    ? 'm.metric_date, mc.dimension_set_id'
+                    : 'mc.dimension_set_id';
                 $selectFields = [
+                    ...($isDailyGrouping ? ['f.daily AS '.$quoteChar.'daily'.$quoteChar] : []),
                     "COALESCE(dv_gender.value, 'unknown') AS ".$quoteChar.'gender'.$quoteChar,
                     "COALESCE(dv_age.value, 'unknown') AS ".$quoteChar.'age'.$quoteChar,
                 ];
                 $orderMap = [
+                    ...($isDailyGrouping ? ['daily' => 'f.daily'] : []),
                     'gender' => "COALESCE(dv_gender.value, 'unknown')",
                     'age'    => "COALESCE(dv_age.value, 'unknown')",
                 ];
