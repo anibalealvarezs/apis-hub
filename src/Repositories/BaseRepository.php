@@ -1684,23 +1684,23 @@
             ];
             $configParams = [];
 
-            if ($filtersArr['page'] !== null) {
+            if (($filtersArr['page'] ?? null) !== null) {
                 $configWhere[] = 'mc.page_id = :pageId';
                 $configParams['pageId'] = (int)$filtersArr['page'];
             }
-            if ($filtersArr['channel'] !== null) {
+            if (($filtersArr['channel'] ?? null) !== null) {
                 $configWhere[] = 'mc.channel = :channel';
                 $configParams['channel'] = (int)$filtersArr['channel'];
             }
-            if ($filtersArr['country'] !== null) {
+            if (($filtersArr['country'] ?? null) !== null) {
                 $configWhere[] = 'mc.country_id = :countryId';
                 $configParams['countryId'] = (int)$filtersArr['country'];
             }
-            if ($filtersArr['device'] !== null) {
+            if (($filtersArr['device'] ?? null) !== null) {
                 $configWhere[] = 'mc.device_id = :deviceId';
                 $configParams['deviceId'] = (int)$filtersArr['device'];
             }
-            if ($filtersArr['query'] !== null) {
+            if (($filtersArr['query'] ?? null) !== null) {
                 $configWhere[] = 'mc.query_id = :queryId';
                 $configParams['queryId'] = (int)$filtersArr['query'];
             }
