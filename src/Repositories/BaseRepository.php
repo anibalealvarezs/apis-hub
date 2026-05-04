@@ -2589,7 +2589,13 @@
                 'likes_daily'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'likes_daily'" : "mc.name = 'likes_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'comments_daily'                       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'comments_daily'" : "mc.name = 'comments_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'follows_daily'                        => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'follows_daily'" : "mc.name = 'follows_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'ig_reels_avg_watch_time_daily'        => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'ig_reels_avg_watch_time_daily'" : "mc.name = 'ig_reels_avg_watch_time_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
+                'ig_reels_avg_watch_time_daily'        => $this->buildCompanionTimeWeightedAverageFormula(
+                    sourceMetricNames: ['ig_reels_avg_watch_time_daily'],
+                    totalTimeMetricNames: ['ig_reels_video_view_total_time_daily'],
+                    valCol: $valCol,
+                    isPostgres: $isPostgres,
+                    periodCondition: $isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'"
+                ),
                 'ig_reels_video_view_total_time_daily' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'ig_reels_video_view_total_time_daily'" : "mc.name = 'ig_reels_video_view_total_time_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'shares_daily'                         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'shares_daily'" : "mc.name = 'shares_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'saved_daily'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'saved_daily'" : "mc.name = 'saved_daily'")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
@@ -2611,7 +2617,13 @@
                 'reposts'                              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reposts', 'reposts_daily')" : "mc.name IN ('reposts', 'reposts_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
                 'profile_activity'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_activity', 'profile_activity_daily')" : "mc.name IN ('profile_activity', 'profile_activity_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
                 'profile_visits'                       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_visits', 'profile_visits_daily')" : "mc.name IN ('profile_visits', 'profile_visits_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'ig_reels_avg_watch_time'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily')" : "mc.name IN ('ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'ig_reels_avg_watch_time'              => $this->buildCompanionTimeWeightedAverageFormula(
+                    sourceMetricNames: ['ig_reels_avg_watch_time', 'ig_reels_avg_watch_time_daily'],
+                    totalTimeMetricNames: ['ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily'],
+                    valCol: $valCol,
+                    isPostgres: $isPostgres,
+                    periodCondition: $periodCondition
+                ),
                 'ig_reels_video_view_total_time'       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily')" : "mc.name IN ('ig_reels_video_view_total_time', 'ig_reels_video_view_total_time_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
                 'post_clicks'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_clicks', 'post_clicks_daily')" : "mc.name IN ('post_clicks', 'post_clicks_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
                 'post_engagements'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_engagements', 'post_engagements_daily', 'post_engagement', 'post_engagement_daily')" : "mc.name IN ('post_engagements', 'post_engagements_daily', 'post_engagement', 'post_engagement_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
@@ -2636,6 +2648,43 @@
             ];
 
             return array_merge($formulas, $periodAwareOverrides);
+        }
+
+        protected function buildCompanionTimeWeightedAverageFormula(
+            array $sourceMetricNames,
+            array $totalTimeMetricNames,
+            string $valCol,
+            bool $isPostgres,
+            string $periodCondition
+        ): string
+        {
+            $nullSafeComparator = $isPostgres ? 'IS NOT DISTINCT FROM' : '<=>';
+            $metricDateColumn = $this->isChanneledMetric ? 'm.metric_date' : 'e.metric_date';
+            $sourceMetricList = $this->toSqlStringList($sourceMetricNames);
+            $totalTimeMetricList = $this->toSqlStringList($totalTimeMetricNames);
+            $sourceCondition = ($isPostgres ? "LOWER(mc.name) IN ($sourceMetricList)" : "mc.name IN ($sourceMetricList)")." AND {$periodCondition}";
+            $totalTimePeriodCondition = str_replace('mc.', 'mc2.', $periodCondition);
+            $totalTimeCondition = ($isPostgres ? "LOWER(mc2.name) IN ($totalTimeMetricList)" : "mc2.name IN ($totalTimeMetricList)")." AND {$totalTimePeriodCondition}";
+
+            $companionTotalTimeSql = "(SELECT m2.value
+                FROM metrics m2
+                JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id
+                WHERE {$totalTimeCondition}
+                AND m2.metric_date = {$metricDateColumn}
+                AND mc2.channel = mc.channel
+                AND (mc2.dimension_set_id {$nullSafeComparator} mc.dimension_set_id)
+                AND (mc2.query_id {$nullSafeComparator} mc.query_id)
+                AND (mc2.page_id {$nullSafeComparator} mc.page_id)
+                AND (mc2.country_id {$nullSafeComparator} mc.country_id)
+                AND (mc2.device_id {$nullSafeComparator} mc.device_id)
+                AND (mc2.channeled_account_id {$nullSafeComparator} mc.channeled_account_id)
+                AND (mc2.post_id {$nullSafeComparator} mc.post_id)
+                LIMIT 1)";
+
+            $nonZeroAverageCondition = "{$sourceCondition} AND NULLIF({$valCol}, 0) IS NOT NULL";
+
+            return "SUM(CASE WHEN {$nonZeroAverageCondition} THEN COALESCE({$companionTotalTimeSql}, 0) ELSE 0 END)
+                / NULLIF(SUM(CASE WHEN {$nonZeroAverageCondition} THEN COALESCE({$companionTotalTimeSql}, 0) / NULLIF({$valCol}, 0) ELSE 0 END), 0)";
         }
 
         protected function getMetricPeriodConditionSql(bool $isPostgres, string $defaultPeriod = 'daily'): string
