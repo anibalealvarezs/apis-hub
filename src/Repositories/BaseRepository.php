@@ -902,23 +902,23 @@
             $nameCol = $isPostgres ? 'LOWER(mc.name)' : 'mc.name';
             $periodCol = $isPostgres ? 'LOWER(mc.period)' : 'mc.period';
             $pagePlatformExpr = $isPostgres
-                ? 'CAST(p.platform_id AS TEXT)'
-                : 'CAST(p.platform_id AS CHAR)';
+                ? "COALESCE(CAST(p.platform_id AS TEXT), ca.data->>'facebook_page_id')"
+                : "COALESCE(CAST(p.platform_id AS CHAR), JSON_UNQUOTE(JSON_EXTRACT(ca.data, '$.facebook_page_id')))";
 
             $metricSqlByExpr = [
-                'likes'                 => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'comments'              => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'reach'                 => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'views'                 => "SUM(CASE WHEN {$nameCol} IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'profile_views'         => "SUM(CASE WHEN {$nameCol} IN ('profile_views', 'profile_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'website_clicks'        => "SUM(CASE WHEN {$nameCol} IN ('website_clicks', 'website_clicks_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'profile_links_taps'    => "SUM(CASE WHEN {$nameCol} IN ('profile_links_taps', 'profile_links_taps_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'follows_and_unfollows' => "SUM(CASE WHEN {$nameCol} IN ('follows_and_unfollows', 'follows_and_unfollows_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'saves'                 => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'shares'                => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'replies'               => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'accounts_engaged'      => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'likes'                 => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'comments'              => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'reach'                 => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'views'                 => "SUM(CASE WHEN {$nameCol} IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'profile_views'         => "SUM(CASE WHEN {$nameCol} IN ('profile_views', 'profile_views_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'website_clicks'        => "SUM(CASE WHEN {$nameCol} IN ('website_clicks', 'website_clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'profile_links_taps'    => "SUM(CASE WHEN {$nameCol} IN ('profile_links_taps', 'profile_links_taps_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'follows_and_unfollows' => "SUM(CASE WHEN {$nameCol} IN ('follows_and_unfollows', 'follows_and_unfollows_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'saves'                 => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'shares'                => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'replies'               => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'accounts_engaged'      => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             ];
 
             $selectFields = [
@@ -1252,19 +1252,19 @@
                 : "COALESCE(CAST(p.platform_id AS CHAR), 'N/A')";
 
             $metricSqlByExpr = [
-                'likes'                 => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'comments'              => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'reach'                 => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'views'                 => "SUM(CASE WHEN {$nameCol} IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'profile_views'         => "SUM(CASE WHEN {$nameCol} IN ('profile_views', 'profile_views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'website_clicks'        => "SUM(CASE WHEN {$nameCol} IN ('website_clicks', 'website_clicks_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'profile_links_taps'    => "SUM(CASE WHEN {$nameCol} IN ('profile_links_taps', 'profile_links_taps_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'follows_and_unfollows' => "SUM(CASE WHEN {$nameCol} IN ('follows_and_unfollows', 'follows_and_unfollows_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'saves'                 => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'shares'                => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'replies'               => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
-                'accounts_engaged'      => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END)",
+                'likes'                 => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'comments'              => "SUM(CASE WHEN {$nameCol} IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'reach'                 => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'views'                 => "SUM(CASE WHEN {$nameCol} IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'profile_views'         => "SUM(CASE WHEN {$nameCol} IN ('profile_views', 'profile_views_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'website_clicks'        => "SUM(CASE WHEN {$nameCol} IN ('website_clicks', 'website_clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'profile_links_taps'    => "SUM(CASE WHEN {$nameCol} IN ('profile_links_taps', 'profile_links_taps_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'follows_and_unfollows' => "SUM(CASE WHEN {$nameCol} IN ('follows_and_unfollows', 'follows_and_unfollows_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'saves'                 => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'shares'                => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'replies'               => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+                'accounts_engaged'      => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             ];
 
             $selectFields = [
@@ -1564,7 +1564,7 @@
                     {$groupingSelectSql},
                     SUM(CASE WHEN $nameCol IN ('spend', 'spend_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_spend,
                     SUM(CASE WHEN $nameCol IN ('clicks', 'clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_clicks,
-                    SUM(CASE WHEN $nameCol IN ('impressions', 'impressions_daily', 'post_impressions', 'post_impressions_daily', 'page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily') AND {$periodCol} = 'daily' THEN m.value ELSE 0 END) AS sum_impressions,
+                    SUM(CASE WHEN $nameCol IN ('impressions', 'impressions_daily', 'post_impressions', 'post_impressions_daily', 'page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_impressions,
                     SUM(CASE WHEN $nameCol IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) AS sum_reach,
                     SUM(CASE WHEN $nameCol = 'results' THEN m.value ELSE 0 END) AS sum_results,
                     AVG(CASE WHEN $nameCol = 'purchase_roas' THEN m.value ELSE NULL END) AS avg_purchase_roas,
@@ -2354,13 +2354,15 @@
                 $joins[] = "LEFT JOIN dimension_values {$dvAlias} ON {$dvAlias}.id = {$dsiAlias}.dimension_value_id";
             }
 
-            return [
+            $formulas = [
                 'final_select' => ['p.dimension_set_id AS group_key'],
                 'group_by'     => ['p.dimension_set_id'],
                 'outer_select' => $outerSelect,
                 'joins'        => $joins,
                 'order_map'    => $orderMap,
             ];
+
+            return $formulas;
         }
 
         protected function buildTemporalBucketExpression(string $granularity, bool $isPostgres, string $dateColumn): string
@@ -2535,7 +2537,7 @@
         {
             $periodCondition = $this->getMetricPeriodConditionSql($isPostgres);
 
-            return [
+            $formulas = [
                 'spend'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'clicks'                               => "SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
                 'impressions'                          => "SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily', 'post_impressions', 'post_impressions_daily', 'page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
@@ -2568,7 +2570,6 @@
                 'page_fans'                            => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_fans', 'page_fans_daily')" : "mc.name IN ('page_fans', 'page_fans_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'post_impressions'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_impressions', 'post_impressions_daily', 'post_media_view', 'post_media_view_daily')" : "mc.name IN ('post_impressions', 'post_impressions_daily', 'post_media_view', 'post_media_view_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'post_engagement'                      => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_engagement', 'post_engagement_daily')" : "mc.name IN ('post_engagement', 'post_engagement_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'post_reactions_by_type_total'         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_reactions_by_type_total', 'post_reactions_by_type_total_daily')" : "mc.name IN ('post_reactions_by_type_total', 'post_reactions_by_type_total_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'likes'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')" : "mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'comments'                             => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')" : "mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
                 'shares'                               => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')" : "mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
@@ -2620,16 +2621,21 @@
                 'post_video_avg_time_watched'          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_video_avg_time_watched', 'post_video_avg_time_watched_daily')" : "mc.name IN ('post_video_avg_time_watched', 'post_video_avg_time_watched_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
                 'post_video_views'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_video_views', 'post_video_views_daily')" : "mc.name IN ('post_video_views', 'post_video_views_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
 
-                // Override core stock-like formulas to respect requested period.
-                'total_interactions'                   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')" : "mc.name IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'comments'                             => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')" : "mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'likes'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')" : "mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'shares'                               => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')" : "mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'saved'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'saves'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'reach'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')" : "mc.name IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'views'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
             ];
+
+            // Override core stock-like formulas to respect requested period.
+            $periodAwareOverrides = [
+                'total_interactions' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')" : "mc.name IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'comments'           => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')" : "mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'likes'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')" : "mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'shares'             => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')" : "mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'saved'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'saves'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'reach'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')" : "mc.name IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+                'views'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
+            ];
+
+            return array_merge($formulas, $periodAwareOverrides);
         }
 
         protected function getMetricPeriodConditionSql(bool $isPostgres, string $defaultPeriod = 'daily'): string
