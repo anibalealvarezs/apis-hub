@@ -826,10 +826,12 @@
 
             $groupCanonical = $this->canonicalizeGroupPattern($groupBy);
             if (!in_array($groupCanonical, [
+                'gender',
                 'age',
                 'age|gender',
                 'ad|ad_id',
                 'adgroup|adgroup_id',
+                'daily|gender',
                 'age|daily',
                 'age|daily|gender',
                 'ad|ad_id|daily',
@@ -845,7 +847,7 @@
                 }
             }
 
-            $allowedFilterKeys = ['channeledCampaign', 'adGroup', 'channel', 'debug_sql', '_'];
+            $allowedFilterKeys = ['channeledCampaign', 'adGroup', 'ad', 'channel', 'debug_sql', '_'];
             foreach (array_keys($filtersArr) as $key) {
                 if (!in_array($key, $allowedFilterKeys, true)) {
                     return null;
@@ -858,7 +860,10 @@
             if (isset($filtersArr['adGroup']) && !is_numeric((string)$filtersArr['adGroup'])) {
                 return null;
             }
-            if (!isset($filtersArr['channeledCampaign']) && !isset($filtersArr['adGroup'])) {
+            if (isset($filtersArr['ad']) && !is_numeric((string)$filtersArr['ad'])) {
+                return null;
+            }
+            if (!isset($filtersArr['channeledCampaign']) && !isset($filtersArr['adGroup']) && !isset($filtersArr['ad'])) {
                 return null;
             }
             if (isset($filtersArr['channel']) && !is_numeric((string)$filtersArr['channel'])) {
@@ -916,6 +921,18 @@
                 $orderMap['ad_id'] = 'f.ad_id';
                 $orderMap['ad'] = "COALESCE(cad.name, 'unknown')";
                 $outerJoinClauses[] = 'LEFT JOIN channeled_ads cad ON cad.id = f.ad_id';
+            } elseif ($groupCanonical === 'gender' || $groupCanonical === 'daily|gender') {
+                $baseJoinClauses[] = "LEFT JOIN dimension_set_items dsi_gender ON dsi_gender.dimension_set_id = mc.dimension_set_id
+                    AND dsi_gender.dimension_value_id IN (
+                        SELECT dvg.id FROM dimension_values dvg
+                        JOIN dimension_keys dkg ON dkg.id = dvg.dimension_key_id
+                        WHERE LOWER(dkg.name) = LOWER('gender')
+                    )";
+                $baseJoinClauses[] = 'LEFT JOIN dimension_values dv_gender ON dv_gender.id = dsi_gender.dimension_value_id';
+                $groupingSelectParts[] = "COALESCE(dv_gender.value, 'unknown') AS gender";
+                $groupingGroupByParts[] = "COALESCE(dv_gender.value, 'unknown')";
+                $selectFields[] = 'f.gender AS '.$quoteChar.'gender'.$quoteChar;
+                $orderMap['gender'] = 'f.gender';
             } elseif ($groupCanonical === 'age' || $groupCanonical === 'age|daily') {
                 $baseJoinClauses[] = "LEFT JOIN dimension_set_items dsi_age ON dsi_age.dimension_set_id = mc.dimension_set_id
                     AND dsi_age.dimension_value_id IN (
@@ -984,6 +1001,10 @@
             if (isset($filtersArr['adGroup'])) {
                 $whereClauses[] = 'mc.channeled_ad_group_id = :adGroupId';
                 $sqlParams['adGroupId'] = (int)$filtersArr['adGroup'];
+            }
+            if (isset($filtersArr['ad'])) {
+                $whereClauses[] = 'mc.channeled_ad_id = :adId';
+                $sqlParams['adId'] = (int)$filtersArr['ad'];
             }
             if (isset($filtersArr['channel'])) {
                 $whereClauses[] = 'mc.channel = :channel';
