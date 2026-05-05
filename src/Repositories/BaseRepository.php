@@ -361,9 +361,6 @@
             $context = $plan->getContext();
             $isPostgres = (bool)($context['is_postgres'] ?? Helpers::isPostgres());
             
-            // Register plan context for strategies that might need repository helpers (temporary)
-            $plan->addContext('repository', $this);
-
             $strategies = [
                 new WeightedMetricStrategy(),
                 new FacebookOrganicStrategy(),

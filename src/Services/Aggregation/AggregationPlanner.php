@@ -85,6 +85,7 @@
                 'is_metric'           => $isMetric,
                 'is_channeled_metric' => $isChanneledMetric,
                 'is_postgres'         => Helpers::isPostgres(),
+                'repository'          => $repository,
             ];
 
             $stages = [
