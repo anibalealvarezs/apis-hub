@@ -61,6 +61,7 @@ final class MetricDefaultFormulaBuilder
             'likes' => "SUM(CASE WHEN mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') THEN $valCol ELSE 0 END)",
             'replies' => "SUM(CASE WHEN mc.name IN ('replies', 'replies_daily') THEN $valCol ELSE 0 END)",
             'accounts_engaged' => "SUM(CASE WHEN mc.name IN ('accounts_engaged', 'accounts_engaged_daily') THEN $valCol ELSE 0 END)",
+            'follows' => "SUM(CASE WHEN mc.name IN ('follows', 'follows_daily') THEN $valCol ELSE 0 END)",
         ];
 
         $periodAwareOverrides = [
@@ -88,6 +89,7 @@ final class MetricDefaultFormulaBuilder
             'likes' => "SUM(CASE WHEN mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') THEN $valCol ELSE 0 END)",
             'replies' => "SUM(CASE WHEN mc.name IN ('replies', 'replies_daily') THEN $valCol ELSE 0 END)",
             'accounts_engaged' => "SUM(CASE WHEN mc.name IN ('accounts_engaged', 'accounts_engaged_daily') THEN $valCol ELSE 0 END)",
+            'follows' => "SUM(CASE WHEN mc.name IN ('follows', 'follows_daily') THEN $valCol ELSE 0 END)",
         ];
 
         return array_merge($formulas, $periodAwareOverrides);

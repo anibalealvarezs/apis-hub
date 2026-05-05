@@ -150,6 +150,19 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             return null;
         }
 
+        $dynamicSimpleMetrics = [];
+        $knownComposites = ['ctr', 'cpc', 'cpm', 'cost_per_result', 'result_rate', 'roas', 'purchase_roas', 'website_purchase_roas'];
+        foreach ($aggregations as $alias => $expr) {
+            $lowerExpr = strtolower(trim((string)$expr));
+            $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+            
+            if (!isset($weightedStrategies[$safeAlias]) 
+                && !in_array($lowerExpr, ['clicks', 'impressions', 'spend', 'ctr'], true) 
+                && !in_array($lowerExpr, $knownComposites, true)) {
+                $dynamicSimpleMetrics[$lowerExpr] = $lowerExpr;
+            }
+        }
+
         $selectMetrics = [];
         foreach ($aggregations as $alias => $expr) {
             $lowerExpr = strtolower(trim((string)$expr));
@@ -157,9 +170,15 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
             $prefix = $weightedStrategies[$safeAlias]['prefix'] ?? null;
 
+            if (isset($dynamicSimpleMetrics[$lowerExpr])) {
+                $selectMetrics[] = "f.$lowerExpr AS $quotedAlias";
+                continue;
+            }
+
             $selectMetrics[] = match ($lowerExpr) {
                 'clicks' => "f.clicks AS $quotedAlias",
                 'impressions' => "f.impressions AS $quotedAlias",
+                'spend' => "f.spend AS $quotedAlias",
                 'ctr' => "f.ctr AS $quotedAlias",
                 default => "f.{$prefix}_value AS $quotedAlias"
             };
@@ -207,6 +226,9 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             SUM(CASE WHEN mc.name IN ('spend') THEN m.value ELSE 0 END) AS spend,
             SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
             SUM(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
+            ".($dynamicSimpleMetrics !== [] ? implode(",\n            ", array_map(function ($metric) {
+                return "SUM(CASE WHEN mc.name IN ('$metric', '{$metric}_daily') THEN m.value ELSE 0 END) AS $metric";
+            }, $dynamicSimpleMetrics))."," : "")."
             ".implode(",\n                ", array_map(function ($strategy) {
                 $prefix = $strategy['prefix'];
                 $sourceList = $this->toSqlStringList($strategy['source_metric_names']);
@@ -229,6 +251,9 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             SUM(b.spend) AS spend_value,
             SUM(b.clicks) AS clicks_value,
             SUM(b.impressions) AS impressions_value,
+            ".($dynamicSimpleMetrics !== [] ? implode(",\n            ", array_map(function ($metric) {
+                return "SUM(b.$metric) AS {$metric}_value";
+            }, $dynamicSimpleMetrics))."," : "")."
             ".implode(",\n                ", array_map(function ($strategy) {
                 $prefix = $strategy['prefix'];
 
@@ -244,6 +269,9 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             SUM(p.spend_value) AS spend,
             SUM(p.clicks_value) AS clicks,
             SUM(p.impressions_value) AS impressions,
+            ".($dynamicSimpleMetrics !== [] ? implode(",\n            ", array_map(function ($metric) {
+                return "SUM(p.{$metric}_value) AS $metric";
+            }, $dynamicSimpleMetrics))."," : "")."
             SUM(p.clicks_value) / NULLIF(SUM(p.impressions_value), 0) AS ctr".(count($weightedStrategies) > 0 ? "," : "")."
             ".implode(",\n                ", array_map(function ($strategy) {
                 $prefix = $strategy['prefix'];
