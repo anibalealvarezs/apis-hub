@@ -769,7 +769,11 @@
                 return false;
             }
 
-            return ($reducerAnalysis['weighted_metric_expressions'] ?? []) !== [];
+            if (($reducerAnalysis['weighted_metric_expressions'] ?? []) !== []) {
+                return true;
+            }
+
+            return $groupPattern === 'daily+channeledCampaign';
         }
 
         /**

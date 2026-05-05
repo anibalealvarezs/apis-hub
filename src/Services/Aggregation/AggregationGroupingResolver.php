@@ -182,7 +182,7 @@ final class AggregationGroupingResolver
             return $this->buildDimensionSetCombinationGroupingConfig($fields, $isPostgres, $quoteChar);
         }
 
-        $isAllEntities = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && (in_array($field, ['query', 'page', 'country', 'device', 'daily'], true)), true);
+        $isAllEntities = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && (in_array($field, ['query', 'page', 'country', 'device', 'daily', 'channeledCampaign'], true)), true);
         if ($isAllEntities) {
             return $this->buildEntityCombinationGroupingConfig($fields, $isPostgres, $quoteChar, $relationMap);
         }

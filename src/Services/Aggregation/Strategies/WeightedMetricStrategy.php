@@ -57,7 +57,7 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             'endDate'   => $endDate,
         ];
 
-        $baseMetricNames = ['clicks', 'clicks_daily'];
+        $baseMetricNames = ['clicks', 'clicks_daily', 'spend', 'impressions', 'impressions_daily'];
         foreach ($weightedStrategies as $strategy) {
             $baseMetricNames = array_merge($baseMetricNames, $strategy['source_metric_names'], $strategy['weight_metric_names']);
         }
@@ -181,7 +181,8 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             $orderSql = " ORDER BY $orderField $direction";
         }
 
-        $firstWeightNameList = $this->toSqlStringList(array_values($weightedStrategies)[0]['weight_metric_names']);
+        $firstWeightedStrategy = count($weightedStrategies) > 0 ? array_values($weightedStrategies)[0] : null;
+        $firstWeightNameList = $firstWeightedStrategy ? $this->toSqlStringList($firstWeightedStrategy['weight_metric_names']) : "'impressions','impressions_daily','page_media_view','post_media_view'";
         $finalSelectFields = $grouping['final_select'] !== [] ? implode(",\n                ", $grouping['final_select'])."," : "";
         $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY ".implode(', ', $grouping['group_by']) : "";
 
@@ -203,6 +204,7 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
         SELECT
             m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id
             $baseSelectFields,
+            SUM(CASE WHEN mc.name IN ('spend') THEN m.value ELSE 0 END) AS spend,
             SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
             SUM(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
             ".implode(",\n                ", array_map(function ($strategy) {
@@ -224,6 +226,7 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
         SELECT
             b.metric_date, 
             ".($grouping['group_by'] !== [] ? implode(", ", $grouping['group_by']).", " : "")."
+            SUM(b.spend) AS spend_value,
             SUM(b.clicks) AS clicks_value,
             SUM(b.impressions) AS impressions_value,
             ".implode(",\n                ", array_map(function ($strategy) {
@@ -238,6 +241,7 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
     finalized AS (
         SELECT
             ".($grouping['outer_select'] !== [] ? implode(",\n                ", array_map(static fn($f) => "p.$f", $grouping['outer_select']))."," : "")."
+            SUM(p.spend_value) AS spend,
             SUM(p.clicks_value) AS clicks,
             SUM(p.impressions_value) AS impressions,
             SUM(p.clicks_value) / NULLIF(SUM(p.impressions_value), 0) AS ctr".(count($weightedStrategies) > 0 ? "," : "")."
