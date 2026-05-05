@@ -53,6 +53,10 @@ final class MetricDefaultFormulaBuilder
             'replies' => "SUM(CASE WHEN mc.name IN ('replies', 'replies_daily') THEN $valCol ELSE 0 END)",
             'accounts_engaged' => "SUM(CASE WHEN mc.name IN ('accounts_engaged', 'accounts_engaged_daily') THEN $valCol ELSE 0 END)",
             'follows' => "SUM(CASE WHEN mc.name IN ('follows', 'follows_daily') THEN $valCol ELSE 0 END)",
+            'ig_reels_avg_watch_time' => "SUM(CASE WHEN mc.name IN ('ig_reels_avg_watch_time') THEN $valCol ELSE 0 END)",
+            'ig_reels_video_view_total_time' => "SUM(CASE WHEN mc.name IN ('ig_reels_video_view_total_time') THEN $valCol ELSE 0 END)",
+            'profile_activity' => "SUM(CASE WHEN mc.name IN ('profile_activity', 'profile_activity_daily') THEN $valCol ELSE 0 END)",
+            'reposts' => "SUM(CASE WHEN mc.name IN ('reposts', 'reposts_daily') THEN $valCol ELSE 0 END)",
         ];
 
         $periodAwareOverrides = [
