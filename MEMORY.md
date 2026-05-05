@@ -64,3 +64,27 @@
     - Centralized grouping and dimension resolution in `AggregationGroupingResolver`.
     - `BaseRepository::executeOptimizedAggregationPlan()` refactored to delegate to strategy classes, significantly reducing repository complexity.
     - The repository now acts as a context provider and proxy for legacy helpers during the progressive retirement of optimized paths.
+- New cross-repo track opened for strategy metric semantics: canonical metric equivalence will be resolved in read-only mode at aggregation time (pre-query), keeping raw provider metric names in persisted data; reference plan: `D:\laragon\www\_shared\data\aggregation-metric-equivalence-readonly-plan-2026-05-05.md`.
+- Shared Phase A artifacts are now available in `api-driver-core` for this track (`CanonicalMetricDefinitionRegistry` + `CanonicalMetricDictionaryProviderInterface`), enabling Phase B integration of a canonical metric SQL resolver in `apis-hub`.
+- During Phase B work, an unexpected test import regression was detected and corrected in `tests/Unit/Services/Aggregation/AggregationPlannerTest.php` (`Traits\AggregationPlanner` -> `Services\Aggregation\AggregationPlanner`), restoring planner regression coverage.
+- A second unexpected test import regression was detected and corrected in `tests/Unit/Services/Aggregation/AggregationExecutorTest.php` (`Traits\*` imports -> `Services\Aggregation\*`), restoring executor regression coverage.
+- Phase B now routes `MarketingHierarchyStrategy` metric expressions through `CanonicalMetricSqlResolver` using read-only precedence `override -> driver dictionary -> default`, preserving raw provider metric names in SQL predicates.
+- `MarketingHierarchyStrategy` now appends `metric_resolution` metadata (`channel`, `strategy`, resolved canonical/raw metrics, source) into aggregate meta via repository strategy hook for telemetry/diagnostics.
+- When canonical resolution fails in `MarketingHierarchyStrategy`, strategy metadata now sets `strategy_fallback_reason=missing_metric_equivalence`; `AggregationExecutor` consumes it as explicit legacy fallback reason with `executor_fallback_reason_source=strategy` when planner does not provide a fallback reason.
+- Canonical dictionary pilot is now cross-channel: `CanonicalMetricSqlResolver` test coverage includes Meta and Shopify registry-provider resolution paths, reducing risk that the resolver is coupled to one driver family.
+- Canonical dictionary pilot now covers a third channel (`klaviyo`), and resolver registry-path tests validate multi-channel behavior across Meta, Shopify, and Klaviyo providers.
+- Google priority pilot is now complete (`google_search_console` dictionary-provider path validated), and pilot expansion is paused as agreed; next work should focus on remaining implementation-plan tasks rather than adding more pilot channels.
+- Stable integration path is now formalized: overrides live in `config/aggregation/metric_equivalences.yaml`, operator/docs are in `docs/aggregation-metric-equivalence.md`, and executor telemetry persistence is covered for `metric_resolution` metadata.
+- Ambiguous legacy marketing inputs are now explicitly classified during canonical resolution: stable aliases (for example `results -> conversions`) emit `input_type=legacy_alias`, while `actions` remains temporarily backward-compatible but is flagged via `metric_resolution.deprecation` as `ambiguous_metric_alias` instead of being treated as a canonical metric.
+
+### 2026-05-05 - Session 2: Decoupling Finalization
+- **Decisions**:
+  - Eliminated `BaseRepository::getChannelKey()` to ensure repositories don't hold channel-specific knowledge.
+  - Migrated `AggregationPlanner` to a fully agnostic matching model using account type suffixes (`_page`, `_account`) and `default_filters` from profiles.
+  - Decoupled platform identity fields (e.g., `facebook_page_id`) by resolving them dynamically through `DriverFactory`.
+- **Changes**:
+  - `AggregationPlanner.php`: Replaced hardcoded channel checks with profile-driven defaults and generic type matching.
+  - `AggregationEntityFieldResolver.php`: Switched from `match($channel)` to dynamic driver lookup.
+  - `CanonicalMetricSqlResolver.php`: Removed hardcoded channel dictionaries; now relies on driver-provided mappings.
+  - `BaseRepository.php`: Removed legacy `getChannelKey()` fallback.
+- **Next Steps**: Clean up the `Strategies` folder by deleting the now-obsolete `FacebookOrganicStrategy.php`.

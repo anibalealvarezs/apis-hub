@@ -74,3 +74,10 @@ scripts/*.ps1
 
 # Handover documents
 /Handover/
+docs/aggregation-telemetry-reporting.md
+
+docs/aggregation-metric-equivalence.md
+
+docs/handoffs/aggregation-2026-05-05-session-2.md
+
+docs/handoffs/aggregation-2026-05-05-session-3.md

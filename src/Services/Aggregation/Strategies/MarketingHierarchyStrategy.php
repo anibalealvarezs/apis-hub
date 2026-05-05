@@ -5,13 +5,22 @@
     namespace Services\Aggregation\Strategies;
 
     use Doctrine\DBAL\Connection;
+    use Entities\Analytics\Channel;
+    use Repositories\BaseRepository;
     use Services\Aggregation\AggregationPlan;
+    use Services\Aggregation\CanonicalMetricSqlResolver;
     use Interfaces\OptimizedAggregationStrategyInterface;
     use Traits\OptimizedAggregationHelpersTrait;
 
     final class MarketingHierarchyStrategy implements OptimizedAggregationStrategyInterface
     {
         use OptimizedAggregationHelpersTrait;
+
+        public function __construct(
+            private readonly ?CanonicalMetricSqlResolver $metricSqlResolver = null,
+        )
+        {
+        }
 
         public function getKey(): string
         {
@@ -43,22 +52,9 @@
             $quoteChar = $isPostgres ? '"' : '`';
             $nameCol = $isPostgres ? 'LOWER(mc.name)' : 'mc.name';
             $periodCol = $isPostgres ? 'LOWER(mc.period)' : 'mc.period';
-
-            $metricSqlByExpr = [
-                'spend'           => "SUM(CASE WHEN $nameCol IN ('spend', 'spend_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
-                'clicks'          => "SUM(CASE WHEN $nameCol IN ('clicks', 'clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
-                'impressions'     => "SUM(CASE WHEN $nameCol IN ('impressions', 'impressions_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
-                'reach'           => "SUM(CASE WHEN $nameCol IN ('reach', 'reach_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
-                'frequency'       => "AVG(CASE WHEN $nameCol IN ('frequency', 'frequency_daily') AND $periodCol = 'daily' THEN m.value END)",
-                'ctr'             => "SUM(CASE WHEN $nameCol IN ('clicks', 'clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN $nameCol IN ('impressions', 'impressions_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END), 0)",
-                'cpc'             => "SUM(CASE WHEN $nameCol IN ('spend', 'spend_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN $nameCol IN ('clicks', 'clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END), 0)",
-                'cpm'             => "SUM(CASE WHEN $nameCol IN ('spend', 'spend_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN $nameCol IN ('impressions', 'impressions_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END), 0) * 1000",
-                'results'         => "SUM(CASE WHEN $nameCol IN ('results', 'results_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
-                'cost_per_result' => "SUM(CASE WHEN $nameCol IN ('spend', 'spend_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN $nameCol IN ('results', 'results_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END), 0)",
-                'result_rate'     => "SUM(CASE WHEN $nameCol IN ('results', 'results_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END) / NULLIF(SUM(CASE WHEN $nameCol IN ('impressions', 'impressions_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END), 0)",
-                'purchase_roas'   => "AVG(CASE WHEN $nameCol IN ('purchase_roas', 'purchase_roas_daily') AND $periodCol = 'daily' THEN m.value END)",
-                'actions'         => "SUM(CASE WHEN $nameCol IN ('actions', 'actions_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
-            ];
+            $metricSqlResolver = $this->metricSqlResolver ?? new CanonicalMetricSqlResolver();
+            $channelKey = $this->resolveChannelKey($filtersArr);
+            $resolvedMetrics = [];
 
             $selectFields = [];
             $groupByFields = [];
@@ -93,21 +89,21 @@
                 JOIN dimension_keys dk ON dk.id = dv.dimension_key_id
                 WHERE LOWER(dk.name) = 'age'
             ) t_age ON t_age.dimension_set_id = mc.dimension_set_id";
-                $selectFields[] = "COALESCE(t_age.value, 'unknown') AS {$quoteChar}age{$quoteChar}";
+                $selectFields[] = "COALESCE(t_age.value, 'unknown') AS {$quoteChar}age$quoteChar";
                 $groupByFields[] = "COALESCE(t_age.value, 'unknown')";
                 $orderMap['age'] = "COALESCE(t_age.value, 'unknown')";
             }
 
             if (str_contains((string)$groupPattern, 'ad+ad_id')) {
-                $selectFields[] = "COALESCE(ca_ad.name, 'N/A') AS {$quoteChar}ad{$quoteChar}";
-                $selectFields[] = "mc.channeled_ad_id AS {$quoteChar}ad_id{$quoteChar}";
+                $selectFields[] = "COALESCE(ca_ad.name, 'N/A') AS {$quoteChar}ad$quoteChar";
+                $selectFields[] = "mc.channeled_ad_id AS {$quoteChar}ad_id$quoteChar";
                 $groupByFields[] = 'mc.channeled_ad_id';
                 $groupByFields[] = 'ca_ad.name';
                 $orderMap['ad'] = "COALESCE(ca_ad.name, 'N/A')";
                 $orderMap['ad_id'] = 'mc.channeled_ad_id';
             } elseif (str_contains((string)$groupPattern, 'adgroup+adgroup_id')) {
-                $selectFields[] = "COALESCE(ca_ag.name, 'N/A') AS {$quoteChar}adgroup{$quoteChar}";
-                $selectFields[] = "mc.channeled_ad_group_id AS {$quoteChar}adgroup_id{$quoteChar}";
+                $selectFields[] = "COALESCE(ca_ag.name, 'N/A') AS {$quoteChar}adgroup$quoteChar";
+                $selectFields[] = "mc.channeled_ad_group_id AS {$quoteChar}adgroup_id$quoteChar";
                 $groupByFields[] = 'mc.channeled_ad_group_id';
                 $groupByFields[] = 'ca_ag.name';
                 $orderMap['adgroup'] = "COALESCE(ca_ag.name, 'N/A')";
@@ -116,14 +112,62 @@
 
             foreach ($aggregations as $alias => $expr) {
                 $normalizedExpr = strtolower(trim((string)$expr));
-                if (!isset($metricSqlByExpr[$normalizedExpr])) {
+                $resolvedMetric = $metricSqlResolver->resolveMarketingMetric(
+                    requestedMetric: $normalizedExpr,
+                    channel: $channelKey,
+                    nameCol: $nameCol,
+                    periodCol: $periodCol,
+                );
+                $metricSql = is_string($resolvedMetric['sql_expression']) ? $resolvedMetric['sql_expression'] : null;
+                if ($metricSql === null) {
+                    $repository = $plan->getContextValue('repository');
+                    if ($repository instanceof BaseRepository) {
+                        $repository->appendOptimizedStrategyMeta([
+                            'strategy_fallback_reason' => 'missing_metric_equivalence',
+                            'metric_resolution'        => [
+                                'channel'          => $channelKey,
+                                'strategy'         => $this->getKey(),
+                                'requested_metric' => $resolvedMetric['requested_metric'] ?? $normalizedExpr,
+                                'canonical_metric' => $resolvedMetric['canonical_metric'] ?? null,
+                                'input_type'       => $resolvedMetric['input_type'] ?? 'unknown',
+                                'legacy_alias_of'  => $resolvedMetric['legacy_alias_of'] ?? null,
+                                'deprecation'      => $resolvedMetric['deprecation'] ?? null,
+                                'source'           => $resolvedMetric['source'] ?? 'none',
+                                'raw_names'        => $resolvedMetric['raw_names'] ?? [],
+                                'missing'          => true,
+                            ],
+                        ]);
+                    }
+
                     return null;
                 }
 
                 $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
                 $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
-                $selectFields[] = $metricSqlByExpr[$normalizedExpr].' AS '.$quotedAlias;
+                $selectFields[] = $metricSql.' AS '.$quotedAlias;
                 $orderMap[strtolower($safeAlias)] = $quotedAlias;
+
+                $resolvedMetrics[] = [
+                    'alias'            => $safeAlias,
+                    'requested_metric' => $resolvedMetric['requested_metric'] ?? $normalizedExpr,
+                    'canonical_metric' => $resolvedMetric['canonical_metric'] ?? null,
+                    'input_type'       => $resolvedMetric['input_type'] ?? 'unknown',
+                    'legacy_alias_of'  => $resolvedMetric['legacy_alias_of'] ?? null,
+                    'deprecation'      => $resolvedMetric['deprecation'] ?? null,
+                    'raw_names'        => $resolvedMetric['raw_names'] ?? [],
+                    'source'           => $resolvedMetric['source'] ?? 'none',
+                ];
+            }
+
+            $repository = $plan->getContextValue('repository');
+            if ($repository instanceof BaseRepository) {
+                $repository->appendOptimizedStrategyMeta([
+                    'metric_resolution' => [
+                        'channel'          => $channelKey,
+                        'strategy'         => $this->getKey(),
+                        'resolved_metrics' => $resolvedMetrics,
+                    ],
+                ]);
             }
 
             $sqlParams = [
@@ -171,15 +215,47 @@
             }
 
             $sql = "SELECT
-            ".implode(",\n                ", $selectFields)."
-        FROM metrics m
-        JOIN metric_configs mc ON m.metric_config_id = mc.id
-        ".implode("\n        ", $joins)."
-        WHERE ".implode("\n              AND ", $whereClauses)."
-        GROUP BY
-            ".implode(",\n            ", $groupByFields)."
-        $orderSql";
+                ".implode(",\n                ", $selectFields)."
+                FROM metrics m
+                JOIN metric_configs mc ON m.metric_config_id = mc.id
+                ".implode("\n        ", $joins)."
+                WHERE ".implode("\n              AND ", $whereClauses)."
+                GROUP BY
+                    ".implode(",\n            ", $groupByFields)."
+                $orderSql";
 
             return $connection->fetchAllAssociative($sql, $sqlParams);
+        }
+
+        /**
+         * @param array<string, mixed> $filtersArr
+         */
+        private function resolveChannelKey(array $filtersArr): ?string
+        {
+            if (!array_key_exists('channel', $filtersArr)) {
+                return null;
+            }
+
+            $value = $filtersArr['channel'];
+            if (is_object($value) && property_exists($value, 'value')) {
+                $value = $value->value;
+            }
+
+            if (!is_scalar($value)) {
+                return null;
+            }
+
+            $normalized = strtolower(trim((string)$value));
+            if ($normalized === '') {
+                return null;
+            }
+
+            if (!ctype_digit($normalized)) {
+                return $normalized;
+            }
+
+            $channel = Channel::tryFrom((int)$normalized);
+
+            return $channel instanceof Channel ? strtolower(trim($channel->getName())) : null;
         }
     }

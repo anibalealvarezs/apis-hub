@@ -45,7 +45,7 @@
     use stdClass;
     use Traits\OptimizedAggregationHelpersTrait;
     use Services\Aggregation\Strategies\WeightedMetricStrategy;
-    use Services\Aggregation\Strategies\FacebookOrganicStrategy;
+    use Services\Aggregation\Strategies\SocialOrganicStrategy;
     use Services\Aggregation\Strategies\MarketingHierarchyStrategy;
 
     class BaseRepository extends EntityRepository
@@ -342,6 +342,16 @@
         }
 
         /**
+         * Public strategy hook for non-invasive metadata enrichment.
+         *
+         * @param array<string, mixed> $meta
+         */
+        public function appendOptimizedStrategyMeta(array $meta): void
+        {
+            $this->appendAggregateMeta($meta);
+        }
+
+        /**
          * @param array<int, array<string, mixed>> $rows
          * @param array<string, mixed> $meta
          */
@@ -364,7 +374,7 @@
 
             $strategies = [
                 new WeightedMetricStrategy(),
-                new FacebookOrganicStrategy(),
+                new SocialOrganicStrategy(),
                 new MarketingHierarchyStrategy(),
             ];
 
@@ -382,13 +392,13 @@
                 }
 
                 // Special case for sub-strategies of FB Organic
-                if ($strategy->getKey() === 'facebook_organic') {
-                    if (array_intersect(['facebook_organic_page_summary', 'facebook_organic_linked_pages', 'facebook_organic_post_snapshot'], $candidateKeys)) {
+                if ($strategy->getKey() === 'social_organic') {
+                    if (array_intersect(['social_organic_page_summary', 'social_organic_linked_pages', 'social_organic_post_snapshot'], $candidateKeys)) {
                         $rows = $strategy->execute($connection, $plan, $isPostgres);
                         if ($rows !== null) {
                             return $this->buildAggregateExecutionResult($rows, [
                                 'execution_path'     => 'optimized',
-                                'optimized_strategy' => 'facebook_organic',
+                                'optimized_strategy' => 'social_organic',
                             ]);
                         }
                     }

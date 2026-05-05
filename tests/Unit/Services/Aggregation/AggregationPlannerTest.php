@@ -5,7 +5,7 @@
     namespace Tests\Unit\Services\Aggregation;
 
     use Repositories\BaseRepository;
-    use Traits\AggregationPlanner;
+    use Services\Aggregation\AggregationPlanner;
     use Tests\Unit\BaseUnitTestCase;
 
     final class AggregationPlannerTest extends BaseUnitTestCase

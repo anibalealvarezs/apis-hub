@@ -5,6 +5,7 @@
     namespace Services\Aggregation;
 
     use Anibalealvarezs\ApiDriverCore\Classes\MetricAggregationStrategyRegistry;
+    use Anibalealvarezs\ApiDriverCore\Classes\CanonicalMetricDefinitionRegistry;
     use Entities\Analytics\Channel;
     use Exceptions\ConfigurationException;
     use Helpers\Helpers;
@@ -18,8 +19,8 @@
         private AggregationProfileResolver $aggregationProfileResolver;
 
         public function __construct(
-            ?callable $aggregationProfilesResolver = null,
-            ?callable $channelKeyResolver = null,
+            ?callable                   $aggregationProfilesResolver = null,
+            ?callable                   $channelKeyResolver = null,
             ?AggregationProfileResolver $aggregationProfileResolver = null
         )
         {
@@ -89,33 +90,33 @@
             ];
 
             $stages = [
-                'scope'    => [
+                'scope'     => [
                     'entity_name'         => $entityName,
                     'is_metric'           => $isMetric,
                     'is_channeled_metric' => $isChanneledMetric,
                 ],
-                'facts'    => [
+                'facts'     => [
                     'aggregation_aliases'     => array_keys($aggregations),
                     'aggregation_expressions' => array_values($aggregations),
                     'requested_period'        => $requestedPeriod,
                     'uses_snapshot_delta'     => $snapshotDelta,
                     'reducer_analysis'        => $reducerAnalysis,
                 ],
-                'grouping' => [
+                'grouping'  => [
                     'group_by'              => $groupBy,
                     'has_temporal_grouping' => $this->hasTemporalGrouping($groupBy),
                     'normalized_pattern'    => $groupPattern,
                 ],
-                'reducers' => [
+                'reducers'  => [
                     'requested_aggregations'      => $aggregations,
                     'missing_reducer_expressions' => $reducerAnalysis['missing_reducer_expressions'],
                     'weighted_metric_expressions' => $reducerAnalysis['weighted_metric_expressions'],
                 ],
-                'filters'  => [
+                'filters'   => [
                     'operators'             => $filterOperators,
                     'unsupported_operators' => $unsupportedFilterOperators,
                 ],
-                'post'     => [
+                'post'      => [
                     'order_by'  => $orderBy,
                     'order_dir' => $orderDir,
                 ],
@@ -125,15 +126,6 @@
             ];
 
             $channel = $this->resolveRequestedChannelKey($filtersArr, $repository);
-            $this->applyChannelSpecificFilters($filtersArr, $groupPattern, $channel);
-
-            $fallbackReason = $this->resolveFallbackReason(
-                canUseOptimized: $canUseOptimized,
-                unsupportedFilterOperators: $unsupportedFilterOperators,
-                reducerAnalysis: $reducerAnalysis,
-                groupPattern: $groupPattern,
-                groupBy: $groupBy,
-            );
 
             $profileValidation = $this->evaluateProfileCapability(
                 filters: $filtersArr,
@@ -143,8 +135,18 @@
             );
             $stages['profiles'] = $profileValidation;
 
+            $this->applyProfileDefaultFilters($filtersArr, $profileValidation['active_profile'] ?? null);
+
+            $fallbackReason = $this->resolveFallbackReason(
+                canUseOptimized: $canUseOptimized,
+                unsupportedFilterOperators: $unsupportedFilterOperators,
+                reducerAnalysis: $reducerAnalysis,
+                groupPattern: $groupPattern,
+                groupBy: $groupBy,
+            );
+
             if ($fallbackReason === null && !$profileValidation['supported']) {
-                 error_log("[AggregateDebug] fallback=missing_profile_capability channel={$channel} groupPattern={$groupPattern} reason=".($profileValidation['failure_reason'] ?? 'unknown'));
+                error_log("[AggregateDebug] fallback=missing_profile_capability channel={$channel} groupPattern={$groupPattern} reason=".($profileValidation['failure_reason'] ?? 'unknown'));
             }
 
             if ($fallbackReason === null && $profileValidation['checked'] === true && $profileValidation['supported'] === false) {
@@ -177,12 +179,12 @@
         {
             if ($channel === null) {
                 return [
-                    'checked' => false,
-                    'supported' => true,
-                    'channel' => null,
-                    'profile_count' => 0,
+                    'checked'          => false,
+                    'supported'        => true,
+                    'channel'          => null,
+                    'profile_count'    => 0,
                     'matched_profiles' => [],
-                    'failure_reason' => null,
+                    'failure_reason'   => null,
                 ];
             }
 
@@ -190,54 +192,53 @@
             if ($profiles === []) {
                 // During rollout, absence of declared profiles should not force legacy fallback.
                 return [
-                    'checked' => true,
-                    'supported' => true,
-                    'channel' => $channel,
-                    'profile_count' => 0,
+                    'checked'          => true,
+                    'supported'        => true,
+                    'channel'          => $channel,
+                    'profile_count'    => 0,
                     'matched_profiles' => [],
-                    'failure_reason' => 'no_profiles_registered',
+                    'failure_reason'   => 'no_profiles_registered',
                 ];
             }
 
             $matchedProfiles = [];
+            $activeProfile = null;
             foreach ($profiles as $profile) {
                 if ($this->profileSupportsRequest($profile, $groupPattern, $filters, $aggregations)) {
                     $matchedProfiles[] = (string)($profile['key'] ?? 'unknown');
+                    if ($activeProfile === null) {
+                        $activeProfile = $profile;
+                    }
                 }
             }
 
             $supported = $matchedProfiles !== [];
 
             return [
-                'checked' => true,
-                'supported' => $supported,
-                'channel' => $channel,
-                'profile_count' => count($profiles),
+                'checked'          => true,
+                'supported'        => $supported,
+                'channel'          => $channel,
+                'profile_count'    => count($profiles),
                 'matched_profiles' => $matchedProfiles,
-                'failure_reason' => $supported ? null : 'no_matching_profile',
+                'active_profile'   => $activeProfile,
+                'failure_reason'   => $supported ? null : 'no_matching_profile',
             ];
         }
 
-        private function applyChannelSpecificFilters(array &$filters, ?string $groupPattern, ?string $channel): void
+        private function applyProfileDefaultFilters(array &$filters, ?array $profile): void
         {
-            if ($channel === 'google_search_console') {
-                $isGroupingBySearchAppearance = $groupPattern !== null && (
-                    str_contains($groupPattern, 'dimensions.searchAppearance') || 
-                    str_contains($groupPattern, 'searchAppearance')
-                );
-                $hasSearchAppearanceFilter = isset($filters['dimensions.searchAppearance']) || isset($filters['searchAppearance']);
+            if ($profile === null) {
+                return;
+            }
 
-                if (!$hasSearchAppearanceFilter) {
-                    if (!$isGroupingBySearchAppearance) {
-                        // Default to standard search appearance for normal queries
-                        $filters['dimensions.searchAppearance'] = 'standard';
-                    } else {
-                        // Exclude standard when specifically grouping by search appearance
-                        $filters['dimensions.searchAppearance'] = [
-                            'operator' => 'neq',
-                            'value' => 'standard'
-                        ];
-                    }
+            $defaults = $profile['default_filters'] ?? [];
+            if (!is_array($defaults) || $defaults === []) {
+                return;
+            }
+
+            foreach ($defaults as $field => $value) {
+                if (!isset($filters[$field])) {
+                    $filters[$field] = $value;
                 }
             }
         }
@@ -276,17 +277,6 @@
             }
 
             // Fallback to repository inference
-            $entityName = $repository->getClassName();
-            if (str_contains($entityName, 'SearchConsole')) {
-                return 'google_search_console';
-            }
-            if (str_contains($entityName, 'FacebookMarketing')) {
-                return 'facebook_marketing';
-            }
-            if (str_contains($entityName, 'FacebookOrganic')) {
-                return 'facebook_organic';
-            }
-
             return null;
         }
 
@@ -296,6 +286,7 @@
                 $resolved = call_user_func($this->channelKeyResolver, $channelId);
                 if (is_string($resolved)) {
                     $normalized = strtolower(trim($resolved));
+
                     return $normalized !== '' ? $normalized : null;
                 }
 
@@ -308,6 +299,7 @@
             }
 
             $name = strtolower(trim($channel->getName()));
+
             return $name !== '' ? $name : null;
         }
 
@@ -358,6 +350,7 @@
         {
             if (is_string($pattern)) {
                 $value = strtolower(trim($pattern));
+
                 return $value !== '' ? $value : null;
             }
 
@@ -382,6 +375,7 @@
             }
 
             sort($normalized);
+
             return implode('+', $normalized);
         }
 
@@ -412,8 +406,8 @@
 
             $hasWildcard = array_key_exists('*', $normalizedStrategies);
             foreach ($aggregations as $alias => $expression) {
-                $aliasKey = strtolower(trim((string)$alias));
-                $expressionKey = strtolower(trim((string)$expression));
+                $aliasKey = strtolower(trim($alias));
+                $expressionKey = strtolower(trim($expression));
                 if ($hasWildcard || isset($normalizedStrategies[$aliasKey]) || isset($normalizedStrategies[$expressionKey])) {
                     continue;
                 }
@@ -457,7 +451,7 @@
             }
 
             foreach ($filters as $field => $value) {
-                $fieldKey = strtolower(trim((string)$field));
+                $fieldKey = strtolower(trim($field));
                 if (!isset($normalizedContract[$fieldKey])) {
                     continue;
                 }
@@ -474,13 +468,14 @@
         private function resolveOperator(mixed $value): string
         {
             if (is_object($value)) {
-                $op = strtolower(trim((string)($value->operator ?? 'eq')));
+                $op = strtolower(trim($value->operator ?? 'eq'));
                 if (in_array($op, ['not_equal', 'not_eq', '!=', '<>'], true)) {
                     return 'neq';
                 }
                 if (in_array($op, ['equal', 'eq', '='], true)) {
                     return 'eq';
                 }
+
                 return $op !== '' ? $op : 'eq';
             }
 
@@ -500,7 +495,6 @@
             return 'eq';
         }
 
-
         /**
          * @param array<string, mixed> $filters
          * @param array<string, string> $aggregations
@@ -508,30 +502,31 @@
          * @return array<int, string>
          */
         private function buildCandidateOptimizedStrategies(
-            bool $isChanneledMetric,
-            bool $isMetric,
+            bool    $isChanneledMetric,
+            bool    $isMetric,
             ?string $groupPattern,
-            array $filters,
-            array $aggregations,
-            array $reducerAnalysis,
+            array   $filters,
+            array   $aggregations,
+            array   $reducerAnalysis,
             ?string $requestedPeriod,
-            bool $snapshotDelta,
+            bool    $snapshotDelta,
             ?string $startDate,
             ?string $endDate,
-        ): array {
+        ): array
+        {
             $candidates = [];
 
             if ($isChanneledMetric) {
-                if ($this->matchesFacebookOrganicPageSummary($groupPattern, $filters, $aggregations, $startDate, $endDate)) {
-                    $candidates[] = 'facebook_organic_page_summary';
+                if ($this->matchesSocialOrganicPageSummary($groupPattern, $filters, $aggregations, $startDate, $endDate)) {
+                    $candidates[] = 'social_organic_page_summary';
                 }
 
-                if ($this->matchesFacebookOrganicLinkedPages($groupPattern, $filters, $aggregations, $startDate, $endDate)) {
-                    $candidates[] = 'facebook_organic_linked_pages';
+                if ($this->matchesSocialOrganicLinkedPages($groupPattern, $filters, $aggregations, $startDate, $endDate)) {
+                    $candidates[] = 'social_organic_linked_pages';
                 }
 
-                if ($this->matchesFacebookOrganicPostSnapshot($groupPattern, $filters, $aggregations, $requestedPeriod, $snapshotDelta, $startDate, $endDate)) {
-                    $candidates[] = 'facebook_organic_post_snapshot';
+                if ($this->matchesSocialOrganicPostSnapshot($groupPattern, $filters, $aggregations, $requestedPeriod, $snapshotDelta, $startDate, $endDate)) {
+                    $candidates[] = 'social_organic_post_snapshot';
                 }
 
                 if ($this->matchesMarketingHierarchy($groupPattern, $filters, $aggregations, $startDate, $endDate)) {
@@ -572,7 +567,7 @@
             $operators = [];
             foreach ($filters as $value) {
                 if (is_object($value)) {
-                    $operators[] = strtolower(trim((string)($value->operator ?? 'eq')));
+                    $operators[] = strtolower(trim($value->operator ?? 'eq'));
                     continue;
                 }
 
@@ -604,33 +599,18 @@
          */
         private function analyzeReducers(array $aggregations, bool $isMetricContext): array
         {
-            $basicExpressions = [
-                'clicks', 'impressions', 'ctr',
-                'likes', 'comments', 'shares', 'saves', 'saved',
-                'reach', 'views', 'spend', 'frequency', 'cpc', 'cpm',
-                'results', 'cost_per_result', 'result_rate', 'purchase_roas',
-                'actions', 'profile_views', 'website_clicks', 'profile_links_taps',
-                'follows_and_unfollows', 'replies', 'accounts_engaged',
-                'total_interactions', 'engagement', 'video_views', 'page_fans',
-                'follower_count', 'profile_activity', 'profile_visits', 'reposts',
-                'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time', 'follows',
-                'post_impressions', 'post_impressions_unique', 'post_engagements', 'post_clicks',
-                'post_reactions_by_type_total', 'post_media_view', 'post_video_views', 'post_video_avg_time_watched',
-                'page_impressions', 'page_impressions_unique', 'page_post_engagements', 'page_views_total',
-                'page_follows', 'page_video_views', 'page_actions_post_reactions_total', 'page_fan_adds', 'page_fans',
-            ];
-
             $weightedMetricExpressions = [];
             $missingReducerExpressions = [];
+
             foreach ($aggregations as $expression) {
-                $normalizedExpr = strtolower(trim((string)$expression));
+                $normalizedExpr = strtolower(trim($expression));
                 $weightedStrategy = MetricAggregationStrategyRegistry::resolve($normalizedExpr);
                 if ($weightedStrategy !== null) {
                     $weightedMetricExpressions[] = $normalizedExpr;
                     continue;
                 }
 
-                if ($isMetricContext && !in_array($normalizedExpr, $basicExpressions, true)) {
+                if ($isMetricContext && CanonicalMetricDefinitionRegistry::normalize($normalizedExpr) === null) {
                     $missingReducerExpressions[] = $normalizedExpr;
                 }
             }
@@ -645,13 +625,13 @@
          * @param array<string, mixed> $filters
          * @param array<string, string> $aggregations
          */
-        private function matchesFacebookOrganicPageSummary(?string $groupPattern, array $filters, array $aggregations, ?string $startDate, ?string $endDate): bool
+        private function matchesSocialOrganicPageSummary(?string $groupPattern, array $filters, array $aggregations, ?string $startDate, ?string $endDate): bool
         {
             if ($groupPattern !== 'page+page_id+page_title' || $startDate === null || $endDate === null) {
                 return false;
             }
 
-            if (strtolower(trim((string)($filters['account_type'] ?? ''))) !== 'facebook_page') {
+            if (!str_ends_with(strtolower(trim((string)($filters['account_type'] ?? ''))), '_page')) {
                 return false;
             }
 
@@ -666,13 +646,18 @@
          * @param array<string, mixed> $filters
          * @param array<string, string> $aggregations
          */
-        private function matchesFacebookOrganicLinkedPages(?string $groupPattern, array $filters, array $aggregations, ?string $startDate, ?string $endDate): bool
+        private function matchesSocialOrganicLinkedPages(?string $groupPattern, array $filters, array $aggregations, ?string $startDate, ?string $endDate): bool
         {
-            if ($groupPattern !== 'channeled_account_id+channeledaccount+linked_fb_page_id+page_platform_id' || $startDate === null || $endDate === null) {
+            if ($startDate === null || $endDate === null) {
                 return false;
             }
 
-            if (strtolower(trim((string)($filters['account_type'] ?? ''))) !== 'instagram_account') {
+            // Supports both legacy linked_fb_page_id and agnostic linked_platform_entity_id
+            if (!str_contains((string)$groupPattern, 'linked_') || !str_contains((string)$groupPattern, 'page_platform_id')) {
+                return false;
+            }
+
+            if (!str_ends_with(strtolower(trim((string)($filters['account_type'] ?? ''))), '_account')) {
                 return false;
             }
 
@@ -683,15 +668,16 @@
          * @param array<string, mixed> $filters
          * @param array<string, string> $aggregations
          */
-        private function matchesFacebookOrganicPostSnapshot(
+        private function matchesSocialOrganicPostSnapshot(
             ?string $groupPattern,
-            array $filters,
-            array $aggregations,
+            array   $filters,
+            array   $aggregations,
             ?string $requestedPeriod,
-            bool $snapshotDelta,
+            bool    $snapshotDelta,
             ?string $startDate,
             ?string $endDate,
-        ): bool {
+        ): bool
+        {
             if ($groupPattern !== 'caption+created_time+media_type+message+permalink+permalink_url+post+post_id+timestamp' || $startDate === null || $endDate === null) {
                 return false;
             }
@@ -701,11 +687,11 @@
             }
 
             $accountType = strtolower(trim((string)($filters['account_type'] ?? '')));
-            if ($accountType === 'instagram_account') {
+            if (str_ends_with($accountType, '_account')) {
                 if (!is_numeric((string)($filters['channeledAccount'] ?? null))) {
                     return false;
                 }
-            } elseif ($accountType === 'facebook_page') {
+            } elseif (str_ends_with($accountType, '_page') || str_ends_with($accountType, '_organization')) {
                 if (!is_numeric((string)($filters['page'] ?? null))) {
                     return false;
                 }
@@ -751,10 +737,14 @@
                 return false;
             }
 
-            return $this->allAggregationExpressionsIn($aggregations, [
-                'spend', 'clicks', 'impressions', 'reach', 'frequency', 'ctr', 'cpc', 'cpm',
-                'results', 'cost_per_result', 'result_rate', 'purchase_roas', 'actions',
-            ]);
+            foreach ($aggregations as $expression) {
+                $normalized = CanonicalMetricDefinitionRegistry::normalize($expression);
+                if (!$normalized) {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /**
@@ -771,23 +761,6 @@
             }
 
             return $groupPattern === 'daily+channeledCampaign';
-        }
-
-        /**
-         * @param array<string, string> $aggregations
-         * @param array<int, string> $allowedExpressions
-         */
-        private function allAggregationExpressionsIn(array $aggregations, array $allowedExpressions): bool
-        {
-            $allowed = array_map(static fn(string $value): string => strtolower(trim($value)), $allowedExpressions);
-
-            foreach ($aggregations as $expression) {
-                if (!in_array(strtolower(trim((string)$expression)), $allowed, true)) {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         /**

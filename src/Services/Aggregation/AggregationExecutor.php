@@ -97,7 +97,19 @@
             }
 
             $plannerFallbackReason = $plan->getFallbackReason();
-            $fallbackReason = $plannerFallbackReason ?? 'no_optimized_strategy_matched';
+            $strategyFallbackReason = null;
+            $lastMeta = $repository->getLastAggregateMeta();
+            if (isset($lastMeta['strategy_fallback_reason']) && is_string($lastMeta['strategy_fallback_reason'])) {
+                $normalized = strtolower(trim($lastMeta['strategy_fallback_reason']));
+                if ($normalized !== '') {
+                    $strategyFallbackReason = $normalized;
+                }
+            }
+
+            $fallbackReason = $plannerFallbackReason ?? $strategyFallbackReason ?? 'no_optimized_strategy_matched';
+            $fallbackReasonSource = $plannerFallbackReason !== null
+                ? 'planner'
+                : ($strategyFallbackReason !== null ? 'strategy' : 'executor');
 
             $legacyResult = $repository->executeLegacyAggregationPlan($plan, $fallbackReason);
 
@@ -108,7 +120,7 @@
                     'optimized_attempted'             => $optimizedAttempted,
                     'optimized_candidate_count'       => count($candidateStrategies),
                     'executor_fallback_reason'        => $fallbackReason,
-                    'executor_fallback_reason_source' => $plannerFallbackReason !== null ? 'planner' : 'executor',
+                    'executor_fallback_reason_source' => $fallbackReasonSource,
                 ] + ($plannerDiagnostics !== [] ? ['planner_diagnostics' => $plannerDiagnostics] : [])
             );
         }

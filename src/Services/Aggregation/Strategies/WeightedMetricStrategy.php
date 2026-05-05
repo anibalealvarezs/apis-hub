@@ -13,10 +13,17 @@
     use Traits\OptimizedAggregationHelpersTrait;
     use Services\Aggregation\FilterConditionResolver;
     use Repositories\BaseRepository;
+    use Entities\Analytics\Channel;
+    use Services\Aggregation\CanonicalMetricSqlResolver;
 
     final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterface
     {
         use OptimizedAggregationHelpersTrait;
+
+        public function __construct(
+            private readonly ?CanonicalMetricSqlResolver $metricSqlResolver = null,
+        ) {
+        }
 
         public function getKey(): string
         {
@@ -65,10 +72,100 @@
                 'endDate'   => $endDate,
             ];
 
-            $baseMetricNames = ['clicks', 'clicks_daily', 'spend', 'impressions', 'impressions_daily'];
-            foreach ($weightedStrategies as $strategy) {
-                $baseMetricNames = array_merge($baseMetricNames, $strategy['source_metric_names'], $strategy['weight_metric_names']);
+            $metricSqlResolver = $this->metricSqlResolver ?? new CanonicalMetricSqlResolver();
+            $channelKey = $this->resolveChannelKey($filtersArr);
+            $resolvedMetrics = [];
+            $missingMetrics = [];
+
+            $baseMetricNames = [];
+            // We need to resolve base metrics (clicks, spend, impressions) and their raw names
+            $coreMetrics = ['clicks', 'spend', 'impressions'];
+            $resolvedCore = [];
+            foreach ($coreMetrics as $coreMetric) {
+                $res = $metricSqlResolver->resolveSearchMetric($coreMetric, $channelKey);
+                if ($res['raw_names'] !== []) {
+                    $baseMetricNames = array_merge($baseMetricNames, $res['raw_names']);
+                }
+                $resolvedCore[$coreMetric] = $res;
+                
+                $resolvedMetrics[] = [
+                    'alias' => $coreMetric,
+                    'requested_metric' => $res['requested_metric'],
+                    'canonical_metric' => $res['canonical_metric'],
+                    'input_type' => $res['input_type'],
+                    'legacy_alias_of' => $res['legacy_alias_of'],
+                    'deprecation' => $res['deprecation'],
+                    'raw_names' => $res['raw_names'],
+                    'source' => $res['source'],
+                ];
             }
+
+            foreach ($weightedStrategies as &$strategy) {
+                $resolvedSources = [];
+                foreach ($strategy['source_metric_names'] as $src) {
+                    $res = $metricSqlResolver->resolveSearchMetric($src, $channelKey);
+                    if ($res['raw_names'] === []) {
+                        $missingMetrics[] = $src;
+                    } else {
+                        $resolvedSources = array_merge($resolvedSources, $res['raw_names']);
+                        $baseMetricNames = array_merge($baseMetricNames, $res['raw_names']);
+                    }
+                    $resolvedMetrics[] = [
+                        'alias' => $src,
+                        'requested_metric' => $res['requested_metric'],
+                        'canonical_metric' => $res['canonical_metric'],
+                        'input_type' => $res['input_type'],
+                        'legacy_alias_of' => $res['legacy_alias_of'],
+                        'deprecation' => $res['deprecation'],
+                        'raw_names' => $res['raw_names'],
+                        'source' => $res['source'],
+                    ];
+                }
+                $strategy['resolved_source_names'] = array_values(array_unique($resolvedSources));
+
+                $resolvedWeights = [];
+                foreach ($strategy['weight_metric_names'] as $wgt) {
+                    $res = $metricSqlResolver->resolveSearchMetric($wgt, $channelKey);
+                    if ($res['raw_names'] !== []) {
+                        $resolvedWeights = array_merge($resolvedWeights, $res['raw_names']);
+                        $baseMetricNames = array_merge($baseMetricNames, $res['raw_names']);
+                    }
+                }
+                $strategy['resolved_weight_names'] = array_values(array_unique($resolvedWeights));
+                if ($strategy['resolved_weight_names'] === []) {
+                    $missingMetrics[] = implode(', ', $strategy['weight_metric_names']);
+                }
+            }
+            unset($strategy);
+
+            if ($missingMetrics !== []) {
+                $repository = $plan->getContextValue('repository');
+                if ($repository instanceof BaseRepository) {
+                    $repository->appendOptimizedStrategyMeta([
+                        'strategy_fallback_reason' => 'missing_metric_equivalence',
+                        'missing_metrics' => $missingMetrics,
+                        'metric_resolution' => [
+                            'channel' => $channelKey,
+                            'strategy' => $this->getKey(),
+                            'resolved_metrics' => $resolvedMetrics,
+                            'missing' => true,
+                        ],
+                    ]);
+                }
+                return null;
+            }
+
+            $repository = $plan->getContextValue('repository');
+            if ($repository instanceof BaseRepository) {
+                $repository->appendOptimizedStrategyMeta([
+                    'metric_resolution' => [
+                        'channel' => $channelKey,
+                        'strategy' => $this->getKey(),
+                        'resolved_metrics' => $resolvedMetrics,
+                    ],
+                ]);
+            }
+
             $baseMetricNames = array_values(array_unique($baseMetricNames));
             $metricNameListSql = $this->toSqlStringList($baseMetricNames);
 
@@ -146,7 +243,7 @@
             }
 
             $resolver = new AggregationGroupingResolver();
-            $relationMap = $repository::getRelationMap();
+            $relationMap = BaseRepository::getRelationMap();
 
             $requestedDimensionKeys = $resolver->resolveOptimizedDimensionKeys($groupPattern, $filtersArr, $relationMap);
             $dsWhere = $resolver->buildOptimizedDimensionSetWhereSql($requestedDimensionKeys);
@@ -231,16 +328,16 @@
         SELECT
             m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id
             $baseSelectFields,
-            SUM(CASE WHEN mc.name IN ('spend') THEN m.value ELSE 0 END) AS spend,
-            SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
-            SUM(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
+            SUM(CASE WHEN mc.name IN (" . ($resolvedCore['spend']['raw_names'] !== [] ? $this->toSqlStringList($resolvedCore['spend']['raw_names']) : "'__none__'") . ") THEN m.value ELSE 0 END) AS spend,
+            SUM(CASE WHEN mc.name IN (" . ($resolvedCore['clicks']['raw_names'] !== [] ? $this->toSqlStringList($resolvedCore['clicks']['raw_names']) : "'__none__'") . ") THEN m.value ELSE 0 END) AS clicks,
+            SUM(CASE WHEN mc.name IN (" . ($resolvedCore['impressions']['raw_names'] !== [] ? $this->toSqlStringList($resolvedCore['impressions']['raw_names']) : "'__none__'") . ") THEN m.value ELSE 0 END) AS impressions,
             ".($dynamicSimpleMetrics !== [] ? implode(",\n            ", array_map(function ($metric) {
                         return "SUM(CASE WHEN mc.name IN ('$metric', '{$metric}_daily') THEN m.value ELSE 0 END) AS $metric";
                     }, $dynamicSimpleMetrics))."," : "")."
             ".implode(",\n                ", array_map(function ($strategy) {
                     $prefix = $strategy['prefix'];
-                    $sourceList = $this->toSqlStringList($strategy['source_metric_names']);
-                    $weightList = $this->toSqlStringList($strategy['weight_metric_names']);
+                    $sourceList = $this->toSqlStringList($strategy['resolved_source_names']);
+                    $weightList = $this->toSqlStringList($strategy['resolved_weight_names']);
 
                     return "MAX(CASE WHEN mc.name IN ($sourceList) THEN m.value END) AS {$prefix}_metric,
             MAX(CASE WHEN mc.name IN ($weightList) THEN m.value END) AS {$prefix}_weight";
@@ -301,5 +398,37 @@
             }
 
             return $rows;
+        }
+
+        /**
+         * @param array<string, mixed> $filtersArr
+         */
+        private function resolveChannelKey(array $filtersArr): ?string
+        {
+            if (!array_key_exists('channel', $filtersArr)) {
+                return null;
+            }
+
+            $value = $filtersArr['channel'];
+            if (is_object($value) && property_exists($value, 'value')) {
+                $value = $value->value;
+            }
+
+            if (!is_scalar($value)) {
+                return null;
+            }
+
+            $normalized = strtolower(trim((string)$value));
+            if ($normalized === '') {
+                return null;
+            }
+
+            if (!ctype_digit($normalized)) {
+                return $normalized;
+            }
+
+            $channel = Channel::tryFrom((int)$normalized);
+
+            return $channel instanceof Channel ? strtolower(trim($channel->getName())) : null;
         }
     }

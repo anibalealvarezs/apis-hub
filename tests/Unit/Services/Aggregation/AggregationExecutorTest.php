@@ -5,10 +5,10 @@
     namespace Tests\Unit\Services\Aggregation;
 
     use Repositories\BaseRepository;
-    use Traits\AggregationExecutionResult;
-    use Traits\AggregationExecutor;
-    use Traits\AggregationTelemetryEventRecorder;
-    use Traits\AggregationPlan;
+    use Services\Aggregation\AggregationExecutionResult;
+    use Services\Aggregation\AggregationExecutor;
+    use Services\Aggregation\AggregationPlan;
+    use Services\Aggregation\AggregationTelemetryEventRecorder;
     use Tests\Unit\BaseUnitTestCase;
 
     final class AggregationExecutorTest extends BaseUnitTestCase
@@ -230,6 +230,102 @@
                 $this->assertSame(['channel'], $event['filter_keys']);
                 $this->assertSame(['daily'], $event['group_by']);
                 $this->assertSame('optimized', $event['planned_execution_path']);
+            } finally {
+                @unlink($telemetryPath);
+            }
+        }
+
+        public function testUsesStrategyFallbackReasonWhenPlannerDoesNotProvideOne(): void
+        {
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->expects($this->once())
+                ->method('executeOptimizedAggregationPlan')
+                ->willReturn(null);
+            $repository->expects($this->once())
+                ->method('getLastAggregateMeta')
+                ->willReturn([
+                    'strategy_fallback_reason' => 'missing_metric_equivalence',
+                ]);
+            $repository->expects($this->once())
+                ->method('executeLegacyAggregationPlan')
+                ->with(
+                    $this->isInstanceOf(AggregationPlan::class),
+                    'missing_metric_equivalence'
+                )
+                ->willReturn(new AggregationExecutionResult([
+                    ['clicks' => 1],
+                ], [
+                    'execution_path' => 'legacy',
+                    'fallback_reason' => 'missing_metric_equivalence',
+                ]));
+
+            $plan = new AggregationPlan(
+                aggregations: ['clicks' => 'clicks'],
+                preferredExecutionPath: 'optimized',
+                canUseOptimized: true,
+                candidateOptimizedStrategies: ['marketing_hierarchy'],
+            );
+
+            $executor = new AggregationExecutor();
+            $result = $executor->execute($repository, $plan);
+
+            $this->assertSame('missing_metric_equivalence', $result->getMeta()['executor_fallback_reason']);
+            $this->assertSame('strategy', $result->getMeta()['executor_fallback_reason_source']);
+        }
+
+        public function testTelemetryEventIncludesMetricResolutionMetadata(): void
+        {
+            $telemetryPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'aggregation-executor-metric-resolution-'.bin2hex(random_bytes(6)).'.jsonl';
+
+            $repository = $this->createMock(BaseRepository::class);
+            $repository->method('getClassName')->willReturn('Entities\Analytics\Channeled\ChanneledMetric');
+            $repository->expects($this->once())
+                ->method('executeOptimizedAggregationPlan')
+                ->willReturn(new AggregationExecutionResult([
+                    ['conversions' => 4],
+                ], [
+                    'execution_path' => 'optimized',
+                    'metric_resolution' => [
+                        'channel' => 'facebook_marketing',
+                        'strategy' => 'marketing_hierarchy',
+                        'resolved_metrics' => [
+                            [
+                                'requested_metric' => 'cost_per_result',
+                                'canonical_metric' => 'cost_per_conversion',
+                                'raw_names' => ['results', 'results_daily'],
+                                'source' => 'driver',
+                            ],
+                        ],
+                    ],
+                ]));
+
+            $executor = new AggregationExecutor(
+                planner: null,
+                telemetryRecorder: new AggregationTelemetryEventRecorder($telemetryPath),
+            );
+
+            try {
+                $result = $executor->executeAggregate(
+                    repository: $repository,
+                    aggregations: ['conversions' => 'cost_per_result'],
+                    groupBy: ['daily'],
+                    filters: (object)['channel' => 'facebook_marketing'],
+                    startDate: '2026-04-01',
+                    endDate: '2026-04-30',
+                );
+
+                $this->assertSame('optimized', $result->getMeta()['execution_path']);
+                $this->assertFileExists($telemetryPath);
+
+                $lines = file($telemetryPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $this->assertIsArray($lines);
+                $this->assertCount(1, $lines);
+                $event = json_decode((string)$lines[0], true, 512, JSON_THROW_ON_ERROR);
+
+                $this->assertSame('facebook_marketing', $event['metric_resolution']['channel']);
+                $this->assertSame('marketing_hierarchy', $event['metric_resolution']['strategy']);
+                $this->assertSame('cost_per_conversion', $event['metric_resolution']['resolved_metrics'][0]['canonical_metric']);
+                $this->assertSame(['results', 'results_daily'], $event['metric_resolution']['resolved_metrics'][0]['raw_names']);
             } finally {
                 @unlink($telemetryPath);
             }

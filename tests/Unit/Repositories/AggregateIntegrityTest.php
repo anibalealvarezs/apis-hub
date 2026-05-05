@@ -94,8 +94,10 @@
             $this->assertStringContainsString('SUM(p.wm_0_weighted_sum) / NULLIF(SUM(p.wm_0_total_weight), 0) AS wm_0_value', $capturedSql);
 
             // Verify filters are in the CTE
-            $this->assertStringContainsString('mc.country_id = :countryId', $capturedSql);
-            $this->assertStringContainsString('mc.channel = :channel', $capturedSql);
+            $this->assertStringContainsString('mc.country_id = :countryVal', $capturedSql);
+            $this->assertStringContainsString('mc.channel = :channelVal', $capturedSql);
+            $this->assertStringContainsString("AND EXISTS (", $capturedSql);
+            $this->assertStringContainsString("LOWER(dk.name) = LOWER('country')", $capturedSql);
         }
 
         /**
@@ -124,8 +126,9 @@
             $this->assertNotEmpty($capturedSql, "SQL should have been captured from optimized path.");
             $this->assertStringContainsString('WITH configs AS MATERIALIZED', $capturedSql);
             $this->assertStringContainsString('paired AS (', $capturedSql);
-            $this->assertStringContainsString('LEFT JOIN dimension_set_items dsi_country', $capturedSql);
-            $this->assertStringContainsString('LEFT JOIN dimension_set_items dsi_device', $capturedSql);
+            $this->assertStringContainsString("LEFT JOIN (", $capturedSql);
+            $this->assertStringContainsString("t_country ON t_country.dimension_set_id = mc.dimension_set_id", $capturedSql);
+            $this->assertStringContainsString("t_device ON t_device.dimension_set_id = mc.dimension_set_id", $capturedSql);
         }
 
         public function testAggregateWritesTelemetryEventWhenPathIsConfigured(): void
