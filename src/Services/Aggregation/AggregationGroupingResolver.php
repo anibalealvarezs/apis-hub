@@ -147,29 +147,6 @@ final class AggregationGroupingResolver
         return " AND mc.dimension_set_id NOT IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name IN ({$excluded}))";
     }
 
-    public function buildWeightedGroupingConfig(string $groupPattern, bool $isPostgres, string $quoteChar): ?array
-    {
-        if ($groupPattern === 'none') {
-            return [
-                'final_select' => [],
-                'group_by'     => [],
-                'joins'        => [],
-                'outer_select' => [],
-                'order_map'    => [],
-            ];
-        }
-
-        if (in_array($groupPattern, ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
-            $dateExpr = (new TemporalDatePartSqlResolver())->resolve($groupPattern, 'p.metric_date', $isPostgres);
-
-            return [
-                'final_select' => ["$dateExpr AS {$quoteChar}date{$quoteChar}"],
-                'group_by'     => ["{$quoteChar}date{$quoteChar}"],
-                'joins'        => [],
-                'outer_select' => ["f.{$quoteChar}date{$quoteChar}"],
-                'order_map'    => ['date' => "f.{$quoteChar}date{$quoteChar}"],
-            ];
-        }
     public function buildWeightedGroupingConfig(string $groupPattern, bool $isPostgres, string $quoteChar, array $relationMap = []): ?array
     {
         $fields = $this->expandGroupPatternToFields($groupPattern);
