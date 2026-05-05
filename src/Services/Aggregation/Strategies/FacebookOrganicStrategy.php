@@ -99,7 +99,10 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
         foreach ($aggregations as $alias => $expr) {
             $normalizedExpr = strtolower(trim((string)$expr));
             if (!isset($metricSqlByExpr[$normalizedExpr])) {
-                return null;
+                if (preg_match('/^[a-z0-9_]+$/', $normalizedExpr) !== 1) {
+                    return null;
+                }
+                $metricSqlByExpr[$normalizedExpr] = "SUM(CASE WHEN {$nameCol} IN ('$normalizedExpr', '{$normalizedExpr}_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)";
             }
 
             $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
@@ -210,7 +213,10 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
         foreach ($aggregations as $alias => $expr) {
             $normalizedExpr = strtolower(trim((string)$expr));
             if (!isset($metricSqlByExpr[$normalizedExpr])) {
-                return null;
+                if (preg_match('/^[a-z0-9_]+$/', $normalizedExpr) !== 1) {
+                    return null;
+                }
+                $metricSqlByExpr[$normalizedExpr] = "SUM(CASE WHEN {$nameCol} IN ('$normalizedExpr', '{$normalizedExpr}_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)";
             }
 
             $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
@@ -327,7 +333,10 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
         foreach ($aggregations as $alias => $expr) {
             $normalizedExpr = strtolower(trim((string)$expr));
             if (!isset($metricSqlByExpr[$normalizedExpr])) {
-                return null;
+                if (preg_match('/^[a-z0-9_]+$/', $normalizedExpr) !== 1) {
+                    return null;
+                }
+                $metricSqlByExpr[$normalizedExpr] = "SUM(CASE WHEN {$nameCol} IN ('$normalizedExpr', '{$normalizedExpr}_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)";
             }
 
             $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;

@@ -727,6 +727,16 @@
                     return "SUM(CASE WHEN $metricNameExpr AND $periodExpr THEN $valCol ELSE 0 END)";
                 }
 
+                // Dynamic catch-all for unknown simple metric names to prevent SQL syntax errors during fallback
+                if (preg_match('/^[a-z0-9_]+$/', $lowerField) === 1 && !in_array($lowerField, ['id', 'value', 'period', 'name', 'metric_config_id', 'metric_date', 'platform_created_at', 'created_at', 'date'], true)) {
+                    $metricNameExpr = $isPostgres
+                        ? "LOWER(mc.name) IN ('$lowerField', '{$lowerField}_daily')"
+                        : "mc.name IN ('$lowerField', '{$lowerField}_daily')";
+                    $periodExpr = $this->getMetricPeriodConditionSql($isPostgres);
+                    
+                    return "SUM(CASE WHEN $metricNameExpr AND $periodExpr THEN $valCol ELSE 0 END)";
+                }
+
                 // Prevent direct 'value' aggregation for ChanneledMetric to avoid data corruption (summing different units)
                 if (str_ends_with($this->getEntityName(), 'ChanneledMetric') && ($lowerField === 'value' || str_contains($lowerField, 'm.value'))) {
                     throw new InvalidArgumentException(
