@@ -123,19 +123,15 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
 
         $configWhereSql = implode(' AND ', $configWhere).$dimWhereSql;
 
-        // Note: The following helpers are still in BaseRepository for now.
-        // We'll move them to a GroupingResolver soon.
-        $repository = $plan->getContextValue('repository');
-        if (!$repository instanceof BaseRepository) {
-             return null;
-        }
-
-        $requestedDimensionKeys = $repository->resolveOptimizedDimensionKeys($groupPattern, $filtersArr);
-        $dsWhere = $repository->buildOptimizedDimensionSetWhereSql($requestedDimensionKeys);
+        $resolver = new \Services\Aggregation\AggregationGroupingResolver();
+        $relationMap = $repository::getRelationMap();
+        
+        $requestedDimensionKeys = $resolver->resolveOptimizedDimensionKeys($groupPattern, $filtersArr, $relationMap);
+        $dsWhere = $resolver->buildOptimizedDimensionSetWhereSql($requestedDimensionKeys);
 
         $sqlParams = array_merge($sqlParams, $configParams);
 
-        $grouping = $repository->buildWeightedGroupingConfig($groupPattern, $isPostgres, $quoteChar);
+        $grouping = $resolver->buildWeightedGroupingConfig($groupPattern, $isPostgres, $quoteChar);
         if ($grouping === null) {
             return null;
         }

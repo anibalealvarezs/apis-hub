@@ -95,7 +95,7 @@
         /**
          * Get relations map (includes defaults and dynamically registered).
          */
-        protected static function getRelationMap(): array
+        public static function getRelationMap(): array
         {
             return array_merge(self::$defaultRelationMap, RepositoryRegistry::getRelations());
         }
