@@ -155,7 +155,10 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
                 default => "f.{$prefix}_value AS $quotedAlias"
             };
         }
-        if ($grouping['outer_select'] !== []) $selectMetrics = array_merge($grouping['outer_select'], $selectMetrics);
+        if ($grouping['outer_select'] !== []) {
+            $prefixedGrouping = array_map(static fn($f) => "f.$f", $grouping['outer_select']);
+            $selectMetrics = array_merge($prefixedGrouping, $selectMetrics);
+        }
 
         $orderSql = '';
         if ($orderBy !== null && $orderBy !== '') {
@@ -225,7 +228,7 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
     ),
     finalized AS (
         SELECT
-            ".($grouping['outer_select'] !== [] ? implode(",\n                ", $grouping['outer_select'])."," : "")."
+            ".($grouping['outer_select'] !== [] ? implode(",\n                ", array_map(static fn($f) => "p.$f", $grouping['outer_select']))."," : "")."
             SUM(p.clicks_value) AS clicks,
             SUM(p.impressions_value) AS impressions,
             SUM(p.clicks_value) / NULLIF(SUM(p.impressions_value), 0) AS ctr".(count($weightedStrategies) > 0 ? "," : "")."

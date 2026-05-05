@@ -203,7 +203,7 @@ final class AggregationGroupingResolver
                 $alias = $quoteChar . 'daily' . $quoteChar;
                 $finalSelect[] = "m.metric_date AS $alias";
                 $groupBy[] = $alias;
-                $outerSelect[] = "p.$alias";
+                $outerSelect[] = $alias;
                 $orderMap['daily'] = "f.$alias";
                 $orderMap['date'] = "f.$alias";
                 continue;
@@ -222,7 +222,7 @@ final class AggregationGroupingResolver
                 $configsSelect[] = "COALESCE($tAlias.$semanticField, 'N/A') AS $alias";
                 $finalSelect[] = "mc.$alias";
                 $groupBy[] = $alias;
-                $outerSelect[] = "p.$alias";
+                $outerSelect[] = $alias;
                 $orderMap[$field] = "f.$alias";
             }
         }
@@ -262,7 +262,7 @@ final class AggregationGroupingResolver
             $configsSelect[] = "COALESCE($dvAlias.value, 'N/A') AS $alias";
             $finalSelect[] = "mc.$alias";
             $groupBy[] = $alias;
-            $outerSelect[] = "p.$alias";
+            $outerSelect[] = $alias;
             $orderMap[$field] = "f.$alias";
         }
 
