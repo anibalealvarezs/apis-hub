@@ -55,6 +55,10 @@ final class AggregationTelemetryEventRecorder
             $path = $_ENV['AGGREGATION_TELEMETRY_PATH'] ?? $_SERVER['AGGREGATION_TELEMETRY_PATH'] ?? null;
         }
 
+        if (!is_string($path) || trim($path) === '') {
+            $path = getcwd() . '/storage/logs/aggregation-telemetry.jsonl';
+        }
+
         return is_string($path) && trim($path) !== '' ? $path : null;
     }
 }
