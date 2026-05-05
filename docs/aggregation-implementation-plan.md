@@ -8,14 +8,15 @@ This plan tracks the staged refactor of the aggregation flow in `apis-hub`.
 - This file is the **execution snapshot for `apis-hub`** based on that shared plan.
 
 ## Current Status
-- Overall status: **Phase 1 complete / Phase 2 started (local cleanup)**
+- Overall status: **Phase 1 complete / Local cleanup track advanced**
 - Last updated: 2026-05-04
-- Tracking commit: `ca4eb62`
+- Tracking commits: `ca4eb62`, `13ca578`
 
 ## Alignment with Shared Plan
 - Phase 0 (instrumentation/baseline): **partially covered** in current repository-level metadata/fallback tracking.
 - Phase 1 (planner/executor extraction + repository delegation): **complete**.
-- Phase 2 (driver-core aggregation profiles): **not started in this repository scope**.
+- Shared Phase 2 (driver-core aggregation profiles): **started (planner-side capability validation integration in progress; driver-core contract rollout pending)**.
+- Local cleanup track (apis-hub only, helper/service extraction): **advanced and in progress**.
 - Phase 3 (pilot channels): **not started under this document**.
 - Phase 4 (optimized-first via feature flag rollout): **not started under this document**.
 - Phase 5 (legacy retirement): **not started**.
@@ -64,7 +65,7 @@ Goal: keep behavior stable while decomposing the legacy aggregate path into expl
 - [x] Run focused phpunit validation for aggregation refactor
 
 ## Evidence executed in this phase
-- Focused suite status (latest run): `OK (26 tests, 103 assertions)`
+- Focused suite status (latest run): `OK (50 tests, 166 assertions)`
 - Primary touched areas:
   - `src/Repositories/BaseRepository.php`
   - `src/Services/Aggregation/*`
@@ -77,7 +78,7 @@ Goal: keep behavior stable while decomposing the legacy aggregate path into expl
 - No broad formula rewrite.
 - No API contract changes.
 
-## Next phase candidates (not started)
+## Local cleanup track (apis-hub only)
 - [~] Phase 2: move remaining legacy SQL semantic helpers from repository into reusable stage services where safe.
   - [x] Extract temporal gap filling into `Services\Aggregation\TemporalGapFiller` and delegate from `BaseRepository`.
   - [x] Extract snapshot aggregate metadata extraction into `Services\Aggregation\SnapshotAggregateMetaExtractor` and delegate from `BaseRepository`.
@@ -87,8 +88,19 @@ Goal: keep behavior stable while decomposing the legacy aggregate path into expl
   - [x] Extract default metric formula construction into `Services\Aggregation\MetricDefaultFormulaBuilder` and delegate from `BaseRepository::getDefaultFormulas()`.
   - [x] Extract metric period SQL condition generation into `Services\Aggregation\MetricPeriodConditionSqlResolver` and delegate from `BaseRepository::getMetricPeriodConditionSql()`.
   - [x] Extract companion weighted-average SQL assembly into `Services\Aggregation\CompanionTimeWeightedAverageFormulaBuilder` and delegate from `BaseRepository::buildCompanionTimeWeightedAverageFormula()`.
-- [ ] Phase 2: tighten planner telemetry and fallback analytics for production monitoring.
-- [ ] Phase 2: evaluate executor-owned dependency wiring to reduce repository orchestration surface.
+
+## Next shared-phase candidates
+- [~] Phase 2: tighten planner telemetry and fallback analytics for production monitoring.
+  - [x] Add executor-level decision metadata in `AggregationExecutor` (`executor_path_decision`, `optimized_attempted`, `optimized_candidate_count`, `executor_fallback_reason`, `executor_fallback_reason_source`).
+  - [x] Propagate planner diagnostics from plan stages into execution metadata (`planner_diagnostics`: fallback reason, unsupported operators, missing reducers, group pattern when available).
+  - [x] Mirror executor metadata into repository aggregate state (`BaseRepository::lastAggregateMeta`) so `getLastAggregateMeta()` exposes the same diagnostics payload.
+  - [x] Add pilot/non-pilot fallback summarization utility (`AggregationFallbackTelemetryReporter`) and wire a CLI entry point (`app:aggregation-telemetry-report`) for periodic JSON snapshot generation from captured telemetry payloads.
+  - [x] Add an opt-in event capture source in `BaseRepository::aggregate()` via `AggregationTelemetryEventRecorder`, persisting aggregate execution metadata as append-only JSONL for downstream reporting.
+- [x] Phase 2: evaluate executor-owned dependency wiring to reduce repository orchestration surface.
+  - `AggregationExecutor` now owns aggregate-request orchestration for planning + execution + optional telemetry recording, while `BaseRepository::aggregate()` only initializes context, delegates, and mirrors final metadata.
+- [~] Shared Phase 2: aggregation profile contract work in `api-driver-core` has started (`AggregationProfileProviderInterface`, normalizer, templates) and planner-side capability checks are now being integrated in `apis-hub`.
+  - [x] Pilot driver migrated: `google_search_console` now exposes aggregation profiles through `AggregationProfileProviderInterface`, and `AggregationPlanner` can resolve and match those profiles from driver registry.
+  - [x] Second pilot driver migrated: `facebook_organic` now exposes aggregation profiles through `AggregationProfileProviderInterface`, and planner profile-stage matching is validated via real driver registry loading.
 
 ## How to continue (new sessions / other agents)
 Use this order to resume work with minimal context loss:

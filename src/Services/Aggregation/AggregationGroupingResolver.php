@@ -1,0 +1,263 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Services\Aggregation;
+
+use Helpers\Helpers;
+use Repositories\BaseRepository;
+
+final class AggregationGroupingResolver
+{
+    /**
+     * @param array<int, string> $groupBy
+     */
+    public function resolveGroupPattern(array $groupBy): ?string
+    {
+        if ($groupBy === []) {
+            return 'none';
+        }
+
+        $rawFields = array_values(array_map(static fn($field) => trim((string)$field), $groupBy));
+        $normalized = array_values(array_map(static fn($field) => strtolower($field), $rawFields));
+
+        if (count($normalized) === 1) {
+            $field = $normalized[0];
+            $rawField = $rawFields[0];
+            if (in_array($field, ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+                return $field;
+            }
+
+            if (in_array($field, ['query', 'page', 'country', 'device'], true)) {
+                return $field;
+            }
+
+            if (str_starts_with(strtolower($rawField), 'dimensions.') && strlen($rawField) > 11) {
+                return 'dimensions.'.substr($rawField, 11);
+            }
+        }
+
+        $allDimensions = array_reduce($rawFields, static fn(bool $carry, string $field): bool => $carry && str_starts_with(strtolower($field), 'dimensions.'), true);
+        if ($allDimensions) {
+            $dimensionFields = array_map(static fn(string $field): string => 'dimensions.'.substr($field, 11), $rawFields);
+            usort($dimensionFields, static fn(string $left, string $right): int => strcmp(strtolower($left), strtolower($right)));
+
+            return implode('+', $dimensionFields);
+        }
+
+        $knownEntityFields = ['query', 'page', 'country', 'device'];
+        $allEntities = count($normalized) >= 2
+            && array_reduce($normalized, static fn(bool $carry, string $field): bool => $carry && in_array($field, $knownEntityFields, true), true);
+        if ($allEntities) {
+            sort($normalized);
+
+            return implode('+', $normalized);
+        }
+
+        if (count($normalized) === 2 && in_array('daily', $normalized) && in_array('channeledcampaign', $normalized)) {
+            return 'daily+channeledCampaign';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $filtersArr
+     * @return array<int, string>
+     */
+    public function resolveOptimizedDimensionKeys(string $groupPattern, array $filtersArr, array $relationMap): array
+    {
+        $dimensionKeys = [];
+
+        if (str_contains($groupPattern, '+')) {
+            $fields = array_values(array_filter(array_map('trim', explode('+', $groupPattern)), static fn($f) => $f !== ''));
+        } else {
+            $fields = $groupPattern === 'none' ? [] : [$groupPattern];
+        }
+
+        foreach ($fields as $field) {
+            if (str_starts_with($field, 'dimensions.')) {
+                $dimensionKeys[] = trim(substr($field, 11));
+            }
+        }
+
+        foreach (array_keys($filtersArr) as $key) {
+            if (!str_starts_with((string)$key, 'dimensions.')) {
+                continue;
+            }
+
+            $dimensionKeys[] = trim(substr((string)$key, 11));
+        }
+
+        $excludedKeys = $this->getOptimizedDimensionSetExcludedKeys($relationMap);
+        $dimensionKeys = array_values(array_unique(array_filter(
+            $dimensionKeys,
+            static fn($key) => !in_array($key, $excludedKeys, true)
+        )));
+
+        usort($dimensionKeys, function (string $left, string $right): int {
+            $priority = array_flip(['query', 'country', 'device']);
+
+            return ($priority[$left] ?? PHP_INT_MAX) <=> ($priority[$right] ?? PHP_INT_MAX);
+        });
+
+        return $dimensionKeys;
+    }
+
+    public function getOptimizedDimensionSetExcludedKeys(array $relationMap): array
+    {
+        $excluded = [];
+        $dimensionSetBackedKeys = ['page', 'query', 'country', 'device'];
+
+        foreach ($relationMap as $relationKey => $map) {
+            if (!isset($map['fk']) || !is_string($map['fk']) || !str_ends_with($map['fk'], '_id')) {
+                continue;
+            }
+
+            $normalizedRelationKey = trim((string)$relationKey);
+            $normalizedFkKey = trim(substr($map['fk'], 0, -3));
+
+            if (!in_array($normalizedRelationKey, $dimensionSetBackedKeys, true)) {
+                $excluded[] = $normalizedRelationKey;
+            }
+            if (!in_array($normalizedFkKey, $dimensionSetBackedKeys, true)) {
+                $excluded[] = $normalizedFkKey;
+            }
+        }
+
+        return array_values(array_unique(array_filter($excluded, static fn($key) => $key !== '')));
+    }
+
+    /**
+     * @param array<int, string> $dimensionKeys
+     */
+    public function buildOptimizedDimensionSetWhereSql(array $dimensionKeys): string
+    {
+        if ($dimensionKeys !== []) {
+            $dimensionKey = $dimensionKeys[0];
+
+            return " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE LOWER(dk.name) = LOWER('".str_replace("'", "''", $dimensionKey)."'))";
+        }
+
+        $excluded = implode(', ', array_map(
+            static fn(string $key): string => "'".str_replace("'", "''", $key)."'",
+            ['query', 'country', 'device']
+        ));
+
+        return " AND mc.dimension_set_id NOT IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name IN ({$excluded}))";
+    }
+
+    public function buildWeightedGroupingConfig(string $groupPattern, bool $isPostgres, string $quoteChar): ?array
+    {
+        if ($groupPattern === 'none') {
+            return [
+                'final_select' => [],
+                'group_by'     => [],
+                'joins'        => [],
+                'outer_select' => [],
+                'order_map'    => [],
+            ];
+        }
+
+        if (in_array($groupPattern, ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'], true)) {
+            $dateExpr = (new TemporalDatePartSqlResolver())->resolve($groupPattern, 'p.metric_date', $isPostgres);
+
+            return [
+                'final_select' => ["$dateExpr AS {$quoteChar}date{$quoteChar}"],
+                'group_by'     => ["{$quoteChar}date{$quoteChar}"],
+                'joins'        => [],
+                'outer_select' => ["f.{$quoteChar}date{$quoteChar}"],
+                'order_map'    => ['date' => "f.{$quoteChar}date{$quoteChar}"],
+            ];
+        }
+
+        if (in_array($groupPattern, ['query', 'page', 'country', 'device'], true)) {
+            return $this->buildEntityCombinationGroupingConfig([$groupPattern], $isPostgres, $quoteChar);
+        }
+
+        if (str_contains($groupPattern, '+')) {
+            $fields = array_values(array_filter(array_map('trim', explode('+', $groupPattern)), static fn($f) => $f !== ''));
+            $isAllDimensions = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && str_starts_with($field, 'dimensions.'), true);
+            if ($isAllDimensions) {
+                return $this->buildDimensionSetCombinationGroupingConfig($fields, $isPostgres, $quoteChar);
+            }
+
+            $isAllEntities = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && in_array($field, ['query', 'page', 'country', 'device'], true), true);
+            if ($isAllEntities) {
+                return $this->buildEntityCombinationGroupingConfig($fields, $isPostgres, $quoteChar);
+            }
+        }
+
+        return null;
+    }
+
+    private function buildEntityCombinationGroupingConfig(array $fields, bool $isPostgres, string $quoteChar): array
+    {
+        $finalSelect = [];
+        $groupBy = [];
+        $joins = [];
+        $outerSelect = [];
+        $orderMap = [];
+
+        foreach ($fields as $field) {
+            $alias = $quoteChar.$field.$quoteChar;
+            $column = match ($field) {
+                'query' => 'query_id',
+                'page' => 'page_id',
+                'country' => 'country_id',
+                'device' => 'device_id',
+                default => null
+            };
+
+            if ($column) {
+                $finalSelect[] = "p.$column AS $alias";
+                $groupBy[] = $alias;
+                $outerSelect[] = "f.$alias";
+                $orderMap[$field] = "f.$alias";
+            }
+        }
+
+        return [
+            'final_select' => $finalSelect,
+            'group_by'     => $groupBy,
+            'joins'        => $joins,
+            'outer_select' => $outerSelect,
+            'order_map'    => $orderMap,
+        ];
+    }
+
+    private function buildDimensionSetCombinationGroupingConfig(array $fields, bool $isPostgres, string $quoteChar): array
+    {
+        $finalSelect = [];
+        $groupBy = [];
+        $joins = [];
+        $outerSelect = [];
+        $orderMap = [];
+
+        foreach ($fields as $field) {
+            $dkName = str_replace('dimensions.', '', $field);
+            $alias = $quoteChar.$field.$quoteChar;
+            $safeDk = preg_replace('/[^a-z0-9]/i', '_', $dkName);
+            $dvAlias = "dv_$safeDk";
+            $dsiAlias = "dsi_$safeDk";
+            $dkAlias = "dk_$safeDk";
+
+            $joins[] = "LEFT JOIN dimension_set_items $dsiAlias ON $dsiAlias.dimension_set_id = mc.dimension_set_id";
+            $joins[] = "LEFT JOIN dimension_values $dvAlias ON $dvAlias.id = $dsiAlias.dimension_value_id";
+            $joins[] = "LEFT JOIN dimension_keys $dkAlias ON $dkAlias.id = $dvAlias.dimension_key_id AND LOWER($dkAlias.name) = LOWER('".str_replace("'", "''", $dkName)."')";
+
+            $finalSelect[] = "COALESCE($dvAlias.value, 'N/A') AS $alias";
+            $groupBy[] = $alias;
+            $outerSelect[] = "f.$alias";
+            $orderMap[$field] = "f.$alias";
+        }
+
+        return [
+            'final_select' => $finalSelect,
+            'group_by'     => $groupBy,
+            'joins'        => $joins,
+            'outer_select' => $outerSelect,
+            'order_map'    => $orderMap,
+        ];
+    }
+}

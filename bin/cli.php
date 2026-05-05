@@ -12,6 +12,7 @@
     use Commands\Analytics\CheckCoverageCommand;
     use Commands\Analytics\InspectJobsCommand;
     use Commands\Analytics\AnalyzeLogsCommand;
+    use Commands\Analytics\ReportAggregationTelemetryCommand;
     use Commands\Analytics\PlanMetricConfigIndexesCommand;
     use Commands\Analytics\ResetMetricsCommand;
     use Commands\Analytics\ResetEntitiesCommand;
@@ -87,6 +88,7 @@
             new CheckCoverageCommand(),
             new InspectJobsCommand(),
             new AnalyzeLogsCommand(),
+            new ReportAggregationTelemetryCommand(),
             new PlanMetricConfigIndexesCommand(),
             new HealthCheckCommand(),
             new AggregateEntityCommand(),

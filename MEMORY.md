@@ -37,3 +37,30 @@
 - Phase 2 local cleanup now also extracts default metric formula construction into `Services\Aggregation\MetricDefaultFormulaBuilder`, with `BaseRepository::getDefaultFormulas()` delegating while preserving period-aware override behavior.
 - Phase 2 local cleanup now also extracts metric period SQL condition generation into `Services\Aggregation\MetricPeriodConditionSqlResolver`, with `BaseRepository::getMetricPeriodConditionSql()` delegating requested-period normalization and SQL rendering.
 - Phase 2 local cleanup now also extracts companion weighted-average SQL assembly into `Services\Aggregation\CompanionTimeWeightedAverageFormulaBuilder`, with `BaseRepository::buildCompanionTimeWeightedAverageFormula()` delegating comparator/date-column/list assembly behavior.
+- Fallback telemetry hardening has started in `Services\Aggregation\AggregationExecutor`: execution results now include executor-level decision metadata (`executor_path_decision`, `optimized_attempted`, `optimized_candidate_count`, `executor_fallback_reason`, `executor_fallback_reason_source`) to distinguish planner-provided vs executor-derived fallback causes.
+- Fallback telemetry now also propagates planner-stage diagnostics into execution metadata under `planner_diagnostics` (fallback reason, unsupported operators, missing reducer expressions, and normalized group pattern when present).
+- `BaseRepository::aggregate()` now merges executor result metadata back into `lastAggregateMeta`, so `getLastAggregateMeta()` consumers receive planner/executor diagnostics consistently.
+- Controller contract coverage now includes `ChanneledCrudController::aggregate()` metadata passthrough validation (`execution_path`, `fallback_reason`, cache flags) via a real-method unit test helper, reducing risk that repository telemetry is dropped at the HTTP response layer.
+- Aggregate controller contract coverage now also validates passthrough of dynamic repository metadata keys (no rigid whitelist) in `ChanneledCrudController::aggregate()`, while preserving base cache metadata fields in the HTTP response.
+- Shared Phase 2 integration has started from the planner side: `Services\Aggregation\AggregationPlanner` now supports optional channel-profile capability validation (via driver-provided aggregation profiles) and emits `missing_profile_capability` when profiles are declared but no profile supports the requested aggregation shape.
+- Planner-side profile capability validation is now pilot-validated against a real registered driver (`google_search_console`), confirming profile loading via driver registry and stage metadata reporting (`profiles.checked/supported/matched_profiles`).
+- Planner-side profile capability validation now covers two real pilot channels (`google_search_console`, `facebook_organic`), reducing uncertainty before broader Shared Phase 2 rollout.
+- Planner profile capability validation now also resolves numeric `filters.channel` IDs to channel keys (via injectable resolver or `Channel::tryFrom()` compatibility bridge), allowing profile checks in id-based request flows without requiring string channel filters.
+- Profile-loading helpers were extracted from `AggregationPlanner` into `Services\Aggregation\AggregationProfileResolver`, centralizing driver-registry lookup + normalization and reducing planner orchestration density.
+- Executor planner diagnostics now include profile-stage telemetry (`profile_checked`, `profile_supported`, `profile_channel`, `profile_count`, `profile_failure_reason`) so fallback-rate comparisons can be segmented across pilot and non-pilot channels.
+- Added `Services\Aggregation\AggregationFallbackTelemetryReporter` to summarize `missing_profile_capability` deltas by pilot/non-pilot segmentation and per-channel buckets from executor metadata events.
+- Added CLI command `app:aggregation-telemetry-report` to turn captured executor metadata JSON payloads into periodic pilot/non-pilot fallback summaries, with optional output-file snapshots for operational use.
+- Added `Services\Aggregation\AggregationTelemetryEventRecorder` and wired it into `BaseRepository::aggregate()` as an opt-in JSONL sink (`AGGREGATION_TELEMETRY_PATH`), giving the reporting command a concrete append-only event source.
+- `AggregationExecutor` now owns aggregate request orchestration dependencies (planner + optional telemetry recorder) through `executeAggregate()`, reducing `BaseRepository::aggregate()` to context initialization, delegation, and final metadata mirroring.
+- Pilot expansion for Phase 2 aggregation profiles has started for `facebook_marketing`, `klaviyo`, and `shopify`:
+    - `FacebookMarketingDriver`, `KlaviyoDriver`, and `ShopifyDriver` now implement `AggregationProfileProviderInterface`.
+    - New templates `flowCampaignProfile` and `storeProfile` were added to `api-driver-core` to support these channels.
+    - This enables strict planner-side validation for ads, email automation, and e-commerce aggregation queries.
+
+- Phase 5 (Legacy Retirement) & Cleanup:
+    - Initiated extraction of optimized aggregation strategies from `BaseRepository` into dedicated service classes.
+    - New strategies: `WeightedMetricStrategy`, `FacebookOrganicStrategy`, `MarketingHierarchyStrategy`.
+    - Introduced `OptimizedAggregationStrategyInterface` and `OptimizedAggregationHelpersTrait` for consistent SQL generation.
+    - Centralized grouping and dimension resolution in `AggregationGroupingResolver`.
+    - `BaseRepository::executeOptimizedAggregationPlan()` refactored to delegate to strategy classes, significantly reducing repository complexity.
+    - The repository now acts as a context provider and proxy for legacy helpers during the progressive retirement of optimized paths.

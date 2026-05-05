@@ -5,12 +5,29 @@
     namespace Services\Aggregation;
 
     use Anibalealvarezs\ApiDriverCore\Classes\MetricAggregationStrategyRegistry;
+    use Entities\Analytics\Channel;
     use Exceptions\ConfigurationException;
     use Helpers\Helpers;
     use Repositories\BaseRepository;
 
     final class AggregationPlanner
     {
+        /** @var callable|null */
+        private $channelKeyResolver;
+
+        private AggregationProfileResolver $aggregationProfileResolver;
+
+        public function __construct(
+            ?callable $aggregationProfilesResolver = null,
+            ?callable $channelKeyResolver = null,
+            ?AggregationProfileResolver $aggregationProfileResolver = null
+        )
+        {
+            $this->channelKeyResolver = $channelKeyResolver;
+            $this->aggregationProfileResolver = $aggregationProfileResolver
+                ?? new AggregationProfileResolver($aggregationProfilesResolver);
+        }
+
         /**
          * @param array<string, string> $aggregations
          * @param array<int, string> $groupBy
@@ -114,6 +131,17 @@
                 groupBy: $groupBy,
             );
 
+            $profileValidation = $this->evaluateProfileCapability(
+                filters: $filtersArr,
+                groupPattern: $groupPattern,
+                aggregations: $aggregations,
+            );
+            $stages['profiles'] = $profileValidation;
+
+            if ($fallbackReason === null && $profileValidation['checked'] === true && $profileValidation['supported'] === false) {
+                $fallbackReason = 'missing_profile_capability';
+            }
+
             return new AggregationPlan(
                 aggregations: $aggregations,
                 groupBy: $groupBy,
@@ -130,6 +158,294 @@
                 candidateOptimizedStrategies: $candidateOptimizedStrategies,
             );
         }
+
+        /**
+         * @param array<string, mixed> $filters
+         * @param array<string, string> $aggregations
+         * @return array<string, mixed>
+         */
+        private function evaluateProfileCapability(array $filters, ?string $groupPattern, array $aggregations): array
+        {
+            $channel = $this->resolveRequestedChannelKey($filters);
+            if ($channel === null) {
+                return [
+                    'checked' => false,
+                    'supported' => true,
+                    'channel' => null,
+                    'profile_count' => 0,
+                    'matched_profiles' => [],
+                    'failure_reason' => null,
+                ];
+            }
+
+            $profiles = $this->aggregationProfileResolver->resolve($channel);
+            if ($profiles === []) {
+                // During rollout, absence of declared profiles should not force legacy fallback.
+                return [
+                    'checked' => true,
+                    'supported' => true,
+                    'channel' => $channel,
+                    'profile_count' => 0,
+                    'matched_profiles' => [],
+                    'failure_reason' => 'no_profiles_registered',
+                ];
+            }
+
+            $matchedProfiles = [];
+            foreach ($profiles as $profile) {
+                if ($this->profileSupportsRequest($profile, $groupPattern, $filters, $aggregations)) {
+                    $matchedProfiles[] = (string)($profile['key'] ?? 'unknown');
+                }
+            }
+
+            $supported = $matchedProfiles !== [];
+
+            return [
+                'checked' => true,
+                'supported' => $supported,
+                'channel' => $channel,
+                'profile_count' => count($profiles),
+                'matched_profiles' => $matchedProfiles,
+                'failure_reason' => $supported ? null : 'no_matching_profile',
+            ];
+        }
+
+        /**
+         * @param array<string, mixed> $filters
+         */
+        private function resolveRequestedChannelKey(array $filters): ?string
+        {
+            $channelId = null;
+
+            foreach (['channel', 'channel_key', 'channel_name'] as $field) {
+                if (!array_key_exists($field, $filters)) {
+                    continue;
+                }
+
+                $value = $filters[$field];
+                if (is_object($value) && property_exists($value, 'value')) {
+                    $value = $value->value;
+                }
+
+                if (is_scalar($value)) {
+                    $normalized = strtolower(trim((string)$value));
+                    if ($normalized !== '' && !ctype_digit($normalized)) {
+                        return $normalized;
+                    }
+
+                    if ($normalized !== '' && ctype_digit($normalized)) {
+                        $channelId = (int)$normalized;
+                    }
+                }
+            }
+
+            if ($channelId !== null && $channelId > 0) {
+                return $this->resolveChannelKeyById($channelId);
+            }
+
+            return null;
+        }
+
+        private function resolveChannelKeyById(int $channelId): ?string
+        {
+            if ($this->channelKeyResolver !== null) {
+                $resolved = call_user_func($this->channelKeyResolver, $channelId);
+                if (is_string($resolved)) {
+                    $normalized = strtolower(trim($resolved));
+                    return $normalized !== '' ? $normalized : null;
+                }
+
+                return null;
+            }
+
+            $channel = Channel::tryFrom($channelId);
+            if (!$channel instanceof Channel) {
+                return null;
+            }
+
+            $name = strtolower(trim($channel->getName()));
+            return $name !== '' ? $name : null;
+        }
+
+        /**
+         * @param array<string, mixed> $profile
+         * @param array<string, mixed> $filters
+         * @param array<string, string> $aggregations
+         */
+        private function profileSupportsRequest(array $profile, ?string $groupPattern, array $filters, array $aggregations): bool
+        {
+            if (!$this->profileSupportsGrouping($profile, $groupPattern)) {
+                return false;
+            }
+
+            if (!$this->profileSupportsReducers($profile, $aggregations)) {
+                return false;
+            }
+
+            return $this->profileSupportsFilters($profile, $filters);
+        }
+
+        /**
+         * @param array<string, mixed> $profile
+         */
+        private function profileSupportsGrouping(array $profile, ?string $groupPattern): bool
+        {
+            if ($groupPattern === null) {
+                return false;
+            }
+
+            $patterns = $profile['group_patterns'] ?? [];
+            if (!is_array($patterns)) {
+                return false;
+            }
+
+            $normalizedNeedle = strtolower($groupPattern);
+            foreach ($patterns as $pattern) {
+                $candidate = $this->normalizeProfilePattern($pattern);
+                if ($candidate !== null && $candidate === $normalizedNeedle) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private function normalizeProfilePattern(mixed $pattern): ?string
+        {
+            if (is_string($pattern)) {
+                $value = strtolower(trim($pattern));
+                return $value !== '' ? $value : null;
+            }
+
+            if (!is_array($pattern) || $pattern === []) {
+                return null;
+            }
+
+            $normalized = [];
+            foreach ($pattern as $field) {
+                $value = strtolower(trim((string)$field));
+                if ($value !== '') {
+                    $normalized[] = $value;
+                }
+            }
+
+            if ($normalized === []) {
+                return null;
+            }
+
+            sort($normalized);
+            return implode('+', $normalized);
+        }
+
+        /**
+         * @param array<string, mixed> $profile
+         * @param array<string, string> $aggregations
+         */
+        private function profileSupportsReducers(array $profile, array $aggregations): bool
+        {
+            $strategies = $profile['reducer_strategies'] ?? [];
+            if (!is_array($strategies) || $strategies === []) {
+                return true;
+            }
+
+            $normalizedStrategies = [];
+            foreach ($strategies as $metric => $strategy) {
+                $metricKey = strtolower(trim((string)$metric));
+                $strategyValue = trim((string)$strategy);
+                if ($metricKey === '' || $strategyValue === '') {
+                    continue;
+                }
+                $normalizedStrategies[$metricKey] = $strategyValue;
+            }
+
+            if ($normalizedStrategies === []) {
+                return true;
+            }
+
+            $hasWildcard = array_key_exists('*', $normalizedStrategies);
+            foreach ($aggregations as $alias => $expression) {
+                $aliasKey = strtolower(trim((string)$alias));
+                $expressionKey = strtolower(trim((string)$expression));
+                if ($hasWildcard || isset($normalizedStrategies[$aliasKey]) || isset($normalizedStrategies[$expressionKey])) {
+                    continue;
+                }
+
+                return false;
+            }
+
+            return true;
+        }
+
+        /**
+         * @param array<string, mixed> $profile
+         * @param array<string, mixed> $filters
+         */
+        private function profileSupportsFilters(array $profile, array $filters): bool
+        {
+            $contract = $profile['filter_contract'] ?? [];
+            if (!is_array($contract) || $contract === []) {
+                return true;
+            }
+
+            $normalizedContract = [];
+            foreach ($contract as $field => $operators) {
+                $fieldKey = strtolower(trim((string)$field));
+                if ($fieldKey === '') {
+                    continue;
+                }
+
+                $ops = is_array($operators) ? $operators : [$operators];
+                $normalizedOps = [];
+                foreach ($ops as $op) {
+                    $opValue = strtolower(trim((string)$op));
+                    if ($opValue !== '' && !in_array($opValue, $normalizedOps, true)) {
+                        $normalizedOps[] = $opValue;
+                    }
+                }
+
+                if ($normalizedOps !== []) {
+                    $normalizedContract[$fieldKey] = $normalizedOps;
+                }
+            }
+
+            foreach ($filters as $field => $value) {
+                $fieldKey = strtolower(trim((string)$field));
+                if (!isset($normalizedContract[$fieldKey])) {
+                    continue;
+                }
+
+                $operator = $this->resolveOperator($value);
+                if (!in_array($operator, $normalizedContract[$fieldKey], true)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private function resolveOperator(mixed $value): string
+        {
+            if (is_object($value)) {
+                $op = strtolower(trim((string)($value->operator ?? 'eq')));
+                return $op !== '' ? $op : 'eq';
+            }
+
+            if (is_string($value)) {
+                $trimmed = trim($value);
+                if ($trimmed === 'N/A' || $trimmed === 'NULL') {
+                    return 'is_null';
+                }
+                if ($trimmed === 'NOT_NULL') {
+                    return 'is_not_null';
+                }
+                if (str_starts_with($trimmed, '!=')) {
+                    return 'neq';
+                }
+            }
+
+            return 'eq';
+        }
+
 
         /**
          * @param array<string, mixed> $filters
