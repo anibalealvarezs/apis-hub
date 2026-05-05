@@ -35,11 +35,16 @@ final class AggregationTelemetryEventRecorder
 
         $directory = dirname($path);
         if ($directory !== '' && !is_dir($directory) && !@mkdir($directory, 0777, true) && !is_dir($directory)) {
+            error_log("AggregationTelemetry: Could not create directory $directory");
             return false;
         }
 
         $json = json_encode($event, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         $written = @file_put_contents($path, $json . PHP_EOL, FILE_APPEND | LOCK_EX);
+
+        if ($written === false) {
+            error_log("AggregationTelemetry: Could not write to $path. Check permissions.");
+        }
 
         return $written !== false;
     }
@@ -56,10 +61,9 @@ final class AggregationTelemetryEventRecorder
         }
 
         if (!is_string($path) || trim($path) === '') {
-            $path = getcwd() . '/storage/logs/aggregation-telemetry.jsonl';
+            $path = __DIR__ . '/../../../storage/logs/aggregation-telemetry.jsonl';
         }
 
         return is_string($path) && trim($path) !== '' ? $path : null;
     }
 }
-
