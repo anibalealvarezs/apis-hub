@@ -125,6 +125,7 @@
             ];
 
             $channel = $this->resolveRequestedChannelKey($filtersArr, $repository);
+            $this->applyChannelSpecificFilters($filtersArr, $groupPattern, $channel);
 
             $fallbackReason = $this->resolveFallbackReason(
                 canUseOptimized: $canUseOptimized,
@@ -215,6 +216,30 @@
                 'matched_profiles' => $matchedProfiles,
                 'failure_reason' => $supported ? null : 'no_matching_profile',
             ];
+        }
+
+        private function applyChannelSpecificFilters(array &$filters, ?string $groupPattern, ?string $channel): void
+        {
+            if ($channel === 'google_search_console') {
+                $isGroupingBySearchAppearance = $groupPattern !== null && (
+                    str_contains($groupPattern, 'dimensions.searchAppearance') || 
+                    str_contains($groupPattern, 'searchAppearance')
+                );
+                $hasSearchAppearanceFilter = isset($filters['dimensions.searchAppearance']) || isset($filters['searchAppearance']);
+
+                if (!$hasSearchAppearanceFilter) {
+                    if (!$isGroupingBySearchAppearance) {
+                        // Default to standard search appearance for normal queries
+                        $filters['dimensions.searchAppearance'] = 'standard';
+                    } else {
+                        // Exclude standard when specifically grouping by search appearance
+                        $filters['dimensions.searchAppearance'] = [
+                            'operator' => 'neq',
+                            'value' => 'standard'
+                        ];
+                    }
+                }
+            }
         }
 
         /**

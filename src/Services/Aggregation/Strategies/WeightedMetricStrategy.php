@@ -70,25 +70,30 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
         ];
         $configParams = [];
 
-        if (($filtersArr['page'] ?? null) !== null) {
-            $configWhere[] = 'mc.page_id = :pageId';
-            $configParams['pageId'] = (int)$filtersArr['page'];
-        }
-        if (($filtersArr['channel'] ?? null) !== null) {
-            $configWhere[] = 'mc.channel = :channel';
-            $configParams['channel'] = (int)$filtersArr['channel'];
-        }
-        if (($filtersArr['country'] ?? null) !== null) {
-            $configWhere[] = 'mc.country_id = :countryId';
-            $configParams['countryId'] = (int)$filtersArr['country'];
-        }
-        if (($filtersArr['device'] ?? null) !== null) {
-            $configWhere[] = 'mc.device_id = :deviceId';
-            $configParams['deviceId'] = (int)$filtersArr['device'];
-        }
-        if (($filtersArr['query'] ?? null) !== null) {
-            $configWhere[] = 'mc.query_id = :queryId';
-            $configParams['queryId'] = (int)$filtersArr['query'];
+        $filterResolver = new FilterConditionResolver();
+        foreach (['page' => 'page_id', 'channel' => 'channel', 'country' => 'country_id', 'device' => 'device_id', 'query' => 'query_id'] as $filterKey => $col) {
+            if (!isset($filtersArr[$filterKey])) continue;
+            
+            $condition = $filterResolver->resolve($filtersArr[$filterKey]);
+            $alias = $filterKey . "Val";
+
+            switch ($condition['operator']) {
+                case 'neq':
+                    $configWhere[] = "mc.$col <> :$alias";
+                    $configParams[$alias] = $condition['value'];
+                    break;
+                case 'is_null':
+                    $configWhere[] = "mc.$col IS NULL";
+                    break;
+                case 'is_not_null':
+                    $configWhere[] = "mc.$col IS NOT NULL";
+                    break;
+                case 'eq':
+                default:
+                    $configWhere[] = "mc.$col = :$alias";
+                    $configParams[$alias] = $condition['value'];
+                    break;
+            }
         }
 
         $filterResolver = new FilterConditionResolver();
@@ -99,13 +104,17 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
                 $alias = "dim_".preg_replace('/[^a-z0-9]/i', '_', $dk);
                 $condition = $filterResolver->resolve($value);
 
-                if (!in_array($condition['operator'], ['eq', 'neq'], true)) {
+                $valuePredicate = match ($condition['operator']) {
+                    'neq' => "dv_$alias.value <> :{$alias}_val",
+                    'is_null' => "dv_$alias.value IS NULL",
+                    'is_not_null' => "dv_$alias.value IS NOT NULL",
+                    'eq' => "dv_$alias.value = :{$alias}_val",
+                    default => null
+                };
+
+                if ($valuePredicate === null) {
                     return null;
                 }
-
-                $valuePredicate = $condition['operator'] === 'neq'
-                    ? "dv_$alias.value <> :{$alias}_val"
-                    : "dv_$alias.value = :{$alias}_val";
 
                 $dimWhereSql .= "\n                    AND EXISTS (
                     SELECT 1

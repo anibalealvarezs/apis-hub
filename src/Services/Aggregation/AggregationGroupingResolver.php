@@ -106,26 +106,7 @@ final class AggregationGroupingResolver
 
     public function getOptimizedDimensionSetExcludedKeys(array $relationMap): array
     {
-        $excluded = [];
-        $dimensionSetBackedKeys = ['page', 'query', 'country', 'device'];
-
-        foreach ($relationMap as $relationKey => $map) {
-            if (!isset($map['fk']) || !is_string($map['fk']) || !str_ends_with($map['fk'], '_id')) {
-                continue;
-            }
-
-            $normalizedRelationKey = trim((string)$relationKey);
-            $normalizedFkKey = trim(substr($map['fk'], 0, -3));
-
-            if (!in_array($normalizedRelationKey, $dimensionSetBackedKeys, true)) {
-                $excluded[] = $normalizedRelationKey;
-            }
-            if (!in_array($normalizedFkKey, $dimensionSetBackedKeys, true)) {
-                $excluded[] = $normalizedFkKey;
-            }
-        }
-
-        return array_values(array_unique(array_filter($excluded, static fn($key) => $key !== '')));
+        return [];
     }
 
     /**
@@ -133,18 +114,23 @@ final class AggregationGroupingResolver
      */
     public function buildOptimizedDimensionSetWhereSql(array $dimensionKeys): string
     {
-        if ($dimensionKeys !== []) {
-            $dimensionKey = $dimensionKeys[0];
-
-            return " AND mc.dimension_set_id IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE LOWER(dk.name) = LOWER('".str_replace("'", "''", $dimensionKey)."'))";
+        $where = "";
+        foreach ($dimensionKeys as $key) {
+            $safeKey = str_replace("'", "''", $key);
+            $where .= "\n            AND EXISTS (
+                SELECT 1 
+                FROM dimension_set_items dsi 
+                JOIN dimension_values dv ON dv.id = dsi.dimension_value_id 
+                JOIN dimension_keys dk ON dk.id = dv.dimension_key_id 
+                WHERE dsi.dimension_set_id = mc.dimension_set_id 
+                AND LOWER(dk.name) = LOWER('$safeKey')
+            )";
         }
 
-        $excluded = implode(', ', array_map(
-            static fn(string $key): string => "'".str_replace("'", "''", $key)."'",
-            ['query', 'country', 'device']
-        ));
+        $count = count($dimensionKeys);
+        $where .= "\n            AND (SELECT COUNT(*) FROM dimension_set_items WHERE dimension_set_id = mc.dimension_set_id) = $count";
 
-        return " AND mc.dimension_set_id NOT IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name IN ({$excluded}))";
+        return $where;
     }
 
     private function expandGroupPatternToFields(string $groupPattern): array
