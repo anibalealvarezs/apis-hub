@@ -61,6 +61,7 @@ final class MarketingHierarchyStrategy implements OptimizedAggregationStrategyIn
 
         $selectFields = [];
         $groupByFields = [];
+        $joins = [];
         $orderMap = [];
 
         $hasDaily = str_contains((string)$groupPattern, 'daily');
@@ -71,17 +72,29 @@ final class MarketingHierarchyStrategy implements OptimizedAggregationStrategyIn
         }
 
         if (str_contains((string)$groupPattern, 'gender')) {
-            $genderExpr = $isPostgres ? "m.metadata->>'gender'" : "JSON_UNQUOTE(JSON_EXTRACT(m.metadata, '$.gender'))";
-            $selectFields[] = "COALESCE($genderExpr, 'unknown') AS {$quoteChar}gender{$quoteChar}";
-            $groupByFields[] = "COALESCE($genderExpr, 'unknown')";
-            $orderMap['gender'] = "COALESCE($genderExpr, 'unknown')";
+            $joins[] = "LEFT JOIN (
+                SELECT dsi.dimension_set_id, dv.value
+                FROM dimension_set_items dsi
+                JOIN dimension_values dv ON dv.id = dsi.dimension_value_id
+                JOIN dimension_keys dk ON dk.id = dv.dimension_key_id
+                WHERE LOWER(dk.name) = 'gender'
+            ) t_gender ON t_gender.dimension_set_id = mc.dimension_set_id";
+            $selectFields[] = "COALESCE(t_gender.value, 'unknown') AS {$quoteChar}gender{$quoteChar}";
+            $groupByFields[] = "COALESCE(t_gender.value, 'unknown')";
+            $orderMap['gender'] = "COALESCE(t_gender.value, 'unknown')";
         }
 
         if (str_contains((string)$groupPattern, 'age')) {
-            $ageExpr = $isPostgres ? "m.metadata->>'age'" : "JSON_UNQUOTE(JSON_EXTRACT(m.metadata, '$.age'))";
-            $selectFields[] = "COALESCE($ageExpr, 'unknown') AS {$quoteChar}age{$quoteChar}";
-            $groupByFields[] = "COALESCE($ageExpr, 'unknown')";
-            $orderMap['age'] = "COALESCE($ageExpr, 'unknown')";
+            $joins[] = "LEFT JOIN (
+                SELECT dsi.dimension_set_id, dv.value
+                FROM dimension_set_items dsi
+                JOIN dimension_values dv ON dv.id = dsi.dimension_value_id
+                JOIN dimension_keys dk ON dk.id = dv.dimension_key_id
+                WHERE LOWER(dk.name) = 'age'
+            ) t_age ON t_age.dimension_set_id = mc.dimension_set_id";
+            $selectFields[] = "COALESCE(t_age.value, 'unknown') AS {$quoteChar}age{$quoteChar}";
+            $groupByFields[] = "COALESCE(t_age.value, 'unknown')";
+            $orderMap['age'] = "COALESCE(t_age.value, 'unknown')";
         }
 
         if (str_contains((string)$groupPattern, 'ad+ad_id')) {
@@ -139,7 +152,7 @@ final class MarketingHierarchyStrategy implements OptimizedAggregationStrategyIn
             $sqlParams['channel'] = (int)$filtersArr['channel'];
         }
 
-        $joins = [];
+
         if (str_contains((string)$groupPattern, 'ad+ad_id')) {
             $joins[] = 'LEFT JOIN channeled_ads ca_ad ON ca_ad.id = mc.channeled_ad_id';
         }
