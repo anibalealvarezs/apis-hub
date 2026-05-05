@@ -1,39 +1,41 @@
 <?php
 
-namespace Interfaces;
+    namespace Interfaces;
 
-interface ChannelInterface
-{
-    /**
-     * @return int|string
-     */
-    public function getPlatformId(): int|string;
+    use Entities\Analytics\Channel;
 
-    /**
-     * @param int|string $platformId
-     * @return ChannelInterface
-     */
-    public function addPlatformId(int|string $platformId): self;
+    interface ChannelInterface
+    {
+        /**
+         * @return int|string
+         */
+        public function getPlatformId(): int|string;
 
-    /**
-     * @return \Entities\Analytics\Channel
-     */
-    public function getChannel(): \Entities\Analytics\Channel;
+        /**
+         * @param int|string $platformId
+         * @return ChannelInterface
+         */
+        public function addPlatformId(int|string $platformId): self;
 
-    /**
-     * @param \Entities\Analytics\Channel $channel
-     * @return ChannelInterface
-     */
-    public function addChannel(\Entities\Analytics\Channel $channel): self;
+        /**
+         * @return Channel
+         */
+        public function getChannel(): Channel;
 
-    /**
-     * @return array|null
-     */
-    public function getData(): ?array;
+        /**
+         * @param Channel $channel
+         * @return ChannelInterface
+         */
+        public function addChannel(Channel $channel): self;
 
-    /**
-     * @param array|null $data
-     * @return ChannelInterface
-     */
-    public function addData(?array $data): self;
-}
+        /**
+         * @return array|null
+         */
+        public function getData(): ?array;
+
+        /**
+         * @param array|null $data
+         * @return ChannelInterface
+         */
+        public function addData(?array $data): self;
+    }

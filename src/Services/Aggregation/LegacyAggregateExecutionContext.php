@@ -1,134 +1,135 @@
 <?php
 
-declare(strict_types=1);
+    declare(strict_types=1);
 
-namespace Services\Aggregation;
+    namespace Services\Aggregation;
 
-use Doctrine\DBAL\Query\QueryBuilder;
+    use Doctrine\DBAL\Query\QueryBuilder;
 
-final class LegacyAggregateExecutionContext
-{
-    /**
-     * @param array<string, string> $aggregations
-     * @param array<int, string> $groupBy
-     * @param array<string, mixed> $relationContext
-     */
-    public function __construct(
-        private readonly QueryBuilder $queryBuilder,
-        private readonly AggregationPlan $plan,
-        private readonly array $aggregations,
-        private readonly ?object $filters,
-        private readonly ?string $startDate,
-        private readonly ?string $endDate,
-        private readonly array $groupBy,
-        private readonly ?string $orderBy,
-        private readonly ?string $orderDir,
-        private readonly string $entityName,
-        private readonly bool $isMetric,
-        private readonly bool $isPostgres,
-        private readonly array $relationContext = [],
-    ) {
-    }
-
-    public function getQueryBuilder(): QueryBuilder
+    final readonly class LegacyAggregateExecutionContext
     {
-        return $this->queryBuilder;
-    }
+        /**
+         * @param array<string, string> $aggregations
+         * @param array<int, string> $groupBy
+         * @param array<string, mixed> $relationContext
+         */
+        public function __construct(
+            private QueryBuilder    $queryBuilder,
+            private AggregationPlan $plan,
+            private array           $aggregations,
+            private ?object         $filters,
+            private ?string         $startDate,
+            private ?string         $endDate,
+            private array           $groupBy,
+            private ?string         $orderBy,
+            private ?string         $orderDir,
+            private string          $entityName,
+            private bool            $isMetric,
+            private bool            $isPostgres,
+            private array           $relationContext = [],
+        )
+        {
+        }
 
-    public function getPlan(): AggregationPlan
-    {
-        return $this->plan;
-    }
+        public function getQueryBuilder(): QueryBuilder
+        {
+            return $this->queryBuilder;
+        }
 
-    /**
-     * @return array<string, string>
-     */
-    public function getAggregations(): array
-    {
-        return $this->aggregations;
-    }
+        public function getPlan(): AggregationPlan
+        {
+            return $this->plan;
+        }
 
-    public function getFilters(): ?object
-    {
-        return $this->filters;
-    }
+        /**
+         * @return array<string, string>
+         */
+        public function getAggregations(): array
+        {
+            return $this->aggregations;
+        }
 
-    public function getStartDate(): ?string
-    {
-        return $this->startDate;
-    }
+        public function getFilters(): ?object
+        {
+            return $this->filters;
+        }
 
-    public function getEndDate(): ?string
-    {
-        return $this->endDate;
-    }
+        public function getStartDate(): ?string
+        {
+            return $this->startDate;
+        }
 
-    /**
-     * @return array<int, string>
-     */
-    public function getGroupBy(): array
-    {
-        return $this->groupBy;
-    }
+        public function getEndDate(): ?string
+        {
+            return $this->endDate;
+        }
 
-    public function getOrderBy(): ?string
-    {
-        return $this->orderBy;
-    }
+        /**
+         * @return array<int, string>
+         */
+        public function getGroupBy(): array
+        {
+            return $this->groupBy;
+        }
 
-    public function getOrderDir(): ?string
-    {
-        return $this->orderDir;
-    }
+        public function getOrderBy(): ?string
+        {
+            return $this->orderBy;
+        }
 
-    public function getEntityName(): string
-    {
-        return $this->entityName;
-    }
+        public function getOrderDir(): ?string
+        {
+            return $this->orderDir;
+        }
 
-    public function isMetric(): bool
-    {
-        return $this->isMetric;
-    }
+        public function getEntityName(): string
+        {
+            return $this->entityName;
+        }
 
-    public function isPostgres(): bool
-    {
-        return $this->isPostgres;
-    }
+        public function isMetric(): bool
+        {
+            return $this->isMetric;
+        }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function getRelationContext(): array
-    {
-        return $this->relationContext;
-    }
+        public function isPostgres(): bool
+        {
+            return $this->isPostgres;
+        }
 
-    public function getRelationContextValue(string $key, mixed $default = null): mixed
-    {
-        return $this->relationContext[$key] ?? $default;
-    }
+        /**
+         * @return array<string, mixed>
+         */
+        public function getRelationContext(): array
+        {
+            return $this->relationContext;
+        }
 
-    /**
-     * @param array<string, mixed> $relationContext
-     */
-    public function withRelationContext(array $relationContext): self
-    {
-        return new self(
-            queryBuilder: $this->queryBuilder,
-            plan: $this->plan,
-            aggregations: $this->aggregations,
-            filters: $this->filters,
-            startDate: $this->startDate,
-            endDate: $this->endDate,
-            groupBy: $this->groupBy,
-            orderBy: $this->orderBy,
-            orderDir: $this->orderDir,
-            entityName: $this->entityName,
-            isMetric: $this->isMetric,
-            isPostgres: $this->isPostgres,
-            relationContext: $relationContext,
-        );
+        public function getRelationContextValue(string $key, mixed $default = null): mixed
+        {
+            return $this->relationContext[$key] ?? $default;
+        }
+
+        /**
+         * @param array<string, mixed> $relationContext
+         */
+        public function withRelationContext(array $relationContext): self
+        {
+            return new self(
+                queryBuilder: $this->queryBuilder,
+                plan: $this->plan,
+                aggregations: $this->aggregations,
+                filters: $this->filters,
+                startDate: $this->startDate,
+                endDate: $this->endDate,
+                groupBy: $this->groupBy,
+                orderBy: $this->orderBy,
+                orderDir: $this->orderDir,
+                entityName: $this->entityName,
+                isMetric: $this->isMetric,
+                isPostgres: $this->isPostgres,
+                relationContext: $relationContext,
+            );
+        }
     }
-}
 

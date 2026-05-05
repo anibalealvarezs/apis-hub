@@ -4,7 +4,7 @@
 
     namespace Tests\Unit\Services\Aggregation;
 
-    use Services\Aggregation\TemporalGapFiller;
+    use Traits\TemporalGapFiller;
     use Tests\Unit\BaseUnitTestCase;
 
     final class TemporalGapFillerTest extends BaseUnitTestCase

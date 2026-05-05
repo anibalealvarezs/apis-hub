@@ -8,12 +8,13 @@
     use Exceptions\ConfigurationException;
     use Repositories\BaseRepository;
 
-    final class AggregationExecutor
+    final readonly class AggregationExecutor
     {
         public function __construct(
-            private readonly ?AggregationPlanner $planner = null,
-            private readonly ?AggregationTelemetryEventRecorder $telemetryRecorder = null,
-        ) {
+            private ?AggregationPlanner                $planner = null,
+            private ?AggregationTelemetryEventRecorder $telemetryRecorder = null,
+        )
+        {
         }
 
         /**
@@ -24,14 +25,15 @@
          */
         public function executeAggregate(
             BaseRepository $repository,
-            array $aggregations,
-            array $groupBy = [],
-            ?object $filters = null,
-            ?string $startDate = null,
-            ?string $endDate = null,
-            ?string $orderBy = null,
-            ?string $orderDir = 'ASC'
-        ): AggregationExecutionResult {
+            array          $aggregations,
+            array          $groupBy = [],
+            ?object        $filters = null,
+            ?string        $startDate = null,
+            ?string        $endDate = null,
+            ?string        $orderBy = null,
+            ?string        $orderDir = 'ASC'
+        ): AggregationExecutionResult
+        {
             $planner = $this->planner ?? new AggregationPlanner();
             $plan = $planner->plan(
                 repository: $repository,
@@ -156,14 +158,15 @@
          */
         private function recordTelemetryEvent(
             BaseRepository $repository,
-            array $aggregations,
-            array $groupBy,
-            ?object $filters,
-            ?string $startDate,
-            ?string $endDate,
-            array $rows,
-            array $meta,
-        ): void {
+            array          $aggregations,
+            array          $groupBy,
+            ?object        $filters,
+            ?string        $startDate,
+            ?string        $endDate,
+            array          $rows,
+            array          $meta,
+        ): void
+        {
             try {
                 $recorder = $this->telemetryRecorder ?? new AggregationTelemetryEventRecorder();
                 if (!$recorder->isEnabled()) {
@@ -171,18 +174,18 @@
                 }
 
                 $recorder->record([
-                    'event_version' => 1,
-                    'recorded_at_utc' => gmdate('c'),
-                    'repository_class' => $repository::class,
-                    'entity_name' => $repository->getClassName(),
-                    'aggregation_aliases' => array_values(array_keys($aggregations)),
-                    'aggregation_expressions' => $aggregations,
-                    'group_by' => array_values($groupBy),
-                    'filter_keys' => $this->extractFilterKeys($filters),
-                    'start_date' => $startDate,
-                    'end_date' => $endDate,
-                    'row_count' => count($rows),
-                ] + $meta);
+                        'event_version'           => 1,
+                        'recorded_at_utc'         => gmdate('c'),
+                        'repository_class'        => $repository::class,
+                        'entity_name'             => $repository->getClassName(),
+                        'aggregation_aliases'     => array_values(array_keys($aggregations)),
+                        'aggregation_expressions' => $aggregations,
+                        'group_by'                => array_values($groupBy),
+                        'filter_keys'             => $this->extractFilterKeys($filters),
+                        'start_date'              => $startDate,
+                        'end_date'                => $endDate,
+                        'row_count'               => count($rows),
+                    ] + $meta);
             } catch (\Throwable) {
                 // Telemetry is best-effort and must not affect aggregate execution.
             }

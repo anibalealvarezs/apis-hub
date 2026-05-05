@@ -1,122 +1,130 @@
 <?php
 
-declare(strict_types=1);
+    declare(strict_types=1);
 
-namespace Services\Aggregation\Strategies;
+    namespace Services\Aggregation\Strategies;
 
-use Doctrine\DBAL\Connection;
-use Services\Aggregation\AggregationPlan;
-use Services\Aggregation\OptimizedAggregationStrategyInterface;
-use Services\Aggregation\OptimizedAggregationHelpersTrait;
-use Services\Aggregation\FilterConditionResolver;
-use Repositories\BaseRepository;
+    use Doctrine\DBAL\Connection;
+    use Doctrine\DBAL\Exception;
+    use Exceptions\ConfigurationException;
+    use Services\Aggregation\AggregationGroupingResolver;
+    use Services\Aggregation\AggregationPlan;
+    use Interfaces\OptimizedAggregationStrategyInterface;
+    use Traits\OptimizedAggregationHelpersTrait;
+    use Services\Aggregation\FilterConditionResolver;
+    use Repositories\BaseRepository;
 
-final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterface
-{
-    use OptimizedAggregationHelpersTrait;
-
-    public function getKey(): string
+    final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterface
     {
-        return 'weighted_metric';
-    }
+        use OptimizedAggregationHelpersTrait;
 
-    public function execute(
-        Connection $connection,
-        AggregationPlan $plan,
-        bool $isPostgres
-    ): ?array {
-        $aggregations = $plan->getAggregations();
-        $groupBy = $plan->getGroupBy();
-        $filters = $plan->getFilters();
-        $startDate = $plan->getStartDate();
-        $endDate = $plan->getEndDate();
-        $orderBy = $plan->getOrderBy();
-        $orderDir = $plan->getOrderDir();
-
-        $filtersArr = [];
-        if ($filters !== null) {
-            foreach ($filters as $key => $value) {
-                $filtersArr[(string)$key] = $value;
-            }
-        }
-        $debugSqlEnabled = !empty($filtersArr['debug_sql']);
-
-        $weightedStrategies = $this->resolveWeightedAggregationStrategies($aggregations);
-        if ($weightedStrategies === []) {
-            return null;
+        public function getKey(): string
+        {
+            return 'weighted_metric';
         }
 
-        $groupPattern = $plan->getStageValue('grouping', 'normalized_pattern');
-        if ($groupPattern === null) {
-            return null;
-        }
+        /**
+         * @throws ConfigurationException
+         * @throws Exception
+         */
+        public function execute(
+            Connection      $connection,
+            AggregationPlan $plan,
+            bool            $isPostgres
+        ): ?array
+        {
+            $aggregations = $plan->getAggregations();
+            $groupBy = $plan->getGroupBy();
+            $filters = $plan->getFilters();
+            $startDate = $plan->getStartDate();
+            $endDate = $plan->getEndDate();
+            $orderBy = $plan->getOrderBy();
+            $orderDir = $plan->getOrderDir();
 
-        $quoteChar = $isPostgres ? '"' : '`';
-        $sqlParams = [
-            'startDate' => $startDate,
-            'endDate'   => $endDate,
-        ];
-
-        $baseMetricNames = ['clicks', 'clicks_daily', 'spend', 'impressions', 'impressions_daily'];
-        foreach ($weightedStrategies as $strategy) {
-            $baseMetricNames = array_merge($baseMetricNames, $strategy['source_metric_names'], $strategy['weight_metric_names']);
-        }
-        $baseMetricNames = array_values(array_unique($baseMetricNames));
-        $metricNameListSql = $this->toSqlStringList($baseMetricNames);
-
-        $configWhere = [
-            "mc.period = 'daily'",
-            "mc.name IN ($metricNameListSql)",
-        ];
-        $configParams = [];
-
-        $filterResolver = new FilterConditionResolver();
-        foreach (['page' => 'page_id', 'channel' => 'channel', 'country' => 'country_id', 'device' => 'device_id', 'query' => 'query_id'] as $filterKey => $col) {
-            if (!isset($filtersArr[$filterKey])) continue;
-            
-            $condition = $filterResolver->resolve($filtersArr[$filterKey]);
-            $alias = $filterKey . "Val";
-
-            switch ($condition['operator']) {
-                case 'neq':
-                    $configWhere[] = "mc.$col <> :$alias";
-                    $configParams[$alias] = $condition['value'];
-                    break;
-                case 'is_null':
-                    $configWhere[] = "mc.$col IS NULL";
-                    break;
-                case 'is_not_null':
-                    $configWhere[] = "mc.$col IS NOT NULL";
-                    break;
-                case 'eq':
-                default:
-                    $configWhere[] = "mc.$col = :$alias";
-                    $configParams[$alias] = $condition['value'];
-                    break;
-            }
-        }
-
-        $filterResolver = new FilterConditionResolver();
-        $dimWhereSql = "";
-        foreach ($filtersArr as $key => $value) {
-            if (str_starts_with($key, 'dimensions.')) {
-                $dk = trim((string)str_replace('dimensions.', '', $key));
-                $alias = "dim_".preg_replace('/[^a-z0-9]/i', '_', $dk);
-                $condition = $filterResolver->resolve($value);
-
-                $valuePredicate = match ($condition['operator']) {
-                    'neq' => "dv_$alias.value <> :{$alias}_val",
-                    'is_null' => "dv_$alias.value IS NULL",
-                    'is_not_null' => "dv_$alias.value IS NOT NULL",
-                    'eq' => "dv_$alias.value = :{$alias}_val",
-                    default => null
-                };
-
-                if ($valuePredicate === null) {
-                    return null;
+            $filtersArr = [];
+            if ($filters !== null) {
+                foreach ($filters as $key => $value) {
+                    $filtersArr[(string)$key] = $value;
                 }
+            }
+            $debugSqlEnabled = !empty($filtersArr['debug_sql']);
 
-                $dimWhereSql .= "\n                    AND EXISTS (
+            $weightedStrategies = $this->resolveWeightedAggregationStrategies($aggregations);
+            if ($weightedStrategies === []) {
+                return null;
+            }
+
+            $groupPattern = $plan->getStageValue('grouping', 'normalized_pattern');
+            if ($groupPattern === null) {
+                return null;
+            }
+
+            $quoteChar = $isPostgres ? '"' : '`';
+            $sqlParams = [
+                'startDate' => $startDate,
+                'endDate'   => $endDate,
+            ];
+
+            $baseMetricNames = ['clicks', 'clicks_daily', 'spend', 'impressions', 'impressions_daily'];
+            foreach ($weightedStrategies as $strategy) {
+                $baseMetricNames = array_merge($baseMetricNames, $strategy['source_metric_names'], $strategy['weight_metric_names']);
+            }
+            $baseMetricNames = array_values(array_unique($baseMetricNames));
+            $metricNameListSql = $this->toSqlStringList($baseMetricNames);
+
+            $configWhere = [
+                "mc.period = 'daily'",
+                "mc.name IN ($metricNameListSql)",
+            ];
+            $configParams = [];
+
+            $filterResolver = new FilterConditionResolver();
+            foreach (['page' => 'page_id', 'channel' => 'channel', 'country' => 'country_id', 'device' => 'device_id', 'query' => 'query_id'] as $filterKey => $col) {
+                if (!isset($filtersArr[$filterKey])) continue;
+
+                $condition = $filterResolver->resolve($filtersArr[$filterKey]);
+                $alias = $filterKey."Val";
+
+                switch ($condition['operator']) {
+                    case 'neq':
+                        $configWhere[] = "mc.$col <> :$alias";
+                        $configParams[$alias] = $condition['value'];
+                        break;
+                    case 'is_null':
+                        $configWhere[] = "mc.$col IS NULL";
+                        break;
+                    case 'is_not_null':
+                        $configWhere[] = "mc.$col IS NOT NULL";
+                        break;
+                    case 'eq':
+                    default:
+                        $configWhere[] = "mc.$col = :$alias";
+                        $configParams[$alias] = $condition['value'];
+                        break;
+                }
+            }
+
+            $filterResolver = new FilterConditionResolver();
+            $dimWhereSql = "";
+            foreach ($filtersArr as $key => $value) {
+                if (str_starts_with($key, 'dimensions.')) {
+                    $dk = trim((string)str_replace('dimensions.', '', $key));
+                    $alias = "dim_".preg_replace('/[^a-z0-9]/i', '_', $dk);
+                    $condition = $filterResolver->resolve($value);
+
+                    $valuePredicate = match ($condition['operator']) {
+                        'neq' => "dv_$alias.value <> :{$alias}_val",
+                        'is_null' => "dv_$alias.value IS NULL",
+                        'is_not_null' => "dv_$alias.value IS NOT NULL",
+                        'eq' => "dv_$alias.value = :{$alias}_val",
+                        default => null
+                    };
+
+                    if ($valuePredicate === null) {
+                        return null;
+                    }
+
+                    $dimWhereSql .= "\n                    AND EXISTS (
                     SELECT 1
                     FROM dimension_set_items dsi_$alias
                     JOIN dimension_values dv_$alias ON dsi_$alias.dimension_value_id = dv_$alias.id
@@ -125,93 +133,93 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
                     AND LOWER(dk_$alias.name) = LOWER(:{$alias}_key)
                     AND {$valuePredicate}
                 )";
-                $sqlParams["{$alias}_key"] = $dk;
-                $sqlParams["{$alias}_val"] = $condition['value'];
-            }
-        }
-
-        $configWhereSql = implode(' AND ', $configWhere).$dimWhereSql;
-
-        $repository = $plan->getContextValue('repository');
-        if (!$repository instanceof \Repositories\BaseRepository) {
-             return null;
-        }
-
-        $resolver = new \Services\Aggregation\AggregationGroupingResolver();
-        $relationMap = $repository::getRelationMap();
-        
-        $requestedDimensionKeys = $resolver->resolveOptimizedDimensionKeys($groupPattern, $filtersArr, $relationMap);
-        $dsWhere = $resolver->buildOptimizedDimensionSetWhereSql($requestedDimensionKeys);
-
-        $sqlParams = array_merge($sqlParams, $configParams);
-
-        $grouping = $resolver->buildWeightedGroupingConfig($groupPattern, $isPostgres, $quoteChar, $relationMap);
-        if ($grouping === null) {
-            return null;
-        }
-
-        $dynamicSimpleMetrics = [];
-        $knownComposites = ['ctr', 'cpc', 'cpm', 'cost_per_result', 'result_rate', 'roas', 'purchase_roas', 'website_purchase_roas'];
-        foreach ($aggregations as $alias => $expr) {
-            $lowerExpr = strtolower(trim((string)$expr));
-            $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
-            
-            if (!isset($weightedStrategies[$safeAlias]) 
-                && !in_array($lowerExpr, ['clicks', 'impressions', 'spend', 'ctr'], true) 
-                && !in_array($lowerExpr, $knownComposites, true)) {
-                $dynamicSimpleMetrics[$lowerExpr] = $lowerExpr;
-            }
-        }
-
-        $selectMetrics = [];
-        foreach ($aggregations as $alias => $expr) {
-            $lowerExpr = strtolower(trim((string)$expr));
-            $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
-            $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
-            $prefix = $weightedStrategies[$safeAlias]['prefix'] ?? null;
-
-            if (isset($dynamicSimpleMetrics[$lowerExpr])) {
-                $selectMetrics[] = "f.$lowerExpr AS $quotedAlias";
-                continue;
+                    $sqlParams["{$alias}_key"] = $dk;
+                    $sqlParams["{$alias}_val"] = $condition['value'];
+                }
             }
 
-            $selectMetrics[] = match ($lowerExpr) {
-                'clicks' => "f.clicks AS $quotedAlias",
-                'impressions' => "f.impressions AS $quotedAlias",
-                'spend' => "f.spend AS $quotedAlias",
-                'ctr' => "f.ctr AS $quotedAlias",
-                default => "f.{$prefix}_value AS $quotedAlias"
-            };
-        }
-        if ($grouping['outer_select'] !== []) {
-            $prefixedGrouping = array_map(static fn($f) => "f.$f", $grouping['outer_select']);
-            $selectMetrics = array_merge($prefixedGrouping, $selectMetrics);
-        }
+            $configWhereSql = implode(' AND ', $configWhere).$dimWhereSql;
 
-        $orderSql = '';
-        if ($orderBy !== null && $orderBy !== '') {
-            $direction = strtoupper((string)$orderDir) === 'DESC' ? 'DESC' : 'ASC';
-            $safeOrderBy = preg_replace('/[^a-z0-9_.]/i', '', $orderBy);
-            $orderField = $grouping['order_map'][strtolower($safeOrderBy)] ?? (
-                isset($aggregations[$safeOrderBy]) 
-                    ? $quoteChar . $safeOrderBy . $quoteChar 
+            $repository = $plan->getContextValue('repository');
+            if (!$repository instanceof BaseRepository) {
+                return null;
+            }
+
+            $resolver = new AggregationGroupingResolver();
+            $relationMap = $repository::getRelationMap();
+
+            $requestedDimensionKeys = $resolver->resolveOptimizedDimensionKeys($groupPattern, $filtersArr, $relationMap);
+            $dsWhere = $resolver->buildOptimizedDimensionSetWhereSql($requestedDimensionKeys);
+
+            $sqlParams = array_merge($sqlParams, $configParams);
+
+            $grouping = $resolver->buildWeightedGroupingConfig($groupPattern, $isPostgres, $quoteChar, $relationMap);
+            if ($grouping === null) {
+                return null;
+            }
+
+            $dynamicSimpleMetrics = [];
+            $knownComposites = ['ctr', 'cpc', 'cpm', 'cost_per_result', 'result_rate', 'roas', 'purchase_roas', 'website_purchase_roas'];
+            foreach ($aggregations as $alias => $expr) {
+                $lowerExpr = strtolower(trim($expr));
+                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+
+                if (!isset($weightedStrategies[$safeAlias])
+                    && !in_array($lowerExpr, ['clicks', 'impressions', 'spend', 'ctr'], true)
+                    && !in_array($lowerExpr, $knownComposites, true)) {
+                    $dynamicSimpleMetrics[$lowerExpr] = $lowerExpr;
+                }
+            }
+
+            $selectMetrics = [];
+            foreach ($aggregations as $alias => $expr) {
+                $lowerExpr = strtolower(trim($expr));
+                $safeAlias = preg_replace('/[^a-z0-9_]/i', '_', (string)$alias) ?: (string)$alias;
+                $quotedAlias = $quoteChar.$safeAlias.$quoteChar;
+                $prefix = $weightedStrategies[$safeAlias]['prefix'] ?? null;
+
+                if (isset($dynamicSimpleMetrics[$lowerExpr])) {
+                    $selectMetrics[] = "f.$lowerExpr AS $quotedAlias";
+                    continue;
+                }
+
+                $selectMetrics[] = match ($lowerExpr) {
+                    'clicks' => "f.clicks AS $quotedAlias",
+                    'impressions' => "f.impressions AS $quotedAlias",
+                    'spend' => "f.spend AS $quotedAlias",
+                    'ctr' => "f.ctr AS $quotedAlias",
+                    default => "f.{$prefix}_value AS $quotedAlias"
+                };
+            }
+            if ($grouping['outer_select'] !== []) {
+                $prefixedGrouping = array_map(static fn($f) => "f.$f", $grouping['outer_select']);
+                $selectMetrics = array_merge($prefixedGrouping, $selectMetrics);
+            }
+
+            $orderSql = '';
+            if ($orderBy !== null && $orderBy !== '') {
+                $direction = strtoupper((string)$orderDir) === 'DESC' ? 'DESC' : 'ASC';
+                $safeOrderBy = preg_replace('/[^a-z0-9_.]/i', '', $orderBy);
+                $orderField = $grouping['order_map'][strtolower($safeOrderBy)] ?? (
+                isset($aggregations[$safeOrderBy])
+                    ? $quoteChar.$safeOrderBy.$quoteChar
                     : $safeOrderBy
-            );
-            $orderSql = " ORDER BY $orderField $direction";
-        }
+                );
+                $orderSql = " ORDER BY $orderField $direction";
+            }
 
-        $firstWeightedStrategy = count($weightedStrategies) > 0 ? array_values($weightedStrategies)[0] : null;
-        $firstWeightNameList = $firstWeightedStrategy ? $this->toSqlStringList($firstWeightedStrategy['weight_metric_names']) : "'impressions','impressions_daily','page_media_view','post_media_view'";
-        $finalSelectFields = $grouping['final_select'] !== [] ? implode(",\n                ", $grouping['final_select'])."," : "";
-        $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY ".implode(', ', $grouping['group_by']) : "";
+            $firstWeightedStrategy = count($weightedStrategies) > 0 ? array_values($weightedStrategies)[0] : null;
+            $firstWeightNameList = $firstWeightedStrategy ? $this->toSqlStringList($firstWeightedStrategy['weight_metric_names']) : "'impressions','impressions_daily','page_media_view','post_media_view'";
+            $finalSelectFields = $grouping['final_select'] !== [] ? implode(",\n                ", $grouping['final_select'])."," : "";
+            $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY ".implode(', ', $grouping['group_by']) : "";
 
-        $configsCteModifier = $isPostgres ? 'MATERIALIZED ' : '';
-        $configsGroupingSelect = $grouping['configs_select'] !== [] ? ", " . implode(', ', $grouping['configs_select']) : "";
-        $configsGroupingJoins = $grouping['configs_joins'] !== [] ? implode("\n            ", $grouping['configs_joins']) : "";
-        $baseSelectFields = $grouping['final_select'] !== [] ? ", " . implode(', ', $grouping['final_select']) : "";
-        $baseGroupByFields = $grouping['group_by'] !== [] ? ", " . implode(', ', $grouping['group_by']) : "";
+            $configsCteModifier = $isPostgres ? 'MATERIALIZED ' : '';
+            $configsGroupingSelect = $grouping['configs_select'] !== [] ? ", ".implode(', ', $grouping['configs_select']) : "";
+            $configsGroupingJoins = $grouping['configs_joins'] !== [] ? implode("\n            ", $grouping['configs_joins']) : "";
+            $baseSelectFields = $grouping['final_select'] !== [] ? ", ".implode(', ', $grouping['final_select']) : "";
+            $baseGroupByFields = $grouping['group_by'] !== [] ? ", ".implode(', ', $grouping['group_by']) : "";
 
-        $sql = "WITH configs AS {$configsCteModifier}(
+            $sql = "WITH configs AS $configsCteModifier(
         SELECT 
             mc.id, mc.page_id, mc.query_id, mc.country_id, mc.device_id, mc.dimension_set_id, mc.name
             $configsGroupingSelect
@@ -227,16 +235,16 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
             SUM(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
             ".($dynamicSimpleMetrics !== [] ? implode(",\n            ", array_map(function ($metric) {
-                return "SUM(CASE WHEN mc.name IN ('$metric', '{$metric}_daily') THEN m.value ELSE 0 END) AS $metric";
-            }, $dynamicSimpleMetrics))."," : "")."
+                        return "SUM(CASE WHEN mc.name IN ('$metric', '{$metric}_daily') THEN m.value ELSE 0 END) AS $metric";
+                    }, $dynamicSimpleMetrics))."," : "")."
             ".implode(",\n                ", array_map(function ($strategy) {
-                $prefix = $strategy['prefix'];
-                $sourceList = $this->toSqlStringList($strategy['source_metric_names']);
-                $weightList = $this->toSqlStringList($strategy['weight_metric_names']);
+                    $prefix = $strategy['prefix'];
+                    $sourceList = $this->toSqlStringList($strategy['source_metric_names']);
+                    $weightList = $this->toSqlStringList($strategy['weight_metric_names']);
 
-                return "MAX(CASE WHEN mc.name IN ($sourceList) THEN m.value END) AS {$prefix}_metric,
+                    return "MAX(CASE WHEN mc.name IN ($sourceList) THEN m.value END) AS {$prefix}_metric,
             MAX(CASE WHEN mc.name IN ($weightList) THEN m.value END) AS {$prefix}_weight";
-            }, $weightedStrategies))."
+                }, $weightedStrategies))."
         FROM metrics m
         JOIN configs mc ON m.metric_config_id = mc.id
         WHERE m.metric_date >= :startDate
@@ -252,14 +260,14 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             SUM(b.clicks) AS clicks_value,
             SUM(b.impressions) AS impressions_value,
             ".($dynamicSimpleMetrics !== [] ? implode(",\n            ", array_map(function ($metric) {
-                return "SUM(b.$metric) AS {$metric}_value";
-            }, $dynamicSimpleMetrics))."," : "")."
+                        return "SUM(b.$metric) AS {$metric}_value";
+                    }, $dynamicSimpleMetrics))."," : "")."
             ".implode(",\n                ", array_map(function ($strategy) {
-                $prefix = $strategy['prefix'];
+                    $prefix = $strategy['prefix'];
 
-                return "SUM(COALESCE(b.{$prefix}_metric, 0) * COALESCE(b.{$prefix}_weight, 0)) AS {$prefix}_weighted_sum,
+                    return "SUM(COALESCE(b.{$prefix}_metric, 0) * COALESCE(b.{$prefix}_weight, 0)) AS {$prefix}_weighted_sum,
             SUM(COALESCE(b.{$prefix}_weight, 0)) AS {$prefix}_total_weight";
-            }, $weightedStrategies))."
+                }, $weightedStrategies))."
         FROM base b
         GROUP BY b.metric_date ".($grouping['group_by'] !== [] ? ", ".implode(", ", $grouping['group_by']) : "")."
     ),
@@ -270,28 +278,28 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             SUM(p.clicks_value) AS clicks,
             SUM(p.impressions_value) AS impressions,
             ".($dynamicSimpleMetrics !== [] ? implode(",\n            ", array_map(function ($metric) {
-                return "SUM(p.{$metric}_value) AS $metric";
-            }, $dynamicSimpleMetrics))."," : "")."
+                        return "SUM(p.{$metric}_value) AS $metric";
+                    }, $dynamicSimpleMetrics))."," : "")."
             SUM(p.clicks_value) / NULLIF(SUM(p.impressions_value), 0) AS ctr".(count($weightedStrategies) > 0 ? "," : "")."
             ".implode(",\n                ", array_map(function ($strategy) {
-                $prefix = $strategy['prefix'];
+                    $prefix = $strategy['prefix'];
 
-                return "SUM(p.{$prefix}_weighted_sum) / NULLIF(SUM(p.{$prefix}_total_weight), 0) AS {$prefix}_value";
-            }, $weightedStrategies))."
+                    return "SUM(p.{$prefix}_weighted_sum) / NULLIF(SUM(p.{$prefix}_total_weight), 0) AS {$prefix}_value";
+                }, $weightedStrategies))."
         FROM paired p
         $finalGroupByFields
     )
     SELECT ".implode(', ', $selectMetrics)." FROM finalized f
     $orderSql";
 
-        $queryStart = $debugSqlEnabled ? microtime(true) : null;
-        $rows = $connection->fetchAllAssociative($sql, $sqlParams);
+            $queryStart = $debugSqlEnabled ? microtime(true) : null;
+            $rows = $connection->fetchAllAssociative($sql, $sqlParams);
 
-        if ($debugSqlEnabled) {
-            $elapsedMs = $queryStart !== null ? (int)round((microtime(true) - $queryStart) * 1000) : -1;
-            error_log("[AggregateDebug] path=optimized_weighted strategy=WeightedMetricStrategy groupPattern={$groupPattern} rows=".count($rows)." elapsed_ms={$elapsedMs}");
+            if ($debugSqlEnabled) {
+                $elapsedMs = $queryStart !== null ? (int)round((microtime(true) - $queryStart) * 1000) : -1;
+                error_log("[AggregateDebug] path=optimized_weighted strategy=WeightedMetricStrategy groupPattern=$groupPattern rows=".count($rows)." elapsed_ms=$elapsedMs");
+            }
+
+            return $rows;
         }
-
-        return $rows;
     }
-}

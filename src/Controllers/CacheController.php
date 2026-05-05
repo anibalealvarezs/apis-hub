@@ -1,431 +1,436 @@
 <?php
 
-namespace Controllers;
+    namespace Controllers;
 
-use Entities\Analytics\Channel as ChannelEntity;
-use Enums\AnalyticsEntity;
-use Exception;
-use Helpers\Helpers;
-use InvalidArgumentException;
-use ReflectionException;
-use Symfony\Component\HttpFoundation\Response;
+    use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
+    use Doctrine\DBAL\Connection;
+    use Entities\Analytics\Channel as ChannelEntity;
+    use Entities\Job;
+    use Enums\AnalyticsEntity;
+    use Enums\JobStatus;
+    use Exception;
+    use Helpers\Helpers;
+    use InvalidArgumentException;
+    use ReflectionException;
+    use ReflectionMethod;
+    use Repositories\JobRepository;
+    use Symfony\Component\HttpFoundation\Response;
 
-class CacheController extends BaseController
-{
-    /**
-     * @param string $channel
-     * @param string $entity
-     * @param string|null $body
-     * @param array|null $params
-     * @return Response
-     * @throws ReflectionException
-     */
-    public function __invoke(
-        string $channel,
-        string $entity,
-        ?string $body = null,
-        ?array $params = null
-    ): Response {
-        /** @var ChannelEntity $channelEntity */
-        $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $channel]);
-        if (! $channelEntity) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: "Invalid channel: " . $channel,
-                httpStatus: Response::HTTP_NOT_FOUND
-            );
-        }
-
-        if (! $this->isValidEntity(entity: $entity)) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: 'Invalid analytics entity',
-                httpStatus: Response::HTTP_NOT_FOUND
-            );
-        }
-
-        $requestsClassName = $this->getEntityRequestsClassName($entity);
-        if (! \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::supportsEntity($channel, $entity)) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: "Channel ". $channelEntity->getLabel() ." not supported for entity " . $entity,
-                httpStatus: Response::HTTP_NOT_FOUND
-            );
-        }
-
-        return $this->list(
-            entity: $entity,
-            channel: $channelEntity,
-            body: $body,
-            params: $params
-        );
-    }
-
-    /**
-     * @param array|null $params
-     * @param string|null $body
-     * @param string $className
-     * @param string $methodName
-     * @return array
-     * @throws ReflectionException
-     */
-    protected function prepareAnalyticsParams(?array $params, ?string $body, string $className, string $methodName): array
+    class CacheController extends BaseController
     {
-        $bodyData = (array) Helpers::bodyToObject(data: $body);
-        $queryParams = $params ?? [];
+        /**
+         * @param string $channel
+         * @param string $entity
+         * @param string|null $body
+         * @param array|null $params
+         * @return Response
+         * @throws ReflectionException|\Doctrine\DBAL\Exception
+         */
+        public function __invoke(
+            string  $channel,
+            string  $entity,
+            ?string $body = null,
+            ?array  $params = null
+        ): Response
+        {
+            /** @var ChannelEntity $channelEntity */
+            $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $channel]);
+            if (!$channelEntity) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: "Invalid channel: ".$channel,
+                    httpStatus: Response::HTTP_NOT_FOUND
+                );
+            }
 
-        // Correctly handle 'filters' if it's explicitly provided in the body
-        if (isset($bodyData['filters']) && is_array($bodyData['filters'])) {
-            $bodyData['filters'] = (object) $bodyData['filters'];
+            if (!$this->isValidEntity(entity: $entity)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: 'Invalid analytics entity',
+                    httpStatus: Response::HTTP_NOT_FOUND
+                );
+            }
+
+            $requestsClassName = $this->getEntityRequestsClassName($entity);
+            if (!DriverFactory::supportsEntity($channel, $entity)) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: "Channel ".$channelEntity->getLabel()." not supported for entity ".$entity,
+                    httpStatus: Response::HTTP_NOT_FOUND
+                );
+            }
+
+            return $this->list(
+                entity: $entity,
+                channel: $channelEntity,
+                body: $body,
+                params: $params
+            );
         }
 
-        // Combine body data and query params
-        $allInputs = array_merge($bodyData, $queryParams);
+        /**
+         * @param array|null $params
+         * @param string|null $body
+         * @param string $className
+         * @param string $methodName
+         * @return array
+         * @throws ReflectionException
+         */
+        protected function prepareAnalyticsParams(?array $params, ?string $body, string $className, string $methodName): array
+        {
+            $bodyData = (array)Helpers::bodyToObject(data: $body);
+            $queryParams = $params ?? [];
 
-        // Use Reflection to only pass parameters that the method expects
-        $reflection = new \ReflectionMethod($className, $methodName);
-        $methodParams = $reflection->getParameters();
+            // Correctly handle 'filters' if it's explicitly provided in the body
+            if (isset($bodyData['filters']) && is_array($bodyData['filters'])) {
+                $bodyData['filters'] = (object)$bodyData['filters'];
+            }
 
-        $finalParams = [];
-        $extraParams = [];
+            // Combine body data and query params
+            $allInputs = array_merge($bodyData, $queryParams);
 
-        foreach ($allInputs as $key => $value) {
-            $isKnownParam = false;
+            // Use Reflection to only pass parameters that the method expects
+            $reflection = new ReflectionMethod($className, $methodName);
+            $methodParams = $reflection->getParameters();
+
+            $finalParams = [];
+            $extraParams = [];
+
+            foreach ($allInputs as $key => $value) {
+                $isKnownParam = false;
+                foreach ($methodParams as $methodParam) {
+                    if ($methodParam->getName() === $key) {
+                        $finalParams[$key] = $value;
+                        $isKnownParam = true;
+
+                        break;
+                    }
+                }
+                if (!$isKnownParam) {
+                    $extraParams[$key] = $value;
+                }
+            }
+
+            // If the method expects 'filters', put all unknown inputs there
             foreach ($methodParams as $methodParam) {
-                if ($methodParam->getName() === $key) {
-                    $finalParams[$key] = $value;
-                    $isKnownParam = true;
+                if ($methodParam->getName() === 'filters') {
+                    $currentFilters = (array)($finalParams['filters'] ?? []);
+                    $finalParams['filters'] = (object)array_merge($currentFilters, $extraParams);
 
                     break;
                 }
             }
-            if (! $isKnownParam) {
-                $extraParams[$key] = $value;
-            }
+
+            return $finalParams;
         }
 
-        // If the method expects 'filters', put all unknown inputs there
-        foreach ($methodParams as $methodParam) {
-            if ($methodParam->getName() === 'filters') {
-                $currentFilters = (array) ($finalParams['filters'] ?? []);
-                $finalParams['filters'] = (object) array_merge($currentFilters, $extraParams);
-
-                break;
-            }
-        }
-
-        return $finalParams;
-    }
-
-    /**
-     * @param string $entity
-     * @param ChannelEntity $channel
-     * @param string|null $body
-     * @param array|null $params
-     * @return Response
-     */
-    protected function list(string $entity, ChannelEntity $channel, ?string $body = null, ?array $params = null): Response
-    {
-        try {
-            /** @var \Repositories\JobRepository $jobRepo */
-            $jobRepo = $this->em->getRepository(\Entities\Job::class);
-
-            $equivalents = [$entity];
-            if (str_contains($entity, 'channeled_')) {
-                $equivalents[] = str_replace('channeled_', '', $entity);
-            } else {
-                $equivalents[] = 'channeled_' . $entity;
-            }
-            $equivalents = array_unique($equivalents);
-
-            $statuses = [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value];
-
-            if ($this->isPostgreSQL()) {
-                $sql = "SELECT id FROM jobs WHERE entity IN (:entities) AND channel = :channel AND status IN (:statuses)";
-                $sqlParams = [
-                    'entities' => $equivalents,
-                    'channel' => $channel->getName(),
-                    'statuses' => $statuses,
-                ];
-
-                $payloadField = 'CAST(payload AS TEXT)';
-                if ($params && isset($params['startDate'])) {
-                    $sql .= " AND ({$payloadField} LIKE :start_pattern1 OR {$payloadField} LIKE :start_pattern2)";
-                    $sqlParams['start_pattern1'] = '%startDate%' . $params['startDate'] . '%';
-                    $sqlParams['start_pattern2'] = '%start_date%' . $params['startDate'] . '%';
-                }
-                if ($params && isset($params['endDate'])) {
-                    $sql .= " AND ({$payloadField} LIKE :end_pattern1 OR {$payloadField} LIKE :end_pattern2)";
-                    $sqlParams['end_pattern1'] = '%endDate%' . $params['endDate'] . '%';
-                    $sqlParams['end_pattern2'] = '%end_date%' . $params['endDate'] . '%';
-                }
-                if ($params && isset($params['instance_name'])) {
-                    $sql .= " AND {$payloadField} LIKE :instance_pattern";
-                    $sqlParams['instance_pattern'] = '%instance_name%' . $params['instance_name'] . '%';
-                }
-
-                $sqlTypes = [
-                    'entities' => \Doctrine\DBAL\Connection::PARAM_STR_ARRAY,
-                    'statuses' => \Doctrine\DBAL\Connection::PARAM_INT_ARRAY,
-                ];
-                $existingJobs = $this->em->getConnection()->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
-            } else {
-                // MySQL works fine with DQL and native JSON support
-                $qb = $jobRepo->createQueryBuilder('j');
-                $qb->where('j.entity IN (:entities)')
-                   ->andWhere('j.channel = :channel')
-                   ->andWhere('j.status IN (:statuses)')
-                   ->setParameter('entities', array_unique($equivalents))
-                   ->setParameter('channel', $channel->getName())
-                   ->setParameter('statuses', $statuses);
-
-                $payloadField = 'j.payload';
-                if ($params && isset($params['startDate'])) {
-                    $qb->andWhere("({$payloadField} LIKE :start_pattern1 OR {$payloadField} LIKE :start_pattern2)")
-                        ->setParameter('start_pattern1', '%startDate%' . $params['startDate'] . '%')
-                        ->setParameter('start_pattern2', '%start_date%' . $params['startDate'] . '%');
-                }
-                if ($params && isset($params['endDate'])) {
-                    $qb->andWhere("({$payloadField} LIKE :end_pattern1 OR {$payloadField} LIKE :end_pattern2)")
-                        ->setParameter('end_pattern1', '%endDate%' . $params['endDate'] . '%')
-                        ->setParameter('end_pattern2', '%end_date%' . $params['endDate'] . '%');
-                }
-                if ($params && isset($params['instance_name'])) {
-                    $qb->andWhere("{$payloadField} LIKE :instance_pattern")
-                       ->setParameter('instance_pattern', '%instance_name%' . $params['instance_name'] . '%');
-                }
-                $existingJobs = $qb->getQuery()->getResult();
-            }
-            if (count($existingJobs) > 0) {
-                return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: 'There is already an active caching process for this endpoint and timeframe.',
-                    httpStatus: Response::HTTP_CONFLICT
-                );
-            }
-
-            $payload = [
-                'body' => $body,
-                'params' => $params,
-            ];
-
-            if (isset($params['instance_name'])) {
-                $payload['instance_name'] = $params['instance_name'];
-                unset($params['instance_name']);
-                $payload['params'] = $params;
-            }
-
-            // --- ATOMIC LOCK START ---
-            $redis = Helpers::getRedisClient();
-            $lockKey = 'lock:schedule:' . sha1($channel->getName() . $entity . json_encode($payload));
-
-            // Try to acquire lock for 30 seconds
-            if (! $redis->set($lockKey, 'locked', 'EX', 30, 'NX')) {
-                return $this->createResponse(
-                    data: null,
-                    status: 'error',
-                    error: 'Another process is currently scheduling this job. Please try again in a moment.',
-                    httpStatus: Response::HTTP_CONFLICT
-                );
-            }
-
+        /**
+         * @param string $entity
+         * @param ChannelEntity $channel
+         * @param string|null $body
+         * @param array|null $params
+         * @return Response
+         * @throws \Doctrine\DBAL\Exception
+         */
+        protected function list(string $entity, ChannelEntity $channel, ?string $body = null, ?array $params = null): Response
+        {
             try {
-                // Secondary check inside lock to be 100% sure
-                $countInner = 0;
-                if ($this->isPostgreSQL()) {
-                    $existingJobsInner = $this->em->getConnection()->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
-                    $countInner = count($existingJobsInner);
+                /** @var JobRepository $jobRepo */
+                $jobRepo = $this->em->getRepository(Job::class);
+
+                $equivalents = [$entity];
+                if (str_contains($entity, 'channeled_')) {
+                    $equivalents[] = str_replace('channeled_', '', $entity);
                 } else {
+                    $equivalents[] = 'channeled_'.$entity;
+                }
+                $equivalents = array_unique($equivalents);
+
+                $statuses = [JobStatus::scheduled->value, JobStatus::processing->value];
+
+                if ($this->isPostgreSQL()) {
+                    $sql = "SELECT id FROM jobs WHERE entity IN (:entities) AND channel = :channel AND status IN (:statuses)";
+                    $sqlParams = [
+                        'entities' => $equivalents,
+                        'channel'  => $channel->getName(),
+                        'statuses' => $statuses,
+                    ];
+
+                    $payloadField = 'CAST(payload AS TEXT)';
+                    if ($params && isset($params['startDate'])) {
+                        $sql .= " AND ($payloadField LIKE :start_pattern1 OR $payloadField LIKE :start_pattern2)";
+                        $sqlParams['start_pattern1'] = '%startDate%'.$params['startDate'].'%';
+                        $sqlParams['start_pattern2'] = '%start_date%'.$params['startDate'].'%';
+                    }
+                    if ($params && isset($params['endDate'])) {
+                        $sql .= " AND ($payloadField LIKE :end_pattern1 OR $payloadField LIKE :end_pattern2)";
+                        $sqlParams['end_pattern1'] = '%endDate%'.$params['endDate'].'%';
+                        $sqlParams['end_pattern2'] = '%end_date%'.$params['endDate'].'%';
+                    }
+                    if ($params && isset($params['instance_name'])) {
+                        $sql .= " AND $payloadField LIKE :instance_pattern";
+                        $sqlParams['instance_pattern'] = '%instance_name%'.$params['instance_name'].'%';
+                    }
+
+                    $sqlTypes = [
+                        'entities' => Connection::PARAM_STR_ARRAY,
+                        'statuses' => Connection::PARAM_INT_ARRAY,
+                    ];
+                    $existingJobs = $this->em->getConnection()->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
+                } else {
+                    // MySQL works fine with DQL and native JSON support
                     $qb = $jobRepo->createQueryBuilder('j');
                     $qb->where('j.entity IN (:entities)')
-                       ->andWhere('j.channel = :channel')
-                       ->andWhere('j.status IN (:statuses)')
-                       ->setParameter('entities', array_unique($equivalents))
-                       ->setParameter('channel', $channel->getName())
-                       ->setParameter('statuses', $statuses);
+                        ->andWhere('j.channel = :channel')
+                        ->andWhere('j.status IN (:statuses)')
+                        ->setParameter('entities', array_unique($equivalents))
+                        ->setParameter('channel', $channel->getName())
+                        ->setParameter('statuses', $statuses);
 
                     $payloadField = 'j.payload';
                     if ($params && isset($params['startDate'])) {
-                        $qb->andWhere("({$payloadField} LIKE :start_pattern1 OR {$payloadField} LIKE :start_pattern2)")
-                            ->setParameter('start_pattern1', '%startDate%' . $params['startDate'] . '%')
-                            ->setParameter('start_pattern2', '%start_date%' . $params['startDate'] . '%');
+                        $qb->andWhere("($payloadField LIKE :start_pattern1 OR $payloadField LIKE :start_pattern2)")
+                            ->setParameter('start_pattern1', '%startDate%'.$params['startDate'].'%')
+                            ->setParameter('start_pattern2', '%start_date%'.$params['startDate'].'%');
                     }
                     if ($params && isset($params['endDate'])) {
                         $qb->andWhere("({$payloadField} LIKE :end_pattern1 OR {$payloadField} LIKE :end_pattern2)")
-                            ->setParameter('end_pattern1', '%endDate%' . $params['endDate'] . '%')
-                            ->setParameter('end_pattern2', '%end_date%' . $params['endDate'] . '%');
+                            ->setParameter('end_pattern1', '%endDate%'.$params['endDate'].'%')
+                            ->setParameter('end_pattern2', '%end_date%'.$params['endDate'].'%');
                     }
                     if ($params && isset($params['instance_name'])) {
                         $qb->andWhere("{$payloadField} LIKE :instance_pattern")
-                           ->setParameter('instance_pattern', '%instance_name%' . $params['instance_name'] . '%');
+                            ->setParameter('instance_pattern', '%instance_name%'.$params['instance_name'].'%');
                     }
-                    $existingJobsInner = $qb->getQuery()->getResult();
-                    $countInner = count($existingJobsInner);
+                    $existingJobs = $qb->getQuery()->getResult();
                 }
-                if ($countInner > 0) {
-                    $redis->del($lockKey);
-
+                if (count($existingJobs) > 0) {
                     return $this->createResponse(
                         data: null,
                         status: 'error',
-                        error: 'There is already an active caching process for this endpoint.',
+                        error: 'There is already an active caching process for this endpoint and timeframe.',
                         httpStatus: Response::HTTP_CONFLICT
                     );
                 }
 
-                $jobData = (object) [
-                    'entity' => $entity,
-                    'channel' => $channel->getName(),
-                    'status' => \Enums\JobStatus::scheduled->value,
-                    'payload' => $payload,
+                $payload = [
+                    'body'   => $body,
+                    'params' => $params,
                 ];
-                $jobRepo->create($jobData);
-            } finally {
-                // We keep the lock for a few seconds to avoid immediate retries from other containers
-                // but we could delete it if we are sure of the uniqueness
+
+                if (isset($params['instance_name'])) {
+                    $payload['instance_name'] = $params['instance_name'];
+                    unset($params['instance_name']);
+                    $payload['params'] = $params;
+                }
+
+                // --- ATOMIC LOCK START ---
+                $redis = Helpers::getRedisClient();
+                $lockKey = 'lock:schedule:'.sha1($channel->getName().$entity.json_encode($payload));
+
+                // Try to acquire lock for 30 seconds
+                if (!$redis->set($lockKey, 'locked', 'EX', 30, 'NX')) {
+                    return $this->createResponse(
+                        data: null,
+                        status: 'error',
+                        error: 'Another process is currently scheduling this job. Please try again in a moment.',
+                        httpStatus: Response::HTTP_CONFLICT
+                    );
+                }
+
+                try {
+                    // Secondary check inside lock to be 100% sure
+                    if ($this->isPostgreSQL()) {
+                        $existingJobsInner = $this->em->getConnection()->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
+                    } else {
+                        $qb = $jobRepo->createQueryBuilder('j');
+                        $qb->where('j.entity IN (:entities)')
+                            ->andWhere('j.channel = :channel')
+                            ->andWhere('j.status IN (:statuses)')
+                            ->setParameter('entities', array_unique($equivalents))
+                            ->setParameter('channel', $channel->getName())
+                            ->setParameter('statuses', $statuses);
+
+                        $payloadField = 'j.payload';
+                        if ($params && isset($params['startDate'])) {
+                            $qb->andWhere("($payloadField LIKE :start_pattern1 OR $payloadField LIKE :start_pattern2)")
+                                ->setParameter('start_pattern1', '%startDate%'.$params['startDate'].'%')
+                                ->setParameter('start_pattern2', '%start_date%'.$params['startDate'].'%');
+                        }
+                        if ($params && isset($params['endDate'])) {
+                            $qb->andWhere("($payloadField LIKE :end_pattern1 OR $payloadField LIKE :end_pattern2)")
+                                ->setParameter('end_pattern1', '%endDate%'.$params['endDate'].'%')
+                                ->setParameter('end_pattern2', '%end_date%'.$params['endDate'].'%');
+                        }
+                        if ($params && isset($params['instance_name'])) {
+                            $qb->andWhere("$payloadField LIKE :instance_pattern")
+                                ->setParameter('instance_pattern', '%instance_name%'.$params['instance_name'].'%');
+                        }
+                        $existingJobsInner = $qb->getQuery()->getResult();
+                    }
+                    $countInner = count($existingJobsInner);
+                    if ($countInner > 0) {
+                        $redis->del($lockKey);
+
+                        return $this->createResponse(
+                            data: null,
+                            status: 'error',
+                            error: 'There is already an active caching process for this endpoint.',
+                            httpStatus: Response::HTTP_CONFLICT
+                        );
+                    }
+
+                    $jobData = (object)[
+                        'entity'  => $entity,
+                        'channel' => $channel->getName(),
+                        'status'  => JobStatus::scheduled->value,
+                        'payload' => $payload,
+                    ];
+                    $jobRepo->create($jobData);
+                } finally {
+                    // We keep the lock for a few seconds to avoid immediate retries from other containers
+                    // but we could delete it if we are sure of the uniqueness
+                }
+
+                // --- ATOMIC LOCK END ---
+
+                return $this->createResponse(
+                    data: ['message' => 'Caching job successfully scheduled in background.'],
+                    status: 'success'
+                );
+            } catch (InvalidArgumentException $e) {
+                return $this->createResponse(
+                    data: null,
+                    status: "error",
+                    error: $e->getMessage(),
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            } catch (Exception $e) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: $e->getMessage(),
+                    httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+                );
             }
-            // --- ATOMIC LOCK END ---
-
-            return $this->createResponse(
-                data: ['message' => 'Caching job successfully scheduled in background.'],
-                status: 'success'
-            );
-        } catch (InvalidArgumentException $e) {
-            return $this->createResponse(
-                data: null,
-                status: "error",
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_BAD_REQUEST
-            );
-        } catch (Exception $e) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
-            );
         }
-    }
 
-    /**
-     * @param string|null $channel
-     * @param string|null $entity
-     * @return Response
-     */
-    public function interruptJobs(?string $channel = null, ?string $entity = null): Response
-    {
-        try {
-            /** @var \Repositories\JobRepository $jobRepo */
-            $jobRepo = $this->em->getRepository(\Entities\Job::class);
-            $qb = $jobRepo->createQueryBuilder('j')
-                ->update()
-                ->set('j.status', \Enums\JobStatus::failed->value)
-                ->where('j.status IN (:statuses)')
-                ->setParameter('statuses', [\Enums\JobStatus::scheduled->value, \Enums\JobStatus::processing->value]);
+        /**
+         * @param string|null $channel
+         * @param string|null $entity
+         * @return Response
+         */
+        public function interruptJobs(?string $channel = null, ?string $entity = null): Response
+        {
+            try {
+                /** @var JobRepository $jobRepo */
+                $jobRepo = $this->em->getRepository(Job::class);
+                $qb = $jobRepo->createQueryBuilder('j')
+                    ->update()
+                    ->set('j.status', JobStatus::failed->value)
+                    ->where('j.status IN (:statuses)')
+                    ->setParameter('statuses', [JobStatus::scheduled->value, JobStatus::processing->value]);
 
-            if ($channel) {
-                $qb->andWhere('j.channel = :channel')->setParameter('channel', $channel);
+                if ($channel) {
+                    $qb->andWhere('j.channel = :channel')->setParameter('channel', $channel);
+                }
+                if ($entity) {
+                    $qb->andWhere('j.entity = :entity')->setParameter('entity', $entity);
+                }
+
+                $count = $qb->getQuery()->execute();
+
+                return $this->createResponse(
+                    data: ['message' => "$count caching jobs interrupted."],
+                    status: 'success'
+                );
+            } catch (InvalidArgumentException $e) {
+                return $this->createResponse(
+                    data: null,
+                    status: "error",
+                    error: $e->getMessage(),
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            } catch (Exception $e) {
+                return $this->createResponse(
+                    data: null,
+                    status: 'error',
+                    error: $e->getMessage(),
+                    httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
+                );
             }
-            if ($entity) {
-                $qb->andWhere('j.entity = :entity')->setParameter('entity', $entity);
-            }
-
-            $count = $qb->getQuery()->execute();
-
-            return $this->createResponse(
-                data: ['message' => "$count caching jobs interrupted."],
-                status: 'success'
-            );
-        } catch (InvalidArgumentException $e) {
-            return $this->createResponse(
-                data: null,
-                status: "error",
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_BAD_REQUEST
-            );
-        } catch (Exception $e) {
-            return $this->createResponse(
-                data: null,
-                status: 'error',
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_INTERNAL_SERVER_ERROR
-            );
-        }
-    }
-
-    /**
-     * @param string $entity
-     * @return bool
-     */
-    protected function isValidEntity(string $entity): bool
-    {
-        $crudEntities = Helpers::getEntitiesConfig();
-        if (in_array(needle: $entity, haystack: array_keys(array: $crudEntities))) {
-            return true;
         }
 
-        return AnalyticsEntity::tryFrom($entity) !== null;
-    }
-
-    /**
-     * @param string $entity
-     * @return string
-     */
-    protected function getEntityRequestsClassName(string $entity): string
-    {
-        $enum = AnalyticsEntity::tryFrom($entity);
-        if ($enum) {
-            return $enum->getRequestsClassName();
-        }
-
-        throw new InvalidArgumentException("Invalid entity: " . $entity);
-    }
-
-    /**
-     * Fetch data and cache it.
-     *
-     * @param string $entity
-     * @param ChannelEntity $channel
-     * @param array|null $params
-     * @param string|null $body
-     * @return mixed
-     * @throws ReflectionException
-     */
-    public function fetchData(string $entity, ChannelEntity $channel, ?array $params = null, ?string $body = null): mixed
-    {
-        try {
-            $resolvedClassName = $this->getEntityRequestsClassName($entity);
-            $params = $params ?? [];
-            if (!isset($params['entity'])) {
-                $params['entity'] = $entity;
+        /**
+         * @param string $entity
+         * @return bool
+         */
+        protected function isValidEntity(string $entity): bool
+        {
+            $crudEntities = Helpers::getEntitiesConfig();
+            if (in_array(needle: $entity, haystack: array_keys(array: $crudEntities))) {
+                return true;
             }
 
-            $startDate = $params['startDate'] ?? $params['start_date'] ?? null;
-            $endDate = $params['endDate'] ?? $params['end_date'] ?? null;
-            $logger = $params['logger'] ?? null;
-            $jobId = isset($params['jobId']) ? (int)$params['jobId'] : null;
+            return AnalyticsEntity::tryFrom($entity) !== null;
+        }
 
-            return $resolvedClassName::getList(
-                channel: $channel,
-                startDate: $startDate,
-                endDate: $endDate,
-                logger: $logger,
-                jobId: $jobId,
-                filters: is_array($params) ? (object)$params : $params
-            );
-        } catch (InvalidArgumentException $e) {
-            return $this->createResponse(
-                data: null,
-                status: "error",
-                error: $e->getMessage(),
-                httpStatus: Response::HTTP_BAD_REQUEST
-            );
-        } catch (Exception $e) {
-            throw $e;
+        /**
+         * @param string $entity
+         * @return string
+         */
+        protected function getEntityRequestsClassName(string $entity): string
+        {
+            $enum = AnalyticsEntity::tryFrom($entity);
+            if ($enum) {
+                return $enum->getRequestsClassName();
+            }
+
+            throw new InvalidArgumentException("Invalid entity: ".$entity);
+        }
+
+        /**
+         * Fetch data and cache it.
+         *
+         * @param string $entity
+         * @param ChannelEntity $channel
+         * @param array|null $params
+         * @param string|null $body
+         * @return mixed
+         * @throws ReflectionException|Exception
+         */
+        public function fetchData(string $entity, ChannelEntity $channel, ?array $params = null, ?string $body = null): mixed
+        {
+            try {
+                $resolvedClassName = $this->getEntityRequestsClassName($entity);
+                $params = $params ?? [];
+                if (!isset($params['entity'])) {
+                    $params['entity'] = $entity;
+                }
+
+                $startDate = $params['startDate'] ?? $params['start_date'] ?? null;
+                $endDate = $params['endDate'] ?? $params['end_date'] ?? null;
+                $logger = $params['logger'] ?? null;
+                $jobId = isset($params['jobId']) ? (int)$params['jobId'] : null;
+
+                return $resolvedClassName::getList(
+                    channel: $channel,
+                    startDate: $startDate,
+                    endDate: $endDate,
+                    logger: $logger,
+                    jobId: $jobId,
+                    filters: is_array($params) ? (object)$params : $params
+                );
+            } catch (InvalidArgumentException $e) {
+                return $this->createResponse(
+                    data: null,
+                    status: "error",
+                    error: $e->getMessage(),
+                    httpStatus: Response::HTTP_BAD_REQUEST
+                );
+            }
         }
     }
-}

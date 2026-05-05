@@ -3,12 +3,12 @@
     namespace Repositories;
 
     use Anibalealvarezs\ApiDriverCore\Classes\RepositoryRegistry;
-    use DateTime;
     use Doctrine\Common\Collections\ArrayCollection;
     use Doctrine\DBAL\Connection;
     use Doctrine\ORM\AbstractQuery;
     use Doctrine\ORM\EntityManagerInterface;
     use Doctrine\ORM\EntityRepository;
+    use Doctrine\ORM\Exception\ORMException;
     use Doctrine\ORM\Mapping\ClassMetadata;
     use Doctrine\ORM\NonUniqueResultException;
     use Doctrine\ORM\NoResultException;
@@ -20,7 +20,6 @@
     use Exception;
     use Exceptions\ConfigurationException;
     use Helpers\Helpers;
-    use Anibalealvarezs\ApiDriverCore\Classes\MetricAggregationStrategyRegistry;
     use InvalidArgumentException;
     use ReflectionException;
     use Services\Aggregation\AggregationExecutionResult;
@@ -43,7 +42,8 @@
     use Services\Aggregation\Stages\LegacyAggregateRelationContextStage;
     use Services\Aggregation\Stages\LegacyAggregateScopeStage;
     use Services\Aggregation\Stages\LegacyAggregateSelectStage;
-    use Services\Aggregation\OptimizedAggregationHelpersTrait;
+    use stdClass;
+    use Traits\OptimizedAggregationHelpersTrait;
     use Services\Aggregation\Strategies\WeightedMetricStrategy;
     use Services\Aggregation\Strategies\FacebookOrganicStrategy;
     use Services\Aggregation\Strategies\MarketingHierarchyStrategy;
@@ -51,6 +51,7 @@
     class BaseRepository extends EntityRepository
     {
         use OptimizedAggregationHelpersTrait;
+
         // Doctrine ORM 3 no longer exposes these internals on EntityRepository,
         // but many repositories in this codebase still rely on them.
         protected EntityManagerInterface $_em;
@@ -143,7 +144,7 @@
         /**
          * Get the minimum date available for these metrics.
          */
-        public function getMinDate(array|\stdClass $filters = []): ?string
+        public function getMinDate(array|stdClass $filters = []): ?string
         {
             $dateField = $this->getDateFieldName();
             $qb = $this->createQueryBuilder('e')
@@ -162,7 +163,7 @@
         /**
          * Get the maximum date available for these metrics.
          */
-        public function getMaxDate(array|\stdClass $filters = []): ?string
+        public function getMaxDate(array|stdClass $filters = []): ?string
         {
             $dateField = $this->getDateFieldName();
             $qb = $this->createQueryBuilder('e')
@@ -360,7 +361,7 @@
             $connection = $this->_em->getConnection();
             $context = $plan->getContext();
             $isPostgres = (bool)($context['is_postgres'] ?? Helpers::isPostgres());
-            
+
             $strategies = [
                 new WeightedMetricStrategy(),
                 new FacebookOrganicStrategy(),
@@ -379,7 +380,7 @@
                         ]);
                     }
                 }
-                
+
                 // Special case for sub-strategies of FB Organic
                 if ($strategy->getKey() === 'facebook_organic') {
                     if (array_intersect(['facebook_organic_page_summary', 'facebook_organic_linked_pages', 'facebook_organic_post_snapshot'], $candidateKeys)) {
@@ -413,7 +414,10 @@
         /**
          * Phase 1 closure: keep legacy execution as stage-driven orchestration.
          *
+         * @param LegacyAggregateExecutionContext $context
          * @return array<int, array<string, mixed>>
+         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
          */
         protected function runLegacyAggregatePipeline(LegacyAggregateExecutionContext $context): array
         {
@@ -578,7 +582,6 @@
             return $this->lastAggregateMeta;
         }
 
-
         /**
          * @param array<int, array<string, mixed>> $results
          */
@@ -595,12 +598,6 @@
             }
         }
 
-
-
-
-
-
-
         /**
          * @param array<int, string> $values
          */
@@ -612,8 +609,6 @@
 
             return implode(',', $escaped);
         }
-
-
 
         /**
          * @return array{operator: string, value: mixed}
@@ -688,6 +683,7 @@
 
         /**
          * Maps a framework field (e.g. metadata.clicks) to a SQL expression.
+         * @throws ConfigurationException
          */
         protected function mapFieldToSql(string $expr, bool $isAggregate = false): string
         {
@@ -733,7 +729,7 @@
                         ? "LOWER(mc.name) IN ('$lowerField', '{$lowerField}_daily')"
                         : "mc.name IN ('$lowerField', '{$lowerField}_daily')";
                     $periodExpr = $this->getMetricPeriodConditionSql($isPostgres);
-                    
+
                     return "SUM(CASE WHEN $metricNameExpr AND $periodExpr THEN $valCol ELSE 0 END)";
                 }
 
@@ -873,24 +869,24 @@
                 JOIN metric_configs mc_sd ON m_sd.metric_config_id = mc_sd.id
                 WHERE mc_sd.channel = mc.channel
                   AND mc_sd.period = mc.period
-                  AND (mc_sd.channeled_account_id {$nullSafeComparator} mc.channeled_account_id)
-                  AND (mc_sd.page_id {$nullSafeComparator} mc.page_id)
-                  AND (mc_sd.post_id {$nullSafeComparator} mc.post_id)
-                  AND (mc_sd.dimension_set_id {$nullSafeComparator} mc.dimension_set_id)
-                  AND (mc_sd.query_id {$nullSafeComparator} mc.query_id)
-                  AND (mc_sd.country_id {$nullSafeComparator} mc.country_id)
-                  AND (mc_sd.device_id {$nullSafeComparator} mc.device_id)
+                  AND (mc_sd.channeled_account_id $nullSafeComparator mc.channeled_account_id)
+                  AND (mc_sd.page_id $nullSafeComparator mc.page_id)
+                  AND (mc_sd.post_id $nullSafeComparator mc.post_id)
+                  AND (mc_sd.dimension_set_id $nullSafeComparator mc.dimension_set_id)
+                  AND (mc_sd.query_id $nullSafeComparator mc.query_id)
+                  AND (mc_sd.country_id $nullSafeComparator mc.country_id)
+                  AND (mc_sd.device_id $nullSafeComparator mc.device_id)
             ";
 
-            $endSnapshotSql = "SELECT MAX(m_sd.metric_date) {$snapshotContextSql} AND m_sd.metric_date <= :snapshotDeltaEndDate";
+            $endSnapshotSql = "SELECT MAX(m_sd.metric_date) $snapshotContextSql AND m_sd.metric_date <= :snapshotDeltaEndDate";
             if ($this->aggregateSnapshotFallbackMode === 'resilient') {
-                $endSnapshotSql = "COALESCE(({$endSnapshotSql}), (SELECT MAX(m_sd.metric_date) {$snapshotContextSql}))";
+                $endSnapshotSql = "COALESCE(($endSnapshotSql), (SELECT MAX(m_sd.metric_date) $snapshotContextSql))";
             }
-            $startSnapshotSql = "SELECT MAX(m_sd.metric_date) {$snapshotContextSql} AND m_sd.metric_date < :snapshotDeltaStartDate";
+            $startSnapshotSql = "SELECT MAX(m_sd.metric_date) $snapshotContextSql AND m_sd.metric_date < :snapshotDeltaStartDate";
 
             return "(CASE
-                WHEN m.metric_date = ({$endSnapshotSql}) THEN m.value
-                WHEN m.metric_date = ({$startSnapshotSql}) THEN -m.value
+                WHEN m.metric_date = ($endSnapshotSql) THEN m.value
+                WHEN m.metric_date = ($startSnapshotSql) THEN -m.value
                 ELSE 0
             END)";
         }
@@ -1046,7 +1042,7 @@
         /**
          * @return int
          * @throws NonUniqueResultException
-         * @throws NoResultException
+         * @throws NoResultException|Exception
          */
         public function getCount(): int
         {
@@ -1061,7 +1057,7 @@
          * @param string|null $endDate
          * @return int
          * @throws NoResultException
-         * @throws NonUniqueResultException
+         * @throws NonUniqueResultException|Exception
          */
         public function countElements(
             ?object $filters = null,
@@ -1091,6 +1087,7 @@
          * @param string $orderDir
          * @param string|null $startDate
          * @param string|null $endDate
+         * @param array|null $extra
          * @return ArrayCollection
          * @throws Exception
          */
@@ -1152,6 +1149,7 @@
          * @param int $pagination
          * @param string|null $startDate
          * @param string|null $endDate
+         * @param array|null $extra
          * @return QueryBuilder
          * @throws Exception
          */
@@ -1260,7 +1258,8 @@
          * @param object|null $data
          * @param bool $returnEntity
          * @return bool|array|Entity|null
-         * @throws NonUniqueResultException
+         * @throws OptimisticLockException
+         * @throws ORMException
          */
         public function update(int $id, ?object $data = null, bool $returnEntity = false): bool|array|null|Entity
         {
@@ -1292,6 +1291,8 @@
         /**
          * @param int $id
          * @return bool
+         * @throws ORMException
+         * @throws OptimisticLockException
          */
         public function delete(int $id): bool
         {
