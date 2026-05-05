@@ -161,7 +161,11 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
         if ($orderBy !== null && $orderBy !== '') {
             $direction = strtoupper((string)$orderDir) === 'DESC' ? 'DESC' : 'ASC';
             $safeOrderBy = preg_replace('/[^a-z0-9_.]/i', '', $orderBy);
-            $orderField = $grouping['order_map'][strtolower($safeOrderBy)] ?? $safeOrderBy;
+            $orderField = $grouping['order_map'][strtolower($safeOrderBy)] ?? (
+                isset($aggregations[$safeOrderBy]) 
+                    ? $quoteChar . $safeOrderBy . $quoteChar 
+                    : $safeOrderBy
+            );
             $orderSql = " ORDER BY $orderField $direction";
         }
 
@@ -170,16 +174,22 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
         $finalGroupByFields = $grouping['group_by'] !== [] ? "GROUP BY ".implode(', ', $grouping['group_by']) : "";
 
         $configsCteModifier = $isPostgres ? 'MATERIALIZED ' : '';
+        $configsGroupingSelect = $grouping['configs_select'] !== [] ? ", " . implode(', ', $grouping['configs_select']) : "";
+        $configsGroupingJoins = $grouping['configs_joins'] !== [] ? implode("\n            ", $grouping['configs_joins']) : "";
+        $baseGroupingFields = $grouping['group_by'] !== [] ? ", " . implode(', ', $grouping['group_by']) : "";
 
         $sql = "WITH configs AS {$configsCteModifier}(
         SELECT 
             mc.id, mc.page_id, mc.query_id, mc.country_id, mc.device_id, mc.dimension_set_id, mc.name
+            $configsGroupingSelect
         FROM metric_configs mc
+        $configsGroupingJoins
         WHERE ".str_replace('mc.', 'mc.', $configWhereSql)." $dsWhere
     ),
     base AS (
         SELECT
-            m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id,
+            m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id
+            $baseGroupingFields,
             SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
             SUM(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
             ".implode(",\n                ", array_map(function ($strategy) {
@@ -195,12 +205,12 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
         WHERE m.metric_date >= :startDate
         AND m.metric_date <= :endDate
         AND mc.dimension_set_id IN (SELECT DISTINCT dimension_set_id FROM configs)
-        GROUP BY m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id
+        GROUP BY m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id $baseGroupingFields
     ),
     paired AS (
         SELECT
             b.metric_date, 
-            ".($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'b.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'b.metric_date'))) ? implode(", ", $cols).", " : "" : "")."
+            ".($grouping['group_by'] !== [] ? implode(", ", $grouping['group_by']).", " : "")."
             SUM(b.clicks) AS clicks_value,
             SUM(b.impressions) AS impressions_value,
             ".implode(",\n                ", array_map(function ($strategy) {
@@ -210,11 +220,11 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
             SUM(COALESCE(b.{$prefix}_weight, 0)) AS {$prefix}_total_weight";
             }, $weightedStrategies))."
         FROM base b
-        GROUP BY b.metric_date".($grouping['final_select'] !== [] ? ($cols = array_unique(array_filter(array_map(fn($s) => str_replace('p.', 'b.', explode(' AS ', $s)[0]), $grouping['final_select']), fn($col) => $col !== 'b.metric_date'))) ? ", ".implode(", ", $cols) : "" : "")."
+        GROUP BY b.metric_date ".($grouping['group_by'] !== [] ? ", ".implode(", ", $grouping['group_by']) : "")."
     ),
     finalized AS (
         SELECT
-            $finalSelectFields
+            ".($grouping['outer_select'] !== [] ? implode(",\n                ", $grouping['outer_select'])."," : "")."
             SUM(p.clicks_value) AS clicks,
             SUM(p.impressions_value) AS impressions,
             SUM(p.clicks_value) / NULLIF(SUM(p.impressions_value), 0) AS ctr".(count($weightedStrategies) > 0 ? "," : "")."
@@ -227,7 +237,6 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
         $finalGroupByFields
     )
     SELECT ".implode(', ', $selectMetrics)." FROM finalized f
-    ".implode("\n            ", $grouping['joins'])."
     $orderSql";
 
         $queryStart = $debugSqlEnabled ? microtime(true) : null;

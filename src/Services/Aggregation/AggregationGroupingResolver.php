@@ -170,47 +170,67 @@ final class AggregationGroupingResolver
                 'order_map'    => ['date' => "f.{$quoteChar}date{$quoteChar}"],
             ];
         }
-
-        if (in_array($groupPattern, ['query', 'page', 'country', 'device'], true)) {
-            return $this->buildEntityCombinationGroupingConfig([$groupPattern], $isPostgres, $quoteChar);
+    public function buildWeightedGroupingConfig(string $groupPattern, bool $isPostgres, string $quoteChar, array $relationMap = []): ?array
+    {
+        $fields = $this->expandGroupPatternToFields($groupPattern);
+        if ($fields === []) {
+            return [
+                'final_select' => [],
+                'group_by'     => [],
+                'joins'        => [],
+                'outer_select' => [],
+                'order_map'    => [],
+                'configs_select' => [],
+                'configs_joins'  => [],
+            ];
         }
 
-        if (str_contains($groupPattern, '+')) {
-            $fields = array_values(array_filter(array_map('trim', explode('+', $groupPattern)), static fn($f) => $f !== ''));
-            $isAllDimensions = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && str_starts_with($field, 'dimensions.'), true);
-            if ($isAllDimensions) {
-                return $this->buildDimensionSetCombinationGroupingConfig($fields, $isPostgres, $quoteChar);
-            }
+        $isAllDimensions = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && str_starts_with($field, 'dimensions.'), true);
+        if ($isAllDimensions) {
+            return $this->buildDimensionSetCombinationGroupingConfig($fields, $isPostgres, $quoteChar);
+        }
 
-            $isAllEntities = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && in_array($field, ['query', 'page', 'country', 'device'], true), true);
-            if ($isAllEntities) {
-                return $this->buildEntityCombinationGroupingConfig($fields, $isPostgres, $quoteChar);
-            }
+        $isAllEntities = array_reduce($fields, static fn(bool $carry, string $field): bool => $carry && (in_array($field, ['query', 'page', 'country', 'device', 'daily'], true)), true);
+        if ($isAllEntities) {
+            return $this->buildEntityCombinationGroupingConfig($fields, $isPostgres, $quoteChar, $relationMap);
         }
 
         return null;
     }
 
-    private function buildEntityCombinationGroupingConfig(array $fields, bool $isPostgres, string $quoteChar): array
+    private function buildEntityCombinationGroupingConfig(array $fields, bool $isPostgres, string $quoteChar, array $relationMap): array
     {
         $finalSelect = [];
         $groupBy = [];
         $joins = [];
         $outerSelect = [];
         $orderMap = [];
+        $configsSelect = [];
+        $configsJoins = [];
 
         foreach ($fields as $field) {
-            $alias = $quoteChar.$field.$quoteChar;
-            $column = match ($field) {
-                'query' => 'query_id',
-                'page' => 'page_id',
-                'country' => 'country_id',
-                'device' => 'device_id',
-                default => null
-            };
+            if ($field === 'daily') {
+                $alias = $quoteChar . 'daily' . $quoteChar;
+                $finalSelect[] = "b.metric_date AS $alias";
+                $groupBy[] = $alias;
+                $outerSelect[] = "f.$alias";
+                $orderMap['daily'] = "f.$alias";
+                $orderMap['date'] = "f.$alias";
+                continue;
+            }
 
-            if ($column) {
-                $finalSelect[] = "p.$column AS $alias";
+            $alias = $quoteChar.$field.$quoteChar;
+            $relation = $relationMap[$field] ?? null;
+
+            if ($relation) {
+                $table = $relation['table'];
+                $fk = $relation['fk'];
+                $semanticField = $relation['field'];
+                $tAlias = $relation['alias'] ?? "t_$field";
+
+                $configsJoins[] = "LEFT JOIN $table $tAlias ON $tAlias.id = mc.$fk";
+                $configsSelect[] = "COALESCE($tAlias.$semanticField, 'N/A') AS $alias";
+                $finalSelect[] = "b.$alias";
                 $groupBy[] = $alias;
                 $outerSelect[] = "f.$alias";
                 $orderMap[$field] = "f.$alias";
@@ -220,9 +240,11 @@ final class AggregationGroupingResolver
         return [
             'final_select' => $finalSelect,
             'group_by'     => $groupBy,
-            'joins'        => $joins,
+            'joins'        => [], // Joins are now in configs_joins
             'outer_select' => $outerSelect,
             'order_map'    => $orderMap,
+            'configs_select' => $configsSelect,
+            'configs_joins'  => $configsJoins,
         ];
     }
 
@@ -230,9 +252,10 @@ final class AggregationGroupingResolver
     {
         $finalSelect = [];
         $groupBy = [];
-        $joins = [];
         $outerSelect = [];
         $orderMap = [];
+        $configsSelect = [];
+        $configsJoins = [];
 
         foreach ($fields as $field) {
             $dkName = str_replace('dimensions.', '', $field);
@@ -242,11 +265,12 @@ final class AggregationGroupingResolver
             $dsiAlias = "dsi_$safeDk";
             $dkAlias = "dk_$safeDk";
 
-            $joins[] = "LEFT JOIN dimension_set_items $dsiAlias ON $dsiAlias.dimension_set_id = mc.dimension_set_id";
-            $joins[] = "LEFT JOIN dimension_values $dvAlias ON $dvAlias.id = $dsiAlias.dimension_value_id";
-            $joins[] = "LEFT JOIN dimension_keys $dkAlias ON $dkAlias.id = $dvAlias.dimension_key_id AND LOWER($dkAlias.name) = LOWER('".str_replace("'", "''", $dkName)."')";
+            $configsJoins[] = "LEFT JOIN dimension_set_items $dsiAlias ON $dsiAlias.dimension_set_id = mc.dimension_set_id";
+            $configsJoins[] = "LEFT JOIN dimension_values $dvAlias ON $dvAlias.id = $dsiAlias.dimension_value_id";
+            $configsJoins[] = "LEFT JOIN dimension_keys $dkAlias ON $dkAlias.id = $dvAlias.dimension_key_id AND LOWER($dkAlias.name) = LOWER('".str_replace("'", "''", $dkName)."')";
 
-            $finalSelect[] = "COALESCE($dvAlias.value, 'N/A') AS $alias";
+            $configsSelect[] = "COALESCE($dvAlias.value, 'N/A') AS $alias";
+            $finalSelect[] = "b.$alias";
             $groupBy[] = $alias;
             $outerSelect[] = "f.$alias";
             $orderMap[$field] = "f.$alias";
@@ -255,9 +279,11 @@ final class AggregationGroupingResolver
         return [
             'final_select' => $finalSelect,
             'group_by'     => $groupBy,
-            'joins'        => $joins,
+            'joins'        => [], // Joins are now in configs_joins
             'outer_select' => $outerSelect,
             'order_map'    => $orderMap,
+            'configs_select' => $configsSelect,
+            'configs_joins'  => $configsJoins,
         ];
     }
 }
