@@ -79,7 +79,7 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
             'follows_and_unfollows' => "SUM(CASE WHEN {$nameCol} IN ('follows_and_unfollows', 'follows_and_unfollows_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'saves'                 => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'shares'                => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
-            'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+            'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'post_engagements', 'post_engagements_daily', 'page_post_engagements', 'page_post_engagements_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'replies'               => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'accounts_engaged'      => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'post_clicks'           => "SUM(CASE WHEN {$nameCol} IN ('post_clicks', 'post_clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
@@ -188,7 +188,7 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
             'follows_and_unfollows' => "SUM(CASE WHEN {$nameCol} IN ('follows_and_unfollows', 'follows_and_unfollows_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'saves'                 => "SUM(CASE WHEN {$nameCol} IN ('saves', 'saves_daily', 'saved', 'saved_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'shares'                => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
-            'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+            'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'post_engagements', 'post_engagements_daily', 'page_post_engagements', 'page_post_engagements_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'replies'               => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'accounts_engaged'      => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'post_clicks'           => "SUM(CASE WHEN {$nameCol} IN ('post_clicks', 'post_clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
@@ -297,7 +297,7 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
             'reposts'                 => "SUM(CASE WHEN {$nameCol} IN ('reposts', 'reposts_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
             'saved'                   => "SUM(CASE WHEN {$nameCol} IN ('saved', 'saved_daily', 'saves', 'saves_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
             'shares'                  => "SUM(CASE WHEN {$nameCol} IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
-            'total_interactions'      => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
+            'total_interactions'      => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'post_engagements', 'post_engagements_daily', 'page_post_engagements', 'page_post_engagements_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
             'views'                   => "SUM(CASE WHEN {$nameCol} IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
         ];
 
