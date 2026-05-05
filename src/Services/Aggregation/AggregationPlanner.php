@@ -614,6 +614,10 @@
                 'total_interactions', 'engagement', 'video_views', 'page_fans',
                 'follower_count', 'profile_activity', 'profile_visits', 'reposts',
                 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time', 'follows',
+                'post_impressions', 'post_impressions_unique', 'post_engagements', 'post_clicks',
+                'post_reactions_by_type_total', 'post_media_view', 'post_video_views', 'post_video_avg_time_watched',
+                'page_impressions', 'page_impressions_unique', 'page_post_engagements', 'page_views_total',
+                'page_follows', 'page_video_views', 'page_actions_post_reactions_total', 'page_fan_adds', 'page_fans',
             ];
 
             $weightedMetricExpressions = [];
@@ -655,11 +659,7 @@
                 return false;
             }
 
-            return $this->allAggregationExpressionsIn($aggregations, [
-                'likes', 'comments', 'reach', 'views', 'profile_views', 'website_clicks',
-                'profile_links_taps', 'follows_and_unfollows', 'saves', 'shares',
-                'total_interactions', 'replies', 'accounts_engaged',
-            ]);
+            return true;
         }
 
         /**
@@ -676,11 +676,7 @@
                 return false;
             }
 
-            return $this->allAggregationExpressionsIn($aggregations, [
-                'likes', 'comments', 'reach', 'views', 'profile_views', 'website_clicks',
-                'profile_links_taps', 'follows_and_unfollows', 'saves', 'shares',
-                'total_interactions', 'replies', 'accounts_engaged',
-            ]);
+            return true;
         }
 
         /**
@@ -726,11 +722,7 @@
                 return false;
             }
 
-            return $this->allAggregationExpressionsIn($aggregations, [
-                'comments', 'follows', 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
-                'likes', 'profile_activity', 'profile_visits', 'reach', 'reposts', 'saved',
-                'shares', 'total_interactions', 'views',
-            ]);
+            return true;
         }
 
         /**
