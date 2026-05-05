@@ -309,7 +309,7 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
             ($isPostgres ? "ps.data->>'permalink'" : "JSON_UNQUOTE(JSON_EXTRACT(ps.data, '$.permalink'))")." AS {$quoteChar}permalink{$quoteChar}",
             ($isPostgres ? "ps.data->>'permalink'" : "JSON_UNQUOTE(JSON_EXTRACT(ps.data, '$.permalink'))")." AS {$quoteChar}permalink_url{$quoteChar}",
             "ps.id AS {$quoteChar}post{$quoteChar}",
-            "ps.platform_id AS {$quoteChar}post_id{$quoteChar}",
+            "ps.post_id AS {$quoteChar}post_id{$quoteChar}",
             ($isPostgres ? "ps.data->>'timestamp'" : "JSON_UNQUOTE(JSON_EXTRACT(ps.data, '$.timestamp'))")." AS {$quoteChar}timestamp{$quoteChar}",
         ];
         $orderMap = [
@@ -320,7 +320,7 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
             'permalink'      => ($isPostgres ? "ps.data->>'permalink'" : "JSON_UNQUOTE(JSON_EXTRACT(ps.data, '$.permalink'))"),
             'permalink_url'  => ($isPostgres ? "ps.data->>'permalink'" : "JSON_UNQUOTE(JSON_EXTRACT(ps.data, '$.permalink'))"),
             'post'           => 'ps.id',
-            'post_id'        => 'ps.platform_id',
+            'post_id'        => 'ps.post_id',
             'timestamp'      => ($isPostgres ? "ps.data->>'timestamp'" : "JSON_UNQUOTE(JSON_EXTRACT(ps.data, '$.timestamp'))"),
         ];
 
@@ -370,7 +370,7 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
         WHERE ".implode("\n              AND ", $whereClauses)."
         GROUP BY
             ps.id,
-            ps.platform_id,
+            ps.post_id,
             ".($isPostgres ? "ps.data->>'caption'" : "JSON_UNQUOTE(JSON_EXTRACT(ps.data, '$.caption'))").",
             ".($isPostgres ? "ps.data->>'timestamp'" : "JSON_UNQUOTE(JSON_EXTRACT(ps.data, '$.timestamp'))").",
             ".($isPostgres ? "ps.data->>'media_type'" : "JSON_UNQUOTE(JSON_EXTRACT(ps.data, '$.media_type'))").",
