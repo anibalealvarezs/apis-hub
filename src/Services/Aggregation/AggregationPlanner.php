@@ -700,11 +700,16 @@
                 return false;
             }
 
-            if (strtolower(trim((string)($filters['account_type'] ?? ''))) !== 'instagram_account') {
-                return false;
-            }
-
-            if (!is_numeric((string)($filters['channeledAccount'] ?? null))) {
+            $accountType = strtolower(trim((string)($filters['account_type'] ?? '')));
+            if ($accountType === 'instagram_account') {
+                if (!is_numeric((string)($filters['channeledAccount'] ?? null))) {
+                    return false;
+                }
+            } elseif ($accountType === 'facebook_page') {
+                if (!is_numeric((string)($filters['page'] ?? null))) {
+                    return false;
+                }
+            } else {
                 return false;
             }
 

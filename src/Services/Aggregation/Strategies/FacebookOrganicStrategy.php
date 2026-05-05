@@ -285,7 +285,7 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
             }
         }
 
-        $channeledAccount = (int)$filtersArr['channeledAccount'];
+
         $quoteChar = $isPostgres ? '"' : '`';
         $nameCol = $isPostgres ? 'LOWER(mc.name)' : 'mc.name';
         $periodCol = $isPostgres ? 'LOWER(mc.period)' : 'mc.period';
@@ -348,14 +348,22 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
         $sqlParams = [
             'startDate' => $startDate,
             'endDate'   => $endDate,
-            'channeledAccount' => $channeledAccount,
         ];
 
         $whereClauses = [
             'm.metric_date >= :startDate',
             'm.metric_date <= :endDate',
-            'mc.channeled_account_id = :channeledAccount',
         ];
+
+        if (!empty($filtersArr['channeledAccount'])) {
+            $whereClauses[] = 'mc.channeled_account_id = :channeledAccount';
+            $sqlParams['channeledAccount'] = (int)$filtersArr['channeledAccount'];
+        } elseif (!empty($filtersArr['page'])) {
+            $whereClauses[] = 'mc.page_id = :pageId';
+            $sqlParams['pageId'] = (int)$filtersArr['page'];
+        } else {
+            return null;
+        }
         if (isset($filtersArr['channel'])) {
             $whereClauses[] = 'mc.channel = :channel';
             $sqlParams['channel'] = (int)$filtersArr['channel'];
