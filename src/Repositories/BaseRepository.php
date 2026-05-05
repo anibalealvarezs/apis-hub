@@ -27,7 +27,15 @@
     use Services\Aggregation\AggregationExecutor;
     use Services\Aggregation\AggregationPlan;
     use Services\Aggregation\AggregationPlanner;
+    use Services\Aggregation\CompanionTimeWeightedAverageFormulaBuilder;
+    use Services\Aggregation\DateSqlFieldResolver;
+    use Services\Aggregation\FilterConditionResolver;
     use Services\Aggregation\LegacyAggregateExecutionContext;
+    use Services\Aggregation\MetricDefaultFormulaBuilder;
+    use Services\Aggregation\MetricPeriodConditionSqlResolver;
+    use Services\Aggregation\SnapshotAggregateMetaExtractor;
+    use Services\Aggregation\TemporalDatePartSqlResolver;
+    use Services\Aggregation\TemporalGapFiller;
     use Services\Aggregation\Stages\LegacyAggregateDateStage;
     use Services\Aggregation\Stages\LegacyAggregateFinalizeStage;
     use Services\Aggregation\Stages\LegacyAggregateFilterStage;
@@ -345,6 +353,10 @@
             return new AggregationExecutionResult($rows, $this->lastAggregateMeta);
         }
 
+        /**
+         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
+         */
         public function executeOptimizedAggregationPlan(AggregationPlan $plan): ?AggregationExecutionResult
         {
             $connection = $this->_em->getConnection();
@@ -415,7 +427,7 @@
 
                 if ($optimizedResult !== null) {
                     return $this->buildAggregateExecutionResult($optimizedResult, [
-                        'execution_path' => 'optimized',
+                        'execution_path'     => 'optimized',
                         'optimized_strategy' => $strategy,
                     ]);
                 }
@@ -432,7 +444,7 @@
             $results = $this->runLegacyAggregatePipeline($context);
 
             return $this->buildAggregateExecutionResult($results, [
-                'execution_path' => 'legacy',
+                'execution_path'  => 'legacy',
                 'fallback_reason' => $fallbackReason,
             ]);
         }
@@ -463,6 +475,9 @@
             return $qb;
         }
 
+        /**
+         * @throws ConfigurationException
+         */
         protected function createLegacyExecutionContext(\Doctrine\DBAL\Query\QueryBuilder $qb, AggregationPlan $plan): LegacyAggregateExecutionContext
         {
             $entityName = (string)$plan->getContextValue('entity_name', $this->getEntityName());
@@ -494,7 +509,8 @@
         }
 
         /**
-         * @param array<string, string> $aggregations
+         * @param LegacyAggregateExecutionContext $context
+         * @throws ConfigurationException
          */
         protected function applyLegacyAggregateSelects(LegacyAggregateExecutionContext $context): void
         {
@@ -524,10 +540,10 @@
         }
 
         /**
-         * @param array<int, string> $groupBy
-         * @param array<string, mixed> $context
+         * @param LegacyAggregateExecutionContext $context
          */
-        protected function applyLegacyAggregateGrouping(LegacyAggregateExecutionContext $context): void {
+        protected function applyLegacyAggregateGrouping(LegacyAggregateExecutionContext $context): void
+        {
             (new LegacyAggregateGroupingStage())->apply(
                 context: $context,
                 relationMap: self::getRelationMap(),
@@ -538,9 +554,10 @@
         }
 
         /**
-         * @param array<string, mixed> $context
+         * @param LegacyAggregateExecutionContext $context
          */
-        protected function applyLegacyAggregateFilters(LegacyAggregateExecutionContext $context): void {
+        protected function applyLegacyAggregateFilters(LegacyAggregateExecutionContext $context): void
+        {
             (new LegacyAggregateFilterStage())->apply(
                 context: $context,
                 relationMap: self::getRelationMap(),
@@ -551,7 +568,8 @@
             );
         }
 
-        protected function applyLegacyAggregateDateConstraints(LegacyAggregateExecutionContext $context): void {
+        protected function applyLegacyAggregateDateConstraints(LegacyAggregateExecutionContext $context): void
+        {
             (new LegacyAggregateDateStage())->apply(
                 context: $context,
                 isChanneledMetric: $this->isChanneledMetric,
@@ -568,23 +586,26 @@
         }
 
         /**
-         * @param array<string, string> $aggregations
+         * @param LegacyAggregateExecutionContext $context
          * @return array<int, array<string, mixed>>
+         * @throws \Doctrine\DBAL\Exception
+         * @throws Exception
          */
-        protected function finalizeLegacyAggregateRows(LegacyAggregateExecutionContext $context): array {
+        protected function finalizeLegacyAggregateRows(LegacyAggregateExecutionContext $context): array
+        {
             return (new LegacyAggregateFinalizeStage())->apply(
                 context: $context,
                 extractSnapshotAggregateMeta: function (array &$results, ?string $startDate, ?string $endDate): void {
                     $this->extractSnapshotAggregateMeta($results, $startDate, $endDate);
                 },
                 fillTemporalGaps: function (
-                    array $results,
+                    array  $results,
                     string $temporalField,
                     string $temporalType,
                     string $startDate,
                     string $endDate,
-                    array $aggregations,
-                    array $groupBy
+                    array  $aggregations,
+                    array  $groupBy
                 ): array {
                     return $this->fillTemporalGaps($results, $temporalField, $temporalType, $startDate, $endDate, $aggregations, $groupBy);
                 },
@@ -601,46 +622,14 @@
          */
         protected function extractSnapshotAggregateMeta(array &$results, ?string $startDate, ?string $endDate): void
         {
-            $effectiveDates = [];
-            foreach ($results as &$row) {
-                if (!array_key_exists('__snapshot_effective_date', $row)) {
-                    continue;
-                }
-
-                $date = $row['__snapshot_effective_date'];
-                if (is_string($date) && trim($date) !== '') {
-                    $effectiveDates[] = trim($date);
-                }
-                unset($row['__snapshot_effective_date']);
-            }
-            unset($row);
-
-            if ($effectiveDates === []) {
-                return;
-            }
-
-            $effectiveDates = array_values(array_unique($effectiveDates));
-            sort($effectiveDates);
-
-            $this->lastAggregateMeta['snapshot_fallback_mode'] = $this->aggregateSnapshotFallbackMode;
-            $this->lastAggregateMeta['effective_end_date'] = count($effectiveDates) === 1 ? $effectiveDates[0] : $effectiveDates;
-
-            if ($endDate !== null) {
-                $fallbackDates = array_values(array_filter(
-                    $effectiveDates,
-                    static fn(string $d): bool => $d !== $endDate
-                ));
-
-                if ($fallbackDates !== []) {
-                    $this->lastAggregateMeta['fallback_end_date'] = count($fallbackDates) === 1 ? $fallbackDates[0] : $fallbackDates;
-                }
-            }
-
-            if ($startDate !== null) {
-                $this->lastAggregateMeta['requested_start_date'] = $startDate;
-            }
-            if ($endDate !== null) {
-                $this->lastAggregateMeta['requested_end_date'] = $endDate;
+            $meta = (new SnapshotAggregateMetaExtractor())->extract(
+                results: $results,
+                startDate: $startDate,
+                endDate: $endDate,
+                snapshotFallbackMode: $this->aggregateSnapshotFallbackMode,
+            );
+            if ($meta !== []) {
+                $this->lastAggregateMeta = array_merge($this->lastAggregateMeta, $meta);
             }
         }
 
@@ -2187,32 +2176,7 @@
          */
         protected function resolveFilterCondition(mixed $rawValue): array
         {
-            if (is_object($rawValue)) {
-                $operator = strtolower(trim((string)($rawValue->operator ?? 'eq')));
-                $value = $rawValue->value ?? null;
-
-                return match ($operator) {
-                    'neq', 'not_equal', '!=', 'ne' => ['operator' => 'neq', 'value' => $value],
-                    'is_null', 'null' => ['operator' => 'is_null', 'value' => null],
-                    'is_not_null', 'not_null' => ['operator' => 'is_not_null', 'value' => null],
-                    default => ['operator' => 'eq', 'value' => $value],
-                };
-            }
-
-            if (is_string($rawValue)) {
-                $trimmed = trim($rawValue);
-                if ($trimmed === 'N/A' || $trimmed === 'NULL') {
-                    return ['operator' => 'is_null', 'value' => null];
-                }
-                if ($trimmed === 'NOT_NULL') {
-                    return ['operator' => 'is_not_null', 'value' => null];
-                }
-                if (str_starts_with($trimmed, '!=')) {
-                    return ['operator' => 'neq', 'value' => trim(substr($trimmed, 2))];
-                }
-            }
-
-            return ['operator' => 'eq', 'value' => $rawValue];
+            return (new FilterConditionResolver())->resolve($rawValue);
         }
 
         /**
@@ -2229,101 +2193,15 @@
             array  $groupBy
         ): array
         {
-            $start = new DateTime($startDate);
-            $end = new DateTime($endDate);
-            $periods = [];
-
-            // Generate all expected periods
-            $current = clone $start;
-            while ($current <= $end) {
-                $periodKey = match ($type) {
-                    'daily' => $current->format('Y-m-d'),
-                    'weekly' => $current->format('Y-\W').str_pad($current->format('W'), 2, '0', STR_PAD_LEFT),
-                    'monthly' => $current->format('Y-m'),
-                    'quarterly' => $current->format('Y-\Q').ceil($current->format('n') / 3),
-                    'yearly' => $current->format('Y'),
-                };
-                $periods[$periodKey] = true;
-
-                $interval = match ($type) {
-                    'daily' => 'P1D',
-                    'weekly' => 'P1W',
-                    'monthly' => 'P1M',
-                    'quarterly' => 'P3M',
-                    'yearly' => 'P1Y',
-                };
-                $current->add(new \DateInterval($interval));
-            }
-
-            // Identify non-temporal grouping fields
-            $otherGroups = array_filter($groupBy, fn($f) => $f !== $temporalField);
-
-            // If we have other groups (e.g. gender), we need to fill gaps for each combination
-            if (!empty($otherGroups)) {
-                $uniqueCombos = [];
-                foreach ($results as $row) {
-                    $combo = [];
-                    foreach ($otherGroups as $field) {
-                        // Casing defense (PostgreSQL returns lowercase even with quotes in some envs)
-                        $val = $row[$field] ?? $row[strtolower($field)] ?? null;
-                        $combo[$field] = $val;
-                    }
-                    $comboKey = serialize($combo);
-                    $uniqueCombos[$comboKey] = $combo;
-                }
-
-                $indexedResults = [];
-                foreach ($results as $row) {
-                    $combo = [];
-                    foreach ($otherGroups as $field) {
-                        $val = $row[$field] ?? $row[strtolower($field)] ?? null;
-                        $combo[$field] = $val;
-                    }
-                    $temporalVal = $row[$temporalField] ?? $row[strtolower($temporalField)] ?? null;
-                    $key = $temporalVal.'|'.serialize($combo);
-                    $indexedResults[$key] = $row;
-                }
-
-                $finalResults = [];
-                foreach ($uniqueCombos as $combo) {
-                    foreach (array_keys($periods) as $pKey) {
-                        $lookupKey = $pKey.'|'.serialize($combo);
-                        if (isset($indexedResults[$lookupKey])) {
-                            $finalResults[] = $indexedResults[$lookupKey];
-                        } else {
-                            $newRow = array_merge($combo, [$temporalField => $pKey]);
-                            foreach (array_keys($aggregations) as $alias) {
-                                $newRow[$alias] = 0;
-                            }
-                            $finalResults[] = $newRow;
-                        }
-                    }
-                }
-
-                return $finalResults;
-            }
-
-            // Simple case: only temporal grouping
-            $indexedResults = [];
-            foreach ($results as $row) {
-                $temporalVal = $row[$temporalField] ?? $row[strtolower($temporalField)] ?? null;
-                $indexedResults[$temporalVal] = $row;
-            }
-
-            $finalResults = [];
-            foreach (array_keys($periods) as $pKey) {
-                if (isset($indexedResults[$pKey])) {
-                    $finalResults[] = $indexedResults[$pKey];
-                } else {
-                    $newRow = [$temporalField => $pKey];
-                    foreach (array_keys($aggregations) as $alias) {
-                        $newRow[$alias] = 0;
-                    }
-                    $finalResults[] = $newRow;
-                }
-            }
-
-            return $finalResults;
+            return (new TemporalGapFiller())->fill(
+                results: $results,
+                temporalField: $temporalField,
+                type: $type,
+                startDate: $startDate,
+                endDate: $endDate,
+                aggregations: $aggregations,
+                groupBy: $groupBy,
+            );
         }
 
         /**
@@ -2333,139 +2211,35 @@
         {
             $periodCondition = $this->getMetricPeriodConditionSql($isPostgres);
 
-            $formulas = [
-                'spend'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'clicks'                               => "SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
-                'impressions'                          => "SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily', 'post_impressions', 'post_impressions_daily', 'page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END)",
-                'reach'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')" : "mc.name IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'frequency'                            => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'impressions_daily')" : "mc.name IN ('impressions', 'impressions_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reach', 'reach_daily')" : "mc.name IN ('reach', 'reach_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0)",
-                'ctr'                                  => "SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily') AND mc.period = 'daily' THEN $valCol ELSE 0 END), 0)",
-                'cpc'                                  => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('clicks', 'clicks_daily')" : "mc.name IN ('clicks', 'clicks_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0)",
-                'cpm'                                  => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('spend', 'spend_daily')" : "mc.name IN ('spend', 'spend_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END) / (NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'impressions_daily')" : "mc.name IN ('impressions', 'impressions_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END), 0) / 1000)",
-                'results'         => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END)",
-                'cost_per_result'                      => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'spend'" : "mc.name = 'spend'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END), 0)",
-                'result_rate'                          => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'results'" : "mc.name = 'results'")." THEN $valCol ELSE 0 END) / NULLIF(SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('impressions', 'page_media_view', 'post_media_view')" : "mc.name IN ('impressions', 'page_media_view', 'post_media_view')")." THEN $valCol ELSE 0 END), 0)",
-                'roas'                                 => "AVG(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'purchase_roas'" : "mc.name = 'purchase_roas'")." THEN $valCol ELSE NULL END)",
-                'website_roas'                         => "AVG(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'website_purchase_roas'" : "mc.name = 'website_purchase_roas'")." THEN $valCol ELSE NULL END)",
-                'actions'                              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'actions'" : "mc.name = 'actions'")." THEN $valCol ELSE 0 END)",
-                'campaign_status'                      => "MIN(rcc.status)",
-                'purchase_roas'                        => "AVG(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'purchase_roas'" : "mc.name = 'purchase_roas'")." THEN $valCol ELSE NULL END)",
-                'website_purchase_roas'                => "AVG(CASE WHEN ".($isPostgres ? "LOWER(mc.name) = 'website_purchase_roas'" : "mc.name = 'website_purchase_roas'")." THEN $valCol ELSE NULL END)",
-                // Organic & Shared Metrics - Mapped for Unification
-                // Intelligence: Detect period and apply SUM or DELTA (Current - Previous)
-                'total_interactions'                   => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')" : "mc.name IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'profile_views'                        => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('profile_views', 'profile_views_daily')" : "mc.name IN ('profile_views', 'profile_views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'follower_count'                       => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('follower_count', 'follower_count_daily', 'page_fans', 'page_fans_daily')" : "mc.name IN ('follower_count', 'follower_count_daily', 'page_fans', 'page_fans_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'page_impressions'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily')" : "mc.name IN ('page_impressions', 'page_impressions_daily', 'page_media_view', 'post_media_view', 'views', 'views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'page_post_engagements'                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_post_engagements', 'page_post_engagements_daily')" : "mc.name IN ('page_post_engagements', 'page_post_engagements_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'page_views_total'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_views_total', 'page_views_total_daily')" : "mc.name IN ('page_views_total', 'page_views_total_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'page_fans'                            => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('page_fans', 'page_fans_daily')" : "mc.name IN ('page_fans', 'page_fans_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'post_impressions'                     => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_impressions', 'post_impressions_daily', 'post_media_view', 'post_media_view_daily')" : "mc.name IN ('post_impressions', 'post_impressions_daily', 'post_media_view', 'post_media_view_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'post_engagement'                      => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('post_engagement', 'post_engagement_daily')" : "mc.name IN ('post_engagement', 'post_engagement_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'likes'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')" : "mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'comments'                             => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')" : "mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'shares'                               => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')" : "mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'saves'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'saved'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'plays'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                'views'                                => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')")." AND ".($isPostgres ? "LOWER(mc.period) = 'daily'" : "mc.period = 'daily'")." THEN $valCol ELSE 0 END)",
-                // Legacy stock metrics (pre-aggregation refactor)
-                'impressions'                          => "SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily', 'page_impressions', 'page_impressions_daily', 'post_impressions', 'post_impressions_daily') THEN $valCol ELSE 0 END)",
-                'reach'                                => "SUM(CASE WHEN mc.name IN ('reach', 'reach_daily', 'page_reach', 'page_reach_daily', 'post_reach', 'post_reach_daily') THEN $valCol ELSE 0 END)",
-                'engagement'                           => "SUM(CASE WHEN mc.name IN ('engagement', 'engagement_daily', 'post_engagement', 'post_engagement_daily', 'page_engagements', 'page_engagements_daily') THEN $valCol ELSE 0 END)",
-                'video_views'                          => "SUM(CASE WHEN mc.name IN ('video_views', 'video_views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') THEN $valCol ELSE 0 END)",
-                'page_fans'                            => "SUM(CASE WHEN mc.name IN ('page_fans', 'page_fans_daily') THEN $valCol ELSE 0 END)",
-                'follower_count'                       => "SUM(CASE WHEN mc.name IN ('follower_count', 'follower_count_daily') THEN $valCol ELSE 0 END)",
-                'profile_views'                        => "SUM(CASE WHEN mc.name IN ('profile_views', 'profile_views_daily') THEN $valCol ELSE 0 END)",
-                'website_clicks'                       => "SUM(CASE WHEN mc.name IN ('website_clicks', 'website_clicks_daily') THEN $valCol ELSE 0 END)",
-                'profile_links_taps'                   => "SUM(CASE WHEN mc.name IN ('profile_links_taps', 'profile_links_taps_daily') THEN $valCol ELSE 0 END)",
-                'follows_and_unfollows'                => "SUM(CASE WHEN mc.name IN ('follows_and_unfollows', 'follows_and_unfollows_daily') THEN $valCol ELSE 0 END)",
-                'saves'                                => "SUM(CASE WHEN mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily') THEN $valCol ELSE 0 END)",
-                'shares'                               => "SUM(CASE WHEN mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') THEN $valCol ELSE 0 END)",
-                'comments'                             => "SUM(CASE WHEN mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') THEN $valCol ELSE 0 END)",
-                'likes'                                => "SUM(CASE WHEN mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') THEN $valCol ELSE 0 END)",
-                'replies'                              => "SUM(CASE WHEN mc.name IN ('replies', 'replies_daily') THEN $valCol ELSE 0 END)",
-                'accounts_engaged'                     => "SUM(CASE WHEN mc.name IN ('accounts_engaged', 'accounts_engaged_daily') THEN $valCol ELSE 0 END)",
-            ];
-
-            // Override core stock-like formulas to respect requested period.
-            $periodAwareOverrides = [
-                'total_interactions' => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')" : "mc.name IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'comments'           => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')" : "mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'likes'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')" : "mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'shares'             => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')" : "mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'saved'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'saves'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('saves', 'saves_daily', 'saved', 'saved_daily')" : "mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'reach'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')" : "mc.name IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'views'              => "SUM(CASE WHEN ".($isPostgres ? "LOWER(mc.name) IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')" : "mc.name IN ('plays', 'plays_daily', 'video_views', 'video_views_daily', 'views', 'views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily')")." AND {$periodCondition} THEN $valCol ELSE 0 END)",
-                'impressions'                          => "SUM(CASE WHEN mc.name IN ('impressions', 'impressions_daily', 'page_impressions', 'page_impressions_daily', 'post_impressions', 'post_impressions_daily') THEN $valCol ELSE 0 END)",
-                'reach'                                => "SUM(CASE WHEN mc.name IN ('reach', 'reach_daily', 'page_reach', 'page_reach_daily', 'post_reach', 'post_reach_daily') THEN $valCol ELSE 0 END)",
-                'engagement'                           => "SUM(CASE WHEN mc.name IN ('engagement', 'engagement_daily', 'post_engagement', 'post_engagement_daily', 'page_engagements', 'page_engagements_daily') THEN $valCol ELSE 0 END)",
-                'video_views'                          => "SUM(CASE WHEN mc.name IN ('video_views', 'video_views_daily', 'post_video_views', 'post_video_views_daily', 'page_video_views', 'page_video_views_daily') THEN $valCol ELSE 0 END)",
-                'page_fans'                            => "SUM(CASE WHEN mc.name IN ('page_fans', 'page_fans_daily') THEN $valCol ELSE 0 END)",
-                'follower_count'                       => "SUM(CASE WHEN mc.name IN ('follower_count', 'follower_count_daily') THEN $valCol ELSE 0 END)",
-                'profile_views'                        => "SUM(CASE WHEN mc.name IN ('profile_views', 'profile_views_daily') THEN $valCol ELSE 0 END)",
-                'website_clicks'                       => "SUM(CASE WHEN mc.name IN ('website_clicks', 'website_clicks_daily') THEN $valCol ELSE 0 END)",
-                'profile_links_taps'                   => "SUM(CASE WHEN mc.name IN ('profile_links_taps', 'profile_links_taps_daily') THEN $valCol ELSE 0 END)",
-                'follows_and_unfollows'                => "SUM(CASE WHEN mc.name IN ('follows_and_unfollows', 'follows_and_unfollows_daily') THEN $valCol ELSE 0 END)",
-                'saves'                                => "SUM(CASE WHEN mc.name IN ('saves', 'saves_daily', 'saved', 'saved_daily') THEN $valCol ELSE 0 END)",
-                'shares'                               => "SUM(CASE WHEN mc.name IN ('shares', 'shares_daily', 'post_shares', 'post_shares_daily') THEN $valCol ELSE 0 END)",
-                'comments'                             => "SUM(CASE WHEN mc.name IN ('comments', 'comments_daily', 'post_comments', 'post_comments_daily') THEN $valCol ELSE 0 END)",
-                'likes'                                => "SUM(CASE WHEN mc.name IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') THEN $valCol ELSE 0 END)",
-                'replies'                              => "SUM(CASE WHEN mc.name IN ('replies', 'replies_daily') THEN $valCol ELSE 0 END)",
-                'accounts_engaged'                     => "SUM(CASE WHEN mc.name IN ('accounts_engaged', 'accounts_engaged_daily') THEN $valCol ELSE 0 END)",
-            ];
-
-            return array_merge($formulas, $periodAwareOverrides);
+            return (new MetricDefaultFormulaBuilder())->build($valCol, $isPostgres, $periodCondition);
         }
 
         protected function buildCompanionTimeWeightedAverageFormula(
-            array $sourceMetricNames,
-            array $totalTimeMetricNames,
+            array  $sourceMetricNames,
+            array  $totalTimeMetricNames,
             string $valCol,
-            bool $isPostgres,
+            bool   $isPostgres,
             string $periodCondition
         ): string
         {
-            $nullSafeComparator = $isPostgres ? 'IS NOT DISTINCT FROM' : '<=>';
-            $metricDateColumn = $this->isChanneledMetric ? 'm.metric_date' : 'e.metric_date';
-            $sourceMetricList = $this->toSqlStringList($sourceMetricNames);
-            $totalTimeMetricList = $this->toSqlStringList($totalTimeMetricNames);
-            $sourceCondition = ($isPostgres ? "LOWER(mc.name) IN ($sourceMetricList)" : "mc.name IN ($sourceMetricList)")." AND {$periodCondition}";
-            $totalTimePeriodCondition = str_replace('mc.', 'mc2.', $periodCondition);
-            $totalTimeCondition = ($isPostgres ? "LOWER(mc2.name) IN ($totalTimeMetricList)" : "mc2.name IN ($totalTimeMetricList)")." AND {$totalTimePeriodCondition}";
-
-            $companionTotalTimeSql = "(SELECT m2.value
-                FROM metrics m2
-                JOIN metric_configs mc2 ON m2.metric_config_id = mc2.id
-                WHERE {$totalTimeCondition}
-                AND m2.metric_date = {$metricDateColumn}
-                AND mc2.channel = mc.channel
-                AND (mc2.dimension_set_id {$nullSafeComparator} mc.dimension_set_id)
-                AND (mc2.query_id {$nullSafeComparator} mc.query_id)
-                AND (mc2.page_id {$nullSafeComparator} mc.page_id)
-                AND (mc2.country_id {$nullSafeComparator} mc.country_id)
-                AND (mc2.device_id {$nullSafeComparator} mc.device_id)
-                AND (mc2.channeled_account_id {$nullSafeComparator} mc.channeled_account_id)
-                AND (mc2.post_id {$nullSafeComparator} mc.post_id)
-                LIMIT 1)";
-
-            $nonZeroAverageCondition = "{$sourceCondition} AND NULLIF({$valCol}, 0) IS NOT NULL";
-
-            return "SUM(CASE WHEN {$nonZeroAverageCondition} THEN COALESCE({$companionTotalTimeSql}, 0) ELSE 0 END)
-                / NULLIF(SUM(CASE WHEN {$nonZeroAverageCondition} THEN COALESCE({$companionTotalTimeSql}, 0) / NULLIF({$valCol}, 0) ELSE 0 END), 0)";
+            return (new CompanionTimeWeightedAverageFormulaBuilder())->build(
+                sourceMetricNames: $sourceMetricNames,
+                totalTimeMetricNames: $totalTimeMetricNames,
+                valCol: $valCol,
+                isPostgres: $isPostgres,
+                periodCondition: $periodCondition,
+                isChanneledMetric: $this->isChanneledMetric,
+                toSqlStringList: fn(array $values): string => $this->toSqlStringList($values),
+            );
         }
 
         protected function getMetricPeriodConditionSql(bool $isPostgres, string $defaultPeriod = 'daily'): string
         {
-            $period = strtolower(trim($this->aggregateRequestedPeriod ?? ''));
-            if ($period === '' || preg_match('/^[a-z0-9_]+$/', $period) !== 1) {
-                $period = strtolower($defaultPeriod);
-            }
-
-            return $isPostgres
-                ? "LOWER(mc.period) = '{$period}'"
-                : "mc.period = '{$period}'";
+            return (new MetricPeriodConditionSqlResolver())->resolve(
+                requestedPeriod: $this->aggregateRequestedPeriod,
+                isPostgres: $isPostgres,
+                defaultPeriod: $defaultPeriod,
+            );
         }
 
         /**
@@ -2612,55 +2386,16 @@
             }
 
             // Temporal virtual fields
-            if ($this->isChanneledMetric) {
-                $baseDate = 'm.metric_date';
-            } elseif ($isMetric) {
-                $baseDate = 'e.metric_date';
-            } else {
-                $baseDate = 'e.platform_created_at';
-                if (!$this->_class->hasField('platformCreatedAt')) {
-                    $baseDate = $this->_class->hasField('createdAt') ? 'e.created_at' : 'e.date';
-                }
-            }
+            $baseDate = (new DateSqlFieldResolver())->resolveBaseDateSql(
+                isChanneledMetric: $this->isChanneledMetric,
+                isMetric: $isMetric,
+                hasEntityField: fn(string $field): bool => $this->_class->hasField($field),
+            );
 
             $isPostgres = Helpers::isPostgres();
-            if ($isPostgres) {
-                $dateParts = [
-                    'year'      => "EXTRACT(YEAR FROM $baseDate)",
-                    'month'     => "EXTRACT(MONTH FROM $baseDate)",
-                    'day'       => "EXTRACT(DAY FROM $baseDate)",
-                    'week'      => "EXTRACT(WEEK FROM $baseDate)",
-                    'quarter'   => "EXTRACT(QUARTER FROM $baseDate)",
-                    'dayofweek' => "EXTRACT(DOW FROM $baseDate)",
-                    'dayname'   => "TO_CHAR($baseDate, 'Day')",
-                    'monthname' => "TO_CHAR($baseDate, 'Month')",
-                    // Friendly grouping keys
-                    'daily'     => "TO_CHAR($baseDate, 'YYYY-MM-DD')",
-                    'weekly'    => "TO_CHAR($baseDate, 'IYYY-\"W\"IW')",
-                    'monthly'   => "TO_CHAR($baseDate, 'YYYY-MM')",
-                    'quarterly' => "CONCAT(EXTRACT(YEAR FROM $baseDate), '-Q', EXTRACT(QUARTER FROM $baseDate))",
-                    'yearly'    => "EXTRACT(YEAR FROM $baseDate)",
-                ];
-            } else {
-                $dateParts = [
-                    'year'      => "YEAR($baseDate)",
-                    'month'     => "MONTH($baseDate)",
-                    'day'       => "DAY($baseDate)",
-                    'week'      => "WEEK($baseDate)",
-                    'quarter'   => "QUARTER($baseDate)",
-                    'dayofweek' => "DAYOFWEEK($baseDate)",
-                    'dayname'   => "DAYNAME($baseDate)",
-                    'monthname' => "MONTHNAME($baseDate)",
-                    // Friendly grouping keys
-                    'daily'     => "DATE($baseDate)",
-                    'weekly'    => "CONCAT(YEAR($baseDate), '-W', LPAD(WEEK($baseDate), 2, '0'))",
-                    'monthly'   => "CONCAT(YEAR($baseDate), '-', LPAD(MONTH($baseDate), 2, '0'))",
-                    'quarterly' => "CONCAT(YEAR($baseDate), '-Q', QUARTER($baseDate))",
-                    'yearly'    => "YEAR($baseDate)",
-                ];
-            }
-            if (isset($dateParts[$lowerField])) {
-                return $dateParts[$lowerField];
+            $temporalDatePartSql = (new TemporalDatePartSqlResolver())->resolve($lowerField, $baseDate, $isPostgres);
+            if ($temporalDatePartSql !== null) {
+                return $temporalDatePartSql;
             }
 
             if ($field === 'value') {
