@@ -57,6 +57,7 @@ final class MetricDefaultFormulaBuilder
             'ig_reels_video_view_total_time' => "SUM(CASE WHEN mc.name IN ('ig_reels_video_view_total_time') THEN $valCol ELSE 0 END)",
             'profile_activity' => "SUM(CASE WHEN mc.name IN ('profile_activity', 'profile_activity_daily') THEN $valCol ELSE 0 END)",
             'reposts' => "SUM(CASE WHEN mc.name IN ('reposts', 'reposts_daily') THEN $valCol ELSE 0 END)",
+            'post_clicks' => "SUM(CASE WHEN mc.name IN ('post_clicks', 'post_clicks_daily') THEN $valCol ELSE 0 END)",
         ];
 
         $periodAwareOverrides = [

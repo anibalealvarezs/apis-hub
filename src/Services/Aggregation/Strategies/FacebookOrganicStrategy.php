@@ -82,6 +82,7 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
             'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'replies'               => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'accounts_engaged'      => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+            'post_clicks'           => "SUM(CASE WHEN {$nameCol} IN ('post_clicks', 'post_clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
         ];
 
         $selectFields = [
@@ -190,6 +191,7 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
             'total_interactions'    => "SUM(CASE WHEN {$nameCol} IN ('total_interactions', 'total_interactions_daily', 'post_engagement', 'post_engagement_daily', 'page_post_engagements', 'page_post_engagements_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'replies'               => "SUM(CASE WHEN {$nameCol} IN ('replies', 'replies_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
             'accounts_engaged'      => "SUM(CASE WHEN {$nameCol} IN ('accounts_engaged', 'accounts_engaged_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
+            'post_clicks'           => "SUM(CASE WHEN {$nameCol} IN ('post_clicks', 'post_clicks_daily') AND $periodCol = 'daily' THEN m.value ELSE 0 END)",
         ];
 
         $selectFields = [
@@ -288,6 +290,7 @@ final class FacebookOrganicStrategy implements OptimizedAggregationStrategyInter
             'ig_reels_avg_watch_time' => "SUM(CASE WHEN {$nameCol} IN ('ig_reels_avg_watch_time') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
             'ig_reels_video_view_total_time' => "SUM(CASE WHEN {$nameCol} IN ('ig_reels_video_view_total_time') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
             'likes'                   => "SUM(CASE WHEN {$nameCol} IN ('likes', 'likes_daily', 'post_reactions_by_type_total', 'post_reactions_by_type_total_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
+            'post_clicks'             => "SUM(CASE WHEN {$nameCol} IN ('post_clicks', 'post_clicks_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
             'profile_activity'        => "SUM(CASE WHEN {$nameCol} IN ('profile_activity', 'profile_activity_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
             'profile_visits'          => "SUM(CASE WHEN {$nameCol} IN ('profile_visits', 'profile_visits_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
             'reach'                   => "SUM(CASE WHEN {$nameCol} IN ('reach', 'reach_daily', 'post_reach', 'post_reach_daily') AND $periodCol = 'lifetime' THEN m.value ELSE 0 END)",
