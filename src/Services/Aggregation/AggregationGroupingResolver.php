@@ -127,8 +127,24 @@ final class AggregationGroupingResolver
             )";
         }
 
-        $count = count($dimensionKeys);
-        $where .= "\n            AND (SELECT COUNT(*) FROM dimension_set_items WHERE dimension_set_id = mc.dimension_set_id) = $count";
+        // Exclude known parallel columns from the set if they are not explicitly requested as dimensions
+        $excluded = [];
+        foreach (['query', 'country', 'device'] as $potential) {
+            if (!in_array($potential, $dimensionKeys, true)) {
+                $excluded[] = $potential;
+            }
+        }
+
+        if ($excluded !== []) {
+            $excludedSql = implode(', ', array_map(static fn($k) => "'".str_replace("'", "''", $k)."'", $excluded));
+            $where .= "\n            AND mc.dimension_set_id NOT IN (
+                SELECT dimension_set_id 
+                FROM dimension_set_items dsi 
+                JOIN dimension_values dv ON dv.id = dsi.dimension_value_id 
+                JOIN dimension_keys dk ON dk.id = dv.dimension_key_id 
+                WHERE dk.name IN ($excludedSql)
+            )";
+        }
 
         return $where;
     }
