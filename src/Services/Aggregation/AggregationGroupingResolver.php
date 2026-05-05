@@ -201,9 +201,9 @@ final class AggregationGroupingResolver
         foreach ($fields as $field) {
             if ($field === 'daily') {
                 $alias = $quoteChar . 'daily' . $quoteChar;
-                $finalSelect[] = "b.metric_date AS $alias";
+                $finalSelect[] = "m.metric_date AS $alias";
                 $groupBy[] = $alias;
-                $outerSelect[] = "f.$alias";
+                $outerSelect[] = "p.$alias";
                 $orderMap['daily'] = "f.$alias";
                 $orderMap['date'] = "f.$alias";
                 continue;
@@ -220,9 +220,9 @@ final class AggregationGroupingResolver
 
                 $configsJoins[] = "LEFT JOIN $table $tAlias ON $tAlias.id = mc.$fk";
                 $configsSelect[] = "COALESCE($tAlias.$semanticField, 'N/A') AS $alias";
-                $finalSelect[] = "b.$alias";
+                $finalSelect[] = "mc.$alias";
                 $groupBy[] = $alias;
-                $outerSelect[] = "f.$alias";
+                $outerSelect[] = "p.$alias";
                 $orderMap[$field] = "f.$alias";
             }
         }
@@ -260,9 +260,9 @@ final class AggregationGroupingResolver
             $configsJoins[] = "LEFT JOIN dimension_keys $dkAlias ON $dkAlias.id = $dvAlias.dimension_key_id AND LOWER($dkAlias.name) = LOWER('".str_replace("'", "''", $dkName)."')";
 
             $configsSelect[] = "COALESCE($dvAlias.value, 'N/A') AS $alias";
-            $finalSelect[] = "b.$alias";
+            $finalSelect[] = "mc.$alias";
             $groupBy[] = $alias;
-            $outerSelect[] = "f.$alias";
+            $outerSelect[] = "p.$alias";
             $orderMap[$field] = "f.$alias";
         }
 

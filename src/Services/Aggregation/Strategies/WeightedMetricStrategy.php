@@ -176,7 +176,8 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
         $configsCteModifier = $isPostgres ? 'MATERIALIZED ' : '';
         $configsGroupingSelect = $grouping['configs_select'] !== [] ? ", " . implode(', ', $grouping['configs_select']) : "";
         $configsGroupingJoins = $grouping['configs_joins'] !== [] ? implode("\n            ", $grouping['configs_joins']) : "";
-        $baseGroupingFields = $grouping['group_by'] !== [] ? ", " . implode(', ', $grouping['group_by']) : "";
+        $baseSelectFields = $grouping['final_select'] !== [] ? ", " . implode(', ', $grouping['final_select']) : "";
+        $baseGroupByFields = $grouping['group_by'] !== [] ? ", " . implode(', ', $grouping['group_by']) : "";
 
         $sql = "WITH configs AS {$configsCteModifier}(
         SELECT 
@@ -189,7 +190,7 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
     base AS (
         SELECT
             m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id
-            $baseGroupingFields,
+            $baseSelectFields,
             SUM(CASE WHEN mc.name IN ('clicks', 'clicks_daily') THEN m.value ELSE 0 END) AS clicks,
             SUM(CASE WHEN mc.name IN ($firstWeightNameList) THEN m.value ELSE 0 END) AS impressions,
             ".implode(",\n                ", array_map(function ($strategy) {
@@ -205,7 +206,7 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
         WHERE m.metric_date >= :startDate
         AND m.metric_date <= :endDate
         AND mc.dimension_set_id IN (SELECT DISTINCT dimension_set_id FROM configs)
-        GROUP BY m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id $baseGroupingFields
+        GROUP BY m.metric_date, mc.dimension_set_id, mc.page_id, mc.query_id, mc.country_id, mc.device_id $baseGroupByFields
     ),
     paired AS (
         SELECT
