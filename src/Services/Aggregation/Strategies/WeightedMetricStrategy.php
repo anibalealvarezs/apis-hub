@@ -136,7 +136,7 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
 
         $sqlParams = array_merge($sqlParams, $configParams);
 
-        $grouping = $resolver->buildWeightedGroupingConfig($groupPattern, $isPostgres, $quoteChar);
+        $grouping = $resolver->buildWeightedGroupingConfig($groupPattern, $isPostgres, $quoteChar, $relationMap);
         if ($grouping === null) {
             return null;
         }

@@ -124,6 +124,8 @@
                 ],
             ];
 
+            $channel = $this->resolveRequestedChannelKey($filtersArr, $repository);
+
             $fallbackReason = $this->resolveFallbackReason(
                 canUseOptimized: $canUseOptimized,
                 unsupportedFilterOperators: $unsupportedFilterOperators,
@@ -136,6 +138,7 @@
                 filters: $filtersArr,
                 groupPattern: $groupPattern,
                 aggregations: $aggregations,
+                channel: $channel,
             );
             $stages['profiles'] = $profileValidation;
 
@@ -165,9 +168,8 @@
          * @param array<string, string> $aggregations
          * @return array<string, mixed>
          */
-        private function evaluateProfileCapability(array $filters, ?string $groupPattern, array $aggregations): array
+        private function evaluateProfileCapability(array $filters, ?string $groupPattern, array $aggregations, ?string $channel): array
         {
-            $channel = $this->resolveRequestedChannelKey($filters);
             if ($channel === null) {
                 return [
                     'checked' => false,
@@ -214,7 +216,7 @@
         /**
          * @param array<string, mixed> $filters
          */
-        private function resolveRequestedChannelKey(array $filters): ?string
+        private function resolveRequestedChannelKey(array $filters, BaseRepository $repository): ?string
         {
             $channelId = null;
 
@@ -242,6 +244,18 @@
 
             if ($channelId !== null && $channelId > 0) {
                 return $this->resolveChannelKeyById($channelId);
+            }
+
+            // Fallback to repository inference
+            $entityName = $repository->getClassName();
+            if (str_contains($entityName, 'SearchConsole')) {
+                return 'google_search_console';
+            }
+            if (str_contains($entityName, 'FacebookMarketing')) {
+                return 'facebook_marketing';
+            }
+            if (str_contains($entityName, 'FacebookOrganic')) {
+                return 'facebook_organic';
             }
 
             return null;
@@ -318,8 +332,12 @@
                 return $value !== '' ? $value : null;
             }
 
-            if (!is_array($pattern) || $pattern === []) {
+            if (!is_array($pattern)) {
                 return null;
+            }
+
+            if ($pattern === []) {
+                return 'none';
             }
 
             $normalized = [];
