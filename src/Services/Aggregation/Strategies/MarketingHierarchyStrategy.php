@@ -71,14 +71,14 @@ final class MarketingHierarchyStrategy implements OptimizedAggregationStrategyIn
         }
 
         if (str_contains((string)$groupPattern, 'gender')) {
-            $genderExpr = $isPostgres ? "mc.metadata->>'gender'" : "JSON_UNQUOTE(JSON_EXTRACT(mc.metadata, '$.gender'))";
+            $genderExpr = $isPostgres ? "m.metadata->>'gender'" : "JSON_UNQUOTE(JSON_EXTRACT(m.metadata, '$.gender'))";
             $selectFields[] = "COALESCE($genderExpr, 'unknown') AS {$quoteChar}gender{$quoteChar}";
             $groupByFields[] = "COALESCE($genderExpr, 'unknown')";
             $orderMap['gender'] = "COALESCE($genderExpr, 'unknown')";
         }
 
         if (str_contains((string)$groupPattern, 'age')) {
-            $ageExpr = $isPostgres ? "mc.metadata->>'age'" : "JSON_UNQUOTE(JSON_EXTRACT(mc.metadata, '$.age'))";
+            $ageExpr = $isPostgres ? "m.metadata->>'age'" : "JSON_UNQUOTE(JSON_EXTRACT(m.metadata, '$.age'))";
             $selectFields[] = "COALESCE($ageExpr, 'unknown') AS {$quoteChar}age{$quoteChar}";
             $groupByFields[] = "COALESCE($ageExpr, 'unknown')";
             $orderMap['age'] = "COALESCE($ageExpr, 'unknown')";
