@@ -123,6 +123,11 @@ final class WeightedMetricStrategy implements OptimizedAggregationStrategyInterf
 
         $configWhereSql = implode(' AND ', $configWhere).$dimWhereSql;
 
+        $repository = $plan->getContextValue('repository');
+        if (!$repository instanceof \Repositories\BaseRepository) {
+             return null;
+        }
+
         $resolver = new \Services\Aggregation\AggregationGroupingResolver();
         $relationMap = $repository::getRelationMap();
         
