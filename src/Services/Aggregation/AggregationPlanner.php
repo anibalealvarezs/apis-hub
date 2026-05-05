@@ -142,6 +142,10 @@
             );
             $stages['profiles'] = $profileValidation;
 
+            if ($fallbackReason === null && !$profileValidation['supported']) {
+                 error_log("[AggregateDebug] fallback=missing_profile_capability channel={$channel} groupPattern={$groupPattern} reason=".($profileValidation['failure_reason'] ?? 'unknown'));
+            }
+
             if ($fallbackReason === null && $profileValidation['checked'] === true && $profileValidation['supported'] === false) {
                 $fallbackReason = 'missing_profile_capability';
             }
@@ -446,6 +450,12 @@
         {
             if (is_object($value)) {
                 $op = strtolower(trim((string)($value->operator ?? 'eq')));
+                if (in_array($op, ['not_equal', 'not_eq', '!=', '<>'], true)) {
+                    return 'neq';
+                }
+                if (in_array($op, ['equal', 'eq', '='], true)) {
+                    return 'eq';
+                }
                 return $op !== '' ? $op : 'eq';
             }
 
