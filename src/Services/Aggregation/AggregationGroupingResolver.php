@@ -257,11 +257,16 @@ final class AggregationGroupingResolver
             $dsiAlias = "dsi_$safeDk";
             $dkAlias = "dk_$safeDk";
 
-            $configsJoins[] = "LEFT JOIN dimension_set_items $dsiAlias ON $dsiAlias.dimension_set_id = mc.dimension_set_id";
-            $configsJoins[] = "LEFT JOIN dimension_values $dvAlias ON $dvAlias.id = $dsiAlias.dimension_value_id";
-            $configsJoins[] = "LEFT JOIN dimension_keys $dkAlias ON $dkAlias.id = $dvAlias.dimension_key_id AND LOWER($dkAlias.name) = LOWER('".str_replace("'", "''", $dkName)."')";
+            $tAlias = "t_$safeDk";
+            $configsJoins[] = "LEFT JOIN (
+                SELECT dsi.dimension_set_id, dv.value
+                FROM dimension_set_items dsi
+                JOIN dimension_values dv ON dv.id = dsi.dimension_value_id
+                JOIN dimension_keys dk ON dk.id = dv.dimension_key_id
+                WHERE LOWER(dk.name) = LOWER('".str_replace("'", "''", $dkName)."')
+            ) $tAlias ON $tAlias.dimension_set_id = mc.dimension_set_id";
 
-            $configsSelect[] = "COALESCE($dvAlias.value, 'N/A') AS $alias";
+            $configsSelect[] = "COALESCE($tAlias.value, 'N/A') AS $alias";
             $finalSelect[] = "mc.$alias";
             $groupBy[] = $alias;
             $outerSelect[] = $alias;
