@@ -147,6 +147,19 @@ final class AggregationGroupingResolver
         return " AND mc.dimension_set_id NOT IN (SELECT dimension_set_id FROM dimension_set_items dsi JOIN dimension_values dv ON dv.id = dsi.dimension_value_id JOIN dimension_keys dk ON dk.id = dv.dimension_key_id WHERE dk.name IN ({$excluded}))";
     }
 
+    private function expandGroupPatternToFields(string $groupPattern): array
+    {
+        if ($groupPattern === 'none') {
+            return [];
+        }
+
+        if (str_contains($groupPattern, '+')) {
+            return array_values(array_filter(array_map('trim', explode('+', $groupPattern)), static fn($f) => $f !== ''));
+        }
+
+        return [$groupPattern];
+    }
+
     public function buildWeightedGroupingConfig(string $groupPattern, bool $isPostgres, string $quoteChar, array $relationMap = []): ?array
     {
         $fields = $this->expandGroupPatternToFields($groupPattern);
