@@ -12,6 +12,7 @@
     use Services\Aggregation\AggregationPlan;
     use Services\Aggregation\CanonicalMetricSqlResolver;
     use Interfaces\OptimizedAggregationStrategyInterface;
+    use Services\Aggregation\FilterConditionResolver;
     use Traits\OptimizedAggregationHelpersTrait;
 
     final class SocialOrganicStrategy implements OptimizedAggregationStrategyInterface
@@ -199,12 +200,33 @@
             $whereClauses = [
                 'm.metric_date >= :startDate',
                 'm.metric_date <= :endDate',
-                'LOWER(ca.type) = LOWER(:accountType)',
             ];
-            if (isset($filtersArr['channel'])) {
-                $whereClauses[] = 'mc.channel = :channel';
-                $sqlParams['channel'] = (int)$filtersArr['channel'];
+
+            $filterResolver = new FilterConditionResolver();
+
+            // Handle Account/Page filters
+            if (!empty($filtersArr['channeledAccount'])) {
+                $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
+                $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
+                if ($condition['value'] !== null) $sqlParams['channeledAccount'] = (int)$condition['value'];
+            } elseif (!empty($filtersArr['page'])) {
+                $condition = $filterResolver->resolve($filtersArr['page']);
+                $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
+                if ($condition['value'] !== null) $sqlParams['pageId'] = (int)$condition['value'];
+            } else {
+                return null;
             }
+
+            // Handle Channel
+            if (isset($filtersArr['channel'])) {
+                $condition = $filterResolver->resolve($filtersArr['channel']);
+                $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
+                if ($condition['value'] !== null) $sqlParams['channel'] = $condition['value'];
+            }
+
+            // Account Type
+            $whereClauses[] = 'LOWER(ca.type) = LOWER(:accountType)';
+            $sqlParams['accountType'] = $accountType;
 
             $orderSql = '';
             if ($orderBy !== null && trim($orderBy) !== '') {
@@ -299,18 +321,30 @@
                 'm.metric_date <= :endDate',
             ];
 
+            $filterResolver = new FilterConditionResolver();
+
             if (!empty($filtersArr['channeledAccount'])) {
-                $whereClauses[] = 'mc.channeled_account_id = :channeledAccount';
-                $sqlParams['channeledAccount'] = (int)$filtersArr['channeledAccount'];
+                $condition = $filterResolver->resolve($filtersArr['channeledAccount']);
+                $whereClauses[] = $this->buildFilterClause('mc.channeled_account_id', $condition, 'channeledAccount');
+                if ($condition['value'] !== null) $sqlParams['channeledAccount'] = (int)$condition['value'];
             } elseif (!empty($filtersArr['page'])) {
-                $whereClauses[] = 'mc.page_id = :pageId';
-                $sqlParams['pageId'] = (int)$filtersArr['page'];
+                $condition = $filterResolver->resolve($filtersArr['page']);
+                $whereClauses[] = $this->buildFilterClause('mc.page_id', $condition, 'pageId');
+                if ($condition['value'] !== null) $sqlParams['pageId'] = (int)$condition['value'];
             } else {
                 return null;
             }
+
             if (isset($filtersArr['channel'])) {
-                $whereClauses[] = 'mc.channel = :channel';
-                $sqlParams['channel'] = (int)$filtersArr['channel'];
+                $condition = $filterResolver->resolve($filtersArr['channel']);
+                $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
+                if ($condition['value'] !== null) $sqlParams['channel'] = $condition['value'];
+            }
+
+            if (isset($filtersArr['post'])) {
+                $condition = $filterResolver->resolve($filtersArr['post']);
+                $whereClauses[] = $this->buildFilterClause('mc.post_id', $condition, 'postId');
+                if ($condition['value'] !== null) $sqlParams['postId'] = (int)$condition['value'];
             }
 
             $orderSql = '';
@@ -417,6 +451,18 @@
             }
 
             return true;
+        }
+
+        private function buildFilterClause(string $col, array $condition, string $alias): string
+        {
+            return match ($condition['operator']) {
+                'neq'         => "$col <> :$alias",
+                'is_null'     => "$col IS NULL",
+                'is_not_null' => "$col IS NOT NULL",
+                'in'          => "$col IN (:$alias)",
+                'eq'          => "$col = :$alias",
+                default       => "$col = :$alias",
+            };
         }
 
         /**
