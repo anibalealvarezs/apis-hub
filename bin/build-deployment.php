@@ -85,6 +85,17 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
             'mcp' => ['condition' => 'service_started'],
         ],
         'extra_hosts' => ['host.docker.internal:host-gateway'],
+        'deploy' => [
+            'resources' => [
+                'limits' => [
+                    'cpus' => '0.50',
+                    'memory' => '512M'
+                ],
+                'reservations' => [
+                    'memory' => '256M'
+                ]
+            ]
+        ]
     ];
 
     // ─── Phase 2: Create Scalable Worker Service ──────────────────────────────────
@@ -107,6 +118,17 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
             'db' => ['condition' => 'service_started'],
             'redis' => ['condition' => 'service_started'],
         ],
+        'deploy' => [
+            'resources' => [
+                'limits' => [
+                    'cpus' => '0.50',
+                    'memory' => '384M'
+                ],
+                'reservations' => [
+                    'memory' => '128M'
+                ]
+            ]
+        ]
     ];
     // Note: The actual number of containers is managed via 'docker compose up -d --scale worker=N'
     // but we can set the default scale in the yaml if supported by the version.
@@ -124,7 +146,8 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         'environment' => [
             'MCP_MODE=sse',
             'MCP_PORT=3000',
-            'INSTANCE_NAME=mcp-server'
+            'INSTANCE_NAME=mcp-server',
+            'PHP_HOST=master'
         ],
         'networks'    => ['default', 'gateway'],
         'ports'       => [
@@ -134,6 +157,17 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
             './:/app',
             '/app/mcp-server/node_modules'
         ],
+        'deploy' => [
+            'resources' => [
+                'limits' => [
+                    'cpus' => '0.30',
+                    'memory' => '256M'
+                ],
+                'reservations' => [
+                    'memory' => '128M'
+                ]
+            ]
+        ]
     ];
 
 // ─── Phase 3: Infrastructure (DB & Redis) ────────────────────────────────────────

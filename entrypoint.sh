@@ -8,7 +8,7 @@ mkdir -p /app/logs /app/storage
 if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     # Ensure modular dependencies are registered (especially during refactoring with local paths)
     echo "Master Instance ($INSTANCE_NAME): Updating modular dependencies..."
-    composer update --no-scripts --no-interaction --ignore-platform-reqs || echo "Modular update failed, continuing..."
+    echo "Master Instance ($INSTANCE_NAME): Dependencies should be managed via Docker build."
 
     # Wait for DB host to be resolvable via DNS
     DB_HOST_TO_CHECK=${DB_HOST:-db}

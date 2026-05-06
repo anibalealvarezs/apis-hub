@@ -68,8 +68,8 @@
             $deploymentName = getenv('DEPLOYMENT_NAME') ?: 'apis-hub';
 
             // We use 'docker compose up -d --scale worker=N' to adjust the pool
-            // This command is idempotent and fast.
-            $cmd = "docker compose -p $deploymentName up -d --scale worker=$targetCount";
+            // We add --no-recreate to ensure we don't restart the master/mcp containers
+            $cmd = "docker compose -p $deploymentName up -d --no-recreate --scale worker=$targetCount";
 
             $output->writeln("Executing: $cmd");
 
