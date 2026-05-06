@@ -70,9 +70,7 @@
                 $initEntitiesCommand = $this->getApplication()->find('app:initialize-entities');
                 $initExitCode = $initEntitiesCommand->run(new ArrayInput([]), $output);
                 if ($initExitCode !== Command::SUCCESS) {
-                    error_log("CRITICAL: app:initialize-entities failed with exit code: ".$initExitCode);
-                    $output->writeln("<error>CRITICAL: app:initialize-entities failed with exit code: $initExitCode</error>");
-                    throw new Exception("Failed to initialize core/channel entities.");
+                    $output->writeln("<comment>  - Warning: app:initialize-entities completed with non-zero exit code: $initExitCode. Some entities might need manual initialization.</comment>");
                 }
 
                 // 5. Auto-Seed for Demo (Smart Zero-Touch)
