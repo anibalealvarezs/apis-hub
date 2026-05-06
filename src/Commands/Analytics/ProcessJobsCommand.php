@@ -302,6 +302,7 @@ class ProcessJobsCommand extends Command
                     }
 
                     $chanConfig = $channelsConfig[$chanKey] ?? null;
+                    error_log("DEBUG: Job {$job->getUuid()} - Channel: $chanKey - Config: " . json_encode($chanConfig));
 
                     // Check if channel is enabled
                     if ($chanConfig && isset($chanConfig['enabled']) && ! $chanConfig['enabled']) {
