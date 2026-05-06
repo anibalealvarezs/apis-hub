@@ -6,6 +6,22 @@
 // Global State
 let currentData = null;
 
+function formatAccountLabel(accountId) {
+    if (accountId === null || accountId === undefined || accountId === '') {
+        return 'All Accounts';
+    }
+    return `Account #${accountId}`;
+}
+
+function formatTimeframe(startDate, endDate) {
+    const hasStart = !!startDate;
+    const hasEnd = !!endDate;
+    if (!hasStart && !hasEnd) {
+        return 'Full Range';
+    }
+    return `${startDate || '...'} -> ${endDate || '...'}`;
+}
+
 // --- Initialization ---
 function initMonitoring() {
     lucide.createIcons();
@@ -63,7 +79,7 @@ async function fetchData() {
         currentData = data;
 
         updateDbTotals(data.dbTotals);
-        updateContainers(data.containers, data.groupedJobs);
+        updateContainers(data.containers);
         if (data.groupedJobs) {
             // DEBUG: Inject Simulation Jobs to preview UI ONLY in Demo Mode
             const envMeta = document.querySelector('meta[name="app-env"]');
@@ -99,8 +115,7 @@ async function fetchData() {
             }
             updatePendingJobsDetailed(data.groupedJobs);
         }
-        updateContainers(data.containers, data.groupedJobs);
-        
+
         const elUpdated = document.getElementById('last-updated');
         if (elUpdated) {
             const now = new Date();
@@ -219,6 +234,23 @@ function updateContainers(containers) {
             const stats = container.stats || { total: 0 };
             const completedCount = stats.completed || 0;
             const failedCount = stats.failed || 0;
+            const activeJob = container.active_job || null;
+
+            const activeJobHtml = activeJob ? `
+                <div class="monitoring-active-job">
+                    <div class="monitoring-active-job-title">Active Job</div>
+                    <div class="monitoring-active-job-grid">
+                        <div><span class="monitoring-muted-key">Flow:</span> ${activeJob.channel || 'n/a'} -> ${activeJob.entity || 'n/a'}</div>
+                        <div><span class="monitoring-muted-key">Scope:</span> ${formatAccountLabel(activeJob.account_id)}</div>
+                        <div><span class="monitoring-muted-key">Timeframe:</span> ${formatTimeframe(activeJob.start_date, activeJob.end_date)}</div>
+                        <div><span class="monitoring-muted-key">Priority:</span> ${activeJob.priority ?? 0}</div>
+                    </div>
+                </div>
+            ` : `
+                <div class="monitoring-active-job" style="font-size:0.72rem; color:var(--text-dim);">
+                    No active job assigned
+                </div>
+            `;
 
             card.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
@@ -261,6 +293,8 @@ function updateContainers(containers) {
                         <i data-lucide="play-circle" style="opacity:0.3" size="18"></i>
                     </button>
                 </div>
+
+                ${activeJobHtml}
             `;
             cardGrid.appendChild(card);
         });
@@ -277,9 +311,15 @@ function updatePendingJobsDetailed(groupedJobs) {
     list.innerHTML = '';
 
     if (!groupedJobs || Object.keys(groupedJobs).length === 0) {
+        const badge = document.getElementById('job-count-badge');
+        if (badge) badge.textContent = '0 Pending';
         list.innerHTML = '<div class="empty-state">No synchronization pipelines active</div>';
         return;
     }
+
+    const totalJobs = Object.values(groupedJobs).reduce((acc, jobs) => acc + (jobs?.length || 0), 0);
+    const badge = document.getElementById('job-count-badge');
+    if (badge) badge.textContent = `${totalJobs} Active`;
 
     // Sort group keys (Channels) to have specific ones first
     const groupKeys = Object.keys(groupedJobs).sort((a,b) => {
@@ -335,6 +375,7 @@ function updatePendingJobsDetailed(groupedJobs) {
                         <span class="job-summary-title">${job.instance_label || job.group} <span style="opacity:0.4; font-weight:400; font-size: 0.7rem; margin-left:5px;">» ${job.entity.toUpperCase()}</span></span>
                     </div>
                     <div class="job-summary-right">
+                        <span class="status-badge monitoring-priority-badge">P${job.priority ?? 0}</span>
                         <span class="job-id-tag">#${job.id}</span>
                         <div class="job-latest-activity">
                             <div style="font-size:0.6rem; text-transform:uppercase; font-weight:700;">Latest Activity</div>
@@ -370,6 +411,14 @@ function updatePendingJobsDetailed(groupedJobs) {
                             <span class="job-metric-label">UPDATED AT</span>
                             <div class="job-metric-value">${job.updated_at}</div>
                         </div>
+                        <div class="job-metric-item">
+                            <span class="job-metric-label">ACCOUNT SCOPE</span>
+                            <div class="job-metric-value">${formatAccountLabel(job.account_id)}</div>
+                        </div>
+                        <div class="job-metric-item">
+                            <span class="job-metric-label">TIMEFRAME</span>
+                            <div class="job-metric-value highlight">${formatTimeframe(job.start_date, job.end_date)}</div>
+                        </div>
                     </div>
 
                     <span class="job-section-label">STATUS MESSAGE</span>
@@ -395,7 +444,20 @@ function updatePendingJobsDetailed(groupedJobs) {
                            </div>
                        </div>
                         <div style="display:flex; gap:8px;">
-                           ${(job.status === 1 || job.status === 5) ? `
+                           <div class="monitoring-priority-controls">
+                               <button onclick="event.stopPropagation(); adjustJobPriority(${job.id}, -1)" 
+                                       class="btn btn-mini monitoring-priority-btn-down"
+                                       title="Lower queue priority">
+                                   <i data-lucide="arrow-down" size="14"></i>
+                               </button>
+                               <span class="monitoring-priority-value">${job.priority ?? 0}</span>
+                               <button onclick="event.stopPropagation(); adjustJobPriority(${job.id}, 1)" 
+                                       class="btn btn-mini monitoring-priority-btn-up"
+                                       title="Raise queue priority">
+                                   <i data-lucide="arrow-up" size="14"></i>
+                               </button>
+                           </div>
+                           ${(job.status === 1 || job.status === 4 || job.status === 5) ? `
                                <button onclick="event.stopPropagation(); runJobNow(${job.id})" 
                                        class="btn btn-mini" 
                                        style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 12px;" 
@@ -532,6 +594,26 @@ async function confirmCancelAction() {
             fetchData(); // Reload
         } else {
             alert('Error cancelling job: ' + (res.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function adjustJobPriority(id, delta) {
+    try {
+        const response = await fetch('/api/monitoring/jobs/action', {
+            method: 'POST',
+            headers: getAdminHeaders(),
+            body: JSON.stringify({ action: 'priority_adjust', id, delta })
+        });
+
+        const res = await response.json();
+        if (res.success || res.status === 'success') {
+            showToast(`Priority updated to ${res.priority ?? 'new value'}`, false);
+            fetchData();
+        } else {
+            alert('Error updating priority: ' + (res.error || 'Unknown error'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -676,6 +758,7 @@ async function confirmRunNowAction() {
 window.processJob = processJob;
 window.cancelJob = cancelJob;
 window.runJobNow = runJobNow;
+window.adjustJobPriority = adjustJobPriority;
 window.closeRunNowModal = closeRunNowModal;
 window.confirmRunNowAction = confirmRunNowAction;
 window.triggerSyncInstance = triggerSyncInstance;

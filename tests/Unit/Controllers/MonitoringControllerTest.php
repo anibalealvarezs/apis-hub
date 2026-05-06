@@ -58,7 +58,7 @@ class MonitoringControllerTest extends BaseUnitTestCase
         
         // Mock count queries in data()
         $queryBuilder = $this->createMock(\Doctrine\ORM\QueryBuilder::class);
-        $query = $this->createMock(\Doctrine\ORM\AbstractQuery::class);
+        $query = $this->createMock(\Doctrine\ORM\Query::class);
         $this->entityManager->method('createQueryBuilder')->willReturn($queryBuilder);
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
@@ -137,6 +137,51 @@ class MonitoringControllerTest extends BaseUnitTestCase
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
         $content = json_decode($response->getContent(), true);
         $this->assertStringContainsString("Original #$jobId history preserved", $content['message']);
+    }
+
+    public function testJobActionPriorityAdjustSuccess(): void
+    {
+        $jobId = $this->faker->randomNumber();
+        $mockJob = $this->createMock(Job::class);
+        $mockJob->method('getPriority')->willReturn(2);
+
+        $mockJob->expects($this->once())
+            ->method('setPriority')
+            ->with(3);
+
+        $this->jobRepository->method('find')->with($jobId)->willReturn($mockJob);
+
+        $this->entityManager->expects($this->once())->method('persist')->with($mockJob);
+        $this->entityManager->expects($this->once())->method('flush');
+
+        $payload = json_encode(['id' => $jobId, 'action' => 'priority_adjust', 'delta' => 1]);
+        $request = Request::create('/api/monitoring/jobs/action', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
+
+        $response = $this->controller->jobAction($request);
+        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+
+        $content = json_decode($response->getContent(), true);
+        $this->assertTrue($content['success']);
+        $this->assertSame(3, $content['priority']);
+    }
+
+    public function testJobActionPrioritySetRejectsNonNumericValue(): void
+    {
+        $jobId = $this->faker->randomNumber();
+        $mockJob = $this->createMock(Job::class);
+        $this->jobRepository->method('find')->with($jobId)->willReturn($mockJob);
+
+        $this->entityManager->expects($this->never())->method('persist');
+        $this->entityManager->expects($this->never())->method('flush');
+
+        $payload = json_encode(['id' => $jobId, 'action' => 'priority_set', 'priority' => 'high']);
+        $request = Request::create('/api/monitoring/jobs/action', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
+
+        $response = $this->controller->jobAction($request);
+        $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+
+        $content = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('numeric', $content['error']);
     }
 
 }

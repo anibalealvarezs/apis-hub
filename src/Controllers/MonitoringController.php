@@ -12,6 +12,27 @@ use Entities\Analytics\Channel;
 
 class MonitoringController extends BaseController
 {
+    private function extractJobScope(array $payload): array
+    {
+        $params = $payload['params'] ?? [];
+        $accountId = $params['account_id'] ?? $params['accountId'] ?? $params['channeled_account_id'] ?? null;
+        $startDate = $params['startDate'] ?? $params['start_date'] ?? null;
+        $endDate = $params['endDate'] ?? $params['end_date'] ?? null;
+
+        if (is_string($startDate)) {
+            $startDate = str_replace('+', ' ', $startDate);
+        }
+        if (is_string($endDate)) {
+            $endDate = str_replace('+', ' ', $endDate);
+        }
+
+        return [
+            'account_id' => $accountId,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ];
+    }
+
     public function index(): Response
     {
         $html = file_get_contents(__DIR__ . '/../views/monitoring.html');
@@ -112,10 +133,6 @@ class MonitoringController extends BaseController
             }
         }
 
-        $containers = array_map(function($c) use ($containerStats) {
-            $c['stats'] = $containerStats[$c['id']] ?? ['total' => 0];
-            return $c;
-        }, $containersData);
 
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
@@ -135,16 +152,40 @@ class MonitoringController extends BaseController
         krsort($finalJobs);
         $allRecentJobs = array_values($finalJobs);
 
+        $activeJobsByContainer = [];
+
         $pipelines = [];
         foreach ($allRecentJobs as $job) {
             $targetId = $this->getTargetContainerId($job, $instances) ?: 'global-infrastructure';
             $payload = $job->getPayload() ?? [];
             $params = $payload['params'] ?? [];
-            
+            $scope = $this->extractJobScope($payload);
+            $accountId = $scope['account_id'] ?? null;
+            $startDate = $scope['start_date'] ?? null;
+            $endDate = $scope['end_date'] ?? null;
+
             $normChan = strtolower(trim($job->getChannel()));
             $normEnt = strtolower(trim($job->getEntity()));
 
-            $pipelineKey = "{$targetId}:{$normChan}:{$normEnt}";
+            $scopeKey = (string)($accountId ?? 'all_accounts');
+            $timeframeKey = ($startDate ?? 'null') . ':' . ($endDate ?? 'null');
+            $pipelineKey = "{$targetId}:{$normChan}:{$normEnt}:{$scopeKey}:{$timeframeKey}";
+
+            if (in_array($job->getStatus(), [JobStatus::processing->value, JobStatus::scheduled->value, JobStatus::delayed->value], true)
+                && !isset($activeJobsByContainer[$targetId])) {
+                $activeJobsByContainer[$targetId] = [
+                    'id' => $job->getId(),
+                    'channel' => $normChan,
+                    'entity' => $normEnt,
+                    'status' => $job->getStatus(),
+                    'status_text' => strtoupper(JobStatus::tryFrom($job->getStatus())?->name ?? 'unknown'),
+                    'priority' => $job->getPriority(),
+                    'account_id' => $accountId,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'worker_id' => $job->getWorkerId(),
+                ];
+            }
 
             if (!isset($pipelines[$pipelineKey])) {
                 $statusText = JobStatus::tryFrom($job->getStatus())?->name ?? 'unknown';
@@ -177,7 +218,12 @@ class MonitoringController extends BaseController
                     'entity' => strtolower($job->getEntity()),
                     'status' => $job->getStatus(),
                     'status_text' => strtoupper($statusText),
+                    'priority' => $job->getPriority(),
+                    'worker_id' => $job->getWorkerId(),
                     'params' => $params,
+                    'account_id' => $accountId,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
                     'frequency' => $payload['cron'] ?? $frequency,
                     'execution_time' => $executionTime,
                     'created_at' => $createdAt ? $createdAt->format('Y-m-d H:i:s') : 'N/A',
@@ -195,6 +241,7 @@ class MonitoringController extends BaseController
                 if (count($pipelines[$pipelineKey]['history']) < 10) {
                     $pipelines[$pipelineKey]['history'][] = [
                         'status' => $job->getStatus(),
+                        'priority' => $job->getPriority(),
                         'date' => $job->getUpdatedAt() ? $job->getUpdatedAt()->format('Y-m-d H:i:s') : 'N/A',
                         'message' => $job->getMessage() ?: 'No details'
                     ];
@@ -215,6 +262,9 @@ class MonitoringController extends BaseController
                 $idxA = $instanceOrder[$a['group']] ?? 999;
                 $idxB = $instanceOrder[$b['group']] ?? 999;
                 if ($idxA !== $idxB) return $idxA - $idxB;
+                if (($a['priority'] ?? 0) !== ($b['priority'] ?? 0)) {
+                    return ($b['priority'] ?? 0) <=> ($a['priority'] ?? 0);
+                }
                 return $b['id'] - $a['id'];
             });
         }
@@ -241,6 +291,12 @@ class MonitoringController extends BaseController
             'Devices' => ['class' => 'Entities\Analytics\Device', 'channeled' => null],
             'Jobs' => ['class' => 'Entities\Job', 'channeled' => 'Entities\Job']
         ];
+
+        $containers = array_map(function($c) use ($containerStats, $activeJobsByContainer) {
+            $c['stats'] = $containerStats[$c['id']] ?? ['total' => 0];
+            $c['active_job'] = $activeJobsByContainer[$c['id']] ?? null;
+            return $c;
+        }, $containersData);
 
         $dbTotals = [];
         foreach ($statsConfig as $label => $config) {
@@ -362,11 +418,11 @@ class MonitoringController extends BaseController
 
     public function jobAction(Request $request): JsonResponse
     {
+        $content = json_decode($request->getContent(), true) ?? [];
         $id = $request->request->get('id');
         $action = $request->request->get('action');
 
         if (!$id || !$action) {
-            $content = json_decode($request->getContent(), true);
             $id = $content['id'] ?? null;
             $action = $content['action'] ?? null;
         }
@@ -412,8 +468,8 @@ class MonitoringController extends BaseController
                     return new JsonResponse(['success' => true, 'message' => "New job scheduled. Original #$id history preserved."]);
                 
                 case 'process':
-                    if ($job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
-                         return new JsonResponse(['error' => 'Only scheduled or delayed jobs can be processed manually'], 400);
+                    if (!in_array($job->getStatus(), [JobStatus::scheduled->value, JobStatus::delayed->value, JobStatus::failed->value], true)) {
+                         return new JsonResponse(['error' => 'Only scheduled, delayed, or failed jobs can be processed manually'], 400);
                     }
                     
                     // Execute in background WITHOUT claiming here. 
@@ -430,6 +486,40 @@ class MonitoringController extends BaseController
                         'message' => 'Manually cancelled via Monitoring Dashboard'
                     ]);
                     return new JsonResponse(['success' => true, 'message' => "Job #$id manually cancelled/deactivated"]);
+
+                case 'priority_adjust':
+                    $delta = (int)($request->request->get('delta') ?? $content['delta'] ?? 0);
+                    if ($delta === 0) {
+                        return new JsonResponse(['error' => 'A non-zero delta is required'], 400);
+                    }
+
+                    $newPriority = max(-100, min(100, $job->getPriority() + $delta));
+                    $job->setPriority($newPriority);
+                    $this->em->persist($job);
+                    $this->em->flush();
+
+                    return new JsonResponse([
+                        'success' => true,
+                        'priority' => $newPriority,
+                        'message' => "Job #$id priority updated to {$newPriority}"
+                    ]);
+
+                case 'priority_set':
+                    $priority = $request->request->get('priority') ?? $content['priority'] ?? null;
+                    if (!is_numeric($priority)) {
+                        return new JsonResponse(['error' => 'Priority must be numeric'], 400);
+                    }
+
+                    $newPriority = max(-100, min(100, (int)$priority));
+                    $job->setPriority($newPriority);
+                    $this->em->persist($job);
+                    $this->em->flush();
+
+                    return new JsonResponse([
+                        'success' => true,
+                        'priority' => $newPriority,
+                        'message' => "Job #$id priority set to {$newPriority}"
+                    ]);
 
                 default: return new JsonResponse(['error' => "Action '$action' not supported"], 400);
             }
