@@ -107,4 +107,14 @@
 - **Actions**: Created implementation plan and handoff docs in `_shared`. Completed backend implementation for agnostic workers, auto-scaling, and granular sync.
 - **Next Steps**: Implement Phase 5 (Monitoring UI Update) and expand granular sync support to other drivers.
 
+### 2026-05-06 - Deployment Stability and OOM Resolution
+- **Issue**: Containers (master, mcp, worker) were crashing with Code 137 (OOM) during Google Search Console config updates.
+- **Cause**: `entrypoint.sh` was running `composer update` on every master start/restart, causing massive memory pressure. Also, the scalable worker pool lacked resource limits.
+- **Fixes**:
+    - Removed `composer update` from `entrypoint.sh`. Startup is now lean.
+    - Added CPU/Memory limits to `master` (512MB), `worker` (384MB), and `mcp` (256MB) in `bin/build-deployment.php`.
+    - Fixed MCP service discovery to use the `master` network name instead of `127.0.0.1`.
+    - Added `--no-recreate` to `ScaleWorkersCommand` to prevent accidental service interruptions during scaling.
+- **Protocol**: Dependencies must be managed during the build phase (Dockerfile) or manually, never during container startup.
+
 
