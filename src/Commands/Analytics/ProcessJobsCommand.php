@@ -71,7 +71,10 @@ class ProcessJobsCommand extends Command
 
         // 0.1 Reset jobs stuck from THIS instance (e.g. after crash/restart)
         if ($envInstance) {
-            $resetCount = $jobRepo->resetStuckJobsByInstance($envInstance);
+            $resetByInstance = $jobRepo->resetStuckJobsByInstance($envInstance);
+            $resetByWorker = $jobRepo->resetStuckJobsByWorker($envInstance);
+            $resetCount = $resetByInstance + $resetByWorker;
+
             if ($resetCount > 0) {
                 $output->writeln("<info>Resumption: Reset {$resetCount} jobs previously held by this instance ({$envInstance}).</info>");
                 $this->logger->info("Resumption: Reset {$resetCount} jobs previously held by this instance ({$envInstance}).");

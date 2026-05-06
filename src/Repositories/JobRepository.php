@@ -480,6 +480,28 @@ class JobRepository extends BaseRepository
     }
 
     /**
+     * Resets stuck jobs by worker ID.
+     *
+     * @param string $workerId
+     * @return int
+     */
+    public function resetStuckJobsByWorker(string $workerId): int
+    {
+        $qb = $this->_em->createQueryBuilder();
+        return $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':scheduled')
+            ->set('e.updatedAt', ':now')
+            ->where('e.status = :processing')
+            ->andWhere('e.workerId = :workerId')
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('now', new \DateTime())
+            ->setParameter('processing', JobStatus::processing->value)
+            ->setParameter('workerId', $workerId)
+            ->getQuery()
+            ->execute();
+    }
+
+    /**
      * Resets a job to scheduled status.
      *
      * @param int $id
