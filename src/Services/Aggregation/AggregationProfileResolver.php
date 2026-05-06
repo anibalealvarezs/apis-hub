@@ -23,9 +23,6 @@ final class AggregationProfileResolver
         $this->driverRegistryResolver = $driverRegistryResolver;
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
     public function resolve(string $channel): array
     {
         if ($this->aggregationProfilesResolver !== null) {
@@ -52,6 +49,28 @@ final class AggregationProfileResolver
             profiles: $driverClass::getAggregationProfiles()
         );
     }
+
+    /**
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    public function resolveAll(): array
+    {
+        $registry = DriverFactory::getRegistry();
+        if ($registry === []) {
+            $registry = $this->resolveLocalDriverRegistry();
+        }
+
+        $allProfiles = [];
+        foreach (array_keys($registry) as $channel) {
+            $profiles = $this->resolve($channel);
+            if ($profiles !== []) {
+                $allProfiles[$channel] = $profiles;
+            }
+        }
+
+        return $allProfiles;
+    }
+
 
     /**
      * @return array<string, array<string, mixed>>

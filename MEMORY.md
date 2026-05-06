@@ -77,14 +77,27 @@
 - Stable integration path is now formalized: overrides live in `config/aggregation/metric_equivalences.yaml`, operator/docs are in `docs/aggregation-metric-equivalence.md`, and executor telemetry persistence is covered for `metric_resolution` metadata.
 - Ambiguous legacy marketing inputs are now explicitly classified during canonical resolution: stable aliases (for example `results -> conversions`) emit `input_type=legacy_alias`, while `actions` remains temporarily backward-compatible but is flagged via `metric_resolution.deprecation` as `ambiguous_metric_alias` instead of being treated as a canonical metric.
 
-### 2026-05-05 - Session 2: Decoupling Finalization
+### 2026-05-05 - Session 2 & 3: Agnostic Aggregation Engine Finalization
 - **Decisions**:
   - Eliminated `BaseRepository::getChannelKey()` to ensure repositories don't hold channel-specific knowledge.
   - Migrated `AggregationPlanner` to a fully agnostic matching model using account type suffixes (`_page`, `_account`) and `default_filters` from profiles.
-  - Decoupled platform identity fields (e.g., `facebook_page_id`) by resolving them dynamically through `DriverFactory`.
-- **Changes**:
+  - Decoupled platform identity fields (e.g., `facebook_page_id`) by resolving them dynamically through `DriverFactory` and the `getPlatformEntityIdField()` driver contract.
+- **Applied Changes**:
   - `AggregationPlanner.php`: Replaced hardcoded channel checks with profile-driven defaults and generic type matching.
-  - `AggregationEntityFieldResolver.php`: Switched from `match($channel)` to dynamic driver lookup.
+  - `AggregationEntityFieldResolver.php`: Switched from `match($channel)` to dynamic driver lookup via `getPlatformEntityIdField()`.
   - `CanonicalMetricSqlResolver.php`: Removed hardcoded channel dictionaries; now relies on driver-provided mappings.
-  - `BaseRepository.php`: Removed legacy `getChannelKey()` fallback.
-- **Next Steps**: Clean up the `Strategies` folder by deleting the now-obsolete `FacebookOrganicStrategy.php`.
+  - `BaseRepository.php`: Removed legacy `getChannelKey()` fallback and integrated agnostic identity resolution.
+- **Next Steps**:
+  - Clean up the `Strategies` folder by deleting the now-obsolete `FacebookOrganicStrategy.php`.
+  ### 2026-05-05 - Session 4: Agnostic Discovery & Optimized Activation
+- **Decision**: Implemented agnostic channel discovery in `AggregationPlanner` to resolve optimized paths for generic metric requests.
+- **Bug**: The optimized path for Instagram account summaries (`facebook_organic_linked_pages_flow`) was failing to activate because the planner could not infer the channel without hardcoded logic.
+- **Changes**:
+    - `AggregationProfileResolver`: Added `resolveAll()` to allow the planner to search for matching profiles across all registered drivers.
+    - `AggregationPlanner`:
+        - Updated `evaluateProfileCapability` to discover the channel agnostically if not provided.
+        - Relaxed `isMetric` entity restrictions to allow optimized strategies for the global metrics table.
+        - Added the discovered channel to the `AggregationPlan` context.
+    - `SocialOrganicStrategy` & `MarketingHierarchyStrategy`: Updated to retrieve the channel key from the plan context, ensuring correct SQL generation even without explicit channel filters.
+- **Next Steps**: Validate the fix with the specific Facebook Organic payload reported by the user.
+

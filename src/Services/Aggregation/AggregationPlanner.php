@@ -133,6 +133,11 @@
                 aggregations: $aggregations,
                 channel: $channel,
             );
+
+            if ($channel === null && ($profileValidation['channel'] ?? null) !== null) {
+                $channel = $profileValidation['channel'];
+            }
+
             $stages['profiles'] = $profileValidation;
 
             $this->applyProfileDefaultFilters($filtersArr, $profileValidation['active_profile'] ?? null);
@@ -153,7 +158,7 @@
                 $fallbackReason = 'missing_profile_capability';
             }
 
-            return new AggregationPlan(
+            $plan = new AggregationPlan(
                 aggregations: $aggregations,
                 groupBy: $groupBy,
                 filters: $filters,
@@ -168,6 +173,12 @@
                 stages: $stages,
                 candidateOptimizedStrategies: $candidateOptimizedStrategies,
             );
+
+            if ($channel !== null) {
+                $plan->addContext('channel', $channel);
+            }
+
+            return $plan;
         }
 
         /**
@@ -178,6 +189,23 @@
         private function evaluateProfileCapability(array $filters, ?string $groupPattern, array $aggregations, ?string $channel): array
         {
             if ($channel === null) {
+                $allProfiles = $this->aggregationProfileResolver->resolveAll();
+                foreach ($allProfiles as $c => $profiles) {
+                    foreach ($profiles as $profile) {
+                        if ($this->profileSupportsRequest($profile, $groupPattern, $filters, $aggregations)) {
+                            return [
+                                'checked'          => true,
+                                'supported'        => true,
+                                'channel'          => $c,
+                                'profile_count'    => count($profiles),
+                                'matched_profiles' => [(string)($profile['key'] ?? 'unknown')],
+                                'active_profile'   => $profile,
+                                'failure_reason'   => null,
+                            ];
+                        }
+                    }
+                }
+
                 return [
                     'checked'          => false,
                     'supported'        => true,
@@ -516,7 +544,7 @@
         {
             $candidates = [];
 
-            if ($isChanneledMetric) {
+            if ($isMetric || $isChanneledMetric) {
                 if ($this->matchesSocialOrganicPageSummary($groupPattern, $filters, $aggregations, $startDate, $endDate)) {
                     $candidates[] = 'social_organic_page_summary';
                 }
@@ -533,6 +561,7 @@
                     $candidates[] = 'marketing_hierarchy';
                 }
             }
+
 
             if (($isMetric || $isChanneledMetric) && $this->matchesWeightedMetric($groupPattern, $reducerAnalysis, $startDate, $endDate)) {
                 $candidates[] = 'weighted_metric';
@@ -835,7 +864,7 @@
                 'query', 'page', 'page_id', 'page_title', 'page_platform_id',
                 'country', 'device', 'daily', 'age', 'gender',
                 'ad', 'ad_id', 'adgroup', 'adgroup_id', 'account', 'campaign',
-                'channeledaccount', 'channeled_account_id', 'linked_fb_page_id',
+                'channeledaccount', 'channeled_account_id', 'linked_fb_page_id', 'linked_platform_entity_id',
                 'caption', 'created_time', 'media_type', 'message', 'permalink',
                 'permalink_url', 'post', 'post_id', 'timestamp',
             ];

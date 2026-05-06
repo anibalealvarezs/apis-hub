@@ -80,7 +80,7 @@
 
             $metricSqlResolver = $this->metricSqlResolver ?? new CanonicalMetricSqlResolver();
             $entityFieldResolver = $this->entityFieldResolver ?? new AggregationEntityFieldResolver();
-            $channelKey = $this->resolveChannelKey($filtersArr);
+            $channelKey = $this->resolveChannelKey($filtersArr, $plan);
 
             $pagePlatformExpr = $entityFieldResolver->getPagePlatformIdExpr($channelKey, $isPostgres);
 
@@ -169,7 +169,7 @@
 
             $metricSqlResolver = $this->metricSqlResolver ?? new CanonicalMetricSqlResolver();
             $entityFieldResolver = $this->entityFieldResolver ?? new AggregationEntityFieldResolver();
-            $channelKey = $this->resolveChannelKey($filtersArr);
+            $channelKey = $this->resolveChannelKey($filtersArr, $plan);
 
             $linkedEntityExpr = $entityFieldResolver->getChanneledAccountEntityIdExpr($channelKey, $isPostgres);
 
@@ -254,7 +254,7 @@
             $periodCol = $isPostgres ? 'LOWER(mc.period)' : 'mc.period';
 
             $metricSqlResolver = $this->metricSqlResolver ?? new CanonicalMetricSqlResolver();
-            $channelKey = $this->resolveChannelKey($filtersArr);
+            $channelKey = $this->resolveChannelKey($filtersArr, $plan);
 
             // Post snapshot typically uses common post fields in JSON
             $captionExpr = $isPostgres ? "ps.data->>'caption'" : "JSON_UNQUOTE(JSON_EXTRACT(ps.data, '$.caption'))";
@@ -422,9 +422,16 @@
         /**
          * @param array<string, mixed> $filtersArr
          */
-        private function resolveChannelKey(array $filtersArr): ?string
+        private function resolveChannelKey(array $filtersArr, ?AggregationPlan $plan = null): ?string
         {
             if (!array_key_exists('channel', $filtersArr)) {
+                if ($plan instanceof AggregationPlan) {
+                    $ctxChannel = $plan->getContextValue('channel');
+                    if (is_string($ctxChannel)) {
+                        return $ctxChannel;
+                    }
+                }
+
                 return null;
             }
 
