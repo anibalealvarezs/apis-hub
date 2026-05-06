@@ -167,6 +167,8 @@ class ProcessJobsCommand extends Command
                 $payload = $job->getPayload() ?? [];
                 $params = $payload['params'] ?? [];
 
+                // 1. Instance Name Match (Primary Filter)
+                $jobInstance = $payload['instance_name'] ?? null;
                 if (! $jobId && ! $forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance && ! $isGenericWorker) {
                     $stats['skipped']++;
 
