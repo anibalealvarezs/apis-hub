@@ -302,12 +302,6 @@ class ProcessJobsCommand extends Command
                     }
 
                     $chanConfig = $channelsConfig[$chanKey] ?? null;
-                    if (Helpers::isDebug()) {
-                        $output->writeln("DEBUG: Checking channel '$chanKey'. Config found: " . ($chanConfig ? 'YES' : 'NO'));
-                        if ($chanConfig) {
-                            $output->writeln("DEBUG: Enabled status: " . (isset($chanConfig['enabled']) ? ($chanConfig['enabled'] ? 'TRUE' : 'FALSE') : 'NOT SET'));
-                        }
-                    }
 
                     // Check if channel is enabled
                     if ($chanConfig && isset($chanConfig['enabled']) && ! $chanConfig['enabled']) {
