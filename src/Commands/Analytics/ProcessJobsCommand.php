@@ -66,7 +66,7 @@ class ProcessJobsCommand extends Command
         $jobRepo = $this->em->getRepository(Job::class);
 
         $envChannel = getenv('API_SOURCE');
-        $isGenericWorker = str_contains($envInstance ?? '', 'worker');
+        $isGenericWorker = empty($envChannel) || $envChannel === 'none';
         $forceAll = $input->getOption('force-all');
 
         if (Helpers::isDebug() || $forceAll) {
@@ -167,8 +167,6 @@ class ProcessJobsCommand extends Command
                 $payload = $job->getPayload() ?? [];
                 $params = $payload['params'] ?? [];
 
-                // 1. Instance Name Match (Primary Filter)
-                $jobInstance = $payload['instance_name'] ?? null;
                 if (! $jobId && ! $forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance && ! $isGenericWorker) {
                     $stats['skipped']++;
 
