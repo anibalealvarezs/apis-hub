@@ -103,12 +103,12 @@ class ProcessJobsCommand extends Command
                 $jobs = $jobRepo->getJobsByStatus(
                     status: JobStatus::scheduled->value,
                     channel: ($forceAll || $envChannel === 'none' ? null : $envChannel),
-                    instanceName: ($forceAll ? null : $envInstance)
+                    instanceName: ($forceAll || $isGenericWorker ? null : $envInstance)
                 );
                 $delayedJobs = $jobRepo->getJobsByStatus(
                     status: JobStatus::delayed->value,
                     channel: ($forceAll || $envChannel === 'none' ? null : $envChannel),
-                    instanceName: ($forceAll ? null : $envInstance)
+                    instanceName: ($forceAll || $isGenericWorker ? null : $envInstance)
                 );
                 $jobsList = array_merge($jobs, $delayedJobs);
             }
