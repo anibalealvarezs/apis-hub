@@ -102,6 +102,7 @@
             new ScaleDownCommand($entityManager),
             new MigratePagesCanonicalCommand(Helpers::getManager()),
             new InstallDriversCommand(),
+            new \Commands\Infrastructure\ScaleWorkersCommand($entityManager),
         ];
 
         foreach ($commands as $command) {

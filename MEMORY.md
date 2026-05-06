@@ -101,3 +101,10 @@
     - `SocialOrganicStrategy` & `MarketingHierarchyStrategy`: Updated to retrieve the channel key from the plan context, ensuring correct SQL generation even without explicit channel filters.
 - **Next Steps**: Validate the fix with the specific Facebook Organic payload reported by the user.
 
+### 2026-05-05 - Orchestrator Modernization Phase 0
+- **Problem**: Dedicated channel containers create deployment overhead and prevent granular account syncs without full restarts. Stuck jobs require manual cleanup.
+- **Solution**: Move to an agnostic worker pool with dynamic scaling via Docker socket and atomic job resumption.
+- **Actions**: Created implementation plan and handoff docs in `_shared`. Completed backend implementation for agnostic workers, auto-scaling, and granular sync.
+- **Next Steps**: Implement Phase 5 (Monitoring UI Update) and expand granular sync support to other drivers.
+
+

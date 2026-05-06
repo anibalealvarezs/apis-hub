@@ -87,31 +87,30 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         'extra_hosts' => ['host.docker.internal:host-gateway'],
     ];
 
-    // ─── Phase 2: Create Workers from Instances Configuration ───────────────────────
-    foreach ($instances as $instance) {
-        $name    = $instance['name'];
-        $channel = $instance['channel'];
-        $entity  = $instance['entity'];
-
-        // Worker configuration (No ports exposed)
-        $services[$name] = [
-            'container_name' => "{$deploymentName}-{$name}",
-            'build'          => [
-                'context'    => '.',
-                'dockerfile' => 'Dockerfile',
-            ],
-            'restart'     => 'always',
-            'command'     => null,
-            'environment' => $buildEnv($name, $channel, $entity),
-            'volumes'     => $phpVolumes,
-            'networks'    => ['default'],
-            'depends_on'  => [
-                'master' => ['condition' => 'service_started'],
-                'db' => ['condition' => 'service_started'],
-                'redis' => ['condition' => 'service_started'],
-            ],
-        ];
-    }
+    // ─── Phase 2: Create Scalable Worker Service ──────────────────────────────────
+    $infraConfig = $config['infrastructure'] ?? [];
+    $workerPoolSize = (int) ($infraConfig['worker_pool_size'] ?? 1);
+    
+    // Generic worker service definition (Single service to be scaled)
+    $services['worker'] = [
+        'build'          => [
+            'context'    => '.',
+            'dockerfile' => 'Dockerfile',
+        ],
+        'restart'     => 'always',
+        'command'     => null,
+        'environment' => $buildEnv('worker'),
+        'volumes'     => $phpVolumes,
+        'networks'    => ['default'],
+        'depends_on'  => [
+            'master' => ['condition' => 'service_started'],
+            'db' => ['condition' => 'service_started'],
+            'redis' => ['condition' => 'service_started'],
+        ],
+    ];
+    // Note: The actual number of containers is managed via 'docker compose up -d --scale worker=N'
+    // but we can set the default scale in the yaml if supported by the version.
+    $services['worker']['scale'] = $workerPoolSize;
 
     // ─── Phase 2.5: Create Dedicated MCP Service ─────────────────────────────────────
     $services['mcp'] = [

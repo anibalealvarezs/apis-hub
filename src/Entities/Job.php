@@ -23,6 +23,44 @@ class Job extends Entity
     #[ORM\Column(type: 'string')]
     protected string $channel;
 
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    protected int $priority = 0;
+
+    #[ORM\Column(name: 'worker_id', type: 'string', nullable: true)]
+    protected ?string $workerId = null;
+
+    /**
+     * @return int
+     */
+    public function getPriority(): int
+    {
+        return $this->priority;
+    }
+
+    /**
+     * @param int $priority
+     */
+    public function setPriority(int $priority): void
+    {
+        $this->priority = $priority;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getWorkerId(): ?string
+    {
+        return $this->workerId;
+    }
+
+    /**
+     * @param string|null $workerId
+     */
+    public function setWorkerId(?string $workerId): void
+    {
+        $this->workerId = $workerId;
+    }
+
     /**
      * @return int
      */

@@ -68,6 +68,15 @@ class ProcessJobsCommand extends Command
             $this->logger->warning("Cleanup: Marked {$cleaned} stuck processing jobs as failed.");
         }
 
+        // 0.1 Reset jobs stuck from THIS instance (e.g. after crash/restart)
+        if ($envInstance) {
+            $resetCount = $jobRepo->resetStuckJobsByInstance($envInstance);
+            if ($resetCount > 0) {
+                $output->writeln("<info>Resumption: Reset {$resetCount} jobs previously held by this instance ({$envInstance}).</info>");
+                $this->logger->info("Resumption: Reset {$resetCount} jobs previously held by this instance ({$envInstance}).");
+            }
+        }
+
         $envStartDate = getenv('START_DATE');
         $envEndDate = getenv('END_DATE');
 
@@ -93,12 +102,12 @@ class ProcessJobsCommand extends Command
             } else {
                 $jobs = $jobRepo->getJobsByStatus(
                     status: JobStatus::scheduled->value,
-                    channel: ($forceAll ? null : $envChannel),
+                    channel: ($forceAll || $envChannel === 'none' ? null : $envChannel),
                     instanceName: ($forceAll ? null : $envInstance)
                 );
                 $delayedJobs = $jobRepo->getJobsByStatus(
                     status: JobStatus::delayed->value,
-                    channel: ($forceAll ? null : $envChannel),
+                    channel: ($forceAll || $envChannel === 'none' ? null : $envChannel),
                     instanceName: ($forceAll ? null : $envInstance)
                 );
                 $jobsList = array_merge($jobs, $delayedJobs);
@@ -118,7 +127,8 @@ class ProcessJobsCommand extends Command
 
                 // 1. Instance Name Match (Primary Filter)
                 $jobInstance = $payload['instance_name'] ?? null;
-                if (! $jobId && ! $forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance) {
+                $isGenericWorker = str_starts_with($envInstance ?? '', 'worker-');
+                if (! $jobId && ! $forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance && ! $isGenericWorker) {
                     $stats['skipped']++;
 
                     continue;
@@ -149,14 +159,14 @@ class ProcessJobsCommand extends Command
                 }
 
                 // Global filters from env
-                if (! $jobId && $envChannel = getenv('API_SOURCE')) {
+                if (! $jobId && ($envChannel = getenv('API_SOURCE')) && $envChannel !== 'none') {
                     if ($job->getChannel() !== $envChannel) {
                         $stats['skipped']++;
 
                         continue;
                     }
                 }
-                if (! $jobId && $envEntity = getenv('API_ENTITY')) {
+                if (! $jobId && ($envEntity = getenv('API_ENTITY')) && $envEntity !== 'none') {
                     if ($job->getEntity() !== $envEntity) {
                         $stats['skipped']++;
 
@@ -221,7 +231,7 @@ class ProcessJobsCommand extends Command
                 try {
                     // Atomic claim by repository
                     // Even if we provide job-id, we must ensure it's not already being processed by another worker
-                    if (! $jobRepo->claimJob($job->getId())) {
+                    if (! $jobRepo->claimJob($job->getId(), $envInstance)) {
                         if (Helpers::isDebug() || $jobId) {
                             $output->writeln("<comment>Job {$job->getUuid()} already claimed or in progress. Skipping.</comment>");
                         }

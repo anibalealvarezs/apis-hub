@@ -6,6 +6,7 @@
     use Doctrine\DBAL\DriverManager;
     use Doctrine\ORM\EntityManager;
     use Exception;
+    use Exceptions\ConfigurationException;
     use Helpers\Helpers;
     use Symfony\Component\Console\Command\Command;
     use Symfony\Component\Console\Exception\ExceptionInterface;
@@ -15,14 +16,18 @@
 
     class SetupDatabaseCommand extends Command
     {
-        protected static $defaultName = 'app:setup-db';
+        protected static string $defaultName = 'app:setup-db';
 
-        protected function configure()
+        protected function configure(): void
         {
             $this
                 ->setDescription('Ensures the database exists, updates the schema, and seeds default entities.');
         }
 
+        /**
+         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
+         */
         protected function execute(InputInterface $input, OutputInterface $output): int
         {
             $dbConfig = Helpers::getDbConfig();
@@ -31,20 +36,20 @@
 
             try {
                 // 1. Ensure Database Exists
-                $output->writeln("<info>🔍 Ensuring database '{$dbName}' exists...</info>");
+                $output->writeln("<info>🔍 Ensuring database '$dbName' exists...</info>");
 
                 $isPostgres = $dbConfig['driver'] === 'pdo_pgsql';
 
                 if (!$isPostgres) {
                     $connection = DriverManager::getConnection($dbConfig);
-                    $connection->executeStatement("CREATE DATABASE IF NOT EXISTS `{$dbName}`");
+                    $connection->executeStatement("CREATE DATABASE IF NOT EXISTS `$dbName`");
                     $connection->close();
                 } else {
                     // For PostgreSQL, the DB is typically created by Docker via environment variables.
                     // If not, we try to connect with the full config; if it fails, the DB is missing.
-                    $output->writeln("<comment>  Notice: Assuming database '{$dbName}' is already created by Docker/Postgres environment.</comment>");
+                    $output->writeln("<comment>  Notice: Assuming database '$dbName' is already created by Docker/Postgres environment.</comment>");
                 }
-                $output->writeln("<info>✔  Database '{$dbName}' check passed.</info>");
+                $output->writeln("<info>✔  Database '$dbName' check passed.</info>");
 
                 // 2. Update Schema
                 $output->writeln("<info>📂 Updating schema structure...</info>");
@@ -66,7 +71,7 @@
                 $initExitCode = $initEntitiesCommand->run(new ArrayInput([]), $output);
                 if ($initExitCode !== Command::SUCCESS) {
                     error_log("CRITICAL: app:initialize-entities failed with exit code: ".$initExitCode);
-                    $output->writeln("<error>CRITICAL: app:initialize-entities failed with exit code: {$initExitCode}</error>");
+                    $output->writeln("<error>CRITICAL: app:initialize-entities failed with exit code: $initExitCode</error>");
                     throw new Exception("Failed to initialize core/channel entities.");
                 }
 

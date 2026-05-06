@@ -321,7 +321,7 @@ class JobRepository extends BaseRepository
                 $params['instance_name_pattern'] = '%instance_name%' . $instanceName . '%';
             }
 
-            $sql .= " ORDER BY j.id ASC LIMIT 100";
+            $sql .= " ORDER BY j.priority DESC, j.id ASC LIMIT 100";
 
             $rsm = new \Doctrine\ORM\Query\ResultSetMappingBuilder($this->_em);
             $rsm->addRootEntityFromClassMetadata($this->getEntityName(), 'j');
@@ -343,8 +343,8 @@ class JobRepository extends BaseRepository
         $qb = $this->buildReadMultipleQuery(
             ids: null,
             filters: (object)$filters,
-            orderBy: 'id',
-            orderDir: 'ASC',
+            orderBy: 'priority',
+            orderDir: 'DESC',
             limit: 100,
             pagination: 0
         );
@@ -420,15 +420,22 @@ class JobRepository extends BaseRepository
      * Returns true if the claim was successful.
      *
      * @param int $id
+     * @param string|null $workerId
      * @return bool
      */
-    public function claimJob(int $id): bool
+    public function claimJob(int $id, ?string $workerId = null): bool
     {
         $qb = $this->_em->createQueryBuilder();
-        $updatedRows = $qb->update($this->getEntityName(), 'e')
+        $qb->update($this->getEntityName(), 'e')
             ->set('e.status', ':processing')
-            ->set('e.updatedAt', ':now')
-            ->where('e.id = :id')
+            ->set('e.updatedAt', ':now');
+
+        if ($workerId) {
+            $qb->set('e.workerId', ':workerId')
+               ->setParameter('workerId', $workerId);
+        }
+
+        $updatedRows = $qb->where('e.id = :id')
             ->andWhere($qb->expr()->in('e.status', ':claimable'))
             ->setParameter('processing', JobStatus::processing->value)
             ->setParameter('now', new \DateTime())
@@ -438,6 +445,38 @@ class JobRepository extends BaseRepository
             ->execute();
 
         return (int)$updatedRows > 0;
+    }
+
+    /**
+     * Resets stuck jobs by instance name.
+     *
+     * @param string $instanceName
+     * @return int
+     */
+    public function resetStuckJobsByInstance(string $instanceName): int
+    {
+        if (Helpers::isPostgres()) {
+            $sql = "UPDATE jobs SET status = :scheduled, updated_at = :now WHERE status = :processing AND CAST(payload AS text) LIKE :instance_pattern";
+            return $this->_em->getConnection()->executeStatement($sql, [
+                'scheduled' => JobStatus::scheduled->value,
+                'now' => (new \DateTime())->format('Y-m-d H:i:s'),
+                'processing' => JobStatus::processing->value,
+                'instance_pattern' => '%instance_name%' . $instanceName . '%',
+            ]);
+        }
+
+        $qb = $this->_em->createQueryBuilder();
+        return $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':scheduled')
+            ->set('e.updatedAt', ':now')
+            ->where('e.status = :processing')
+            ->andWhere('e.payload LIKE :instance_pattern')
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('now', new \DateTime())
+            ->setParameter('processing', JobStatus::processing->value)
+            ->setParameter('instance_pattern', '%instance_name%' . $instanceName . '%')
+            ->getQuery()
+            ->execute();
     }
 
     /**

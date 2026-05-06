@@ -1,117 +1,121 @@
 <?php
 
-declare(strict_types=1);
+    declare(strict_types=1);
 
-namespace Commands;
+    namespace Commands;
 
-use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
-use Doctrine\ORM\EntityManagerInterface;
-use Entities\Analytics\Channel;
-use Entities\Analytics\Provider;
-use Helpers\Helpers;
-use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Style\SymfonyStyle;
+    use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
+    use Doctrine\ORM\EntityManagerInterface;
+    use Doctrine\ORM\Exception\ORMException;
+    use Entities\Analytics\Channel;
+    use Entities\Analytics\Provider;
+    use Exception;
+    use Helpers\Helpers;
+    use Symfony\Component\Console\Attribute\AsCommand;
+    use Symfony\Component\Console\Command\Command;
+    use Symfony\Component\Console\Input\InputInterface;
+    use Symfony\Component\Console\Output\OutputInterface;
+    use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand(
-    name: 'app:install-drivers',
-    description: 'Installs and updates Providers and Channels from registered Drivers'
-)]
-class InstallDriversCommand extends Command
-{
-    private EntityManagerInterface $entityManager;
-
-    public function __construct()
+    #[AsCommand(
+        name: 'app:install-drivers',
+        description: 'Installs and updates Providers and Channels from registered Drivers'
+    )]
+    class InstallDriversCommand extends Command
     {
-        parent::__construct();
-        $this->entityManager = Helpers::getManager();
-    }
+        private EntityManagerInterface $entityManager;
 
-    protected function execute(InputInterface $input, OutputInterface $output): int
-    {
-        $io = new SymfonyStyle($input, $output);
-        $io->title('Installing/Updating Drivers into Database');
+        /**
+         * @throws \Doctrine\DBAL\Exception
+         */
+        public function __construct()
+        {
+            parent::__construct();
+            $this->entityManager = Helpers::getManager();
+        }
 
-        $channels = DriverFactory::getAvailableChannels();
-        $installedCount = 0;
+        protected function execute(InputInterface $input, OutputInterface $output): int
+        {
+            $io = new SymfonyStyle($input, $output);
+            $io->title('Installing/Updating Drivers into Database');
 
-        try {
-            foreach ($channels as $channelName) {
-                $regConfig = DriverFactory::getChannelConfig($channelName);
-                $driverClass = $regConfig['driver'] ?? null;
-                if (!$driverClass || !class_exists($driverClass)) {
-                    $io->warning("Skipping $channelName: Driver class not found.");
-                    continue;
+            $channels = DriverFactory::getAvailableChannels();
+            $installedCount = 0;
+
+            try {
+                foreach ($channels as $channelName) {
+                    $regConfig = DriverFactory::getChannelConfig($channelName);
+                    $driverClass = $regConfig['driver'] ?? null;
+                    if (!$driverClass || !class_exists($driverClass)) {
+                        $io->warning("Skipping $channelName: Driver class not found.");
+                        continue;
+                    }
+
+                    // Get Provider Info from Registry OR Driver
+                    $providerSystemName = $driverClass::getProviderName();
+                    $providerName = $regConfig['parent'] ?? $providerSystemName;
+                    $providerLabel = method_exists($driverClass, 'getProviderLabel') ? $driverClass::getProviderLabel() : ucfirst($providerName);
+
+                    // Integrity Check: Provider Mismatch
+                    if (isset($regConfig['parent']) && $regConfig['parent'] !== $providerSystemName) {
+                        $io->warning("Provider mismatch for $channelName: Registry says '{$regConfig['parent']}', Driver says '$providerSystemName'. Registry takes precedence.");
+                    }
+
+                    static $providersCache = [];
+                    $provider = $providersCache[$providerName] ?? $this->entityManager->getRepository(Provider::class)->findOneBy(['name' => $providerName]);
+
+                    if (!$provider) {
+                        $provider = new Provider();
+                        $provider->setName($providerName)
+                            ->setLabel($providerLabel);
+                        $this->entityManager->persist($provider);
+                        $providersCache[$providerName] = $provider;
+                        $io->note("Created Provider: $providerLabel ($providerName)");
+                    } else {
+                        $providersCache[$providerName] = $provider;
+                    }
+
+                    // Get Channel Info
+                    $channelLabel = method_exists($driverClass, 'getChannelLabel') ? $driverClass::getChannelLabel() : ucfirst($channelName);
+                    $channelIcon = method_exists($driverClass, 'getChannelIcon') ? $driverClass::getChannelIcon() : substr($channelLabel, 0, 1);
+                    $cooldown = method_exists($driverClass, 'getCooldown') ? $driverClass::getCooldown() : 600;
+
+                    // For validation, we use the static label or just the registry key
+                    // Instantiating the driver here is dangerous as it may have dependencies
+
+                    /** @var Channel $dbChannel */
+                    $dbChannel = $this->entityManager->getRepository(Channel::class)->findOneBy(['name' => $channelName]);
+                    if (!$dbChannel) {
+                        $dbChannel = new Channel();
+                        $dbChannel->setName($channelName)
+                            ->setLabel($channelLabel)
+                            ->setIcon($channelIcon)
+                            ->setCooldown($cooldown)
+                            ->setProvider($provider);
+                        $this->entityManager->persist($dbChannel);
+                        $io->note("Created Channel: $channelLabel ($channelName)");
+                    } else {
+                        // Update label/icon/provider if changed
+                        $dbChannel->setLabel($channelLabel)
+                            ->setIcon($channelIcon)
+                            ->setCooldown($cooldown)
+                            ->setProvider($provider);
+                        $io->text("Verified/Updated Channel: $channelLabel ($channelName)");
+                    }
+
+                    $installedCount++;
                 }
 
-                // Get Provider Info from Registry OR Driver
-                $providerSystemName = $driverClass::getProviderName();
-                $providerName = $regConfig['parent'] ?? $providerSystemName;
-                $providerLabel = method_exists($driverClass, 'getProviderLabel') ? $driverClass::getProviderLabel() : ucfirst($providerName);
+                $this->entityManager->flush();
+                $io->success("Successfully installed/updated $installedCount drivers.");
 
-                // Integrity Check: Provider Mismatch
-                if (isset($regConfig['parent']) && $regConfig['parent'] !== $providerSystemName) {
-                    $io->warning("Provider mismatch for $channelName: Registry says '{$regConfig['parent']}', Driver says '$providerSystemName'. Registry takes precedence.");
-                }
-                
-                static $providersCache = [];
-                $provider = $providersCache[$providerName] ?? $this->entityManager->getRepository(Provider::class)->findOneBy(['name' => $providerName]);
-                
-                if (!$provider) {
-                    $provider = new Provider();
-                    $provider->setName($providerName)
-                        ->setLabel($providerLabel);
-                    $this->entityManager->persist($provider);
-                    $providersCache[$providerName] = $provider;
-                    $io->note("Created Provider: $providerLabel ($providerName)");
-                } else {
-                    $providersCache[$providerName] = $provider;
-                }
+                return Command::SUCCESS;
 
-                // Get Channel Info
-                $channelLabel = method_exists($driverClass, 'getChannelLabel') ? $driverClass::getChannelLabel() : ucfirst($channelName);
-                $channelIcon = method_exists($driverClass, 'getChannelIcon') ? $driverClass::getChannelIcon() : substr($channelLabel, 0, 1);
-                $cooldown = method_exists($driverClass, 'getCooldown') ? $driverClass::getCooldown() : 600;
+            } catch (Exception|ORMException $e) {
+                $io->error("Registration failed: ".$e->getMessage());
+                $io->text($e->getTraceAsString());
 
-                // For validation, we use the static label or just the registry key
-                // Instantiating the driver here is dangerous as it may have dependencies
-                $channelSystemName = $channelName; 
-
-
-                /** @var Channel $dbChannel */
-                $dbChannel = $this->entityManager->getRepository(Channel::class)->findOneBy(['name' => $channelName]);
-                if (!$dbChannel) {
-                    $dbChannel = new Channel();
-                    $dbChannel->setName($channelName)
-                        ->setLabel($channelLabel)
-                        ->setIcon($channelIcon)
-                        ->setCooldown($cooldown)
-                        ->setProvider($provider);
-                    $this->entityManager->persist($dbChannel);
-                    $io->note("Created Channel: $channelLabel ($channelName)");
-                } else {
-                    // Update label/icon/provider if changed
-                    $dbChannel->setLabel($channelLabel)
-                        ->setIcon($channelIcon)
-                        ->setCooldown($cooldown)
-                        ->setProvider($provider);
-                    $io->text("Verified/Updated Channel: $channelLabel ($channelName)");
-                }
-                
-                $installedCount++;
+                return Command::FAILURE;
             }
-
-            $this->entityManager->flush();
-            $io->success("Successfully installed/updated $installedCount drivers.");
-
-            return Command::SUCCESS;
-
-        } catch (\Exception $e) {
-            $io->error("Registration failed: " . $e->getMessage());
-            $io->text($e->getTraceAsString());
-            return Command::FAILURE;
         }
     }
-}

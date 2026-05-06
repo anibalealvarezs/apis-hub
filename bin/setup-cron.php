@@ -110,8 +110,8 @@ foreach ($instances as $instance) {
 // Also add the job processor cron (runs every minute)
 $cronLines[] = "* * * * * cd /app && /usr/local/bin/php bin/cli.php jobs:process > /dev/null 2>&1";
 
-// Add the scale-down cron (runs every 15 minutes)
-$cronLines[] = "*/15 * * * * cd /app && /usr/local/bin/php bin/cli.php app:scale-down > /dev/null 2>&1";
+// Add the worker scaling engine (runs every minute to adapt to demand)
+$cronLines[] = "* * * * * cd /app && /usr/local/bin/php bin/cli.php app:scale-workers > /dev/null 2>&1";
 
 
 $cronFile = '/tmp/apis-hub-cron';
