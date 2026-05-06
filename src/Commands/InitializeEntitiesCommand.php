@@ -404,7 +404,7 @@
                     $skip = $results['skipped'] ?? 0;
 
                     $this->logger->info("  - $channel results: $init initialized, $skip skipped.");
-                } catch (Exception $e) {
+                } catch (\Throwable $e) {
                     $output->writeln("<error>  - FATAL ERROR initializing channel '$channel': ".$e->getMessage()."</error>");
                     error_log("FATAL ERROR initializing channel '$channel': ".$e->getMessage());
                     error_log($e->getTraceAsString());
