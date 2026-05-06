@@ -276,7 +276,7 @@
 
                     if (!$accountEntity) {
                         $accountEntity = new Account();
-                        $accountEntity->addName($groupName)->addDescription("Group Account for $channel");
+                        $accountEntity->addName($groupName);
                         $this->entityManager->persist($accountEntity);
                         $this->entityManager->flush();
                     }
