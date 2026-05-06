@@ -236,7 +236,7 @@ class ProcessJobsCommand extends Command
                     $requiredInstances = array_map('trim', explode(',', $requires));
                     foreach ($requiredInstances as $requiredInstance) {
                         if (! $jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
-                            if (Helpers::isDebug()) {
+                            if (Helpers::isDebug() || $output->isVerbose()) {
                                 $output->writeln("<comment>Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.</comment>");
                             }
                             $this->logger->info("Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.");
@@ -250,7 +250,7 @@ class ProcessJobsCommand extends Command
                 // Guard: Prevent another job for the same instance from running if one is already processing
                 $instanceName = $payload['instance_name'] ?? null;
                 if (! $jobId && $instanceName && $jobRepo->isAnotherJobProcessing($instanceName)) {
-                    if (Helpers::isDebug()) {
+                    if (Helpers::isDebug() || $output->isVerbose()) {
                         $output->writeln("<comment>Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.</comment>");
                     }
                     $this->logger->info("Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.");
