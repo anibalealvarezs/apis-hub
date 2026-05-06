@@ -186,8 +186,10 @@
                         return $stats;
                     };
 
+                    $output->writeln("<info>TRACE: [$channel] Fetching channel entity from DB...</info>");
                     /** @var Channel $channelEntity */
                     $channelEntity = $this->entityManager->getRepository(Channel::class)->findOneBy(['name' => $channel]);
+                    $output->writeln("<info>TRACE: [$channel] Channel entity fetched.</info>");
                     if (!$channelEntity) {
                         $this->logger->error("  - ERROR: Channel entity '$channel' NOT FOUND in database. Ensure 'app:install-drivers' ran correctly.");
 
@@ -263,6 +265,7 @@
                         return $map;
                     };
 
+                    $output->writeln("<info>TRACE: [$channel] Syncing YAML assets (ConfigManagerController logic)...</info>");
                     // 1. Sync Assets from YAML to Database (Ported from ConfigManagerController)
                     $commonKey = $driver::getCommonConfigKey();
                     $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
@@ -295,6 +298,8 @@
                             }
                         }
                     }
+
+                    $output->writeln("<info>TRACE: [$channel] Persisting YAML assets...</info>");
 
                     foreach ($assets as $assetInfo) {
                         $asset = $assetInfo['data'];
