@@ -33,8 +33,8 @@ echo "⚒  Building standardized Master/Worker deployment for: " . strtoupper($e
 $services = [];
 
 // Helper to build environment block
-$buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($db, $redis, $config, $env, $deploymentName) {
-    return [
+$buildEnv = function($instanceName = null, $channel = 'none', $entity = 'none') use ($db, $redis, $config, $env, $deploymentName) {
+    $envVars = [
         "PORT=8080",
         "API_SOURCE={$channel}",
         "API_ENTITY={$entity}",
@@ -49,10 +49,13 @@ $buildEnv = function($instanceName, $channel = 'none', $entity = 'none') use ($d
         "REDIS_PORT=\${REDIS_PORT:-" . $redis['port'] . "}",
         "PROJECT_CONFIG_FILE=/app/config/" . ($config['project'] ?? 'apis-hub') . ".yaml",
         "CONFIG_DIR=/app/config",
-        "INSTANCE_NAME={$instanceName}",
         "SKIP_SEED=\${SKIP_SEED:-0}",
         "ENV_FILE=\${ENV_FILE:-" . (getenv('ENV_FILE') ?: '.env') . "}",
     ];
+    if ($instanceName) {
+        $envVars[] = "INSTANCE_NAME={$instanceName}";
+    }
+    return $envVars;
 };
 
 // ─── Phase 1: Create Standardized Master ────────────────────────────────────────
@@ -110,7 +113,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         ],
         'restart'     => 'always',
         'command'     => null,
-        'environment' => $buildEnv('worker'),
+        'environment' => $buildEnv(),
         'networks'    => ['default'],
         'volumes'     => ['./:/app'],
         'depends_on'  => [

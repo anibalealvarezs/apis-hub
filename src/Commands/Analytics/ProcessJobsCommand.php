@@ -49,7 +49,7 @@ class ProcessJobsCommand extends Command
     {
         Helpers::clearConfigCache();
         $channelsConfig = Helpers::getChannelsConfig();
-        $envInstance = getenv('INSTANCE_NAME');
+        $envInstance = getenv('INSTANCE_NAME') ?: gethostname();
         $lockFile = sys_get_temp_dir() . '/process_jobs_' . ($envInstance ?: 'default') . '.lock';
         $fp = fopen($lockFile, 'w+');
 
