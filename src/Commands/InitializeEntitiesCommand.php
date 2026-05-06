@@ -128,16 +128,17 @@
          */
         protected function initializeChannelEntities(OutputInterface $output): int
         {
+            $output->writeln("<info>TRACE: Fetching registry...</info>");
             $registry = DriverFactory::getRegistry();
-            die("!!! PASSED REGISTRY !!!\n");
+            $output->writeln("<info>TRACE: Fetching channels config...</info>");
             $channelsConfig = Helpers::getChannelsConfig();
+
+            foreach ($registry as $channel => $driverCfg) {
                 // Determine if specifically enabled for this channel
                 $chanConfig = $channelsConfig[$channel] ?? [];
 
                 $driverClass = $driverCfg['driver'] ?? null;
                 if (!$driverClass || !class_exists($driverClass)) {
-                    $this->logger->error("Driver class '$driverClass' not found for channel: $channel");
-
                     continue;
                 }
 
@@ -148,15 +149,15 @@
                 }
 
                 if (!($chanConfig['enabled'] ?? false)) {
-                    $this->logger->info("Channel '$channel' is disabled. Skipping.");
-
                     continue;
                 }
 
-                $this->logger->info("Initializing entities for channel: $channel...");
+                $output->writeln("<info>TRACE: [ACTIVE] Starting initialization for $channel...</info>");
 
                 try {
+                    $output->writeln("<info>TRACE: [$channel] Instantiating driver (DriverFactory::get)...</info>");
                     $driver = DriverFactory::get($channel, $this->logger);
+                    $output->writeln("<info>TRACE: [$channel] Driver instantiated successfully.</info>");
 
                     $dataProcessor = function ($collection) {
                         $stats = ['rows' => 0, 'metrics' => 0, 'duplicates' => 0];
@@ -386,6 +387,7 @@
                     $this->entityManager->flush();
                     $this->entityManager->flush();
 
+                    $output->writeln("<info>TRACE: [$channel] Executing Driver->initializeEntities() hook...</info>");
                     // 2. Initialize Channel-specific Entities via Driver hook
                     $results = $driver->initializeEntities(array_merge($chanConfig, [
                         'manager'        => $this->entityManager,
