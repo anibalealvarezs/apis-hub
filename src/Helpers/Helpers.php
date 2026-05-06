@@ -81,10 +81,6 @@
          */
         public static function getProjectConfig(): array
         {
-            if (self::$projectConfig !== null) {
-                return self::$projectConfig;
-            }
-
             $config = [];
             $rootConfigDir = self::getConfigDir();
 
@@ -170,7 +166,7 @@
                 $config = array_replace_recursive($config, $legacyConfig);
             }
 
-            return self::$projectConfig = $config;
+            return $config;
         }
 
         /**
@@ -508,130 +504,126 @@
          */
         public static function getChannelsConfig(): array
         {
-            if (self::$channelsConfig === null) {
-                $projectConfig = self::getProjectConfig();
-                $config = $projectConfig['channels'] ?? [];
-                $configDir = self::getConfigDir();
-                $filePath = $configDir.'/yaml/channelsconfig.yaml';
+            $projectConfig = self::getProjectConfig();
+            $config = $projectConfig['channels'] ?? [];
+            $configDir = self::getConfigDir();
+            $filePath = $configDir.'/yaml/channelsconfig.yaml';
 
-                try {
-                    if (file_exists($filePath)) {
-                        $yamlConfig = Yaml::parseFile($filePath);
-                        if (is_array($yamlConfig)) {
-                            $config = array_replace_recursive($yamlConfig, $config);
-                        }
+            try {
+                if (file_exists($filePath)) {
+                    $yamlConfig = Yaml::parseFile($filePath);
+                    if (is_array($yamlConfig)) {
+                        $config = array_replace_recursive($yamlConfig, $config);
                     }
-
-                    // Override with environment variables if present
-                    if ($envChannelsJson = getenv('CHANNELS_CONFIG')) {
-                        $envChannels = json_decode($envChannelsJson, true);
-                        if (is_array($envChannels)) {
-                            $config = array_replace_recursive($config, $envChannels);
-                        }
-                    }
-
-                    // Normalize relative paths to project root to avoid CWD issues
-                    $rootPath = dirname(__DIR__, 2);
-                    $resolvePath = function ($path) use ($rootPath) {
-                        if (is_string($path) && str_starts_with($path, './')) {
-                            return $rootPath.substr($path, 1);
-                        }
-
-                        return $path;
-                    };
-
-                    foreach ($config as $chan => $chanConfig) {
-                        if (isset($chanConfig['token_path'])) {
-                            $config[$chan]['token_path'] = $resolvePath($chanConfig['token_path']);
-                        }
-                    }
-
-                    $resolvePlaceholders = function (&$item) use (&$resolvePlaceholders) {
-                        if (is_array($item)) {
-                            foreach ($item as &$value) {
-                                $resolvePlaceholders($value);
-                            }
-                        } elseif (is_string($item) && preg_match('/\${([^}]+)}/', $item, $matches)) {
-                            $envValue = getenv($matches[1]);
-                            if ($envValue !== false && $envValue !== '') {
-                                $item = $envValue;
-                            } else {
-                                $item = ''; // Clear unresolved placeholders
-                            }
-                        }
-                    };
-                    $resolvePlaceholders($config);
-
-                    // Dynamic config enrichment from Drivers and Registry (Decoupled implementation)
-                    $registry = DriverFactory::getRegistry();
-
-                    // 1. Inject credentials from environment variables using Driver-defined mappings
-                    foreach ($registry as $chan => $chanDef) {
-                        $driverClass = $chanDef['driver'] ?? null;
-                        if ($driverClass && class_exists($driverClass) && method_exists($driverClass, 'getEnvMapping')) {
-                            $mapping = $driverClass::getEnvMapping();
-                            foreach ($mapping as $targetChan => $envMap) {
-                                if (!isset($config[$targetChan])) {
-                                    $config[$targetChan] = [];
-                                }
-                                foreach ($envMap as $envKey => $configKey) {
-                                    $val = getenv($envKey);
-                                    if ($val && empty($config[$targetChan][$configKey])) {
-                                        $config[$targetChan][$configKey] = $val;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // 2. Generic Parental Inheritance (Backward Compatibility for common credentials)
-                    foreach ($registry as $chan => $chanDef) {
-                        $parent = $chanDef['parent'] ?? null;
-                        if ($parent && !empty($config[$parent])) {
-                            if (isset($config[$chan])) {
-                                // Important: Merge parent into child preserving existing child values
-                                $config[$chan] = array_replace_recursive($config[$parent], $config[$chan]);
-                                // Maintain nested structure for backward compatibility
-                                if (!isset($config[$chan][$parent])) {
-                                    $config[$chan][$parent] = $config[$parent];
-                                } else {
-                                    $config[$chan][$parent] = array_replace_recursive($config[$parent], array_filter($config[$chan][$parent]));
-                                }
-                            }
-                        }
-                    }
-
-                    if (getenv('APP_ENV') === 'demo') {
-                        $placeholders = ['PAGE_ID', 'IG_ACCOUNT_ID', 'PAGE_URL', 'example.com', 'AD_ACCOUNT_ID'];
-                        $cleanEntityList = function ($entities) use ($placeholders) {
-                            return array_filter($entities, function ($item) use ($placeholders) {
-                                $asString = json_encode($item);
-                                foreach ($placeholders as $p) {
-                                    if (str_contains($asString, $p)) {
-                                        return false;
-                                    }
-                                }
-
-                                return true;
-                            });
-                        };
-
-                        $registry = DriverFactory::getRegistry();
-                        foreach ($registry as $chan => $rConfig) {
-                            $resourceKey = $rConfig['resource_key'] ?? null;
-                            if ($resourceKey && isset($config[$chan][$resourceKey])) {
-                                $config[$chan][$resourceKey] = $cleanEntityList($config[$chan][$resourceKey]);
-                            }
-                        }
-                    }
-
-                    self::$channelsConfig = $config;
-                } catch (Exception $e) {
-                    throw new RuntimeException("Failed to load channels configuration: ".$e->getMessage());
                 }
-            }
 
-            return self::$channelsConfig;
+                // Override with environment variables if present
+                if ($envChannelsJson = getenv('CHANNELS_CONFIG')) {
+                    $envChannels = json_decode($envChannelsJson, true);
+                    if (is_array($envChannels)) {
+                        $config = array_replace_recursive($config, $envChannels);
+                    }
+                }
+
+                // Normalize relative paths to project root to avoid CWD issues
+                $rootPath = dirname(__DIR__, 2);
+                $resolvePath = function ($path) use ($rootPath) {
+                    if (is_string($path) && str_starts_with($path, './')) {
+                        return $rootPath.substr($path, 1);
+                    }
+
+                    return $path;
+                };
+
+                foreach ($config as $chan => $chanConfig) {
+                    if (isset($chanConfig['token_path'])) {
+                        $config[$chan]['token_path'] = $resolvePath($chanConfig['token_path']);
+                    }
+                }
+
+                $resolvePlaceholders = function (&$item) use (&$resolvePlaceholders) {
+                    if (is_array($item)) {
+                        foreach ($item as &$value) {
+                            $resolvePlaceholders($value);
+                        }
+                    } elseif (is_string($item) && preg_match('/\${([^}]+)}/', $item, $matches)) {
+                        $envValue = getenv($matches[1]);
+                        if ($envValue !== false && $envValue !== '') {
+                            $item = $envValue;
+                        } else {
+                            $item = ''; // Clear unresolved placeholders
+                        }
+                    }
+                };
+                $resolvePlaceholders($config);
+
+                // Dynamic config enrichment from Drivers and Registry (Decoupled implementation)
+                $registry = DriverFactory::getRegistry();
+
+                // 1. Inject credentials from environment variables using Driver-defined mappings
+                foreach ($registry as $chan => $chanDef) {
+                    $driverClass = $chanDef['driver'] ?? null;
+                    if ($driverClass && class_exists($driverClass) && method_exists($driverClass, 'getEnvMapping')) {
+                        $mapping = $driverClass::getEnvMapping();
+                        foreach ($mapping as $targetChan => $envMap) {
+                            if (!isset($config[$targetChan])) {
+                                $config[$targetChan] = [];
+                            }
+                            foreach ($envMap as $envKey => $configKey) {
+                                $val = getenv($envKey);
+                                if ($val && empty($config[$targetChan][$configKey])) {
+                                    $config[$targetChan][$configKey] = $val;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Generic Parental Inheritance (Backward Compatibility for common credentials)
+                foreach ($registry as $chan => $chanDef) {
+                    $parent = $chanDef['parent'] ?? null;
+                    if ($parent && !empty($config[$parent])) {
+                        if (isset($config[$chan])) {
+                            // Important: Merge parent into child preserving existing child values
+                            $config[$chan] = array_replace_recursive($config[$parent], $config[$chan]);
+                            // Maintain nested structure for backward compatibility
+                            if (!isset($config[$chan][$parent])) {
+                                $config[$chan][$parent] = $config[$parent];
+                            } else {
+                                $config[$chan][$parent] = array_replace_recursive($config[$parent], array_filter($config[$chan][$parent]));
+                            }
+                        }
+                    }
+                }
+
+                if (getenv('APP_ENV') === 'demo') {
+                    $placeholders = ['PAGE_ID', 'IG_ACCOUNT_ID', 'PAGE_URL', 'example.com', 'AD_ACCOUNT_ID'];
+                    $cleanEntityList = function ($entities) use ($placeholders) {
+                        return array_filter($entities, function ($item) use ($placeholders) {
+                            $asString = json_encode($item);
+                            foreach ($placeholders as $p) {
+                                if (str_contains($asString, $p)) {
+                                    return false;
+                                }
+                            }
+
+                            return true;
+                        });
+                    };
+
+                    $registry = DriverFactory::getRegistry();
+                    foreach ($registry as $chan => $rConfig) {
+                        $resourceKey = $rConfig['resource_key'] ?? null;
+                        if ($resourceKey && isset($config[$chan][$resourceKey])) {
+                            $config[$chan][$resourceKey] = $cleanEntityList($config[$chan][$resourceKey]);
+                        }
+                    }
+                }
+
+                return $config;
+            } catch (Exception $e) {
+                throw new RuntimeException("Failed to load channels configuration: ".$e->getMessage());
+            }
         }
 
         /**
