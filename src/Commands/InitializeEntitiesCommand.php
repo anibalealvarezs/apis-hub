@@ -403,7 +403,7 @@
                     error_log("FATAL ERROR initializing channel '$channel': ".$e->getMessage());
                     error_log($e->getTraceAsString());
 
-                    return Command::FAILURE;
+                    continue; // Continue with next channel instead of failing the whole deployment
                 }
             }
 
