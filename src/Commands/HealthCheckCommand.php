@@ -28,7 +28,7 @@
             $dbStatus = true;
             try {
                 $em = Helpers::getManager();
-                $em->getConnection()->connect();
+                $em->getConnection()->executeQuery('SELECT 1');
                 $output->writeln("<info>ONLINE</info>");
             } catch (Throwable $e) {
                 $output->writeln("<error>OFFLINE: ".$e->getMessage()."</error>");
