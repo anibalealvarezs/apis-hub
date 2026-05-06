@@ -81,6 +81,10 @@
          */
         public static function getProjectConfig(): array
         {
+            if (self::$projectConfig !== null) {
+                return self::$projectConfig;
+            }
+
             $config = [];
             $rootConfigDir = self::getConfigDir();
 
@@ -166,7 +170,13 @@
                 $config = array_replace_recursive($config, $legacyConfig);
             }
 
-            return $config;
+            return self::$projectConfig = $config;
+        }
+
+        public static function clearConfigCache(): void
+        {
+            self::$projectConfig = null;
+            self::$channelsConfig = null;
         }
 
         /**
@@ -504,6 +514,10 @@
          */
         public static function getChannelsConfig(): array
         {
+            if (self::$channelsConfig !== null) {
+                return self::$channelsConfig;
+            }
+
             $projectConfig = self::getProjectConfig();
             $config = $projectConfig['channels'] ?? [];
             $configDir = self::getConfigDir();

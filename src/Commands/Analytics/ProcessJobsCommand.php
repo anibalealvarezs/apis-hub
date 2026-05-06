@@ -47,6 +47,8 @@ class ProcessJobsCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        Helpers::clearConfigCache();
+        $channelsConfig = Helpers::getChannelsConfig();
         $envInstance = getenv('INSTANCE_NAME');
         $lockFile = sys_get_temp_dir() . '/process_jobs_' . ($envInstance ?: 'default') . '.lock';
         $fp = fopen($lockFile, 'w+');
