@@ -101,8 +101,10 @@ class ProcessJobsCommand extends Command
                     $activeIds = [];
                     foreach (explode("\n", trim($activeContainersStr)) as $line) {
                         if (empty($line)) continue;
-                        $parts = explode('|', $line);
-                        $activeIds = array_merge($activeIds, $parts);
+                        $parts = explode('|', $line); // [Name, ID]
+                        $activeIds[] = $parts[0]; // Full container name
+                        $activeIds[] = $parts[1]; // Short container ID
+                        $activeIds[] = "worker-" . $parts[1]; // Our unique worker identity
                     }
                     // Also include ourselves and known master/specific instances
                     $activeIds[] = $envInstance;
