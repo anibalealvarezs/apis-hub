@@ -301,6 +301,9 @@
 
                     $output->writeln("<info>TRACE: [$channel] Persisting YAML assets...</info>");
 
+                    $pageCache = [];
+                    $channeledAccountCache = [];
+
                     foreach ($assets as $assetInfo) {
                         $asset = $assetInfo['data'];
                         $category = $assetInfo['category'];
@@ -343,7 +346,15 @@
                                 continue;
                             }
 
-                            $dbPage = $canonicalId ? ($this->entityManager->getRepository(Page::class)->findOneBy(['canonicalId' => $canonicalId])) : null;
+                            $dbPage = null;
+                            if ($canonicalId) {
+                                if (isset($pageCache[$canonicalId])) {
+                                    $dbPage = $pageCache[$canonicalId];
+                                } else {
+                                    $dbPage = $this->entityManager->getRepository(Page::class)->findOneBy(['canonicalId' => $canonicalId]);
+                                }
+                            }
+                            
                             if (!$dbPage && !$anyEnabled) {
                                 continue;
                             }
@@ -351,8 +362,14 @@
                                 $dbPage = new Page();
                                 if ($canonicalId) {
                                     $dbPage->addCanonicalId($canonicalId);
+                                    $pageCache[$canonicalId] = $dbPage; // Save to local cache
+                                }
+                            } else {
+                                if ($canonicalId) {
+                                    $pageCache[$canonicalId] = $dbPage; // Save to local cache
                                 }
                             }
+                            
                             $dbPage->addUrl($page['url'] ?? null)
                                 ->addTitle($page['title'] ?? null)
                                 ->addAccount($accountEntity)
@@ -368,17 +385,29 @@
                                 continue;
                             }
 
-                            $dbChanneledAccount = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy([
-                                'platformId' => (string)$pId,
-                                'channel'    => $channelEntity,
-                            ]);
+                            $cacheKey = (string)$pId . '_' . $channelEntity->getId();
+                            $dbChanneledAccount = null;
+                            
+                            if (isset($channeledAccountCache[$cacheKey])) {
+                                $dbChanneledAccount = $channeledAccountCache[$cacheKey];
+                            } else {
+                                $dbChanneledAccount = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy([
+                                    'platformId' => (string)$pId,
+                                    'channel'    => $channelEntity,
+                                ]);
+                            }
+
                             if (!$dbChanneledAccount && !$anyEnabled) {
                                 continue;
                             }
                             if (!$dbChanneledAccount) {
                                 $dbChanneledAccount = new ChanneledAccount();
                                 $dbChanneledAccount->addPlatformId($pId);
+                                $channeledAccountCache[$cacheKey] = $dbChanneledAccount;
+                            } else {
+                                $channeledAccountCache[$cacheKey] = $dbChanneledAccount;
                             }
+                            
                             $dbChanneledAccount->addAccount($accountEntity)
                                 ->addType($account['type'])
                                 ->addChannel($channelEntity)
