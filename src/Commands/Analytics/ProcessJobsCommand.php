@@ -91,29 +91,45 @@ class ProcessJobsCommand extends Command
                 $this->logger->info("Resumption: Reset ".($resetByInstance + $resetByWorker)." jobs previously held by this instance ({$envInstance}).");
             }
 
-            // Global recovery: If this is the Master, detect dead containers via Docker Socket
-            if (! $isGenericWorker) {
+            // Global recovery: If this is the Master (has docker socket), detect dead containers
+            $isMaster = file_exists('/var/run/docker.sock');
+            
+            if ($isMaster) {
                 // 1. Reset by Timeout (Safety net for other issues, increased to 2 hours)
                 $jobRepo->resetAllOrphanedJobs(120);
 
-                // 2. Reset by Dead Containers (Accurate detection)
-                // We use docker ps to get names and short IDs of running containers
-                $activeContainersStr = shell_exec("docker ps --format '{{.Names}}|{{.ID}}' 2>/dev/null");
-                if ($activeContainersStr) {
-                    $activeIds = [];
-                    foreach (explode("\n", trim($activeContainersStr)) as $line) {
-                        if (empty($line)) continue;
-                        $parts = explode('|', $line); // [Name, ID]
-                        $activeIds[] = $parts[0]; // Full container name
-                        $activeIds[] = $parts[1]; // Short container ID
-                        $activeIds[] = "worker-" . $parts[1]; // Our unique worker identity
-                    }
-                    // Also include ourselves and known master/specific instances
-                    $activeIds[] = $envInstance;
-                    
-                    $resetDead = $jobRepo->resetJobsByDeadWorkers($activeIds);
-                    if ($resetDead > 0) {
-                        $this->logger->info("Global Recovery: Reset {$resetDead} jobs from dead containers.");
+                // 2. Reset by Dead Containers (Accurate detection via Docker Socket API)
+                $activeContainersStr = '';
+                $ch = curl_init('http://localhost/containers/json');
+                curl_setopt($ch, CURLOPT_UNIX_SOCKET_PATH, '/var/run/docker.sock');
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                $response = curl_exec($ch);
+                curl_close($ch);
+
+                if ($response) {
+                    $containers = json_decode($response, true);
+                    if (is_array($containers)) {
+                        $activeIds = [];
+                        foreach ($containers as $container) {
+                            $shortId = substr($container['Id'], 0, 12);
+                            $activeIds[] = $shortId;
+                            $activeIds[] = "worker-" . $shortId;
+                            
+                            if (!empty($container['Names'])) {
+                                foreach ($container['Names'] as $name) {
+                                    $cleanName = ltrim($name, '/');
+                                    $activeIds[] = $cleanName;
+                                }
+                            }
+                        }
+                        
+                        // Also include ourselves and known master/specific instances
+                        $activeIds[] = $envInstance;
+                        
+                        $resetDead = $jobRepo->resetJobsByDeadWorkers($activeIds);
+                        if ($resetDead > 0) {
+                            $this->logger->info("Cleanup: Reset {$resetDead} jobs from dead containers.");
+                        }
                     }
                 }
             }
