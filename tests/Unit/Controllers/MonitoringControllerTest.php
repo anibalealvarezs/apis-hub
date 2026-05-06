@@ -3,12 +3,16 @@
 namespace Tests\Unit\Controllers;
 
 use Controllers\MonitoringController;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use Entities\Job;
+use Enums\JobStatus;
+use ReflectionClass;
 use Repositories\JobRepository;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Enums\JobStatus;
 use Tests\Unit\BaseUnitTestCase;
 
 class MonitoringControllerTest extends BaseUnitTestCase
@@ -22,22 +26,20 @@ class MonitoringControllerTest extends BaseUnitTestCase
         parent::setUp();
         $this->entityManager = $this->createMock(EntityManager::class);
         $this->jobRepository = $this->createMock(JobRepository::class);
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
 
         $this->entityManager->method('getRepository')
             ->with(Job::class)
             ->willReturn($this->jobRepository);
-            
+
         $this->entityManager->method('getConnection')
             ->willReturn($connection);
 
-        // Mock statement for fetchAllAssociative
         $connection->method('fetchAllAssociative')->willReturn([]);
 
         $this->controller = new MonitoringController();
-        
-        // Inject mock EM into controller
-        $reflection = new \ReflectionClass($this->controller);
+
+        $reflection = new ReflectionClass($this->controller);
         $emProperty = $reflection->getProperty('em');
         $emProperty->setAccessible(true);
         $emProperty->setValue($this->controller, $this->entityManager);
@@ -53,12 +55,10 @@ class MonitoringControllerTest extends BaseUnitTestCase
 
     public function testDataReturnsJsonInstances(): void
     {
-        // Mock findBy to return empty or mock data
         $this->jobRepository->method('findBy')->willReturn([]);
-        
-        // Mock count queries in data()
-        $queryBuilder = $this->createMock(\Doctrine\ORM\QueryBuilder::class);
-        $query = $this->createMock(\Doctrine\ORM\Query::class);
+
+        $queryBuilder = $this->createMock(QueryBuilder::class);
+        $query = $this->createMock(Query::class);
         $this->entityManager->method('createQueryBuilder')->willReturn($queryBuilder);
         $queryBuilder->method('select')->willReturnSelf();
         $queryBuilder->method('from')->willReturnSelf();
@@ -71,7 +71,7 @@ class MonitoringControllerTest extends BaseUnitTestCase
         $this->assertInstanceOf(Response::class, $response);
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
         $this->assertStringContainsString('application/json', $response->headers->get('Content-Type'));
-        
+
         $content = json_decode($response->getContent(), true);
         $this->assertArrayHasKey('containers', $content);
     }
@@ -95,10 +95,10 @@ class MonitoringControllerTest extends BaseUnitTestCase
         $this->jobRepository->method('find')->with($jobId)->willReturn($mockJob);
 
         $request = new Request([], ['id' => $jobId, 'action' => 'cancel']);
-        
+
         $this->jobRepository->expects($this->once())
             ->method('update')
-            ->with($jobId, $this->callback(function($data) {
+            ->with($jobId, $this->callback(function ($data) {
                 return $data->status === JobStatus::cancelled->value;
             }))
             ->willReturn(['id' => $jobId]);
@@ -119,21 +119,21 @@ class MonitoringControllerTest extends BaseUnitTestCase
         $mockJob->method('getChannel')->willReturn($channel);
         $mockJob->method('getEntity')->willReturn($entity);
         $mockJob->method('getPayload')->willReturn($payload);
-        
+
         $this->jobRepository->method('find')->with($jobId)->willReturn($mockJob);
-            
+
         $this->jobRepository->expects($this->once())
             ->method('create')
-            ->with($this->callback(function($data) use ($channel, $entity) {
-                return $data->channel === $channel && 
-                       $data->entity === $entity &&
-                       $data->status === JobStatus::scheduled->value;
+            ->with($this->callback(function ($data) use ($channel, $entity) {
+                return $data->channel === $channel
+                    && $data->entity === $entity
+                    && $data->status === JobStatus::scheduled->value;
             }))
             ->willReturn(['id' => $newJobId]);
 
         $request = new Request([], ['id' => $jobId, 'action' => 'retry']);
         $response = $this->controller->jobAction($request);
-        
+
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
         $content = json_decode($response->getContent(), true);
         $this->assertStringContainsString("Original #$jobId history preserved", $content['message']);
@@ -183,5 +183,4 @@ class MonitoringControllerTest extends BaseUnitTestCase
         $content = json_decode($response->getContent(), true);
         $this->assertStringContainsString('numeric', $content['error']);
     }
-
 }
