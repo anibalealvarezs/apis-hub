@@ -53,6 +53,7 @@ class ProcessJobsCommand extends Command
 
         $envChannel = getenv('API_SOURCE');
         $envInstance = getenv('INSTANCE_NAME');
+        $isGenericWorker = str_starts_with($envInstance ?? '', 'worker-');
         $forceAll = $input->getOption('force-all');
 
         if (Helpers::isDebug() || $forceAll) {
@@ -127,7 +128,6 @@ class ProcessJobsCommand extends Command
 
                 // 1. Instance Name Match (Primary Filter)
                 $jobInstance = $payload['instance_name'] ?? null;
-                $isGenericWorker = str_starts_with($envInstance ?? '', 'worker-');
                 if (! $jobId && ! $forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance && ! $isGenericWorker) {
                     $stats['skipped']++;
 
