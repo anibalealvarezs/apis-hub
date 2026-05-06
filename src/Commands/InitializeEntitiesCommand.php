@@ -48,6 +48,7 @@
 
         protected function execute(InputInterface $input, OutputInterface $output): int
         {
+            die("!!! REACHED INITIALIZE-ENTITIES EXECUTE !!!\n");
             $this->logger = new ConsoleLogger($output);
             $this->logger->info("Starting dynamic entity initialization...");
 
@@ -132,6 +133,7 @@
             $channelsConfig = Helpers::getChannelsConfig();
 
             foreach ($registry as $channel => $driverCfg) {
+                $output->writeln("DEBUG: Processing channel: $channel");
                 // Determine if specifically enabled for this channel
                 $chanConfig = $channelsConfig[$channel] ?? [];
 
