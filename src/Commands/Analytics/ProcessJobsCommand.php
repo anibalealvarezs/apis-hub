@@ -302,19 +302,22 @@ class ProcessJobsCommand extends Command
                     }
 
                     $chanConfig = $channelsConfig[$chanKey] ?? null;
-                    error_log("DEBUG: Job {$job->getUuid()} - Channel: $chanKey - Config: " . json_encode($chanConfig));
+                    
+                    $isEnabled = true;
+                    if ($chanConfig && isset($chanConfig['enabled'])) {
+                        $isEnabled = (bool) $chanConfig['enabled'];
+                    }
 
                     // Check if channel is enabled
-                    if ($chanConfig && isset($chanConfig['enabled']) && ! $chanConfig['enabled']) {
+                    if (!$isEnabled) {
+                        $output->writeln("<error>FAILURE: Channel '$chanKey' is EXPLICITLY DISABLED in the loaded configuration.</error>");
+                        $output->writeln("<comment>Loaded Config for '$chanKey': " . json_encode($chanConfig) . "</comment>");
+                        
                         $jobRepo->update($job->getId(), (object)[
                             'status' => JobStatus::failed->value,
                             'message' => 'Channel is disabled in configuration',
                         ]);
-                        if (Helpers::isDebug()) {
-                            $output->writeln("<comment>Job {$job->getUuid()} marked as failed because channel {$channelName} is disabled.</comment>");
-                        }
                         $stats['failed']++;
-
                         continue;
                     }
 
