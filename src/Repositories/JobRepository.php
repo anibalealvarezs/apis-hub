@@ -165,13 +165,13 @@ class JobRepository extends BaseRepository
             $envStart = getenv('START_DATE');
             $envEnd = getenv('END_DATE');
 
-            if ($envChannel && (! is_object($filters) || ! isset($filters->channel))) {
+            if ($envChannel && $envChannel !== 'none' && (! is_object($filters) || ! isset($filters->channel))) {
                 if ($chanEnum = Channel::tryFromName($envChannel)) {
                     $envChannel = $chanEnum->name;
                 }
                 $query->andWhere('e.channel = :ctx_channel')->setParameter('ctx_channel', $envChannel);
             }
-            if ($envEntity && (! is_object($filters) || ! isset($filters->entity))) {
+            if ($envEntity && $envEntity !== 'none' && (! is_object($filters) || ! isset($filters->entity))) {
                 $equivalents = [$envEntity];
                 if (strpos($envEntity, 'channeled_') === 0) {
                     $equivalents[] = str_replace('channeled_', '', $envEntity);

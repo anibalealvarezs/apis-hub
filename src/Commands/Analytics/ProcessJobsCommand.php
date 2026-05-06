@@ -47,13 +47,24 @@ class ProcessJobsCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $envInstance = getenv('INSTANCE_NAME');
+        $lockFile = sys_get_temp_dir() . '/process_jobs_' . ($envInstance ?: 'default') . '.lock';
+        $fp = fopen($lockFile, 'w+');
+
+        if (!flock($fp, LOCK_EX | LOCK_NB)) {
+            if (Helpers::isDebug()) {
+                $output->writeln("<comment>Another instance of this command is already running for '{$envInstance}'. Skipping.</comment>");
+            }
+            fclose($fp);
+            return Command::SUCCESS;
+        }
+
         Helpers::reconnectIfNeeded($this->em);
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
 
         $envChannel = getenv('API_SOURCE');
-        $envInstance = getenv('INSTANCE_NAME');
-        $isGenericWorker = str_starts_with($envInstance ?? '', 'worker-');
+        $isGenericWorker = str_contains($envInstance ?? '', 'worker-');
         $forceAll = $input->getOption('force-all');
 
         if (Helpers::isDebug() || $forceAll) {
