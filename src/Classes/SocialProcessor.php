@@ -119,29 +119,15 @@ class SocialProcessor
 
     private static array $channelMap = [];
 
-    private static function resolveChannelId(string $channelName, EntityManager $manager): ?int
+    private static function resolveChannelId(string $channelName, EntityManager $manager): int
     {
         if (isset(self::$channelMap[$channelName])) {
             return self::$channelMap[$channelName];
         }
 
-        $repo = $manager->getRepository(\Entities\Analytics\Channel::class);
-        $channel = $repo->findOneBy(['name' => $channelName]);
-        
+        $channel = $manager->getRepository(\Entities\Analytics\Channel::class)->findOneBy(['name' => $channelName]);
         if (!$channel) {
-            // Fallback: Case-insensitive search
-            $allChannels = $repo->findAll();
-            foreach ($allChannels as $c) {
-                if (strtolower($c->getName()) === strtolower($channelName)) {
-                    $channel = $c;
-                    break;
-                }
-            }
-        }
-
-        if (!$channel) {
-            error_log("WARNING: Channel '$channelName' not found in database. Skipping entity.");
-            return null;
+            throw new \Exception("Channel '$channelName' not found in database during social processing.");
         }
 
         self::$channelMap[$channelName] = $channel->getId();
@@ -156,15 +142,10 @@ class SocialProcessor
         $account = $entity->getContext()['account'] ?? null;
         $accountId = is_object($account) ? $account->getId() : $account;
 
-        $channelId = self::resolveChannelId((string)$entity->getChannel(), $manager);
-        if (!$channelId) {
-            return;
-        }
-
         $params = [
             (string)$entity->getPlatformId(),
             $accountId,
-            $channelId,
+            self::resolveChannelId((string)$entity->getChannel(), $manager),
             (string)($entity->getTitle() ?? $entity->getPlatformId()),
             (string)$entity->getType(),
             json_encode($entity->getData() ?? [])
