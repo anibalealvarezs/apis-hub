@@ -4,7 +4,7 @@
 
     namespace Commands\Analytics;
 
-    use Traits\AggregationFallbackTelemetryReporter;
+    use Services\Aggregation\AggregationFallbackTelemetryReporter;
     use Symfony\Component\Console\Attribute\AsCommand;
     use Symfony\Component\Console\Command\Command;
     use Symfony\Component\Console\Input\InputInterface;
