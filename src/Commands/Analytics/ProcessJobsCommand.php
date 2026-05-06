@@ -313,6 +313,8 @@ class ProcessJobsCommand extends Command
                     // Check if channel is enabled
                     if (!$isEnabled) {
                         $configDump = json_encode($chanConfig);
+                        file_put_contents('/tmp/debug_channel.log', "DEBUG: Channel $chanKey failed at " . date('Y-m-d H:i:s') . " - Config: $configDump\n", FILE_APPEND);
+                        
                         $output->writeln("<error>FAILURE: Channel '$chanKey' is EXPLICITLY DISABLED in the loaded configuration.</error>");
                         $output->writeln("<comment>Loaded Config for '$chanKey': $configDump</comment>");
                         
