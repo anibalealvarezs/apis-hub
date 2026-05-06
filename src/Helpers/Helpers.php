@@ -825,10 +825,7 @@
                     self::$entityManager = new EntityManager(self::$connection, $ormConfig);
                     error_log("DEBUG: Helpers::getManager - CREATED NEW EntityManager. ID: ".spl_object_id(self::$entityManager));
                 } catch (Exception $e) {
-                    $config = self::getDbConfig();
-                    $host = $config['host'] ?? 'unknown';
-                    $port = $config['port'] ?? 'unknown';
-                    throw new RuntimeException("INTENTO DE CONEXIÓN A {$host}:{$port} - Error: ".$e->getMessage());
+                    throw new RuntimeException('Failed to initialize EntityManager: '.$e->getMessage());
                 }
             }
 
