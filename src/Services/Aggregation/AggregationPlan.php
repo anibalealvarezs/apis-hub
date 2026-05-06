@@ -4,7 +4,7 @@
 
     namespace Services\Aggregation;
 
-    final readonly class AggregationPlan
+    final class AggregationPlan
     {
         /**
          * @param array<string, string> $aggregations
@@ -98,6 +98,13 @@
         public function getContextValue(string $key, mixed $default = null): mixed
         {
             return $this->context[$key] ?? $default;
+        }
+
+        public function addContext(string $key, mixed $value): self
+        {
+            $this->context[$key] = $value;
+
+            return $this;
         }
 
         /**
