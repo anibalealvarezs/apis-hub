@@ -48,13 +48,13 @@
 
         protected function execute(InputInterface $input, OutputInterface $output): int
         {
-            die("!!! REACHED INITIALIZE-ENTITIES EXECUTE !!!\n");
             $this->logger = new ConsoleLogger($output);
             $this->logger->info("Starting dynamic entity initialization...");
 
             try {
                 // 1. Initialize Core Entities
                 $this->initializeCoreEntities();
+                die("!!! PASSED CORE ENTITIES !!!\n");
 
                 // 2. Initialize Channel-specific Entities via Drivers
                 $exitCode = $this->initializeChannelEntities($output);
