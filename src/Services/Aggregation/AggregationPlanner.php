@@ -497,14 +497,12 @@
         {
             if (is_object($value)) {
                 $op = strtolower(trim($value->operator ?? 'eq'));
-                if (in_array($op, ['not_equal', 'not_eq', '!=', '<>'], true)) {
-                    return 'neq';
-                }
-                if (in_array($op, ['equal', 'eq', '='], true)) {
-                    return 'eq';
-                }
+                return $this->normalizeOperator($op);
+            }
 
-                return $op !== '' ? $op : 'eq';
+            if (is_array($value)) {
+                $op = strtolower(trim($value['operator'] ?? 'eq'));
+                return $this->normalizeOperator($op);
             }
 
             if (is_string($value)) {
@@ -521,6 +519,18 @@
             }
 
             return 'eq';
+        }
+
+        private function normalizeOperator(string $op): string
+        {
+            if (in_array($op, ['not_equal', 'not_eq', 'neq', '!=', '<>'], true)) {
+                return 'neq';
+            }
+            if (in_array($op, ['equal', 'eq', '='], true)) {
+                return 'eq';
+            }
+
+            return $op !== '' ? $op : 'eq';
         }
 
         /**
