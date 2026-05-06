@@ -111,7 +111,6 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         'restart'     => 'always',
         'command'     => null,
         'environment' => $buildEnv('worker'),
-        'volumes'     => $phpVolumes,
         'networks'    => ['default'],
         'depends_on'  => [
             'master' => ['condition' => 'service_started'],
