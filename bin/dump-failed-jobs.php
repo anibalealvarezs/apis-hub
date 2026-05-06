@@ -2,23 +2,26 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 use Helpers\Helpers;
 use Entities\Job;
-use Enums\JobStatus;
 
 $em = Helpers::getManager();
 $jobRepo = $em->getRepository(Job::class);
 
-$failedJobs = $jobRepo->findBy(
-    ['status' => JobStatus::failed->value],
+$allJobs = $jobRepo->findBy(
+    [],
     ['updatedAt' => 'DESC'],
-    5
+    15
 );
 
-echo "Last 5 Failed Jobs (with Timestamps):\n";
-echo "------------------------------------\n";
-foreach ($failedJobs as $job) {
+echo "Last 15 Jobs Status & Ownership:\n";
+echo "---------------------------------\n";
+foreach ($allJobs as $job) {
+    $payload = $job->getPayload() ?? [];
+    $owner = $payload['instance_name'] ?? 'None';
     echo "ID: " . $job->getUuid() . "\n";
-    echo "Time: " . $job->getUpdatedAt()->format('Y-m-d H:i:s') . "\n";
+    echo "Time: " . $job->getUpdatedAt()->format('H:i:s') . "\n";
+    echo "Status: " . $job->getStatus() . "\n";
     echo "Channel: " . $job->getChannel() . "\n";
-    echo "Message: " . $job->getMessage() . "\n";
-    echo "------------------------------------\n";
+    echo "Owner: " . $owner . "\n";
+    echo "Message: " . substr((string)($job->getMessage() ?? ''), 0, 50) . "...\n";
+    echo "---------------------------------\n";
 }
