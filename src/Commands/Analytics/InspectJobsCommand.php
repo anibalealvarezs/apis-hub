@@ -47,11 +47,15 @@ class InspectJobsCommand extends Command
             }
 
             // Failed jobs by Channel (Last 24h)
+            $yesterday = (new \DateTime())->modify('-1 day')->format('Y-m-d H:i:s');
             $sqlFailed = "SELECT channel, COUNT(*) as count FROM jobs 
                           WHERE status = :status 
-                          AND updated_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
+                          AND updated_at >= :yesterday
                           GROUP BY channel";
-            $failedResults = $conn->fetchAllAssociative($sqlFailed, ['status' => JobStatus::failed->value]);
+            $failedResults = $conn->fetchAllAssociative($sqlFailed, [
+                'status' => JobStatus::failed->value,
+                'yesterday' => $yesterday
+            ]);
 
             if (!empty($failedResults)) {
                 $output->writeln("\n<error>Failed Jobs (Last 24h) by Channel:</error>");
