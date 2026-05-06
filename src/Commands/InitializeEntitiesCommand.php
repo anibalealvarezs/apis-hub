@@ -53,23 +53,22 @@
 
             try {
                 // 1. Initialize Core Entities
-                try {
-                    $this->initializeCoreEntities();
-                } catch (Exception $e) {
-                    $this->logger?->warning("Core entity initialization partially failed: ".$e->getMessage());
-                }
+                $this->initializeCoreEntities();
 
                 // 2. Initialize Channel-specific Entities via Drivers
-                $this->initializeChannelEntities($output);
+                $exitCode = $this->initializeChannelEntities($output);
+                if ($exitCode !== Command::SUCCESS) {
+                    return $exitCode;
+                }
 
                 $this->logger->info("Initialization complete.");
 
                 return Command::SUCCESS;
 
             } catch (Exception $e) {
-                $this->logger?->error("Initialization encountered a non-fatal error: ".$e->getMessage());
+                $this->logger?->error("Initialization failed: ".$e->getMessage());
 
-                return Command::SUCCESS; // Still return success to allow server to start
+                return Command::FAILURE;
             }
         }
 
@@ -404,7 +403,7 @@
                     error_log("FATAL ERROR initializing channel '$channel': ".$e->getMessage());
                     error_log($e->getTraceAsString());
 
-                    continue; // Continue with next channel instead of failing the whole deployment
+                    return Command::FAILURE;
                 }
             }
 
