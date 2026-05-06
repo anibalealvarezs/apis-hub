@@ -129,15 +129,8 @@ class DriverInitializer
     public static function bootDrivers(?LoggerInterface $logger = null): void
     {
         $registry = DriverFactory::getRegistry();
-        $channelsConfig = Helpers::getChannelsConfig();
-
         foreach ($registry as $channel => $config) {
             if (! isset($config['driver'])) {
-                continue;
-            }
-
-            // ONLY boot if enabled in configuration
-            if (! ($channelsConfig[$channel]['enabled'] ?? false)) {
                 continue;
             }
 

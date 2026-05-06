@@ -129,6 +129,7 @@
         protected function initializeChannelEntities(OutputInterface $output): int
         {
             $registry = DriverFactory::getRegistry();
+            die("!!! PASSED REGISTRY !!!\n");
             $channelsConfig = Helpers::getChannelsConfig();
                 // Determine if specifically enabled for this channel
                 $chanConfig = $channelsConfig[$channel] ?? [];
