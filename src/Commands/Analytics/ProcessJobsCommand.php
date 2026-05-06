@@ -64,7 +64,7 @@ class ProcessJobsCommand extends Command
         $jobRepo = $this->em->getRepository(Job::class);
 
         $envChannel = getenv('API_SOURCE');
-        $isGenericWorker = str_contains($envInstance ?? '', 'worker-');
+        $isGenericWorker = str_contains($envInstance ?? '', 'worker');
         $forceAll = $input->getOption('force-all');
 
         if (Helpers::isDebug() || $forceAll) {
