@@ -8,6 +8,11 @@ mkdir -p /app/logs /app/storage
 # We exclude proxy variables and other sensitive/volatile ones if needed
 printenv | grep -v "no_proxy" >> /etc/environment
 
+# Set Instance Name with uniqueness if it's a worker
+if [[ "$INSTANCE_NAME" == *"worker"* ]]; then
+    export INSTANCE_NAME="${INSTANCE_NAME}-$(hostname)"
+fi
+
 # Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
 if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     # Ensure modular dependencies are registered (especially during refactoring with local paths)

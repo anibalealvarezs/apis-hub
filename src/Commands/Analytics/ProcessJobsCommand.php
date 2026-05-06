@@ -84,11 +84,34 @@ class ProcessJobsCommand extends Command
         if ($envInstance) {
             $resetByInstance = $jobRepo->resetStuckJobsByInstance($envInstance);
             $resetByWorker = $jobRepo->resetStuckJobsByWorker($envInstance);
-            $resetCount = $resetByInstance + $resetByWorker;
 
-            if ($resetCount > 0) {
-                $output->writeln("<info>Resumption: Reset {$resetCount} jobs previously held by this instance ({$envInstance}).</info>");
-                $this->logger->info("Resumption: Reset {$resetCount} jobs previously held by this instance ({$envInstance}).");
+            if ($resetByInstance > 0 || $resetByWorker > 0) {
+                $this->logger->info("Resumption: Reset ".($resetByInstance + $resetByWorker)." jobs previously held by this instance ({$envInstance}).");
+            }
+
+            // Global recovery: If this is the Master, detect dead containers via Docker Socket
+            if (! $isGenericWorker) {
+                // 1. Reset by Timeout (Safety net for other issues, increased to 2 hours)
+                $jobRepo->resetAllOrphanedJobs(120);
+
+                // 2. Reset by Dead Containers (Accurate detection)
+                // We use docker ps to get names and short IDs of running containers
+                $activeContainersStr = shell_exec("docker ps --format '{{.Names}}|{{.ID}}' 2>/dev/null");
+                if ($activeContainersStr) {
+                    $activeIds = [];
+                    foreach (explode("\n", trim($activeContainersStr)) as $line) {
+                        if (empty($line)) continue;
+                        $parts = explode('|', $line);
+                        $activeIds = array_merge($activeIds, $parts);
+                    }
+                    // Also include ourselves and known master/specific instances
+                    $activeIds[] = $envInstance;
+                    
+                    $resetDead = $jobRepo->resetJobsByDeadWorkers($activeIds);
+                    if ($resetDead > 0) {
+                        $this->logger->info("Global Recovery: Reset {$resetDead} jobs from dead containers.");
+                    }
+                }
             }
         }
 

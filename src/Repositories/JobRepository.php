@@ -480,8 +480,64 @@ class JobRepository extends BaseRepository
     }
 
     /**
-     * Resets stuck jobs by worker ID.
+     * Resets jobs held by workers that are no longer active.
      *
+     * @param array $activeWorkerIds
+     * @return int
+     */
+    public function resetJobsByDeadWorkers(array $activeWorkerIds): int
+    {
+        if (empty($activeWorkerIds)) {
+            return 0;
+        }
+
+        $qb = $this->createQueryBuilder('e');
+        $count = $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':scheduled')
+            ->set('e.updatedAt', ':now')
+            ->where('e.status = :processing')
+            ->andWhere('e.workerId NOT IN (:activeWorkers)')
+            ->andWhere('e.workerId IS NOT NULL')
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('processing', JobStatus::processing->value)
+            ->setParameter('now', new \DateTime())
+            ->setParameter('activeWorkers', $activeWorkerIds)
+            ->getQuery()
+            ->execute();
+
+        return (int)$count;
+    }
+
+    /**
+     * Resets ALL jobs that have been stuck in processing for too long.
+     * This is a safety net for orphaned jobs when workers crash or are renamed.
+     *
+     * @param int $timeoutMinutes
+     * @return int
+     */
+    public function resetAllOrphanedJobs(int $timeoutMinutes = 30): int
+    {
+        $threshold = new \DateTime();
+        $threshold->modify("-{$timeoutMinutes} minutes");
+
+        $qb = $this->createQueryBuilder('e');
+        $count = $qb->update($this->getEntityName(), 'e')
+            ->set('e.status', ':scheduled')
+            ->set('e.updatedAt', ':now')
+            ->where('e.status = :processing')
+            ->andWhere('e.updatedAt < :threshold')
+            ->setParameter('scheduled', JobStatus::scheduled->value)
+            ->setParameter('processing', JobStatus::processing->value)
+            ->setParameter('now', new \DateTime())
+            ->setParameter('threshold', $threshold)
+            ->getQuery()
+            ->execute();
+
+        return (int)$count;
+    }
+
+    /**
+     * Resets jobs held by a specific worker ID that are stuck in processing.
      * @param string $workerId
      * @return int
      */
