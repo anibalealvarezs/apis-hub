@@ -33,8 +33,11 @@
         {
             $jobRepo = $this->entityManager->getRepository(Job::class);
 
-            // 1. Get Scheduled Jobs
+            // 1. Get Active Jobs (Scheduled + Processing)
             $scheduledJobs = $jobRepo->findBy(['status' => JobStatus::scheduled->value]);
+            $processingJobs = $jobRepo->findBy(['status' => JobStatus::processing->value]);
+
+            $activeJobsCount = count($scheduledJobs) + count($processingJobs);
 
             // 2. Calculate Demand
             $demand = 0;
@@ -59,7 +62,7 @@
             $maxWorkers = (int)($infraConfig['max_workers'] ?? 10);
             $jobsPerWorker = (int)($infraConfig['jobs_per_worker'] ?? 10);
 
-            $targetCount = (int)ceil($demand / $jobsPerWorker);
+            $targetCount = (int)ceil(max($demand, (float)$activeJobsCount) / $jobsPerWorker);
             $targetCount = max($minWorkers, min($maxWorkers, $targetCount));
 
             $output->writeln("Queue Demand Score: $demand. Target Workers: $targetCount");
