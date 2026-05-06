@@ -4,6 +4,10 @@ set -e
 # Ensure persistent log directory exists (mapped to host via volume)
 mkdir -p /app/logs /app/storage
 
+# Export environment variables for cron
+# We exclude proxy variables and other sensitive/volatile ones if needed
+printenv | grep -v "no_proxy" >> /etc/environment
+
 # Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
 if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     # Ensure modular dependencies are registered (especially during refactoring with local paths)
