@@ -232,7 +232,7 @@ class ProcessJobsCommand extends Command
 
                 // Dependency check
                 $requires = $params['requires'] ?? null;
-                if (! $jobId && $requires) {
+                if (! $jobId && ! $forceAll && $requires) {
                     $requiredInstances = array_map('trim', explode(',', $requires));
                     foreach ($requiredInstances as $requiredInstance) {
                         if (! $jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
