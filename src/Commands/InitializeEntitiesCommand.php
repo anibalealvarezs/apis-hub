@@ -54,7 +54,6 @@
             try {
                 // 1. Initialize Core Entities
                 $this->initializeCoreEntities();
-                die("!!! PASSED CORE ENTITIES !!!\n");
 
                 // 2. Initialize Channel-specific Entities via Drivers
                 $exitCode = $this->initializeChannelEntities($output);
@@ -130,10 +129,8 @@
         protected function initializeChannelEntities(OutputInterface $output): int
         {
             $registry = DriverFactory::getRegistry();
+            die("!!! PASSED REGISTRY !!!\n");
             $channelsConfig = Helpers::getChannelsConfig();
-
-            foreach ($registry as $channel => $driverCfg) {
-                $output->writeln("DEBUG: Processing channel: $channel");
                 // Determine if specifically enabled for this channel
                 $chanConfig = $channelsConfig[$channel] ?? [];
 
