@@ -343,6 +343,22 @@ class ProcessJobsCommand extends Command
 
                     // Inject channel configuration into parameters
                     if ($chanConfig) {
+                        $accountId = $params['account_id'] ?? null;
+                        if ($accountId) {
+                            $registryConfig = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getChannelConfig($chanKey);
+                            $resourceKey = $registryConfig['resource_key'] ?? null;
+                            if ($resourceKey && !empty($chanConfig[$resourceKey])) {
+                                $filteredResources = [];
+                                foreach ($chanConfig[$resourceKey] as $res) {
+                                    $resId = is_array($res) ? ($res['id'] ?? $res['identifier'] ?? null) : $res;
+                                    if ((string)$resId === (string)$accountId) {
+                                        $filteredResources[] = $res;
+                                        break;
+                                    }
+                                }
+                                $chanConfig[$resourceKey] = $filteredResources;
+                            }
+                        }
                         $resolvedParams = array_merge($chanConfig, $resolvedParams);
                     }
 

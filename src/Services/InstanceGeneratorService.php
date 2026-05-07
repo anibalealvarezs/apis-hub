@@ -87,6 +87,7 @@ class InstanceGeneratorService
                     'channel' => $channel,
                     'entity' => $entitiesSyncValue,
                     'frequency' => '0 2 * * *',
+                    'granular_sync' => filter_var($chanConfig['granular_sync'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 ];
             }
 
@@ -130,6 +131,7 @@ class InstanceGeneratorService
                     'entity' => 'metric',
                     'start_date' => $tempStart->format('Y-m-d'),
                     'end_date' => $quarterEnd->format('Y-m-d'),
+                    'granular_sync' => filter_var($chanConfig['granular_sync'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 ];
 
                 $tempStart = $quarterEnd->modify('+1 day');
@@ -148,6 +150,7 @@ class InstanceGeneratorService
                 'start_date' => '-3 days',
                 'end_date' => 'yesterday',
                 'frequency' => sprintf('%d %d * * *', $rules['recent_cron_minute'], $rules['recent_cron_hour']),
+                'granular_sync' => filter_var($chanConfig['granular_sync'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ];
 
             // 4. Handle dependencies (Optional)

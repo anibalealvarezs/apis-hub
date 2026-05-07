@@ -148,9 +148,9 @@
                     }
 
                     $shouldSchedule = true;
-                    // Try to find ANY existing job for this instance/account
+                    // Try to find the LAST existing job for this instance/account
                     if (Helpers::isPostgres()) {
-                        $sql = "SELECT count(j.id) FROM jobs j WHERE j.channel = :channel AND j.entity = :entity AND CAST(j.payload AS text) LIKE :instance_pattern";
+                        $sql = "SELECT id, status, payload FROM jobs j WHERE j.channel = :channel AND j.entity = :entity AND CAST(j.payload AS text) LIKE :instance_pattern";
                         $sqlParams = [
                             'channel'          => $channel,
                             'entity'           => $entity,
@@ -160,10 +160,11 @@
                             $sql .= " AND CAST(j.payload AS text) LIKE :account_pattern";
                             $sqlParams['account_pattern'] = '%account_id%'.$accountId.'%';
                         }
-                        $count = $this->entityManager->getConnection()->executeQuery($sql, $sqlParams)->fetchOne();
+                        $sql .= " ORDER BY id DESC LIMIT 1";
+                        $lastJob = $this->entityManager->getConnection()->fetchAssociative($sql, $sqlParams);
                     } else {
                         $qb = $this->entityManager->createQueryBuilder();
-                        $qb->select('count(j.id)')
+                        $qb->select('j.id', 'j.status', 'j.payload')
                             ->from(Job::class, 'j')
                             ->where('j.channel = :channel')
                             ->andWhere('j.entity = :entity')
@@ -175,11 +176,39 @@
                             $qb->andWhere('j.payload LIKE :account_pattern')
                                 ->setParameter('account_pattern', '%account_id%'.$accountId.'%');
                         }
-                        $count = $qb->getQuery()->getSingleScalarResult();
+                        $qb->orderBy('j.id', 'DESC')->setMaxResults(1);
+                        $lastJob = $qb->getQuery()->getOneOrNullResult();
                     }
 
-                    if ((int)$count > 0) {
-                        $shouldSchedule = false;
+                    if ($lastJob) {
+                        $payloadObj = is_string($lastJob['payload']) ? json_decode($lastJob['payload'], true) : $lastJob['payload'];
+                        $oldStart = $payloadObj['params']['startDate'] ?? $payloadObj['params']['start_date'] ?? null;
+                        $oldEnd = $payloadObj['params']['endDate'] ?? $payloadObj['params']['end_date'] ?? null;
+                        
+                        $newStart = $jobParams['startDate'] ?? $jobParams['start_date'] ?? null;
+                        $newEnd = $jobParams['endDate'] ?? $jobParams['end_date'] ?? null;
+                        
+                        if ($oldStart === $newStart && $oldEnd === $newEnd) {
+                            $shouldSchedule = false;
+                        } else {
+                            // Dates changed! If old job is still pending (status 1), soft-delete it.
+                            if ((int)$lastJob['status'] === \Enums\JobStatus::scheduled->value) {
+                                if (Helpers::isPostgres()) {
+                                    $this->entityManager->getConnection()->executeStatement(
+                                        "UPDATE jobs SET status = :status WHERE id = :id",
+                                        ['status' => \Enums\JobStatus::cancelled->value, 'id' => $lastJob['id']]
+                                    );
+                                } else {
+                                    $qbUpdate = $this->entityManager->createQueryBuilder();
+                                    $qbUpdate->update(Job::class, 'j')
+                                        ->set('j.status', ':status')
+                                        ->where('j.id = :id')
+                                        ->setParameter('status', \Enums\JobStatus::cancelled->value)
+                                        ->setParameter('id', $lastJob['id'])
+                                        ->getQuery()->execute();
+                                }
+                            }
+                        }
                     }
 
                     if ($shouldSchedule) {

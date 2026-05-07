@@ -215,6 +215,9 @@ function populateGlobalFields() {
         const gscStatus = document.getElementById('gsc-channel-enabled');
         if (gscStatus) gscStatus.checked = !!currentConfig.gsc_enabled;
 
+        const gscGranular = document.getElementById('gsc-granular-sync');
+        if (gscGranular) gscGranular.checked = !!currentConfig.gsc_granular_sync;
+
         const gscCalcSynth = document.getElementById('gsc-calculate-synthetics');
         if (gscCalcSynth) {
             gscCalcSynth.checked = !!(currentConfig.gsc_calculate_synthetics || currentConfig.google_search_console?.calculate_synthetics);
@@ -223,8 +226,14 @@ function populateGlobalFields() {
         const fbOrganicStatus = document.getElementById('fb-organic-enabled');
         if (fbOrganicStatus) fbOrganicStatus.checked = !!currentConfig.fb_organic_enabled;
 
+        const fbOrganicGranular = document.getElementById('fb-organic-granular-sync');
+        if (fbOrganicGranular) fbOrganicGranular.checked = !!currentConfig.fb_organic_granular_sync;
+
         const fbMarketingStatus = document.getElementById('fb-marketing-enabled');
         if (fbMarketingStatus) fbMarketingStatus.checked = !!currentConfig.fb_marketing_enabled;
+
+        const fbMarketingGranular = document.getElementById('fb-marketing-granular-sync');
+        if (fbMarketingGranular) fbMarketingGranular.checked = !!currentConfig.fb_marketing_granular_sync;
 
         // Windows & Ranges
         const gscRange = document.getElementById('gsc-history-range');
@@ -1048,6 +1057,7 @@ async function updateConfig(typeArg) {
 
         if (typeArg === 'google_search_console') {
             payload.enabled = document.getElementById('gsc-channel-enabled')?.checked;
+            payload.granular_sync = document.getElementById('gsc-granular-sync')?.checked;
             payload.cache_history_range = document.getElementById('gsc-history-range')?.value;
             payload.feature_toggles.cron_recent_hour = document.getElementById('gsc-cron-hour')?.value;
             payload.feature_toggles.cron_recent_minute = document.getElementById('gsc-cron-minute')?.value;
@@ -1056,6 +1066,7 @@ async function updateConfig(typeArg) {
             payload.feature_toggles.calculate_synthetics = calcSynthEl ? calcSynthEl.checked : false;
         } else if (typeArg === 'facebook_organic') {
             payload.enabled = document.getElementById('fb-organic-enabled').checked;
+            payload.granular_sync = document.getElementById('fb-organic-granular-sync')?.checked;
             payload.organic_history_range = document.getElementById('fb-organic-history-range').value;
             payload.feature_toggles.cron_entities_hour = document.getElementById('fb-organic-entities-cron-hour')?.value;
             payload.feature_toggles.cron_entities_minute = document.getElementById('fb-organic-entities-cron-minute')?.value;
@@ -1063,6 +1074,7 @@ async function updateConfig(typeArg) {
             payload.feature_toggles.cron_recent_minute = document.getElementById('fb-organic-recent-cron-minute')?.value;
         } else if (typeArg === 'facebook_marketing') {
             payload.enabled = document.getElementById('fb-marketing-enabled').checked;
+            payload.granular_sync = document.getElementById('fb-marketing-granular-sync')?.checked;
             payload.marketing_history_range = document.getElementById('fb-marketing-history-range').value;
             payload.feature_toggles.cron_entities_hour = document.getElementById('fb-marketing-entities-cron-hour')?.value;
             payload.feature_toggles.cron_entities_minute = document.getElementById('fb-marketing-entities-cron-minute')?.value;
