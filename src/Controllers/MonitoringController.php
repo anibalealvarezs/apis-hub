@@ -448,10 +448,11 @@ class MonitoringController extends BaseController
     private function getJobIds(string $channel, int $status, string $order = 'DESC', int $limit = 5): array
     {
         $conn = $this->em->getConnection();
+        // Safe cast to int for LIMIT to avoid Doctrine DBAL 3 type mapping issues
+        $limitCount = (int)$limit;
         return $conn->fetchFirstColumn(
-            "SELECT id FROM jobs WHERE channel = :chan AND status = :status ORDER BY id $order LIMIT :limit",
-            ['chan' => $channel, 'status' => $status, 'limit' => $limit],
-            ['limit' => \PDO::PARAM_INT]
+            "SELECT id FROM jobs WHERE channel = :chan AND status = :status ORDER BY id $order LIMIT $limitCount",
+            ['chan' => $channel, 'status' => $status]
         );
     }
 
