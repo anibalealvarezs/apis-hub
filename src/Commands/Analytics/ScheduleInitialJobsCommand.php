@@ -277,10 +277,12 @@
                             $accMsg = $accountId ? " (Account: $accountId)" : "";
                             $output->writeln("<info>Created initial $statusName job for $name$accMsg ($channel -> $entity)</info>");
                         }
+                        }
                     } else {
                         $skippedCount++;
                     }
                 }
+            }
             }
         }
 
