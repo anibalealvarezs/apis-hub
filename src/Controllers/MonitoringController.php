@@ -132,7 +132,7 @@ class MonitoringController extends BaseController
                 if (!isset($containerStats[$targetId])) $containerStats[$targetId] = ['total' => 0];
                 
                 // Only count successes in the last hour as "active" for UI pruning
-                if ($row['status'] == JobStatus::success->value && ($row['updated_at'] ?? '') >= $oneHourAgo) {
+                if ($row['status'] == JobStatus::completed->value && ($row['updated_at'] ?? '') >= $oneHourAgo) {
                     $containerStats[$targetId]['total']++;
                 }
                 
