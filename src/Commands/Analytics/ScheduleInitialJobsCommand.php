@@ -129,13 +129,13 @@
                 $accounts = [null];
                 if ($isGranular) {
                     try {
-                        $driver = DriverFactory::get($channel);
-                        $resourceKey = $driver->getResourceKey();
-                        $accounts = $chanConfig[$resourceKey] ?? [];
+                        $regConfig = DriverFactory::getChannelConfig($channel);
+                        $resourceKey = $regConfig['resource_key'] ?? null;
+                        $accounts = $resourceKey ? ($chanConfig[$resourceKey] ?? []) : [null];
                         if (empty($accounts)) {
                             $accounts = [null];
                         }
-                    } catch (\Exception $e) {
+                    } catch (\Throwable $e) {
                         $accounts = [null];
                     }
                 }
