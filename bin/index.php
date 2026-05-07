@@ -29,6 +29,14 @@ $request = Request::createFromGlobals();
 
 $app = new RoutingCore();
 
+// DEBUG: Direct interception to verify file execution
+if (strpos($_SERVER['REQUEST_URI'] ?? '', '/api/sync/status') !== false) {
+    header('Content-Type: application/json');
+    echo json_encode(['debug' => 'Interception Active', 'uri' => $_SERVER['REQUEST_URI']]);
+    exit;
+}
+
+
 // Sync Telemetry routes
 $syncRoutes = require_once __DIR__ . "/../src/Routes/sync.php";
 $app->multiMap($syncRoutes);
