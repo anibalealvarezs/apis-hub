@@ -62,6 +62,9 @@
                 try {
                     $driver = DriverFactory::get($channel);
                     $driverJs .= $driver->getConfigurationJs() . "\n";
+                } catch (Throwable $e) {
+                    error_log("DEBUG: ConfigManagerController - Failed to load JS for channel $channel: " . $e->getMessage());
+                    continue;
                 }
             }
 
