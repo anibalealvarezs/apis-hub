@@ -125,14 +125,7 @@
                 if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
                 if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
 
-                $isGranular = $instance['granular_sync'] ?? false;
-                $accounts = [null];
                 if ($isGranular) {
-                    if ($channel === 'google_search_console') {
-                        $output->writeln("<comment>DEBUG: Checking GSC configuration...</comment>");
-                        $output->writeln("<comment>DEBUG: Config enabled: " . (isset($chanConfig['enabled']) && $chanConfig['enabled'] ? 'YES' : 'NO') . "</comment>");
-                        $output->writeln("<comment>DEBUG: Sites found: " . count($chanConfig['sites'] ?? []) . "</comment>");
-                    }
                     try {
                         $regConfig = DriverFactory::getChannelConfig($channel);
                         $resourceKey = $regConfig['resource_key'] ?? null;
@@ -147,6 +140,17 @@
 
                 foreach ($accounts as $account) {
                     $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? null) : $account;
+
+                    // Agnostic Canonical ID resolution
+                    if ($account) {
+                        $assetData = is_array($account) ? $account : ['id' => $account];
+                        $driverClass = $regConfig['driver'] ?? null;
+                        if ($driverClass && method_exists($driverClass, 'getCanonicalId')) {
+                            $category = \Anibalealvarezs\ApiDriverCore\Enums\AssetCategory::ACCOUNT;
+                            $context = $driverClass::getContextForCategory($category) ?: $channel;
+                            $accountId = $driverClass::getCanonicalId($assetData, $category, $context);
+                        }
+                    }
                     $jobParams = $params;
                     if ($accountId) {
                         $jobParams['account_id'] = $accountId;
