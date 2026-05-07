@@ -49,6 +49,13 @@
             ?array          $params = null
         ): Response
         {
+            // DEBUG INTERCEPTION
+            if ($channel === 'api' && $entity === 'sync') {
+                header('Content-Type: application/json');
+                echo json_encode(['debug' => 'Intercepted in ChanneledCrudController', 'channel' => $channel, 'entity' => $entity]);
+                exit;
+            }
+
             if (!$this->isValidCrudableEntity(entity: $entity)) {
                 return $this->createResponse(
                     data: null,
