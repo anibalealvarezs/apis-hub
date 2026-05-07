@@ -118,3 +118,12 @@
 - **Protocol**: Dependencies must be managed during the build phase (Dockerfile) or manually, never during container startup.
 
 
+
+### 2026-05-07 - Sync Telemetry Engine Implementation
+- **Decision**: Implemented a Redis-cached telemetry API to track sync progress across all channels and assets.
+- **Components**:
+    - `SyncTelemetryService`: Calculates completion % using `JSON_EXTRACT` (MySQL) or JSONB operators (PostgreSQL).
+    - `SyncStatusController`: Exposes `GET /api/sync/status` with API Key security.
+- **Invalidation Strategy**: Event-driven invalidation via `JobRepository::update()`. Every time a job status changes, the relevant telemetry cache keys are purged.
+- **Compatibility**: The telemetry service query dynamically switches syntax based on `Helpers::isPostgres()` to ensure platform parity.
+- **Routing**: Routes are registered in `src/Routes/sync.php` and loaded via `bin/index.php`.

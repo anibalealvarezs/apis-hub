@@ -45,6 +45,10 @@ $app->multiMap($pageRoutes);
 $channeledRoutes = require_once __DIR__ . "/../src/Routes/channeledcrud.php";
 $app->multiMap($channeledRoutes);
 
+// Sync Telemetry routes
+$syncRoutes = require_once __DIR__ . "/../src/Routes/sync.php";
+$app->multiMap($syncRoutes);
+
 $entityManager = null;
 try {
     $entityManager = require_once __DIR__ . "/../app/bootstrap.php";

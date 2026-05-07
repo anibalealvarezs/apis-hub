@@ -13,6 +13,7 @@ use Enums\JobStatus;
 use Enums\QueryBuilderType;
 use Faker\Factory;
 use Helpers\Helpers;
+use Services\CacheService;
 use InvalidArgumentException;
 
 class JobRepository extends BaseRepository
@@ -752,5 +753,41 @@ class JobRepository extends BaseRepository
             ->setParameter('since', $since)
             ->getQuery()
             ->execute();
+    }
+
+    /**
+     * @param int $id
+     * @param object|null $data
+     * @param bool $returnEntity
+     * @return bool|array|null|object
+     */
+    public function update(int $id, ?object $data = null, bool $returnEntity = false): bool|array|null|object
+    {
+        $result = parent::update($id, $data, $returnEntity);
+
+        if ($result) {
+            try {
+                $job = $this->find($id);
+                if ($job) {
+                    $redis = Helpers::getRedisClient();
+                    $cache = CacheService::getInstance($redis);
+                    $channel = $job->getChannel();
+                    $payload = $job->getPayload();
+                    $accountId = $payload['params']['account_id'] ?? null;
+
+                    $cache->delete('sync_telemetry:global');
+                    if ($channel) {
+                        $cache->delete('sync_telemetry:channel:' . $channel);
+                        if ($accountId) {
+                            $cache->delete('sync_telemetry:channel:' . $channel . ':' . $accountId);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Silently fail cache invalidation
+            }
+        }
+
+        return $result;
     }
 }
