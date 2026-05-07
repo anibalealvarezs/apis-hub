@@ -131,7 +131,8 @@ echo "  🌐 Ensuring external gateway network exists (${DEPLOYMENT_NAME}_defaul
 docker network ls | grep -w "${DEPLOYMENT_NAME}_default" >/dev/null 2>&1 || docker network create "${DEPLOYMENT_NAME}_default"
 
 echo "  🏗️  Building and starting new containers..."
-docker compose --env-file "$ENV_FILE" up -d --remove-orphans --build
+# Inject PROJECT_PATH_HOST so master knows how to scale workers correctly
+PROJECT_PATH_HOST=$PROJECT_PATH_HOST docker compose --env-file "$ENV_FILE" up -d --remove-orphans --build
 
 # ── Step 5: Post-deployment Health Check ──────────────────────────────────────
 echo ""
