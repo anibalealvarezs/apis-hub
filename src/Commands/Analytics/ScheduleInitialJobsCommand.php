@@ -44,8 +44,10 @@
          */
         protected function execute(InputInterface $input, OutputInterface $output): int
         {
+            $output->writeln("<info>Executing ScheduleInitialJobsCommand...</info>");
             $config = Helpers::getProjectConfig();
             $instances = $config['instances'] ?? [];
+            $output->writeln("<comment>Found " . count($instances) . " instances in config.</comment>");
             $targetInstance = $input->getOption('instance');
 
             if (empty($instances)) {
@@ -62,6 +64,7 @@
 
             foreach ($instances as $instance) {
                 $name = $instance['name'] ?? 'unknown';
+                $output->writeln("<comment>Processing instance: $name</comment>");
 
                 // Filter by instance if provided
                 if ($targetInstance && $targetInstance !== $name) {
@@ -83,6 +86,7 @@
                 // Check if channel is enabled and history range
                 $channelsConfig = Helpers::getChannelsConfig();
                 $chanKey = $channel;
+                $output->writeln("<comment> - Channel: $channel</comment>");
                 try {
                     $driver = DriverFactory::get($channel);
                     $commonKey = $driver::getCommonConfigKey();
@@ -140,8 +144,10 @@
                         }
                     }
 
+                    $output->writeln("<comment> - Found " . count($accounts) . " accounts for granular sync.</comment>");
                     foreach ($accounts as $account) {
                         $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? $account['url'] ?? null) : $account;
+                        $output->writeln("<comment>   - Resolving identity for: " . ($accountId ?: '[EMPTY]') . "</comment>");
  
                         // Agnostic Canonical ID resolution
                         if ($account) {
@@ -168,6 +174,7 @@
                                 }
                                 // 2. Ask the driver for the ID using the resolved category
                                 $accountId = $driverClass::getCanonicalId($assetData, $category, $context);
+                                $output->writeln("<comment>   - Resolved Canonical ID: " . ($accountId ?: '[EMPTY]') . "</comment>");
                             }
                         }
                     }
