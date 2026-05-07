@@ -44,8 +44,10 @@
          */
         protected function execute(InputInterface $input, OutputInterface $output): int
         {
+            $output->writeln("<info>Executing ScheduleInitialJobsCommand...</info>");
             $config = Helpers::getProjectConfig();
             $instances = $config['instances'] ?? [];
+            $output->writeln("<comment>Found " . count($instances) . " instances in config.</comment>");
             $targetInstance = $input->getOption('instance');
 
             if (empty($instances)) {
@@ -275,9 +277,7 @@
 
         $this->entityManager->flush();
 
-            if (Helpers::isDebug()) {
-                $output->writeln("<info>Successfully scheduled $scheduledCount new jobs ($skippedCount skipped).</info>");
-            }
+        $output->writeln("<info>Successfully scheduled $scheduledCount new jobs ($skippedCount skipped).</info>");
 
             return Command::SUCCESS;
         }
