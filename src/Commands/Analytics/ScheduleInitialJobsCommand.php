@@ -64,6 +64,7 @@
 
             foreach ($instances as $instance) {
                 $name = $instance['name'] ?? 'unknown';
+                $output->writeln("<comment>Processing instance: $name</comment>");
 
                 // Filter by instance if provided
                 if ($targetInstance && $targetInstance !== $name) {
@@ -85,6 +86,7 @@
                 // Check if channel is enabled and history range
                 $channelsConfig = Helpers::getChannelsConfig();
                 $chanKey = $channel;
+                $output->writeln("<comment> - Channel: $channel</comment>");
                 try {
                     $driver = DriverFactory::get($channel);
                     $commonKey = $driver::getCommonConfigKey();
@@ -142,6 +144,7 @@
                         }
                     }
 
+                    $output->writeln("<comment> - Found " . count($accounts) . " accounts for granular sync.</comment>");
                     foreach ($accounts as $account) {
                     $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? null) : $account;
 
