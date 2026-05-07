@@ -387,33 +387,56 @@ class JobRepository extends BaseRepository
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function update(int $id, ?object $data = null, bool $returnEntity = false): ?array
+    public function update(int $id, ?object $data = null, bool $returnEntity = false): bool|array|null|object
     {
-        $data = (array) ($data ?? []);
-        if (! isset($data['status']) || ! $data['status']) {
-            return parent::update($id, (object) $data);
+        $dataArr = (array) ($data ?? []);
+        if (isset($dataArr['status']) && $dataArr['status']) {
+            $statusValue = $dataArr['status'];
+            $mappedStatus = null;
+
+            if (is_numeric($statusValue)) {
+                $mappedStatus = JobStatus::tryFrom((int)$statusValue);
+            } elseif (is_string($statusValue)) {
+                foreach (JobStatus::cases() as $case) {
+                    if (strtolower($case->name) === strtolower($statusValue)) {
+                        $mappedStatus = $case;
+                        break;
+                    }
+                }
+            }
+
+            if ($mappedStatus) {
+                $dataArr['status'] = $mappedStatus->value;
+            }
+            $data = (object) $dataArr;
         }
 
-        $statusValue = $data['status'];
-        $mappedStatus = null;
+        $result = parent::update($id, $data, $returnEntity);
 
-        if (is_numeric($statusValue)) {
-            $mappedStatus = JobStatus::tryFrom((int)$statusValue);
-        } elseif (is_string($statusValue)) {
-            foreach (JobStatus::cases() as $case) {
-                if (strtolower($case->name) === strtolower($statusValue)) {
-                    $mappedStatus = $case;
+        if ($result) {
+            try {
+                $job = $this->find($id);
+                if ($job) {
+                    $redis = Helpers::getRedisClient();
+                    $cache = CacheService::getInstance($redis);
+                    $channel = $job->getChannel();
+                    $payload = $job->getPayload();
+                    $accountId = $payload['params']['account_id'] ?? null;
 
-                    break;
+                    $cache->delete('sync_telemetry:global');
+                    if ($channel) {
+                        $cache->delete('sync_telemetry:channel:' . $channel);
+                        if ($accountId) {
+                            $cache->delete('sync_telemetry:channel:' . $channel . ':' . $accountId);
+                        }
+                    }
                 }
+            } catch (\Throwable $e) {
+                // Silently fail cache invalidation
             }
         }
 
-        if ($mappedStatus) {
-            $data['status'] = $mappedStatus->value;
-        }
-
-        return parent::update($id, (object) $data) ?: null;
+        return $result;
     }
 
     /**
@@ -755,39 +778,5 @@ class JobRepository extends BaseRepository
             ->execute();
     }
 
-    /**
-     * @param int $id
-     * @param object|null $data
-     * @param bool $returnEntity
-     * @return bool|array|null|object
-     */
-    public function update(int $id, ?object $data = null, bool $returnEntity = false): bool|array|null|object
-    {
-        $result = parent::update($id, $data, $returnEntity);
 
-        if ($result) {
-            try {
-                $job = $this->find($id);
-                if ($job) {
-                    $redis = Helpers::getRedisClient();
-                    $cache = CacheService::getInstance($redis);
-                    $channel = $job->getChannel();
-                    $payload = $job->getPayload();
-                    $accountId = $payload['params']['account_id'] ?? null;
-
-                    $cache->delete('sync_telemetry:global');
-                    if ($channel) {
-                        $cache->delete('sync_telemetry:channel:' . $channel);
-                        if ($accountId) {
-                            $cache->delete('sync_telemetry:channel:' . $channel . ':' . $accountId);
-                        }
-                    }
-                }
-            } catch (\Throwable $e) {
-                // Silently fail cache invalidation
-            }
-        }
-
-        return $result;
-    }
 }
