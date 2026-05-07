@@ -144,6 +144,8 @@
 
                 // 3. Recent Instance
                 $recentName = str_replace('_', '-', $channel).'-recent';
+                $recentCronMinute = $rules['recent_cron_minute'] ?? 0;
+                $recentCronHour = $rules['recent_cron_hour'] ?? 3;
                 $channelInstances[] = [
                     'name'          => $recentName,
                     'port'          => $currentPort++,
@@ -151,7 +153,7 @@
                     'entity'        => 'metric',
                     'start_date'    => '-3 days',
                     'end_date'      => 'yesterday',
-                    'frequency'     => sprintf('%d %d * * *', $rules['recent_cron_minute'], $rules['recent_cron_hour']),
+                    'frequency'     => sprintf('%d %d * * *', $recentCronMinute, $recentCronHour),
                     'granular_sync' => filter_var($chanConfig['granular_sync'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 ];
 
