@@ -137,12 +137,26 @@ class MonitoringController extends BaseController
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
 
-        // Fetch ONLY pending, processing, or failed jobs for priority visibility
-        $allRecentJobs = $jobRepo->findBy([], ['id' => 'DESC'], 300);
-        $priorityJobs = $jobRepo->findBy(
-            ['status' => [JobStatus::scheduled->value, JobStatus::processing->value, JobStatus::failed->value]],
+        // Define active/visible statuses (exclude cancelled/delayed to reduce noise)
+        $visibleStatuses = [
+            JobStatus::scheduled->value,
+            JobStatus::processing->value,
+            JobStatus::failed->value,
+            JobStatus::completed->value
+        ];
+
+        // Fetch recent visible jobs
+        $allRecentJobs = $jobRepo->findBy(
+            ['status' => $visibleStatuses],
             ['id' => 'DESC'],
-            100
+            600
+        );
+
+        // Fetch processing jobs with high priority regardless of ID
+        $priorityJobs = $jobRepo->findBy(
+            ['status' => [JobStatus::processing->value, JobStatus::failed->value]],
+            ['id' => 'DESC'],
+            200
         );
 
         $finalJobs = [];
@@ -250,6 +264,12 @@ class MonitoringController extends BaseController
         }
 
         $groupedJobs = [];
+        // Pre-initialize groups for consistency based on active channels
+        foreach ($instances as $instance) {
+            $chan = strtolower($instance['channel']);
+            if (!isset($groupedJobs[$chan])) $groupedJobs[$chan] = [];
+        }
+
         foreach ($pipelines as $pipeline) {
             $chan = $pipeline['channel'];
             if (!isset($groupedJobs[$chan])) $groupedJobs[$chan] = [];
