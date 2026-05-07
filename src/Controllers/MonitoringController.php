@@ -119,16 +119,23 @@ class MonitoringController extends BaseController
         $containersData[] = ['id' => 'redis', 'name' => 'Redis Cache', 'source' => 'global', 'entity' => 'cache', 'period' => 'N/A', 'port' => 6379];
 
         $conn = $this->em->getConnection();
-        $allJobsSql = "SELECT channel, entity, status, payload FROM jobs";
+        $allJobsSql = "SELECT channel, entity, status, payload, updated_at FROM jobs";
         $results = $conn->fetchAllAssociative($allJobsSql);
         
         $containerStats = [];
+        $oneHourAgo = (new \DateTime('-1 hour'))->format('Y-m-d H:i:s');
+
         foreach ($results as $row) {
             $targetId = $this->getTargetContainerId($row, $instances);
             if ($targetId) {
                 $statusName = JobStatus::tryFrom((int)$row['status'])?->name ?? 'unknown';
                 if (!isset($containerStats[$targetId])) $containerStats[$targetId] = ['total' => 0];
-                $containerStats[$targetId]['total']++;
+                
+                // Only count successes in the last hour as "active" for UI pruning
+                if ($row['status'] == JobStatus::success->value && ($row['updated_at'] ?? '') >= $oneHourAgo) {
+                    $containerStats[$targetId]['total']++;
+                }
+                
                 $containerStats[$targetId][$statusName] = ($containerStats[$targetId][$statusName] ?? 0) + 1;
             }
         }
