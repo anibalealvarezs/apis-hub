@@ -146,13 +146,15 @@
 
                     $output->writeln("<comment> - Found " . count($accounts) . " accounts for granular sync.</comment>");
                     foreach ($accounts as $account) {
-                    $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? null) : $account;
+                        $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? null) : $account;
+                        $output->writeln("<comment>   - Resolving identity for: $accountId</comment>");
 
-                    // Agnostic Canonical ID resolution
-                    if ($account) {
+                        // Agnostic Canonical ID resolution
+                        if ($account) {
                         $assetData = is_array($account) ? $account : ['id' => $account];
-                        $driverClass = $regConfig['driver'] ?? null;
-                        if ($driverClass && method_exists($driverClass, 'getCanonicalId')) {
+                            $driverClass = $regConfig['driver'] ?? null;
+                            $output->writeln("<comment>   - Driver Class: " . ($driverClass ?? 'NULL') . "</comment>");
+                            if ($driverClass && method_exists($driverClass, 'getCanonicalId')) {
                             // 1. Resolve context and category from driver patterns
                             $resourceKey = $regConfig['resource_key'] ?? null;
                             $patterns = $driverClass::getAssetPatterns();
