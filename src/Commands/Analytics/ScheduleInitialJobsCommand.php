@@ -44,6 +44,7 @@
          */
         protected function execute(InputInterface $input, OutputInterface $output): int
         {
+            die("DEBUG: DENTRO DE EXECUTE");
             $output->writeln("<info>Executing ScheduleInitialJobsCommand...</info>");
             $config = Helpers::getProjectConfig();
             $instances = $config['instances'] ?? [];
