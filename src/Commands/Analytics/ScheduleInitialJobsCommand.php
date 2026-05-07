@@ -106,7 +106,7 @@
                     if (!empty($instance['end_date']) && !empty($chanConfig['cache_history_range']) && $instance['end_date'] !== 'yesterday') {
                         try {
                             $limitDate = new DateTime();
-                            $limitDate->modify('-'.$chanConfig['cache_history_range']);
+                            $limitDate->modify('-' . $chanConfig['cache_history_range']);
                             $jobEndDate = new DateTime($instance['end_date']);
                             if ($jobEndDate < $limitDate) {
                                 if (Helpers::isDebug()) {
@@ -118,27 +118,29 @@
                             // ignore malformed dates
                         }
                     }
-                }
 
-                $params = [];
-                if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];
-                if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
-                if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
+                    $params = [];
+                    if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];
+                    if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
+                    if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
 
-                if ($isGranular) {
-                    try {
-                        $regConfig = DriverFactory::getChannelConfig($channel);
-                        $resourceKey = $regConfig['resource_key'] ?? null;
-                        $accounts = $resourceKey ? ($chanConfig[$resourceKey] ?? []) : [null];
-                        if (empty($accounts)) {
+                    $isGranular = (bool)($chanConfig['granular_sync'] ?? false);
+                    $accounts = [null];
+
+                    if ($isGranular) {
+                        try {
+                            $regConfig = DriverFactory::getChannelConfig($channel);
+                            $resourceKey = $regConfig['resource_key'] ?? null;
+                            $accounts = $resourceKey ? ($chanConfig[$resourceKey] ?? []) : [null];
+                            if (empty($accounts)) {
+                                $accounts = [null];
+                            }
+                        } catch (\Throwable $e) {
                             $accounts = [null];
                         }
-                    } catch (\Throwable $e) {
-                        $accounts = [null];
                     }
-                }
 
-                foreach ($accounts as $account) {
+                    foreach ($accounts as $account) {
                     $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? null) : $account;
 
                     // Agnostic Canonical ID resolution
@@ -269,8 +271,9 @@
                     }
                 }
             }
+        }
 
-            $this->entityManager->flush();
+        $this->entityManager->flush();
 
             if (Helpers::isDebug()) {
                 $output->writeln("<info>Successfully scheduled $scheduledCount new jobs ($skippedCount skipped).</info>");
