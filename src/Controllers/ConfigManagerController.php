@@ -54,7 +54,10 @@
 
         public function index(): Response
         {
-            $html = file_get_contents(__DIR__.'/../views/config_manager.html');
+            $viewPath = __DIR__.'/../views/config_manager.html';
+            $realViewPath = realpath($viewPath);
+            error_log("DEBUG: ConfigManagerController - Loading view from: " . ($realViewPath ?: $viewPath . " (NOT FOUND)"));
+            $html = file_get_contents($viewPath);
 
             $availableChannels = DriverFactory::getAvailableChannels();
             $driverJs = "";
@@ -70,6 +73,7 @@
                         $className = $reflector->getShortName();
                         $baseName = str_replace('Driver', '', $className);
                         $jsPath = $driverDir . "/js/" . $baseName . "ConfigHandler.js";
+                        error_log("DEBUG: ConfigManagerController - Checking JS path: " . $jsPath);
                         
                         // Try loading directly first (faster and doesn't require instantiation)
                         if (file_exists($jsPath)) {
