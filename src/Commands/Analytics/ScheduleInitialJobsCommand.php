@@ -128,6 +128,11 @@
                 $isGranular = $instance['granular_sync'] ?? false;
                 $accounts = [null];
                 if ($isGranular) {
+                    if ($channel === 'google_search_console') {
+                        $output->writeln("<comment>DEBUG: Checking GSC configuration...</comment>");
+                        $output->writeln("<comment>DEBUG: Config enabled: " . (isset($chanConfig['enabled']) && $chanConfig['enabled'] ? 'YES' : 'NO') . "</comment>");
+                        $output->writeln("<comment>DEBUG: Sites found: " . count($chanConfig['sites'] ?? []) . "</comment>");
+                    }
                     try {
                         $regConfig = DriverFactory::getChannelConfig($channel);
                         $resourceKey = $regConfig['resource_key'] ?? null;
