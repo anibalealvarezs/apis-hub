@@ -80,7 +80,7 @@ async function fetchData() {
 
         updateDbTotals(data.dbTotals);
         updateContainers(data.containers);
-        updateSyncTelemetry(data.syncTelemetry);
+        fetchSyncTelemetry(); // Call separately
         if (data.groupedJobs) {
             // DEBUG: Inject Simulation Jobs to preview UI ONLY in Demo Mode
             const envMeta = document.querySelector('meta[name="app-env"]');
@@ -191,16 +191,33 @@ function updateDbTotals(totals) {
     });
 }
 
+async function fetchSyncTelemetry() {
+    try {
+        const headers = getAdminHeaders();
+        if (!headers.Authorization) return;
+
+        const response = await fetch('/api/sync/status', { headers });
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+            updateSyncTelemetry(data.data.channels || {});
+        }
+    } catch (e) {
+        console.error('Sync Telemetry Fetch Error:', e);
+    }
+}
+
 function updateSyncTelemetry(telemetry) {
+    console.log('[Sync Telemetry Debug]', telemetry);
     const grid = document.getElementById('sync-telemetry-grid');
     if (!grid) return;
-    grid.innerHTML = '';
-
+    
     if (!telemetry || Object.keys(telemetry).length === 0) {
         grid.innerHTML = '<div class="empty-state">No synchronization activity detected</div>';
         return;
     }
 
+    grid.innerHTML = '';
     Object.entries(telemetry).forEach(([channel, stats]) => {
         const total = stats.total_jobs || 0;
         if (total === 0) return;

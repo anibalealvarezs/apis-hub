@@ -61,12 +61,12 @@ class SyncTelemetryService
             foreach ($enabledChannels as $chan) {
                 $status = $this->getChannelStatus($chan);
                 $results[$chan] = $status;
-                $totalCompletion += $status['completion'];
+                $totalCompletion += $status['completion_percentage'];
                 $count++;
             }
 
             return [
-                'completion' => $count > 0 ? round($totalCompletion / $count, 2) : 0,
+                'completion_percentage' => $count > 0 ? round($totalCompletion / $count, 2) : 0,
                 'channels' => $results
             ];
         }, self::DEFAULT_TTL);
@@ -134,21 +134,37 @@ class SyncTelemetryService
                 elseif ($status === JobStatus::scheduled->value) $assets[$accId]['scheduled'] += $count;
             }
             
-            // 3. Format assets and calculate percentages
+            // 3. Format assets and calculate totals
             $formattedAssets = [];
             $totalChanCompletion = 0;
+            $chanTotal = 0;
+            $chanCompleted = 0;
+            $chanProcessing = 0;
+            $chanFailed = 0;
+            $chanScheduled = 0;
             
             foreach ($assets as $id => $stats) {
                 $completion = $stats['total'] > 0 ? round(($stats['completed'] / $stats['total']) * 100, 2) : 0;
                 $formattedAssets[] = array_merge(['id' => $id, 'completion' => $completion], $stats);
                 $totalChanCompletion += $completion;
+                
+                $chanTotal += $stats['total'];
+                $chanCompleted += $stats['completed'];
+                $chanProcessing += $stats['processing'];
+                $chanFailed += $stats['failed'];
+                $chanScheduled += $stats['scheduled'];
             }
             
             $assetCount = count($formattedAssets);
             
             return [
                 'channel' => $channelName,
-                'completion' => $assetCount > 0 ? round($totalChanCompletion / $assetCount, 2) : 0,
+                'completion_percentage' => $assetCount > 0 ? round($totalChanCompletion / $assetCount, 2) : 0,
+                'total_jobs' => $chanTotal,
+                'completed' => $chanCompleted,
+                'processing' => $chanProcessing,
+                'failed' => $chanFailed,
+                'scheduled' => $chanScheduled,
                 'assets' => $formattedAssets
             ];
         }, self::DEFAULT_TTL);

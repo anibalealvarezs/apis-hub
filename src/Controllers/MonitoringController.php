@@ -460,8 +460,15 @@ class MonitoringController extends BaseController
             $cache = CacheService::getInstance($redis);
             $telemetryService = new SyncTelemetryService($this->em, $cache);
             
-            // Get data for each active channel
-            foreach ($activeChannels as $chan) {
+            // If activeChannels is empty, try to get all channels that have jobs
+            $channelsToCheck = $activeChannels;
+            if (empty($channelsToCheck)) {
+                $channelsToCheck = $conn->fetchFirstColumn("SELECT DISTINCT channel FROM jobs WHERE channel IS NOT NULL");
+            }
+
+            // Get data for each channel
+            foreach ($channelsToCheck as $chan) {
+                if (!$chan) continue;
                 $syncTelemetry[$chan] = $telemetryService->getChannelStatus($chan);
             }
         } catch (\Exception $e) {
