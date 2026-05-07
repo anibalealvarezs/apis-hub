@@ -51,6 +51,7 @@ $buildEnv = function($instanceName = null, $channel = 'none', $entity = 'none') 
         "CONFIG_DIR=/app/config",
         "SKIP_SEED=\${SKIP_SEED:-0}",
         "ENV_FILE=\${ENV_FILE:-" . (getenv('ENV_FILE') ?: '.env') . "}",
+        "PROJECT_PATH_HOST=\${PROJECT_PATH_HOST:-./}",
     ];
     if ($instanceName) {
         $envVars[] = "INSTANCE_NAME={$instanceName}";
@@ -63,8 +64,9 @@ $masterName = "{$deploymentName}-master";
 $startingHostPort = (int) (getenv('STARTING_HOST_PORT') ?: 10000);
 $externalPort = getenv('EXTERNAL_PORT') ?: ($instances[0]['port'] ?? $startingHostPort);
 $mcpPort = getenv('MCP_PORT') ?: 3000;
+    $projectPathHost = "\${PROJECT_PATH_HOST:-./}";
     $phpVolumes = [
-        './:/app',
+        "$projectPathHost:/app",
         '/var/run/docker.sock:/var/run/docker.sock'
     ];
 
@@ -115,7 +117,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         'command'     => null,
         'environment' => $buildEnv(),
         'networks'    => ['default'],
-        'volumes'     => ['./:/app'],
+        'volumes'     => ["$projectPathHost:/app"],
         'depends_on'  => [
             'master' => ['condition' => 'service_started'],
             'db' => ['condition' => 'service_started'],
@@ -157,7 +159,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
             "{$mcpPort}:3000"
         ],
         'volumes'     => [
-            './:/app',
+            "$projectPathHost:/app",
             '/app/mcp-server/node_modules'
         ],
         'deploy' => [

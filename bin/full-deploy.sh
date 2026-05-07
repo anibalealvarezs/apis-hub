@@ -102,10 +102,12 @@ echo -e "${GREEN}✔ Instances refreshed (config/instances.yaml).${NC}"
 # ── Step 3: Generate docker-compose.yml ───────────────────────────────────────
 echo ""
 echo -e "${YELLOW}📂 [3/5] Building Docker Compose manifest...${NC}"
+export PROJECT_PATH_HOST=$(pwd)
 MSYS_NO_PATHCONV=1 docker run --rm \
     -v "$(pwd):/app" \
     -e "ENV_FILE=$ENV_FILE" \
     -e "SKIP_SEED=$SKIP_SEED" \
+    -e "PROJECT_PATH_HOST=$PROJECT_PATH_HOST" \
     --env-file "$ENV_FILE" \
     -w /app \
     php:8.3-cli \

@@ -77,6 +77,9 @@
             $output->writeln("Executing: $cmd");
 
             // Important: master container must have /var/run/docker.sock mapped
+            $projectPathHost = getenv('PROJECT_PATH_HOST') ?: './';
+            $cmd = "PROJECT_PATH_HOST=$projectPathHost " . $cmd;
+
             exec($cmd, $execOutput, $returnVar);
 
             if ($returnVar !== 0) {
