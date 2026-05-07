@@ -100,15 +100,31 @@
 
             $logger->info("Total available channels: " . count($availableChannels));
             $logger->info("Injected JS length: " . strlen($driverJs));
-            $logger->debug("Tag /* [DRIVER_JS_INJECTION] */ found at: " . (strpos($html, '/* [DRIVER_JS_INJECTION] */') === false ? "NOT FOUND" : strpos($html, '/* [DRIVER_JS_INJECTION] */')));
 
-            $driverJs = "\nconsole.log('--- START DRIVER JS INJECTION ---');\n" . $driverJs . "\nconsole.log('--- END DRIVER JS INJECTION ---');\n";
+            $jsBlock = "\n<!-- START DRIVER JS INJECTION -->\n<script>\n";
+            $jsBlock .= "console.log('--- START DRIVER JS INJECTION ---');\n";
+            $jsBlock .= "window.ConfigHandlers = window.ConfigHandlers || {};\n";
+            $jsBlock .= $driverJs;
+            $jsBlock .= "\nconsole.log('--- END DRIVER JS INJECTION ---');\n";
+            $jsBlock .= "</script>\n<!-- END DRIVER JS INJECTION -->\n";
 
-            $html = str_replace('/* [DRIVER_JS_INJECTION] */', $driverJs, $html);
-            // Fallback for legacy tag if still present
-            $html = str_replace('{{DRIVER_JS}}', $driverJs, $html);
+            // Attempt 1: Modern tag with comments
+            if (str_contains($html, '/* [DRIVER_JS_INJECTION] */')) {
+                $html = str_replace('/* [DRIVER_JS_INJECTION] */', $driverJs, $html);
+                $logger->debug("Injected JS using modern tag /* [DRIVER_JS_INJECTION] */");
+            } 
+            // Attempt 2: Legacy tag
+            elseif (str_contains($html, '{{DRIVER_JS}}')) {
+                $html = str_replace('{{DRIVER_JS}}', $driverJs, $html);
+                $logger->debug("Injected JS using legacy tag {{DRIVER_JS}}");
+            } 
+            // Attempt 3: Safety Fallback - Inject before closing body
+            else {
+                $html = str_replace('</body>', $jsBlock . '</body>', $html);
+                $logger->warning("Injection tags not found! Using safety fallback (before </body>)");
+            }
 
-            return $this->renderWithEnv($html);
+            return new Response($html, 200, ['Content-Type' => 'text/html']);
         }
 
         public function fetchAssets(Request $request): Response
