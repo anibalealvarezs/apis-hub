@@ -14,6 +14,7 @@
     use Exception;
     use Exceptions\ConfigurationException;
     use Helpers\Helpers;
+    use ReflectionClass;
     use Symfony\Component\HttpFoundation\Request;
     use Symfony\Component\HttpFoundation\Response;
     use Symfony\Component\Yaml\Yaml;
@@ -52,6 +53,9 @@
             }
         }
 
+        /**
+         * @throws ConfigurationException
+         */
         public function index(): Response
         {
             $viewPath = __DIR__.'/../views/config_manager.html';
@@ -66,18 +70,18 @@
                 try {
                     $reg = DriverFactory::getRegistry();
                     $driverClass = $reg[$channel]['driver'] ?? null;
-                    
+
                     if ($driverClass && class_exists($driverClass)) {
-                        $reflector = new \ReflectionClass($driverClass);
+                        $reflector = new ReflectionClass($driverClass);
                         $fn = $reflector->getFileName();
                         $driverDir = dirname($fn);
                         $className = $reflector->getShortName();
                         $baseName = str_replace('Driver', '', $className);
-                        $jsPath = $driverDir . "/js/" . $baseName . "ConfigHandler.js";
-                        
+                        $jsPath = $driverDir."/js/".$baseName."ConfigHandler.js";
+
                         // Try loading directly first (faster and doesn't require instantiation)
                         if (file_exists($jsPath)) {
-                            $driverJs .= file_get_contents($jsPath) . "\n";
+                            $driverJs .= file_get_contents($jsPath)."\n";
                             $logger->debug("Loaded JS for $channel from static path: $jsPath");
                             continue;
                         }
@@ -87,19 +91,19 @@
                     $driver = DriverFactory::get($channel);
                     $js = $driver->getConfigurationJs();
                     if ($js) {
-                        $driverJs .= $js . "\n";
+                        $driverJs .= $js."\n";
                         $logger->debug("Loaded JS for $channel from driver method");
                     } else {
                         $logger->warning("Driver for $channel returned empty JS");
                     }
                 } catch (Throwable $e) {
-                    $logger->error("Failed to load JS for channel $channel: " . $e->getMessage());
+                    $logger->error("Failed to load JS for channel $channel: ".$e->getMessage());
                     continue;
                 }
             }
 
-            $logger->info("Total available channels: " . count($availableChannels));
-            $logger->info("Injected JS length: " . strlen($driverJs));
+            $logger->info("Total available channels: ".count($availableChannels));
+            $logger->info("Injected JS length: ".strlen($driverJs));
 
             $jsBlock = "\n<!-- START DRIVER JS INJECTION -->\n<script>\n";
             $jsBlock .= "console.log('--- START DRIVER JS INJECTION ---');\n";
@@ -112,15 +116,13 @@
             if (str_contains($html, '/* [DRIVER_JS_INJECTION] */')) {
                 $html = str_replace('/* [DRIVER_JS_INJECTION] */', $driverJs, $html);
                 $logger->debug("Injected JS using modern tag /* [DRIVER_JS_INJECTION] */");
-            } 
-            // Attempt 2: Legacy tag
+            } // Attempt 2: Legacy tag
             elseif (str_contains($html, '{{DRIVER_JS}}')) {
                 $html = str_replace('{{DRIVER_JS}}', $driverJs, $html);
                 $logger->debug("Injected JS using legacy tag {{DRIVER_JS}}");
-            } 
-            // Attempt 3: Safety Fallback - Inject before closing body
+            } // Attempt 3: Safety Fallback - Inject before closing body
             else {
-                $html = str_replace('</body>', $jsBlock . '</body>', $html);
+                $html = str_replace('</body>', $jsBlock.'</body>', $html);
                 $logger->warning("Injection tags not found! Using safety fallback (before </body>)");
             }
 
