@@ -62,11 +62,14 @@
                 try {
                     $driver = DriverFactory::get($channel);
                     $driverJs .= $driver->getConfigurationJs() . "\n";
-                } catch (Exception) {
-                    continue;
                 }
             }
 
+            error_log("DEBUG: ConfigManagerController - Total available channels: " . count($availableChannels));
+            error_log("DEBUG: ConfigManagerController - Injected JS length: " . strlen($driverJs));
+
+            $html = str_replace('/* [DRIVER_JS_INJECTION] */', $driverJs, $html);
+            // Fallback for legacy tag if still present
             $html = str_replace('{{DRIVER_JS}}', $driverJs, $html);
 
             return $this->renderWithEnv($html);
