@@ -2,10 +2,12 @@
 
 namespace Tests\Unit\Controllers;
 
+use Anibalealvarezs\ApiSkeleton\Enums\Channel;
 use Controllers\ChanneledCrudController;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityRepository;
 use Entities\Analytics\Channeled\ChanneledDiscount;
-use Entities\Analytics\Channel;
+use Entities\Analytics\Channel as ChannelEntity;
 use Exception;
 use Helpers\Helpers;
 use InvalidArgumentException;
@@ -42,6 +44,19 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
     }
 
     /**
+     * Builds a repository mock compatible with EntityManager::getRepository() return typing.
+     *
+     * @param array<int, string> $methods
+     */
+    private function createRepositoryMock(array $methods): MockObject|EntityRepository
+    {
+        return $this->getMockBuilder(EntityRepository::class)
+            ->disableOriginalConstructor()
+            ->addMethods($methods)
+            ->getMock();
+    }
+
+    /**
      * @throws ReflectionException
      */
     public function testInvokeReturnsErrorForInvalidEntity(): void
@@ -55,9 +70,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method);
-
-        if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-        }
 
         $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
         $this->assertEquals('application/json', $response->headers->get('Content-Type'));
@@ -80,9 +92,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->controller->setMockChannelsConfig([]);
 
         $response = $this->controller->__invoke($entity, $channel, $method);
-
-        if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-        }
 
         $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
         $this->assertEquals(
@@ -112,9 +121,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $response = $this->controller->__invoke($entity, $channel, $method);
 
-        if ($response->getStatusCode() !== Response::HTTP_FORBIDDEN) {
-        }
-
         $this->assertEquals(Response::HTTP_FORBIDDEN, $response->getStatusCode());
         $this->assertEquals(
             json_encode(['data' => null, 'status' => 'error', 'error' => 'Channel disabled']),
@@ -138,9 +144,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->assertNotNull($id, 'Faker generated a null ID');
 
         // Mock repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
-            ->getMock();
+        $repository = $this->createRepositoryMock(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete']);
         $repository->expects($this->once())
             ->method('read')
             ->with($id, false, (object) ['channel' => Channel::shopify->value])
@@ -176,9 +180,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $response = $this->controller->__invoke($entity, $channel, $method, $id);
 
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
         $this->assertEquals(
             json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
@@ -207,9 +208,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         ]);
 
         $response = $this->controller->__invoke($entity, $channel, $method);
-
-        if ($response->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-        }
 
         $this->assertEquals(Response::HTTP_NOT_FOUND, $response->getStatusCode());
         $this->assertEquals(
@@ -282,9 +280,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->assertNotNull($id, 'Faker generated a null ID');
 
         // Mock repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
-            ->getMock();
+        $repository = $this->createRepositoryMock(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete']);
         $repository->expects($this->once())
             ->method('read')
             ->with($id, false, (object) ['channel' => $channel->value])
@@ -315,9 +311,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $response = $this->controller->read($entity, $channel, $id);
 
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
         $this->assertEquals(
             json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
@@ -340,9 +333,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $this->assertNotNull($id, 'Faker generated a null ID');
 
         // Mock repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
-            ->getMock();
+        $repository = $this->createRepositoryMock(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete']);
         $repository->expects($this->once())
             ->method('read')
             ->with($id, false, (object) ['channel' => $channel->value])
@@ -373,9 +364,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $response = $this->controller->read($entity, $channel, $id);
 
-        if ($response->getStatusCode() !== Response::HTTP_INTERNAL_SERVER_ERROR) {
-        }
-
         $this->assertEquals(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode());
         $this->assertEquals(
             json_encode(['data' => null, 'status' => 'error', 'error' => $exceptionMessage]),
@@ -397,9 +385,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $cacheKey = 'channeled_count_' . $entity . '_' . $channel->value . '_' . md5(serialize($filters));
 
         // Mock repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
-            ->getMock();
+        $repository = $this->createRepositoryMock(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete']);
         $repository->expects($this->once())
             ->method('countElements')
             ->with($filters)
@@ -433,9 +419,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $response = $this->controller->count($entity, $channel, $body, $params);
 
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
         $this->assertEquals(
             json_encode(['data' => ['count' => $count], 'status' => 'success', 'error' => null]),
@@ -455,9 +438,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $expectedData = [['total' => 500, 'metricDate' => '2024-01-01']];
 
         // Mock repository
-        $repository = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'aggregate'])
-            ->getMock();
+        $repository = $this->createRepositoryMock(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete', 'aggregate']);
         $repository->expects($this->once())
             ->method('aggregate')
             ->with(
@@ -494,6 +475,128 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         );
     }
 
+    public function testRealAggregateIncludesRepositoryMetaInResponse(): void
+    {
+        $entity = 'product_metric';
+        $channel = $this->makeChannel('shopify', 1);
+        $params = [
+            'aggregations' => ['total' => 'SUM(value)'],
+            'groupBy' => ['metricDate'],
+            'filters' => ['status' => 'active'],
+        ];
+        $expectedData = [['total' => 500, 'metricDate' => '2024-01-01']];
+        $expectedMeta = [
+            'execution_path' => 'legacy',
+            'fallback_reason' => 'no_optimized_strategy_matched',
+        ];
+
+        $repository = new class ($expectedData, $expectedMeta) {
+            public ?object $lastFilters = null;
+
+            public function __construct(
+                private readonly array $data,
+                private readonly array $meta
+            ) {
+            }
+
+            public function aggregate(
+                array $aggregations,
+                array $groupBy,
+                ?object $filters = null,
+                ?string $startDate = null,
+                ?string $endDate = null,
+                ?string $orderBy = null,
+                string $orderDir = 'ASC'
+            ): array {
+                $this->lastFilters = $filters;
+                return $this->data;
+            }
+
+            public function getLastAggregateMeta(): array
+            {
+                return $this->meta;
+            }
+        };
+
+        $realController = new AggregateMetaExposingChanneledCrudController($repository);
+
+        $response = $realController->aggregatePublic($entity, $channel, null, $params);
+
+        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+        $payload = json_decode($response->getContent(), true);
+        $this->assertSame('success', $payload['status']);
+        $this->assertSame($expectedData, $payload['data']);
+        $this->assertSame('active', $repository->lastFilters?->status);
+        $this->assertSame($channel->value, $repository->lastFilters?->channel);
+        $this->assertSame('legacy', $payload['meta']['execution_path']);
+        $this->assertSame('no_optimized_strategy_matched', $payload['meta']['fallback_reason']);
+        $this->assertFalse($payload['meta']['cached']);
+        $this->assertFalse($payload['meta']['cacheable']);
+    }
+
+    public function testRealAggregatePreservesDynamicMetaKeysInResponse(): void
+    {
+        $entity = 'product_metric';
+        $channel = $this->makeChannel('shopify', 1);
+        $params = [
+            'aggregations' => ['total' => 'SUM(value)'],
+            'groupBy' => ['metricDate'],
+            'filters' => ['status' => 'active'],
+        ];
+        $expectedData = [['total' => 700, 'metricDate' => '2024-02-01']];
+        $dynamicMeta = [
+            'execution_path' => 'optimized',
+            'fallback_reason' => null,
+            'driver_contract_version' => 'v2026.05.04',
+            'meta_probe' => [
+                'custom_flag' => true,
+                'weights' => [0.25, 0.75],
+            ],
+        ];
+
+        $repository = new class ($expectedData, $dynamicMeta) {
+            public function __construct(
+                private readonly array $data,
+                private readonly array $meta
+            ) {
+            }
+
+            public function aggregate(
+                array $aggregations,
+                array $groupBy,
+                ?object $filters = null,
+                ?string $startDate = null,
+                ?string $endDate = null,
+                ?string $orderBy = null,
+                string $orderDir = 'ASC'
+            ): array {
+                return $this->data;
+            }
+
+            public function getLastAggregateMeta(): array
+            {
+                return $this->meta;
+            }
+        };
+
+        $realController = new AggregateMetaExposingChanneledCrudController($repository);
+
+        $response = $realController->aggregatePublic($entity, $channel, null, $params);
+
+        $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
+        $payload = json_decode($response->getContent(), true);
+
+        $this->assertSame('success', $payload['status']);
+        $this->assertSame($expectedData, $payload['data']);
+        $this->assertSame('optimized', $payload['meta']['execution_path']);
+        $this->assertNull($payload['meta']['fallback_reason']);
+        $this->assertSame('v2026.05.04', $payload['meta']['driver_contract_version']);
+        $this->assertTrue($payload['meta']['meta_probe']['custom_flag']);
+        $this->assertSame([0.25, 0.75], $payload['meta']['meta_probe']['weights']);
+        $this->assertFalse($payload['meta']['cached']);
+        $this->assertFalse($payload['meta']['cacheable']);
+    }
+
     /**
      * @throws ReflectionException
      */
@@ -522,9 +625,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         };
 
         // Mock repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
-            ->getMock();
+        $repository = $this->createRepositoryMock(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete']);
         $repository->expects($this->once())
             ->method('readMultiple')
             ->with($filters, 'param')
@@ -556,9 +657,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         ]);
 
         $response = $this->controller->list($entity, $channel, $body, $params);
-
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
         $this->assertEquals(
@@ -598,9 +696,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         };
 
         // Mock repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
-            ->getMock();
+        $repository = $this->createRepositoryMock(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete']);
         $repository->expects($this->once())
             ->method('create')
             ->with($this->isInstanceOf(stdClass::class))
@@ -623,12 +719,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $response = $this->controller->create($entity, $channel, $body);
 
-        if ($response->getStatusCode() !== Response::HTTP_CREATED) {
-        }
-
-        if ($response->getStatusCode() !== Response::HTTP_CREATED) {
-        }
-
         $this->assertEquals(Response::HTTP_CREATED, $response->getStatusCode());
         $this->assertEquals(
             json_encode(['data' => $data, 'status' => 'success', 'error' => null]),
@@ -645,9 +735,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $body = json_encode(['name' => $this->faker->word]);
 
         // Mock repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
-            ->getMock();
+        $repository = $this->createRepositoryMock(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete']);
         $repository->expects($this->once())
             ->method('create')
             ->with($this->isInstanceOf(stdClass::class))
@@ -665,9 +753,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         ]);
 
         $response = $this->controller->create($entity, $channel, $body);
-
-        if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-        }
 
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
         $this->assertEquals(
@@ -707,9 +792,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         };
 
         // Mock repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
-            ->getMock();
+        $repository = $this->createRepositoryMock(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete']);
         $repository->expects($this->once())
             ->method('update')
             ->with($id, $this->isInstanceOf(stdClass::class))
@@ -731,9 +814,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         ]);
 
         $response = $this->controller->update($entity, $channel, $id, $body);
-
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
 
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
         $this->assertEquals(
@@ -758,9 +838,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $response = $this->controller->update($entity, $channel, null, $body);
 
-        if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-        }
-
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
         $this->assertEquals(
             json_encode(['data' => null, 'status' => 'error', 'error' => 'Invalid or missing ID']),
@@ -777,9 +854,7 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $id = $this->faker->numberBetween(1, 1000);
 
         // Mock repository
-        $repository = $this->getMockBuilder(stdClass::class)
-            ->addMethods(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete'])
-            ->getMock();
+        $repository = $this->createRepositoryMock(['read', 'countElements', 'readMultiple', 'create', 'update', 'delete']);
         $repository->expects($this->once())
             ->method('delete')
             ->with($id)
@@ -802,9 +877,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $response = $this->controller->delete($entity, $channel, $id);
 
-        if ($response->getStatusCode() !== Response::HTTP_OK) {
-        }
-
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
         $this->assertEquals(
             json_encode(['data' => null, 'status' => 'success', 'error' => null]),
@@ -826,9 +898,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         ]);
 
         $response = $this->controller->delete($entity, $channel);
-
-        if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-        }
 
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
         $this->assertEquals(
@@ -932,8 +1001,6 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
 
         $response = $this->controller->__invoke($entity, $channel, $method, $id);
 
-        if ($response->getStatusCode() !== Response::HTTP_BAD_REQUEST) {
-        }
 
         $this->assertEquals(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
         $this->assertEquals(
@@ -969,6 +1036,18 @@ class ChanneledCrudControllerTest extends BaseUnitTestCase
         $extractedId = $this->controller->extractId($result);
 
         $this->assertNull($extractedId);
+    }
+
+    private function makeChannel(string $name = 'shopify', int $id = 1): ChannelEntity
+    {
+        $channel = new ChannelEntity();
+        $channel->setName($name);
+
+        $reflection = new \ReflectionProperty(\Entities\Entity::class, 'id');
+        $reflection->setAccessible(true);
+        $reflection->setValue($channel, $id);
+
+        return $channel;
     }
 }
 
@@ -1012,6 +1091,10 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
 
     public function setMockChannelsConfigOverride(array $config): void
     {
+        if ($config === $this->mockChannelsConfigOverride) {
+            return;
+        }
+
         $this->mockChannelsConfigOverride = $config;
     }
 
@@ -1028,9 +1111,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         if (! isset($config[$entityKey][$configKey])) {
             throw new Exception("Entity configuration for '$entity' with key '$configKey' not found");
         }
-        $repository = $this->entityManager->getRepository(
-            entityName: $config[$entityKey][$configKey]
-        );
+        $repository = $this->entityManager->getRepository($config[$entityKey][$configKey]);
 
         return $repository;
     }
@@ -1057,7 +1138,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         ?array $params,
         string $repositoryClass,
         ?string $body,
-        Channel $channel
+        Channel|ChannelEntity $channel
     ): array {
         if (! empty($params) && ! $this->validateParams(array_keys($params), $repositoryClass, 'readMultiple')) {
             throw new InvalidArgumentException('Invalid parameters');
@@ -1070,7 +1151,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         return $params;
     }
 
-    public function read(string $entity, Channel $channel, int|string|null $id = null, bool $rawData = false, array $hideFields = []): Response
+    public function read(string $entity, Channel|ChannelEntity $channel, int|string|null $id = null, bool $rawData = false, array $hideFields = []): Response
     {
         try {
             if ($id === null) {
@@ -1105,7 +1186,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function count(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
+    public function count(string $entity, Channel|ChannelEntity $channel, ?string $body = null, ?array $params = null): Response
     {
         try {
             $repository = $this->getRepository($entity);
@@ -1146,7 +1227,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function list(string $entity, Channel $channel, ?string $body = null, ?array $params = null, bool $rawData = false, array $hideFields = []): Response
+    public function list(string $entity, Channel|ChannelEntity $channel, ?string $body = null, ?array $params = null, bool $rawData = false, array $hideFields = []): Response
     {
         try {
             $repository = $this->getRepository($entity);
@@ -1187,7 +1268,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function create(string $entity, Channel $channel, ?string $body = null): Response
+    public function create(string $entity, Channel|ChannelEntity $channel, ?string $body = null): Response
     {
         try {
             $data = Helpers::bodyToObject($body);
@@ -1229,7 +1310,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function update(string $entity, Channel $channel, int|string|null $id = null, ?string $body = null): Response
+    public function update(string $entity, Channel|ChannelEntity $channel, int|string|null $id = null, ?string $body = null): Response
     {
         try {
             if (! $id) {
@@ -1276,7 +1357,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function aggregate(string $entity, Channel $channel, ?string $body = null, ?array $params = null): Response
+    public function aggregate(string $entity, Channel|ChannelEntity $channel, ?string $body = null, ?array $params = null): Response
     {
         try {
             $repository = $this->getRepository($entity);
@@ -1319,7 +1400,7 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 
-    public function delete(string $entity, Channel $channel, int|string|null $id = null): Response
+    public function delete(string $entity, Channel|ChannelEntity $channel, int|string|null $id = null): Response
     {
         try {
             if (! $id) {
@@ -1390,9 +1471,8 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
     ): Response {
 
         $channelsConfig = $this->getChannelsConfig();
-        $validChannels = ['shopify', 'klaviyo', 'facebook', 'bigcommerce', 'netsuite', 'amazon'];
-        $channelEnum = Channel::tryFromName($channel);
-        if (! in_array($channel, $validChannels) || ! $channelEnum || ! isset($channelsConfig[$channelEnum->value])) {
+        $channelEnum = Channel::tryFrom($channel);
+        if (! $channelEnum || ! isset($channelsConfig[$channelEnum->value])) {
             return $this->createResponse(
                 data: null,
                 status: 'error',
@@ -1418,18 +1498,6 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
                 httpStatus: Response::HTTP_NOT_FOUND
             );
         }
-
-        // Map string channel to enum value
-        $channelMap = [
-            'shopify' => 1,
-            'klaviyo' => 2,
-            'facebook' => 3,
-            'bigcommerce' => 4,
-            'netsuite' => 5,
-            'amazon' => 6,
-        ];
-
-        $channelEnum = Channel::tryFrom($channelMap[$channel]);
 
         if (! method_exists($this, $method)) {
             return $this->createResponse(
@@ -1464,3 +1532,38 @@ class ConcreteChanneledCrudController extends ChanneledCrudController
         }
     }
 }
+
+class AggregateMetaExposingChanneledCrudController extends ChanneledCrudController
+{
+    public function __construct(private readonly object $repository)
+    {
+        parent::__construct();
+    }
+
+    public function aggregatePublic(string $entity, ChannelEntity $channel, ?string $body = null, ?array $params = null): Response
+    {
+        return $this->aggregate($entity, $channel, $body, $params);
+    }
+
+    public function getRepository(string $entity, string $configKey = 'channeled_class'): object
+    {
+        return $this->repository;
+    }
+
+    public function prepareChanneledReadMultipleParams(
+        string $entity,
+        ?array $params,
+        string $repositoryClass,
+        ?string $body,
+        Channel|ChannelEntity $channel
+    ): array {
+        $prepared = parent::prepareCrudParams($params, $body);
+        $prepared['filters'] = $prepared['filters'] ?? new stdClass();
+        if (! isset($prepared['filters']->channel)) {
+            $prepared['filters']->channel = $channel->value;
+        }
+
+        return $prepared;
+    }
+}
+

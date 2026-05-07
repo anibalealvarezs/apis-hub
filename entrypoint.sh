@@ -4,11 +4,20 @@ set -e
 # Ensure persistent log directory exists (mapped to host via volume)
 mkdir -p /app/logs /app/storage
 
+# Export environment variables for cron
+# We exclude proxy variables and other sensitive/volatile ones if needed
+printenv | grep -v "no_proxy" >> /etc/environment
+
+# Set Instance Name with uniqueness if it's a worker
+if [[ "$INSTANCE_NAME" == *"worker"* ]]; then
+    export INSTANCE_NAME="${INSTANCE_NAME}-$(hostname)"
+fi
+
 # Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
 if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     # Ensure modular dependencies are registered (especially during refactoring with local paths)
     echo "Master Instance ($INSTANCE_NAME): Updating modular dependencies..."
-    composer update --no-scripts --no-interaction --ignore-platform-reqs || echo "Modular update failed, continuing..."
+    echo "Master Instance ($INSTANCE_NAME): Dependencies should be managed via Docker build."
 
     # Wait for DB host to be resolvable via DNS
     DB_HOST_TO_CHECK=${DB_HOST:-db}

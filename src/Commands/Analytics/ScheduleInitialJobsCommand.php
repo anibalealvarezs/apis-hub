@@ -63,6 +63,7 @@
             foreach ($instances as $instance) {
                 $name = $instance['name'] ?? 'unknown';
 
+
                 // Filter by instance if provided
                 if ($targetInstance && $targetInstance !== $name) {
                     continue;
@@ -106,7 +107,7 @@
                     if (!empty($instance['end_date']) && !empty($chanConfig['cache_history_range']) && $instance['end_date'] !== 'yesterday') {
                         try {
                             $limitDate = new DateTime();
-                            $limitDate->modify('-'.$chanConfig['cache_history_range']);
+                            $limitDate->modify('-' . $chanConfig['cache_history_range']);
                             $jobEndDate = new DateTime($instance['end_date']);
                             if ($jobEndDate < $limitDate) {
                                 if (Helpers::isDebug()) {
@@ -118,101 +119,168 @@
                             // ignore malformed dates
                         }
                     }
-                }
 
-                $params = [];
-                if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];
-                if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
-                if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
+                    $params = [];
+                    if (!empty($instance['start_date'])) $params['startDate'] = $instance['start_date'];
+                    if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
+                    if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
 
-                $shouldSchedule = true;
-                // Try to find ANY existing job for this instance (any status)
-                $existingJob = $jobRepository->findOneBy([
-                    'channel' => $channel,
-                    'entity'  => $entity,
-                ]);
+                    $isGranular = (bool)($chanConfig['granular_sync'] ?? false);
+                    $accounts = [null];
 
-                if ($existingJob) {
-                    // If we found a generic match, verify it belongs to this instance
-                    $payload = $existingJob->getPayload();
-                    $jobInstance = $payload['instance_name'] ?? null;
-                    $jobParams = $payload['params'] ?? [];
+                    if ($isGranular) {
+                        try {
+                            $regConfig = DriverFactory::getChannelConfig($channel);
+                            $resourceKey = $regConfig['resource_key'] ?? null;
+                            $accounts = $resourceKey ? ($chanConfig[$resourceKey] ?? []) : [null];
+                            if (empty($accounts)) {
+                                $accounts = [null];
+                            }
+                        } catch (\Throwable $e) {
+                            $accounts = [null];
+                        }
+                    }
 
-                    if ($jobInstance === $name || ($jobParams == $params)) {
-                        $shouldSchedule = false;
+
+                    foreach ($accounts as $account) {
+                        $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? $account['url'] ?? null) : $account;
+ 
+                        // Agnostic Canonical ID resolution
+                        if ($account) {
+                            $assetData = is_array($account) ? $account : ['id' => $account];
+                            $driverClass = $regConfig['driver'] ?? null;
+                            if ($driverClass && method_exists($driverClass, 'getCanonicalId')) {
+                                // 1. Resolve context and category from driver patterns
+                                $resourceKey = $regConfig['resource_key'] ?? null;
+                                $patterns = method_exists($driverClass, 'getAssetPatterns') ? $driverClass::getAssetPatterns() : [];
+                                $category = \Anibalealvarezs\ApiDriverCore\Enums\AssetCategory::IDENTITY; // Default
+                                $context = $channel;
+ 
+                                if (!empty($patterns)) {
+                                    foreach ($patterns as $pKey => $pattern) {
+                                        if (($pattern['key'] ?? null) === $resourceKey) {
+                                            $categories = (array) ($pattern['category'] ?? []);
+                                            if (!empty($categories) && isset($categories[0])) {
+                                                $category = $categories[0];
+                                                $context = $pKey;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                // 2. Ask the driver for the ID using the resolved category
+                                $accountId = $driverClass::getPlatformId($assetData, $category, $context);
+                            }
+                        }
+
+                    $jobParams = $params;
+                    if ($accountId) {
+                        $jobParams['account_id'] = $accountId;
+                    }
+
+                    $shouldSchedule = true;
+                    // Try to find the LAST existing job for this instance/account
+                    if (Helpers::isPostgres()) {
+                        $sql = "SELECT id, status, payload FROM jobs j WHERE j.channel = :channel AND j.entity = :entity AND CAST(j.payload AS text) LIKE :instance_pattern";
+                        $sqlParams = [
+                            'channel'          => $channel,
+                            'entity'           => $entity,
+                            'instance_pattern' => '%instance_name%'.$name.'%',
+                        ];
+                        if ($accountId) {
+                            $sql .= " AND CAST(j.payload AS text) LIKE :account_pattern";
+                            $sqlParams['account_pattern'] = '%account_id%'.$accountId.'%';
+                        }
+                        $sql .= " ORDER BY id DESC LIMIT 1";
+                        $lastJob = $this->entityManager->getConnection()->fetchAssociative($sql, $sqlParams);
                     } else {
-                        // Look specifically for a job with this instance name in its payload
-                        if (Helpers::isPostgres()) {
-                            $sql = "SELECT count(j.id) FROM jobs j WHERE j.channel = :channel AND j.entity = :entity AND CAST(j.payload AS text) LIKE :instance_pattern";
-                            $count = $this->entityManager->getConnection()->executeQuery($sql, [
-                                'channel'          => $channel,
-                                'entity'           => $entity,
-                                'instance_pattern' => '%instance_name%'.$name.'%',
-                            ])->fetchOne();
-                        } else {
-                            $qb = $this->entityManager->createQueryBuilder();
-                            $count = $qb->select('count(j.id)')
-                                ->from(Job::class, 'j')
-                                ->where('j.channel = :channel')
-                                ->andWhere('j.entity = :entity')
-                                ->andWhere('j.payload LIKE :instance_pattern')
-                                ->setParameter('channel', $channel)
-                                ->setParameter('entity', $entity)
-                                ->setParameter('instance_pattern', '%instance_name%'.$name.'%')
-                                ->getQuery()
-                                ->getSingleScalarResult();
+                        $qb = $this->entityManager->createQueryBuilder();
+                        $qb->select('j.id', 'j.status', 'j.payload')
+                            ->from(Job::class, 'j')
+                            ->where('j.channel = :channel')
+                            ->andWhere('j.entity = :entity')
+                            ->andWhere('j.payload LIKE :instance_pattern')
+                            ->setParameter('channel', $channel)
+                            ->setParameter('entity', $entity)
+                            ->setParameter('instance_pattern', '%instance_name%'.$name.'%');
+                        if ($accountId) {
+                            $qb->andWhere('j.payload LIKE :account_pattern')
+                                ->setParameter('account_pattern', '%account_id%'.$accountId.'%');
                         }
+                        $qb->orderBy('j.id', 'DESC')->setMaxResults(1);
+                        $lastJob = $qb->getQuery()->getOneOrNullResult();
+                    }
 
-                        if ((int)$count > 0) {
+                    if ($lastJob) {
+                        $payloadObj = is_string($lastJob['payload']) ? json_decode($lastJob['payload'], true) : $lastJob['payload'];
+                        $oldStart = $payloadObj['params']['startDate'] ?? $payloadObj['params']['start_date'] ?? null;
+                        $oldEnd = $payloadObj['params']['endDate'] ?? $payloadObj['params']['end_date'] ?? null;
+                        
+                        $newStart = $jobParams['startDate'] ?? $jobParams['start_date'] ?? null;
+                        $newEnd = $jobParams['endDate'] ?? $jobParams['end_date'] ?? null;
+                        
+                        if ($oldStart === $newStart && $oldEnd === $newEnd) {
                             $shouldSchedule = false;
+                        } else {
+                            // Dates changed! If old job is still pending (status 1), soft-delete it.
+                            if ((int)$lastJob['status'] === \Enums\JobStatus::scheduled->value) {
+                                if (Helpers::isPostgres()) {
+                                    $this->entityManager->getConnection()->executeStatement(
+                                        "UPDATE jobs SET status = :status WHERE id = :id",
+                                        ['status' => \Enums\JobStatus::cancelled->value, 'id' => $lastJob['id']]
+                                    );
+                                } else {
+                                    $qbUpdate = $this->entityManager->createQueryBuilder();
+                                    $qbUpdate->update(Job::class, 'j')
+                                        ->set('j.status', ':status')
+                                        ->where('j.id = :id')
+                                        ->setParameter('status', \Enums\JobStatus::cancelled->value)
+                                        ->setParameter('id', $lastJob['id'])
+                                        ->getQuery()->execute();
+                                }
+                            }
                         }
                     }
-                }
 
-                if ($shouldSchedule) {
-                    $job = new Job();
-                    $job->addChannel($channel);
-                    $job->addEntity($entity);
+                    if ($shouldSchedule) {
+                        $job = new Job();
+                        $job->addChannel($channel);
+                        $job->addEntity($entity);
 
-                    // For '-recent' instances, we schedule them as CANCELLED initially
-                    // to prevent redundancy with historical jobs during deployment,
-                    // while still keeping them available in the UI for re-scheduling.
-                    $isRecent = str_ends_with($name, '-recent');
-                    $job->addStatus($isRecent ? JobStatus::cancelled->value : JobStatus::scheduled->value);
+                        $isRecent = str_ends_with($name, '-recent');
+                        $job->addStatus($isRecent ? JobStatus::cancelled->value : JobStatus::scheduled->value);
 
-                    $job->addUuid(bin2hex(random_bytes(16)));
-                    $job->addPayload([
-                        'params'        => $params,
-                        'instance_name' => $name
-                    ]);
+                        $job->addUuid(bin2hex(random_bytes(16)));
+                        $job->addPayload([
+                            'params'        => $jobParams,
+                            'instance_name' => $name
+                        ]);
 
-                    $msg = $isRecent
-                        ? "Initial job cancelled during deployment to prevent redundancy. Will run via cron at next scheduled time."
-                        : "Initial scheduling from deployment command";
-                    $job->addMessage($msg);
+                        $msg = $isRecent
+                            ? "Initial job cancelled during deployment to prevent redundancy. Will run via cron at next scheduled time."
+                            : "Initial scheduling from deployment command" . ($accountId ? " for account $accountId" : "");
+                        $job->addMessage($msg);
 
-                    $job->addCreatedAt(new DateTime());
-                    $job->addUpdatedAt(new DateTime());
+                        $job->addCreatedAt(new DateTime());
+                        $job->addUpdatedAt(new DateTime());
 
-                    $this->entityManager->persist($job);
-                    $scheduledCount++;
-                    if (Helpers::isDebug()) {
-                        $statusName = $isRecent ? 'cancelled' : 'scheduled';
-                        $output->writeln("<info>Created initial $statusName job for $name ($channel -> $entity)</info>");
-                    }
-                } else {
-                    $skippedCount++;
-                    if (Helpers::isDebug()) {
-                        $output->writeln("<comment>Job for $name already exists in queue. Skipping.</comment>");
+                        $this->entityManager->persist($job);
+                        $scheduledCount++;
+                        if (Helpers::isDebug()) {
+                            $statusName = $isRecent ? 'cancelled' : 'scheduled';
+                            $accMsg = $accountId ? " (Account: $accountId)" : "";
+                            $output->writeln("<info>Created initial $statusName job for $name$accMsg ($channel -> $entity)</info>");
+                        }
+                    } else {
+                        $skippedCount++;
                     }
                 }
             }
+        }
 
-            $this->entityManager->flush();
+        $this->entityManager->flush();
 
-            if (Helpers::isDebug()) {
-                $output->writeln("<info>Successfully scheduled $scheduledCount new jobs ($skippedCount skipped).</info>");
-            }
+        $output->writeln("<info>Successfully scheduled $scheduledCount new jobs ($skippedCount skipped).</info>");
 
             return Command::SUCCESS;
         }

@@ -12,6 +12,27 @@ use Entities\Analytics\Channel;
 
 class MonitoringController extends BaseController
 {
+    private function extractJobScope(array $payload): array
+    {
+        $params = $payload['params'] ?? [];
+        $accountId = $params['account_id'] ?? $params['accountId'] ?? $params['channeled_account_id'] ?? null;
+        $startDate = $params['startDate'] ?? $params['start_date'] ?? null;
+        $endDate = $params['endDate'] ?? $params['end_date'] ?? null;
+
+        if (is_string($startDate)) {
+            $startDate = str_replace('+', ' ', $startDate);
+        }
+        if (is_string($endDate)) {
+            $endDate = str_replace('+', ' ', $endDate);
+        }
+
+        return [
+            'account_id' => $accountId,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+        ];
+    }
+
     public function index(): Response
     {
         $html = file_get_contents(__DIR__ . '/../views/monitoring.html');
@@ -98,53 +119,88 @@ class MonitoringController extends BaseController
         $containersData[] = ['id' => 'redis', 'name' => 'Redis Cache', 'source' => 'global', 'entity' => 'cache', 'period' => 'N/A', 'port' => 6379];
 
         $conn = $this->em->getConnection();
-        $allJobsSql = "SELECT channel, entity, status, payload FROM jobs";
+        $allJobsSql = "SELECT channel, entity, status, payload, updated_at FROM jobs";
         $results = $conn->fetchAllAssociative($allJobsSql);
         
         $containerStats = [];
+        $oneHourAgo = (new \DateTime('-1 hour'))->format('Y-m-d H:i:s');
+
         foreach ($results as $row) {
             $targetId = $this->getTargetContainerId($row, $instances);
             if ($targetId) {
                 $statusName = JobStatus::tryFrom((int)$row['status'])?->name ?? 'unknown';
                 if (!isset($containerStats[$targetId])) $containerStats[$targetId] = ['total' => 0];
-                $containerStats[$targetId]['total']++;
+                
+                // Only count successes in the last hour as "active" for UI pruning
+                if ($row['status'] == JobStatus::completed->value && ($row['updated_at'] ?? '') >= $oneHourAgo) {
+                    $containerStats[$targetId]['total']++;
+                }
+                
                 $containerStats[$targetId][$statusName] = ($containerStats[$targetId][$statusName] ?? 0) + 1;
             }
         }
 
-        $containers = array_map(function($c) use ($containerStats) {
-            $c['stats'] = $containerStats[$c['id']] ?? ['total' => 0];
-            return $c;
-        }, $containersData);
 
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
 
-        // Fetch ONLY pending, processing, or failed jobs for priority visibility
-        $allRecentJobs = $jobRepo->findBy([], ['id' => 'DESC'], 300);
-        $priorityJobs = $jobRepo->findBy(
-            ['status' => [JobStatus::scheduled->value, JobStatus::processing->value, JobStatus::failed->value]],
-            ['id' => 'DESC'],
-            100
-        );
+        // 1. Identify all active channels first
+        $activeChannels = array_unique(array_map(fn($i) => strtolower($i['channel']), $instances));
 
-        $finalJobs = [];
-        foreach (array_merge($allRecentJobs, $priorityJobs) as $j) {
-            $finalJobs[$j->getId()] = $j;
+        // 2. Perform surgical sampling per channel
+        $sampledIds = [];
+        foreach ($activeChannels as $chan) {
+            // Scheduled: 5 Oldest (next to run)
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::scheduled->value, 'ASC', 5));
+            // Processing: 5 Oldest + 5 Newest
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::processing->value, 'ASC', 5));
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::processing->value, 'DESC', 5));
+            // Failed: 5 Newest
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::failed->value, 'DESC', 5));
+            // Completed: 5 Newest
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::completed->value, 'DESC', 5));
+            // Cancelled: 5 Newest
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::cancelled->value, 'DESC', 5));
         }
-        krsort($finalJobs);
-        $allRecentJobs = array_values($finalJobs);
+
+        // 3. Fetch full data for these specific IDs
+        $sampledIds = array_unique($sampledIds);
+        $allRecentJobs = !empty($sampledIds) ? $jobRepo->findBy(['id' => $sampledIds], ['id' => 'DESC']) : [];
+
+        $activeJobsByContainer = [];
 
         $pipelines = [];
         foreach ($allRecentJobs as $job) {
             $targetId = $this->getTargetContainerId($job, $instances) ?: 'global-infrastructure';
             $payload = $job->getPayload() ?? [];
             $params = $payload['params'] ?? [];
-            
+            $scope = $this->extractJobScope($payload);
+            $accountId = $scope['account_id'] ?? null;
+            $startDate = $scope['start_date'] ?? null;
+            $endDate = $scope['end_date'] ?? null;
+
             $normChan = strtolower(trim($job->getChannel()));
             $normEnt = strtolower(trim($job->getEntity()));
 
-            $pipelineKey = "{$targetId}:{$normChan}:{$normEnt}";
+            $scopeKey = (string)($accountId ?? 'all_accounts');
+            $timeframeKey = ($startDate ?? 'null') . ':' . ($endDate ?? 'null');
+            $pipelineKey = "{$targetId}:{$normChan}:{$normEnt}:{$scopeKey}:{$timeframeKey}";
+
+            if (in_array($job->getStatus(), [JobStatus::processing->value, JobStatus::scheduled->value, JobStatus::delayed->value], true)
+                && !isset($activeJobsByContainer[$targetId])) {
+                $activeJobsByContainer[$targetId] = [
+                    'id' => $job->getId(),
+                    'channel' => $normChan,
+                    'entity' => $normEnt,
+                    'status' => $job->getStatus(),
+                    'status_text' => strtoupper(JobStatus::tryFrom($job->getStatus())?->name ?? 'unknown'),
+                    'priority' => $job->getPriority(),
+                    'account_id' => $accountId,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'worker_id' => $job->getWorkerId(),
+                ];
+            }
 
             if (!isset($pipelines[$pipelineKey])) {
                 $statusText = JobStatus::tryFrom($job->getStatus())?->name ?? 'unknown';
@@ -177,7 +233,12 @@ class MonitoringController extends BaseController
                     'entity' => strtolower($job->getEntity()),
                     'status' => $job->getStatus(),
                     'status_text' => strtoupper($statusText),
+                    'priority' => $job->getPriority(),
+                    'worker_id' => $job->getWorkerId(),
                     'params' => $params,
+                    'account_id' => $accountId,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
                     'frequency' => $payload['cron'] ?? $frequency,
                     'execution_time' => $executionTime,
                     'created_at' => $createdAt ? $createdAt->format('Y-m-d H:i:s') : 'N/A',
@@ -195,6 +256,7 @@ class MonitoringController extends BaseController
                 if (count($pipelines[$pipelineKey]['history']) < 10) {
                     $pipelines[$pipelineKey]['history'][] = [
                         'status' => $job->getStatus(),
+                        'priority' => $job->getPriority(),
                         'date' => $job->getUpdatedAt() ? $job->getUpdatedAt()->format('Y-m-d H:i:s') : 'N/A',
                         'message' => $job->getMessage() ?: 'No details'
                     ];
@@ -203,6 +265,26 @@ class MonitoringController extends BaseController
         }
 
         $groupedJobs = [];
+        $channelTotals = [];
+
+        // Pre-initialize groups for consistency based on active channels
+        foreach ($instances as $instance) {
+            $chan = strtolower($instance['channel']);
+            if (!isset($groupedJobs[$chan])) $groupedJobs[$chan] = [];
+            if (!isset($channelTotals[$chan])) $channelTotals[$chan] = [
+                'scheduled' => 0, 'processing' => 0, 'completed' => 0, 'failed' => 0, 'cancelled' => 0
+            ];
+        }
+
+        // Calculate real totals per channel/status
+        foreach ($results as $row) {
+            $chan = strtolower($row['channel']);
+            $statusName = strtolower(JobStatus::tryFrom((int)$row['status'])?->name ?? 'unknown');
+            if (isset($channelTotals[$chan][$statusName])) {
+                $channelTotals[$chan][$statusName]++;
+            }
+        }
+
         foreach ($pipelines as $pipeline) {
             $chan = $pipeline['channel'];
             if (!isset($groupedJobs[$chan])) $groupedJobs[$chan] = [];
@@ -215,6 +297,9 @@ class MonitoringController extends BaseController
                 $idxA = $instanceOrder[$a['group']] ?? 999;
                 $idxB = $instanceOrder[$b['group']] ?? 999;
                 if ($idxA !== $idxB) return $idxA - $idxB;
+                if (($a['priority'] ?? 0) !== ($b['priority'] ?? 0)) {
+                    return ($b['priority'] ?? 0) <=> ($a['priority'] ?? 0);
+                }
                 return $b['id'] - $a['id'];
             });
         }
@@ -241,6 +326,21 @@ class MonitoringController extends BaseController
             'Devices' => ['class' => 'Entities\Analytics\Device', 'channeled' => null],
             'Jobs' => ['class' => 'Entities\Job', 'channeled' => 'Entities\Job']
         ];
+
+        $containers = array_map(function($c) use ($containerStats, $activeJobsByContainer) {
+            $c['stats'] = $containerStats[$c['id']] ?? ['total' => 0];
+            $c['active_job'] = $activeJobsByContainer[$c['id']] ?? null;
+            return $c;
+        }, $containersData);
+
+        // Filter to only show containers with activity or pending work
+        $containers = array_filter($containers, function($c) {
+            if ($c['id'] === 'redis') return true;
+            if ($c['active_job'] !== null) return true;
+            if (($c['stats']['total'] ?? 0) > 0) return true;
+            return false;
+        });
+        $containers = array_values($containers);
 
         $dbTotals = [];
         foreach ($statsConfig as $label => $config) {
@@ -354,19 +454,31 @@ class MonitoringController extends BaseController
         return new JsonResponse([
             'containers' => $containers,
             'groupedJobs' => $groupedJobs,
+            'channelTotals' => $channelTotals,
             'dbTotals' => $dbTotals,
             'projectName' => $this->config['project'] ?? 'APIs Hub',
             'timestamp' => date('Y-m-d H:i:s')
         ]);
     }
 
+    private function getJobIds(string $channel, int $status, string $order = 'DESC', int $limit = 5): array
+    {
+        $conn = $this->em->getConnection();
+        // Safe cast to int for LIMIT to avoid Doctrine DBAL 3 type mapping issues
+        $limitCount = (int)$limit;
+        return $conn->fetchFirstColumn(
+            "SELECT id FROM jobs WHERE channel = :chan AND status = :status ORDER BY id $order LIMIT $limitCount",
+            ['chan' => $channel, 'status' => $status]
+        );
+    }
+
     public function jobAction(Request $request): JsonResponse
     {
+        $content = json_decode($request->getContent(), true) ?? [];
         $id = $request->request->get('id');
         $action = $request->request->get('action');
 
         if (!$id || !$action) {
-            $content = json_decode($request->getContent(), true);
             $id = $content['id'] ?? null;
             $action = $content['action'] ?? null;
         }
@@ -412,8 +524,8 @@ class MonitoringController extends BaseController
                     return new JsonResponse(['success' => true, 'message' => "New job scheduled. Original #$id history preserved."]);
                 
                 case 'process':
-                    if ($job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
-                         return new JsonResponse(['error' => 'Only scheduled or delayed jobs can be processed manually'], 400);
+                    if (!in_array($job->getStatus(), [JobStatus::scheduled->value, JobStatus::delayed->value, JobStatus::failed->value], true)) {
+                         return new JsonResponse(['error' => 'Only scheduled, delayed, or failed jobs can be processed manually'], 400);
                     }
                     
                     // Execute in background WITHOUT claiming here. 
@@ -430,6 +542,40 @@ class MonitoringController extends BaseController
                         'message' => 'Manually cancelled via Monitoring Dashboard'
                     ]);
                     return new JsonResponse(['success' => true, 'message' => "Job #$id manually cancelled/deactivated"]);
+
+                case 'priority_adjust':
+                    $delta = (int)($request->request->get('delta') ?? $content['delta'] ?? 0);
+                    if ($delta === 0) {
+                        return new JsonResponse(['error' => 'A non-zero delta is required'], 400);
+                    }
+
+                    $newPriority = max(-100, min(100, $job->getPriority() + $delta));
+                    $job->setPriority($newPriority);
+                    $this->em->persist($job);
+                    $this->em->flush();
+
+                    return new JsonResponse([
+                        'success' => true,
+                        'priority' => $newPriority,
+                        'message' => "Job #$id priority updated to {$newPriority}"
+                    ]);
+
+                case 'priority_set':
+                    $priority = $request->request->get('priority') ?? $content['priority'] ?? null;
+                    if (!is_numeric($priority)) {
+                        return new JsonResponse(['error' => 'Priority must be numeric'], 400);
+                    }
+
+                    $newPriority = max(-100, min(100, (int)$priority));
+                    $job->setPriority($newPriority);
+                    $this->em->persist($job);
+                    $this->em->flush();
+
+                    return new JsonResponse([
+                        'success' => true,
+                        'priority' => $newPriority,
+                        'message' => "Job #$id priority set to {$newPriority}"
+                    ]);
 
                 default: return new JsonResponse(['error' => "Action '$action' not supported"], 400);
             }

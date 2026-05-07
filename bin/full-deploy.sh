@@ -102,10 +102,12 @@ echo -e "${GREEN}✔ Instances refreshed (config/instances.yaml).${NC}"
 # ── Step 3: Generate docker-compose.yml ───────────────────────────────────────
 echo ""
 echo -e "${YELLOW}📂 [3/5] Building Docker Compose manifest...${NC}"
+export PROJECT_PATH_HOST=$(pwd)
 MSYS_NO_PATHCONV=1 docker run --rm \
     -v "$(pwd):/app" \
     -e "ENV_FILE=$ENV_FILE" \
     -e "SKIP_SEED=$SKIP_SEED" \
+    -e "PROJECT_PATH_HOST=$PROJECT_PATH_HOST" \
     --env-file "$ENV_FILE" \
     -w /app \
     php:8.3-cli \
@@ -129,7 +131,8 @@ echo "  🌐 Ensuring external gateway network exists (${DEPLOYMENT_NAME}_defaul
 docker network ls | grep -w "${DEPLOYMENT_NAME}_default" >/dev/null 2>&1 || docker network create "${DEPLOYMENT_NAME}_default"
 
 echo "  🏗️  Building and starting new containers..."
-docker compose --env-file "$ENV_FILE" up -d --remove-orphans --build
+# Inject PROJECT_PATH_HOST so master knows how to scale workers correctly
+PROJECT_PATH_HOST=$PROJECT_PATH_HOST docker compose --env-file "$ENV_FILE" up -d --remove-orphans --build
 
 # ── Step 5: Post-deployment Health Check ──────────────────────────────────────
 echo ""

@@ -2,11 +2,11 @@
 
 namespace Tests\Unit\Repositories;
 
-use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\QueryBuilderType;
@@ -21,7 +21,7 @@ class CampaignRepositoryTest extends TestCase
 {
     private MockObject|EntityManager $entityManager;
     private MockObject|QueryBuilder $queryBuilder;
-    private MockObject|AbstractQuery $query;
+    private MockObject|Query $query;
     private CampaignRepository $repository;
     private string $entityName = 'Entities\Analytics\Campaign';
 
@@ -29,7 +29,7 @@ class CampaignRepositoryTest extends TestCase
     {
         $this->entityManager = $this->createMock(EntityManager::class);
         $this->queryBuilder = $this->createMock(QueryBuilder::class);
-        $this->query = $this->createMock(AbstractQuery::class);
+        $this->query = $this->createMock(Query::class);
 
         $this->entityManager->method('createQueryBuilder')
             ->willReturn($this->queryBuilder);
@@ -63,22 +63,38 @@ class CampaignRepositoryTest extends TestCase
      */
     public function testCreateBaseQueryBuilderSelect(): void
     {
+        $addSelectCalls = 0;
+        $leftJoinCalls = 0;
+
         $this->queryBuilder->expects($this->once())
             ->method('select')
             ->with('e')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(2))
             ->method('addSelect')
-            ->withConsecutive(['c'], ['ag'])
-            ->willReturnSelf();
+            ->willReturnCallback(function (string $select) use (&$addSelectCalls) {
+                $expected = ['c', 'ag'];
+                $this->assertSame($expected[$addSelectCalls], $select);
+                $addSelectCalls++;
+
+                return $this->queryBuilder;
+            });
         $this->queryBuilder->expects($this->once())
             ->method('from')
             ->with($this->entityName, 'e')
             ->willReturnSelf();
         $this->queryBuilder->expects($this->exactly(2))
             ->method('leftJoin')
-            ->withConsecutive(['e.channeledCampaigns', 'c'], ['e.channeledAdGroups', 'ag'])
-            ->willReturnSelf();
+            ->willReturnCallback(function (string $join, string $alias) use (&$leftJoinCalls) {
+                $expected = [
+                    ['e.channeledCampaigns', 'c'],
+                    ['e.channeledAdGroups', 'ag'],
+                ];
+                $this->assertSame($expected[$leftJoinCalls], [$join, $alias]);
+                $leftJoinCalls++;
+
+                return $this->queryBuilder;
+            });
 
         $reflection = new ReflectionMethod($this->repository, 'createBaseQueryBuilder');
         $result = $reflection->invoke($this->repository, QueryBuilderType::SELECT);

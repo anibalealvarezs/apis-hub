@@ -1712,7 +1712,7 @@
                 return null;
             }
 
-            return isset($metric->countryCode) ? ($map['map'][$metric->countryCode]?->getId() ?? null) : (isset($metric->country) ? $metric->country?->getId() : null);
+            return isset($metric->countryCode) ? (($map['map'][$metric->countryCode] ?? null)?->getId() ?? null) : (isset($metric->country) ? $metric->country?->getId() : null);
         }
 
         private static function resolveDeviceId(object $metric, ?array $map): ?int
@@ -1721,7 +1721,7 @@
                 return null;
             }
 
-            return isset($metric->deviceType) ? ($map['map'][$metric->deviceType]?->getId() ?? null) : (isset($metric->device) ? $metric->device?->getId() : null);
+            return isset($metric->deviceType) ? (($map['map'][$metric->deviceType] ?? null)?->getId() ?? null) : (isset($metric->device) ? $metric->device?->getId() : null);
         }
 
         private static function resolveDimensionSetId(object $metric, ?array $map): ?int
