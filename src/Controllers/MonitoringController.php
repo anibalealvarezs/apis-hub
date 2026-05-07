@@ -137,34 +137,28 @@ class MonitoringController extends BaseController
         /** @var \Repositories\JobRepository $jobRepo */
         $jobRepo = $this->em->getRepository(Job::class);
 
-        // Define active/visible statuses (exclude cancelled/delayed to reduce noise)
-        $visibleStatuses = [
-            JobStatus::scheduled->value,
-            JobStatus::processing->value,
-            JobStatus::failed->value,
-            JobStatus::completed->value
-        ];
+        // 1. Identify all active channels first
+        $activeChannels = array_unique(array_map(fn($i) => strtolower($i['channel']), $instances));
 
-        // Fetch recent visible jobs
-        $allRecentJobs = $jobRepo->findBy(
-            ['status' => $visibleStatuses],
-            ['id' => 'DESC'],
-            600
-        );
-
-        // Fetch processing jobs with high priority regardless of ID
-        $priorityJobs = $jobRepo->findBy(
-            ['status' => [JobStatus::processing->value, JobStatus::failed->value]],
-            ['id' => 'DESC'],
-            200
-        );
-
-        $finalJobs = [];
-        foreach (array_merge($allRecentJobs, $priorityJobs) as $j) {
-            $finalJobs[$j->getId()] = $j;
+        // 2. Perform surgical sampling per channel
+        $sampledIds = [];
+        foreach ($activeChannels as $chan) {
+            // Scheduled: 5 Oldest (next to run)
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::scheduled->value, 'ASC', 5));
+            // Processing: 5 Oldest + 5 Newest
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::processing->value, 'ASC', 5));
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::processing->value, 'DESC', 5));
+            // Failed: 5 Newest
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::failed->value, 'DESC', 5));
+            // Completed: 5 Newest
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::completed->value, 'DESC', 5));
+            // Cancelled: 5 Newest
+            $sampledIds = array_merge($sampledIds, $this->getJobIds($chan, JobStatus::cancelled->value, 'DESC', 5));
         }
-        krsort($finalJobs);
-        $allRecentJobs = array_values($finalJobs);
+
+        // 3. Fetch full data for these specific IDs
+        $sampledIds = array_unique($sampledIds);
+        $allRecentJobs = !empty($sampledIds) ? $jobRepo->findBy(['id' => $sampledIds], ['id' => 'DESC']) : [];
 
         $activeJobsByContainer = [];
 
@@ -264,10 +258,24 @@ class MonitoringController extends BaseController
         }
 
         $groupedJobs = [];
+        $channelTotals = [];
+
         // Pre-initialize groups for consistency based on active channels
         foreach ($instances as $instance) {
             $chan = strtolower($instance['channel']);
             if (!isset($groupedJobs[$chan])) $groupedJobs[$chan] = [];
+            if (!isset($channelTotals[$chan])) $channelTotals[$chan] = [
+                'scheduled' => 0, 'processing' => 0, 'completed' => 0, 'failed' => 0, 'cancelled' => 0
+            ];
+        }
+
+        // Calculate real totals per channel/status
+        foreach ($results as $row) {
+            $chan = strtolower($row['channel']);
+            $statusName = strtolower(JobStatus::tryFrom((int)$row['status'])?->name ?? 'unknown');
+            if (isset($channelTotals[$chan][$statusName])) {
+                $channelTotals[$chan][$statusName]++;
+            }
         }
 
         foreach ($pipelines as $pipeline) {
@@ -430,10 +438,21 @@ class MonitoringController extends BaseController
         return new JsonResponse([
             'containers' => $containers,
             'groupedJobs' => $groupedJobs,
+            'channelTotals' => $channelTotals,
             'dbTotals' => $dbTotals,
             'projectName' => $this->config['project'] ?? 'APIs Hub',
             'timestamp' => date('Y-m-d H:i:s')
         ]);
+    }
+
+    private function getJobIds(string $channel, int $status, string $order = 'DESC', int $limit = 5): array
+    {
+        $conn = $this->em->getConnection();
+        return $conn->fetchFirstColumn(
+            "SELECT id FROM jobs WHERE channel = :chan AND status = :status ORDER BY id $order LIMIT :limit",
+            ['chan' => $channel, 'status' => $status, 'limit' => $limit],
+            ['limit' => \PDO::PARAM_INT]
+        );
     }
 
     public function jobAction(Request $request): JsonResponse
