@@ -56,8 +56,9 @@
         {
             $viewPath = __DIR__.'/../views/config_manager.html';
             $realViewPath = realpath($viewPath);
-            error_log("DEBUG: ConfigManagerController - Loading view from: " . ($realViewPath ?: $viewPath . " (NOT FOUND)"));
             $html = file_get_contents($viewPath);
+
+            $logger = Helpers::setLogger('config-manager.log');
 
             $availableChannels = DriverFactory::getAvailableChannels();
             $driverJs = "";
@@ -73,12 +74,11 @@
                         $className = $reflector->getShortName();
                         $baseName = str_replace('Driver', '', $className);
                         $jsPath = $driverDir . "/js/" . $baseName . "ConfigHandler.js";
-                        error_log("DEBUG: ConfigManagerController - Checking JS path: " . $jsPath);
                         
                         // Try loading directly first (faster and doesn't require instantiation)
                         if (file_exists($jsPath)) {
                             $driverJs .= file_get_contents($jsPath) . "\n";
-                            error_log("DEBUG: ConfigManagerController - Loaded JS for $channel from static path: $jsPath");
+                            $logger->debug("Loaded JS for $channel from static path: $jsPath");
                             continue;
                         }
                     }
@@ -88,19 +88,19 @@
                     $js = $driver->getConfigurationJs();
                     if ($js) {
                         $driverJs .= $js . "\n";
-                        error_log("DEBUG: ConfigManagerController - Loaded JS for $channel from driver method");
+                        $logger->debug("Loaded JS for $channel from driver method");
                     } else {
-                        error_log("DEBUG: ConfigManagerController - Driver for $channel returned empty JS");
+                        $logger->warning("Driver for $channel returned empty JS");
                     }
                 } catch (Throwable $e) {
-                    error_log("DEBUG: ConfigManagerController - Failed to load JS for channel $channel: " . $e->getMessage());
+                    $logger->error("Failed to load JS for channel $channel: " . $e->getMessage());
                     continue;
                 }
             }
 
-            error_log("DEBUG: ConfigManagerController - Total available channels: " . count($availableChannels));
-            error_log("DEBUG: ConfigManagerController - Injected JS length: " . strlen($driverJs));
-            error_log("DEBUG: ConfigManagerController - Tag /* [DRIVER_JS_INJECTION] */ found at: " . (strpos($html, '/* [DRIVER_JS_INJECTION] */') === false ? "NOT FOUND" : strpos($html, '/* [DRIVER_JS_INJECTION] */')));
+            $logger->info("Total available channels: " . count($availableChannels));
+            $logger->info("Injected JS length: " . strlen($driverJs));
+            $logger->debug("Tag /* [DRIVER_JS_INJECTION] */ found at: " . (strpos($html, '/* [DRIVER_JS_INJECTION] */') === false ? "NOT FOUND" : strpos($html, '/* [DRIVER_JS_INJECTION] */')));
 
             $driverJs = "\nconsole.log('--- START DRIVER JS INJECTION ---');\n" . $driverJs . "\nconsole.log('--- END DRIVER JS INJECTION ---');\n";
 
