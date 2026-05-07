@@ -326,6 +326,15 @@ class MonitoringController extends BaseController
             return $c;
         }, $containersData);
 
+        // Filter to only show containers with activity or pending work
+        $containers = array_filter($containers, function($c) {
+            if ($c['id'] === 'redis') return true;
+            if ($c['active_job'] !== null) return true;
+            if (($c['stats']['total'] ?? 0) > 0) return true;
+            return false;
+        });
+        $containers = array_values($containers);
+
         $dbTotals = [];
         foreach ($statsConfig as $label => $config) {
             $entry = ['entity' => $label, 'count' => 0, 'channels' => []];
