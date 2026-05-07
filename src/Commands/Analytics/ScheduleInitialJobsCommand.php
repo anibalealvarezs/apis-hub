@@ -146,8 +146,11 @@
 
                     $output->writeln("<comment> - Found " . count($accounts) . " accounts for granular sync.</comment>");
                     foreach ($accounts as $account) {
-                        $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? null) : $account;
-                        $output->writeln("<comment>   - Resolving identity for: $accountId</comment>");
+                        $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? $account['url'] ?? null) : $account;
+                        $output->writeln("<comment>   - Resolving identity for: " . ($accountId ?: '[EMPTY]') . "</comment>");
+                        if (!$accountId && is_array($account)) {
+                            $output->writeln("<comment>     DEBUG Array: " . json_encode($account) . "</comment>");
+                        }
 
                         // Agnostic Canonical ID resolution
                         if ($account) {
