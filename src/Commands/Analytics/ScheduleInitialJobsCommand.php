@@ -164,7 +164,7 @@
                                     foreach ($patterns as $pKey => $pattern) {
                                         if (($pattern['key'] ?? null) === $resourceKey) {
                                             $categories = (array) ($pattern['category'] ?? []);
-                                            if (!empty($categories)) {
+                                            if (!empty($categories) && isset($categories[0])) {
                                                 $category = $categories[0];
                                                 $context = $pKey;
                                                 break;
