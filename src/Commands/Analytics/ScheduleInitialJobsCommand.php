@@ -28,6 +28,7 @@
 
         public function __construct(EntityManagerInterface $entityManager)
         {
+            die("DEBUG: DENTRO DEL CONSTRUCTOR");
             $this->entityManager = $entityManager;
             parent::__construct();
         }
