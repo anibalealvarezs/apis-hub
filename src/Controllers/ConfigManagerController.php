@@ -56,6 +56,19 @@
         {
             $html = file_get_contents(__DIR__.'/../views/config_manager.html');
 
+            $availableChannels = DriverFactory::getAvailableChannels();
+            $driverJs = "";
+            foreach ($availableChannels as $channel) {
+                try {
+                    $driver = DriverFactory::get($channel);
+                    $driverJs .= $driver->getConfigurationJs() . "\n";
+                } catch (Exception) {
+                    continue;
+                }
+            }
+
+            $html = str_replace('{{DRIVER_JS}}', $driverJs, $html);
+
             return $this->renderWithEnv($html);
         }
 
