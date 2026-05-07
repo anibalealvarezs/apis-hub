@@ -60,8 +60,34 @@
             $driverJs = "";
             foreach ($availableChannels as $channel) {
                 try {
+                    $reg = DriverFactory::getRegistry();
+                    $driverClass = $reg[$channel]['driver'] ?? null;
+                    
+                    if ($driverClass && class_exists($driverClass)) {
+                        $reflector = new \ReflectionClass($driverClass);
+                        $fn = $reflector->getFileName();
+                        $driverDir = dirname($fn);
+                        $className = $reflector->getShortName();
+                        $baseName = str_replace('Driver', '', $className);
+                        $jsPath = $driverDir . "/js/" . $baseName . "ConfigHandler.js";
+                        
+                        // Try loading directly first (faster and doesn't require instantiation)
+                        if (file_exists($jsPath)) {
+                            $driverJs .= file_get_contents($jsPath) . "\n";
+                            error_log("DEBUG: ConfigManagerController - Loaded JS for $channel from static path: $jsPath");
+                            continue;
+                        }
+                    }
+
+                    // Fallback to driver method if static path fails
                     $driver = DriverFactory::get($channel);
-                    $driverJs .= $driver->getConfigurationJs() . "\n";
+                    $js = $driver->getConfigurationJs();
+                    if ($js) {
+                        $driverJs .= $js . "\n";
+                        error_log("DEBUG: ConfigManagerController - Loaded JS for $channel from driver method");
+                    } else {
+                        error_log("DEBUG: ConfigManagerController - Driver for $channel returned empty JS");
+                    }
                 } catch (Throwable $e) {
                     error_log("DEBUG: ConfigManagerController - Failed to load JS for channel $channel: " . $e->getMessage());
                     continue;
@@ -70,6 +96,9 @@
 
             error_log("DEBUG: ConfigManagerController - Total available channels: " . count($availableChannels));
             error_log("DEBUG: ConfigManagerController - Injected JS length: " . strlen($driverJs));
+            error_log("DEBUG: ConfigManagerController - Tag /* [DRIVER_JS_INJECTION] */ found at: " . (strpos($html, '/* [DRIVER_JS_INJECTION] */') === false ? "NOT FOUND" : strpos($html, '/* [DRIVER_JS_INJECTION] */')));
+
+            $driverJs = "\nconsole.log('--- START DRIVER JS INJECTION ---');\n" . $driverJs . "\nconsole.log('--- END DRIVER JS INJECTION ---');\n";
 
             $html = str_replace('/* [DRIVER_JS_INJECTION] */', $driverJs, $html);
             // Fallback for legacy tag if still present
