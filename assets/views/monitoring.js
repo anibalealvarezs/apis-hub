@@ -80,6 +80,7 @@ async function fetchData() {
 
         updateDbTotals(data.dbTotals);
         updateContainers(data.containers);
+        updateSyncTelemetry(data.syncTelemetry);
         if (data.groupedJobs) {
             // DEBUG: Inject Simulation Jobs to preview UI ONLY in Demo Mode
             const envMeta = document.querySelector('meta[name="app-env"]');
@@ -188,6 +189,67 @@ function updateDbTotals(totals) {
         `;
         grid.appendChild(card);
     });
+}
+
+function updateSyncTelemetry(telemetry) {
+    const grid = document.getElementById('sync-telemetry-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    if (!telemetry || Object.keys(telemetry).length === 0) {
+        grid.innerHTML = '<div class="empty-state">No synchronization activity detected</div>';
+        return;
+    }
+
+    Object.entries(telemetry).forEach(([channel, stats]) => {
+        const total = stats.total_jobs || 0;
+        if (total === 0) return;
+
+        const pCompleted = (stats.completed / total) * 100;
+        const pProcessing = (stats.processing / total) * 100;
+        const pFailed = (stats.failed / total) * 100;
+        const pScheduled = (stats.scheduled / total) * 100;
+
+        const card = document.createElement('div');
+        card.className = 'sync-channel-card';
+        
+        const channelLabel = channel.replace(/_/g, ' ').toUpperCase();
+        
+        card.innerHTML = `
+            <div class="sync-card-header">
+                <div class="sync-channel-name">
+                    <i data-lucide="activity" size="16" style="color:var(--secondary)"></i>
+                    ${channelLabel}
+                </div>
+                <div class="sync-percentage">${Math.round(stats.completion_percentage)}%</div>
+            </div>
+            
+            <div class="sync-progress-container">
+                <div class="sync-progress-segment sync-segment-completed" style="width: ${pCompleted}%" title="Completed: ${stats.completed}"></div>
+                <div class="sync-progress-segment sync-segment-processing" style="width: ${pProcessing}%" title="Processing: ${stats.processing}"></div>
+                <div class="sync-progress-segment sync-segment-failed" style="width: ${pFailed}%" title="Failed: ${stats.failed}"></div>
+                <div class="sync-progress-segment sync-segment-scheduled" style="width: ${pScheduled}%" title="Scheduled: ${stats.scheduled}"></div>
+            </div>
+            
+            <div class="sync-stats-mini">
+                <div class="sync-stat-item">
+                    <div class="sync-stat-label">Total</div>
+                    <div class="sync-stat-val">${total}</div>
+                </div>
+                <div class="sync-stat-item">
+                    <div class="sync-stat-label">Done</div>
+                    <div class="sync-stat-val" style="color:#10b981">${stats.completed}</div>
+                </div>
+                <div class="sync-stat-item">
+                    <div class="sync-stat-label">Active</div>
+                    <div class="sync-stat-val" style="color:var(--secondary)">${stats.processing}</div>
+                </div>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+
+    lucide.createIcons();
 }
 
 function updateContainers(containers) {

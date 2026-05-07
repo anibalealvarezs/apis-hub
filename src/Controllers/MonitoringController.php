@@ -9,6 +9,8 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
 use Entities\Analytics\Channel;
+use Services\Sync\SyncTelemetryService;
+use Services\CacheService;
 
 class MonitoringController extends BaseController
 {
@@ -451,11 +453,27 @@ class MonitoringController extends BaseController
             $dbTotals[] = $entry;
         }
 
+        // Add Sync Telemetry
+        $syncTelemetry = [];
+        try {
+            $redis = Helpers::getRedisClient();
+            $cache = CacheService::getInstance($redis);
+            $telemetryService = new SyncTelemetryService($this->em, $cache);
+            
+            // Get data for each active channel
+            foreach ($activeChannels as $chan) {
+                $syncTelemetry[$chan] = $telemetryService->getChannelStatus($chan);
+            }
+        } catch (\Exception $e) {
+            error_log("Failed to fetch sync telemetry for monitoring: " . $e->getMessage());
+        }
+
         return new JsonResponse([
             'containers' => $containers,
             'groupedJobs' => $groupedJobs,
             'channelTotals' => $channelTotals,
             'dbTotals' => $dbTotals,
+            'syncTelemetry' => $syncTelemetry,
             'projectName' => $this->config['project'] ?? 'APIs Hub',
             'timestamp' => date('Y-m-d H:i:s')
         ]);
