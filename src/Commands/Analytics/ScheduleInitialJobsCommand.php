@@ -202,8 +202,10 @@
                             'instance_pattern' => '%instance_name%'.$name.'%',
                         ];
                         if ($accountId) {
-                            $sql .= " AND CAST(j.payload AS text) LIKE :account_pattern";
-                            $sqlParams['account_pattern'] = '%account_id%'.$accountId.'%';
+                            $sql .= " AND (CAST(j.payload AS JSONB)->'params'->>'account_id' = :account_id OR CAST(j.payload AS JSONB)->>'account_id' = :account_id)";
+                            $sqlParams['account_id'] = $accountId;
+                        } else {
+                            $sql .= " AND (CAST(j.payload AS JSONB)->'params'->>'account_id' IS NULL AND CAST(j.payload AS JSONB)->>'account_id' IS NULL)";
                         }
                         $sql .= " ORDER BY id DESC LIMIT 1";
                         $lastJob = $this->entityManager->getConnection()->fetchAssociative($sql, $sqlParams);
@@ -220,6 +222,9 @@
                         if ($accountId) {
                             $qb->andWhere('j.payload LIKE :account_pattern')
                                 ->setParameter('account_pattern', '%account_id%'.$accountId.'%');
+                        } else {
+                            $qb->andWhere('j.payload NOT LIKE :account_pattern')
+                                ->setParameter('account_pattern', '%account_id%');
                         }
                         $qb->orderBy('j.id', 'DESC')->setMaxResults(1);
                         $lastJob = $qb->getQuery()->getOneOrNullResult();
