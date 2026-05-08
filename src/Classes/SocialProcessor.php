@@ -139,8 +139,11 @@ class SocialProcessor
         $conn = $manager->getConnection();
         $cols = ['platform_id', 'account_id', 'channel', 'name', 'type', 'data'];
 
-        $account = $entity->getContext()['account'] ?? null;
-        $accountId = is_object($account) ? $account->getId() : $account;
+        $accountId = self::resolveContextId(
+            $entity->getContext() ?? [],
+            ['account'],
+            ['account_id', 'accountId']
+        );
 
         $params = [
             (string)$entity->getPlatformId(),
@@ -189,12 +192,12 @@ class SocialProcessor
                 $accountId = self::resolveContextId(
                     $context,
                     ['account'],
-                    ['account_id', 'accountId', 'accountPlatformId']
+                    ['account_id', 'accountId']
                 );
                 $pageId = self::resolveContextId(
                     $context,
                     ['page'],
-                    ['page_id', 'pageId', 'pagePlatformId']
+                    ['page_id', 'pageId']
                 );
                 $channeledAccountId = self::resolveContextId(
                     $context,
@@ -240,11 +243,20 @@ class SocialProcessor
 
             $value = $context[$key];
             if (is_object($value) && method_exists($value, 'getId')) {
-                return $value->getId();
+                $id = $value->getId();
+                if ($id !== null && $id !== '') {
+                    return $id;
+                }
             }
 
-            if (!is_object($value) && $value !== '') {
-                return $value;
+            if (!is_object($value) && $value !== null && $value !== '') {
+                // If it's a numeric string or integer, check if it fits in a 32-bit signed integer (PostgreSQL 'integer')
+                if (is_int($value) || ctype_digit((string)$value)) {
+                    $numValue = (float)$value;
+                    if ($numValue <= 2147483647) {
+                        return (int)$value;
+                    }
+                }
             }
         }
 
