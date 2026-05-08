@@ -160,10 +160,17 @@
 
 
                     foreach ($accounts as $account) {
-                        $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? $account['url'] ?? null) : $account;
- 
+                        $accountId = null;
+                        if ($account instanceof \Entities\Analytics\ChanneledAccount) {
+                            $accountId = $account->getPlatformId();
+                        } elseif (is_array($account)) {
+                            $accountId = $account['id'] ?? $account['identifier'] ?? $account['url'] ?? null;
+                        } else {
+                            $accountId = $account;
+                        }
+  
                         // Agnostic Canonical ID resolution
-                        if ($account) {
+                        if ($account && !$accountId) {
                             $assetData = is_array($account) ? $account : ['id' => $account];
                             $driverClass = $regConfig['driver'] ?? null;
                             if ($driverClass && method_exists($driverClass, 'getCanonicalId')) {
@@ -230,15 +237,22 @@
                                 ->setParameter('account_pattern', '%account_id%');
                         }
                         $qb->orderBy('j.id', 'DESC')->setMaxResults(1);
-                        $lastJob = $qb->getQuery()->getOneOrNullResult();
+                        $result = $qb->getQuery()->getOneOrNullResult();
+                        $lastJob = $result ? ['id' => $result->getId(), 'status' => $result->getStatus(), 'payload' => $result->getPayload()] : null;
                     }
 
                     if ($lastJob) {
                         $payloadObj = is_string($lastJob['payload']) ? json_decode($lastJob['payload'], true) : $lastJob['payload'];
-                        if (strpos($channel, 'facebook') !== false) {
-                            $foundAcc = $payloadObj['params']['account_id'] ?? $payloadObj['account_id'] ?? 'NULL';
-                            echo "DEBUG: Instance $name (Postgres: " . (\Helpers\Helpers::isPostgres() ? 'YES' : 'NO') . ") -> Match found! New Account: " . ($accountId ?? 'GLOBAL') . " | Existing Job #{$lastJob['id']} Account: $foundAcc\n";
+                        $foundAcc = $payloadObj['params']['account_id'] ?? $payloadObj['account_id'] ?? null;
+                        
+                        // FINAL GUARD: If account IDs don't match, this is NOT a duplicate
+                        if (($accountId ?: null) !== ($foundAcc ?: null)) {
+                            $lastJob = null;
                         }
+                    }
+
+                    if ($lastJob) {
+                        $payloadObj = is_string($lastJob['payload']) ? json_decode($lastJob['payload'], true) : $lastJob['payload'];
                         $oldStart = $payloadObj['params']['startDate'] ?? $payloadObj['params']['start_date'] ?? null;
                         $oldEnd = $payloadObj['params']['endDate'] ?? $payloadObj['params']['end_date'] ?? null;
                         
