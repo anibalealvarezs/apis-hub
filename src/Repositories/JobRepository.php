@@ -796,6 +796,16 @@ class JobRepository extends BaseRepository
             $count = $this->_em->getConnection()->fetchOne($checkSql, $checkParams);
             if (Helpers::isDebug()) {
                 echo "DEBUG: claimAvailableJob found $count potential jobs (status=$statusSql, channel=$channel, instance=$instanceName, threshold=$thresholdTime)\n";
+                if ($count > 0) {
+                    // Find what's blocking if we found jobs but claim returns null
+                    $blockerSql = "SELECT id, status, updated_at, payload->>'account_id' as acc, payload->>'instance_name' as inst 
+                                  FROM jobs 
+                                  WHERE status = {$processingStatus} AND updated_at >= :threshold";
+                    $blockers = $this->_em->getConnection()->fetchAllAssociative($blockerSql, ['threshold' => $thresholdTime]);
+                    foreach ($blockers as $b) {
+                        echo "DEBUG: Potential blocker: ID={$b['id']}, Status={$b['status']}, Updated={$b['updated_at']}, Acc={$b['acc']}, Inst={$b['inst']}\n";
+                    }
+                }
             }
 
             // Optimized query
