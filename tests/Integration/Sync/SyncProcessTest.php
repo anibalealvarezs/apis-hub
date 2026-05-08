@@ -32,9 +32,9 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $fbChannelName = $fbDriver->getChannel();
         $fbEntity = \Enums\AnalyticsEntity::campaigns->value;
 
-        // Register driver in factory registry with full metadata via reflection
-        $reflection = new \ReflectionClass(\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::class);
-        $regProp = $reflection->getProperty('registry');
+        // 1. Register driver in factory registry with full metadata via reflection
+        $reflectionFactory = new \ReflectionClass(\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::class);
+        $regProp = $reflectionFactory->getProperty('registry');
         $regProp->setAccessible(true);
         $registry = $regProp->getValue();
         $registry[$fbChannelName] = [
@@ -45,11 +45,28 @@ class SyncProcessTest extends BaseIntegrationTestCase
         ];
         $regProp->setValue(null, $registry);
 
-        // Ensure channel exists in DB
+        // 2. Ensure channel exists in DB
         $this->seedChannel($fbChannelName, $fbDriver->getProviderName(), $fbDriver->getChannelLabel());
 
-        // Mock a channel config so the command has something to schedule
-        $mockConfig = [
+        // 3. Mock configurations via reflection
+        $reflectionHelpers = new \ReflectionClass(Helpers::class);
+        
+        // Mock projectConfig (with instances)
+        $projectProp = $reflectionHelpers->getProperty('projectConfig');
+        $projectProp->setAccessible(true);
+        $projectProp->setValue(null, [
+            'instances' => [
+                [
+                    'name' => 'global',
+                    'channel' => $fbChannelName,
+                    'entity' => $fbEntity,
+                    'granular_sync' => true
+                ]
+            ]
+        ]);
+
+        // Mock channelsConfig (with account data)
+        $mockChannels = [
             $fbChannelName => [
                 'enabled' => true,
                 'ad_accounts' => [['id' => '123', 'enabled' => true]],
@@ -58,16 +75,14 @@ class SyncProcessTest extends BaseIntegrationTestCase
                 ]
             ]
         ];
-        
-        $reflectionHelpers = new \ReflectionClass(Helpers::class);
-        $prop = $reflectionHelpers->getProperty('channelsConfig');
-        $prop->setAccessible(true);
-        $prop->setValue(null, $mockConfig);
+        $channelsProp = $reflectionHelpers->getProperty('channelsConfig');
+        $channelsProp->setAccessible(true);
+        $channelsProp->setValue(null, $mockChannels);
 
         $command = new ScheduleInitialJobsCommand($this->entityManager);
         
         // Run first time
-        $command->run(new ArrayInput(['--instance' => 'global']), new NullOutput());
+        $command->run(new ArrayInput(['--instance' => 'global']), new \Symfony\Component\Console\Output\BufferedOutput());
         
         $count = $this->jobRepo->count([]);
         $this->assertGreaterThan(0, $count, "Jobs should be scheduled for the mock channel");
@@ -75,7 +90,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $initialCount = $count;
         
         // Run second time (should be idempotent for same instance)
-        $command->run(new ArrayInput(['--instance' => 'global']), new NullOutput());
+        $command->run(new ArrayInput(['--instance' => 'global']), new \Symfony\Component\Console\Output\BufferedOutput());
         
         $this->assertEquals($initialCount, $this->jobRepo->count([]), "Jobs should not be duplicated for same instance");
     }
@@ -174,6 +189,8 @@ class SyncProcessTest extends BaseIntegrationTestCase
         // 2. Get Telemetry
         $redis = Helpers::getRedisClient();
         $cache = new \Services\CacheService($redis);
+        $cache->deletePattern('telemetry_*'); // Clear cache to force fresh data
+
         $service = new SyncTelemetryService($cache);
         $telemetry = $service->getGlobalStatus();
 
