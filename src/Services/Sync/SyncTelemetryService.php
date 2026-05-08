@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Services\Sync;
 
-use Doctrine\ORM\EntityManagerInterface;
-use Entities\Analytics\Channel;
 use Entities\Job;
 use Enums\JobStatus;
 use Entities\Analytics\Channeled\ChanneledAccount;
@@ -15,14 +13,12 @@ use Throwable;
 
 class SyncTelemetryService
 {
-    private EntityManagerInterface $entityManager;
     private CacheService $cacheService;
     private const CACHE_PREFIX = 'sync_telemetry:';
     private const DEFAULT_TTL = 86400; // 24 hours
 
-    public function __construct(EntityManagerInterface $entityManager, CacheService $cacheService)
+    public function __construct(CacheService $cacheService)
     {
-        $this->entityManager = $entityManager;
         $this->cacheService = $cacheService;
     }
 
@@ -51,8 +47,8 @@ class SyncTelemetryService
     {
         $cacheKey = self::CACHE_PREFIX . 'global';
         
-        $em = $this->entityManager;
-        return $this->cacheService->get($cacheKey, function () use ($em) {
+        return $this->cacheService->get($cacheKey, function () {
+            $em = Helpers::getManager();
             $channelsConfig = Helpers::getChannelsConfig();
             
             // Get all channels that have jobs in the database
@@ -98,8 +94,8 @@ class SyncTelemetryService
     {
         $cacheKey = self::CACHE_PREFIX . 'channel:' . $channelName . ($targetAccountId ? ':' . $targetAccountId : '');
 
-        $em = $this->entityManager;
-        return $this->cacheService->get($cacheKey, function () use ($em, $channelName, $targetAccountId) {
+        return $this->cacheService->get($cacheKey, function () use ($channelName, $targetAccountId) {
+            $em = Helpers::getManager();
             $conn = $em->getConnection();
             
             // 1. Get Job Stats from DB
@@ -228,8 +224,8 @@ class SyncTelemetryService
     {
         $cacheKey = self::CACHE_PREFIX . 'daily:' . $channel . ':' . $accountId;
         
-        $em = $this->entityManager;
-        return $this->cacheService->get($cacheKey, function () use ($em, $channel, $accountId) {
+        return $this->cacheService->get($cacheKey, function () use ($channel, $accountId) {
+            $em = Helpers::getManager();
             $conn = $em->getConnection();
             $isPostgres = Helpers::isPostgres($em);
             

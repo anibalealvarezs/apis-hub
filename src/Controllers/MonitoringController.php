@@ -458,7 +458,7 @@ class MonitoringController extends BaseController
         try {
             $redis = Helpers::getRedisClient();
             $cache = CacheService::getInstance($redis);
-            $telemetryService = new SyncTelemetryService($this->em, $cache);
+            $telemetryService = new SyncTelemetryService($cache);
             
             // If activeChannels is empty, try to get all channels that have jobs
             $channelsToCheck = $activeChannels;

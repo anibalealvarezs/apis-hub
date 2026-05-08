@@ -19,7 +19,7 @@ class SyncStatusController extends BaseController
         parent::__construct();
         $redis = Helpers::getRedisClient();
         $cacheService = CacheService::getInstance($redis);
-        $this->telemetryService = new SyncTelemetryService($this->em, $cacheService);
+        $this->telemetryService = new SyncTelemetryService($cacheService);
     }
 
     /**
