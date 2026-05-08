@@ -14,6 +14,7 @@ use Enums\QueryBuilderType;
 use Faker\Factory;
 use Helpers\Helpers;
 use Services\CacheService;
+use Entities\Entity;
 use InvalidArgumentException;
 
 class JobRepository extends BaseRepository
@@ -387,7 +388,7 @@ class JobRepository extends BaseRepository
      * @return array|null
      * @throws NonUniqueResultException
      */
-    public function update(int $id, ?object $data = null, bool $returnEntity = false): bool|array|null|object
+    public function update(int $id, ?object $data = null, bool $returnEntity = false): bool|array|null|Entity
     {
         $dataArr = (array) ($data ?? []);
         if (isset($dataArr['status']) && $dataArr['status']) {
