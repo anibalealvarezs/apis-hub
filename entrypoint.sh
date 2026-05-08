@@ -144,9 +144,13 @@ if [[ "$INSTANCE_NAME" == *"mcp"* ]]; then
     exec node mcp-server/index.js
 fi
 
-# Start cron service
-echo "Starting cron service..."
-cron || service cron start || echo "Cron service startup failed"
+# Start cron service (Master instance ONLY)
+if [[ "$INSTANCE_NAME" == *"master"* ]]; then
+    echo "Master Instance ($INSTANCE_NAME): Starting cron service..."
+    cron || service cron start || echo "Cron service startup failed"
+else
+    echo "Worker Instance ($INSTANCE_NAME): Skipping cron service (not master)."
+fi
 
 # Automatic server detection based on INSTANCE_NAME
 if [[ "$INSTANCE_NAME" == *"master"* ]]; then
@@ -157,21 +161,26 @@ else
     USE_SWOOLE=${USE_SWOOLE:-false}
 fi
 
-# Start the web server
-if [ "$DISABLE_HTTP_SERVER" = "true" ]; then
-    echo "HTTP server disabled ($INSTANCE_NAME). Running as pure worker."
-    # We keep the container alive by waiting on the background processes or just tailing a log
-    # Since cron is running and potentially other background tasks, we tail the cron log
-    touch /app/logs/cron.log
-    exec tail -f /app/logs/cron.log
-elif [ "$USE_SWOOLE" = "true" ]; then
-    echo "Starting Swoole HTTP server on port $PORT..."
-    exec php bin/swoole-server.php
-elif [ $# -gt 0 ]; then
-    # If arguments are provided to the container (like 'vendor/bin/phpunit'), execute them instead of the web server
-    echo "Executing custom command: $@"
-    exec "$@"
+# Start the web server or worker process
+if [[ "$INSTANCE_NAME" == *"master"* ]]; then
+    if [ "$DISABLE_HTTP_SERVER" = "true" ]; then
+        echo "Master Instance ($INSTANCE_NAME): HTTP server disabled. Running as scheduler only."
+        exec tail -f /app/logs/cron.log
+    elif [ "$USE_SWOOLE" = "true" ]; then
+        echo "Master Instance ($INSTANCE_NAME): Starting Swoole HTTP server on port $PORT..."
+        exec php bin/swoole-server.php
+    else
+        echo "Master Instance ($INSTANCE_NAME): Starting PHP server on port $PORT..."
+        exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
+    fi
 else
-    echo "Starting PHP server on port $PORT with compression..."
-    exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
+    echo "Worker Instance ($INSTANCE_NAME): Running as persistent job processor."
+    # We disable the cron service for workers to prevent process accumulation.
+    # We use a while loop to keep the process alive even if jobs:process exits 
+    # when the queue is empty, avoiding continuous container restarts.
+    while true; do
+        php bin/cli.php jobs:process
+        echo "Worker Instance ($INSTANCE_NAME): Queue empty or process finished. Sleeping 5s..."
+        sleep 5
+    done
 fi
