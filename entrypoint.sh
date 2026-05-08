@@ -83,9 +83,6 @@ if [[ "$INSTANCE_NAME" != *"master"* ]] || [[ "$INSTANCE_TYPE" == "waiting-maste
     done
 fi
 
-if [[ "$INSTANCE_NAME" != *"master"* ]] || [[ "$INSTANCE_TYPE" == "waiting-master" ]]; then
-    # ... (rest of the check stays the same)
-
 # Configure Cron based on project config
 if [ -n "$PROJECT_CONFIG_FILE" ]; then
     # Extract project name from path (e.g. deploy/alimentos-bahia.yaml -> alimentos-bahia)
