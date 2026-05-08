@@ -32,6 +32,13 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $fbChannelName = $fbDriver->getChannel();
         $fbEntity = \Enums\AnalyticsEntity::campaigns->value;
 
+        // Register driver in factory registry
+        \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::register(
+            $fbChannelName,
+            get_class($fbDriver),
+            ''
+        );
+
         // Ensure channel exists in DB
         $this->seedChannel($fbChannelName, $fbDriver->getProviderName(), $fbDriver->getChannelLabel());
 
@@ -159,7 +166,9 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->entityManager->flush();
 
         // 2. Get Telemetry
-        $service = new SyncTelemetryService(Helpers::getCache());
+        $redis = Helpers::getRedisClient();
+        $cache = new \Services\CacheService($redis);
+        $service = new SyncTelemetryService($cache);
         $telemetry = $service->getGlobalStatus();
 
         // 3. Verify counts
