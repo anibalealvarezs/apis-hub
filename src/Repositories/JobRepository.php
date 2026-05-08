@@ -813,7 +813,9 @@ class JobRepository extends BaseRepository
                              AND j.payload->'params'->>'account_id' IS NOT NULL)
                             OR 
                             -- Same Instance Name (only if no account_id is present, e.g. full entity sync)
-                            (p.payload->>'instance_name' = j.payload->>'instance_name' 
+                            (COALESCE(p.payload->>'instance_name', '') = COALESCE(j.payload->>'instance_name', '') 
+                             AND p.channel = j.channel 
+                             AND p.entity = j.entity
                              AND j.payload->'params'->>'account_id' IS NULL)
                         )
                     )

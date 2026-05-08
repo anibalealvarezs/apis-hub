@@ -45,7 +45,8 @@ if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     if mkdir "$LOCK_DIR" 2>/dev/null; then
         echo "Master Instance ($INSTANCE_NAME): Acquired lock. Initializing database and entities..."
         if php bin/cli.php app:setup-db; then
-            echo "Database setup successful."
+            echo "Database setup successful. Scheduling initial jobs..."
+            php bin/cli.php app:schedule-initial-jobs --instance="global" || echo "Initial scheduling failed"
         else
             echo "Database setup failed. Removing lock to allow retries."
             rmdir "$LOCK_DIR"
@@ -82,9 +83,8 @@ if [[ "$INSTANCE_NAME" != *"master"* ]] || [[ "$INSTANCE_TYPE" == "waiting-maste
     done
 fi
 
-# Each instance only schedules its OWN initial job to prevent massive duplication
-echo "Scheduling initial job for $INSTANCE_NAME..."
-php bin/cli.php app:schedule-initial-jobs --instance="$INSTANCE_NAME" || echo "Initial scheduling failed"
+if [[ "$INSTANCE_NAME" != *"master"* ]] || [[ "$INSTANCE_TYPE" == "waiting-master" ]]; then
+    # ... (rest of the check stays the same)
 
 # Configure Cron based on project config
 if [ -n "$PROJECT_CONFIG_FILE" ]; then

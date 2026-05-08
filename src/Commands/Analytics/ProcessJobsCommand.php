@@ -164,7 +164,7 @@
                         status: [JobStatus::scheduled->value, JobStatus::delayed->value],
                         workerId: $envInstance,
                         channel: ($forceAll || empty($envChannel) || $envChannel === 'none' ? null : $envChannel),
-                        instanceName: ($forceAll || $isGenericWorker ? null : $envInstance)
+                        instanceName: ($forceAll || $isGenericWorker ? 'global' : $envInstance)
                     );
                 }
 
