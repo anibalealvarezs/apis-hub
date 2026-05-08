@@ -125,20 +125,34 @@
                     if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
                     if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
 
-                    $isGranular = (bool)($chanConfig['granular_sync'] ?? false);
-                    $accounts = [null];
+                    // Priority: Instance config -> Channel config
+                    $isGranular = (bool)($instance['granular_sync'] ?? $chanConfig['granular_sync'] ?? false);
+                    $accounts = [];
 
                     if ($isGranular) {
                         try {
                             $regConfig = DriverFactory::getChannelConfig($channel);
                             $resourceKey = $regConfig['resource_key'] ?? null;
-                            $accounts = $resourceKey ? ($chanConfig[$resourceKey] ?? []) : [null];
+                            $accounts = $resourceKey ? ($chanConfig[$resourceKey] ?? []) : [];
+                            
+                            // If no accounts in config, fetch from database
                             if (empty($accounts)) {
-                                $accounts = [null];
+                                $caRepo = $this->entityManager->getRepository(\Entities\Analytics\ChanneledAccount::class);
+                                $dbAccounts = $caRepo->findBy(['channel' => $channel]);
+                                foreach ($dbAccounts as $dbAcc) {
+                                    $accounts[] = [
+                                        'id' => $dbAcc->getPlatformId(),
+                                        'name' => $dbAcc->getName()
+                                    ];
+                                }
                             }
                         } catch (\Throwable $e) {
-                            $accounts = [null];
+                            // Fallback logic handled below
                         }
+                    }
+
+                    if (empty($accounts)) {
+                        $accounts = [null];
                     }
 
 
