@@ -493,19 +493,10 @@
          * @return bool
          * @throws ConfigurationException
          */
-        public static function isPostgres(): bool
+        public static function isPostgres(?\Doctrine\ORM\EntityManagerInterface $manager = null): bool
         {
-            $config = self::getDbConfig();
-            $driver = $config['driver'] ?? '';
-
-            return (
-                $driver === 'pdo_pgsql' ||
-                $driver === 'pgsql' ||
-                $driver === 'postgres' ||
-                $driver === 'postgresql' ||
-                str_contains($driver, 'pgsql') ||
-                str_contains($driver, 'postgres')
-            );
+            $manager = $manager ?? self::getManager();
+            return $manager->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
         }
 
         /**
