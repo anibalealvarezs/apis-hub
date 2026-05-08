@@ -103,8 +103,8 @@ class SyncTelemetryService
             // 1. Get Job Stats from DB
             $isPostgres = Helpers::isPostgres();
             $jsonExtract = $isPostgres 
-                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id')" 
-                : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')))";
+                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')" 
+                : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
 
             $query = "SELECT 
                         $jsonExtract as account_id,
@@ -128,7 +128,7 @@ class SyncTelemetryService
             $assets = [];
             foreach ($rows as $row) {
                 $accId = ltrim(trim((string)$row['account_id'], '"'), '#');
-                if ($accId === 'null' || $accId === '') continue;
+                if ($accId === 'null' || ($accId === '' && $row['account_id'] !== 'global')) continue;
 
                 if (!isset($assets[$accId])) {
                     $assets[$accId] = [
@@ -231,8 +231,8 @@ class SyncTelemetryService
             $isPostgres = Helpers::isPostgres();
             
             $jsonExtract = $isPostgres 
-                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id')" 
-                : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')))";
+                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')" 
+                : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
             
             $jsonStart = $isPostgres ? "CAST(payload AS JSONB)->'params'->>'startDate'" : "JSON_EXTRACT(payload, '$.params.startDate')";
             $jsonEnd = $isPostgres ? "CAST(payload AS JSONB)->'params'->>'endDate'" : "JSON_EXTRACT(payload, '$.params.endDate')";
