@@ -51,12 +51,14 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $mockChannel = 'facebook_marketing';
         $this->seedChannel($mockChannel, 'facebook', 'Facebook Marketing');
 
-        // Mock configurations using Reflection
+        // Mock configurations with CORRECT structure (list of objects)
         $this->mockConfigurations([
             'instances' => [
-                'test_instance_initial' => [
+                [
+                    'name' => 'test_instance_initial',
                     'enabled' => true,
-                    'channels' => [$mockChannel => ['enabled' => true]]
+                    'channel' => $mockChannel,
+                    'entity' => 'campaign'
                 ]
             ]
         ], [
@@ -70,9 +72,6 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $command->run(new ArrayInput([]), new NullOutput());
 
         $jobs = $this->jobRepo->findAll();
-        // Since we cleaned up, we should have jobs. 
-        // We don't assert exact count because of potential external noise, 
-        // but we verify at least one exists for our channel.
         $found = false;
         foreach ($jobs as $job) {
             if ($job->getChannel() === $mockChannel) {
@@ -95,12 +94,12 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->seedChannel($googleChannel, 'google', 'Google Search Console');
 
         // Create two jobs for different channels but same instance/account
-        $this->jobRepo->create((object)[
+        $this->jobRepo->create([
             'entity' => 'campaign',
             'channel' => $fbChannel,
             'payload' => ['account_id' => 'test_acc_parallel_123', 'instance_name' => 'test_instance_parallel']
         ]);
-        $this->jobRepo->create((object)[
+        $this->jobRepo->create([
             'entity' => 'page',
             'channel' => $googleChannel,
             'payload' => ['account_id' => 'test_acc_parallel_123', 'instance_name' => 'test_instance_parallel']
@@ -133,17 +132,17 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $testInstance = 'test_instance_telemetry';
         
         // Completed
-        $this->jobRepo->create((object)[
+        $this->jobRepo->create([
             'entity' => $fbEntity, 'channel' => $fbChannelName, 'status' => JobStatus::completed->value,
             'payload' => ['account_id' => 'test_acc_telemetry_1', 'instance_name' => $testInstance]
         ]);
         // Processing
-        $this->jobRepo->create((object)[
+        $this->jobRepo->create([
             'entity' => $fbEntity, 'channel' => $fbChannelName, 'status' => JobStatus::processing->value,
             'payload' => ['account_id' => 'test_acc_telemetry_2', 'instance_name' => $testInstance]
         ]);
         // Scheduled
-        $this->jobRepo->create((object)[
+        $this->jobRepo->create([
             'entity' => $fbEntity, 'channel' => $fbChannelName, 'status' => JobStatus::scheduled->value,
             'payload' => ['account_id' => 'test_acc_telemetry_3', 'instance_name' => $testInstance]
         ]);
@@ -171,7 +170,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
             $this->fail("Facebook Marketing stats not found in telemetry");
         }
 
-        // AGGREGATE ONLY OUR TEST ACCOUNTS TO AVOID NOISE
+        // AGGREGATE ONLY OUR TEST ACCOUNTS
         $testStats = [
             'total' => 0,
             'completed' => 0,
@@ -205,7 +204,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->seedChannel($fbChannelName, $fbDriver->getProviderName(), $fbDriver->getChannelLabel());
 
         // 1. Create a job and mark it as processing
-        $jobData = $this->jobRepo->create((object)[
+        $jobData = $this->jobRepo->create([
             'entity' => $fbEntity,
             'channel' => $fbChannelName,
             'status' => JobStatus::processing->value,
