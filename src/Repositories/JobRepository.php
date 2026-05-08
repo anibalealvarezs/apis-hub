@@ -789,9 +789,14 @@ class JobRepository extends BaseRepository
             // DEBUG: Check how many jobs match before claiming
             $checkSql = "SELECT count(*) FROM jobs j WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))";
             if ($channel) $checkSql .= " AND j.channel = :channel";
+            if ($instanceName && $instanceName !== 'global') $checkSql .= " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)";
             
             $checkParams = ['threshold' => $thresholdTime];
             if ($channel) $checkParams['channel'] = $channel;
+            if ($instanceName && $instanceName !== 'global') {
+                $checkParams['instance_name'] = $instanceName;
+                $checkParams['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
+            }
             
             $count = $this->_em->getConnection()->fetchOne($checkSql, $checkParams);
             if (Helpers::isDebug()) {
@@ -805,7 +810,7 @@ class JobRepository extends BaseRepository
                     FROM jobs j
                     WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))
                     " . ($channel ? " AND j.channel = :channel" : "") . "
-                    " . ($instanceName ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
+                    " . ($instanceName && $instanceName !== 'global' ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
@@ -835,7 +840,7 @@ class JobRepository extends BaseRepository
 
             $params = ['worker_id' => $workerId, 'threshold' => $thresholdTime];
             if ($channel) $params['channel'] = $channel;
-            if ($instanceName) {
+            if ($instanceName && $instanceName !== 'global') {
                 $params['instance_name'] = $instanceName;
                 $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
             }
