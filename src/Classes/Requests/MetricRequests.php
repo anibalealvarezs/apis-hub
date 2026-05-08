@@ -54,6 +54,7 @@ class MetricRequests implements RequestInterface
 
         return (new SyncService($logger))->execute($chanKey, $start, $end, [
             'jobId' => $jobId,
+            'account_id' => $filters->account_id ?? null,
             'resume' => $filters->resume ?? true,
             'filters' => $filters,
             'entity' => $filters->entity ?? 'metrics',

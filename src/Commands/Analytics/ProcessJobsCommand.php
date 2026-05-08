@@ -174,6 +174,7 @@
 
                 $payload = $job->getPayload() ?? [];
                 $params = $payload['params'] ?? [];
+                error_log("DEBUG PROCESS: Params for job " . $job->getUuid() . " are: " . json_encode($params));
 
                 // Dependency check
                 $requires = $params['requires'] ?? null;

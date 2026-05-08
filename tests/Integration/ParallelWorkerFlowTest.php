@@ -62,32 +62,28 @@ class ParallelWorkerFlowTest extends TestCase
 
     /**
      * Test 2: Identity matching in GSC Driver
-     * This is where the "armoring" happens for the specific bug we found.
+     * This validates the standardized "certeza" flow.
      */
-    public function testGscDriverFiltersCorrectlyWithNestedPayload()
+    public function testGscDriverFiltersCorrectlyWithStandardizedPayload()
     {
         $siteUrl = 'sc-domain:example.com';
         $siteId = SearchConsoleDriver::getPlatformId(['url' => $siteUrl], AssetCategory::IDENTITY, 'gsc');
 
-        // Case A: Payload matches
-        $configA = [
-            'params' => ['account_id' => $siteId],
+        // Standardized Case: Payload matches in root 'account_id'
+        $config = [
+            'account_id' => $siteId,
             'sites' => [$siteUrl, 'sc-domain:other.com']
         ];
         
-        $targetAccountId = $configA['account_id'] ?? $configA['params']['account_id'] ?? null;
+        $targetAccountId = $config['account_id'] ?? null;
         $this->assertEquals($siteId, $targetAccountId);
 
-        // Case B: Payload with prefix (simulating the '#' issue if it exists)
-        $configB = [
-            'params' => ['account_id' => '#' . $siteId],
-            'sites' => [$siteUrl]
-        ];
-        $targetAccountIdB = $configB['account_id'] ?? $configB['params']['account_id'] ?? null;
+        // Current Platform ID from Driver
+        $currentPlatformId = SearchConsoleDriver::getPlatformId(['url' => $siteUrl], AssetCategory::IDENTITY, 'gsc');
         
-        // We ensure that if we find a '#', we can still match it by cleaning it
-        $cleanId = ltrim($targetAccountIdB, '#');
-        $this->assertEquals($siteId, $cleanId, "Should match after removing the '#' prefix");
+        // Clean matching logic
+        $cleanTargetId = $targetAccountId ? ltrim($targetAccountId, '#') : null;
+        $this->assertEquals($currentPlatformId, $cleanTargetId, "Should match the Driver calculated Platform ID");
     }
 
     /**
