@@ -197,7 +197,8 @@ class SyncProcessTest extends BaseIntegrationTestCase
 
         // 3. Verify counts
         $fbStats = null;
-        foreach ($telemetry as $key => $item) {
+        $channels = $telemetry['channels'] ?? [];
+        foreach ($channels as $key => $item) {
             if (is_array($item) && isset($item['channel']) && strtolower($item['channel']) === strtolower($fbChannelName)) {
                 $fbStats = $item;
                 break;
@@ -205,8 +206,8 @@ class SyncProcessTest extends BaseIntegrationTestCase
         }
 
         if (!$fbStats) {
-            $channels = array_filter(array_keys($telemetry), fn($k) => is_array($telemetry[$k]));
-            $this->fail("Facebook Marketing stats not found. Available channels: " . implode(', ', $channels) . ". Telemetry keys: " . implode(', ', array_keys($telemetry)));
+            $available = array_keys($channels);
+            $this->fail("Facebook Marketing stats not found in 'channels'. Available: " . implode(', ', $available));
         }
 
         $this->assertEquals(3, $fbStats['total_jobs'], "Total jobs count should match");
@@ -223,6 +224,9 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $fbDriver = new \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver();
         $fbChannelName = $fbDriver->getChannel();
         $fbEntity = \Anibalealvarezs\MetaHubDriver\Enums\MetaEntityType::CAMPAIGN->value;
+
+        // 0. SEED CHANNEL FIRST (Required by JobRepository::create validation)
+        $this->seedChannel($fbChannelName, $fbDriver->getProviderName(), $fbDriver->getChannelLabel());
 
         // 1. Create a job and mark it as processing (simulating a worker that died)
         $job = $this->jobRepo->create((object)[
