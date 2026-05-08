@@ -44,14 +44,15 @@ RUN cd mcp-server && npm install --omit=dev
 
 
 # Configurar el entrypoint
-RUN chmod +x /app/entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Cloud Run escucha por defecto en el puerto 8080 (o donde le mande la variable $PORT)
 ENV PORT=8080
 
 # Al levantar el contenedor, ejecutar el script de entrada usando bash
 # para evitar problemas de permisos de ejecución en volúmenes montados.
-ENTRYPOINT ["bash", "/app/entrypoint.sh"]
+ENTRYPOINT ["bash", "/usr/local/bin/entrypoint.sh"]
 
 # El servidor PHP se ejecuta en el entrypoint.sh final.
 CMD []

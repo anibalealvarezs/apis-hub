@@ -49,35 +49,130 @@ class SyncTelemetryService
         
         return $this->cacheService->get($cacheKey, function () {
             $em = Helpers::getManager();
+            $conn = $em->getConnection();
             $channelsConfig = Helpers::getChannelsConfig();
+            $isPostgres = Helpers::isPostgres($em);
             
-            // Get all channels that have jobs in the database
-            $allChannelsWithJobs = $em->getConnection()->fetchFirstColumn("SELECT DISTINCT channel FROM jobs");
-            $enabledChannels = array_unique(array_merge(
-                array_keys(array_filter($channelsConfig, fn($c) => ($c['enabled'] ?? true))),
-                $allChannelsWithJobs
-            ));
-            
-            $results = [];
-            $totalCompletion = 0;
-            $totalAssets = 0;
-            $totalFullySynced = 0;
-            $count = 0;
+            $jsonExtract = $isPostgres 
+                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')" 
+                : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
 
-            foreach ($enabledChannels as $chan) {
-                $status = $this->getChannelStatus($chan);
-                $results[$chan] = $status;
-                $totalCompletion += $status['completion_percentage'];
-                $totalAssets += ($status['total_assets'] ?? 0);
-                $totalFullySynced += ($status['fully_synced_count'] ?? 0);
-                $count++;
+            // 1. Get all stats in ONE query
+            $sql = "SELECT 
+                        channel,
+                        $jsonExtract as account_id,
+                        status,
+                        COUNT(*) as count
+                    FROM jobs 
+                    GROUP BY channel, account_id, status";
+            
+            $rows = $conn->fetchAllAssociative($sql);
+            
+            // 2. Group by channel and process
+            $chanStats = [];
+            foreach ($rows as $row) {
+                $chan = $row['channel'];
+                if (!isset($chanStats[$chan])) {
+                    $chanStats[$chan] = ['assets' => []];
+                }
+                
+                $accId = ltrim(trim((string)$row['account_id'], '"'), '#');
+                if ($accId === 'null' || ($accId === '' && $row['account_id'] !== 'global')) continue;
+
+                if (!isset($chanStats[$chan]['assets'][$accId])) {
+                    $chanStats[$chan]['assets'][$accId] = [
+                        'total' => 0,
+                        'completed' => 0,
+                        'failed' => 0,
+                        'processing' => 0,
+                        'scheduled' => 0
+                    ];
+                }
+                
+                $status = (int)$row['status'];
+                $count = (int)$row['count'];
+                $chanStats[$chan]['assets'][$accId]['total'] += $count;
+                
+                if ($status === JobStatus::completed->value) $chanStats[$chan]['assets'][$accId]['completed'] += $count;
+                elseif ($status === JobStatus::failed->value) $chanStats[$chan]['assets'][$accId]['failed'] += $count;
+                elseif ($status === JobStatus::processing->value) $chanStats[$chan]['assets'][$accId]['processing'] += $count;
+                elseif ($status === JobStatus::scheduled->value) $chanStats[$chan]['assets'][$accId]['scheduled'] += $count;
+            }
+            
+            // 3. Final formatting
+            $results = [];
+            $globalTotalCompletion = 0;
+            $globalTotalAssets = 0;
+            $globalFullySynced = 0;
+            $totalChans = 0;
+
+            foreach ($chanStats as $chan => $data) {
+                $chanTotalCompletion = 0;
+                $chanFullySynced = 0;
+                $chanTotalJobs = 0;
+                $chanCompleted = 0;
+                $chanProcessing = 0;
+                $chanFailed = 0;
+                $chanScheduled = 0;
+                
+                $assetCount = count($data['assets']);
+                foreach ($data['assets'] as $asset) {
+                    $completion = $asset['total'] > 0 ? round(($asset['completed'] / $asset['total']) * 100, 2) : 0;
+                    if ($completion >= 100) $chanFullySynced++;
+                    $chanTotalCompletion += $completion;
+                    
+                    $chanTotalJobs += $asset['total'];
+                    $chanCompleted += $asset['completed'];
+                    $chanProcessing += $asset['processing'];
+                    $chanFailed += $asset['failed'];
+                    $chanScheduled += $asset['scheduled'];
+                }
+                
+                $chanCompletion = $assetCount > 0 ? round($chanTotalCompletion / $assetCount, 2) : 0;
+                
+                $results[$chan] = [
+                    'channel' => $chan,
+                    'completion_percentage' => $chanCompletion,
+                    'fully_synced_count' => $chanFullySynced,
+                    'fully_synced_percentage' => $assetCount > 0 ? round(($chanFullySynced / $assetCount) * 100, 2) : 0,
+                    'total_assets' => $assetCount,
+                    'total_jobs' => $chanTotalJobs,
+                    'completed' => $chanCompleted,
+                    'processing' => $chanProcessing,
+                    'failed' => $chanFailed,
+                    'scheduled' => $chanScheduled
+                ];
+                
+                $globalTotalCompletion += $chanCompletion;
+                $globalTotalAssets += $assetCount;
+                $globalFullySynced += $chanFullySynced;
+                $totalChans++;
+            }
+
+            // Ensure enabled channels from config are present even if no jobs
+            foreach ($channelsConfig as $chan => $config) {
+                if (($config['enabled'] ?? true) && !isset($results[$chan])) {
+                    $results[$chan] = [
+                        'channel' => $chan,
+                        'completion_percentage' => 0,
+                        'fully_synced_count' => 0,
+                        'fully_synced_percentage' => 0,
+                        'total_assets' => 0,
+                        'total_jobs' => 0,
+                        'completed' => 0,
+                        'processing' => 0,
+                        'failed' => 0,
+                        'scheduled' => 0
+                    ];
+                    $totalChans++;
+                }
             }
 
             return [
-                'completion_percentage' => $count > 0 ? round($totalCompletion / $count, 2) : 0,
-                'total_assets' => $totalAssets,
-                'fully_synced_count' => $totalFullySynced,
-                'fully_synced_percentage' => $totalAssets > 0 ? round(($totalFullySynced / $totalAssets) * 100, 2) : 0,
+                'completion_percentage' => $totalChans > 0 ? round($globalTotalCompletion / $totalChans, 2) : 0,
+                'total_assets' => $globalTotalAssets,
+                'fully_synced_count' => $globalFullySynced,
+                'fully_synced_percentage' => $globalTotalAssets > 0 ? round(($globalFullySynced / $globalTotalAssets) * 100, 2) : 0,
                 'channels' => $results
             ];
         }, self::DEFAULT_TTL);
