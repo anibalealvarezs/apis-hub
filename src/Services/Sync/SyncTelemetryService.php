@@ -53,7 +53,13 @@ class SyncTelemetryService
         
         return $this->cacheService->get($cacheKey, function () {
             $channelsConfig = Helpers::getChannelsConfig();
-            $enabledChannels = array_keys(array_filter($channelsConfig, fn($c) => ($c['enabled'] ?? true)));
+            
+            // Get all channels that have jobs in the database
+            $allChannelsWithJobs = $this->em->getConnection()->fetchFirstColumn("SELECT DISTINCT channel FROM jobs");
+            $enabledChannels = array_unique(array_merge(
+                array_keys(array_filter($channelsConfig, fn($c) => ($c['enabled'] ?? true))),
+                $allChannelsWithJobs
+            ));
             
             $results = [];
             $totalCompletion = 0;
