@@ -29,12 +29,15 @@ class SyncProcessTest extends BaseIntegrationTestCase
     public function testInitialJobScheduling()
     {
         $fbDriver = new \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver();
-        $fbChannel = $fbDriver->getChannel();
-        $fbEntity = \Enums\AnalyticsEntity::campaign->value;
+        $fbChannelName = $fbDriver->getChannel();
+        $fbEntity = \Enums\AnalyticsEntity::campaigns->value;
+
+        // Ensure channel exists in DB
+        $this->seedChannel($fbChannelName, $fbDriver->getProviderName(), $fbDriver->getChannelLabel());
 
         // Mock a channel config so the command has something to schedule
         $mockConfig = [
-            $fbChannel => [
+            $fbChannelName => [
                 'enabled' => true,
                 'sync' => [
                     'entities' => [$fbEntity]
@@ -69,23 +72,29 @@ class SyncProcessTest extends BaseIntegrationTestCase
      */
     public function testParallelJobClaiming()
     {
-        $fbChannel = (new \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver())->getChannel();
-        $gscChannel = (new \Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver())->getChannel();
-
+        $fbDriver = new \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver();
+        $fbChannelName = $fbDriver->getChannel();
         $fbEntity = \Anibalealvarezs\MetaHubDriver\Enums\MetaEntityType::CAMPAIGN->value;
+
+        $gscDriver = new \Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver();
+        $gscChannelName = $gscDriver->getChannel();
         $gscEntity = \Enums\AnalyticsEntity::queries->value;
+
+        // Seed channels
+        $this->seedChannel($fbChannelName, $fbDriver->getProviderName(), $fbDriver->getChannelLabel());
+        $this->seedChannel($gscChannelName, $gscDriver->getProviderName(), $gscDriver->getChannelLabel());
 
         // 1. Create two jobs for the same instance but different channels
         $this->jobRepo->create((object)[
             'entity' => $fbEntity,
-            'channel' => $fbChannel,
+            'channel' => $fbChannelName,
             'status' => JobStatus::scheduled->value,
             'payload' => ['instance_name' => 'global', 'params' => ['account_id' => null]]
         ]);
 
         $this->jobRepo->create((object)[
             'entity' => $gscEntity,
-            'channel' => $gscChannel,
+            'channel' => $gscChannelName,
             'status' => JobStatus::scheduled->value,
             'payload' => ['instance_name' => 'global', 'params' => ['account_id' => null]]
         ]);
@@ -99,7 +108,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
             instanceName: 'global'
         );
         $this->assertNotNull($jobA, "Worker A should be able to claim a job");
-        $this->assertEquals($fbChannel, $jobA->getChannel());
+        $this->assertEquals($fbChannelName, $jobA->getChannel());
 
         // 3. Worker B tries to claim the second job (DIFFERENT CHANNEL, SAME INSTANCE)
         $jobB = $this->jobRepo->claimAvailableJob(
@@ -109,7 +118,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
         );
         
         $this->assertNotNull($jobB, "Worker B SHOULD be able to claim a job from the same instance if the channel is different");
-        $this->assertEquals($gscChannel, $jobB->getChannel());
+        $this->assertEquals($gscChannelName, $jobB->getChannel());
     }
 
     /**
@@ -117,27 +126,31 @@ class SyncProcessTest extends BaseIntegrationTestCase
      */
     public function testTelemetryAggregation()
     {
-        $fbChannel = (new \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver())->getChannel();
+        $fbDriver = new \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver();
+        $fbChannelName = $fbDriver->getChannel();
         $fbEntity = \Anibalealvarezs\MetaHubDriver\Enums\MetaEntityType::CAMPAIGN->value;
+
+        // Seed channel
+        $this->seedChannel($fbChannelName, $fbDriver->getProviderName(), $fbDriver->getChannelLabel());
 
         // 1. Setup jobs in various states
         $this->jobRepo->create((object)[
             'entity' => $fbEntity,
-            'channel' => $fbChannel,
+            'channel' => $fbChannelName,
             'status' => JobStatus::completed->value,
             'payload' => ['instance_name' => 'global', 'params' => ['account_id' => 'acc1']]
         ]);
 
         $this->jobRepo->create((object)[
             'entity' => $fbEntity,
-            'channel' => $fbChannel,
+            'channel' => $fbChannelName,
             'status' => JobStatus::processing->value,
             'payload' => ['instance_name' => 'global', 'params' => ['account_id' => 'acc1']]
         ]);
 
         $this->jobRepo->create((object)[
             'entity' => $fbEntity,
-            'channel' => $fbChannel,
+            'channel' => $fbChannelName,
             'status' => JobStatus::failed->value,
             'payload' => ['instance_name' => 'global', 'params' => ['account_id' => 'acc2']]
         ]);
@@ -161,5 +174,30 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->assertEquals(3, $fbStats['totalJobs'], "Total jobs count should match");
         $this->assertEquals(1, $fbStats['doneJobs'], "Done jobs count should match");
         $this->assertEquals(1, $fbStats['activeJobs'], "Active jobs count should match");
+    }
+
+    private function seedChannel(string $name, string $providerName, string $label): void
+    {
+        $channelRepo = $this->entityManager->getRepository(\Entities\Analytics\Channel::class);
+        $providerRepo = $this->entityManager->getRepository(\Entities\Analytics\Provider::class);
+
+        $provider = $providerRepo->findOneBy(['name' => $providerName]);
+        if (!$provider) {
+            $provider = new \Entities\Analytics\Provider();
+            $provider->setName($providerName);
+            $provider->setLabel(ucfirst($providerName));
+            $this->entityManager->persist($provider);
+            $this->entityManager->flush();
+        }
+
+        $channel = $channelRepo->findOneBy(['name' => $name]);
+        if (!$channel) {
+            $channel = new \Entities\Analytics\Channel();
+            $channel->setName($name);
+            $channel->setLabel($label);
+            $channel->setProvider($provider);
+            $this->entityManager->persist($channel);
+            $this->entityManager->flush();
+        }
     }
 }
