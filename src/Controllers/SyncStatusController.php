@@ -62,12 +62,28 @@ class SyncStatusController extends BaseController
      */
     private function isAuthorized(Request $request): bool
     {
-        $apiKey = $request->headers->get('X-API-KEY') ?: $request->query->get('api_key');
+        $apiKey = $request->headers->get('X-API-KEY') ?: $request->headers->get('X-Admin-API-Key');
+        if (!$apiKey) {
+            $authHeader = $request->headers->get('Authorization');
+            if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
+                $apiKey = substr($authHeader, 7);
+            }
+        }
+
+        if (!$apiKey) {
+            $apiKey = $request->query->get('api_key') ?: $request->query->get('token');
+        }
+
         if (!$apiKey) {
             return false;
         }
 
         $validKeys = explode(',', Helpers::getAppApiKey() ?? '');
-        return in_array($apiKey, $validKeys);
+        $adminKey = Helpers::getAdminApiKey();
+        if ($adminKey) {
+            $validKeys[] = $adminKey;
+        }
+
+        return in_array(trim($apiKey), array_map('trim', $validKeys));
     }
 }
