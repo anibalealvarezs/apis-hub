@@ -793,6 +793,8 @@ class JobRepository extends BaseRepository
         
         $this->_em->beginTransaction();
         try {
+            // Optimized query: Pick a job that is NOT currently being processed by another worker
+            // We use a more granular check for 'processing' jobs to allow parallelism
             $sql = "
                 WITH RankedJobs AS (
                     SELECT j.id
@@ -804,8 +806,15 @@ class JobRepository extends BaseRepository
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
                         AND (
-                            (p.payload->'params'->>'account_id' = j.payload->'params'->>'account_id' AND j.payload->'params'->>'account_id' IS NOT NULL)
-                            OR (CAST(p.payload AS text) LIKE '%instance_name%\"' || (j.payload->>'instance_name') || '\"%' AND j.payload->'params'->>'account_id' IS NULL)
+                            -- Same Account and same Entity/Channel
+                            (p.payload->'params'->>'account_id' = j.payload->'params'->>'account_id' 
+                             AND p.channel = j.channel 
+                             AND p.entity = j.entity
+                             AND j.payload->'params'->>'account_id' IS NOT NULL)
+                            OR 
+                            -- Same Instance Name (only if no account_id is present, e.g. full entity sync)
+                            (p.payload->>'instance_name' = j.payload->>'instance_name' 
+                             AND j.payload->'params'->>'account_id' IS NULL)
                         )
                     )
                     ORDER BY j.priority DESC, j.id ASC
