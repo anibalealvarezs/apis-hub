@@ -94,12 +94,12 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->seedChannel($googleChannel, 'google', 'Google Search Console');
 
         // Create two jobs for different channels but same instance/account
-        $this->jobRepo->create([
+        $this->jobRepo->create((object)[
             'entity' => 'campaign',
             'channel' => $fbChannel,
             'payload' => ['account_id' => 'test_acc_parallel_123', 'instance_name' => 'test_instance_parallel']
         ]);
-        $this->jobRepo->create([
+        $this->jobRepo->create((object)[
             'entity' => 'page',
             'channel' => $googleChannel,
             'payload' => ['account_id' => 'test_acc_parallel_123', 'instance_name' => 'test_instance_parallel']
@@ -111,16 +111,25 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->assertGreaterThan(0, count($allJobs), "Jobs should exist in the database before claiming");
         
         $testJobs = array_filter($allJobs, function($j) {
-            return strpos($j->getPayload()['account_id'] ?? '', 'test_acc_parallel_') !== false;
+            $payload = $j->getPayload();
+            return strpos($payload['account_id'] ?? '', 'test_acc_parallel_') !== false;
         });
         $this->assertCount(2, $testJobs, "Should find exactly 2 test jobs for parallel test");
 
-        // Worker 1 claims a job
-        $claimed1 = $this->jobRepo->claimAvailableJob([JobStatus::scheduled->value], 'worker-1', 'test_instance_parallel');
+        // Worker 1 claims a job - USING NAMED ARGUMENTS TO PREVENT PARAMETER POSITION ERRORS
+        $claimed1 = $this->jobRepo->claimAvailableJob(
+            status: [JobStatus::scheduled->value], 
+            workerId: 'worker-1', 
+            instanceName: 'test_instance_parallel'
+        );
         $this->assertNotNull($claimed1, "Worker 1 should claim a job");
 
         // Worker 2 should still be able to claim the other job because it's a different channel
-        $claimed2 = $this->jobRepo->claimAvailableJob([JobStatus::scheduled->value], 'worker-2', 'test_instance_parallel');
+        $claimed2 = $this->jobRepo->claimAvailableJob(
+            status: [JobStatus::scheduled->value], 
+            workerId: 'worker-2', 
+            instanceName: 'test_instance_parallel'
+        );
         $this->assertNotNull($claimed2, "Worker 2 should claim the second job in parallel");
         
         $this->assertNotEquals($claimed1->getId(), $claimed2->getId());
@@ -141,17 +150,17 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $testInstance = 'test_instance_telemetry';
         
         // Completed
-        $this->jobRepo->create([
+        $this->jobRepo->create((object)[
             'entity' => $fbEntity, 'channel' => $fbChannelName, 'status' => JobStatus::completed->value,
             'payload' => ['account_id' => 'test_acc_telemetry_1', 'instance_name' => $testInstance]
         ]);
         // Processing
-        $this->jobRepo->create([
+        $this->jobRepo->create((object)[
             'entity' => $fbEntity, 'channel' => $fbChannelName, 'status' => JobStatus::processing->value,
             'payload' => ['account_id' => 'test_acc_telemetry_2', 'instance_name' => $testInstance]
         ]);
         // Scheduled
-        $this->jobRepo->create([
+        $this->jobRepo->create((object)[
             'entity' => $fbEntity, 'channel' => $fbChannelName, 'status' => JobStatus::scheduled->value,
             'payload' => ['account_id' => 'test_acc_telemetry_3', 'instance_name' => $testInstance]
         ]);
@@ -176,7 +185,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
         }
 
         if (!$fbChannelData || !isset($fbChannelData['assets'])) {
-            $this->fail("Facebook Marketing stats not found in telemetry");
+            $this->fail("Facebook Marketing stats not found in telemetry. Available channels: " . implode(', ', array_keys($channels)));
         }
 
         // AGGREGATE ONLY OUR TEST ACCOUNTS
@@ -213,20 +222,19 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->seedChannel($fbChannelName, $fbDriver->getProviderName(), $fbDriver->getChannelLabel());
 
         // 1. Create a job and mark it as processing
-        $jobData = $this->jobRepo->create([
+        $jobData = $this->jobRepo->create((object)[
             'entity' => $fbEntity,
             'channel' => $fbChannelName,
             'status' => JobStatus::processing->value,
-            'payload' => ['account_id' => 'test_acc_resilient', 'instance_name' => 'test_instance_resilient'],
-            'worker_id' => 'dead-worker'
+            'payload' => ['account_id' => 'test_acc_resilient', 'instance_name' => 'test_instance_resilient']
         ]);
         $this->entityManager->flush();
         
         $jobId = is_array($jobData) ? $jobData['id'] : $jobData->getId();
 
-        // 2. Backdate
+        // 2. Backdate and manually set worker_id (since create doesn't handle it directly if passed in payload)
         $conn = $this->entityManager->getConnection();
-        $conn->executeStatement("UPDATE jobs SET updated_at = NOW() - INTERVAL '11 minutes' WHERE id = ?", [$jobId]);
+        $conn->executeStatement("UPDATE jobs SET worker_id = 'dead-worker', updated_at = NOW() - INTERVAL '11 minutes' WHERE id = ?", [$jobId]);
 
         // 3. Re-claim
         $newJob = $this->jobRepo->claimAvailableJob(
