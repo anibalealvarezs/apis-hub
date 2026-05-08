@@ -164,10 +164,6 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $service = new SyncTelemetryService($cache);
         $telemetry = $service->getGlobalStatus();
 
-        if (Helpers::isDebug()) {
-            echo "DEBUG: Telemetry Structure: " . substr(json_encode($telemetry), 0, 500) . "...\n";
-        }
-
         // 3. Verify counts for our SPECIFIC test accounts
         $channels = $telemetry['channels'] ?? [];
 
