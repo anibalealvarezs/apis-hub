@@ -55,7 +55,7 @@ class SyncTelemetryService
             $channelsConfig = Helpers::getChannelsConfig();
             
             // Get all channels that have jobs in the database
-            $allChannelsWithJobs = $this->em->getConnection()->fetchFirstColumn("SELECT DISTINCT channel FROM jobs");
+            $allChannelsWithJobs = $this->entityManager->getConnection()->fetchFirstColumn("SELECT DISTINCT channel FROM jobs");
             $enabledChannels = array_unique(array_merge(
                 array_keys(array_filter($channelsConfig, fn($c) => ($c['enabled'] ?? true))),
                 $allChannelsWithJobs
