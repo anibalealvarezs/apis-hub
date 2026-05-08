@@ -51,11 +51,12 @@ class SyncTelemetryService
     {
         $cacheKey = self::CACHE_PREFIX . 'global';
         
-        return $this->cacheService->get($cacheKey, function () {
+        $em = $this->entityManager;
+        return $this->cacheService->get($cacheKey, function () use ($em) {
             $channelsConfig = Helpers::getChannelsConfig();
             
             // Get all channels that have jobs in the database
-            $allChannelsWithJobs = $this->entityManager->getConnection()->fetchFirstColumn("SELECT DISTINCT channel FROM jobs");
+            $allChannelsWithJobs = $em->getConnection()->fetchFirstColumn("SELECT DISTINCT channel FROM jobs");
             $enabledChannels = array_unique(array_merge(
                 array_keys(array_filter($channelsConfig, fn($c) => ($c['enabled'] ?? true))),
                 $allChannelsWithJobs
@@ -97,11 +98,12 @@ class SyncTelemetryService
     {
         $cacheKey = self::CACHE_PREFIX . 'channel:' . $channelName . ($targetAccountId ? ':' . $targetAccountId : '');
 
-        return $this->cacheService->get($cacheKey, function () use ($channelName, $targetAccountId) {
-            $conn = $this->entityManager->getConnection();
+        $em = $this->entityManager;
+        return $this->cacheService->get($cacheKey, function () use ($em, $channelName, $targetAccountId) {
+            $conn = $em->getConnection();
             
             // 1. Get Job Stats from DB
-            $isPostgres = Helpers::isPostgres();
+            $isPostgres = Helpers::isPostgres($em);
             $jsonExtract = $isPostgres 
                 ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')" 
                 : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
@@ -180,7 +182,7 @@ class SyncTelemetryService
             // 4. Enrich with names from ChanneledAccount
             if (!empty($platformIds)) {
                 try {
-                    $caRepo = $this->entityManager->getRepository(ChanneledAccount::class);
+                    $caRepo = $em->getRepository(ChanneledAccount::class);
                     $channeledAccounts = $caRepo->findBy([
                         'channel' => $channelName,
                         'platformId' => $platformIds
@@ -226,9 +228,10 @@ class SyncTelemetryService
     {
         $cacheKey = self::CACHE_PREFIX . 'daily:' . $channel . ':' . $accountId;
         
-        return $this->cacheService->get($cacheKey, function () use ($channel, $accountId) {
-            $conn = $this->entityManager->getConnection();
-            $isPostgres = Helpers::isPostgres();
+        $em = $this->entityManager;
+        return $this->cacheService->get($cacheKey, function () use ($em, $channel, $accountId) {
+            $conn = $em->getConnection();
+            $isPostgres = Helpers::isPostgres($em);
             
             $jsonExtract = $isPostgres 
                 ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')" 
@@ -273,7 +276,7 @@ class SyncTelemetryService
 
             $name = $accountId;
             try {
-                $caRepo = $this->entityManager->getRepository(ChanneledAccount::class);
+                $caRepo = $em->getRepository(ChanneledAccount::class);
                 $ca = $caRepo->findOneBy([
                     'channel' => $channel,
                     'platformId' => $accountId
