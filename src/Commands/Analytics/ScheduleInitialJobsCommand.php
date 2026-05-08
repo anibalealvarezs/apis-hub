@@ -159,8 +159,10 @@
                     }
 
 
+                    if (strpos($channel, 'facebook') !== false) echo "DEBUG: Total accounts to process for $channel: " . count($accounts) . "\n";
                     foreach ($accounts as $account) {
                         $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? $account['url'] ?? null) : $account;
+                        if (strpos($channel, 'facebook') !== false) echo "DEBUG: -> Resolved accountId: " . ($accountId ?? 'NULL') . "\n";
  
                         // Agnostic Canonical ID resolution
                         if ($account) {
