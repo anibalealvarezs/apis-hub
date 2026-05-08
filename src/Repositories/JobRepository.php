@@ -767,19 +767,31 @@ class JobRepository extends BaseRepository
         return (int)$qb->getQuery()->getSingleScalarResult() > 0;
     }
 
-    /**
-     * Atomically selects and claims the next available job using FOR UPDATE SKIP LOCKED.
-     * 
-     * @param int|array $status
-     * @param string|null $workerId
-     * @param string|null $channel
-     * @param string|null $instanceName
-     * @return Job|null
-     */
+    public function getJobsByStatus(mixed $status, ?string $channel = null, ?string $instanceName = null): array
+    {
+        $qb = $this->createQueryBuilder('j');
+        
+        if (is_array($status)) {
+            $qb->andWhere('j.status IN (:status)')->setParameter('status', $status);
+        } else {
+            $qb->andWhere('j.status = :status')->setParameter('status', $status);
+        }
+
+        if ($channel) {
+            $qb->andWhere('j.channel = :channel')->setParameter('channel', $channel);
+        }
+
+        if ($instanceName) {
+            $qb->andWhere('j.payload LIKE :instance_pattern')
+               ->setParameter('instance_pattern', '%instance_name%' . $instanceName . '%');
+        }
+
+        return $qb->orderBy('j.priority', 'DESC')->addOrderBy('j.id', 'ASC')->getQuery()->getResult();
+    }
+
     public function claimAvailableJob(mixed $status, ?string $workerId = null, ?string $channel = null, ?string $instanceName = null): ?Job
     {
         if (!Helpers::isPostgres()) {
-            // Fallback for non-postgres: use regular selection (less efficient but safe)
             $jobs = $this->getJobsByStatus($status, $channel, $instanceName);
             foreach ($jobs as $job) {
                 if ($this->claimJob($job->getId(), $workerId)) {
@@ -795,8 +807,15 @@ class JobRepository extends BaseRepository
         
         $this->_em->beginTransaction();
         try {
-            // Optimized query: Pick a job that is NOT currently being processed by another worker
-            // We also allow claiming jobs that are 'processing' but have been stuck for more than $staleThreshold minutes
+            // DEBUG: Check how many jobs match before claiming
+            $checkSql = "SELECT count(*) FROM jobs j WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < NOW() - INTERVAL '{$staleThreshold} minutes'))";
+            if ($channel) $checkSql .= " AND j.channel = '{$channel}'";
+            $count = $this->_em->getConnection()->fetchOne($checkSql);
+            if (Helpers::isDebug()) {
+                echo "DEBUG: claimAvailableJob found $count potential jobs (status=$statusSql, channel=$channel, instance=$instanceName)\n";
+            }
+
+            // Optimized query
             $sql = "
                 WITH RankedJobs AS (
                     SELECT j.id
@@ -852,6 +871,9 @@ class JobRepository extends BaseRepository
                 $this->_em->rollback();
             }
             \Helpers\Helpers::log("Error in claimAvailableJob: " . $e->getMessage());
+            if (Helpers::isDebug()) {
+                echo "DEBUG: claimAvailableJob ERROR: " . $e->getMessage() . "\n";
+            }
             return null;
         }
     }
