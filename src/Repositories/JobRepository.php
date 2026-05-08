@@ -790,21 +790,24 @@ class JobRepository extends BaseRepository
 
         $statusSql = is_array($status) ? "IN (" . implode(',', array_map('intval', $status)) . ")" : "= " . (int)$status;
         $processingStatus = JobStatus::processing->value;
+        $staleThreshold = 10; // minutes
         
         $this->_em->beginTransaction();
         try {
             // Optimized query: Pick a job that is NOT currently being processed by another worker
-            // We use a more granular check for 'processing' jobs to allow parallelism
+            // We also allow claiming jobs that are 'processing' but have been stuck for more than $staleThreshold minutes
             $sql = "
                 WITH RankedJobs AS (
                     SELECT j.id
                     FROM jobs j
-                    WHERE j.status {$statusSql}
+                    WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < NOW() - INTERVAL '{$staleThreshold} minutes'))
                     " . ($channel ? " AND j.channel = :channel" : "") . "
                     " . ($instanceName ? " AND CAST(j.payload AS text) LIKE :instance_name_pattern" : "") . "
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
+                        AND p.updated_at >= NOW() - INTERVAL '{$staleThreshold} minutes' -- Only recent processing jobs block
+                        AND p.id != j.id -- Don't block self
                         AND (
                             -- Same Account and same Entity/Channel
                             (p.payload->'params'->>'account_id' = j.payload->'params'->>'account_id' 
