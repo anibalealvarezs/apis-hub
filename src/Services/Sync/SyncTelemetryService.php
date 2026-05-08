@@ -50,7 +50,6 @@ class SyncTelemetryService
         return $this->cacheService->get($cacheKey, function () {
             $em = Helpers::getManager();
             $conn = $em->getConnection();
-            $channelsConfig = Helpers::getChannelsConfig();
             $isPostgres = Helpers::isPostgres($em);
             
             $jsonExtract = $isPostgres 
@@ -132,6 +131,7 @@ class SyncTelemetryService
                 
                 $results[$chan] = [
                     'channel' => $chan,
+                    'assets' => $data['assets'], // CRITICAL: Added back for detailed view
                     'completion_percentage' => $chanCompletion,
                     'fully_synced_count' => $chanFullySynced,
                     'fully_synced_percentage' => $assetCount > 0 ? round(($chanFullySynced / $assetCount) * 100, 2) : 0,
@@ -149,25 +149,6 @@ class SyncTelemetryService
                 $totalChans++;
             }
 
-            // Ensure enabled channels from config are present even if no jobs
-            foreach ($channelsConfig as $chan => $config) {
-                if (($config['enabled'] ?? true) && !isset($results[$chan])) {
-                    $results[$chan] = [
-                        'channel' => $chan,
-                        'completion_percentage' => 0,
-                        'fully_synced_count' => 0,
-                        'fully_synced_percentage' => 0,
-                        'total_assets' => 0,
-                        'total_jobs' => 0,
-                        'completed' => 0,
-                        'processing' => 0,
-                        'failed' => 0,
-                        'scheduled' => 0
-                    ];
-                    $totalChans++;
-                }
-            }
-
             return [
                 'completion_percentage' => $totalChans > 0 ? round($globalTotalCompletion / $totalChans, 2) : 0,
                 'total_assets' => $globalTotalAssets,
@@ -175,11 +156,11 @@ class SyncTelemetryService
                 'fully_synced_percentage' => $globalTotalAssets > 0 ? round(($globalFullySynced / $globalTotalAssets) * 100, 2) : 0,
                 'channels' => $results
             ];
-        }, self::DEFAULT_TTL);
+        });
     }
 
     /**
-     * Get sync status for a specific channel
+     * Get synchronization status for a specific channel
      *
      * @param string $channelName
      * @param string|null $targetAccountId
@@ -188,13 +169,12 @@ class SyncTelemetryService
     public function getChannelStatus(string $channelName, ?string $targetAccountId = null): array
     {
         $cacheKey = self::CACHE_PREFIX . 'channel:' . $channelName . ($targetAccountId ? ':' . $targetAccountId : '');
-
+        
         return $this->cacheService->get($cacheKey, function () use ($channelName, $targetAccountId) {
             $em = Helpers::getManager();
             $conn = $em->getConnection();
-            
-            // 1. Get Job Stats from DB
             $isPostgres = Helpers::isPostgres($em);
+            
             $jsonExtract = $isPostgres 
                 ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')" 
                 : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
@@ -284,7 +264,7 @@ class SyncTelemetryService
                             $formattedAssets[$pId]['name'] = $ca->getName();
                         }
                     }
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     // Silently fail name enrichment to avoid breaking telemetry
                 }
             }
@@ -360,7 +340,7 @@ class SyncTelemetryService
                     foreach ($period as $date) {
                         $dailyMap[$date->format('Y-m-d')] = true;
                     }
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     continue;
                 }
             }
@@ -375,7 +355,7 @@ class SyncTelemetryService
                 if ($ca) {
                     $name = $ca->getName();
                 }
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 // Silently fail name enrichment
             }
 
