@@ -272,7 +272,7 @@ function updateSyncTelemetry(telemetry) {
                 ${(stats.assets || []).sort((a,b) => b.completion - a.completion).slice(0, 10).map(asset => `
                     <div class="sync-asset-item" onclick="toggleAccountStats('${channel}', '${asset.id}')">
                         <div class="sync-asset-info">
-                            <span class="sync-asset-id">#${asset.id}</span>
+                            <span class="sync-asset-id">${asset.name || '#' + asset.id}</span>
                             <span class="sync-asset-p">${Math.round(asset.completion)}%</span>
                         </div>
                         <div class="sync-asset-bar-bg">
@@ -335,6 +335,10 @@ async function toggleAccountStats(channel, accountId) {
         const response = await fetch(`/api/sync/account-stats?channel=${channel}&account_id=${accountId}`, { headers });
         const data = await response.json();
         
+        if (data.name) {
+            titleEl.textContent = `SYNC HISTORY: ${data.name}`;
+        }
+
         if (data.completed_days) {
             renderContributionChart(chartContainer, data.completed_days);
         } else {

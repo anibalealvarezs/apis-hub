@@ -8,6 +8,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Entities\Analytics\Channel;
 use Entities\Job;
 use Enums\JobStatus;
+use Entities\Analytics\Channeled\ChanneledAccount;
 use Helpers\Helpers;
 use Services\CacheService;
 use Throwable;
@@ -145,6 +146,7 @@ class SyncTelemetryService
             
             // 3. Format assets and calculate totals
             $formattedAssets = [];
+            $platformIds = [];
             $totalChanCompletion = 0;
             $chanTotal = 0;
             $chanCompleted = 0;
@@ -157,17 +159,39 @@ class SyncTelemetryService
                 $completion = $stats['total'] > 0 ? round(($stats['completed'] / $stats['total']) * 100, 2) : 0;
                 if ($completion >= 100) $fullySyncedCount++;
 
-                $formattedAssets[] = array_merge(['id' => $id, 'completion' => $completion], $stats);
+                $assetObj = array_merge(['id' => $id, 'completion' => $completion], $stats);
+                $formattedAssets[$id] = $assetObj;
+                $platformIds[] = $id;
+
                 $totalChanCompletion += $completion;
-                
                 $chanTotal += $stats['total'];
                 $chanCompleted += $stats['completed'];
                 $chanProcessing += $stats['processing'];
                 $chanFailed += $stats['failed'];
                 $chanScheduled += $stats['scheduled'];
             }
+
+            // 4. Enrich with names from ChanneledAccount
+            if (!empty($platformIds)) {
+                try {
+                    $caRepo = $this->entityManager->getRepository(ChanneledAccount::class);
+                    $channeledAccounts = $caRepo->findBy([
+                        'channel' => $channelName,
+                        'platformId' => $platformIds
+                    ]);
+                    foreach ($channeledAccounts as $ca) {
+                        $pId = $ca->getPlatformId();
+                        if (isset($formattedAssets[$pId])) {
+                            $formattedAssets[$pId]['name'] = $ca->getName();
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Silently fail name enrichment to avoid breaking telemetry
+                }
+            }
             
-            $assetCount = count($formattedAssets);
+            $finalAssets = array_values($formattedAssets);
+            $assetCount = count($finalAssets);
             
             return [
                 'channel' => $channelName,
@@ -180,7 +204,7 @@ class SyncTelemetryService
                 'processing' => $chanProcessing,
                 'failed' => $chanFailed,
                 'scheduled' => $chanScheduled,
-                'assets' => $formattedAssets
+                'assets' => $finalAssets
             ];
         }, self::DEFAULT_TTL);
     }
@@ -241,8 +265,23 @@ class SyncTelemetryService
                 }
             }
 
+            $name = $accountId;
+            try {
+                $caRepo = $this->entityManager->getRepository(ChanneledAccount::class);
+                $ca = $caRepo->findOneBy([
+                    'channel' => $channel,
+                    'platformId' => $accountId
+                ]);
+                if ($ca) {
+                    $name = $ca->getName();
+                }
+            } catch (\Throwable $e) {
+                // Silently fail name enrichment
+            }
+
             return [
                 'account_id' => $accountId,
+                'name' => $name,
                 'channel' => $channel,
                 'completed_days' => array_keys($dailyMap)
             ];

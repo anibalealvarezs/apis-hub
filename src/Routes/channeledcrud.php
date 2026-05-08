@@ -15,7 +15,7 @@ return [
             );
         },
         'admin' => false,
-        'requirements' => ['channel' => '^(?!api$).*']
+        'requirements' => ['channel' => '^(?!api$|api/).+']
     ],
     '/{channel}/{entity}/aggregate' => [
         'httpMethod' => 'POST',
@@ -29,7 +29,7 @@ return [
             );
         },
         'admin' => false,
-        'requirements' => ['channel' => '^(?!api$).*']
+        'requirements' => ['channel' => '^(?!api$|api/).+']
     ],
     '/{channel}/{entity}/range' => [
         'httpMethod' => 'GET',
@@ -43,7 +43,7 @@ return [
             );
         },
         'admin' => false,
-        'requirements' => ['channel' => '^(?!api$).*']
+        'requirements' => ['channel' => '^(?!api$|api/).+']
     ],
     '/{channel}/{entity}/{id}' => [
         'httpMethod' => 'GET',
@@ -56,7 +56,7 @@ return [
             );
         },
         'admin' => false,
-        'requirements' => ['channel' => '^(?!api$).*']
+        'requirements' => ['channel' => '^(?!api$|api/).+']
     ],
     '/{channel}/{entity}' => [
         'httpMethod' => 'GET',
@@ -70,6 +70,6 @@ return [
             );
         },
         'admin' => false,
-        'requirements' => ['channel' => '^(?!api$).*']
+        'requirements' => ['channel' => '^(?!api$|api/).+']
     ],
 ];
