@@ -164,15 +164,12 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $service = new SyncTelemetryService($cache);
         $telemetry = $service->getGlobalStatus();
 
+        if (Helpers::isDebug()) {
+            echo "DEBUG: Telemetry Structure: " . substr(json_encode($telemetry), 0, 500) . "...\n";
+        }
+
         // 3. Verify counts for our SPECIFIC test accounts
         $channels = $telemetry['channels'] ?? [];
-        
-        if (Helpers::isDebug()) {
-            echo "DEBUG: Telemetry channels keys: " . implode(', ', array_keys($channels)) . "\n";
-            if (isset($channels[$fbChannelName])) {
-                echo "DEBUG: Found fbChannelName in keys exactly\n";
-            }
-        }
 
         $fbChannelData = null;
         foreach ($channels as $name => $data) {
@@ -230,9 +227,8 @@ class SyncProcessTest extends BaseIntegrationTestCase
         
         $jobId = is_array($jobData) ? $jobData['id'] : $jobData->getId();
 
-        // 2. Backdate VERY AGGRESSIVELY to avoid timezone race conditions (e.g. 1 hour ago)
-        $conn = $this->entityManager->getConnection();
         $conn->executeStatement("UPDATE jobs SET worker_id = 'dead-worker', updated_at = NOW() - INTERVAL '1 hour' WHERE id = ?", [$jobId]);
+        $this->entityManager->clear(); // FORCE FRESH DATA FROM DB
 
         // 3. Re-claim
         $newJob = $this->jobRepo->claimAvailableJob(
