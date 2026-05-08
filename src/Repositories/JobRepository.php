@@ -799,13 +799,13 @@ class JobRepository extends BaseRepository
                     FROM jobs j
                     WHERE j.status {$statusSql}
                     " . ($channel ? " AND j.channel = :channel" : "") . "
-                    " . ($instanceName ? " AND (j.payload->>'instance_name') = :instance_name" : "") . "
+                    " . ($instanceName ? " AND CAST(j.payload AS text) LIKE :instance_name_pattern" : "") . "
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
                         AND (
                             (p.payload->'params'->>'account_id' = j.payload->'params'->>'account_id' AND j.payload->'params'->>'account_id' IS NOT NULL)
-                            OR (p.payload->>'instance_name' = j.payload->>'instance_name' AND j.payload->'params'->>'account_id' IS NULL)
+                            OR (CAST(p.payload AS text) LIKE '%instance_name%\"' || (j.payload->>'instance_name') || '\"%' AND j.payload->'params'->>'account_id' IS NULL)
                         )
                     )
                     ORDER BY j.priority DESC, j.id ASC
@@ -818,7 +818,7 @@ class JobRepository extends BaseRepository
 
             $params = ['worker_id' => $workerId];
             if ($channel) $params['channel'] = $channel;
-            if ($instanceName) $params['instance_name'] = $instanceName;
+            if ($instanceName) $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
 
             $jobId = $this->_em->getConnection()->fetchOne($sql, $params);
 
@@ -830,9 +830,10 @@ class JobRepository extends BaseRepository
             $this->_em->rollback();
             return null;
         } catch (\Throwable $e) {
-            if ($this->_em->getConnection()->isTransactionActive()) {
+            if (isset($this->_em) && $this->_em->getConnection()->isTransactionActive()) {
                 $this->_em->rollback();
             }
+            \Helpers\Helpers::log("Error in claimAvailableJob: " . $e->getMessage());
             return null;
         }
     }
