@@ -317,21 +317,21 @@ class JobRepository extends BaseRepository
                 WITH RankedJobs AS (
                     SELECT j.*, 
                            ROW_NUMBER() OVER(
-                               PARTITION BY COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id'), j.payload->>'instance_name'
+                               PARTITION BY COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id'), j.payload->>'instance_name'
                                ORDER BY j.priority DESC, j.id ASC
                            ) as account_rank
                     FROM jobs j
                     WHERE j.status {$statusSql}
                     " . ($channel ? " AND j.channel = :channel" : "") . "
-                    " . ($instanceName ? " AND (j.payload->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
+                    " . ($instanceName ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
                         AND (
-                            (COALESCE(p.payload->>'account_id', p.payload->'params'->>'account_id') = COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') 
-                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NOT NULL)
-                            OR (COALESCE(p.payload->>'instance_name', '') = COALESCE(j.payload->>'instance_name', '') 
-                                AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
+                            (COALESCE(CAST(p.payload AS JSONB)->>'account_id', CAST(p.payload AS JSONB)->'params'->>'account_id') = COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') 
+                             AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') IS NOT NULL)
+                            OR (COALESCE(CAST(p.payload AS JSONB)->>'instance_name', '') = COALESCE(CAST(j.payload AS JSONB)->>'instance_name', '') 
+                                AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') IS NULL)
                         )
                     )
                 )
@@ -805,7 +805,7 @@ class JobRepository extends BaseRepository
                     FROM jobs j
                     WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))
                     " . ($channel ? " AND j.channel = :channel" : "") . "
-                    " . ($instanceName ? " AND (j.payload->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
+                    " . ($instanceName ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
@@ -813,16 +813,16 @@ class JobRepository extends BaseRepository
                         AND p.id != j.id -- Don't block self
                         AND (
                             -- Same Account (check root and params) and same Entity/Channel
-                            (COALESCE(p.payload->>'account_id', p.payload->'params'->>'account_id') = COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id')
+                            (COALESCE(CAST(p.payload AS JSONB)->>'account_id', CAST(p.payload AS JSONB)->'params'->>'account_id') = COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id')
                              AND p.channel = j.channel 
                              AND p.entity = j.entity
-                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NOT NULL)
+                             AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') IS NOT NULL)
                             OR 
                             -- Same Instance Name (only if no account_id is present, e.g. full entity sync)
-                            (COALESCE(p.payload->>'instance_name', '') = COALESCE(j.payload->>'instance_name', '') 
+                            (COALESCE(CAST(p.payload AS JSONB)->>'instance_name', '') = COALESCE(CAST(j.payload AS JSONB)->>'instance_name', '') 
                              AND p.channel = j.channel 
                              AND p.entity = j.entity
-                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
+                             AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') IS NULL)
                         )
                     )
                     ORDER BY j.priority DESC, j.id ASC
