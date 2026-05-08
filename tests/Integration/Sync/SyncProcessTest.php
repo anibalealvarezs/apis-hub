@@ -227,6 +227,8 @@ class SyncProcessTest extends BaseIntegrationTestCase
         
         $jobId = is_array($jobData) ? $jobData['id'] : $jobData->getId();
 
+        // 2. Backdate VERY AGGRESSIVELY to avoid timezone race conditions (e.g. 1 hour ago)
+        $conn = $this->entityManager->getConnection();
         $conn->executeStatement("UPDATE jobs SET worker_id = 'dead-worker', updated_at = NOW() - INTERVAL '1 hour' WHERE id = ?", [$jobId]);
         $this->entityManager->clear(); // FORCE FRESH DATA FROM DB
 
