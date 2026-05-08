@@ -106,6 +106,15 @@ class SyncProcessTest extends BaseIntegrationTestCase
         ]);
         $this->entityManager->flush();
 
+        // DEBUG: Verify jobs exist
+        $allJobs = $this->jobRepo->findAll();
+        $this->assertGreaterThan(0, count($allJobs), "Jobs should exist in the database before claiming");
+        
+        $testJobs = array_filter($allJobs, function($j) {
+            return strpos($j->getPayload()['account_id'] ?? '', 'test_acc_parallel_') !== false;
+        });
+        $this->assertCount(2, $testJobs, "Should find exactly 2 test jobs for parallel test");
+
         // Worker 1 claims a job
         $claimed1 = $this->jobRepo->claimAvailableJob([JobStatus::scheduled->value], 'worker-1', 'test_instance_parallel');
         $this->assertNotNull($claimed1, "Worker 1 should claim a job");
