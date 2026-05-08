@@ -56,17 +56,24 @@ class SyncTelemetryService
             
             $results = [];
             $totalCompletion = 0;
+            $totalAssets = 0;
+            $totalFullySynced = 0;
             $count = 0;
 
             foreach ($enabledChannels as $chan) {
                 $status = $this->getChannelStatus($chan);
                 $results[$chan] = $status;
                 $totalCompletion += $status['completion_percentage'];
+                $totalAssets += ($status['total_assets'] ?? 0);
+                $totalFullySynced += ($status['fully_synced_count'] ?? 0);
                 $count++;
             }
 
             return [
                 'completion_percentage' => $count > 0 ? round($totalCompletion / $count, 2) : 0,
+                'total_assets' => $totalAssets,
+                'fully_synced_count' => $totalFullySynced,
+                'fully_synced_percentage' => $totalAssets > 0 ? round(($totalFullySynced / $totalAssets) * 100, 2) : 0,
                 'channels' => $results
             ];
         }, self::DEFAULT_TTL);
@@ -114,6 +121,8 @@ class SyncTelemetryService
             $assets = [];
             foreach ($rows as $row) {
                 $accId = trim((string)$row['account_id'], '"');
+                if ($accId === 'null' || $accId === '') continue;
+
                 if (!isset($assets[$accId])) {
                     $assets[$accId] = [
                         'total' => 0,
@@ -142,9 +151,12 @@ class SyncTelemetryService
             $chanProcessing = 0;
             $chanFailed = 0;
             $chanScheduled = 0;
+            $fullySyncedCount = 0;
             
             foreach ($assets as $id => $stats) {
                 $completion = $stats['total'] > 0 ? round(($stats['completed'] / $stats['total']) * 100, 2) : 0;
+                if ($completion >= 100) $fullySyncedCount++;
+
                 $formattedAssets[] = array_merge(['id' => $id, 'completion' => $completion], $stats);
                 $totalChanCompletion += $completion;
                 
@@ -160,6 +172,9 @@ class SyncTelemetryService
             return [
                 'channel' => $channelName,
                 'completion_percentage' => $assetCount > 0 ? round($totalChanCompletion / $assetCount, 2) : 0,
+                'fully_synced_count' => $fullySyncedCount,
+                'fully_synced_percentage' => $assetCount > 0 ? round(($fullySyncedCount / $assetCount) * 100, 2) : 0,
+                'total_assets' => $assetCount,
                 'total_jobs' => $chanTotal,
                 'completed' => $chanCompleted,
                 'processing' => $chanProcessing,
@@ -168,6 +183,70 @@ class SyncTelemetryService
                 'assets' => $formattedAssets
             ];
         }, self::DEFAULT_TTL);
+    }
+
+    /**
+     * Get daily sync map for a specific account (GitHub-style chart data)
+     *
+     * @param string $channel
+     * @param string $accountId
+     * @return array
+     */
+    public function getAccountDailyStats(string $channel, string $accountId): array
+    {
+        $cacheKey = self::CACHE_PREFIX . 'daily:' . $channel . ':' . $accountId;
+        
+        return $this->cacheService->get($cacheKey, function () use ($channel, $accountId) {
+            $conn = $this->entityManager->getConnection();
+            $isPostgres = Helpers::isPostgres();
+            
+            $jsonExtract = $isPostgres 
+                ? "payload->'params'->>'account_id'" 
+                : "JSON_EXTRACT(payload, '$.params.account_id')";
+            
+            $jsonStart = $isPostgres ? "payload->'params'->>'startDate'" : "JSON_EXTRACT(payload, '$.params.startDate')";
+            $jsonEnd = $isPostgres ? "payload->'params'->>'endDate'" : "JSON_EXTRACT(payload, '$.params.endDate')";
+
+            $query = "SELECT $jsonStart as start_date, $jsonEnd as end_date
+                      FROM jobs 
+                      WHERE channel = :channel 
+                      AND $jsonExtract = :account_id
+                      AND status = :status";
+            
+            $rows = $conn->fetchAllAssociative($query, [
+                'channel' => $channel,
+                'account_id' => $accountId,
+                'status' => JobStatus::completed->value
+            ]);
+
+            $dailyMap = [];
+            foreach ($rows as $row) {
+                $start = $row['start_date'] ? trim($row['start_date'], '"') : null;
+                $end = $row['end_date'] ? trim($row['end_date'], '"') : null;
+                
+                if (!$start) continue;
+                if (!$end) $end = $start;
+
+                try {
+                    $period = new \DatePeriod(
+                        new \DateTime($start),
+                        new \DateInterval('P1D'),
+                        (new \DateTime($end))->modify('+1 day')
+                    );
+                    foreach ($period as $date) {
+                        $dailyMap[$date->format('Y-m-d')] = true;
+                    }
+                } catch (\Throwable $e) {
+                    continue;
+                }
+            }
+
+            return [
+                'account_id' => $accountId,
+                'channel' => $channel,
+                'completed_days' => array_keys($dailyMap)
+            ];
+        }, 3600); // 1 hour cache
     }
 
     /**

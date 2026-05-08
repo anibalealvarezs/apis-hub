@@ -55,6 +55,36 @@ class SyncStatusController extends BaseController
     }
 
     /**
+     * GET /api/sync/account-stats
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function getAccountStats(Request $request): JsonResponse
+    {
+        if (!$this->isAuthorized($request)) {
+            return new JsonResponse(['error' => 'Unauthorized'], 401);
+        }
+
+        $channel = $request->query->get('channel');
+        $accountId = $request->query->get('account_id');
+
+        if (!$channel || !$accountId) {
+            return new JsonResponse(['error' => 'Missing channel or account_id'], 400);
+        }
+
+        try {
+            $stats = $this->telemetryService->getAccountDailyStats($channel, $accountId);
+            return new JsonResponse($stats);
+        } catch (\Throwable $e) {
+            return new JsonResponse([
+                'error' => 'Failed to retrieve account stats',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Basic API Key authorization check
      *
      * @param Request $request

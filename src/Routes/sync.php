@@ -15,4 +15,13 @@ return [
         'public' => true,
         'admin' => false
     ],
+    '/api/sync/account-stats' => [
+        'httpMethod' => 'GET',
+        'callable' => function (...$args) {
+            $request = $args['request'] ?? Request::createFromGlobals();
+            return (new SyncStatusController())->getAccountStats($request);
+        },
+        'public' => true,
+        'admin' => false
+    ],
 ];
