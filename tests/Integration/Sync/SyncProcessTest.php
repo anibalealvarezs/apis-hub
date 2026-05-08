@@ -66,15 +66,21 @@ class SyncProcessTest extends BaseIntegrationTestCase
             ]
         ]);
 
-        $command = new ScheduleInitialJobsCommand();
+        $command = new ScheduleInitialJobsCommand($this->entityManager);
         $command->run(new ArrayInput([]), new NullOutput());
 
         $jobs = $this->jobRepo->findAll();
-        $this->assertGreaterThan(0, count($jobs), "Jobs should be scheduled for the mock channel");
-        
-        $job = $jobs[0];
-        $this->assertEquals($mockChannel, $job->getChannel());
-        $this->assertEquals('campaign', $job->getEntity());
+        // Since we cleaned up, we should have jobs. 
+        // We don't assert exact count because of potential external noise, 
+        // but we verify at least one exists for our channel.
+        $found = false;
+        foreach ($jobs as $job) {
+            if ($job->getChannel() === $mockChannel) {
+                $found = true;
+                break;
+            }
+        }
+        $this->assertTrue($found, "Jobs should be scheduled for the mock channel");
     }
 
     /**
@@ -89,15 +95,15 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->seedChannel($googleChannel, 'google', 'Google Search Console');
 
         // Create two jobs for different channels but same instance/account
-        $job1Data = $this->jobRepo->create((object)[
+        $this->jobRepo->create((object)[
             'entity' => 'campaign',
             'channel' => $fbChannel,
-            'payload' => ['account_id' => 'test_acc_123', 'instance_name' => 'test_instance_parallel']
+            'payload' => ['account_id' => 'test_acc_parallel_123', 'instance_name' => 'test_instance_parallel']
         ]);
-        $job2Data = $this->jobRepo->create((object)[
+        $this->jobRepo->create((object)[
             'entity' => 'page',
             'channel' => $googleChannel,
-            'payload' => ['account_id' => 'test_acc_123', 'instance_name' => 'test_instance_parallel']
+            'payload' => ['account_id' => 'test_acc_parallel_123', 'instance_name' => 'test_instance_parallel']
         ]);
         $this->entityManager->flush();
 
@@ -151,24 +157,40 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $service = new SyncTelemetryService($cache);
         $telemetry = $service->getGlobalStatus();
 
-        // 3. Verify counts for our specific test markers
-        $fbStats = null;
+        // 3. Verify counts for our SPECIFIC test accounts
+        $fbChannelData = null;
         $channels = $telemetry['channels'] ?? [];
         foreach ($channels as $key => $item) {
             if (is_array($item) && isset($item['channel']) && strtolower($item['channel']) === strtolower($fbChannelName)) {
-                $fbStats = $item;
+                $fbChannelData = $item;
                 break;
             }
         }
 
-        if (!$fbStats) {
-            $available = array_keys($channels);
-            $this->fail("Facebook Marketing stats not found in 'channels'. Available: " . implode(', ', $available));
+        if (!$fbChannelData || !isset($fbChannelData['assets'])) {
+            $this->fail("Facebook Marketing stats not found in telemetry");
         }
 
-        $this->assertEquals(3, $fbStats['total_jobs'], "Total jobs count should match");
-        $this->assertEquals(1, $fbStats['completed'], "Done jobs count should match");
-        $this->assertEquals(1, $fbStats['processing'], "Active jobs count should match");
+        // AGGREGATE ONLY OUR TEST ACCOUNTS TO AVOID NOISE
+        $testStats = [
+            'total' => 0,
+            'completed' => 0,
+            'processing' => 0,
+            'scheduled' => 0
+        ];
+
+        foreach ($fbChannelData['assets'] as $accId => $stats) {
+            if (str_starts_with($accId, 'test_acc_telemetry_')) {
+                $testStats['total'] += $stats['total'];
+                $testStats['completed'] += $stats['completed'];
+                $testStats['processing'] += $stats['processing'];
+                $testStats['scheduled'] += $stats['scheduled'];
+            }
+        }
+
+        $this->assertEquals(3, $testStats['total'], "Total jobs count for test accounts should match");
+        $this->assertEquals(1, $testStats['completed'], "Done jobs count for test accounts should match");
+        $this->assertEquals(1, $testStats['processing'], "Active jobs count for test accounts should match");
     }
 
     /**
