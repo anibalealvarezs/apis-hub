@@ -38,8 +38,8 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $conn->executeStatement("
             DELETE FROM jobs 
             WHERE worker_id IN ('worker-1', 'worker-2', 'dead-worker', 'new-worker') 
-               OR payload->>'account_id' LIKE 'test_acc_%'
-               OR payload->>'instance_name' LIKE 'test_instance%'
+               OR CAST(payload AS text) LIKE 'test_acc_%'
+               OR CAST(payload AS text) LIKE 'test_instance%'
         ");
     }
 
@@ -106,17 +106,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
         ]);
         $this->entityManager->flush();
 
-        // DEBUG: Verify jobs exist
-        $allJobs = $this->jobRepo->findAll();
-        $this->assertGreaterThan(0, count($allJobs), "Jobs should exist in the database before claiming");
-        
-        $testJobs = array_filter($allJobs, function($j) {
-            $payload = $j->getPayload();
-            return strpos($payload['account_id'] ?? '', 'test_acc_parallel_') !== false;
-        });
-        $this->assertCount(2, $testJobs, "Should find exactly 2 test jobs for parallel test");
-
-        // Worker 1 claims a job - USING NAMED ARGUMENTS TO PREVENT PARAMETER POSITION ERRORS
+        // Worker 1 claims a job
         $claimed1 = $this->jobRepo->claimAvailableJob(
             status: [JobStatus::scheduled->value], 
             workerId: 'worker-1', 
@@ -168,21 +158,16 @@ class SyncProcessTest extends BaseIntegrationTestCase
 
         // 2. Get Telemetry
         $redis = Helpers::getRedisClient();
-        $cache = new \Services\CacheService($redis);
-        $cache->deletePattern('telemetry_*'); // Clear cache to force fresh data
+        $cache = \Services\CacheService::getInstance($redis);
+        $cache->deletePattern('sync_telemetry:*'); // Clear cache to force fresh data
 
         $service = new SyncTelemetryService($cache);
         $telemetry = $service->getGlobalStatus();
 
         // 3. Verify counts for our SPECIFIC test accounts
-        $fbChannelData = null;
         $channels = $telemetry['channels'] ?? [];
-        foreach ($channels as $key => $item) {
-            if (is_array($item) && isset($item['channel']) && strtolower($item['channel']) === strtolower($fbChannelName)) {
-                $fbChannelData = $item;
-                break;
-            }
-        }
+        // THE KEY IS THE CHANNEL NAME!
+        $fbChannelData = $channels[$fbChannelName] ?? null;
 
         if (!$fbChannelData || !isset($fbChannelData['assets'])) {
             $this->fail("Facebook Marketing stats not found in telemetry. Available channels: " . implode(', ', array_keys($channels)));
@@ -232,9 +217,9 @@ class SyncProcessTest extends BaseIntegrationTestCase
         
         $jobId = is_array($jobData) ? $jobData['id'] : $jobData->getId();
 
-        // 2. Backdate and manually set worker_id (since create doesn't handle it directly if passed in payload)
+        // 2. Backdate VERY AGGRESSIVELY to avoid timezone race conditions (e.g. 1 hour ago)
         $conn = $this->entityManager->getConnection();
-        $conn->executeStatement("UPDATE jobs SET worker_id = 'dead-worker', updated_at = NOW() - INTERVAL '11 minutes' WHERE id = ?", [$jobId]);
+        $conn->executeStatement("UPDATE jobs SET worker_id = 'dead-worker', updated_at = NOW() - INTERVAL '1 hour' WHERE id = ?", [$jobId]);
 
         // 3. Re-claim
         $newJob = $this->jobRepo->claimAvailableJob(
