@@ -158,148 +158,55 @@
 
                 $jobId = $input->getOption('job-id');
                 if ($jobId) {
-                    $specificJob = $jobRepo->find($jobId);
-                    $jobsList = $specificJob ? [$specificJob] : [];
+                    $job = $jobRepo->find($jobId);
                 } else {
-                    $jobs = $jobRepo->getJobsByStatus(
-                        status: JobStatus::scheduled->value,
+                    $job = $jobRepo->claimAvailableJob(
+                        status: [JobStatus::scheduled->value, JobStatus::delayed->value],
+                        workerId: $envInstance,
                         channel: ($forceAll || empty($envChannel) || $envChannel === 'none' ? null : $envChannel),
                         instanceName: ($forceAll || $isGenericWorker ? null : $envInstance)
                     );
-                    $delayedJobs = $jobRepo->getJobsByStatus(
-                        status: JobStatus::delayed->value,
-                        channel: ($forceAll || empty($envChannel) || $envChannel === 'none' ? null : $envChannel),
-                        instanceName: ($forceAll || $isGenericWorker ? null : $envInstance)
-                    );
-                    $jobsList = array_merge($jobs, $delayedJobs);
                 }
 
-                if (empty($jobsList)) {
+                if (!$job) {
                     break;
                 }
 
-                /** @var Job $job */
-                foreach ($jobsList as $job) {
-                    Helpers::reconnectIfNeeded($this->em);
-                    $jobRepo = $this->em->getRepository(Job::class);
+                $payload = $job->getPayload() ?? [];
+                $params = $payload['params'] ?? [];
 
-                    $payload = $job->getPayload() ?? [];
-                    $params = $payload['params'] ?? [];
-
-                    // 1. Instance Name Match (Primary Filter)
-                    $jobInstance = $payload['instance_name'] ?? null;
-                    if (!$jobId && !$forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance && !$isGenericWorker) {
-                        $stats['skipped']++;
-
-                        continue;
-                    }
-
-                    // 2. Date Range Filters (Fallback/Secondary)
-                    if (!$jobId && $envStartDate !== false && $envStartDate !== '') {
-                        $jobStart = $params['startDate'] ?? $params['start_date'] ?? null;
-                        if ($jobStart !== $envStartDate) {
-                            $stats['skipped']++;
-
-                            continue;
+                // Dependency check
+                $requires = $params['requires'] ?? null;
+                if (!$jobId && !$forceAll && $requires) {
+                    $requiredInstances = array_map('trim', explode(',', $requires));
+                    $allMet = true;
+                    foreach ($requiredInstances as $requiredInstance) {
+                        if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
+                            $allMet = false;
+                            break;
                         }
                     }
-                    if (!$jobId && $envEndDate !== false && $envEndDate !== '') {
-                        $jobEnd = $params['endDate'] ?? $params['end_date'] ?? null;
-                        if ($jobEnd !== $envEndDate) {
-                            $stats['skipped']++;
-
-                            continue;
-                        }
-                    }
-
-                    if (!$jobId && $job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
-                        $stats['skipped']++;
-
-                        continue;
-                    }
-
-                    // Global filters from env
-                    if (!$jobId && ($envChannel = getenv('API_SOURCE')) && $envChannel !== 'none') {
-                        if ($job->getChannel() !== $envChannel) {
-                            $stats['skipped']++;
-
-                            continue;
-                        }
-                    }
-                    if (!$jobId && ($envEntity = getenv('API_ENTITY')) && $envEntity !== 'none') {
-                        if ($job->getEntity() !== $envEntity) {
-                            $stats['skipped']++;
-
-                            continue;
-                        }
-                    }
-
-                    // Cooldown check for delayed jobs
-                    if (!$jobId && $job->getStatus() === JobStatus::delayed->value) {
-                        $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $job->getChannel()]);
-                        $cooldown = $channelEntity ? $channelEntity->getCooldown() : 600;
-                        $updatedAt = $job->getUpdatedAt();
-                        if ($updatedAt) {
-                            $elapsed = time() - $updatedAt->getTimestamp();
-                            if ($elapsed < $cooldown) {
-                                $stats['skipped']++;
-
-                                continue;
-                            }
-                        }
-                    }
-
-                    // Dependency check
-                    $requires = $params['requires'] ?? null;
-                    if (!$jobId && !$forceAll && $requires) {
-                        $requiredInstances = array_map('trim', explode(',', $requires));
-                        foreach ($requiredInstances as $requiredInstance) {
-                            if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
-                                if (Helpers::isDebug() || $output->isVerbose()) {
-                                    $output->writeln("<comment>Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.</comment>");
-                                }
-                                $this->logger->info("Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.");
-                                $stats['skipped']++;
-
-                                continue 2; // Skip to next job
-                            }
-                        }
-                    }
-
-                    // Guard: Prevent another job for the same instance from running if one is already processing
-                    $instanceName = $payload['instance_name'] ?? null;
-                    if (!$jobId && $instanceName && $jobRepo->isAnotherJobProcessing($instanceName)) {
+                    if (!$allMet) {
                         if (Helpers::isDebug() || $output->isVerbose()) {
-                            $output->writeln("<comment>Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.</comment>");
+                            $output->writeln("<comment>Job {$job->getUuid()} dependencies not met. Moving to delayed.</comment>");
                         }
-                        $this->logger->info("Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.");
+                        $jobRepo->update($job->getId(), (object)['status' => JobStatus::delayed->value]);
                         $stats['skipped']++;
-
                         continue;
                     }
+                }
 
-                    if (Helpers::isDebug()) {
-                        $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
-                    }
-                    $this->logger->info("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}", [
-                        'uuid'    => $job->getUuid(),
-                        'entity'  => $job->getEntity(),
-                        'channel' => $job->getChannel(),
-                    ]);
-                    $stats['total']++;
+                if (Helpers::isDebug()) {
+                    $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
+                }
+                $this->logger->info("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}", [
+                    'uuid'    => $job->getUuid(),
+                    'entity'  => $job->getEntity(),
+                    'channel' => $job->getChannel(),
+                ]);
+                $stats['total']++;
 
-                    try {
-                        // Atomic claim by repository
-                        // Even if we provide job-id, we must ensure it's not already being processed by another worker
-                        if (!$jobRepo->claimJob($job->getId(), $envInstance)) {
-                            if (Helpers::isDebug() || $jobId) {
-                                $output->writeln("<comment>Job {$job->getUuid()} already claimed or in progress. Skipping.</comment>");
-                            }
-                            $stats['skipped']++;
-                            $stats['total']--;
-
-                            continue;
-                        }
+                try {
 
                         $channelName = $job->getChannel();
                         $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $channelName]);

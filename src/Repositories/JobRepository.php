@@ -734,9 +734,9 @@ class JobRepository extends BaseRepository
     public function isAnotherJobProcessing(string $instanceName, ?int $excludeJobId = null): bool
     {
         if (Helpers::isPostgres()) {
-            $sql = "SELECT count(j.id) FROM jobs j WHERE CAST(j.payload AS text) LIKE :instance_name_pattern AND j.status = :processing";
+            $sql = "SELECT count(j.id) FROM jobs j WHERE (j.payload->>'instance_name') = :instance_name AND j.status = :processing";
             $params = [
-                'instance_name_pattern' => '%instance_name%' . $instanceName . '%',
+                'instance_name' => $instanceName,
                 'processing' => JobStatus::processing->value,
             ];
 
@@ -745,9 +745,7 @@ class JobRepository extends BaseRepository
                 $params['excludeId'] = $excludeJobId;
             }
 
-            $result = $this->_em->getConnection()->executeQuery($sql, $params);
-
-            return (int)$result->fetchOne() > 0;
+            return (int)$this->_em->getConnection()->fetchOne($sql, $params) > 0;
         }
 
         $qb = $this->_em->createQueryBuilder();
@@ -766,6 +764,77 @@ class JobRepository extends BaseRepository
         }
 
         return (int)$qb->getQuery()->getSingleScalarResult() > 0;
+    }
+
+    /**
+     * Atomically selects and claims the next available job using FOR UPDATE SKIP LOCKED.
+     * 
+     * @param int|array $status
+     * @param string|null $workerId
+     * @param string|null $channel
+     * @param string|null $instanceName
+     * @return Job|null
+     */
+    public function claimAvailableJob(mixed $status, ?string $workerId = null, ?string $channel = null, ?string $instanceName = null): ?Job
+    {
+        if (!Helpers::isPostgres()) {
+            // Fallback for non-postgres: use regular selection (less efficient but safe)
+            $jobs = $this->getJobsByStatus($status, $channel, $instanceName);
+            foreach ($jobs as $job) {
+                if ($this->claimJob($job->getId(), $workerId)) {
+                    return $job;
+                }
+            }
+            return null;
+        }
+
+        $statusSql = is_array($status) ? "IN (" . implode(',', array_map('intval', $status)) . ")" : "= " . (int)$status;
+        $processingStatus = JobStatus::processing->value;
+        
+        $this->_em->beginTransaction();
+        try {
+            $sql = "
+                WITH RankedJobs AS (
+                    SELECT j.id
+                    FROM jobs j
+                    WHERE j.status {$statusSql}
+                    " . ($channel ? " AND j.channel = :channel" : "") . "
+                    " . ($instanceName ? " AND (j.payload->>'instance_name') = :instance_name" : "") . "
+                    AND NOT EXISTS (
+                        SELECT 1 FROM jobs p 
+                        WHERE p.status = {$processingStatus} 
+                        AND (
+                            (p.payload->'params'->>'account_id' = j.payload->'params'->>'account_id' AND j.payload->'params'->>'account_id' IS NOT NULL)
+                            OR (p.payload->>'instance_name' = j.payload->>'instance_name' AND j.payload->'params'->>'account_id' IS NULL)
+                        )
+                    )
+                    ORDER BY j.priority DESC, j.id ASC
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED
+                )
+                UPDATE jobs SET status = {$processingStatus}, worker_id = :worker_id, updated_at = NOW()
+                WHERE id = (SELECT id FROM RankedJobs)
+                RETURNING id";
+
+            $params = ['worker_id' => $workerId];
+            if ($channel) $params['channel'] = $channel;
+            if ($instanceName) $params['instance_name'] = $instanceName;
+
+            $jobId = $this->_em->getConnection()->fetchOne($sql, $params);
+
+            if ($jobId) {
+                $this->_em->commit();
+                return $this->find($jobId);
+            }
+
+            $this->_em->rollback();
+            return null;
+        } catch (\Throwable $e) {
+            if ($this->_em->getConnection()->isTransactionActive()) {
+                $this->_em->rollback();
+            }
+            return null;
+        }
     }
 
     /**
