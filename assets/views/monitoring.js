@@ -199,8 +199,11 @@ async function fetchSyncTelemetry() {
         const response = await fetch('/api/sync/status', { headers });
         const data = await response.json();
         
-        if (data.success && data.data) {
-            updateSyncTelemetry(data.data.channels || {});
+        // Handle both direct object and wrapped responses
+        const telemetry = data.channels ? data.channels : (data.data && data.data.channels ? data.data.channels : null);
+        
+        if (telemetry) {
+            updateSyncTelemetry(telemetry);
         }
     } catch (e) {
         console.error('Sync Telemetry Fetch Error:', e);
