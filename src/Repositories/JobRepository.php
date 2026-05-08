@@ -782,15 +782,20 @@ class JobRepository extends BaseRepository
         $statusSql = is_array($status) ? "IN (" . implode(',', array_map('intval', $status)) . ")" : "= " . (int)$status;
         $processingStatus = JobStatus::processing->value;
         $staleThreshold = 10; // minutes
+        $thresholdTime = (new \DateTime())->modify("-{$staleThreshold} minutes")->format('Y-m-d H:i:s');
         
         $this->_em->beginTransaction();
         try {
             // DEBUG: Check how many jobs match before claiming
-            $checkSql = "SELECT count(*) FROM jobs j WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < NOW() - INTERVAL '{$staleThreshold} minutes'))";
-            if ($channel) $checkSql .= " AND j.channel = '{$channel}'";
-            $count = $this->_em->getConnection()->fetchOne($checkSql);
+            $checkSql = "SELECT count(*) FROM jobs j WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))";
+            if ($channel) $checkSql .= " AND j.channel = :channel";
+            
+            $checkParams = ['threshold' => $thresholdTime];
+            if ($channel) $checkParams['channel'] = $channel;
+            
+            $count = $this->_em->getConnection()->fetchOne($checkSql, $checkParams);
             if (Helpers::isDebug()) {
-                echo "DEBUG: claimAvailableJob found $count potential jobs (status=$statusSql, channel=$channel, instance=$instanceName)\n";
+                echo "DEBUG: claimAvailableJob found $count potential jobs (status=$statusSql, channel=$channel, instance=$instanceName, threshold=$thresholdTime)\n";
             }
 
             // Optimized query
@@ -798,13 +803,13 @@ class JobRepository extends BaseRepository
                 WITH RankedJobs AS (
                     SELECT j.id
                     FROM jobs j
-                    WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < NOW() - INTERVAL '{$staleThreshold} minutes'))
+                    WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))
                     " . ($channel ? " AND j.channel = :channel" : "") . "
                     " . ($instanceName ? " AND (j.payload->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
-                        AND p.updated_at >= NOW() - INTERVAL '{$staleThreshold} minutes' -- Only recent processing jobs block
+                        AND p.updated_at >= :threshold -- Only recent processing jobs block
                         AND p.id != j.id -- Don't block self
                         AND (
                             -- Same Account (check root and params) and same Entity/Channel
@@ -828,7 +833,7 @@ class JobRepository extends BaseRepository
                 WHERE id = (SELECT id FROM RankedJobs)
                 RETURNING id";
 
-            $params = ['worker_id' => $workerId];
+            $params = ['worker_id' => $workerId, 'threshold' => $thresholdTime];
             if ($channel) $params['channel'] = $channel;
             if ($instanceName) {
                 $params['instance_name'] = $instanceName;
