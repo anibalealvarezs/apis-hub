@@ -67,10 +67,8 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
     $projectPathHost = "\${PROJECT_PATH_HOST:-./}";
     $isLocal = !in_array($env, ['production', 'testing', 'remote']);
 
-    $phpVolumes = $isLocal ? [
+    $phpVolumes = [
         "$projectPathHost:/app",
-        '/var/run/docker.sock:/var/run/docker.sock'
-    ] : [
         '/var/run/docker.sock:/var/run/docker.sock'
     ];
 
@@ -110,7 +108,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
     // ─── Phase 2: Create Scalable Worker Service ──────────────────────────────────
     $infraConfig = $config['infrastructure'] ?? [];
     $workerPoolSize = (int) ($infraConfig['worker_pool_size'] ?? 1);
-    $workerVolumes = $isLocal ? ["$projectPathHost:/app"] : [];
+    $workerVolumes = ["$projectPathHost:/app"];
 
     // Generic worker service definition (Single service to be scaled)
     $services['worker'] = [
@@ -144,7 +142,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
     // but we can set the default scale in the yaml if supported by the version.
     $services['worker']['scale'] = $workerPoolSize;
     if (empty($workerVolumes)) {
-        unset($services['worker']['volumes']);
+        // unset($services['worker']['volumes']); // Keep volumes for sync
     }
 
     // ─── Phase 2.5: Create Dedicated MCP Service ─────────────────────────────────────
