@@ -43,6 +43,22 @@
                 $output->writeln("<info>✔ Instances configuration regenerated successfully with ".count($instances)." instances.</info>");
                 $output->writeln("<info>✔ File updated: config/instances.yaml</info>");
 
+                // ─── Phase 4: Auto-regenerate Docker Compose Manifest ──────────────────
+                $output->writeln("<comment>➤ Regenerating Docker Compose manifest...</comment>");
+                $deploymentName = getenv('DEPLOYMENT_NAME') ?: 'apis-hub';
+                $buildScript = realpath(__DIR__.'/../../bin/build-deployment.php');
+                if ($buildScript) {
+                    $cmd = "php \"$buildScript\" \"$deploymentName\" 2>&1";
+                    exec($cmd, $buildOutput, $resultCode);
+                    if ($resultCode === 0) {
+                        $output->writeln("<info>✔ docker-compose.yml updated successfully.</info>");
+                    } else {
+                        $output->writeln("<error>✘ Failed to update docker-compose.yml: ".implode("\n", $buildOutput)."</error>");
+                    }
+                } else {
+                    $output->writeln("<error>✘ build-deployment.php not found.</error>");
+                }
+
                 return Command::SUCCESS;
             } catch (Exception $e) {
                 $output->writeln("<error>✘ Error generating instances: ".$e->getMessage()."</error>");
