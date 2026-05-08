@@ -54,7 +54,7 @@ class SyncTelemetryService
             $isPostgres = Helpers::isPostgres($em);
             
             $jsonExtract = $isPostgres 
-                ? "COALESCE(payload->>'account_id', payload->'params'->>'account_id', 'global')" 
+                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')" 
                 : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
 
             // 1. Get all stats in ONE query
