@@ -28,13 +28,32 @@ class SyncProcessTest extends BaseIntegrationTestCase
      */
     public function testInitialJobScheduling()
     {
+        $fbDriver = new \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver();
+        $fbChannel = $fbDriver->getChannel();
+        $fbEntity = \Enums\AnalyticsEntity::campaign->value;
+
+        // Mock a channel config so the command has something to schedule
+        $mockConfig = [
+            $fbChannel => [
+                'enabled' => true,
+                'sync' => [
+                    'entities' => [$fbEntity]
+                ]
+            ]
+        ];
+        
+        $reflection = new \ReflectionClass(Helpers::class);
+        $prop = $reflection->getProperty('channelsConfig');
+        $prop->setAccessible(true);
+        $prop->setValue(null, $mockConfig);
+
         $command = new ScheduleInitialJobsCommand($this->entityManager);
         
         // Run first time
         $command->run(new ArrayInput(['--instance' => 'global']), new NullOutput());
         
         $count = $this->jobRepo->count([]);
-        $this->assertGreaterThan(0, $count, "Jobs should be scheduled");
+        $this->assertGreaterThan(0, $count, "Jobs should be scheduled for the mock channel");
         
         $initialCount = $count;
         
@@ -50,17 +69,23 @@ class SyncProcessTest extends BaseIntegrationTestCase
      */
     public function testParallelJobClaiming()
     {
+        $fbChannel = (new \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver())->getChannel();
+        $gscChannel = (new \Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver())->getChannel();
+
+        $fbEntity = \Anibalealvarezs\MetaHubDriver\Enums\MetaEntityType::CAMPAIGN->value;
+        $gscEntity = \Enums\AnalyticsEntity::queries->value;
+
         // 1. Create two jobs for the same instance but different channels
         $this->jobRepo->create((object)[
-            'entity' => 'facebook_marketing',
-            'channel' => 'facebook',
+            'entity' => $fbEntity,
+            'channel' => $fbChannel,
             'status' => JobStatus::scheduled->value,
             'payload' => ['instance_name' => 'global', 'params' => ['account_id' => null]]
         ]);
 
         $this->jobRepo->create((object)[
-            'entity' => 'google_search_console',
-            'channel' => 'gsc',
+            'entity' => $gscEntity,
+            'channel' => $gscChannel,
             'status' => JobStatus::scheduled->value,
             'payload' => ['instance_name' => 'global', 'params' => ['account_id' => null]]
         ]);
@@ -74,10 +99,9 @@ class SyncProcessTest extends BaseIntegrationTestCase
             instanceName: 'global'
         );
         $this->assertNotNull($jobA, "Worker A should be able to claim a job");
-        $this->assertEquals('facebook', $jobA->getChannel());
+        $this->assertEquals($fbChannel, $jobA->getChannel());
 
         // 3. Worker B tries to claim the second job (DIFFERENT CHANNEL, SAME INSTANCE)
-        // Before our fix, this would return null because Worker A "locked" the 'global' instance.
         $jobB = $this->jobRepo->claimAvailableJob(
             status: [JobStatus::scheduled->value],
             workerId: 'worker-B',
@@ -85,7 +109,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
         );
         
         $this->assertNotNull($jobB, "Worker B SHOULD be able to claim a job from the same instance if the channel is different");
-        $this->assertEquals('gsc', $jobB->getChannel());
+        $this->assertEquals($gscChannel, $jobB->getChannel());
     }
 
     /**
@@ -93,24 +117,27 @@ class SyncProcessTest extends BaseIntegrationTestCase
      */
     public function testTelemetryAggregation()
     {
+        $fbChannel = (new \Anibalealvarezs\MetaHubDriver\Drivers\FacebookMarketingDriver())->getChannel();
+        $fbEntity = \Anibalealvarezs\MetaHubDriver\Enums\MetaEntityType::CAMPAIGN->value;
+
         // 1. Setup jobs in various states
         $this->jobRepo->create((object)[
-            'entity' => 'facebook_marketing',
-            'channel' => 'facebook',
+            'entity' => $fbEntity,
+            'channel' => $fbChannel,
             'status' => JobStatus::completed->value,
             'payload' => ['instance_name' => 'global', 'params' => ['account_id' => 'acc1']]
         ]);
 
         $this->jobRepo->create((object)[
-            'entity' => 'facebook_marketing',
-            'channel' => 'facebook',
+            'entity' => $fbEntity,
+            'channel' => $fbChannel,
             'status' => JobStatus::processing->value,
             'payload' => ['instance_name' => 'global', 'params' => ['account_id' => 'acc1']]
         ]);
 
         $this->jobRepo->create((object)[
-            'entity' => 'facebook_marketing',
-            'channel' => 'facebook',
+            'entity' => $fbEntity,
+            'channel' => $fbChannel,
             'status' => JobStatus::failed->value,
             'payload' => ['instance_name' => 'global', 'params' => ['account_id' => 'acc2']]
         ]);
