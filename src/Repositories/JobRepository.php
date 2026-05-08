@@ -312,27 +312,26 @@ class JobRepository extends BaseRepository
                 $params = ['status' => $status];
             }
 
-            // Use a Window Function to pick a diverse set of jobs across different accounts.
-            // We partition by account_id (extracted from JSON) to ensure that multiple workers 
-            // can pick up different accounts from the same backlog.
             $processingStatus = JobStatus::processing->value;
             $sql = "
                 WITH RankedJobs AS (
                     SELECT j.*, 
                            ROW_NUMBER() OVER(
-                               PARTITION BY (j.payload->'params'->>'account_id'), (j.payload->>'instance_name') 
+                               PARTITION BY COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id'), j.payload->>'instance_name'
                                ORDER BY j.priority DESC, j.id ASC
                            ) as account_rank
                     FROM jobs j
                     WHERE j.status {$statusSql}
                     " . ($channel ? " AND j.channel = :channel" : "") . "
-                    " . ($instanceName ? " AND CAST(j.payload AS text) LIKE :instance_name_pattern" : "") . "
+                    " . ($instanceName ? " AND (j.payload->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
                         AND (
-                            (p.payload->'params'->>'account_id' = j.payload->'params'->>'account_id' AND j.payload->'params'->>'account_id' IS NOT NULL)
-                            OR (p.payload->>'instance_name' = j.payload->>'instance_name' AND j.payload->'params'->>'account_id' IS NULL)
+                            (COALESCE(p.payload->>'account_id', p.payload->'params'->>'account_id') = COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') 
+                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NOT NULL)
+                            OR (COALESCE(p.payload->>'instance_name', '') = COALESCE(j.payload->>'instance_name', '') 
+                                AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
                         )
                     )
                 )
@@ -340,6 +339,12 @@ class JobRepository extends BaseRepository
                 WHERE account_rank <= 5
                 ORDER BY priority DESC, id ASC 
                 LIMIT 100";
+
+            if ($channel) $params['channel'] = $channel;
+            if ($instanceName) {
+                $params['instance_name'] = $instanceName;
+                $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
+            }
 
             $rsm = new \Doctrine\ORM\Query\ResultSetMappingBuilder($this->_em);
             $rsm->addRootEntityFromClassMetadata($this->getEntityName(), 'j');
@@ -350,30 +355,24 @@ class JobRepository extends BaseRepository
             return $query->getResult();
         }
 
-        $filters = ['status' => $status];
-        if ($channel) {
-            if ($chanEnum = Channel::tryFromName($channel)) {
-                $channel = $chanEnum->name;
-            }
-            $filters['channel'] = $channel;
+        $qb = $this->createQueryBuilder('j');
+        
+        if (is_array($status)) {
+            $qb->andWhere('j.status IN (:status)')->setParameter('status', $status);
+        } else {
+            $qb->andWhere('j.status = :status')->setParameter('status', $status);
         }
 
-        $qb = $this->buildReadMultipleQuery(
-            ids: null,
-            filters: (object)$filters,
-            orderBy: 'priority',
-            orderDir: 'DESC',
-            limit: 100,
-            pagination: 0
-        );
+        if ($channel) {
+            $qb->andWhere('j.channel = :channel')->setParameter('channel', $channel);
+        }
 
         if ($instanceName) {
-            $payloadField = 'e.payload';
-            $qb->andWhere("{$payloadField} LIKE :instance_name_pattern")
-               ->setParameter('instance_name_pattern', '%instance_name%' . $instanceName . '%');
+            $qb->andWhere('j.payload LIKE :instance_pattern')
+               ->setParameter('instance_pattern', '%instance_name%' . $instanceName . '%');
         }
 
-        return $qb->getQuery()->getResult();
+        return $qb->orderBy('j.priority', 'DESC')->addOrderBy('j.id', 'ASC')->setMaxResults(100)->getQuery()->getResult();
     }
 
     /**
@@ -767,27 +766,6 @@ class JobRepository extends BaseRepository
         return (int)$qb->getQuery()->getSingleScalarResult() > 0;
     }
 
-    public function getJobsByStatus(mixed $status, ?string $channel = null, ?string $instanceName = null): array
-    {
-        $qb = $this->createQueryBuilder('j');
-        
-        if (is_array($status)) {
-            $qb->andWhere('j.status IN (:status)')->setParameter('status', $status);
-        } else {
-            $qb->andWhere('j.status = :status')->setParameter('status', $status);
-        }
-
-        if ($channel) {
-            $qb->andWhere('j.channel = :channel')->setParameter('channel', $channel);
-        }
-
-        if ($instanceName) {
-            $qb->andWhere('j.payload LIKE :instance_pattern')
-               ->setParameter('instance_pattern', '%instance_name%' . $instanceName . '%');
-        }
-
-        return $qb->orderBy('j.priority', 'DESC')->addOrderBy('j.id', 'ASC')->getQuery()->getResult();
-    }
 
     public function claimAvailableJob(mixed $status, ?string $workerId = null, ?string $channel = null, ?string $instanceName = null): ?Job
     {
