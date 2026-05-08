@@ -21,7 +21,10 @@ class SyncProcessTest extends BaseIntegrationTestCase
     {
         parent::setUp();
         
-        // Ensure Helpers uses the SAME EntityManager as the test to see seeded data
+        // 1. Reset configs FIRST
+        Helpers::resetConfigs();
+
+        // 2. Ensure Helpers uses the SAME EntityManager as the test
         $reflection = new \ReflectionClass(Helpers::class);
         $property = $reflection->getProperty('entityManager');
         $property->setAccessible(true);
@@ -30,7 +33,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->jobRepo = $this->entityManager->getRepository(Job::class);
         $this->entityManager->flush();
 
-        // CLEANUP: Only remove jobs related to our test markers
+        // 3. CLEANUP: Only remove jobs related to our test markers
         $conn = $this->entityManager->getConnection();
         $conn->executeStatement("
             DELETE FROM jobs 
@@ -38,9 +41,6 @@ class SyncProcessTest extends BaseIntegrationTestCase
                OR payload->>'account_id' LIKE 'test_acc_%'
                OR payload->>'instance_name' LIKE 'test_instance%'
         ");
-        
-        // Reset configs
-        Helpers::resetConfigs();
     }
 
     /**
