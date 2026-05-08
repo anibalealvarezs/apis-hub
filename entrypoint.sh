@@ -59,25 +59,27 @@ fi
 
 if [[ "$INSTANCE_NAME" != *"master"* ]] || [[ "$INSTANCE_TYPE" == "waiting-master" ]]; then
 
-    # Wait for the database and jobs table to exist (up to 2 minutes)
-    MAX_RETRIES=60
-    RETRY_COUNT=0
-    
     # We use a robust PHP check that handles "Unknown database" error 
     # without crashing, treating it as "not ready".
-    CHECK_CMD="require 'app/bootstrap.php'; try { \Helpers\Helpers::getManager()->getConnection()->executeQuery('SELECT 1 FROM jobs LIMIT 1'); echo 'READY'; } catch (Exception \$e) { echo 'NOT_READY'; }"
+    # We use Throwable to catch fatal errors as well.
+    CHECK_CMD="require 'app/bootstrap.php'; try { \Helpers\Helpers::getManager()->getConnection()->executeQuery('SELECT 1 FROM jobs LIMIT 1'); echo 'READY'; } catch (\Throwable \$e) { echo 'NOT_READY: ' . \$e->getMessage(); }"
     
-    while [ "$(php -r "$CHECK_CMD" 2>/dev/null)" != "READY" ] && [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        echo "Waiting for database '$DB_NAME' and 'jobs' table... (Attempt $((RETRY_COUNT+1))/$MAX_RETRIES)"
+    while true; do
+        CHECK_RESULT=$(php -r "$CHECK_CMD" 2>&1)
+        if [[ "$CHECK_RESULT" == *"READY"* ]]; then
+            break
+        fi
+        
+        echo "Waiting for database '$DB_NAME' and 'jobs' table... (Attempt $((RETRY_COUNT+1))/$MAX_RETRIES) - Status: $CHECK_RESULT"
+        
+        if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+            echo "Warning: Database schema not ready after timeout. Proceeding anyway..."
+            break
+        fi
+        
         sleep 2
         RETRY_COUNT=$((RETRY_COUNT+1))
     done
-    
-    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-        echo "Warning: Database schema not ready after 2 minutes. Proceeding anyway..."
-    else
-        echo "Database schema detected and ready."
-    fi
 fi
 
 # Each instance only schedules its OWN initial job to prevent massive duplication
