@@ -39,6 +39,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $mockConfig = [
             $fbChannelName => [
                 'enabled' => true,
+                'ad_accounts' => [['id' => '123', 'enabled' => true]],
                 'sync' => [
                     'entities' => [$fbEntity]
                 ]
@@ -158,7 +159,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->entityManager->flush();
 
         // 2. Get Telemetry
-        $service = new SyncTelemetryService();
+        $service = new SyncTelemetryService(Helpers::getCache());
         $telemetry = $service->getGlobalStatus();
 
         // 3. Verify counts
