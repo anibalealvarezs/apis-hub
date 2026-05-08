@@ -159,10 +159,8 @@
                     }
 
 
-                    if (strpos($channel, 'facebook') !== false) echo "DEBUG: Total accounts to process for $channel: " . count($accounts) . "\n";
                     foreach ($accounts as $account) {
                         $accountId = is_array($account) ? ($account['id'] ?? $account['identifier'] ?? $account['url'] ?? null) : $account;
-                        if (strpos($channel, 'facebook') !== false) echo "DEBUG: -> Resolved accountId: " . ($accountId ?? 'NULL') . "\n";
  
                         // Agnostic Canonical ID resolution
                         if ($account) {
@@ -237,6 +235,10 @@
 
                     if ($lastJob) {
                         $payloadObj = is_string($lastJob['payload']) ? json_decode($lastJob['payload'], true) : $lastJob['payload'];
+                        if (strpos($channel, 'facebook') !== false) {
+                            $foundAcc = $payloadObj['params']['account_id'] ?? $payloadObj['account_id'] ?? 'NULL';
+                            echo "DEBUG: Instance $name (Postgres: " . (\Helpers\Helpers::isPostgres() ? 'YES' : 'NO') . ") -> Match found! New Account: " . ($accountId ?? 'GLOBAL') . " | Existing Job #{$lastJob['id']} Account: $foundAcc\n";
+                        }
                         $oldStart = $payloadObj['params']['startDate'] ?? $payloadObj['params']['start_date'] ?? null;
                         $oldEnd = $payloadObj['params']['endDate'] ?? $payloadObj['params']['end_date'] ?? null;
                         
