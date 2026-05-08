@@ -311,17 +311,17 @@ class JobRepository extends BaseRepository
                 $params = ['status' => $status];
             }
 
-            // Use a Window Function to pick a diverse set of jobs across different instances.
-            // This prevents a single instance with a massive backlog (e.g. 1000+ jobs) 
-            // from starving other instances in the same queue.
+            // Use a Window Function to pick a diverse set of jobs across different accounts.
+            // We partition by account_id (extracted from JSON) to ensure that multiple workers 
+            // can pick up different accounts from the same backlog.
             $processingStatus = JobStatus::processing->value;
             $sql = "
                 WITH RankedJobs AS (
                     SELECT j.*, 
                            ROW_NUMBER() OVER(
-                               PARTITION BY (j.payload->>'instance_name') 
+                               PARTITION BY (j.payload->'params'->>'account_id'), (j.payload->>'instance_name') 
                                ORDER BY j.priority DESC, j.id ASC
-                           ) as instance_rank
+                           ) as account_rank
                     FROM jobs j
                     WHERE j.status {$statusSql}
                     " . ($channel ? " AND j.channel = :channel" : "") . "
@@ -329,12 +329,14 @@ class JobRepository extends BaseRepository
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
-                        AND (p.payload->>'instance_name') = (j.payload->>'instance_name')
-                        AND j.payload->>'instance_name' IS NOT NULL
+                        AND (
+                            (p.payload->'params'->>'account_id' = j.payload->'params'->>'account_id' AND j.payload->'params'->>'account_id' IS NOT NULL)
+                            OR (p.payload->>'instance_name' = j.payload->>'instance_name' AND j.payload->'params'->>'account_id' IS NULL)
+                        )
                     )
                 )
                 SELECT * FROM RankedJobs 
-                WHERE instance_rank <= 10
+                WHERE account_rank <= 5
                 ORDER BY priority DESC, id ASC 
                 LIMIT 100";
 
