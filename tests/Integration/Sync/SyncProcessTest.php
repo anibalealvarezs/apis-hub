@@ -166,8 +166,21 @@ class SyncProcessTest extends BaseIntegrationTestCase
 
         // 3. Verify counts for our SPECIFIC test accounts
         $channels = $telemetry['channels'] ?? [];
-        // THE KEY IS THE CHANNEL NAME!
-        $fbChannelData = $channels[$fbChannelName] ?? null;
+        
+        if (Helpers::isDebug()) {
+            echo "DEBUG: Telemetry channels keys: " . implode(', ', array_keys($channels)) . "\n";
+            if (isset($channels[$fbChannelName])) {
+                echo "DEBUG: Found fbChannelName in keys exactly\n";
+            }
+        }
+
+        $fbChannelData = null;
+        foreach ($channels as $name => $data) {
+            if (strtolower((string)$name) === strtolower((string)$fbChannelName)) {
+                $fbChannelData = $data;
+                break;
+            }
+        }
 
         if (!$fbChannelData || !isset($fbChannelData['assets'])) {
             $this->fail("Facebook Marketing stats not found in telemetry. Available channels: " . implode(', ', array_keys($channels)));
