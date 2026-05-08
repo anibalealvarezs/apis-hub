@@ -143,6 +143,9 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
     // Note: The actual number of containers is managed via 'docker compose up -d --scale worker=N'
     // but we can set the default scale in the yaml if supported by the version.
     $services['worker']['scale'] = $workerPoolSize;
+    if (empty($workerVolumes)) {
+        unset($services['worker']['volumes']);
+    }
 
     // ─── Phase 2.5: Create Dedicated MCP Service ─────────────────────────────────────
     $services['mcp'] = [
