@@ -32,12 +32,18 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $fbChannelName = $fbDriver->getChannel();
         $fbEntity = \Enums\AnalyticsEntity::campaigns->value;
 
-        // Register driver in factory registry
-        \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::register(
-            $fbChannelName,
-            get_class($fbDriver),
-            ''
-        );
+        // Register driver in factory registry with full metadata via reflection
+        $reflection = new \ReflectionClass(\Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::class);
+        $regProp = $reflection->getProperty('registry');
+        $regProp->setAccessible(true);
+        $registry = $regProp->getValue();
+        $registry[$fbChannelName] = [
+            'driver' => get_class($fbDriver),
+            'auth' => '',
+            'parent' => $fbDriver->getProviderName(),
+            'resource_key' => 'ad_accounts'
+        ];
+        $regProp->setValue(null, $registry);
 
         // Ensure channel exists in DB
         $this->seedChannel($fbChannelName, $fbDriver->getProviderName(), $fbDriver->getChannelLabel());
@@ -53,8 +59,8 @@ class SyncProcessTest extends BaseIntegrationTestCase
             ]
         ];
         
-        $reflection = new \ReflectionClass(Helpers::class);
-        $prop = $reflection->getProperty('channelsConfig');
+        $reflectionHelpers = new \ReflectionClass(Helpers::class);
+        $prop = $reflectionHelpers->getProperty('channelsConfig');
         $prop->setAccessible(true);
         $prop->setValue(null, $mockConfig);
 
@@ -174,16 +180,16 @@ class SyncProcessTest extends BaseIntegrationTestCase
         // 3. Verify counts
         $fbStats = null;
         foreach ($telemetry as $item) {
-            if ($item['name'] === 'FACEBOOK MARKETING') {
+            if (is_array($item) && isset($item['channel']) && $item['channel'] === $fbChannelName) {
                 $fbStats = $item;
                 break;
             }
         }
 
-        $this->assertNotNull($fbStats, "Facebook Marketing stats should exist");
-        $this->assertEquals(3, $fbStats['totalJobs'], "Total jobs count should match");
-        $this->assertEquals(1, $fbStats['doneJobs'], "Done jobs count should match");
-        $this->assertEquals(1, $fbStats['activeJobs'], "Active jobs count should match");
+        $this->assertNotNull($fbStats, "Facebook Marketing stats should exist in telemetry");
+        $this->assertEquals(3, $fbStats['total_jobs'], "Total jobs count should match");
+        $this->assertEquals(1, $fbStats['completed'], "Done jobs count should match");
+        $this->assertEquals(1, $fbStats['processing'], "Active jobs count should match");
     }
 
     private function seedChannel(string $name, string $providerName, string $label): void
