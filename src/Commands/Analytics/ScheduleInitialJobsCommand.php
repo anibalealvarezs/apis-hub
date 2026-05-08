@@ -125,12 +125,10 @@
                     if (!empty($instance['end_date'])) $params['endDate'] = $instance['end_date'];
                     if (!empty($instance['requires'])) $params['requires'] = $instance['requires'];
 
-                    // Priority: Instance config -> Channel config
                     $isGranular = (bool)($instance['granular_sync'] ?? $chanConfig['granular_sync'] ?? false);
                     $accounts = [];
 
                     if ($isGranular) {
-                        if (strpos($channel, 'facebook') !== false) echo "DEBUG: Processing granular channel: $channel\n";
                         try {
                             $regConfig = DriverFactory::getChannelConfig($channel);
                             $resourceKey = $regConfig['resource_key'] ?? null;
