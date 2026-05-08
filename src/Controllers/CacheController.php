@@ -221,6 +221,10 @@
                     'params' => $params,
                 ];
 
+                if (isset($params['account_id'])) {
+                    $payload['account_id'] = $params['account_id'];
+                }
+
                 if (isset($params['instance_name'])) {
                     $payload['instance_name'] = $params['instance_name'];
                     unset($params['instance_name']);

@@ -97,8 +97,8 @@ class SyncTelemetryService
             // 1. Get Job Stats from DB
             $isPostgres = Helpers::isPostgres();
             $jsonExtract = $isPostgres 
-                ? "CAST(payload AS JSONB)->'params'->>'account_id'" 
-                : "JSON_EXTRACT(payload, '$.params.account_id')";
+                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id')" 
+                : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')))";
 
             $query = "SELECT 
                         $jsonExtract as account_id,
@@ -225,8 +225,8 @@ class SyncTelemetryService
             $isPostgres = Helpers::isPostgres();
             
             $jsonExtract = $isPostgres 
-                ? "CAST(payload AS JSONB)->'params'->>'account_id'" 
-                : "JSON_EXTRACT(payload, '$.params.account_id')";
+                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id')" 
+                : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')))";
             
             $jsonStart = $isPostgres ? "CAST(payload AS JSONB)->'params'->>'startDate'" : "JSON_EXTRACT(payload, '$.params.startDate')";
             $jsonEnd = $isPostgres ? "CAST(payload AS JSONB)->'params'->>'endDate'" : "JSON_EXTRACT(payload, '$.params.endDate')";
