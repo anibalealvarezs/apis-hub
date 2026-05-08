@@ -56,12 +56,6 @@ class JobRepository extends BaseRepository
             $data = (array)$data;
         }
 
-        $job = new Job();
-        $job->addEntity($data['entity']);
-        $job->addChannel($data['channel']);
-        $job->addStatus($data['status'] ?? JobStatus::scheduled->value);
-        $job->addPayload($data['payload'] ?? []);
-
         $status = $data['status'] ?? null;
         if (is_numeric($status)) {
             $statusEnum = JobStatus::tryFrom((int)$status);
@@ -72,25 +66,24 @@ class JobRepository extends BaseRepository
                 if (strtolower($case->name) === strtolower($status)) {
                     $data['status'] = $case->value;
                     $matched = true;
-
                     break;
                 }
             }
-            if (! $matched) {
+            if (!$matched) {
                 $data['status'] = JobStatus::scheduled->value;
             }
         } else {
             $data['status'] = JobStatus::scheduled->value;
         }
 
-        if (! isset($data['entity']) || ! $data['entity']) {
+        if (!isset($data['entity']) || !$data['entity']) {
             throw new InvalidArgumentException('Entity is required');
         }
-        if (! AnalyticsEntity::tryFrom($data['entity'])) {
+        if (!AnalyticsEntity::tryFrom($data['entity'])) {
             throw new InvalidArgumentException('Invalid entity: ' . $data['entity']);
         }
 
-        if (! isset($data['channel'])) {
+        if (!isset($data['channel'])) {
             throw new InvalidArgumentException('Channel is required');
         }
         if ($chanEnum = Channel::tryFromName($data['channel'])) {
@@ -99,11 +92,11 @@ class JobRepository extends BaseRepository
             throw new InvalidArgumentException('Invalid channel');
         }
 
-        if (! isset($data['uuid'])) {
+        if (!isset($data['uuid'])) {
             $data['uuid'] = Factory::create()->uuid;
         }
 
-        return parent::create((object) $data);
+        return parent::create((object) $data, $returnEntity);
     }
 
     /**
