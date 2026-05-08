@@ -130,6 +130,7 @@
                     $accounts = [];
 
                     if ($isGranular) {
+                        if (strpos($channel, 'facebook') !== false) echo "DEBUG: Processing granular channel: $channel\n";
                         try {
                             $regConfig = DriverFactory::getChannelConfig($channel);
                             $resourceKey = $regConfig['resource_key'] ?? null;
@@ -137,8 +138,10 @@
                             
                             // If no accounts in config, fetch from database
                             if (empty($accounts)) {
+                                if (strpos($channel, 'facebook') !== false) echo "DEBUG: No accounts in YAML for $channel, checking DB...\n";
                                 $caRepo = $this->entityManager->getRepository(\Entities\Analytics\ChanneledAccount::class);
                                 $dbAccounts = $caRepo->findBy(['channel' => $channel]);
+                                if (strpos($channel, 'facebook') !== false) echo "DEBUG: Found " . count($dbAccounts) . " accounts in DB\n";
                                 foreach ($dbAccounts as $dbAcc) {
                                     $accounts[] = [
                                         'id' => $dbAcc->getPlatformId(),
@@ -147,7 +150,7 @@
                                 }
                             }
                         } catch (\Throwable $e) {
-                            // Fallback logic handled below
+                            if (strpos($channel, 'facebook') !== false) echo "DEBUG: Error in granular logic: " . $e->getMessage() . "\n";
                         }
                     }
 
