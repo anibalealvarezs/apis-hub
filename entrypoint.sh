@@ -9,8 +9,10 @@ mkdir -p /app/logs /app/storage
 printenv | grep -v "no_proxy" >> /etc/environment
 
 # Set Instance Name with uniqueness if it's a worker
-if [[ "$INSTANCE_NAME" == *"worker"* ]]; then
-    export INSTANCE_NAME="${INSTANCE_NAME}-$(hostname)"
+if [[ "$INSTANCE_NAME" == *"worker"* ]] || [[ -z "$INSTANCE_NAME" ]]; then
+    # Use hostname to ensure uniqueness in scaled environments
+    UNIQUE_ID=$(hostname)
+    export INSTANCE_NAME="${INSTANCE_NAME:-worker}-${UNIQUE_ID}"
 fi
 
 # Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
