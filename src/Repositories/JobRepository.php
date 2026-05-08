@@ -802,24 +802,24 @@ class JobRepository extends BaseRepository
                     FROM jobs j
                     WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < NOW() - INTERVAL '{$staleThreshold} minutes'))
                     " . ($channel ? " AND j.channel = :channel" : "") . "
-                    " . ($instanceName ? " AND CAST(j.payload AS text) LIKE :instance_name_pattern" : "") . "
+                    " . ($instanceName ? " AND (j.payload->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
                         AND p.updated_at >= NOW() - INTERVAL '{$staleThreshold} minutes' -- Only recent processing jobs block
                         AND p.id != j.id -- Don't block self
                         AND (
-                            -- Same Account and same Entity/Channel
-                            (p.payload->'params'->>'account_id' = j.payload->'params'->>'account_id' 
+                            -- Same Account (check root and params) and same Entity/Channel
+                            (COALESCE(p.payload->>'account_id', p.payload->'params'->>'account_id') = COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id')
                              AND p.channel = j.channel 
                              AND p.entity = j.entity
-                             AND j.payload->'params'->>'account_id' IS NOT NULL)
+                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NOT NULL)
                             OR 
                             -- Same Instance Name (only if no account_id is present, e.g. full entity sync)
                             (COALESCE(p.payload->>'instance_name', '') = COALESCE(j.payload->>'instance_name', '') 
                              AND p.channel = j.channel 
                              AND p.entity = j.entity
-                             AND j.payload->'params'->>'account_id' IS NULL)
+                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
                         )
                     )
                     ORDER BY j.priority DESC, j.id ASC
@@ -832,7 +832,10 @@ class JobRepository extends BaseRepository
 
             $params = ['worker_id' => $workerId];
             if ($channel) $params['channel'] = $channel;
-            if ($instanceName) $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
+            if ($instanceName) {
+                $params['instance_name'] = $instanceName;
+                $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
+            }
 
             $jobId = $this->_em->getConnection()->fetchOne($sql, $params);
 
