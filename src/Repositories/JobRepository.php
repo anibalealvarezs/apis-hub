@@ -45,14 +45,22 @@ class JobRepository extends BaseRepository
      * @param object|null $data
      * @phpstan-param object{status?: int|string, entity?: string, channel?: string, uuid?: string, payload?: array}
      * @param bool $returnEntity
-     * @return array|null
+     * @return Entity|array|null
      * @throws NonUniqueResultException
      * @throws \ReflectionException
      * @throws MappingException|OptimisticLockException
      */
-    public function create(?object $data = null, bool $returnEntity = false): ?array
+    public function create($data = null, bool $returnEntity = false): Entity|array|null
     {
-        $data = (array) ($data ?? []);
+        if (is_object($data)) {
+            $data = (array)$data;
+        }
+
+        $job = new Job();
+        $job->setEntity($data['entity']);
+        $job->setChannel($data['channel']);
+        $job->setStatus($data['status'] ?? JobStatus::scheduled->value);
+        $job->setPayload($data['payload'] ?? []);
 
         $status = $data['status'] ?? null;
         if (is_numeric($status)) {
