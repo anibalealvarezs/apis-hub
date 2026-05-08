@@ -65,8 +65,12 @@ $startingHostPort = (int) (getenv('STARTING_HOST_PORT') ?: 10000);
 $externalPort = getenv('EXTERNAL_PORT') ?: ($instances[0]['port'] ?? $startingHostPort);
 $mcpPort = getenv('MCP_PORT') ?: 3000;
     $projectPathHost = "\${PROJECT_PATH_HOST:-./}";
-    $phpVolumes = [
+    $isLocal = !in_array($env, ['production', 'testing', 'remote']);
+
+    $phpVolumes = $isLocal ? [
         "$projectPathHost:/app",
+        '/var/run/docker.sock:/var/run/docker.sock'
+    ] : [
         '/var/run/docker.sock:/var/run/docker.sock'
     ];
 
@@ -106,7 +110,8 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
     // ─── Phase 2: Create Scalable Worker Service ──────────────────────────────────
     $infraConfig = $config['infrastructure'] ?? [];
     $workerPoolSize = (int) ($infraConfig['worker_pool_size'] ?? 1);
-    
+    $workerVolumes = $isLocal ? ["$projectPathHost:/app"] : [];
+
     // Generic worker service definition (Single service to be scaled)
     $services['worker'] = [
         'build'          => [
@@ -117,7 +122,7 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         'command'     => null,
         'environment' => $buildEnv(),
         'networks'    => ['default'],
-        'volumes'     => ["$projectPathHost:/app"],
+        'volumes'     => $workerVolumes,
         'depends_on'  => [
             'master' => ['condition' => 'service_started'],
             'db' => ['condition' => 'service_started'],
@@ -158,8 +163,10 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         'ports'       => [
             "{$mcpPort}:3000"
         ],
-        'volumes'     => [
+        'volumes'     => $isLocal ? [
             "$projectPathHost:/app",
+            '/app/mcp-server/node_modules'
+        ] : [
             '/app/mcp-server/node_modules'
         ],
         'deploy' => [
