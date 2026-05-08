@@ -57,10 +57,10 @@ class JobRepository extends BaseRepository
         }
 
         $job = new Job();
-        $job->setEntity($data['entity']);
-        $job->setChannel($data['channel']);
-        $job->setStatus($data['status'] ?? JobStatus::scheduled->value);
-        $job->setPayload($data['payload'] ?? []);
+        $job->addEntity($data['entity']);
+        $job->addChannel($data['channel']);
+        $job->addStatus($data['status'] ?? JobStatus::scheduled->value);
+        $job->addPayload($data['payload'] ?? []);
 
         $status = $data['status'] ?? null;
         if (is_numeric($status)) {
