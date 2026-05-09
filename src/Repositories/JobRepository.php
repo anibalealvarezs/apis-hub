@@ -786,64 +786,59 @@ class JobRepository extends BaseRepository
         
         $this->_em->beginTransaction();
         try {
-            // DEBUG: Check how many jobs match before claiming
-            $checkSql = "SELECT count(*) FROM jobs j WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))";
-            if ($channel) $checkSql .= " AND j.channel = :channel";
-            if ($instanceName && $instanceName !== 'global') $checkSql .= " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)";
+            // 1. Identify Providers that are already at the limit (3 workers)
+            // We use a subquery to avoid complex CTEs that might fail if tables are unpopulated
+            $busyProvidersSql = "
+                SELECT pr.name 
+                FROM jobs j
+                JOIN channels c ON j.channel = c.name
+                JOIN providers pr ON c.provider_id = pr.id
+                WHERE j.status = {$processingStatus}
+                AND j.updated_at >= :threshold
+                GROUP BY pr.name
+                HAVING COUNT(*) >= 3
+            ";
             
-            $checkParams = ['threshold' => $thresholdTime];
-            if ($channel) $checkParams['channel'] = $channel;
-            if ($instanceName && $instanceName !== 'global') {
-                $checkParams['instance_name'] = $instanceName;
-                $checkParams['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
-            }
-            
-            $count = $this->_em->getConnection()->fetchOne($checkSql, $checkParams);
-            if (Helpers::isDebug()) {
-                echo "DEBUG: claimAvailableJob found $count potential jobs (status=$statusSql, channel=$channel, instance=$instanceName)\n";
+            try {
+                $busyProviders = $this->_em->getConnection()->fetchFirstColumn($busyProvidersSql, ['threshold' => $thresholdTime]);
+            } catch (\Exception $e) {
+                // If tables don't exist yet or query fails, assume no providers are busy
+                $busyProviders = [];
             }
 
-            // Optimized query with Provider-level concurrency limit (max 3 per provider)
+            // 2. Main Claim Query
             $sql = "
-                WITH ProviderCounts AS (
-                    SELECT pr.name as provider_name, COUNT(*) as active_count
-                    FROM jobs j
-                    JOIN channels c ON j.channel = c.name
-                    JOIN providers pr ON c.provider_id = pr.id
-                    WHERE j.status = {$processingStatus}
-                    AND j.updated_at >= :threshold
-                    GROUP BY pr.name
-                ),
-                RankedJobs AS (
+                WITH RankedJobs AS (
                     SELECT j.id
                     FROM jobs j
-                    LEFT JOIN channels c ON j.channel = c.name
-                    LEFT JOIN providers pr ON c.provider_id = pr.id
-                    LEFT JOIN ProviderCounts pc ON pr.name = pc.provider_name
                     WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))
-                    AND (pc.active_count IS NULL OR pc.active_count < 3)
                     " . ($channel ? " AND j.channel = :channel" : "") . "
                     " . ($instanceName && $instanceName !== 'global' ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
+                    -- Provider Limit Guard: Skip jobs if their provider is already busy
+                    AND NOT EXISTS (
+                        SELECT 1 FROM channels c
+                        JOIN providers pr ON c.provider_id = pr.id
+                        WHERE c.name = j.channel
+                        AND pr.name IN (:busy_providers)
+                    )
+                    -- Standard Mutual Exclusion (Same Account/Channel/Entity)
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
-                        AND p.updated_at >= :threshold -- Only recent processing jobs block
-                        AND p.id != j.id -- Don't block self
+                        AND p.updated_at >= :threshold
+                        AND p.id != j.id
                         AND (
-                            -- Same Account (check root and params) and same Entity/Channel
                             (COALESCE(CAST(p.payload AS JSONB)->>'account_id', CAST(p.payload AS JSONB)->'params'->>'account_id') = COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id')
                              AND p.channel = j.channel 
                              AND p.entity = j.entity
                              AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') IS NOT NULL)
                             OR 
-                            -- Same Instance Name (only if no account_id is present, e.g. full entity sync)
                             (COALESCE(CAST(p.payload AS JSONB)->>'instance_name', '') = COALESCE(CAST(j.payload AS JSONB)->>'instance_name', '') 
                              AND p.channel = j.channel 
                              AND p.entity = j.entity
                              AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') IS NULL)
                         )
                     )
-                    -- Atomic Mutual Exclusion via Advisory Locks (Prevents race conditions between uncommitted transactions)
                     AND pg_try_advisory_xact_lock(hashtext(COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id', CAST(j.payload AS JSONB)->>'instance_name', 'global') || j.channel || j.entity))
                     ORDER BY j.priority DESC, j.id ASC
                     LIMIT 1
@@ -853,27 +848,33 @@ class JobRepository extends BaseRepository
                 WHERE id = (SELECT id FROM RankedJobs)
                 RETURNING id";
 
-            $params = ['worker_id' => $workerId, 'threshold' => $thresholdTime];
+            $params = [
+                'worker_id' => $workerId, 
+                'threshold' => $thresholdTime,
+                'busy_providers' => !empty($busyProviders) ? $busyProviders : ['__NONE__']
+            ];
             if ($channel) $params['channel'] = $channel;
             if ($instanceName && $instanceName !== 'global') {
                 $params['instance_name'] = $instanceName;
                 $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
             }
 
-            $jobId = $this->_em->getConnection()->fetchOne($sql, $params);
+            $jobId = $this->_em->getConnection()->fetchOne($sql, $params, [
+                'busy_providers' => \Doctrine\DBAL\Connection::PARAM_STR_ARRAY
+            ]);
 
             if ($jobId) {
                 $this->_em->commit();
                 return $this->find($jobId);
             }
 
-            $this->_em->rollback();
+            $this->_em->commit(); // Commit empty transaction
             return null;
         } catch (\Throwable $e) {
             if (isset($this->_em) && $this->_em->getConnection()->isTransactionActive()) {
                 $this->_em->rollback();
             }
-            \Helpers\Helpers::log("Error in claimAvailableJob: " . $e->getMessage());
+            \Helpers\Helpers::log("Error in claimAvailableJob: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
             return null;
         }
     }
