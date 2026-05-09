@@ -82,8 +82,8 @@ class SyncService
                     }
 
                     $first = $data->first();
-                    // If it's a collection of metrics, use MetricRequests
-                    if ($first instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalMetric) {
+                    // If it's a collection of metrics (has metricConfigKey), use MetricRequests
+                    if (isset($first->metricConfigKey)) {
                         return \Classes\Requests\MetricRequests::persist($data, $logger);
                     }
 
