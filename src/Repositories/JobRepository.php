@@ -803,12 +803,25 @@ class JobRepository extends BaseRepository
                 echo "DEBUG: claimAvailableJob found $count potential jobs (status=$statusSql, channel=$channel, instance=$instanceName)\n";
             }
 
-            // Optimized query
+            // Optimized query with Provider-level concurrency limit (max 3 per provider)
             $sql = "
-                WITH RankedJobs AS (
+                WITH ProviderCounts AS (
+                    SELECT pr.name as provider_name, COUNT(*) as active_count
+                    FROM jobs j
+                    JOIN channels c ON j.channel = c.name
+                    JOIN providers pr ON c.provider_id = pr.id
+                    WHERE j.status = {$processingStatus}
+                    AND j.updated_at >= :threshold
+                    GROUP BY pr.name
+                ),
+                RankedJobs AS (
                     SELECT j.id
                     FROM jobs j
+                    LEFT JOIN channels c ON j.channel = c.name
+                    LEFT JOIN providers pr ON c.provider_id = pr.id
+                    LEFT JOIN ProviderCounts pc ON pr.name = pc.provider_name
                     WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))
+                    AND (pc.active_count IS NULL OR pc.active_count < 3)
                     " . ($channel ? " AND j.channel = :channel" : "") . "
                     " . ($instanceName && $instanceName !== 'global' ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
                     AND NOT EXISTS (

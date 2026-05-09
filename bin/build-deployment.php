@@ -107,7 +107,29 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
 
     // ─── Phase 2: Create Scalable Worker Service ──────────────────────────────────
     $infraConfig = $config['infrastructure'] ?? [];
-    $workerPoolSize = (int) ($infraConfig['worker_pool_size'] ?? 1);
+    
+    // Dynamic Worker Pool Calculation: 3 workers per unique provider
+    $activeProviders = [];
+    $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
+    foreach ($availableChannels as $chanKey) {
+        $chanConfig = \Classes\DriverInitializer::validateConfig($chanKey);
+        if (!empty($chanConfig['enabled'])) {
+            // Get provider name (usually the prefix before first underscore, or from Driver rules)
+            $provider = explode('_', $chanKey)[0];
+            $activeProviders[$provider] = true;
+        }
+    }
+    
+    $providerCount = count($activeProviders) ?: 1;
+    $calculatedPoolSize = $providerCount * 3;
+    
+    // Apply global cap if defined, otherwise use calculated
+    $workerPoolSize = (int) ($infraConfig['worker_pool_size'] ?? $calculatedPoolSize);
+    
+    if ($calculatedPoolSize !== $workerPoolSize) {
+        echo "ℹ  Calculated Worker Pool Size: {$calculatedPoolSize} (based on " . count($activeProviders) . " providers)\n";
+    }
+
     $workerVolumes = ["$projectPathHost:/app"];
 
     // Generic worker service definition (Single service to be scaled)
