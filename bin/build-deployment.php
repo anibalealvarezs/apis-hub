@@ -111,24 +111,37 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
     // Dynamic Worker Pool Calculation: 3 workers per unique provider
     $activeProviders = [];
     $availableChannels = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::getAvailableChannels();
+    
+    // Fallback if registry is empty in this context (Scan config files)
+    if (empty($availableChannels)) {
+        $availableChannels = array_map(function($f) {
+            return str_replace('.yaml', '', basename($f));
+        }, glob(__DIR__ . '/../config/channels/*.yaml'));
+    }
+
     foreach ($availableChannels as $chanKey) {
-        $chanConfig = \Classes\DriverInitializer::validateConfig($chanKey);
-        if (!empty($chanConfig['enabled'])) {
-            // Get provider name (usually the prefix before first underscore, or from Driver rules)
-            $provider = explode('_', $chanKey)[0];
-            $activeProviders[$provider] = true;
+        try {
+            $chanConfig = \Classes\DriverInitializer::validateConfig($chanKey);
+            if (!empty($chanConfig['enabled'])) {
+                // Get provider name (e.g., facebook_marketing -> facebook)
+                $provider = explode('_', $chanKey)[0];
+                $activeProviders[$provider] = true;
+            }
+        } catch (\Exception $e) {
+            // Skip invalid configs
         }
     }
     
     $providerCount = count($activeProviders) ?: 1;
-    $calculatedPoolSize = $providerCount * 3;
+    $smartPoolSize = $providerCount * 3;
     
-    // Apply global cap if defined, otherwise use calculated
-    $workerPoolSize = (int) ($infraConfig['worker_pool_size'] ?? $calculatedPoolSize);
-    
-    if ($calculatedPoolSize !== $workerPoolSize) {
-        echo "ℹ  Calculated Worker Pool Size: {$calculatedPoolSize} (based on " . count($activeProviders) . " providers)\n";
+    // Logic: Use smart size, but allow user to CAP it (not force it) via worker_pool_size
+    $workerPoolSize = $smartPoolSize;
+    if (isset($infraConfig['worker_pool_size'])) {
+        $workerPoolSize = min((int)$infraConfig['worker_pool_size'], $smartPoolSize);
     }
+    
+    echo "ℹ  Calculated Worker Pool Size: {$workerPoolSize} (based on " . count($activeProviders) . " active providers: " . implode(', ', array_keys($activeProviders)) . ")\n";
 
     $workerVolumes = ["$projectPathHost:/app"];
 
