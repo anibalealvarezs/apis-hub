@@ -77,7 +77,41 @@ class SyncService
                 $type = is_string($mixed) ? $mixed : null;
 
                 if ($data instanceof \Doctrine\Common\Collections\ArrayCollection) {
-                    return \Classes\Requests\MetricRequests::persist($data, $logger);
+                    if ($data->isEmpty()) {
+                        return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
+                    }
+
+                    $first = $data->first();
+                    // If it's a collection of metrics, use MetricRequests
+                    if ($first instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalMetric) {
+                        return \Classes\Requests\MetricRequests::persist($data, $logger);
+                    }
+
+                    // If it's a collection of entities, use appropriate processors
+                    if ($first instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity && $type) {
+                        switch ($type) {
+                            case 'campaign':
+                                \Classes\MarketingProcessor::processCampaigns($data, $manager);
+                                break;
+                            case 'ad_group':
+                                \Classes\MarketingProcessor::processAdGroups($data, $manager);
+                                break;
+                            case 'ad':
+                                \Classes\MarketingProcessor::processAds($data, $manager);
+                                break;
+                            case 'creative':
+                                \Classes\MarketingProcessor::processCreatives($data, $manager);
+                                break;
+                            case 'page':
+                                \Classes\SocialProcessor::processPages($data, $manager);
+                                break;
+                            case 'post':
+                            case 'ig_media':
+                                \Classes\SocialProcessor::processPosts($data, $manager);
+                                break;
+                        }
+                    }
+                    return ['metrics' => 0, 'rows' => 0, 'duplicates' => 0];
                 }
 
                 if ($data instanceof \Anibalealvarezs\ApiDriverCore\Classes\UniversalEntity && $type) {
@@ -85,28 +119,22 @@ class SyncService
                     switch ($type) {
                         case 'campaign':
                             \Classes\MarketingProcessor::processCampaigns($collection, $manager);
-
                             break;
                         case 'ad_group':
                             \Classes\MarketingProcessor::processAdGroups($collection, $manager);
-
                             break;
                         case 'ad':
                             \Classes\MarketingProcessor::processAds($collection, $manager);
-
                             break;
                         case 'creative':
                             \Classes\MarketingProcessor::processCreatives($collection, $manager);
-
                             break;
                         case 'page':
                             \Classes\SocialProcessor::processPages($collection, $manager);
-
                             break;
                         case 'post':
                         case 'ig_media':
                             \Classes\SocialProcessor::processPosts($collection, $manager);
-
                             break;
                     }
 
