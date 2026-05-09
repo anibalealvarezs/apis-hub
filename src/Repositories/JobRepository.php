@@ -830,6 +830,8 @@ class JobRepository extends BaseRepository
                              AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') IS NULL)
                         )
                     )
+                    -- Atomic Mutual Exclusion via Advisory Locks (Prevents race conditions between uncommitted transactions)
+                    AND pg_try_advisory_xact_lock(hashtext(COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id', CAST(j.payload AS JSONB)->>'instance_name', 'global') || j.channel || j.entity))
                     ORDER BY j.priority DESC, j.id ASC
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
