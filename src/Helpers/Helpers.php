@@ -522,6 +522,30 @@
                     }
                 }
 
+                // 2. Scan modular channels/ directory for any YAML files
+                $channelsDir = $configDir . '/channels';
+                if (is_dir($channelsDir)) {
+                    foreach (glob($channelsDir . '/*') as $file) {
+                        if (is_dir($file)) continue;
+                        try {
+                            $yamlConfig = Yaml::parseFile($file);
+                        } catch (\Exception $e) {
+                            continue;
+                        }
+                        if (is_array($yamlConfig)) {
+                            if (isset($yamlConfig['channels']) && is_array($yamlConfig['channels'])) {
+                                $config = array_replace_recursive($config, $yamlConfig['channels']);
+                            } else {
+                                // Allow files that directly contain the channel configuration
+                                // Filename used as channel name (taking the first part before any dots)
+                                $baseName = basename($file);
+                                $channelName = explode('.', $baseName)[0];
+                                $config = array_replace_recursive($config, [$channelName => $yamlConfig]);
+                            }
+                        }
+                    }
+                }
+
                 // Override with environment variables if present
                 if ($envChannelsJson = getenv('CHANNELS_CONFIG')) {
                     $envChannels = json_decode($envChannelsJson, true);
