@@ -788,7 +788,7 @@ class JobRepository extends BaseRepository
         try {
             $sql = "
                 WITH BusyProviders AS (
-                    SELECT pr.name 
+                    SELECT pr.name as provider_name
                     FROM jobs j
                     JOIN channels c ON j.channel = c.name
                     JOIN providers pr ON c.provider_id = pr.id
@@ -800,17 +800,16 @@ class JobRepository extends BaseRepository
                 RankedJobs AS (
                     SELECT j.id
                     FROM jobs j
+                    -- We join with provider info to allow filtering by BusyProviders
+                    LEFT JOIN channels c ON j.channel = c.name
+                    LEFT JOIN providers pr ON c.provider_id = pr.id
+                    LEFT JOIN BusyProviders bp ON pr.name = bp.provider_name
                     WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))
+                    -- Priority 1: Skip if the provider is currently at limit (3 workers)
+                    AND bp.provider_name IS NULL
                     " . ($channel ? " AND j.channel = :channel" : "") . "
                     " . ($instanceName && $instanceName !== 'global' ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
-                    -- Provider Limit Guard: Skip if provider is in BusyProviders
-                    AND NOT EXISTS (
-                        SELECT 1 FROM channels c
-                        JOIN providers pr ON c.provider_id = pr.id
-                        JOIN BusyProviders bp ON pr.name = bp.name
-                        WHERE c.name = j.channel
-                    )
-                    -- Standard Mutual Exclusion (Same Account/Channel/Entity)
+                    -- Priority 2: Standard Mutual Exclusion (Same Account/Channel/Entity)
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
@@ -825,7 +824,7 @@ class JobRepository extends BaseRepository
                             (COALESCE(CAST(p.payload AS JSONB)->>'instance_name', '') = COALESCE(CAST(j.payload AS JSONB)->>'instance_name', '') 
                              AND p.channel = j.channel 
                              AND p.entity = j.entity
-                             AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') IS NULL)
+                             AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(p.payload AS JSONB)->'params'->>'account_id') IS NULL)
                         )
                     )
                     AND pg_try_advisory_xact_lock(hashtext(COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id', CAST(j.payload AS JSONB)->>'instance_name', 'global') || j.channel || j.entity))
