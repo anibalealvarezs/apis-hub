@@ -800,34 +800,34 @@ class JobRepository extends BaseRepository
                 RankedJobs AS (
                     SELECT j.id
                     FROM jobs j
-                    -- We join with provider info to allow filtering by BusyProviders
                     LEFT JOIN channels c ON j.channel = c.name
                     LEFT JOIN providers pr ON c.provider_id = pr.id
                     LEFT JOIN BusyProviders bp ON pr.name = bp.provider_name
                     WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))
-                    -- Priority 1: Skip if the provider is currently at limit (3 workers)
+                    -- Limit Guard: Skip if provider is busy
                     AND bp.provider_name IS NULL
                     " . ($channel ? " AND j.channel = :channel" : "") . "
-                    " . ($instanceName && $instanceName !== 'global' ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "") . "
-                    -- Priority 2: Standard Mutual Exclusion (Same Account/Channel/Entity)
+                    " . ($instanceName && $instanceName !== 'global' ? " AND (j.payload->>'instance_name' = :instance_name OR j.payload::text LIKE :instance_name_pattern)" : "") . "
+                    -- Mutual Exclusion
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
                         AND p.updated_at >= :threshold
                         AND p.id != j.id
                         AND (
-                            (COALESCE(CAST(p.payload AS JSONB)->>'account_id', CAST(p.payload AS JSONB)->'params'->>'account_id') = COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id')
+                            (COALESCE(p.payload->>'account_id', p.payload->'params'->>'account_id') = COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id')
                              AND p.channel = j.channel 
                              AND p.entity = j.entity
-                             AND COALESCE(CAST(p.payload AS JSONB)->>'account_id', CAST(p.payload AS JSONB)->'params'->>'account_id') IS NOT NULL)
+                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NOT NULL)
                             OR 
-                            (COALESCE(CAST(p.payload AS JSONB)->>'instance_name', '') = COALESCE(CAST(j.payload AS JSONB)->>'instance_name', '') 
+                            (COALESCE(p.payload->>'instance_name', '') = COALESCE(j.payload->>'instance_name', '') 
                              AND p.channel = j.channel 
                              AND p.entity = j.entity
-                             AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(p.payload AS JSONB)->'params'->>'account_id') IS NULL)
+                             AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
                         )
                     )
-                    AND pg_try_advisory_xact_lock(hashtext(COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id', CAST(j.payload AS JSONB)->>'instance_name', 'global') || j.channel || j.entity))
+                    -- Stable Advisory Lock
+                    AND pg_try_advisory_xact_lock(hashtext(j.channel || '|' || j.entity || '|' || COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', j.payload->>'instance_name', 'global')))
                     ORDER BY j.priority DESC, j.id ASC
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
@@ -835,6 +835,36 @@ class JobRepository extends BaseRepository
                 UPDATE jobs SET status = {$processingStatus}, worker_id = :worker_id, updated_at = NOW()
                 WHERE id = (SELECT id FROM RankedJobs)
                 RETURNING id";
+
+            $params = [
+                'worker_id' => $workerId, 
+                'threshold' => $thresholdTime
+            ];
+            if ($channel) $params['channel'] = $channel;
+            if ($instanceName && $instanceName !== 'global') {
+                $params['instance_name'] = $instanceName;
+                $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
+            }
+
+            $jobId = $this->_em->getConnection()->fetchOne($sql, $params);
+
+            if ($jobId) {
+                $this->_em->commit();
+                return $this->find($jobId);
+            }
+
+            if ($this->_em->getConnection()->isTransactionActive()) {
+                $this->_em->commit();
+            }
+            return null;
+        } catch (\Throwable $e) {
+            if (isset($this->_em) && $this->_em->getConnection()->isTransactionActive()) {
+                $this->_em->rollback();
+            }
+            error_log("Error in claimAvailableJob: " . $e->getMessage());
+            return null;
+        }
+    }
 
             $params = [
                 'worker_id' => $workerId, 
