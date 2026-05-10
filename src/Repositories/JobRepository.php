@@ -866,35 +866,6 @@ class JobRepository extends BaseRepository
         }
     }
 
-            $params = [
-                'worker_id' => $workerId, 
-                'threshold' => $thresholdTime
-            ];
-            if ($channel) $params['channel'] = $channel;
-            if ($instanceName && $instanceName !== 'global') {
-                $params['instance_name'] = $instanceName;
-                $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
-            }
-
-            $jobId = $this->_em->getConnection()->fetchOne($sql, $params);
-
-            if ($jobId) {
-                $this->_em->commit();
-                return $this->find($jobId);
-            }
-
-            if ($this->_em->getConnection()->isTransactionActive()) {
-                $this->_em->commit();
-            }
-            return null;
-        } catch (\Throwable $e) {
-            if (isset($this->_em) && $this->_em->getConnection()->isTransactionActive()) {
-                $this->_em->rollback();
-            }
-            \Helpers\Helpers::log("Error in claimAvailableJob: " . $e->getMessage());
-            return null;
-        }
-    }
 
     /**
      * @param int $hours
