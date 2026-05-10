@@ -830,7 +830,7 @@ class JobRepository extends BaseRepository
                     AND pg_try_advisory_xact_lock(hashtext(j.channel || '|' || j.entity || '|' || COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', j.payload->>'instance_name', 'global')))
                     ORDER BY j.priority DESC, j.id ASC
                     LIMIT 1
-                    FOR UPDATE SKIP LOCKED
+                    FOR UPDATE OF j SKIP LOCKED
                 )
                 UPDATE jobs SET status = {$processingStatus}, worker_id = :worker_id, updated_at = NOW()
                 WHERE id = (SELECT id FROM RankedJobs)
