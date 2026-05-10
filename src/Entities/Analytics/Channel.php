@@ -29,6 +29,20 @@ class Channel extends Entity
     #[ORM\JoinColumn(name: 'provider_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     protected Provider $provider;
 
+    #[ORM\Column(type: 'integer', options: ['default' => 3])]
+    protected int $maxWorkers = 3;
+
+    public function getMaxWorkers(): int
+    {
+        return $this->maxWorkers;
+    }
+
+    public function setMaxWorkers(int $maxWorkers): self
+    {
+        $this->maxWorkers = $maxWorkers;
+        return $this;
+    }
+
     public function getCooldown(): int
     {
         return $this->cooldown;

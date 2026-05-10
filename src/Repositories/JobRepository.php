@@ -787,25 +787,23 @@ class JobRepository extends BaseRepository
         $this->_em->beginTransaction();
         try {
             $sql = "
-                WITH BusyProviders AS (
-                    SELECT pr.name as provider_name
+                WITH BusyChannels AS (
+                    SELECT j.channel as channel_name
                     FROM jobs j
                     JOIN channels c ON j.channel = c.name
-                    JOIN providers pr ON c.provider_id = pr.id
                     WHERE j.status = {$processingStatus}
                     AND j.updated_at >= :threshold
-                    GROUP BY pr.name
-                    HAVING COUNT(*) >= 3
+                    GROUP BY j.channel, c.max_workers
+                    HAVING COUNT(*) >= COALESCE(c.max_workers, 3)
                 ),
                 RankedJobs AS (
                     SELECT j.id
                     FROM jobs j
                     LEFT JOIN channels c ON j.channel = c.name
-                    LEFT JOIN providers pr ON c.provider_id = pr.id
-                    LEFT JOIN BusyProviders bp ON pr.name = bp.provider_name
+                    LEFT JOIN BusyChannels bc ON j.channel = bc.channel_name
                     WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))
-                    -- Limit Guard: Skip if provider is busy
-                    AND bp.provider_name IS NULL
+                    -- Limit Guard: Skip if channel is busy
+                    AND bc.channel_name IS NULL
                     " . ($channel ? " AND j.channel = :channel" : "") . "
                     " . ($instanceName && $instanceName !== 'global' ? " AND (j.payload->>'instance_name' = :instance_name OR j.payload::text LIKE :instance_name_pattern)" : "") . "
                     -- Mutual Exclusion

@@ -472,6 +472,11 @@
                 $chanConfig = $rawConfig['channels'][$channel] ?? $rawConfig;
                 $logger->info("DEBUG: Config loaded from disk for $channel");
                 $channelEntity = $this->em->getRepository(Channel::class)->findOneBy(['name' => $channel]);
+                if ($channelEntity) {
+                    $maxWorkers = (int)($chanConfig['max_workers'] ?? 3);
+                    $channelEntity->setMaxWorkers($maxWorkers);
+                    $this->em->persist($channelEntity);
+                }
 
                 // 2. Identify common account group
                 $commonKey = $driver::getCommonConfigKey();
