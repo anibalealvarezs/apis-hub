@@ -793,8 +793,8 @@ class JobRepository extends BaseRepository
                     JOIN channels c ON j.channel = c.name
                     WHERE j.status = {$processingStatus}
                     AND j.updated_at >= :threshold
-                    GROUP BY j.channel, c.max_workers
-                    HAVING COUNT(*) >= COALESCE(c.max_workers, 3)
+                    GROUP BY j.channel, c.maxworkers
+                    HAVING COUNT(*) >= COALESCE(c.maxworkers, 3)
                 ),
                 RankedJobs AS (
                     SELECT j.id
