@@ -62,8 +62,12 @@ class SyncService
             $this->logger?->info("DEBUG: SyncService::execute - DRIVER RESOLVED", ['class' => get_class($driver)]);
 
             // 2. Build final configuration
-            $validatedConfig = \Classes\DriverInitializer::validateConfig($channel, $this->logger);
-            $finalConfig = array_merge($validatedConfig, $config);
+            // Merge base validated config with job-level overrides first, then re-validate
+            // so that the driver's normalization (e.g. re-keying ad_accounts by ID) always
+            // runs on the fully-merged config and is never clobbered by the raw job payload.
+            $baseConfig = \Classes\DriverInitializer::validateConfig($channel, $this->logger);
+            $mergedRaw  = array_merge($baseConfig, $config);
+            $finalConfig = $driver->validateConfig($mergedRaw);
 
             // 3. Inject production dependencies
             $finalConfig['manager'] = Helpers::getManager();
