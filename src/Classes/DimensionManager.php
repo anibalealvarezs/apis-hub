@@ -73,14 +73,18 @@ class DimensionManager implements DimensionManagerInterface
             return $this->keyCache[$name];
         }
 
-        $key = $this->em->getRepository(DimensionKey::class)->findOneBy(['name' => $name]);
-        if (!$key) {
-            $key = new DimensionKey();
-            $key->setName($name);
-            $this->em->persist($key);
-            $this->em->flush($key);
-        }
+        // Atomic upsert: INSERT ... ON CONFLICT DO NOTHING, then SELECT.
+        // Avoids the check-then-insert race condition that causes unique violations
+        // when multiple workers process the same dimension key simultaneously.
+        $conn = $this->em->getConnection();
+        $conn->executeStatement(
+            'INSERT INTO dimension_keys (name) VALUES (?) ON CONFLICT (name) DO NOTHING',
+            [$name]
+        );
+        $row = $conn->fetchAssociative('SELECT id, name FROM dimension_keys WHERE name = ?', [$name]);
 
+        /** @var DimensionKey $key */
+        $key = $this->em->getReference(DimensionKey::class, (int)$row['id']);
         $this->keyCache[$name] = $key;
         return $key;
     }
@@ -92,19 +96,19 @@ class DimensionManager implements DimensionManagerInterface
             return $this->valueCache[$cacheKey];
         }
 
-        $value = $this->em->getRepository(DimensionValue::class)->findOneBy([
-            'dimensionKey' => $key,
-            'value' => $valueStr
-        ]);
+        // Same atomic upsert pattern for values.
+        $conn = $this->em->getConnection();
+        $conn->executeStatement(
+            'INSERT INTO dimension_values (dimension_key_id, value) VALUES (?, ?) ON CONFLICT (dimension_key_id, value) DO NOTHING',
+            [$key->getId(), $valueStr]
+        );
+        $row = $conn->fetchAssociative(
+            'SELECT id FROM dimension_values WHERE dimension_key_id = ? AND value = ?',
+            [$key->getId(), $valueStr]
+        );
 
-        if (!$value) {
-            $value = new DimensionValue();
-            $value->setDimensionKey($key);
-            $value->setValue($valueStr);
-            $this->em->persist($value);
-            $this->em->flush($value);
-        }
-
+        /** @var DimensionValue $value */
+        $value = $this->em->getReference(DimensionValue::class, (int)$row['id']);
         $this->valueCache[$cacheKey] = $value;
         return $value;
     }
