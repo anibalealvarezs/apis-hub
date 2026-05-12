@@ -811,12 +811,12 @@
             try {
                 $sql = "
                 WITH BusyChannels AS (
-                    SELECT j.channel as channel_name, COUNT(*) as active_count, MAX(COALESCE(c.maxworkers, 3)) as max_workers
+                    SELECT j.channel as channel_name, COUNT(*) as active_count, MAX(COALESCE(c.max_workers, 3)) as max_workers
                     FROM jobs j
                     JOIN channels c ON j.channel = c.name
                     WHERE j.status = {$processingStatus}
                     GROUP BY j.channel
-                    HAVING COUNT(*) >= MAX(COALESCE(c.maxworkers, 3))
+                    HAVING COUNT(*) >= MAX(COALESCE(c.max_workers, 3))
                 ),
                 ChannelSlots AS (
                     -- Acquire a channel-level advisory lock to prevent concurrent workers from
