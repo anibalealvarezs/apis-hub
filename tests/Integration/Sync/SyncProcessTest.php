@@ -125,6 +125,127 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->assertNotEquals($claimed1->getId(), $claimed2->getId());
     }
 
+    public function testChannelMaxWorkersAreStrictlyEnforcedAndExtraWorkersStayIdle(): void
+    {
+        $gscChannel = 'google_search_console';
+        $fbMarketingChannel = 'facebook_marketing';
+        $fbOrganicChannel = 'facebook_organic';
+
+        $this->seedChannel($gscChannel, 'google', 'Google Search Console', 3);
+        $this->seedChannel($fbMarketingChannel, 'facebook', 'Facebook Marketing', 1);
+        $this->seedChannel($fbOrganicChannel, 'facebook', 'Facebook Organic', 1);
+
+        $jobsPerChannel = 6;
+        foreach (range(1, $jobsPerChannel) as $i) {
+            $this->jobRepo->create((object)[
+                'entity' => 'page',
+                'channel' => $gscChannel,
+                'payload' => ['params' => ['account_id' => 'test_acc_gsc_'.$i], 'instance_name' => 'test_instance_limits'],
+            ]);
+            $this->jobRepo->create((object)[
+                'entity' => 'campaign',
+                'channel' => $fbMarketingChannel,
+                'payload' => ['params' => ['account_id' => 'test_acc_fbm_'.$i], 'instance_name' => 'test_instance_limits'],
+            ]);
+            $this->jobRepo->create((object)[
+                'entity' => 'post',
+                'channel' => $fbOrganicChannel,
+                'payload' => ['params' => ['account_id' => 'test_acc_fbo_'.$i], 'instance_name' => 'test_instance_limits'],
+            ]);
+        }
+        $this->entityManager->flush();
+
+        $claimedByChannel = [
+            $gscChannel => 0,
+            $fbMarketingChannel => 0,
+            $fbOrganicChannel => 0,
+        ];
+
+        $idleWorkers = 0;
+        foreach (range(1, 6) as $i) {
+            $claimed = $this->jobRepo->claimAvailableJob(
+                status: [JobStatus::scheduled->value],
+                workerId: 'worker-limit-'.$i,
+                instanceName: 'global'
+            );
+
+            if (!$claimed) {
+                $idleWorkers++;
+                continue;
+            }
+
+            $claimedByChannel[$claimed->getChannel()]++;
+        }
+
+        $this->assertSame(3, $claimedByChannel[$gscChannel]);
+        $this->assertSame(1, $claimedByChannel[$fbMarketingChannel]);
+        $this->assertSame(1, $claimedByChannel[$fbOrganicChannel]);
+        $this->assertSame(1, $idleWorkers);
+
+        foreach (range(7, 10) as $i) {
+            $claimed = $this->jobRepo->claimAvailableJob(
+                status: [JobStatus::scheduled->value],
+                workerId: 'worker-limit-'.$i,
+                instanceName: 'global'
+            );
+            $this->assertNull($claimed, 'Workers above per-channel max limits must remain idle.');
+        }
+    }
+
+    public function testUnderCapacityWorkersCanClaimWithoutExceedingChannelCaps(): void
+    {
+        $gscChannel = 'google_search_console';
+        $fbMarketingChannel = 'facebook_marketing';
+        $fbOrganicChannel = 'facebook_organic';
+
+        $this->seedChannel($gscChannel, 'google', 'Google Search Console', 3);
+        $this->seedChannel($fbMarketingChannel, 'facebook', 'Facebook Marketing', 1);
+        $this->seedChannel($fbOrganicChannel, 'facebook', 'Facebook Organic', 1);
+
+        foreach (range(1, 4) as $i) {
+            $this->jobRepo->create((object)[
+                'entity' => 'page',
+                'channel' => $gscChannel,
+                'payload' => ['params' => ['account_id' => 'test_acc_gsc_under_'.$i], 'instance_name' => 'test_instance_under_capacity'],
+            ]);
+            $this->jobRepo->create((object)[
+                'entity' => 'campaign',
+                'channel' => $fbMarketingChannel,
+                'payload' => ['params' => ['account_id' => 'test_acc_fbm_under_'.$i], 'instance_name' => 'test_instance_under_capacity'],
+            ]);
+            $this->jobRepo->create((object)[
+                'entity' => 'post',
+                'channel' => $fbOrganicChannel,
+                'payload' => ['params' => ['account_id' => 'test_acc_fbo_under_'.$i], 'instance_name' => 'test_instance_under_capacity'],
+            ]);
+        }
+        $this->entityManager->flush();
+
+        $claimedByChannel = [
+            $gscChannel => 0,
+            $fbMarketingChannel => 0,
+            $fbOrganicChannel => 0,
+        ];
+
+        $claimedTotal = 0;
+        foreach (range(1, 4) as $i) {
+            $claimed = $this->jobRepo->claimAvailableJob(
+                status: [JobStatus::scheduled->value],
+                workerId: 'worker-under-'.$i,
+                instanceName: 'global'
+            );
+
+            $this->assertNotNull($claimed, 'Available workers should be able to claim while capacity exists.');
+            $claimedTotal++;
+            $claimedByChannel[$claimed->getChannel()]++;
+        }
+
+        $this->assertSame(4, $claimedTotal);
+        $this->assertLessThanOrEqual(3, $claimedByChannel[$gscChannel]);
+        $this->assertLessThanOrEqual(1, $claimedByChannel[$fbMarketingChannel]);
+        $this->assertLessThanOrEqual(1, $claimedByChannel[$fbOrganicChannel]);
+    }
+
     /**
      * Test 3: Verify telemetry aggregation logic.
      */
@@ -240,7 +361,7 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $this->assertEquals('new-worker', $newJob->getWorkerId());
     }
 
-    private function seedChannel(string $name, string $providerName, string $label): void
+    private function seedChannel(string $name, string $providerName, string $label, int $maxWorkers = 3): void
     {
         $channelRepo = $this->entityManager->getRepository(\Entities\Analytics\Channel::class);
         $providerRepo = $this->entityManager->getRepository(\Entities\Analytics\Provider::class);
@@ -260,9 +381,11 @@ class SyncProcessTest extends BaseIntegrationTestCase
             $channel->setName($name);
             $channel->setLabel($label);
             $channel->setProvider($provider);
-            $this->entityManager->persist($channel);
-            $this->entityManager->flush();
         }
+
+        $channel->setMaxWorkers($maxWorkers);
+        $this->entityManager->persist($channel);
+        $this->entityManager->flush();
     }
 
     private function mockConfigurations(array $projectConfig, array $channelsConfig): void
