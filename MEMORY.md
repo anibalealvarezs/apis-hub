@@ -9,6 +9,7 @@
 - Use `D:\laragon\www\_shared\AGENTS.md` and `D:\laragon\www\_shared\MEMORY.md` for cross-repository protocols and workspace-wide learnings.
 - Keep secrets, credentials, tokens, and private endpoints out of this file.
 ## Current notes
+- MCP server dependency management now uses `pnpm` with `mcp-server/.npmrc` enforcing `minimum-release-age=1440` and `block-exotic-subdeps=true`; Docker builds activate pnpm via Corepack before installing MCP dependencies.
 - Orchestrator owns caching, normalization, persistence, and aggregation.
 - Prefer Doctrine-managed schema changes for index work; avoid direct manual `CREATE INDEX` unless there is explicit emergency authorization.
 - Use the metric aggregation strategy abstraction and the metric profile index planner to derive candidate indexes from driver-defined profiles before materializing them in Doctrine metadata.

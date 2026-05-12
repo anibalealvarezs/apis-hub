@@ -39,8 +39,9 @@ COPY . /app
 # Ejecutar scripts de composer que faltaron
 RUN composer dump-autoload --optimize
 
-# Instalar dependencias del servidor MCP
-RUN cd mcp-server && npm install --omit=dev
+# Instalar dependencias del servidor MCP con pnpm
+RUN corepack enable && corepack prepare pnpm@11.1.1 --activate \
+    && cd mcp-server && pnpm install --prod --frozen-lockfile
 
 
 # Configurar el entrypoint
