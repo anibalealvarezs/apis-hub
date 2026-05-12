@@ -39,8 +39,8 @@ COPY . /app
 # Ejecutar scripts de composer que faltaron
 RUN composer dump-autoload --optimize
 
-# Instalar dependencias del servidor MCP con pnpm
-RUN corepack enable && corepack prepare pnpm@11.1.1 --activate \
+# Instalar dependencias del servidor MCP con pnpm (compatible con Node 20)
+RUN corepack enable && corepack prepare pnpm@10.19.0 --activate \
     && cd mcp-server && pnpm install --prod --frozen-lockfile
 
 
