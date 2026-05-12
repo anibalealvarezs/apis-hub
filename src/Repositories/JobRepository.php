@@ -706,6 +706,9 @@
         /**
          * @param string $instanceName
          * @return DateTime|null
+         * @throws ConfigurationException
+         * @throws Exception
+         * @throws \DateMalformedStringException
          */
         public function getLastSuccessfulJobTime(string $instanceName): ?DateTime
         {
@@ -743,6 +746,8 @@
          * @param string $instanceName
          * @param int|null $excludeJobId
          * @return bool
+         * @throws ConfigurationException
+         * @throws Exception
          */
         public function isAnotherJobProcessing(string $instanceName, ?int $excludeJobId = null): bool
         {
