@@ -255,6 +255,21 @@ function populateGlobalFields() {
             toggleRawMetricsWarning(rawMetricsEl.checked);
         }
 
+        // Max Workers
+        const gscMaxWorkers = document.getElementById('gsc-max-workers');
+        if (gscMaxWorkers) gscMaxWorkers.value = (currentConfig.gsc_max_workers !== undefined && currentConfig.gsc_max_workers !== null) ? currentConfig.gsc_max_workers : 3;
+
+        const fbOrgMaxWorkers = document.getElementById('fb-organic-max-workers');
+        if (fbOrgMaxWorkers) fbOrgMaxWorkers.value = (currentConfig.fb_organic_max_workers !== undefined && currentConfig.fb_organic_max_workers !== null) ? currentConfig.fb_organic_max_workers : 3;
+
+        const fbMarkMaxWorkers = document.getElementById('fb-marketing-max-workers');
+        console.log("DEBUG: fb_marketing_max_workers from config:", currentConfig.fb_marketing_max_workers);
+        if (fbMarkMaxWorkers) {
+            const val = (currentConfig.fb_marketing_max_workers !== undefined && currentConfig.fb_marketing_max_workers !== null) ? currentConfig.fb_marketing_max_workers : 3;
+            fbMarkMaxWorkers.value = val;
+            console.log("DEBUG: Setting fb-marketing-max-workers value to:", val);
+        }
+
         // Extraction Granularity (Conceptual Separation)
         const fbLevelEl = document.getElementById('fb-marketing-level');
         const fbMetricsLevelEl = document.getElementById('fb-marketing-metrics-level');
