@@ -788,19 +788,33 @@ class JobRepository extends BaseRepository
         try {
             $sql = "
                 WITH BusyChannels AS (
-                    SELECT j.channel as channel_name
+                    SELECT j.channel as channel_name, COUNT(*) as active_count, MAX(COALESCE(c.maxworkers, 3)) as max_workers
                     FROM jobs j
                     JOIN channels c ON j.channel = c.name
                     WHERE j.status = {$processingStatus}
                     AND j.updated_at >= :threshold
-                    GROUP BY j.channel, c.maxworkers
-                    HAVING COUNT(*) >= COALESCE(c.maxworkers, 3)
+                    GROUP BY j.channel
+                    HAVING COUNT(*) >= MAX(COALESCE(c.maxworkers, 3))
+                ),
+                ChannelSlots AS (
+                    -- Acquire a channel-level advisory lock to prevent concurrent workers from
+                    -- racing past BusyChannels before any of them has updated updated_at.
+                    -- pg_try_advisory_xact_lock returns false if another transaction holds the lock,
+                    -- meaning only one worker per channel can enter this CTE at a time.
+                    SELECT DISTINCT j.channel,
+                           pg_try_advisory_xact_lock(hashtext('channel_slot|' || j.channel)) as slot_acquired
+                    FROM jobs j
+                    LEFT JOIN BusyChannels bc ON j.channel = bc.channel_name
+                    WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))
+                    AND bc.channel_name IS NULL
+                    " . ($channel ? " AND j.channel = :channel" : "") . "
                 ),
                 RankedJobs AS (
                     SELECT j.id
                     FROM jobs j
                     LEFT JOIN channels c ON j.channel = c.name
                     LEFT JOIN BusyChannels bc ON j.channel = bc.channel_name
+                    JOIN ChannelSlots cs ON j.channel = cs.channel AND cs.slot_acquired = true
                     WHERE (j.status {$statusSql} OR (j.status = {$processingStatus} AND j.updated_at < :threshold))
                     -- Limit Guard: Skip if channel is busy
                     AND bc.channel_name IS NULL
@@ -824,7 +838,7 @@ class JobRepository extends BaseRepository
                              AND COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id') IS NULL)
                         )
                     )
-                    -- Stable Advisory Lock
+                    -- Job-level advisory lock (prevents two workers claiming the exact same job)
                     AND pg_try_advisory_xact_lock(hashtext(j.channel || '|' || j.entity || '|' || COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id', j.payload->>'instance_name', 'global')))
                     ORDER BY j.priority DESC, j.id ASC
                     LIMIT 1
