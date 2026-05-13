@@ -12,7 +12,10 @@
     use Entities\Job;
     use Enums\JobStatus;
     use Exception;
+    use Exceptions\ConfigurationException;
     use Helpers\Helpers;
+    use Psr\Log\LoggerInterface;
+    use Repositories\JobRepository;
     use Services\DateResolver;
     use Symfony\Component\Console\Attribute\AsCommand;
     use Symfony\Component\Console\Command\Command;
@@ -29,10 +32,14 @@
     )]
     class ProcessJobsCommand extends Command
     {
-        protected static $defaultName = 'jobs:process';
+        protected static string $defaultName = 'jobs:process';
         private EntityManager $em;
-        private \Psr\Log\LoggerInterface $logger;
+        private LoggerInterface $logger;
 
+        /**
+         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
+         */
         public function __construct(?EntityManager $em = null)
         {
             $this->em = $em ?? Helpers::getManager();
@@ -47,6 +54,10 @@
                 ->addOption('job-id', 'j', InputOption::VALUE_REQUIRED, 'Process a specific job ID immediately regardless of status.');
         }
 
+        /**
+         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
+         */
         protected function execute(InputInterface $input, OutputInterface $output): int
         {
             Helpers::clearConfigCache();
@@ -65,7 +76,7 @@
             }
 
             Helpers::reconnectIfNeeded($this->em);
-            /** @var \Repositories\JobRepository $jobRepo */
+            /** @var JobRepository $jobRepo */
             $jobRepo = $this->em->getRepository(Job::class);
 
             $envChannel = getenv('API_SOURCE');
@@ -174,7 +185,7 @@
 
                 $payload = $job->getPayload() ?? [];
                 $params = $payload['params'] ?? [];
-                error_log("DEBUG PROCESS: Params for job " . $job->getUuid() . " are: " . json_encode($params));
+                error_log("DEBUG PROCESS: Params for job ".$job->getUuid()." are: ".json_encode($params));
 
                 // Dependency check
                 $requires = $params['requires'] ?? null;
