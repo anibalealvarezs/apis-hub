@@ -35,35 +35,35 @@
         public static function validateConfig(string $channel, ?LoggerInterface $logger = null): array
         {
             if (isset(self::$configs[$channel])) {
-                $logger->info("DEBUG: DriverInitializer::validateConfig - First IF");
+                $logger?->info("DEBUG: DriverInitializer::validateConfig - First IF");
 
                 return self::$configs[$channel];
             }
 
             $allConfigs = Helpers::getChannelsConfig();
             $config = $allConfigs[$channel] ?? [];
-            $logger->info("DEBUG: DriverInitializer::validateConfig - All channels config gotten");
+            $logger?->info("DEBUG: DriverInitializer::validateConfig - All channels config gotten");
 
             // Dynamic merging based on driver-defined common key
             try {
                 $registryConfig = DriverFactory::getChannelConfig($channel);
                 $driverClass = $registryConfig['driver'] ?? null;
                 if ($driverClass && class_exists($driverClass)) {
-                    $logger->info("DEBUG: DriverInitializer::validateConfig - Driver class found");
+                    $logger?->info("DEBUG: DriverInitializer::validateConfig - Driver class found");
                     $commonKey = $driverClass::getCommonConfigKey();
                     if ($commonKey && isset($allConfigs[$commonKey])) {
-                        $logger->info("DEBUG: DriverInitializer::validateConfig - Common key found in all configs");
+                        $logger?->info("DEBUG: DriverInitializer::validateConfig - Common key found in all configs");
                         $config = array_replace_recursive($allConfigs[$commonKey], $config);
                     }
                 }
             } catch (Exception $e) {
                 // Fallback to parent key if driver discovery fails
-                $logger->info("DEBUG: DriverInitializer::validateConfig - Fallback to parent key");
+                $logger?->info("DEBUG: DriverInitializer::validateConfig - Fallback to parent key");
                 if (isset($registryConfig['parent'])) {
-                    $logger->info("DEBUG: DriverInitializer::validateConfig - Parent config found in registry");
+                    $logger?->info("DEBUG: DriverInitializer::validateConfig - Parent config found in registry");
                     $parentKey = $registryConfig['parent'];
                     if (isset($allConfigs[$parentKey])) {
-                        $logger->info("DEBUG: DriverInitializer::validateConfig - Parent config found in all configs");
+                        $logger?->info("DEBUG: DriverInitializer::validateConfig - Parent config found in all configs");
                         $config = array_replace_recursive($allConfigs[$parentKey], $config);
                     }
                 }
@@ -75,7 +75,7 @@
                 $registry = DriverFactory::getRegistry();
                 foreach ($registry as $chan => $reg) {
                     if (($reg['parent'] ?? null) === $parent) {
-                        $logger->info("DEBUG: DriverInitializer::validateConfig - Registry parent found for $chan");
+                        $logger?->info("DEBUG: DriverInitializer::validateConfig - Registry parent found for $chan");
                         $propName = str_replace($parent.'_', '', $chan).'_enabled';
                         $config[$propName] = (bool)($allConfigs[$chan]['enabled'] ?? false);
                     }
@@ -87,10 +87,10 @@
                 $driver = DriverFactory::get($channel, $logger);
                 $config = $driver->validateConfig($config);
             } catch (Exception $e) {
-                $logger->warning("Driver validation failed for $channel: ".$e->getMessage());
+                $logger?->warning("Driver validation failed for $channel: ".$e->getMessage());
             }
 
-            $logger->info("DEBUG: DriverInitializer::validateConfig - Last IF");
+            $logger?->info("DEBUG: DriverInitializer::validateConfig - Last IF");
             self::$configs[$channel] = $config;
 
             return $config;
