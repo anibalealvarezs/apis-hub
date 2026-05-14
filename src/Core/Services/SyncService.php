@@ -71,15 +71,14 @@
                 $this->logger?->info("DEBUG: SyncService::execute - DRIVER RESOLVED", ['class' => get_class($driver)]);
 
                 // 2. Build final configuration
-                // Merge base validated config with job-level overrides first, then re-validate
-                // so that the driver's normalization (e.g. re-keying ad_accounts by ID) always
-                // runs on the fully-merged config and is never clobbered by the raw job payload.
                 $baseConfig = DriverInitializer::validateConfig($channel, $this->logger);
                 $this->logger?->info("DEBUG: SyncService::execute - Channel", [$channel]);
-                // $this->logger?->info("DEBUG: SyncService::execute - BASE CONFIG", [json_encode($baseConfig)]);
-                // $this->logger?->info("DEBUG: SyncService::execute - JOB CONFIG", [json_encode($config)]);
-                $mergedRaw = array_merge($baseConfig, $config);
-                // $this->logger?->info("DEBUG: SyncService::execute - MERGED CONFIG", [json_encode($mergedRaw)]);
+
+                // Extract job-specific config, potentially nested under 'filters'
+                $jobConfig = $config['filters'] ?? $config;
+
+                // Merge base validated config with job-level overrides, then re-validate
+                $mergedRaw = array_merge($baseConfig, $jobConfig);
                 $finalConfig = $driver->validateConfig($mergedRaw);
 
                 // 3. Inject production dependencies
