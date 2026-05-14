@@ -75,10 +75,10 @@
                 // so that the driver's normalization (e.g. re-keying ad_accounts by ID) always
                 // runs on the fully-merged config and is never clobbered by the raw job payload.
                 $baseConfig = DriverInitializer::validateConfig($channel, $this->logger);
-                $this->logger?->info("DEBUG: SyncService::execute - BASE CONFIG", [json_encode($baseConfig, JSON_PRETTY_PRINT)]);
-                $this->logger?->info("DEBUG: SyncService::execute - JOB CONFIG", [json_encode($config, JSON_PRETTY_PRINT)]);
+                $this->logger?->info("DEBUG: SyncService::execute - BASE CONFIG", [json_encode($baseConfig)]);
+                $this->logger?->info("DEBUG: SyncService::execute - JOB CONFIG", [json_encode($config)]);
                 $mergedRaw = array_merge($baseConfig, $config);
-                $this->logger?->info("DEBUG: SyncService::execute - MERGED CONFIG", [json_encode($mergedRaw, JSON_PRETTY_PRINT)]);
+                $this->logger?->info("DEBUG: SyncService::execute - MERGED CONFIG", [json_encode($mergedRaw)]);
                 $finalConfig = $driver->validateConfig($mergedRaw);
 
                 // 3. Inject production dependencies
