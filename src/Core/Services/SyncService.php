@@ -12,9 +12,20 @@
     use Classes\SocialProcessor;
     use DateTime;
     use Doctrine\Common\Collections\ArrayCollection;
+    use Entities\Analytics\Account;
+    use Entities\Analytics\Channel;
+    use Entities\Analytics\Channeled\ChanneledAccount;
+    use Entities\Analytics\Channeled\ChanneledAd;
+    use Entities\Analytics\Channeled\ChanneledAdGroup;
+    use Entities\Analytics\Channeled\ChanneledCampaign;
+    use Entities\Analytics\Page;
+    use Entities\Analytics\Post;
+    use Exception;
     use Helpers\Helpers;
     use Psr\Log\LoggerInterface;
+    use RuntimeException;
     use Symfony\Component\HttpFoundation\Response;
+    use Throwable;
 
     class SyncService
     {
@@ -38,7 +49,7 @@
          * @param LoggerInterface|null $logger
          * @param string|null $instanceName
          * @return Response
-         * @throws \Throwable
+         * @throws Throwable
          */
         public function execute(
             string            $channel,
@@ -153,13 +164,13 @@
                     static $cache = [];
                     $manager = $finalConfig['manager'] ?? Helpers::getManager();
                     $repoMap = [
-                        'channeled_accounts'  => \Entities\Analytics\Channeled\ChanneledAccount::class,
-                        'pages'               => \Entities\Analytics\Page::class,
-                        'channeled_campaigns' => \Entities\Analytics\Channeled\ChanneledCampaign::class,
-                        'channeled_ad_groups' => \Entities\Analytics\Channeled\ChanneledAdGroup::class,
-                        'channeled_ads'       => \Entities\Analytics\Channeled\ChanneledAd::class,
-                        'posts'               => \Entities\Analytics\Post::class,
-                        'accounts'            => \Entities\Analytics\Account::class,
+                        'channeled_accounts'  => ChanneledAccount::class,
+                        'pages'               => Page::class,
+                        'channeled_campaigns' => ChanneledCampaign::class,
+                        'channeled_ad_groups' => ChanneledAdGroup::class,
+                        'channeled_ads'       => ChanneledAd::class,
+                        'posts'               => Post::class,
+                        'accounts'            => Account::class,
                     ];
 
                     if (!isset($repoMap[$type])) {
@@ -179,8 +190,7 @@
                         'channeled_accounts' => AssetCategory::IDENTITY,
                         'channeled_campaigns' => AssetCategory::CAMPAIGN,
                         'channeled_ad_groups' => AssetCategory::GROUPING,
-                        'channeled_ads' => AssetCategory::UNIT,
-                        'posts' => AssetCategory::UNIT,
+                        'channeled_ads', 'posts' => AssetCategory::UNIT,
                         default => null
                     };
 
@@ -188,7 +198,7 @@
                         return null;
                     }
 
-                    $driverClass = DriverFactory::getRegistry()[(string)$channel]['driver'] ?? null;
+                    $driverClass = DriverFactory::getRegistry()[$channel]['driver'] ?? null;
                     $context = $driverClass ? $driverClass::getContextForCategory($category) : '';
 
                     if ($type === 'pages') {
@@ -205,7 +215,7 @@
                                     return $driverClass::getCanonicalId(['url' => $u], $category, $context);
                                 }
 
-                                throw new \RuntimeException("Driver not found for channel: ".$channel);
+                                throw new RuntimeException("Driver not found for channel: ".$channel);
                             }, $urls));
                             $searchValues = array_values($canonicalMap);
                         } elseif (isset($params['platform_ids'])) {
@@ -260,16 +270,14 @@
                             $criteria[$idField] = array_unique($searchValues);
                         }
                         if (in_array($type, ['channeled_accounts', 'channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
-                            $enum = \Entities\Analytics\Channel::tryFromName($channel);
+                            $enum = Channel::tryFromName($channel);
                             if ($enum) {
                                 $criteria['channel'] = $enum->value;
                             } else {
                                 $this->logger?->warning("SyncService::identityMapper - Channel '$channel' not found in database channels table.");
                             }
                         }
-                        if ($this->logger) {
-                            $this->logger->info("SyncService::identityMapper - Lookup criteria for $type", ['criteria' => $criteria]);
-                        }
+                        $this->logger?->info("SyncService::identityMapper - Lookup criteria for $type", ['criteria' => $criteria]);
                         if ($type === 'posts' && isset($params['page_id'])) {
                             $criteria['page'] = $params['page_id'];
                         }
@@ -305,7 +313,7 @@
                     try {
                         Helpers::checkJobStatus($jobId);
                         $lastResult = true;
-                    } catch (\Exception $e) {
+                    } catch (Exception $e) {
                         $lastResult = false;
                     }
 
@@ -317,14 +325,48 @@
                 $result = $driver->sync($startDate, $endDate, $finalConfig, $shouldContinue, $identityMapper);
                 $this->logger?->info("DEBUG: SyncService::execute - driver->sync RETURNED");
 
+                // Handle cases where the driver returns a Response object on error (e.g., auth failure)
+                $content = json_decode($result->getContent(), true);
+                // Check for the specific auth failure signature from the driver
+                if (isset($content['status'], $content['error_code']) && $content['status'] === 'error' && $content['error_code'] === 'auth_failure') {
+                    if ($jobId) {
+                        $this->logger->critical(
+                            "Authentication failure detected from driver response for channel '{$channel}'. Cancelling job #{$jobId}.",
+                            ['response' => $content]
+                        );
+                        Helpers::cancelJob($jobId);
+                    }
+
+                    return $result; // Return the original error response
+                }
+
                 return new Response(json_encode([
                     'success' => true,
                     'message' => 'Sync completed successfully',
                     'data'    => (array)$result,
                 ]), Response::HTTP_OK, ['Content-Type' => 'application/json']);
 
-            } catch (\Throwable $e) {
-                $this->logger->error("SyncService Error [{$channel}]: ".$e->getMessage(), [
+            } catch (Throwable $e) {
+                // Handle non-retriable authentication exceptions that bubble up
+                if (Helpers::isAuthenticationRevokedException($e)) {
+                    $jobId = $finalConfig['jobId'] ?? $config['jobId'] ?? null;
+                    if ($jobId) {
+                        $this->logger->critical(
+                            "A non-retriable authentication error occurred for channel '$channel'. Cancelling job #$jobId.",
+                            ['error' => $e->getMessage()]
+                        );
+                        Helpers::cancelJob($jobId);
+
+                        // Return a structured error response instead of re-throwing
+                        return new Response(json_encode([
+                            'success' => false,
+                            'message' => 'Authentication has been revoked. The job has been cancelled.',
+                            'error'   => $e->getMessage(),
+                        ]), Response::HTTP_UNAUTHORIZED, ['Content-Type' => 'application/json']);
+                    }
+                }
+
+                $this->logger->error("SyncService Error [$channel]: ".$e->getMessage(), [
                     'trace' => $e->getTraceAsString(),
                 ]);
 
@@ -337,7 +379,7 @@
          * @param ArrayCollection $collection
          * @param mixed $manager
          * @return void
-         * @throws \Exception
+         * @throws Exception
          */
         protected function processUniversalEntity(string $type, ArrayCollection $collection, mixed $manager): void
         {
