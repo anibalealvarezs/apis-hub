@@ -78,7 +78,7 @@
                 $jobConfig = $config['filters'] ?? $config;
 
                 // Merge base validated config with job-level overrides, then re-validate
-                $mergedRaw = array_merge($baseConfig, $jobConfig);
+                $mergedRaw = array_merge($baseConfig, (array)$jobConfig);
                 $finalConfig = $driver->validateConfig($mergedRaw);
 
                 // 3. Inject production dependencies
