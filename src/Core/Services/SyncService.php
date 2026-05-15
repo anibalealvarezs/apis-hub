@@ -77,13 +77,13 @@
                 }
 
                 // 1. Get official driver via Factory
-                $this->logger?->info("DEBUG: SyncService::execute - RESOLVING DRIVER via Factory");
+                $this->logger->info("DEBUG: SyncService::execute - RESOLVING DRIVER via Factory");
                 $driver = DriverFactory::get($channel, $this->logger, $config);
-                $this->logger?->info("DEBUG: SyncService::execute - DRIVER RESOLVED", ['class' => get_class($driver)]);
+                $this->logger->info("DEBUG: SyncService::execute - DRIVER RESOLVED", ['class' => get_class($driver)]);
 
                 // 2. Build final configuration
                 $baseConfig = DriverInitializer::validateConfig($channel, $this->logger);
-                $this->logger?->info("DEBUG: SyncService::execute - Channel", [$channel]);
+                $this->logger->info("DEBUG: SyncService::execute - Channel", [$channel]);
 
                 // Extract job-specific config, potentially nested under 'filters'
                 $jobConfig = $config['filters'] ?? $config;
@@ -95,7 +95,7 @@
                 // 3. Inject production dependencies
                 $finalConfig['manager'] = Helpers::getManager();
                 $manager = $finalConfig['manager'];
-                $this->logger?->info("DEBUG: SyncService::execute - Manager injected. ID: ".spl_object_id($manager)." | Open: ".($manager->isOpen() ? 'YES' : 'NO'));
+                $this->logger->info("DEBUG: SyncService::execute - Manager injected. ID: ".spl_object_id($manager)." | Open: ".($manager->isOpen() ? 'YES' : 'NO'));
                 $finalConfig['seeder'] = new ProductionEntityMapper($manager);
 
                 // 4. Define and set Data Processor
@@ -151,14 +151,14 @@
                     }
                 });
 
-                $this->logger->info("SyncService: Executing sync for channel '{$channel}'", [
+                $this->logger->info("SyncService: Executing sync for channel '$channel'", [
                     'start_date' => $startDate->format('Y-m-d'),
                     'end_date'   => $endDate->format('Y-m-d'),
                     'instance'   => $instanceName,
                     'config'     => $sanitizedConfig,
                 ]);
 
-                $this->logger?->info("DEBUG: SyncService::execute - INVOKING driver->sync");
+                $this->logger->info("DEBUG: SyncService::execute - INVOKING driver->sync");
 
                 $identityMapper = function (string $type, array $params) use ($finalConfig, $channel) {
                     static $cache = [];
@@ -272,12 +272,12 @@
                         if (in_array($type, ['channeled_accounts', 'channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
                             $enum = Channel::tryFromName($channel);
                             if ($enum) {
-                                $criteria['channel'] = $enum->value;
+                                $criteria['channel'] = $enum->getId();
                             } else {
-                                $this->logger?->warning("SyncService::identityMapper - Channel '$channel' not found in database channels table.");
+                                $this->logger->warning("SyncService::identityMapper - Channel '$channel' not found in database channels table.");
                             }
                         }
-                        $this->logger?->info("SyncService::identityMapper - Lookup criteria for $type", ['criteria' => $criteria]);
+                        $this->logger->info("SyncService::identityMapper - Lookup criteria for $type", ['criteria' => $criteria]);
                         if ($type === 'posts' && isset($params['page_id'])) {
                             $criteria['page'] = $params['page_id'];
                         }
@@ -323,7 +323,7 @@
                 } : null;
 
                 $result = $driver->sync($startDate, $endDate, $finalConfig, $shouldContinue, $identityMapper);
-                $this->logger?->info("DEBUG: SyncService::execute - driver->sync RETURNED");
+                $this->logger->info("DEBUG: SyncService::execute - driver->sync RETURNED");
 
                 // Handle cases where the driver returns a Response object on error (e.g., auth failure)
                 $content = json_decode($result->getContent(), true);
@@ -331,7 +331,7 @@
                 if (isset($content['status'], $content['error_code']) && $content['status'] === 'error' && $content['error_code'] === 'auth_failure') {
                     if ($jobId) {
                         $this->logger->critical(
-                            "Authentication failure detected from driver response for channel '{$channel}'. Cancelling job #{$jobId}.",
+                            "Authentication failure detected from driver response for channel '$channel'. Cancelling job #$jobId.",
                             ['response' => $content]
                         );
                         Helpers::cancelJob($jobId);
