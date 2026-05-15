@@ -11,8 +11,10 @@
     use Doctrine\ORM\EntityManager;
     use Doctrine\ORM\EntityManagerInterface;
     use Doctrine\ORM\Exception\NotSupported;
+    use Doctrine\ORM\Exception\ORMException;
     use Doctrine\ORM\NonUniqueResultException;
     use Doctrine\ORM\NoResultException;
+    use Doctrine\ORM\OptimisticLockException;
     use Doctrine\ORM\ORMSetup;
     use Doctrine\Persistence\Mapping\MappingException;
     use Doctrine\Persistence\Proxy;
@@ -1130,6 +1132,52 @@
 
             if ($status == JobStatus::failed->value || $status == JobStatus::cancelled->value) {
                 throw new JobCancelledException("El Job #{$jobId} fue interrumpido o cancelado manualmente.");
+            }
+        }
+
+        /**
+         * Checks if an exception indicates a revoked OAuth token that requires user re-authentication.
+         * This is specifically for "invalid_grant" type errors where the refresh token is no longer valid.
+         *
+         * @param \Throwable $e The exception to inspect.
+         * @return bool True if the exception is determined to be an authentication revocation error.
+         */
+        public static function isAuthenticationRevokedException(\Throwable $e): bool
+        {
+            $message = $e->getMessage();
+
+            // Google's "invalid_grant" is a strong indicator of a revoked refresh token.
+            if (str_contains($message, 'invalid_grant')) {
+                // The error description can vary slightly, but "Token has been expired or revoked" is the key.
+                if (str_contains($message, 'Token has been expired or revoked') || str_contains($message, 'Bad Request')) {
+                    return true;
+                }
+            }
+
+            // This can be expanded to include patterns from other platforms (e.g., Meta)
+            // if they have distinct messages for revoked credentials vs. temporary issues.
+
+            return false;
+        }
+
+        /**
+         * Cancels a job in the database, typically after a non-retriable error like auth revocation.
+         *
+         * @param int $jobId The ID of the job to cancel.
+         * @return void
+         * @throws \Doctrine\DBAL\Exception
+         * @throws ORMException
+         * @throws OptimisticLockException
+         */
+        public static function cancelJob(int $jobId): void
+        {
+            $em = self::getManager();
+            /** @var Job|null $job */
+            $job = $em->find(Job::class, $jobId);
+
+            if ($job) {
+                $job->addStatus(JobStatus::cancelled->value);
+                $em->flush();
             }
         }
 
