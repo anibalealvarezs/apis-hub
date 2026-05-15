@@ -10,7 +10,6 @@
     use Doctrine\DBAL\DriverManager;
     use Doctrine\ORM\EntityManager;
     use Doctrine\ORM\EntityManagerInterface;
-    use Doctrine\ORM\Exception\NotSupported;
     use Doctrine\ORM\Exception\ORMException;
     use Doctrine\ORM\NonUniqueResultException;
     use Doctrine\ORM\NoResultException;
@@ -38,6 +37,7 @@
     use ReflectionProperty;
     use RuntimeException;
     use Symfony\Component\Yaml\Yaml;
+    use Throwable;
 
     class Helpers
     {
@@ -875,7 +875,7 @@
 
         public static function getAllSubsets($elements): array
         {
-            $subsets = [[]]; // Include the emtpy subset
+            $subsets = [[]]; // Include the empty subset
             foreach ($elements as $element) {
                 $newSubsets = [];
                 foreach ($subsets as $subset) {
@@ -1110,7 +1110,6 @@
         /**
          * @param int|null $jobId
          * @return void
-         * @throws NotSupported
          * @throws NoResultException
          * @throws NonUniqueResultException
          * @throws JobCancelledException
@@ -1139,10 +1138,10 @@
          * Checks if an exception indicates a revoked OAuth token that requires user re-authentication.
          * This is specifically for "invalid_grant" type errors where the refresh token is no longer valid.
          *
-         * @param \Throwable $e The exception to inspect.
+         * @param Throwable $e The exception to inspect.
          * @return bool True if the exception is determined to be an authentication revocation error.
          */
-        public static function isAuthenticationRevokedException(\Throwable $e): bool
+        public static function isAuthenticationRevokedException(Throwable $e): bool
         {
             $message = $e->getMessage();
 
