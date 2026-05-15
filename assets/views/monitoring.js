@@ -224,6 +224,12 @@ function updateSyncTelemetry(telemetry) {
         const total = stats.total_jobs || 0;
         if (total === 0) return;
 
+        const assetsArray = Object.entries(stats.assets || {}).map(([id, assetStats]) => ({
+            id,
+            name: assetStats.name || id,
+            completion: assetStats.total > 0 ? (assetStats.completed / assetStats.total) * 100 : 0
+        }));
+
         const pCompleted = (stats.completed / total) * 100;
         const pProcessing = (stats.processing / total) * 100;
         const pFailed = (stats.failed / total) * 100;
@@ -269,7 +275,7 @@ function updateSyncTelemetry(telemetry) {
             </div>
             
             <div class="sync-assets-list">
-                ${(stats.assets || []).sort((a,b) => b.completion - a.completion).slice(0, 10).map(asset => `
+                ${assetsArray.sort((a,b) => b.completion - a.completion).slice(0, 10).map(asset => `
                     <div class="sync-asset-item" onclick="toggleAccountStats('${channel}', '${asset.id}')">
                         <div class="sync-asset-info">
                             <span class="sync-asset-id">${asset.name || '#' + asset.id}</span>
@@ -280,7 +286,7 @@ function updateSyncTelemetry(telemetry) {
                         </div>
                     </div>
                 `).join('')}
-                ${stats.assets.length > 10 ? `<div style="font-size:0.6rem; color:var(--text-dim); text-align:center; padding-top:5px; border-top:1px solid rgba(255,255,255,0.03);">+ ${stats.assets.length - 10} more accounts</div>` : ''}
+                ${assetsArray.length > 10 ? `<div style="font-size:0.6rem; color:var(--text-dim); text-align:center; padding-top:5px; border-top:1px solid rgba(255,255,255,0.03);">+ ${assetsArray.length - 10} more accounts</div>` : ''}
             </div>
 
             <div id="details-${channel}" class="sync-details-container" style="display:none;">
