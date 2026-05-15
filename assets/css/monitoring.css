@@ -62,7 +62,7 @@
 
 
 /* Sync Telemetry Styles */
-.sync-telemetry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+#sync-telemetry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
 .sync-channel-card { 
     background: rgba(255, 255, 255, 0.03); 
     border: 1px solid var(--border); 
