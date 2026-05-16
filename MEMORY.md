@@ -128,3 +128,4 @@
 - **Invalidation Strategy**: Event-driven invalidation via `JobRepository::update()`. Every time a job status changes, the relevant telemetry cache keys are purged.
 - **Compatibility**: The telemetry service query dynamically switches syntax based on `Helpers::isPostgres()` to ensure platform parity.
 - **Routing**: Routes are registered in `src/Routes/sync.php` and loaded via `bin/index.php`.
+- **GSC Database Syntax Error**: Resolved "invalid input syntax for type integer: 'google_search_console'" by refactoring `ChanneledBaseRepository`. All channeled repositories now automatically resolve channel name strings to entity IDs in `findBy`, `findOneBy`, and `count` calls.
