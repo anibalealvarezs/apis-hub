@@ -69,7 +69,7 @@
                         COUNT(*) as count
                     FROM jobs 
                     WHERE NOT (
-                        payload LIKE '%\"recent\"%' AND
+                        CAST(payload AS TEXT) LIKE '%\"recent\"%' AND
                         status = 6 AND
                         updated_at >= NOW() - INTERVAL '24 HOUR'
                     )
@@ -196,7 +196,7 @@
                         COUNT(*) as count
                       FROM jobs 
                       WHERE channel = :channel AND NOT (
-                        payload LIKE '%\"recent\"%' AND
+                        CAST(payload AS TEXT) LIKE '%\"recent\"%' AND
                         status = 6 AND
                         updated_at >= NOW() - INTERVAL '24 HOUR'
                       )";
