@@ -61,18 +61,16 @@
                     ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')"
                     : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
 
+                $conditionalTotal = "SUM(CASE WHEN CAST(payload AS TEXT) LIKE '%\"recent\"%' AND status IN (1, 5, 6) THEN 0 ELSE 1 END)";
+
                 // 1. Get all stats in ONE query
                 $sql = "SELECT 
                         channel,
                         $jsonExtract as account_id,
                         status,
-                        COUNT(*) as count
+                        COUNT(*) as count,
+                        $conditionalTotal as total_for_percentage
                     FROM jobs 
-                    WHERE NOT (
-                        CAST(payload AS TEXT) LIKE '%\"recent\"%' AND
-                        status = 6 AND
-                        updated_at >= NOW() - INTERVAL '24 HOUR'
-                    )
                     GROUP BY channel, account_id, status";
 
                 $rows = $conn->fetchAllAssociative($sql);
@@ -91,6 +89,7 @@
                     if (!isset($chanStats[$chan]['assets'][$accId])) {
                         $chanStats[$chan]['assets'][$accId] = [
                             'total'      => 0,
+                            'total_for_percentage' => 0,
                             'completed'  => 0,
                             'failed'     => 0,
                             'processing' => 0,
@@ -101,6 +100,7 @@
                     $status = (int)$row['status'];
                     $count = (int)$row['count'];
                     $chanStats[$chan]['assets'][$accId]['total'] += $count;
+                    $chanStats[$chan]['assets'][$accId]['total_for_percentage'] += (int)$row['total_for_percentage'];
 
                     if ($status === JobStatus::completed->value) $chanStats[$chan]['assets'][$accId]['completed'] += $count;
                     elseif ($status === JobStatus::failed->value) $chanStats[$chan]['assets'][$accId]['failed'] += $count;
@@ -126,7 +126,7 @@
 
                     $assetCount = count($data['assets']);
                     foreach ($data['assets'] as $asset) {
-                        $completion = $asset['total'] > 0 ? round(($asset['completed'] / $asset['total']) * 100, 2) : 0;
+                        $completion = $asset['total_for_percentage'] > 0 ? round(($asset['completed'] / $asset['total_for_percentage']) * 100, 2) : 0;
                         if ($completion >= 100) $chanFullySynced++;
                         $chanTotalCompletion += $completion;
 
@@ -190,16 +190,15 @@
                     ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')"
                     : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
 
+                $conditionalTotal = "SUM(CASE WHEN CAST(payload AS TEXT) LIKE '%\"recent\"%' AND status IN (1, 5, 6) THEN 0 ELSE 1 END)";
+
                 $query = "SELECT 
                         $jsonExtract as account_id,
                         status,
-                        COUNT(*) as count
+                        COUNT(*) as count,
+                        $conditionalTotal as total_for_percentage
                       FROM jobs 
-                      WHERE channel = :channel AND NOT (
-                        CAST(payload AS TEXT) LIKE '%\"recent\"%' AND
-                        status = 6 AND
-                        updated_at >= NOW() - INTERVAL '24 HOUR'
-                      )";
+                      WHERE channel = :channel";
 
                 $params = ['channel' => $channelName];
 
@@ -221,6 +220,7 @@
                     if (!isset($assets[$accId])) {
                         $assets[$accId] = [
                             'total'      => 0,
+                            'total_for_percentage' => 0,
                             'completed'  => 0,
                             'failed'     => 0,
                             'processing' => 0,
@@ -231,6 +231,7 @@
                     $status = (int)$row['status'];
                     $count = (int)$row['count'];
                     $assets[$accId]['total'] += $count;
+                    $assets[$accId]['total_for_percentage'] += (int)$row['total_for_percentage'];
 
                     if ($status === JobStatus::completed->value) $assets[$accId]['completed'] += $count;
                     elseif ($status === JobStatus::failed->value) $assets[$accId]['failed'] += $count;
@@ -250,7 +251,7 @@
                 $fullySyncedCount = 0;
 
                 foreach ($assets as $id => $stats) {
-                    $completion = $stats['total'] > 0 ? round(($stats['completed'] / $stats['total']) * 100, 2) : 0;
+                    $completion = $stats['total_for_percentage'] > 0 ? round(($stats['completed'] / $stats['total_for_percentage']) * 100, 2) : 0;
                     if ($completion >= 100) $fullySyncedCount++;
 
                     $assetObj = array_merge(['id' => $id, 'completion' => $completion], $stats);
