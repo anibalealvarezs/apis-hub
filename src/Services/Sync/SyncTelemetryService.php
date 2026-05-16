@@ -1,63 +1,68 @@
 <?php
 
-declare(strict_types=1);
+    declare(strict_types=1);
 
-namespace Services\Sync;
+    namespace Services\Sync;
 
-use Entities\Job;
-use Enums\JobStatus;
-use Entities\Analytics\Channeled\ChanneledAccount;
-use Helpers\Helpers;
-use Services\CacheService;
-use Throwable;
+    use DateInterval;
+    use DatePeriod;
+    use DateTime;
+    use Doctrine\DBAL\Exception;
+    use Enums\JobStatus;
+    use Entities\Analytics\Channeled\ChanneledAccount;
+    use Helpers\Helpers;
+    use Services\CacheService;
+    use Throwable;
 
-class SyncTelemetryService
-{
-    private CacheService $cacheService;
-    private const CACHE_PREFIX = 'sync_telemetry:';
-    private const DEFAULT_TTL = 86400; // 24 hours
-
-    public function __construct(CacheService $cacheService)
+    class SyncTelemetryService
     {
-        $this->cacheService = $cacheService;
-    }
+        private CacheService $cacheService;
+        private const string CACHE_PREFIX = 'sync_telemetry:';
+        private const int DEFAULT_TTL = 86400; // 24 hours
 
-    /**
-     * Get synchronization status for a channel or globally
-     *
-     * @param string|null $channelName
-     * @param string|null $accountId
-     * @return array
-     */
-    public function getSyncStatus(?string $channelName = null, ?string $accountId = null): array
-    {
-        if ($channelName) {
-            return $this->getChannelStatus($channelName, $accountId);
+        public function __construct(CacheService $cacheService)
+        {
+            $this->cacheService = $cacheService;
         }
 
-        return $this->getGlobalStatus();
-    }
+        /**
+         * Get synchronization status for a channel or globally
+         *
+         * @param string|null $channelName
+         * @param string|null $accountId
+         * @return array
+         * @throws Exception
+         */
+        public function getSyncStatus(?string $channelName = null, ?string $accountId = null): array
+        {
+            if ($channelName) {
+                return $this->getChannelStatus($channelName, $accountId);
+            }
 
-    /**
-     * Get global platform sync status
-     *
-     * @return array
-     */
-    public function getGlobalStatus(): array
-    {
-        $cacheKey = self::CACHE_PREFIX . 'global';
-        
-        return $this->cacheService->get($cacheKey, function () {
-            $em = Helpers::getManager();
-            $conn = $em->getConnection();
-            $isPostgres = Helpers::isPostgres($em);
-            
-            $jsonExtract = $isPostgres 
-                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')" 
-                : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+            return $this->getGlobalStatus();
+        }
 
-            // 1. Get all stats in ONE query
-            $sql = "SELECT 
+        /**
+         * Get global platform sync status
+         *
+         * @return array
+         * @throws Exception
+         */
+        public function getGlobalStatus(): array
+        {
+            $cacheKey = self::CACHE_PREFIX.'global';
+
+            return $this->cacheService->get($cacheKey, function () {
+                $em = Helpers::getManager();
+                $conn = $em->getConnection();
+                $isPostgres = Helpers::isPostgres($em);
+
+                $jsonExtract = $isPostgres
+                    ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')"
+                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+
+                // 1. Get all stats in ONE query
+                $sql = "SELECT 
                         channel,
                         $jsonExtract as account_id,
                         status,
@@ -69,122 +74,123 @@ class SyncTelemetryService
                         updated_at >= NOW() - INTERVAL '24 HOUR'
                     )
                     GROUP BY channel, account_id, status";
-            
-            $rows = $conn->fetchAllAssociative($sql);
-            
-            // 2. Group by channel and process
-            $chanStats = [];
-            foreach ($rows as $row) {
-                $chan = $row['channel'];
-                if (!isset($chanStats[$chan])) {
-                    $chanStats[$chan] = ['assets' => []];
-                }
-                
-                $accId = ltrim(trim((string)$row['account_id'], '"'), '#');
-                if ($accId === 'null' || ($accId === '' && $row['account_id'] !== 'global')) continue;
 
-                if (!isset($chanStats[$chan]['assets'][$accId])) {
-                    $chanStats[$chan]['assets'][$accId] = [
-                        'total' => 0,
-                        'completed' => 0,
-                        'failed' => 0,
-                        'processing' => 0,
-                        'scheduled' => 0
+                $rows = $conn->fetchAllAssociative($sql);
+
+                // 2. Group by channel and process
+                $chanStats = [];
+                foreach ($rows as $row) {
+                    $chan = $row['channel'];
+                    if (!isset($chanStats[$chan])) {
+                        $chanStats[$chan] = ['assets' => []];
+                    }
+
+                    $accId = ltrim(trim((string)$row['account_id'], '"'), '#');
+                    if ($accId === 'null' || ($accId === '' && $row['account_id'] !== 'global')) continue;
+
+                    if (!isset($chanStats[$chan]['assets'][$accId])) {
+                        $chanStats[$chan]['assets'][$accId] = [
+                            'total'      => 0,
+                            'completed'  => 0,
+                            'failed'     => 0,
+                            'processing' => 0,
+                            'scheduled'  => 0
+                        ];
+                    }
+
+                    $status = (int)$row['status'];
+                    $count = (int)$row['count'];
+                    $chanStats[$chan]['assets'][$accId]['total'] += $count;
+
+                    if ($status === JobStatus::completed->value) $chanStats[$chan]['assets'][$accId]['completed'] += $count;
+                    elseif ($status === JobStatus::failed->value) $chanStats[$chan]['assets'][$accId]['failed'] += $count;
+                    elseif ($status === JobStatus::processing->value) $chanStats[$chan]['assets'][$accId]['processing'] += $count;
+                    elseif ($status === JobStatus::scheduled->value) $chanStats[$chan]['assets'][$accId]['scheduled'] += $count;
+                }
+
+                // 3. Final formatting
+                $results = [];
+                $globalTotalCompletion = 0;
+                $globalTotalAssets = 0;
+                $globalFullySynced = 0;
+                $totalChans = 0;
+
+                foreach ($chanStats as $chan => $data) {
+                    $chanTotalCompletion = 0;
+                    $chanFullySynced = 0;
+                    $chanTotalJobs = 0;
+                    $chanCompleted = 0;
+                    $chanProcessing = 0;
+                    $chanFailed = 0;
+                    $chanScheduled = 0;
+
+                    $assetCount = count($data['assets']);
+                    foreach ($data['assets'] as $asset) {
+                        $completion = $asset['total'] > 0 ? round(($asset['completed'] / $asset['total']) * 100, 2) : 0;
+                        if ($completion >= 100) $chanFullySynced++;
+                        $chanTotalCompletion += $completion;
+
+                        $chanTotalJobs += $asset['total'];
+                        $chanCompleted += $asset['completed'];
+                        $chanProcessing += $asset['processing'];
+                        $chanFailed += $asset['failed'];
+                        $chanScheduled += $asset['scheduled'];
+                    }
+
+                    $chanCompletion = $assetCount > 0 ? round($chanTotalCompletion / $assetCount, 2) : 0;
+
+                    $results[$chan] = [
+                        'channel'                 => $chan,
+                        'assets'                  => $data['assets'], // CRITICAL: Added back for detailed view
+                        'completion_percentage'   => $chanCompletion,
+                        'fully_synced_count'      => $chanFullySynced,
+                        'fully_synced_percentage' => $assetCount > 0 ? round(($chanFullySynced / $assetCount) * 100, 2) : 0,
+                        'total_assets'            => $assetCount,
+                        'total_jobs'              => $chanTotalJobs,
+                        'completed'               => $chanCompleted,
+                        'processing'              => $chanProcessing,
+                        'failed'                  => $chanFailed,
+                        'scheduled'               => $chanScheduled
                     ];
-                }
-                
-                $status = (int)$row['status'];
-                $count = (int)$row['count'];
-                $chanStats[$chan]['assets'][$accId]['total'] += $count;
-                
-                if ($status === JobStatus::completed->value) $chanStats[$chan]['assets'][$accId]['completed'] += $count;
-                elseif ($status === JobStatus::failed->value) $chanStats[$chan]['assets'][$accId]['failed'] += $count;
-                elseif ($status === JobStatus::processing->value) $chanStats[$chan]['assets'][$accId]['processing'] += $count;
-                elseif ($status === JobStatus::scheduled->value) $chanStats[$chan]['assets'][$accId]['scheduled'] += $count;
-            }
-            
-            // 3. Final formatting
-            $results = [];
-            $globalTotalCompletion = 0;
-            $globalTotalAssets = 0;
-            $globalFullySynced = 0;
-            $totalChans = 0;
 
-            foreach ($chanStats as $chan => $data) {
-                $chanTotalCompletion = 0;
-                $chanFullySynced = 0;
-                $chanTotalJobs = 0;
-                $chanCompleted = 0;
-                $chanProcessing = 0;
-                $chanFailed = 0;
-                $chanScheduled = 0;
-                
-                $assetCount = count($data['assets']);
-                foreach ($data['assets'] as $asset) {
-                    $completion = $asset['total'] > 0 ? round(($asset['completed'] / $asset['total']) * 100, 2) : 0;
-                    if ($completion >= 100) $chanFullySynced++;
-                    $chanTotalCompletion += $completion;
-                    
-                    $chanTotalJobs += $asset['total'];
-                    $chanCompleted += $asset['completed'];
-                    $chanProcessing += $asset['processing'];
-                    $chanFailed += $asset['failed'];
-                    $chanScheduled += $asset['scheduled'];
+                    $globalTotalCompletion += $chanCompletion;
+                    $globalTotalAssets += $assetCount;
+                    $globalFullySynced += $chanFullySynced;
+                    $totalChans++;
                 }
-                
-                $chanCompletion = $assetCount > 0 ? round($chanTotalCompletion / $assetCount, 2) : 0;
-                
-                $results[$chan] = [
-                    'channel' => $chan,
-                    'assets' => $data['assets'], // CRITICAL: Added back for detailed view
-                    'completion_percentage' => $chanCompletion,
-                    'fully_synced_count' => $chanFullySynced,
-                    'fully_synced_percentage' => $assetCount > 0 ? round(($chanFullySynced / $assetCount) * 100, 2) : 0,
-                    'total_assets' => $assetCount,
-                    'total_jobs' => $chanTotalJobs,
-                    'completed' => $chanCompleted,
-                    'processing' => $chanProcessing,
-                    'failed' => $chanFailed,
-                    'scheduled' => $chanScheduled
+
+                return [
+                    'completion_percentage'   => $totalChans > 0 ? round($globalTotalCompletion / $totalChans, 2) : 0,
+                    'total_assets'            => $globalTotalAssets,
+                    'fully_synced_count'      => $globalFullySynced,
+                    'fully_synced_percentage' => $globalTotalAssets > 0 ? round(($globalFullySynced / $globalTotalAssets) * 100, 2) : 0,
+                    'channels'                => $results
                 ];
-                
-                $globalTotalCompletion += $chanCompletion;
-                $globalTotalAssets += $assetCount;
-                $globalFullySynced += $chanFullySynced;
-                $totalChans++;
-            }
+            });
+        }
 
-            return [
-                'completion_percentage' => $totalChans > 0 ? round($globalTotalCompletion / $totalChans, 2) : 0,
-                'total_assets' => $globalTotalAssets,
-                'fully_synced_count' => $globalFullySynced,
-                'fully_synced_percentage' => $globalTotalAssets > 0 ? round(($globalFullySynced / $globalTotalAssets) * 100, 2) : 0,
-                'channels' => $results
-            ];
-        });
-    }
+        /**
+         * Get synchronization status for a specific channel
+         *
+         * @param string $channelName
+         * @param string|null $targetAccountId
+         * @return array
+         * @throws Exception
+         */
+        public function getChannelStatus(string $channelName, ?string $targetAccountId = null): array
+        {
+            $cacheKey = self::CACHE_PREFIX.'channel:'.$channelName.($targetAccountId ? ':'.$targetAccountId : '');
 
-    /**
-     * Get synchronization status for a specific channel
-     *
-     * @param string $channelName
-     * @param string|null $targetAccountId
-     * @return array
-     */
-    public function getChannelStatus(string $channelName, ?string $targetAccountId = null): array
-    {
-        $cacheKey = self::CACHE_PREFIX . 'channel:' . $channelName . ($targetAccountId ? ':' . $targetAccountId : '');
-        
-        return $this->cacheService->get($cacheKey, function () use ($channelName, $targetAccountId) {
-            $em = Helpers::getManager();
-            $conn = $em->getConnection();
-            $isPostgres = Helpers::isPostgres($em);
-            
-            $jsonExtract = $isPostgres 
-                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')" 
-                : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+            return $this->cacheService->get($cacheKey, function () use ($channelName, $targetAccountId) {
+                $em = Helpers::getManager();
+                $conn = $em->getConnection();
+                $isPostgres = Helpers::isPostgres($em);
 
-            $query = "SELECT 
+                $jsonExtract = $isPostgres
+                    ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')"
+                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+
+                $query = "SELECT 
                         $jsonExtract as account_id,
                         status,
                         COUNT(*) as count
@@ -194,206 +200,207 @@ class SyncTelemetryService
                         status = 6 AND
                         updated_at >= NOW() - INTERVAL '24 HOUR'
                       )";
-            
-            $params = ['channel' => $channelName];
-            
-            if ($targetAccountId) {
-                $query .= " AND $jsonExtract = :account_id";
-                $params['account_id'] = $targetAccountId;
-            }
-            
-            $query .= " GROUP BY account_id, status";
-            
-            $rows = $conn->fetchAllAssociative($query, $params);
-            
-            // 2. Process results
-            $assets = [];
-            foreach ($rows as $row) {
-                $accId = ltrim(trim((string)$row['account_id'], '"'), '#');
-                if ($accId === 'null' || ($accId === '' && $row['account_id'] !== 'global')) continue;
 
-                if (!isset($assets[$accId])) {
-                    $assets[$accId] = [
-                        'total' => 0,
-                        'completed' => 0,
-                        'failed' => 0,
-                        'processing' => 0,
-                        'scheduled' => 0
-                    ];
+                $params = ['channel' => $channelName];
+
+                if ($targetAccountId) {
+                    $query .= " AND $jsonExtract = :account_id";
+                    $params['account_id'] = $targetAccountId;
                 }
-                
-                $status = (int)$row['status'];
-                $count = (int)$row['count'];
-                $assets[$accId]['total'] += $count;
-                
-                if ($status === JobStatus::completed->value) $assets[$accId]['completed'] += $count;
-                elseif ($status === JobStatus::failed->value) $assets[$accId]['failed'] += $count;
-                elseif ($status === JobStatus::processing->value) $assets[$accId]['processing'] += $count;
-                elseif ($status === JobStatus::scheduled->value) $assets[$accId]['scheduled'] += $count;
-            }
-            
-            // 3. Format assets and calculate totals
-            $formattedAssets = [];
-            $platformIds = [];
-            $totalChanCompletion = 0;
-            $chanTotal = 0;
-            $chanCompleted = 0;
-            $chanProcessing = 0;
-            $chanFailed = 0;
-            $chanScheduled = 0;
-            $fullySyncedCount = 0;
-            
-            foreach ($assets as $id => $stats) {
-                $completion = $stats['total'] > 0 ? round(($stats['completed'] / $stats['total']) * 100, 2) : 0;
-                if ($completion >= 100) $fullySyncedCount++;
 
-                $assetObj = array_merge(['id' => $id, 'completion' => $completion], $stats);
-                $formattedAssets[$id] = $assetObj;
-                $platformIds[] = $id;
+                $query .= " GROUP BY account_id, status";
 
-                $totalChanCompletion += $completion;
-                $chanTotal += $stats['total'];
-                $chanCompleted += $stats['completed'];
-                $chanProcessing += $stats['processing'];
-                $chanFailed += $stats['failed'];
-                $chanScheduled += $stats['scheduled'];
-            }
+                $rows = $conn->fetchAllAssociative($query, $params);
 
-            // 4. Enrich with names from ChanneledAccount
-            if (!empty($platformIds)) {
-                try {
-                    $caRepo = $em->getRepository(ChanneledAccount::class);
-                    $channeledAccounts = $caRepo->findBy([
-                        'channel' => $channelName,
-                        'platformId' => $platformIds
-                    ]);
-                    foreach ($channeledAccounts as $ca) {
-                        $pId = $ca->getPlatformId();
-                        if (isset($formattedAssets[$pId])) {
-                            $formattedAssets[$pId]['name'] = $ca->getName();
-                        }
+                // 2. Process results
+                $assets = [];
+                foreach ($rows as $row) {
+                    $accId = ltrim(trim((string)$row['account_id'], '"'), '#');
+                    if ($accId === 'null' || ($accId === '' && $row['account_id'] !== 'global')) continue;
+
+                    if (!isset($assets[$accId])) {
+                        $assets[$accId] = [
+                            'total'      => 0,
+                            'completed'  => 0,
+                            'failed'     => 0,
+                            'processing' => 0,
+                            'scheduled'  => 0
+                        ];
                     }
-                } catch (Throwable $e) {
-                    // Silently fail name enrichment to avoid breaking telemetry
+
+                    $status = (int)$row['status'];
+                    $count = (int)$row['count'];
+                    $assets[$accId]['total'] += $count;
+
+                    if ($status === JobStatus::completed->value) $assets[$accId]['completed'] += $count;
+                    elseif ($status === JobStatus::failed->value) $assets[$accId]['failed'] += $count;
+                    elseif ($status === JobStatus::processing->value) $assets[$accId]['processing'] += $count;
+                    elseif ($status === JobStatus::scheduled->value) $assets[$accId]['scheduled'] += $count;
                 }
-            }
-            
-            $finalAssets = array_values($formattedAssets);
-            $assetCount = count($finalAssets);
-            
-            return [
-                'channel' => $channelName,
-                'completion_percentage' => $assetCount > 0 ? round($totalChanCompletion / $assetCount, 2) : 0,
-                'fully_synced_count' => $fullySyncedCount,
-                'fully_synced_percentage' => $assetCount > 0 ? round(($fullySyncedCount / $assetCount) * 100, 2) : 0,
-                'total_assets' => $assetCount,
-                'total_jobs' => $chanTotal,
-                'completed' => $chanCompleted,
-                'processing' => $chanProcessing,
-                'failed' => $chanFailed,
-                'scheduled' => $chanScheduled,
-                'assets' => $finalAssets
-            ];
-        }, self::DEFAULT_TTL);
-    }
 
-    /**
-     * Get daily sync map for a specific account (GitHub-style chart data)
-     *
-     * @param string $channel
-     * @param string $accountId
-     * @return array
-     */
-    public function getAccountDailyStats(string $channel, string $accountId): array
-    {
-        $cacheKey = self::CACHE_PREFIX . 'daily:' . $channel . ':' . $accountId;
-        
-        return $this->cacheService->get($cacheKey, function () use ($channel, $accountId) {
-            $em = Helpers::getManager();
-            $conn = $em->getConnection();
-            $isPostgres = Helpers::isPostgres($em);
-            
-            $jsonExtract = $isPostgres 
-                ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')" 
-                : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
-            
-            $jsonStart = $isPostgres ? "CAST(payload AS JSONB)->'params'->>'startDate'" : "JSON_EXTRACT(payload, '$.params.startDate')";
-            $jsonEnd = $isPostgres ? "CAST(payload AS JSONB)->'params'->>'endDate'" : "JSON_EXTRACT(payload, '$.params.endDate')";
+                // 3. Format assets and calculate totals
+                $formattedAssets = [];
+                $platformIds = [];
+                $totalChanCompletion = 0;
+                $chanTotal = 0;
+                $chanCompleted = 0;
+                $chanProcessing = 0;
+                $chanFailed = 0;
+                $chanScheduled = 0;
+                $fullySyncedCount = 0;
 
-            $query = "SELECT $jsonStart as start_date, $jsonEnd as end_date
+                foreach ($assets as $id => $stats) {
+                    $completion = $stats['total'] > 0 ? round(($stats['completed'] / $stats['total']) * 100, 2) : 0;
+                    if ($completion >= 100) $fullySyncedCount++;
+
+                    $assetObj = array_merge(['id' => $id, 'completion' => $completion], $stats);
+                    $formattedAssets[$id] = $assetObj;
+                    $platformIds[] = $id;
+
+                    $totalChanCompletion += $completion;
+                    $chanTotal += $stats['total'];
+                    $chanCompleted += $stats['completed'];
+                    $chanProcessing += $stats['processing'];
+                    $chanFailed += $stats['failed'];
+                    $chanScheduled += $stats['scheduled'];
+                }
+
+                // 4. Enrich with names from ChanneledAccount
+                if (!empty($platformIds)) {
+                    try {
+                        $caRepo = $em->getRepository(ChanneledAccount::class);
+                        $channeledAccounts = $caRepo->findBy([
+                            'channel'    => $channelName,
+                            'platformId' => $platformIds
+                        ]);
+                        foreach ($channeledAccounts as $ca) {
+                            $pId = $ca->getPlatformId();
+                            if (isset($formattedAssets[$pId])) {
+                                $formattedAssets[$pId]['name'] = $ca->getName();
+                            }
+                        }
+                    } catch (Throwable $e) {
+                        // Silently fail name enrichment to avoid breaking telemetry
+                    }
+                }
+
+                $finalAssets = array_values($formattedAssets);
+                $assetCount = count($finalAssets);
+
+                return [
+                    'channel'                 => $channelName,
+                    'completion_percentage'   => $assetCount > 0 ? round($totalChanCompletion / $assetCount, 2) : 0,
+                    'fully_synced_count'      => $fullySyncedCount,
+                    'fully_synced_percentage' => $assetCount > 0 ? round(($fullySyncedCount / $assetCount) * 100, 2) : 0,
+                    'total_assets'            => $assetCount,
+                    'total_jobs'              => $chanTotal,
+                    'completed'               => $chanCompleted,
+                    'processing'              => $chanProcessing,
+                    'failed'                  => $chanFailed,
+                    'scheduled'               => $chanScheduled,
+                    'assets'                  => $finalAssets
+                ];
+            }, self::DEFAULT_TTL);
+        }
+
+        /**
+         * Get daily sync map for a specific account (GitHub-style chart data)
+         *
+         * @param string $channel
+         * @param string $accountId
+         * @return array
+         * @throws Exception
+         */
+        public function getAccountDailyStats(string $channel, string $accountId): array
+        {
+            $cacheKey = self::CACHE_PREFIX.'daily:'.$channel.':'.$accountId;
+
+            return $this->cacheService->get($cacheKey, function () use ($channel, $accountId) {
+                $em = Helpers::getManager();
+                $conn = $em->getConnection();
+                $isPostgres = Helpers::isPostgres($em);
+
+                $jsonExtract = $isPostgres
+                    ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')"
+                    : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
+
+                $jsonStart = $isPostgres ? "CAST(payload AS JSONB)->'params'->>'startDate'" : "JSON_EXTRACT(payload, '$.params.startDate')";
+                $jsonEnd = $isPostgres ? "CAST(payload AS JSONB)->'params'->>'endDate'" : "JSON_EXTRACT(payload, '$.params.endDate')";
+
+                $query = "SELECT $jsonStart as start_date, $jsonEnd as end_date
                       FROM jobs 
                       WHERE channel = :channel 
                       AND $jsonExtract = :account_id
                       AND status = :status";
-            
-            $rows = $conn->fetchAllAssociative($query, [
-                'channel' => $channel,
-                'account_id' => $accountId,
-                'status' => JobStatus::completed->value
-            ]);
 
-            $dailyMap = [];
-            foreach ($rows as $row) {
-                $start = $row['start_date'] ? trim($row['start_date'], '"') : null;
-                $end = $row['end_date'] ? trim($row['end_date'], '"') : null;
-                
-                if (!$start) continue;
-                if (!$end) $end = $start;
+                $rows = $conn->fetchAllAssociative($query, [
+                    'channel'    => $channel,
+                    'account_id' => $accountId,
+                    'status'     => JobStatus::completed->value
+                ]);
 
+                $dailyMap = [];
+                foreach ($rows as $row) {
+                    $start = $row['start_date'] ? trim($row['start_date'], '"') : null;
+                    $end = $row['end_date'] ? trim($row['end_date'], '"') : null;
+
+                    if (!$start) continue;
+                    if (!$end) $end = $start;
+
+                    try {
+                        $period = new DatePeriod(
+                            new DateTime($start),
+                            new DateInterval('P1D'),
+                            (new DateTime($end))->modify('+1 day')
+                        );
+                        foreach ($period as $date) {
+                            $dailyMap[$date->format('Y-m-d')] = true;
+                        }
+                    } catch (Throwable $e) {
+                        continue;
+                    }
+                }
+
+                $name = $accountId;
                 try {
-                    $period = new \DatePeriod(
-                        new \DateTime($start),
-                        new \DateInterval('P1D'),
-                        (new \DateTime($end))->modify('+1 day')
-                    );
-                    foreach ($period as $date) {
-                        $dailyMap[$date->format('Y-m-d')] = true;
+                    $caRepo = $em->getRepository(ChanneledAccount::class);
+                    $ca = $caRepo->findOneBy([
+                        'channel'    => $channel,
+                        'platformId' => $accountId
+                    ]);
+                    if ($ca) {
+                        $name = $ca->getName();
                     }
                 } catch (Throwable $e) {
-                    continue;
+                    // Silently fail name enrichment
                 }
+
+                return [
+                    'account_id'     => $accountId,
+                    'name'           => $name,
+                    'channel'        => $channel,
+                    'completed_days' => array_keys($dailyMap)
+                ];
+            }); // 1 hour cache
+        }
+
+        /**
+         * Invalidate sync telemetry cache
+         *
+         * @param string|null $channelName
+         * @param string|null $accountId
+         * @return void
+         */
+        public function invalidate(?string $channelName = null, ?string $accountId = null): void
+        {
+            if ($channelName && $accountId) {
+                $this->cacheService->delete(self::CACHE_PREFIX.'channel:'.$channelName.':'.$accountId);
             }
 
-            $name = $accountId;
-            try {
-                $caRepo = $em->getRepository(ChanneledAccount::class);
-                $ca = $caRepo->findOneBy([
-                    'channel' => $channel,
-                    'platformId' => $accountId
-                ]);
-                if ($ca) {
-                    $name = $ca->getName();
-                }
-            } catch (Throwable $e) {
-                // Silently fail name enrichment
+            if ($channelName) {
+                $this->cacheService->delete(self::CACHE_PREFIX.'channel:'.$channelName);
             }
 
-            return [
-                'account_id' => $accountId,
-                'name' => $name,
-                'channel' => $channel,
-                'completed_days' => array_keys($dailyMap)
-            ];
-        }, 3600); // 1 hour cache
-    }
-
-    /**
-     * Invalidate sync telemetry cache
-     *
-     * @param string|null $channelName
-     * @param string|null $accountId
-     * @return void
-     */
-    public function invalidate(?string $channelName = null, ?string $accountId = null): void
-    {
-        if ($channelName && $accountId) {
-            $this->cacheService->delete(self::CACHE_PREFIX . 'channel:' . $channelName . ':' . $accountId);
+            $this->cacheService->delete(self::CACHE_PREFIX.'global');
         }
-        
-        if ($channelName) {
-            $this->cacheService->delete(self::CACHE_PREFIX . 'channel:' . $channelName);
-        }
-        
-        $this->cacheService->delete(self::CACHE_PREFIX . 'global');
     }
-}
