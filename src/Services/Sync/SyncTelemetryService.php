@@ -61,19 +61,28 @@
                     ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')"
                     : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
 
-                $conditionalTotal = "SUM(CASE WHEN CAST(payload AS TEXT) LIKE '%\"recent\"%' AND status IN (1, 5, 6) THEN 0 ELSE 1 END)";
-
-                // 1. Get all stats in ONE query
-                $sql = "SELECT 
+                $sql = "
+                    SELECT
                         channel,
                         $jsonExtract as account_id,
-                        status,
-                        COUNT(*) as count,
-                        $conditionalTotal as total_for_percentage
-                    FROM jobs 
-                    GROUP BY channel, account_id, status";
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = :completed THEN 1 ELSE 0 END) as completed,
+                        SUM(CASE WHEN status = :failed THEN 1 ELSE 0 END) as failed,
+                        SUM(CASE WHEN status = :processing THEN 1 ELSE 0 END) as processing,
+                        SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
+                        SUM(CASE WHEN CAST(payload AS TEXT) LIKE '%\"recent\"%' AND status IN (:scheduled, :delayed, :cancelled) THEN 0 ELSE 1 END) as total_for_percentage
+                    FROM jobs
+                    GROUP BY channel, account_id
+                ";
 
-                $rows = $conn->fetchAllAssociative($sql);
+                $rows = $conn->fetchAllAssociative($sql, [
+                    'completed'  => JobStatus::completed->value,
+                    'failed'     => JobStatus::failed->value,
+                    'processing' => JobStatus::processing->value,
+                    'scheduled'  => JobStatus::scheduled->value,
+                    'delayed'    => JobStatus::delayed->value,
+                    'cancelled'  => JobStatus::cancelled->value,
+                ]);
 
                 // 2. Group by channel and process
                 $chanStats = [];
@@ -86,26 +95,14 @@
                     $accId = ltrim(trim((string)$row['account_id'], '"'), '#');
                     if ($accId === 'null' || ($accId === '' && $row['account_id'] !== 'global')) continue;
 
-                    if (!isset($chanStats[$chan]['assets'][$accId])) {
-                        $chanStats[$chan]['assets'][$accId] = [
-                            'total'      => 0,
-                            'total_for_percentage' => 0,
-                            'completed'  => 0,
-                            'failed'     => 0,
-                            'processing' => 0,
-                            'scheduled'  => 0
-                        ];
-                    }
-
-                    $status = (int)$row['status'];
-                    $count = (int)$row['count'];
-                    $chanStats[$chan]['assets'][$accId]['total'] += $count;
-                    $chanStats[$chan]['assets'][$accId]['total_for_percentage'] += (int)$row['total_for_percentage'];
-
-                    if ($status === JobStatus::completed->value) $chanStats[$chan]['assets'][$accId]['completed'] += $count;
-                    elseif ($status === JobStatus::failed->value) $chanStats[$chan]['assets'][$accId]['failed'] += $count;
-                    elseif ($status === JobStatus::processing->value) $chanStats[$chan]['assets'][$accId]['processing'] += $count;
-                    elseif ($status === JobStatus::scheduled->value) $chanStats[$chan]['assets'][$accId]['scheduled'] += $count;
+                    $chanStats[$chan]['assets'][$accId] = [
+                        'total'                => (int)$row['total'],
+                        'total_for_percentage' => (int)$row['total_for_percentage'],
+                        'completed'            => (int)$row['completed'],
+                        'failed'               => (int)$row['failed'],
+                        'processing'           => (int)$row['processing'],
+                        'scheduled'            => (int)$row['scheduled']
+                    ];
                 }
 
                 // 3. Final formatting
@@ -190,24 +187,35 @@
                     ? "COALESCE(CAST(payload AS JSONB)->>'account_id', CAST(payload AS JSONB)->'params'->>'account_id', 'global')"
                     : "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.account_id')), JSON_UNQUOTE(JSON_EXTRACT(payload, '$.params.account_id')), 'global')";
 
-                $conditionalTotal = "SUM(CASE WHEN CAST(payload AS TEXT) LIKE '%\"recent\"%' AND status IN (1, 5, 6) THEN 0 ELSE 1 END)";
-
-                $query = "SELECT 
+                $query = "
+                    SELECT
                         $jsonExtract as account_id,
-                        status,
-                        COUNT(*) as count,
-                        $conditionalTotal as total_for_percentage
-                      FROM jobs 
-                      WHERE channel = :channel";
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = :completed THEN 1 ELSE 0 END) as completed,
+                        SUM(CASE WHEN status = :failed THEN 1 ELSE 0 END) as failed,
+                        SUM(CASE WHEN status = :processing THEN 1 ELSE 0 END) as processing,
+                        SUM(CASE WHEN status = :scheduled THEN 1 ELSE 0 END) as scheduled,
+                        SUM(CASE WHEN CAST(payload AS TEXT) LIKE '%\"recent\"%' AND status IN (:scheduled, :delayed, :cancelled) THEN 0 ELSE 1 END) as total_for_percentage
+                    FROM jobs
+                    WHERE channel = :channel
+                ";
 
-                $params = ['channel' => $channelName];
+                $params = [
+                    'channel'    => $channelName,
+                    'completed'  => JobStatus::completed->value,
+                    'failed'     => JobStatus::failed->value,
+                    'processing' => JobStatus::processing->value,
+                    'scheduled'  => JobStatus::scheduled->value,
+                    'delayed'    => JobStatus::delayed->value,
+                    'cancelled'  => JobStatus::cancelled->value,
+                ];
 
                 if ($targetAccountId) {
                     $query .= " AND $jsonExtract = :account_id";
                     $params['account_id'] = $targetAccountId;
                 }
 
-                $query .= " GROUP BY account_id, status";
+                $query .= " GROUP BY account_id";
 
                 $rows = $conn->fetchAllAssociative($query, $params);
 
@@ -217,26 +225,14 @@
                     $accId = ltrim(trim((string)$row['account_id'], '"'), '#');
                     if ($accId === 'null' || ($accId === '' && $row['account_id'] !== 'global')) continue;
 
-                    if (!isset($assets[$accId])) {
-                        $assets[$accId] = [
-                            'total'      => 0,
-                            'total_for_percentage' => 0,
-                            'completed'  => 0,
-                            'failed'     => 0,
-                            'processing' => 0,
-                            'scheduled'  => 0
-                        ];
-                    }
-
-                    $status = (int)$row['status'];
-                    $count = (int)$row['count'];
-                    $assets[$accId]['total'] += $count;
-                    $assets[$accId]['total_for_percentage'] += (int)$row['total_for_percentage'];
-
-                    if ($status === JobStatus::completed->value) $assets[$accId]['completed'] += $count;
-                    elseif ($status === JobStatus::failed->value) $assets[$accId]['failed'] += $count;
-                    elseif ($status === JobStatus::processing->value) $assets[$accId]['processing'] += $count;
-                    elseif ($status === JobStatus::scheduled->value) $assets[$accId]['scheduled'] += $count;
+                    $assets[$accId] = [
+                        'total'                => (int)$row['total'],
+                        'total_for_percentage' => (int)$row['total_for_percentage'],
+                        'completed'            => (int)$row['completed'],
+                        'failed'               => (int)$row['failed'],
+                        'processing'           => (int)$row['processing'],
+                        'scheduled'            => (int)$row['scheduled']
+                    ];
                 }
 
                 // 3. Format assets and calculate totals
