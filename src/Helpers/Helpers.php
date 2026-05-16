@@ -376,11 +376,10 @@
          * @param array|string $uniqueCols Single column or array of columns that form the unique constraint (required for Postgres)
          * @param int $rowCount Number of rows to be inserted in bulk
          * @return string The generated SQL
-         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
          */
         public static function buildUpsertSql(string $table, array $insertCols, array $updateCols, array|string $uniqueCols, int $rowCount = 1): string
         {
-            $dbConfig = self::getDbConfig();
             $isPostgres = self::isPostgres();
 
             $colString = implode(', ', $insertCols);
@@ -433,11 +432,10 @@
          * @param array|string $uniqueCols Single column or array of columns that form the unique constraint (required for Postgres)
          * @param int $rowCount Number of rows to be inserted in bulk
          * @return string The generated SQL
-         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
          */
         public static function buildInsertIgnoreSql(string $table, array $insertCols, array|string $uniqueCols, int $rowCount = 1): string
         {
-            $dbConfig = self::getDbConfig();
             $isPostgres = self::isPostgres();
 
             $colString = implode(', ', $insertCols);

@@ -32,6 +32,7 @@
     use Helpers\Helpers;
     use Psr\Log\LoggerInterface;
     use RuntimeException;
+    use Throwable;
     use Traits\CalculatesMetricDeltas;
 
     class MetricsProcessor
@@ -693,6 +694,7 @@
         /**
          * Processes metrics and returns a map of metric IDs.
          * @throws Exception
+         * @throws ConfigurationException
          */
         public static function processMetricConfigs(
             ArrayCollection  $metrics,

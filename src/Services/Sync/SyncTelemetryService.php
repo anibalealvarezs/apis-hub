@@ -63,6 +63,11 @@ class SyncTelemetryService
                         status,
                         COUNT(*) as count
                     FROM jobs 
+                    WHERE NOT (
+                        payload LIKE '%\"recent\"%' AND
+                        status = 6 AND
+                        updated_at >= NOW() - INTERVAL '24 HOUR'
+                    )
                     GROUP BY channel, account_id, status";
             
             $rows = $conn->fetchAllAssociative($sql);
@@ -184,7 +189,11 @@ class SyncTelemetryService
                         status,
                         COUNT(*) as count
                       FROM jobs 
-                      WHERE channel = :channel";
+                      WHERE channel = :channel AND NOT (
+                        payload LIKE '%\"recent\"%' AND
+                        status = 6 AND
+                        updated_at >= NOW() - INTERVAL '24 HOUR'
+                      )";
             
             $params = ['channel' => $channelName];
             
