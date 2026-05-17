@@ -400,4 +400,65 @@ class SyncProcessTest extends BaseIntegrationTestCase
         $channelsProp->setAccessible(true);
         $channelsProp->setValue(null, $channelsConfig);
     }
+
+    public function testGscEnabledSitesScheduling()
+    {
+        $gscChannel = 'google_search_console';
+        $this->seedChannel($gscChannel, 'google', 'Google Search Console');
+
+        // Mock configurations with a mix of enabled and disabled sites
+        $this->mockConfigurations([
+            'instances' => [
+                [
+                    'name' => 'test_instance_gsc',
+                    'enabled' => true,
+                    'channel' => $gscChannel,
+                    'entity' => 'metric',
+                    'granular_sync' => true
+                ]
+            ]
+        ], [
+            $gscChannel => [
+                'enabled' => true,
+                'granular_sync' => true,
+                'sites' => [
+                    [
+                        'url' => 'sc-domain:enabled-site.com',
+                        'enabled' => true
+                    ],
+                    [
+                        'url' => 'sc-domain:disabled-site.com',
+                        'enabled' => false
+                    ]
+                ]
+            ]
+        ]);
+
+        // Clean existing jobs first
+        $conn = $this->entityManager->getConnection();
+        $conn->executeStatement("DELETE FROM jobs");
+        $this->entityManager->clear();
+
+        $command = new ScheduleInitialJobsCommand($this->entityManager);
+        $command->run(new ArrayInput([]), new NullOutput());
+
+        $jobs = $this->jobRepo->findAll();
+        
+        $scheduledUrls = [];
+        foreach ($jobs as $job) {
+            if ($job->getChannel() === $gscChannel) {
+                $payload = $job->getPayload();
+                if (isset($payload['params']['account_id'])) {
+                    $scheduledUrls[] = $payload['params']['account_id'];
+                }
+            }
+        }
+
+        // We expect only 'sc-domain:enabled-site.com''s platform ID or URL, not 'sc-domain:disabled-site.com'
+        $enabledPId = \Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver::getPlatformId(['url' => 'sc-domain:enabled-site.com'], \Anibalealvarezs\ApiDriverCore\Enums\AssetCategory::IDENTITY, 'gsc');
+        $disabledPId = \Anibalealvarezs\GoogleHubDriver\Drivers\SearchConsoleDriver::getPlatformId(['url' => 'sc-domain:disabled-site.com'], \Anibalealvarezs\ApiDriverCore\Enums\AssetCategory::IDENTITY, 'gsc');
+
+        $this->assertContains($enabledPId, $scheduledUrls, "Enabled GSC site should be scheduled");
+        $this->assertNotContains($disabledPId, $scheduledUrls, "Disabled GSC site should NOT be scheduled");
+    }
 }

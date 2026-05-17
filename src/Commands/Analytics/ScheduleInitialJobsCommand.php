@@ -141,9 +141,13 @@
                                 $dbAccounts = $caRepo->findBy(['channel' => $channel]);
                                 if (strpos($channel, 'facebook') !== false) echo "DEBUG: Found " . count($dbAccounts) . " accounts in DB\n";
                                 foreach ($dbAccounts as $dbAcc) {
+                                    if (!$dbAcc->isEnabled()) {
+                                        continue;
+                                    }
                                     $accounts[] = [
                                         'id' => $dbAcc->getPlatformId(),
-                                        'name' => $dbAcc->getName()
+                                        'name' => $dbAcc->getName(),
+                                        'enabled' => true
                                     ];
                                 }
                             }
@@ -158,6 +162,16 @@
 
 
                     foreach ($accounts as $account) {
+                        if ($account instanceof \Entities\Analytics\ChanneledAccount) {
+                            if (!$account->isEnabled()) {
+                                continue;
+                            }
+                        } elseif (is_array($account)) {
+                            if (isset($account['enabled']) && !$account['enabled']) {
+                                continue;
+                            }
+                        }
+
                         $accountId = null;
                         if ($account instanceof \Entities\Analytics\ChanneledAccount) {
                             $accountId = $account->getPlatformId();
