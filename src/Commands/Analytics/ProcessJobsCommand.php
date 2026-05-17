@@ -133,6 +133,14 @@
                                     foreach ($container['Names'] as $name) {
                                         $cleanName = ltrim($name, '/');
                                         $activeIds[] = $cleanName;
+
+                                        // Dynamically support all suffix matches to avoid deployment prefix mismatches
+                                        $parts = explode('-', $cleanName);
+                                        $numParts = count($parts);
+                                        for ($i = 1; $i < $numParts; $i++) {
+                                            $suffix = implode('-', array_slice($parts, $i));
+                                            $activeIds[] = $suffix;
+                                        }
                                     }
                                 }
                             }
