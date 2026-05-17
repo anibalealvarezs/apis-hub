@@ -7,6 +7,7 @@
     require_once __DIR__.'/../vendor/autoload.php';
 
     use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
+    use Anibalealvarezs\ApiDriverCore\Enums\InstanceTier;
     use Classes\DriverInitializer;
     use Exceptions\ConfigurationException;
     use Symfony\Component\Yaml\Yaml;
@@ -26,13 +27,10 @@
     if (file_exists($tiersConfigFile)) {
         $tiersConfig = Yaml::parseFile($tiersConfigFile)['tiers'] ?? [];
     }
-    // Default tiers fallback
+    // Default tiers validaton
     if (empty($tiersConfig)) {
-        $tiersConfig = [
-                1 => ['memory' => '384M', 'cpu' => '0.50'],
-                2 => ['memory' => '1024M', 'cpu' => '1.00'],
-                3 => ['memory' => '2048M', 'cpu' => '1.50'],
-        ];
+        fwrite(STDERR, "Missing required tiers configuration.\n");
+        exit(1);
     }
 
     // ─── Validate required sections ───────────────────────────────────────────────
@@ -119,11 +117,11 @@
             'deploy'         => [
                     'resources' => [
                             'limits'       => [
-                                    'cpus'   => '0.50',
-                                    'memory' => '512M'
+                                    'cpus'   => $tiersConfig[InstanceTier::MASTER->value]['cpu'],
+                                    'memory' => $tiersConfig[InstanceTier::MASTER->value]['memory']
                             ],
                             'reservations' => [
-                                    'memory' => '256M'
+                                    'memory' => $tiersConfig[InstanceTier::MINIMAL->value]['memory']
                             ]
                     ]
             ]
@@ -188,11 +186,11 @@
             'deploy'      => [
                     'resources' => [
                             'limits'       => [
-                                    'cpus'   => '0.50',
-                                    'memory' => '384M'
+                                    'cpus'   => $tiersConfig[InstanceTier::BASIC->value]['cpu'],
+                                    'memory' => $tiersConfig[InstanceTier::BASIC->value]['memory']
                             ],
                             'reservations' => [
-                                    'memory' => '128M'
+                                    'memory' => $tiersConfig[InstanceTier::RESERVATION->value]['memory']
                             ]
                     ]
             ]
@@ -211,19 +209,19 @@
         $entity = $instance['entity'];
 
         // Determine worker tier based on driver
-        $tierLevel = 1;
+        $tierLevel = InstanceTier::BASIC;
         try {
             $driver = DriverFactory::get($channel);
-            if (method_exists($driver, 'getRequiredWorkerTier')) {
-                $tierLevel = $driver->getRequiredWorkerTier();
+            if (method_exists($driver, 'getRequiredInstanceTier')) {
+                $tierLevel = $driver->getRequiredInstanceTier();
             }
         } catch (Exception $e) {
             // Silently fallback to tier 1 if driver can't be loaded or method missing
         }
 
         // Apply limits based on defined tier, falling back to defaults if tier not found
-        $memoryLimit = $tiersConfig[$tierLevel]['memory'] ?? '384M';
-        $cpuLimit = $tiersConfig[$tierLevel]['cpu'] ?? '0.50';
+        $memoryLimit = $tiersConfig[$tierLevel->value]['memory'] ?? $tiersConfig[InstanceTier::BASIC->value]['memory'];
+        $cpuLimit = $tiersConfig[$tierLevel->value]['cpu'] ?? $tiersConfig[InstanceTier::BASIC->value]['cpu'];
 
         $services[$instName] = [
                 'container_name' => "$deploymentName-$instName",
@@ -248,7 +246,7 @@
                                         'memory' => $memoryLimit
                                 ],
                                 'reservations' => [
-                                        'memory' => '128M'
+                                        'memory' => $tiersConfig[InstanceTier::RESERVATION->value]['memory']
                                 ]
                         ]
                 ]
@@ -283,11 +281,11 @@
             'deploy'         => [
                     'resources' => [
                             'limits'       => [
-                                    'cpus'   => '0.30',
-                                    'memory' => '256M'
+                                    'cpus'   => $tiersConfig[InstanceTier::MINIMAL->value]['cpu'],
+                                    'memory' => $tiersConfig[InstanceTier::MINIMAL->value]['memory']
                             ],
                             'reservations' => [
-                                    'memory' => '128M'
+                                    'memory' => $tiersConfig[InstanceTier::RESERVATION->value]['memory']
                             ]
                     ]
             ]
