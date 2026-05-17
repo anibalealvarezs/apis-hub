@@ -131,6 +131,7 @@ class MetricRequests implements RequestInterface
             );
 
             $manager->getConnection()->commit();
+            $manager->clear();
 
             return [
                 'metrics' => $collection->count(),
