@@ -328,7 +328,10 @@
                     FROM jobs j
                     WHERE j.status {$statusSql}
                     ".($channel ? " AND j.channel = :channel" : "")."
-                    ".($instanceName ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)" : "")."
+                    ".($instanceName && $instanceName !== 'global'
+                        ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)"
+                        : " AND (CAST(j.payload AS JSONB)->>'instance_name' IS NULL OR CAST(j.payload AS JSONB)->>'instance_name' = '' OR CAST(j.payload AS JSONB)->>'instance_name' = 'global')"
+                    )."
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
@@ -346,7 +349,7 @@
                 LIMIT 100";
 
                 if ($channel) $params['channel'] = $channel;
-                if ($instanceName) {
+                if ($instanceName && $instanceName !== 'global') {
                     $params['instance_name'] = $instanceName;
                     $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
                 }
@@ -850,7 +853,10 @@
                     -- Limit Guard: Skip if channel is busy
                     AND bc.channel_name IS NULL
                     ".($channel ? " AND j.channel = :channel" : "")."
-                    ".($instanceName && $instanceName !== 'global' ? " AND (j.payload->>'instance_name' = :instance_name OR j.payload::text LIKE :instance_name_pattern)" : "")."
+                    ".($instanceName && $instanceName !== 'global'
+                        ? " AND (j.payload->>'instance_name' = :instance_name OR j.payload::text LIKE :instance_name_pattern)"
+                        : " AND (j.payload->>'instance_name' IS NULL OR j.payload->>'instance_name' = '' OR j.payload->>'instance_name' = 'global')"
+                    )."
                     -- Mutual Exclusion
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
