@@ -138,11 +138,14 @@ class MetricRequests implements RequestInterface
                 'duplicates' => 0,
             ];
 
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             if ($manager->getConnection()->isTransactionActive()) {
                 $manager->getConnection()->rollback();
             }
-            $logger->error("Error in MetricRequests::persist: " . $e->getMessage());
+            $logger->error("Error in MetricRequests::persist: " . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
 
             throw $e;
         }
