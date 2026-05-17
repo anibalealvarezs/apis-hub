@@ -180,6 +180,61 @@ $mcpPort = getenv('MCP_PORT') ?: 3000;
         // unset($services['worker']['volumes']); // Keep volumes for sync
     }
 
+    // ─── Phase 2.1: Create Dedicated Channel-Entity Instance Services ────────────
+    foreach ($instances as $instance) {
+        $instName = $instance['name'];
+        $channel  = $instance['channel'];
+        $entity   = $instance['entity'];
+
+        // Default memory limits for standard instances
+        $memoryLimit = '384M';
+        $cpuLimit = '0.50';
+
+        if ($channel === 'google_search_console') {
+            try {
+                $chanConfig = \Classes\DriverInitializer::validateConfig($channel);
+                $calculateSynthetics = $chanConfig['calculate_synthetics'] ?? true;
+                if ($calculateSynthetics) {
+                    $memoryLimit = '1024M'; // 1GB limit for GSC synthetic calculation workers
+                    $cpuLimit = '1.00';     // 1.0 CPU limit
+                }
+            } catch (\Exception $e) {
+                // Fallback in case of driver validation issues
+                $memoryLimit = '1024M';
+                $cpuLimit = '1.00';
+            }
+        }
+
+        $services[$instName] = [
+            'container_name' => "{$deploymentName}-{$instName}",
+            'build' => [
+                'context'    => '.',
+                'dockerfile' => 'Dockerfile',
+            ],
+            'restart'     => 'always',
+            'command'     => null,
+            'environment' => $buildEnv($instName, $channel, $entity),
+            'networks'    => ['default'],
+            'volumes'     => $workerVolumes,
+            'depends_on'  => [
+                'master' => ['condition' => 'service_started'],
+                'db' => ['condition' => 'service_started'],
+                'redis' => ['condition' => 'service_started'],
+            ],
+            'deploy' => [
+                'resources' => [
+                    'limits' => [
+                        'cpus' => $cpuLimit,
+                        'memory' => $memoryLimit
+                    ],
+                    'reservations' => [
+                        'memory' => '128M'
+                    ]
+                ]
+            ]
+        ];
+    }
+
     // ─── Phase 2.5: Create Dedicated MCP Service ─────────────────────────────────────
     $services['mcp'] = [
         'container_name' => "{$deploymentName}-mcp",
