@@ -1119,7 +1119,8 @@
                 return;
             }
 
-            $jobRepo = self::getManager()->getRepository(Job::class);
+            $manager = self::getManager();
+            $jobRepo = $manager->getRepository(Job::class);
             $status = $jobRepo->createQueryBuilder('j')
                 ->select('j.status')
                 ->where('j.id = :id')
@@ -1127,9 +1128,19 @@
                 ->getQuery()
                 ->getSingleScalarResult();
 
-            if ($status == JobStatus::failed->value || $status == JobStatus::cancelled->value) {
-                throw new JobCancelledException("El Job #{$jobId} fue interrumpido o cancelado manualmente.");
+            if ($status !== JobStatus::processing->value) {
+                throw new JobCancelledException("El Job #{$jobId} no está en estado PROCESSING (Estado actual: {$status}). Fue interrumpido, reseteado o cancelado.");
             }
+
+            // Update the updatedAt timestamp to act as a heartbeat
+            $manager->createQueryBuilder()
+                ->update(Job::class, 'j')
+                ->set('j.updatedAt', ':now')
+                ->where('j.id = :id')
+                ->setParameter('now', new \DateTime())
+                ->setParameter('id', $jobId)
+                ->getQuery()
+                ->execute();
         }
 
         /**
