@@ -29,8 +29,14 @@
     }
     // Default tiers validaton
     if (empty($tiersConfig)) {
-        fwrite(STDERR, "Missing required tiers configuration.\n");
-        exit(1);
+        $tiersConfig = [
+                0 => ['memory' => '128M', 'cpu' => '0.30'],
+                1 => ['memory' => '256M', 'cpu' => '0.30'],
+                2 => ['memory' => '384M', 'cpu' => '0.50'],
+                3 => ['memory' => '512M', 'cpu' => '0.50'],
+                4 => ['memory' => '1024M', 'cpu' => '1.00'],
+                5 => ['memory' => '2048M', 'cpu' => '1.50'],
+        ];
     }
 
     // ─── Validate required sections ───────────────────────────────────────────────
