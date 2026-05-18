@@ -129,3 +129,4 @@
 - **Compatibility**: The telemetry service query dynamically switches syntax based on `Helpers::isPostgres()` to ensure platform parity.
 - **Routing**: Routes are registered in `src/Routes/sync.php` and loaded via `bin/index.php`.
 - **GSC Database Syntax Error**: Resolved "invalid input syntax for type integer: 'google_search_console'" by refactoring `ChanneledBaseRepository`. All channeled repositories now automatically resolve channel name strings to entity IDs in `findBy`, `findOneBy`, and `count` calls.
+- **Meta Ad Account ID Prefix Normalization**: Updated the frontend `config-manager.js` to normalize ID comparisons by stripping the `act_` prefix before rendering saved checkboxes. Similarly, updated `ConfigManagerController::fetchAssets` to consistently strip `act_` when doing array/in-array checks on fresh vs previous assets (cached in `assets_backup.yaml`) to avoid false-positive 'is_new' or 'lost_access' duplicates.

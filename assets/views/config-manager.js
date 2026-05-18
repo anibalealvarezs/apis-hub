@@ -943,7 +943,8 @@ function renderAssets(assets) {
             if (!a || !a.id) return;
             const rawAccs = currentConfig.fb_ad_accounts_full_config || currentConfig.ad_accounts || currentConfig.facebook_marketing?.ad_accounts || [];
             const savedAccs = Array.isArray(rawAccs) ? rawAccs : Object.values(rawAccs);
-            const saved = savedAccs.find(acc => String(acc.id) === String(a.id));
+            const cleanId = id => String(id).replace(/^act_/, '').trim();
+            const saved = savedAccs.find(acc => cleanId(acc.id) === cleanId(a.id));
             const isInConfig = !!saved;
             const isSynced = isInConfig && saved.enabled !== false && !a.lost_access;
             const div = document.createElement('div');
