@@ -4,8 +4,12 @@
 
     use DateTime;
     use Doctrine\DBAL\Exception;
+    use Doctrine\ORM\EntityManagerInterface;
+    use Doctrine\ORM\Exception\ORMException;
+    use Doctrine\ORM\Mapping\ClassMetadata;
     use Doctrine\ORM\NonUniqueResultException;
     use Doctrine\ORM\OptimisticLockException;
+    use Doctrine\ORM\Query\ResultSetMappingBuilder;
     use Doctrine\ORM\QueryBuilder;
     use Doctrine\Persistence\Mapping\MappingException;
     use Entities\Analytics\Channel;
@@ -16,13 +20,15 @@
     use Exceptions\ConfigurationException;
     use Faker\Factory;
     use Helpers\Helpers;
+    use ReflectionException;
     use Services\CacheService;
     use Entities\Entity;
     use InvalidArgumentException;
+    use Throwable;
 
     class JobRepository extends BaseRepository
     {
-        public function __construct(\Doctrine\ORM\EntityManagerInterface $em, \Doctrine\ORM\Mapping\ClassMetadata $class)
+        public function __construct(EntityManagerInterface $em, ClassMetadata $class)
         {
             parent::__construct($em, $class);
         }
@@ -38,7 +44,7 @@
             match ($type) {
                 QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
                 QueryBuilderType::COUNT => $query->select('count(e.id)'),
-                QueryBuilderType::CUSTOM => throw new \Exception('To be implemented'),
+                QueryBuilderType::CUSTOM, QueryBuilderType::AGGREGATE => throw new \Exception('To be implemented'),
             };
 
             return $query->from($this->getEntityName(), 'e');
@@ -46,14 +52,13 @@
 
         /**
          * @param object|null $data
-         * @phpstan-param object{status?: int|string, entity?: string, channel?: string, uuid?: string, payload?: array}
          * @param bool $returnEntity
          * @return Entity|array|null
          * @throws NonUniqueResultException
-         * @throws \ReflectionException
+         * @throws ReflectionException
          * @throws MappingException|OptimisticLockException
          */
-        public function create($data = null, bool $returnEntity = false): Entity|array|null
+        public function create(?object $data = null, bool $returnEntity = false): Entity|array|null
         {
             if (is_object($data)) {
                 $data = (array)$data;
@@ -90,7 +95,7 @@
                 throw new InvalidArgumentException('Channel is required');
             }
             if ($chanEnum = Channel::tryFromName($data['channel'])) {
-                $data['channel'] = $chanEnum->name;
+                $data['channel'] = $chanEnum->getName();
             } else {
                 throw new InvalidArgumentException('Invalid channel');
             }
@@ -111,7 +116,10 @@
          * @param int $pagination
          * @param string|null $startDate
          * @param string|null $endDate
+         * @param array|null $extra
          * @return QueryBuilder
+         * @throws Exception
+         * @throws \Exception
          */
         protected function buildReadMultipleQuery(
             ?array  $ids,
@@ -156,11 +164,11 @@
                     }
                     if ($key === 'channel') {
                         if ($chanEnum = Channel::tryFromName($value)) {
-                            $value = $chanEnum->name;
+                            $value = $chanEnum->getName();
                         }
                     }
                     $operator = is_array($value) ? 'IN' : '=';
-                    $query->andWhere("e.{$key} {$operator} (:{$key})")
+                    $query->andWhere("e.$key $operator (:$key)")
                         ->setParameter($key, $value);
                 }
             }
@@ -174,13 +182,13 @@
 
                 if ($envChannel && $envChannel !== 'none' && (!is_object($filters) || !isset($filters->channel))) {
                     if ($chanEnum = Channel::tryFromName($envChannel)) {
-                        $envChannel = $chanEnum->name;
+                        $envChannel = $chanEnum->getName();
                     }
                     $query->andWhere('e.channel = :ctx_channel')->setParameter('ctx_channel', $envChannel);
                 }
                 if ($envEntity && $envEntity !== 'none' && (!is_object($filters) || !isset($filters->entity))) {
                     $equivalents = [$envEntity];
-                    if (strpos($envEntity, 'channeled_') === 0) {
+                    if (str_starts_with($envEntity, 'channeled_')) {
                         $equivalents[] = str_replace('channeled_', '', $envEntity);
                     } else {
                         $equivalents[] = 'channeled_'.$envEntity;
@@ -194,12 +202,12 @@
                 if (!Helpers::isPostgres()) {
                     $payloadField = 'e.payload';
                     if ($envStart && (!is_object($filters) || !isset($filters->startDate))) {
-                        $query->andWhere("({$payloadField} LIKE :ctx_start_pattern1 OR {$payloadField} LIKE :ctx_start_pattern2)")
+                        $query->andWhere("($payloadField LIKE :ctx_start_pattern1 OR $payloadField LIKE :ctx_start_pattern2)")
                             ->setParameter('ctx_start_pattern1', '%startDate%'.$envStart.'%')
                             ->setParameter('ctx_start_pattern2', '%start_date%'.$envStart.'%');
                     }
                     if ($envEnd && (!is_object($filters) || !isset($filters->endDate))) {
-                        $query->andWhere("({$payloadField} LIKE :ctx_end_pattern1 OR {$payloadField} LIKE :ctx_end_pattern2)")
+                        $query->andWhere("($payloadField LIKE :ctx_end_pattern1 OR $payloadField LIKE :ctx_end_pattern2)")
                             ->setParameter('ctx_end_pattern1', '%endDate%'.$envEnd.'%')
                             ->setParameter('ctx_end_pattern2', '%end_date%'.$envEnd.'%');
                     }
@@ -250,11 +258,11 @@
                     }
                     if ($key === 'channel') {
                         if ($chanEnum = Channel::tryFromName($value)) {
-                            $value = $chanEnum->name;
+                            $value = $chanEnum->getName();
                         }
                     }
                     $operator = is_array($value) ? 'IN' : '=';
-                    $query->andWhere("e.{$key} {$operator} (:{$key})")
+                    $query->andWhere("e.$key $operator (:$key)")
                         ->setParameter($key, $value);
                 }
             }
@@ -263,7 +271,7 @@
                 $envChannel = getenv('API_SOURCE');
                 if ($envChannel && (!is_object($filters) || !isset($filters->channel))) {
                     if ($chanEnum = Channel::tryFromName($envChannel)) {
-                        $envChannel = $chanEnum->name;
+                        $envChannel = $chanEnum->getName();
                     }
                     $query->andWhere('e.channel = :ctx_channel')->setParameter('ctx_channel', $envChannel);
                 }
@@ -287,6 +295,7 @@
 
         /**
          * @return array
+         * @throws \Exception
          */
         public function getJobs(): array
         {
@@ -299,8 +308,9 @@
          * @param string|null $instanceName
          * @param int|null $workerTier
          * @return Job[]
+         * @throws Exception
          */
-        public function getJobsByStatus($status, ?string $channel = null, ?string $instanceName = null, ?int $workerTier = null): array
+        public function getJobsByStatus(array|int $status, ?string $channel = null, ?string $instanceName = null, ?int $workerTier = null): array
         {
             if (Helpers::isPostgres()) {
                 $isBatch = is_array($status);
@@ -337,7 +347,7 @@
                     ".($workerTier !== null ? " AND COALESCE(c.tier, 2) = :worker_tier" : "")."
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
-                        WHERE p.status = {$processingStatus} 
+                        WHERE p.status = $processingStatus 
                         AND (
                             (COALESCE(CAST(p.payload AS JSONB)->>'account_id', CAST(p.payload AS JSONB)->'params'->>'account_id') = COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') 
                              AND COALESCE(CAST(j.payload AS JSONB)->>'account_id', CAST(j.payload AS JSONB)->'params'->>'account_id') IS NOT NULL)
@@ -360,7 +370,7 @@
                     $params['worker_tier'] = $workerTier;
                 }
 
-                $rsm = new \Doctrine\ORM\Query\ResultSetMappingBuilder($this->_em);
+                $rsm = new ResultSetMappingBuilder($this->_em);
                 $rsm->addRootEntityFromClassMetadata($this->getEntityName(), 'j');
 
                 $query = $this->_em->createNativeQuery($sql, $rsm);
@@ -396,6 +406,7 @@
         /**
          * @param string $uuid
          * @return array
+         * @throws \Exception
          */
         public function getJobsByUuid(string $uuid): array
         {
@@ -416,10 +427,10 @@
         /**
          * @param int $id
          * @param object|null $data
-         * @phpstan-param object{status?: int|string}
          * @param bool $returnEntity
-         * @return array|null
-         * @throws NonUniqueResultException
+         * @return bool|array|Entity|null
+         * @throws OptimisticLockException
+         * @throws ORMException
          */
         public function update(int $id, ?object $data = null, bool $returnEntity = false): bool|array|null|Entity
         {
@@ -465,7 +476,7 @@
                             }
                         }
                     }
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     // Silently fail cache invalidation
                 }
             }
@@ -576,11 +587,12 @@
          *
          * @param int $timeoutMinutes
          * @return int
+         * @throws \DateMalformedStringException
          */
         public function resetAllOrphanedJobs(int $timeoutMinutes = 30): int
         {
             $threshold = new DateTime();
-            $threshold->modify("-{$timeoutMinutes} minutes");
+            $threshold->modify("-$timeoutMinutes minutes");
 
             $qb = $this->createQueryBuilder('e');
             $count = $qb->update($this->getEntityName(), 'e')
@@ -704,7 +716,7 @@
 
             $count = $qb->select('count(e.id)')
                 ->from($this->getEntityName(), 'e')
-                ->where("{$payloadField} LIKE :instance_name_pattern")
+                ->where("$payloadField LIKE :instance_name_pattern")
                 ->andWhere('e.status = :completed')
                 ->andWhere('e.updatedAt >= :since')
                 ->setParameter('instance_name_pattern', '%instance_name%'.$instanceName.'%')
@@ -784,7 +796,7 @@
 
             $qb->select('count(e.id)')
                 ->from($this->getEntityName(), 'e')
-                ->where("{$payloadField} LIKE :instance_name_pattern")
+                ->where("$payloadField LIKE :instance_name_pattern")
                 ->andWhere('e.status = :processing')
                 ->setParameter('instance_name_pattern', '%instance_name%'.$instanceName.'%')
                 ->setParameter('processing', JobStatus::processing->value);
@@ -799,6 +811,7 @@
 
         /**
          * @throws ConfigurationException
+         * @throws Exception
          */
         public function claimAvailableJob(mixed $status, ?string $workerId = null, ?string $channel = null, ?string $instanceName = null, ?int $workerTier = null): ?Job
         {
@@ -871,7 +884,7 @@
                     -- Mutual Exclusion
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
-                        WHERE p.status = {$processingStatus} 
+                        WHERE p.status = $processingStatus 
                         AND p.id != j.id
                         AND (
                             (COALESCE(p.payload->>'account_id', p.payload->'params'->>'account_id') = COALESCE(j.payload->>'account_id', j.payload->'params'->>'account_id')
@@ -920,7 +933,7 @@
                 }
 
                 return null;
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 if (isset($this->_em) && $this->_em->getConnection()->isTransactionActive()) {
                     $this->_em->rollback();
                 }
@@ -962,7 +975,7 @@
                     ->getSingleScalarResult();
 
                 return max(0, (int)$maxWorkers);
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 return 3;
             }
         }
@@ -970,6 +983,7 @@
         /**
          * @param int $hours
          * @return int
+         * @throws \DateMalformedStringException
          */
         public function cleanupStuckJobs(int $hours = 6): int
         {

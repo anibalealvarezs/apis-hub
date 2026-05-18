@@ -82,7 +82,7 @@
             $envChannel = getenv('API_SOURCE');
             $isGenericWorker = empty($envChannel) || $envChannel === 'none';
             $forceAll = $input->getOption('force-all');
-            
+
             $envWorkerTier = getenv('WORKER_TIER');
             $workerTier = $envWorkerTier !== false && $envWorkerTier !== '' ? (int)$envWorkerTier : null;
 
@@ -159,9 +159,6 @@
                     }
                 }
             }
-
-            $envStartDate = getenv('START_DATE');
-            $envEndDate = getenv('END_DATE');
 
             $stats = [
                 'completed' => 0,
