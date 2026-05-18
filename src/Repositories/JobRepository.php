@@ -332,7 +332,7 @@
                     ".($channel ? " AND j.channel = :channel" : "")."
                     ".($instanceName && $instanceName !== 'global'
                         ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)"
-                        : " AND (CAST(j.payload AS JSONB)->>'instance_name' IS NULL OR CAST(j.payload AS JSONB)->>'instance_name' = '' OR CAST(j.payload AS JSONB)->>'instance_name' = 'global')"
+                        : ""
                     )."
                     ".($workerTier !== null ? " AND COALESCE(c.tier, 2) = :worker_tier" : "")."
                     AND NOT EXISTS (
@@ -381,7 +381,7 @@
                 $qb->andWhere('j.channel = :channel')->setParameter('channel', $channel);
             }
 
-            if ($instanceName) {
+            if ($instanceName && $instanceName !== 'global') {
                 $qb->andWhere('j.payload LIKE :instance_pattern')
                     ->setParameter('instance_pattern', '%instance_name%'.$instanceName.'%');
             }
@@ -865,7 +865,7 @@
                     ".($channel ? " AND j.channel = :channel" : "")."
                     ".($instanceName && $instanceName !== 'global'
                         ? " AND (j.payload->>'instance_name' = :instance_name OR j.payload::text LIKE :instance_name_pattern)"
-                        : " AND (j.payload->>'instance_name' IS NULL OR j.payload->>'instance_name' = '' OR j.payload->>'instance_name' = 'global')"
+                        : ""
                     )."
                     ".($workerTier !== null ? " AND COALESCE(c.tier, 2) = :worker_tier" : "")."
                     -- Mutual Exclusion
