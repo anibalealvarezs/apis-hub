@@ -297,9 +297,10 @@
          * @param int|int[] $status
          * @param string|null $channel
          * @param string|null $instanceName
+         * @param int|null $workerTier
          * @return Job[]
          */
-        public function getJobsByStatus($status, ?string $channel = null, ?string $instanceName = null): array
+        public function getJobsByStatus($status, ?string $channel = null, ?string $instanceName = null, ?int $workerTier = null): array
         {
             if (Helpers::isPostgres()) {
                 $isBatch = is_array($status);
@@ -326,12 +327,14 @@
                                ORDER BY j.priority DESC, j.id ASC
                            ) as account_rank
                     FROM jobs j
+                    LEFT JOIN channels c ON j.channel = c.name
                     WHERE j.status {$statusSql}
                     ".($channel ? " AND j.channel = :channel" : "")."
                     ".($instanceName && $instanceName !== 'global'
                         ? " AND (CAST(j.payload AS JSONB)->>'instance_name' = :instance_name OR CAST(j.payload AS text) LIKE :instance_name_pattern)"
                         : " AND (CAST(j.payload AS JSONB)->>'instance_name' IS NULL OR CAST(j.payload AS JSONB)->>'instance_name' = '' OR CAST(j.payload AS JSONB)->>'instance_name' = 'global')"
                     )."
+                    ".($workerTier !== null ? " AND COALESCE(c.tier, 2) = :worker_tier" : "")."
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
                         WHERE p.status = {$processingStatus} 
@@ -352,6 +355,9 @@
                 if ($instanceName && $instanceName !== 'global') {
                     $params['instance_name'] = $instanceName;
                     $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
+                }
+                if ($workerTier !== null) {
+                    $params['worker_tier'] = $workerTier;
                 }
 
                 $rsm = new \Doctrine\ORM\Query\ResultSetMappingBuilder($this->_em);
@@ -378,6 +384,10 @@
             if ($instanceName) {
                 $qb->andWhere('j.payload LIKE :instance_pattern')
                     ->setParameter('instance_pattern', '%instance_name%'.$instanceName.'%');
+            }
+
+            if ($workerTier !== null) {
+                // Not supported cleanly in standard doctrine DQL without joins, but sqlite logic fallback
             }
 
             return $qb->orderBy('j.priority', 'DESC')->addOrderBy('j.id', 'ASC')->setMaxResults(100)->getQuery()->getResult();
@@ -790,10 +800,10 @@
         /**
          * @throws ConfigurationException
          */
-        public function claimAvailableJob(mixed $status, ?string $workerId = null, ?string $channel = null, ?string $instanceName = null): ?Job
+        public function claimAvailableJob(mixed $status, ?string $workerId = null, ?string $channel = null, ?string $instanceName = null, ?int $workerTier = null): ?Job
         {
             if (!Helpers::isPostgres()) {
-                $jobs = $this->getJobsByStatus($status, $channel, $instanceName);
+                $jobs = $this->getJobsByStatus($status, $channel, $instanceName, $workerTier);
                 foreach ($jobs as $job) {
                     if (!$this->canClaimMoreJobsForChannel($job->getChannel())) {
                         continue;
@@ -857,6 +867,7 @@
                         ? " AND (j.payload->>'instance_name' = :instance_name OR j.payload::text LIKE :instance_name_pattern)"
                         : " AND (j.payload->>'instance_name' IS NULL OR j.payload->>'instance_name' = '' OR j.payload->>'instance_name' = 'global')"
                     )."
+                    ".($workerTier !== null ? " AND COALESCE(c.tier, 2) = :worker_tier" : "")."
                     -- Mutual Exclusion
                     AND NOT EXISTS (
                         SELECT 1 FROM jobs p 
@@ -891,6 +902,9 @@
                 if ($instanceName && $instanceName !== 'global') {
                     $params['instance_name'] = $instanceName;
                     $params['instance_name_pattern'] = '%instance_name%'.$instanceName.'%';
+                }
+                if ($workerTier !== null) {
+                    $params['worker_tier'] = $workerTier;
                 }
 
                 $jobId = $this->_em->getConnection()->fetchOne($sql, $params);

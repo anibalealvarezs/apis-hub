@@ -82,6 +82,9 @@
             $envChannel = getenv('API_SOURCE');
             $isGenericWorker = empty($envChannel) || $envChannel === 'none';
             $forceAll = $input->getOption('force-all');
+            
+            $envWorkerTier = getenv('WORKER_TIER');
+            $workerTier = $envWorkerTier !== false && $envWorkerTier !== '' ? (int)$envWorkerTier : null;
 
             if (Helpers::isDebug() || $forceAll) {
                 $output->writeln("Querying scheduled and delayed jobs...");
@@ -183,7 +186,8 @@
                         status: [JobStatus::scheduled->value, JobStatus::delayed->value],
                         workerId: $envInstance,
                         channel: ($forceAll || empty($envChannel) || $envChannel === 'none' ? null : $envChannel),
-                        instanceName: ($forceAll || $isGenericWorker ? 'global' : $envInstance)
+                        instanceName: ($forceAll || $isGenericWorker ? null : $envInstance),
+                        workerTier: $workerTier
                     );
                 }
 

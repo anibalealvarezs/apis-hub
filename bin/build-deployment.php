@@ -60,7 +60,7 @@
     $services = [];
 
     // Helper to build environment block
-    $buildEnv = function ($instanceName = null, $channel = 'none', $entity = 'none') use ($db, $redis, $config, $env, $deploymentName) {
+    $buildEnv = function ($instanceName = null, $channel = 'none', $entity = 'none', $workerTier = null) use ($db, $redis, $config, $env, $deploymentName) {
         $envVars = [
                 "PORT=8080",
                 "API_SOURCE=$channel",
@@ -82,6 +82,9 @@
         ];
         if ($instanceName) {
             $envVars[] = "INSTANCE_NAME=$instanceName";
+        }
+        if ($workerTier !== null) {
+            $envVars[] = "WORKER_TIER=$workerTier";
         }
 
         return $envVars;
@@ -133,119 +136,89 @@
             ]
     ];
 
-    // ─── Phase 2: Create Scalable Worker Service ──────────────────────────────────
+    // ─── Phase 2: Create Scalable Tiered Worker Pools ─────────────────────────────
     $infraConfig = $config['infrastructure'] ?? [];
+    $workerVolumes = ["$projectPathHost:/app"];
 
-    // Dynamic Worker Pool Calculation: 3 workers per unique provider
-    $activeProviders = [];
+    // 1. Gather all active channels and their required tiers
     $availableChannels = DriverFactory::getAvailableChannels();
-
-    // Fallback if registry is empty in this context (Scan config files)
     if (empty($availableChannels)) {
         $availableChannels = array_map(function ($f) {
             return str_replace('.yaml', '', basename($f));
         }, glob(__DIR__.'/../config/channels/*.yaml'));
     }
 
+    $requiredTiers = []; // Map of [tierValue => totalMaxWorkers]
+    
     foreach ($availableChannels as $chanKey) {
         try {
             $chanConfig = DriverInitializer::validateConfig($chanKey);
             if (!empty($chanConfig['enabled'])) {
-                // Get provider name (e.g., facebook_marketing -> facebook)
-                $provider = explode('_', $chanKey)[0];
-                $activeProviders[$provider] = true;
+                $driver = DriverFactory::get($chanKey);
+                $tierLevel = InstanceTier::BASIC->value;
+                if (method_exists($driver, 'getRequiredInstanceTier')) {
+                    $tierLevel = $driver->getRequiredInstanceTier()->value;
+                }
+                
+                $maxWorkers = 3;
+                if (array_key_exists('max_workers', $chanConfig)) {
+                    $maxWorkers = max(0, (int)$chanConfig['max_workers']);
+                } elseif (method_exists($driver, 'getDefaultMaxWorkers')) {
+                    $maxWorkers = max(0, (int)$driver::getDefaultMaxWorkers());
+                }
+                
+                if (!isset($requiredTiers[$tierLevel])) {
+                    $requiredTiers[$tierLevel] = 0;
+                }
+                // We add up the max workers required by each channel in this tier
+                // This gives us a theoretical maximum concurrency needed for this tier
+                $requiredTiers[$tierLevel] += $maxWorkers;
             }
         } catch (Exception $e) {
             // Skip invalid configs
         }
     }
 
-    $providerCount = count($activeProviders) ?: 1;
-    $smartPoolSize = $providerCount * 3;
-
-    // Logic: Use smart size, but allow user to CAP it (not force it) via worker_pool_size
-    $workerPoolSize = $smartPoolSize;
-    if (isset($infraConfig['worker_pool_size'])) {
-        $workerPoolSize = min((int)$infraConfig['worker_pool_size'], $smartPoolSize);
+    // Default to at least one basic worker pool if nothing is found
+    if (empty($requiredTiers)) {
+        $requiredTiers[InstanceTier::BASIC->value] = 3;
     }
 
-    echo "ℹ  Calculated Worker Pool Size: $workerPoolSize (based on ".count($activeProviders)." active providers: ".implode(', ', array_keys($activeProviders)).")\n";
-
-    $workerVolumes = ["$projectPathHost:/app"];
-
-    // Generic worker service definition (Single service to be scaled)
-    $services['worker'] = [
-            'build'       => [
-                    'context'    => '.',
-                    'dockerfile' => 'Dockerfile',
-            ],
-            'restart'     => 'always',
-            'command'     => null,
-            'environment' => $buildEnv(),
-            'networks'    => ['default'],
-            'volumes'     => $workerVolumes,
-            'depends_on'  => [
-                    'master' => ['condition' => 'service_started'],
-                    'db'     => ['condition' => 'service_started'],
-                    'redis'  => ['condition' => 'service_started'],
-            ],
-            'deploy'      => [
-                    'resources' => [
-                            'limits'       => [
-                                    'cpus'   => $tiersConfig[InstanceTier::BASIC->value]['cpu'],
-                                    'memory' => $tiersConfig[InstanceTier::BASIC->value]['memory']
-                            ],
-                            'reservations' => [
-                                    'memory' => $tiersConfig[InstanceTier::RESERVATION->value]['memory']
-                            ]
-                    ]
-            ]
-    ];
-    // Note: The actual number of containers is managed via 'docker compose up -d --scale worker=N'
-    // but we can set the default scale in the yaml if supported by the version.
-    $services['worker']['scale'] = $workerPoolSize;
-    if (empty($workerVolumes)) {
-        // unset($services['worker']['volumes']); // Keep volumes for sync
-    }
-
-    // ─── Phase 2.1: Create Dedicated Channel-Entity Instance Services ────────────
-    foreach ($instances as $instance) {
-        $instName = $instance['name'];
-        $channel = $instance['channel'];
-        $entity = $instance['entity'];
-
-        // Determine worker tier based on driver
-        $tierLevel = InstanceTier::BASIC;
-        try {
-            $driver = DriverFactory::get($channel);
-            if (method_exists($driver, 'getRequiredInstanceTier')) {
-                $tierLevel = $driver->getRequiredInstanceTier();
-            }
-        } catch (Exception $e) {
-            // Silently fallback to tier 1 if driver can't be loaded or method missing
+    // 2. Generate a worker pool service for each required tier
+    foreach ($requiredTiers as $tierValue => $totalChannelConcurrency) {
+        // Limit the pool size to a reasonable default (e.g., max 10 per tier) or based on infra config
+        // Assuming infraConfig['worker_pool_size'] applies globally, we might want to scale it or just use a sensible ratio
+        // Let's cap each pool to 10 by default to avoid accidental massive scaling, but allow infra config to override.
+        $maxPerTier = 10;
+        if (isset($infraConfig['worker_pool_size'])) {
+            $maxPerTier = (int)$infraConfig['worker_pool_size'];
         }
+        $poolSize = min($totalChannelConcurrency, $maxPerTier);
+        
+        $tierName = "worker-tier-$tierValue";
+        
+        // Safety check to ensure we have limits defined for this tier
+        $memoryLimit = $tiersConfig[$tierValue]['memory'] ?? $tiersConfig[InstanceTier::BASIC->value]['memory'];
+        $cpuLimit = $tiersConfig[$tierValue]['cpu'] ?? $tiersConfig[InstanceTier::BASIC->value]['cpu'];
 
-        // Apply limits based on defined tier, falling back to defaults if tier not found
-        $memoryLimit = $tiersConfig[$tierLevel->value]['memory'] ?? $tiersConfig[InstanceTier::BASIC->value]['memory'];
-        $cpuLimit = $tiersConfig[$tierLevel->value]['cpu'] ?? $tiersConfig[InstanceTier::BASIC->value]['cpu'];
+        echo "ℹ  Calculated Worker Pool Size for Tier $tierValue: $poolSize (Max theoretical concurrency needed: $totalChannelConcurrency)\n";
 
-        $services[$instName] = [
-                'container_name' => "$deploymentName-$instName",
-                'build'          => [
+        $services[$tierName] = [
+                'build'       => [
                         'context'    => '.',
                         'dockerfile' => 'Dockerfile',
                 ],
-                'restart'        => 'always',
-                'command'        => null,
-                'environment'    => $buildEnv($instName, $channel, $entity),
-                'networks'       => ['default'],
-                'volumes'        => $workerVolumes,
-                'depends_on'     => [
+                'restart'     => 'always',
+                'command'     => null,
+                'environment' => $buildEnv(null, 'none', 'none', $tierValue),
+                'networks'    => ['default'],
+                'volumes'     => $workerVolumes,
+                'depends_on'  => [
                         'master' => ['condition' => 'service_started'],
                         'db'     => ['condition' => 'service_started'],
                         'redis'  => ['condition' => 'service_started'],
                 ],
-                'deploy'         => [
+                'deploy'      => [
                         'resources' => [
                                 'limits'       => [
                                         'cpus'   => (string)$cpuLimit,
@@ -257,7 +230,9 @@
                         ]
                 ]
         ];
+        $services[$tierName]['scale'] = $poolSize;
     }
+
 
     // ─── Phase 2.5: Create Dedicated MCP Service ─────────────────────────────────────
     $services['mcp'] = [
