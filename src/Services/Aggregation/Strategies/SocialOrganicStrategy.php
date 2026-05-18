@@ -115,7 +115,12 @@
             ];
             if (isset($filtersArr['channel'])) {
                 $whereClauses[] = 'mc.channel = :channel';
-                $sqlParams['channel'] = $filtersArr['channel'];
+                $channelVal = $filtersArr['channel'];
+                if (is_scalar($channelVal) && !ctype_digit((string)$channelVal)) {
+                    $ch = Channel::tryFromName((string)$channelVal);
+                    if ($ch) $channelVal = $ch->getId();
+                }
+                $sqlParams['channel'] = (int)$channelVal;
             }
 
             $orderSql = '';
@@ -220,8 +225,13 @@
             // Handle Channel
             if (isset($filtersArr['channel'])) {
                 $condition = $filterResolver->resolve($filtersArr['channel']);
+                $channelVal = $condition['value'];
+                if (is_scalar($channelVal) && !ctype_digit((string)$channelVal)) {
+                    $ch = Channel::tryFromName((string)$channelVal);
+                    if ($ch) $condition['value'] = $ch->getId();
+                }
                 $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
-                if ($condition['value'] !== null) $sqlParams['channel'] = $condition['value'];
+                if ($condition['value'] !== null) $sqlParams['channel'] = (int)$condition['value'];
             }
 
             // Account Type
@@ -337,8 +347,13 @@
 
             if (isset($filtersArr['channel'])) {
                 $condition = $filterResolver->resolve($filtersArr['channel']);
+                $channelVal = $condition['value'];
+                if (is_scalar($channelVal) && !ctype_digit((string)$channelVal)) {
+                    $ch = Channel::tryFromName((string)$channelVal);
+                    if ($ch) $condition['value'] = $ch->getId();
+                }
                 $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
-                if ($condition['value'] !== null) $sqlParams['channel'] = $condition['value'];
+                if ($condition['value'] !== null) $sqlParams['channel'] = (int)$condition['value'];
             }
 
             if (isset($filtersArr['post'])) {
