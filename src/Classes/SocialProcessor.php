@@ -192,17 +192,17 @@ class SocialProcessor
                 $accountId = self::resolveContextId(
                     $context,
                     ['account'],
-                    ['account_id', 'accountId']
+                    ['account_id', 'accountId', 'accountPlatformId']
                 );
                 $pageId = self::resolveContextId(
                     $context,
                     ['page'],
-                    ['page_id', 'pageId']
+                    ['page_id', 'pageId', 'pagePlatformId']
                 );
                 $channeledAccountId = self::resolveContextId(
                     $context,
                     ['channeled_account', 'channeledAccount'],
-                    ['channeled_account_id', 'channeledAccountId']
+                    ['channeled_account_id', 'channeledAccountId', 'channeledAccountPlatformId']
                 );
 
                 $params[] = $p->getPlatformId();
