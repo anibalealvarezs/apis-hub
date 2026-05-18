@@ -36,7 +36,7 @@
             'total_interactions', 'replies', 'accounts_engaged', 'post_clicks',
             'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
             'profile_activity', 'profile_visits', 'reposts', 'follows',
-            'reach', 'page_views_total', 'video_views' // Reach is also organic
+            'reach', 'page_views_total', 'video_views', 'post_video_avg_time_watched'
         ];
 
         /**
@@ -232,7 +232,7 @@
                 'profile_links_taps', 'follows_and_unfollows', 'saves', 'shares',
                 'total_interactions', 'replies', 'accounts_engaged', 'post_clicks',
                 'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
-                'profile_activity', 'profile_visits', 'reposts', 'follows', 'reach' =>
+                'profile_activity', 'profile_visits', 'reposts', 'follows', 'reach', 'post_video_avg_time_watched' =>
                 $this->buildSumExpression($resolvedNames['raw_names'], $nameCol, $periodCol, $period),
                 default => null,
             };
