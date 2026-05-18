@@ -186,7 +186,7 @@
                         }
 
                         // Fast Load Logic for Assets: Populate basic asset lists from config without full discovery
-                        if (!$forceRefresh) {
+                        if (!$forceRefresh || !$isRequestedType) {
                             $resourceKey = $systemConfig[$chan]['resource_key'] ?? null;
                             if ($resourceKey && isset($chanConfig[$resourceKey])) {
                                 // Merge with existing assets if the key is already present (e.g. across multiple social channels)
@@ -195,11 +195,11 @@
                                     array_values($chanConfig[$resourceKey])
                                 );
                             }
+                        }
 
-                            // If it's not a requested type for asset discovery, we skip the slow Discovery part
-                            if (!$isRequestedType) {
-                                continue;
-                            }
+                        // If it's not a requested type for asset discovery, we skip the slow Discovery part
+                        if (!$isRequestedType) {
+                            continue;
                         }
 
                         // 2. Fetch Assets if needed (Discovery)
