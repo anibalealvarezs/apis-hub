@@ -321,15 +321,16 @@
                 return null;
             }
 
-            $sqlParams = [
-                'startDate' => $startDate,
-                'endDate'   => $endDate,
-            ];
+            $sqlParams = [];
+            $whereClauses = [];
 
-            $whereClauses = [
-                'm.metric_date >= :startDate',
-                'm.metric_date <= :endDate',
-            ];
+            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
+            if (!$isLatestSnapshot) {
+                $sqlParams['startDate'] = $startDate;
+                $sqlParams['endDate']   = $endDate;
+                $whereClauses[] = 'm.metric_date >= :startDate';
+                $whereClauses[] = 'm.metric_date <= :endDate';
+            }
 
             $filterResolver = new FilterConditionResolver();
 
