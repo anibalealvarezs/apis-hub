@@ -13,6 +13,11 @@
     use Symfony\Component\Yaml\Yaml;
     use Helpers\Helpers;
 
+    // ─── Ensure CONFIG_DIR is set ────────────────────────────────────────────────
+    $configDir = getenv('CONFIG_DIR') ?: realpath(__DIR__.'/../config');
+    putenv("CONFIG_DIR=$configDir");
+    $_ENV['CONFIG_DIR'] = $configDir;
+
     // ─── Load Configuration ───────────────────────────────────────────────────────
     try {
         $config = Helpers::getProjectConfig();

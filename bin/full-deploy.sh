@@ -121,6 +121,7 @@ MSYS_NO_PATHCONV=1 docker run --rm \
     -e "ENV_FILE=$ENV_FILE" \
     -e "SKIP_SEED=$SKIP_SEED" \
     -e "PROJECT_PATH_HOST=$PROJECT_PATH_HOST" \
+    -e "CONFIG_DIR=/app/config" \
     --env-file "$ENV_FILE" \
     -w /app \
     php:8.3-cli \
