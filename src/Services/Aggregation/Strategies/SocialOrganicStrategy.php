@@ -115,7 +115,7 @@
             ];
             if (isset($filtersArr['channel'])) {
                 $whereClauses[] = 'mc.channel = :channel';
-                $sqlParams['channel'] = (int)$filtersArr['channel'];
+                $sqlParams['channel'] = $filtersArr['channel'];
             }
 
             $orderSql = '';
