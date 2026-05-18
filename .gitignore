@@ -87,3 +87,5 @@ GRANULAR_SYNC_PLAN.md
 config/instances.yaml.test
 
 .env-old
+
+config/channels/facebook_organic.yaml_old

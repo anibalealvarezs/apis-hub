@@ -36,7 +36,7 @@
             'total_interactions', 'replies', 'accounts_engaged', 'post_clicks',
             'ig_reels_avg_watch_time', 'ig_reels_video_view_total_time',
             'profile_activity', 'profile_visits', 'reposts', 'follows',
-            'reach' // Reach is also organic
+            'reach', 'page_views_total', 'video_views' // Reach is also organic
         ];
 
         /**
