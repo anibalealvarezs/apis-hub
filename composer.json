@@ -24,10 +24,10 @@
   },
   "require": {
     "ext-json": "*",
-    "anibalealvarezs/api-client-skeleton": "dev-main",
-    "anibalealvarezs/api-driver-core": "dev-main",
-    "anibalealvarezs/facebook-graph-api": "dev-main",
-    "anibalealvarezs/google-api": "dev-develop",
+    "anibalealvarezs/api-client-skeleton": "^1.0.0",
+    "anibalealvarezs/api-driver-core": "^1.0.0",
+    "anibalealvarezs/facebook-graph-api": "^1.0.0",
+    "anibalealvarezs/google-api": "^1.0.0",
     "doctrine/orm": "^2.12.3 || ^3.0",
     "doctrine/dbal": "^3.3.7 || ^4.0",
     "fakerphp/faker": "^1.20",
@@ -42,18 +42,18 @@
     "symfony/redis-messenger": "^6.4 || ^7.0",
     "symfony/cache-contracts": "^3.0",
     "predis/predis": "^2.0",
-    "anibalealvarezs/google-hub-driver": "dev-main",
-    "anibalealvarezs/meta-hub-driver": "dev-main",
-    "anibalealvarezs/klaviyo-hub-driver": "dev-main",
-    "anibalealvarezs/shopify-hub-driver": "dev-main",
-    "anibalealvarezs/netsuite-hub-driver": "dev-main",
-    "anibalealvarezs/amazon-hub-driver": "dev-main",
-    "anibalealvarezs/bigcommerce-hub-driver": "dev-main",
-    "anibalealvarezs/pinterest-hub-driver": "dev-main",
-    "anibalealvarezs/linkedin-hub-driver": "dev-main",
-    "anibalealvarezs/tiktok-hub-driver": "dev-main",
-    "anibalealvarezs/x-hub-driver": "dev-main",
-    "anibalealvarezs/triple-whale-hub-driver": "dev-main",
+    "anibalealvarezs/google-hub-driver": "^1.0.0",
+    "anibalealvarezs/meta-hub-driver": "^1.0.0",
+    "anibalealvarezs/klaviyo-hub-driver": "^0.1.0",
+    "anibalealvarezs/shopify-hub-driver": "^0.1.0",
+    "anibalealvarezs/netsuite-hub-driver": "^0.1.0",
+    "anibalealvarezs/amazon-hub-driver": "^0.1.0",
+    "anibalealvarezs/bigcommerce-hub-driver": "^0.1.0",
+    "anibalealvarezs/pinterest-hub-driver": "^0.1.0",
+    "anibalealvarezs/linkedin-hub-driver": "^0.1.0",
+    "anibalealvarezs/tiktok-hub-driver": "^0.1.0",
+    "anibalealvarezs/x-hub-driver": "^0.1.0",
+    "anibalealvarezs/triple-whale-hub-driver": "^0.1.0",
     "php": ">=8.3"
   },
   "conflict": {
@@ -95,12 +95,12 @@
     }
   },
   "require-dev": {
-    "doctrine/instantiator": "^1.5",
     "phpbench/phpbench": "^1.2.6",
+    "mikey179/vfsstream": "2.0.x-dev",
+    "phpunit/phpunit": "^9",
     "doctrine/data-fixtures": "^1.5.3",
     "phpstan/phpstan": "^1.10",
-    "mikey179/vfsstream": "2.0.x-dev",
-    "phpunit/phpunit": "^9"
+    "doctrine/instantiator": "^1.5"
   },
   "repositories": [
     {
