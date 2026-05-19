@@ -115,6 +115,12 @@
             $config = $config ?: self::validateConfig($channel, $logger);
             $driver = DriverFactory::get($channel, $logger, $config);
 
+            if ($authProvider = $driver->getAuthProvider()) {
+                if (!$authProvider->hasCredentials()) {
+                    throw new Exception("Credentials not configured for channel: $channel");
+                }
+            }
+
             // Merge config into the driver if needed, but getApi usually takes it
             $api = $driver->getApi($config);
 

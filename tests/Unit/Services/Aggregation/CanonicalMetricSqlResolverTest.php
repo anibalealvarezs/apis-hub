@@ -207,6 +207,11 @@ final class FakeCanonicalMetricProviderDriver implements CanonicalMetricDictiona
             'conversions' => ['registry_result', 'registry_result_daily'],
         ];
     }
+
+    public static function getPlatformEntityIdField(): string
+    {
+        return 'id';
+    }
 }
 
 final class FakeShopifyCanonicalMetricProviderDriver implements CanonicalMetricDictionaryProviderInterface
@@ -219,6 +224,11 @@ final class FakeShopifyCanonicalMetricProviderDriver implements CanonicalMetricD
         return [
             'conversions' => ['shopify_orders', 'shopify_orders_daily'],
         ];
+    }
+
+    public static function getPlatformEntityIdField(): string
+    {
+        return 'id';
     }
 }
 
@@ -233,6 +243,11 @@ final class FakeKlaviyoCanonicalMetricProviderDriver implements CanonicalMetricD
             'conversions' => ['klaviyo_conversion', 'klaviyo_conversion_daily'],
         ];
     }
+
+    public static function getPlatformEntityIdField(): string
+    {
+        return 'id';
+    }
 }
 
 final class FakeGoogleCanonicalMetricProviderDriver implements CanonicalMetricDictionaryProviderInterface
@@ -245,6 +260,11 @@ final class FakeGoogleCanonicalMetricProviderDriver implements CanonicalMetricDi
         return [
             'clicks' => ['gsc_clicks', 'gsc_clicks_daily'],
         ];
+    }
+
+    public static function getPlatformEntityIdField(): string
+    {
+        return 'id';
     }
 }
 

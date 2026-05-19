@@ -404,7 +404,16 @@
                         }
 
                         $driver = DriverFactory::get($chan, $logger, $chanConfig);
-                        $validation = $driver->validateAuthentication();
+                        $authProvider = $driver->getAuthProvider();
+                        if ($authProvider && !$authProvider->hasCredentials()) {
+                            $validation = [
+                                'success' => false,
+                                'message' => 'Credentials not configured.',
+                                'details' => []
+                            ];
+                        } else {
+                            $validation = $driver->validateAuthentication();
+                        }
 
                         $result = [
                             'status'  => $validation['success'] ? 'valid' : 'error',
