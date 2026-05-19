@@ -244,16 +244,19 @@
                             }
                         } elseif ($type === 'channeled_accounts' && isset($params['platform_ids']) && $category) {
                             $ids = (array)$params['platform_ids'];
-                            if ($driverClass) {
-                                $searchValues = array_map(fn($id) => $driverClass::getPlatformId(['id' => $id], $category, $context), $ids);
-                            } else {
-                                $searchValues = $ids;
+                            $normalizedToOriginal = [];
+                            foreach ($ids as $id) {
+                                $normalized = $driverClass ? $driverClass::getPlatformId(['id' => $id], $category, $context) : (string)$id;
+                                $normalizedToOriginal[$normalized][] = (string)$id;
                             }
-                            $searchValues = array_unique($searchValues);
-                            error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'channeled_accounts' by platformId: ".json_encode($searchValues));
+                            $searchValues = array_unique(array_keys($normalizedToOriginal));
+                            error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'channeled_accounts' by platformId (normalized): ".json_encode($searchValues));
                             $entities = $repo->findBy(['platformId' => $searchValues, 'channel' => $channelEntity]);
                             foreach ($entities as $e) {
-                                $map[(string)$e->getPlatformId()] = $e;
+                                $dbId = (string)$e->getPlatformId();
+                                foreach (($normalizedToOriginal[$dbId] ?? []) as $origId) {
+                                    $map[$origId] = $e;
+                                }
                             }
                         } elseif ($type === 'accounts' && isset($params['names'])) {
                             $entities = $repo->findBy(['name' => $params['names']]);

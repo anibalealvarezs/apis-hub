@@ -115,7 +115,12 @@
             ];
             if (isset($filtersArr['channel'])) {
                 $whereClauses[] = 'mc.channel = :channel';
-                $sqlParams['channel'] = (int)$filtersArr['channel'];
+                $channelVal = $filtersArr['channel'];
+                if (is_scalar($channelVal) && !ctype_digit((string)$channelVal)) {
+                    $ch = Channel::tryFromName((string)$channelVal);
+                    if ($ch) $channelVal = $ch->getId();
+                }
+                $sqlParams['channel'] = (int)$channelVal;
             }
 
             $orderSql = '';
@@ -220,8 +225,13 @@
             // Handle Channel
             if (isset($filtersArr['channel'])) {
                 $condition = $filterResolver->resolve($filtersArr['channel']);
+                $channelVal = $condition['value'];
+                if (is_scalar($channelVal) && !ctype_digit((string)$channelVal)) {
+                    $ch = Channel::tryFromName((string)$channelVal);
+                    if ($ch) $condition['value'] = $ch->getId();
+                }
                 $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
-                if ($condition['value'] !== null) $sqlParams['channel'] = $condition['value'];
+                if ($condition['value'] !== null) $sqlParams['channel'] = (int)$condition['value'];
             }
 
             // Account Type
@@ -311,15 +321,16 @@
                 return null;
             }
 
-            $sqlParams = [
-                'startDate' => $startDate,
-                'endDate'   => $endDate,
-            ];
+            $sqlParams = [];
+            $whereClauses = [];
 
-            $whereClauses = [
-                'm.metric_date >= :startDate',
-                'm.metric_date <= :endDate',
-            ];
+            $isLatestSnapshot = (bool)($filtersArr['latest_snapshot'] ?? false);
+            if (!$isLatestSnapshot) {
+                $sqlParams['startDate'] = $startDate;
+                $sqlParams['endDate']   = $endDate;
+                $whereClauses[] = 'm.metric_date >= :startDate';
+                $whereClauses[] = 'm.metric_date <= :endDate';
+            }
 
             $filterResolver = new FilterConditionResolver();
 
@@ -337,8 +348,13 @@
 
             if (isset($filtersArr['channel'])) {
                 $condition = $filterResolver->resolve($filtersArr['channel']);
+                $channelVal = $condition['value'];
+                if (is_scalar($channelVal) && !ctype_digit((string)$channelVal)) {
+                    $ch = Channel::tryFromName((string)$channelVal);
+                    if ($ch) $condition['value'] = $ch->getId();
+                }
                 $whereClauses[] = $this->buildFilterClause('mc.channel', $condition, 'channel');
-                if ($condition['value'] !== null) $sqlParams['channel'] = $condition['value'];
+                if ($condition['value'] !== null) $sqlParams['channel'] = (int)$condition['value'];
             }
 
             if (isset($filtersArr['post'])) {

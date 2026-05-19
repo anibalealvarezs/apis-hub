@@ -9,6 +9,7 @@
 - Use `D:\laragon\www\_shared\AGENTS.md` and `D:\laragon\www\_shared\MEMORY.md` for cross-repository protocols and workspace-wide learnings.
 - Keep secrets, credentials, tokens, and private endpoints out of this file.
 ## Current notes
+- MCP server dependency management now uses `pnpm` with `mcp-server/.npmrc` enforcing `minimum-release-age=1440` and `block-exotic-subdeps=true`; Docker builds activate pnpm via Corepack before installing MCP dependencies.
 - Orchestrator owns caching, normalization, persistence, and aggregation.
 - Prefer Doctrine-managed schema changes for index work; avoid direct manual `CREATE INDEX` unless there is explicit emergency authorization.
 - Use the metric aggregation strategy abstraction and the metric profile index planner to derive candidate indexes from driver-defined profiles before materializing them in Doctrine metadata.
@@ -118,3 +119,14 @@
 - **Protocol**: Dependencies must be managed during the build phase (Dockerfile) or manually, never during container startup.
 
 
+
+### 2026-05-07 - Sync Telemetry Engine Implementation
+- **Decision**: Implemented a Redis-cached telemetry API to track sync progress across all channels and assets.
+- **Components**:
+    - `SyncTelemetryService`: Calculates completion % using `JSON_EXTRACT` (MySQL) or JSONB operators (PostgreSQL).
+    - `SyncStatusController`: Exposes `GET /api/sync/status` with API Key security.
+- **Invalidation Strategy**: Event-driven invalidation via `JobRepository::update()`. Every time a job status changes, the relevant telemetry cache keys are purged.
+- **Compatibility**: The telemetry service query dynamically switches syntax based on `Helpers::isPostgres()` to ensure platform parity.
+- **Routing**: Routes are registered in `src/Routes/sync.php` and loaded via `bin/index.php`.
+- **GSC Database Syntax Error**: Resolved "invalid input syntax for type integer: 'google_search_console'" by refactoring `ChanneledBaseRepository`. All channeled repositories now automatically resolve channel name strings to entity IDs in `findBy`, `findOneBy`, and `count` calls.
+- **Meta Ad Account ID Prefix Normalization**: Updated the frontend `config-manager.js` to normalize ID comparisons by stripping the `act_` prefix before rendering saved checkboxes. Similarly, updated `ConfigManagerController::fetchAssets` to consistently strip `act_` when doing array/in-array checks on fresh vs previous assets (cached in `assets_backup.yaml`) to avoid false-positive 'is_new' or 'lost_access' duplicates.

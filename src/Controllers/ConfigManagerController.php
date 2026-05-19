@@ -186,7 +186,7 @@
                         }
 
                         // Fast Load Logic for Assets: Populate basic asset lists from config without full discovery
-                        if (!$forceRefresh) {
+                        if (!$forceRefresh || !$isRequestedType) {
                             $resourceKey = $systemConfig[$chan]['resource_key'] ?? null;
                             if ($resourceKey && isset($chanConfig[$resourceKey])) {
                                 // Merge with existing assets if the key is already present (e.g. across multiple social channels)
@@ -195,11 +195,11 @@
                                     array_values($chanConfig[$resourceKey])
                                 );
                             }
+                        }
 
-                            // If it's not a requested type for asset discovery, we skip the slow Discovery part
-                            if (!$isRequestedType) {
-                                continue;
-                            }
+                        // If it's not a requested type for asset discovery, we skip the slow Discovery part
+                        if (!$isRequestedType) {
+                            continue;
                         }
 
                         // 2. Fetch Assets if needed (Discovery)
@@ -208,18 +208,19 @@
                             // Mix with previous assets to detect "NEW" and "LOST ACCESS"
                             foreach ($driverAssets as $assetKey => $assetList) {
                                 $prevList = $previousAssets[$assetKey] ?? [];
-                                $prevIds = array_map(fn($a) => (string)($a['id'] ?? $a['url'] ?? ''), $prevList);
-                                $freshIds = array_map(fn($a) => (string)($a['id'] ?? $a['url'] ?? ''), $assetList);
+                                $normalizeId = fn($id) => str_replace('act_', '', (string)$id);
+                                $prevIds = array_map(fn($a) => $normalizeId($a['id'] ?? $a['url'] ?? ''), $prevList);
+                                $freshIds = array_map(fn($a) => $normalizeId($a['id'] ?? $a['url'] ?? ''), $assetList);
 
                                 // Mark newly discovered assets
                                 foreach ($assetList as &$asset) {
-                                    $asset['is_new'] = !empty($prevIds) && !in_array((string)($asset['id'] ?? $asset['url'] ?? ''), $prevIds);
+                                    $asset['is_new'] = !empty($prevIds) && !in_array($normalizeId($asset['id'] ?? $asset['url'] ?? ''), $prevIds);
                                 }
                                 unset($asset);
 
                                 // Append previously-known assets that Meta no longer returns → lost_access
                                 foreach ($prevList as $prevAsset) {
-                                    $prevId = (string)($prevAsset['id'] ?? $prevAsset['url'] ?? '');
+                                    $prevId = $normalizeId($prevAsset['id'] ?? $prevAsset['url'] ?? '');
                                     if ($prevId && !in_array($prevId, $freshIds)) {
                                         $prevAsset['lost_access'] = true;
                                         $prevAsset['enabled'] = false;
@@ -472,6 +473,11 @@
                 $chanConfig = $rawConfig['channels'][$channel] ?? $rawConfig;
                 $logger->info("DEBUG: Config loaded from disk for $channel");
                 $channelEntity = $this->em->getRepository(Channel::class)->findOneBy(['name' => $channel]);
+                if ($channelEntity) {
+                    $maxWorkers = (int)($chanConfig['max_workers'] ?? 3);
+                    $channelEntity->setMaxWorkers($maxWorkers);
+                    $this->em->persist($channelEntity);
+                }
 
                 // 2. Identify common account group
                 $commonKey = $driver::getCommonConfigKey();

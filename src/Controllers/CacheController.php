@@ -3,6 +3,7 @@
     namespace Controllers;
 
     use Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory;
+    use Doctrine\DBAL\ArrayParameterType;
     use Doctrine\DBAL\Connection;
     use Entities\Analytics\Channel as ChannelEntity;
     use Entities\Job;
@@ -176,8 +177,8 @@
                     }
 
                     $sqlTypes = [
-                        'entities' => Connection::PARAM_STR_ARRAY,
-                        'statuses' => Connection::PARAM_INT_ARRAY,
+                        'entities' => ArrayParameterType::STRING,
+                        'statuses' => ArrayParameterType::INTEGER,
                     ];
                     $existingJobs = $this->em->getConnection()->fetchAllAssociative($sql, $sqlParams, $sqlTypes);
                 } else {
@@ -220,6 +221,10 @@
                     'body'   => $body,
                     'params' => $params,
                 ];
+
+                if (isset($params['account_id'])) {
+                    $payload['account_id'] = $params['account_id'];
+                }
 
                 if (isset($params['instance_name'])) {
                     $payload['instance_name'] = $params['instance_name'];

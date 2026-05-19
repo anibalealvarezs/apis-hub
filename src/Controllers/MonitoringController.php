@@ -9,6 +9,8 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
 use Entities\Analytics\Channel;
+use Services\Sync\SyncTelemetryService;
+use Services\CacheService;
 
 class MonitoringController extends BaseController
 {
@@ -451,11 +453,34 @@ class MonitoringController extends BaseController
             $dbTotals[] = $entry;
         }
 
+        // Add Sync Telemetry
+        $syncTelemetry = [];
+        try {
+            $redis = Helpers::getRedisClient();
+            $cache = CacheService::getInstance($redis);
+            $telemetryService = new SyncTelemetryService($cache);
+            
+            // If activeChannels is empty, try to get all channels that have jobs
+            $channelsToCheck = $activeChannels;
+            if (empty($channelsToCheck)) {
+                $channelsToCheck = $conn->fetchFirstColumn("SELECT DISTINCT channel FROM jobs WHERE channel IS NOT NULL");
+            }
+
+            // Get data for each channel
+            foreach ($channelsToCheck as $chan) {
+                if (!$chan) continue;
+                $syncTelemetry[$chan] = $telemetryService->getChannelStatus($chan);
+            }
+        } catch (\Exception $e) {
+            error_log("Failed to fetch sync telemetry for monitoring: " . $e->getMessage());
+        }
+
         return new JsonResponse([
             'containers' => $containers,
             'groupedJobs' => $groupedJobs,
             'channelTotals' => $channelTotals,
             'dbTotals' => $dbTotals,
+            'syncTelemetry' => $syncTelemetry,
             'projectName' => $this->config['project'] ?? 'APIs Hub',
             'timestamp' => date('Y-m-d H:i:s')
         ]);

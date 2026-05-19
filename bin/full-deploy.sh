@@ -7,8 +7,6 @@ set -e
 echo "⚒  Starting Full Deployment"
 echo ""
 
-# ── Step 0: Ensure configuration files exist ──────────────────────────────────
-echo "📂 [0/4] Checking configuration files..."
 # --- Configuration & Colors ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -85,10 +83,25 @@ MSYS_NO_PATHCONV=1 docker run --rm \
     php:8.3-cli \
     php bin/fetch-remote-config.php || echo "  ⚠️ Remote config fetch failed, continuing with local config..."
 
+# ── Step 1.5: Start temporary infrastructure for build steps ──────────────────
+echo ""
+echo -e "${YELLOW}🚀 [1.5/5] Starting temporary Redis for build process...${NC}"
+DEPLOYMENT_NAME=$(grep -E '^DEPLOYMENT_NAME=' "$ENV_FILE" | cut -d '=' -f 2 | tr -d '"' | tr -d "'" || echo "apis-hub")
+BUILD_NETWORK="${DEPLOYMENT_NAME}_build_net"
+REDIS_CONTAINER_NAME="${DEPLOYMENT_NAME}-redis-build"
+
+# Create a temporary network
+docker network create "$BUILD_NETWORK" >/dev/null 2>&1 || echo "  ℹ️  Build network already exists."
+
+# Start a temporary redis container on that network
+docker run -d --rm --name "$REDIS_CONTAINER_NAME" --network "$BUILD_NETWORK" --network-alias redis redis:alpine >/dev/null
+echo -e "${GREEN}✔ Temporary Redis is running.${NC}"
+
 # ── Step 2: Refresh Instances from rules ──────────────────────────────────────
 echo ""
 echo -e "${YELLOW}🔄 [2/5] Calculating instance nodes and splits...${NC}"
 MSYS_NO_PATHCONV=1 docker run --rm \
+    --network "$BUILD_NETWORK" \
     -v "$(pwd):/app" \
     -e "ENV_FILE=$ENV_FILE" \
     -e "SKIP_SEED=$SKIP_SEED" \
@@ -108,11 +121,19 @@ MSYS_NO_PATHCONV=1 docker run --rm \
     -e "ENV_FILE=$ENV_FILE" \
     -e "SKIP_SEED=$SKIP_SEED" \
     -e "PROJECT_PATH_HOST=$PROJECT_PATH_HOST" \
+    -e "CONFIG_DIR=/app/config" \
     --env-file "$ENV_FILE" \
     -w /app \
     php:8.3-cli \
     php bin/build-deployment.php
 echo -e "${GREEN}✔ docker-compose.yml generated.${NC}"
+
+# ── Step 3.5: Stop temporary infrastructure ───────────────────────────────────
+echo ""
+echo -e "${YELLOW}🧹 [3.5/5] Cleaning up temporary build infrastructure...${NC}"
+docker stop "$REDIS_CONTAINER_NAME" >/dev/null
+docker network rm "$BUILD_NETWORK" >/dev/null
+echo -e "${GREEN}✔ Build infrastructure removed.${NC}"
 
 # ── Step 4: Build images and start containers ─────────────────────────────────
 echo ""

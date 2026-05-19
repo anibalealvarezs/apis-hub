@@ -57,7 +57,7 @@ enum AnalyticsEntity: string
             self::channeled_ad_groups => '\Classes\Requests\AdGroupRequests',
             self::channeled_ads => '\Classes\Requests\AdRequests',
             self::creatives, self::channeled_creatives => '\Classes\Requests\CreativeRequests',
-            self::entities => '\Classes\Requests\MetricRequests',
+            self::entities => '\Classes\Requests\EntitySyncRequests',
         };
     }
 }

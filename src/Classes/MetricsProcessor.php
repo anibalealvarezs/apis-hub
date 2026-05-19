@@ -32,6 +32,7 @@
     use Helpers\Helpers;
     use Psr\Log\LoggerInterface;
     use RuntimeException;
+    use Throwable;
     use Traits\CalculatesMetricDeltas;
 
     class MetricsProcessor
@@ -51,8 +52,9 @@
                 return self::extractMetricLookupKey($metric, 'query');
             }, $metrics->toArray()));
 
-            // Remove duplicates
+            // Remove duplicates and sort to prevent deadlocks
             $uniqueQueries = array_unique($queries);
+            sort($uniqueQueries);
             if (empty($uniqueQueries)) {
                 return ['map' => [], 'mapReverse' => []];
             }
@@ -206,6 +208,7 @@
             }
 
             $names = array_unique(array_filter($names));
+            sort($names);
 
             if (empty($names)) {
                 return ['map' => [], 'mapReverse' => []];
@@ -691,6 +694,7 @@
         /**
          * Processes metrics and returns a map of metric IDs.
          * @throws Exception
+         * @throws ConfigurationException
          */
         public static function processMetricConfigs(
             ArrayCollection  $metrics,
@@ -912,6 +916,7 @@
 
             // INSERT IGNORE / ON CONFLICT: atomic upsert.
             if (!empty($uniqueMetricConfigs)) {
+                ksort($uniqueMetricConfigs);
                 $cols = [
                     'channel', 'name', 'period', 'account_id', 'channeled_account_id',
                     'campaign_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'channeled_ad_id',
@@ -1080,6 +1085,7 @@
 
             $metricsToInsert = [];
             $metricsToUpdate = [];
+            ksort($uniqueMetrics);
             foreach ($uniqueMetrics as $key => $metric) {
                 if (!isset($metricMap[$key])) {
                     $metricsToInsert[] = [
@@ -1273,6 +1279,7 @@
             $dimManager = new DimensionManager($manager);
             $channeledMetricsToInsert = [];
             $channeledMetricsToUpdate = [];
+            ksort($uniqueChanneledMetrics);
             foreach ($uniqueChanneledMetrics as $key => $channeledMetric) {
                 if (!isset($channeledMetricMap[$key]) && !isset($channeledMetricsToInsert[$key])) {
                     $originalMetric = $metricsMapByMKey[$channeledMetric['metricKey']] ?? null;

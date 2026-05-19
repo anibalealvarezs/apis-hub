@@ -10,9 +10,10 @@
     use Doctrine\DBAL\DriverManager;
     use Doctrine\ORM\EntityManager;
     use Doctrine\ORM\EntityManagerInterface;
-    use Doctrine\ORM\Exception\NotSupported;
+    use Doctrine\ORM\Exception\ORMException;
     use Doctrine\ORM\NonUniqueResultException;
     use Doctrine\ORM\NoResultException;
+    use Doctrine\ORM\OptimisticLockException;
     use Doctrine\ORM\ORMSetup;
     use Doctrine\Persistence\Mapping\MappingException;
     use Doctrine\Persistence\Proxy;
@@ -36,6 +37,7 @@
     use ReflectionProperty;
     use RuntimeException;
     use Symfony\Component\Yaml\Yaml;
+    use Throwable;
 
     class Helpers
     {
@@ -374,11 +376,10 @@
          * @param array|string $uniqueCols Single column or array of columns that form the unique constraint (required for Postgres)
          * @param int $rowCount Number of rows to be inserted in bulk
          * @return string The generated SQL
-         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
          */
         public static function buildUpsertSql(string $table, array $insertCols, array $updateCols, array|string $uniqueCols, int $rowCount = 1): string
         {
-            $dbConfig = self::getDbConfig();
             $isPostgres = self::isPostgres();
 
             $colString = implode(', ', $insertCols);
@@ -431,11 +432,10 @@
          * @param array|string $uniqueCols Single column or array of columns that form the unique constraint (required for Postgres)
          * @param int $rowCount Number of rows to be inserted in bulk
          * @return string The generated SQL
-         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
          */
         public static function buildInsertIgnoreSql(string $table, array $insertCols, array|string $uniqueCols, int $rowCount = 1): string
         {
-            $dbConfig = self::getDbConfig();
             $isPostgres = self::isPostgres();
 
             $colString = implode(', ', $insertCols);
@@ -490,22 +490,15 @@
         }
 
         /**
+         * @param EntityManagerInterface|null $manager
          * @return bool
-         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
          */
-        public static function isPostgres(): bool
+        public static function isPostgres(?EntityManagerInterface $manager = null): bool
         {
-            $config = self::getDbConfig();
-            $driver = $config['driver'] ?? '';
+            $manager = $manager ?? self::getManager();
 
-            return (
-                $driver === 'pdo_pgsql' ||
-                $driver === 'pgsql' ||
-                $driver === 'postgres' ||
-                $driver === 'postgresql' ||
-                str_contains($driver, 'pgsql') ||
-                str_contains($driver, 'postgres')
-            );
+            return $manager->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
         }
 
         /**
@@ -521,123 +514,144 @@
             $projectConfig = self::getProjectConfig();
             $config = $projectConfig['channels'] ?? [];
             $configDir = self::getConfigDir();
-            $filePath = $configDir.'/yaml/channelsconfig.yaml';
 
-            try {
-                if (file_exists($filePath)) {
-                    $yamlConfig = Yaml::parseFile($filePath);
+            // 1. Scan modular channels/ directory for all YAML files
+            $channelsDir = $configDir.'/channels';
+            if (is_dir($channelsDir)) {
+                $allFiles = glob($channelsDir.'/*.yaml');
+                $baseFiles = array_filter($allFiles, fn($file) => !str_contains(basename($file), '_'));
+                $specificFiles = array_filter($allFiles, fn($file) => str_contains(basename($file), '_'));
+
+                // Sort files to ensure base configs are loaded before specific ones.
+                $filesToLoad = array_merge($baseFiles, $specificFiles);
+
+                foreach ($filesToLoad as $file) {
+                    $baseName = basename($file);
+                    try {
+                        $yamlConfig = self::loadYamlFile($file);
+                    } catch (\Exception $e) {
+                        continue; // Skip files that fail to parse
+                    }
+
                     if (is_array($yamlConfig)) {
-                        $config = array_replace_recursive($yamlConfig, $config);
-                    }
-                }
-
-                // Override with environment variables if present
-                if ($envChannelsJson = getenv('CHANNELS_CONFIG')) {
-                    $envChannels = json_decode($envChannelsJson, true);
-                    if (is_array($envChannels)) {
-                        $config = array_replace_recursive($config, $envChannels);
-                    }
-                }
-
-                // Normalize relative paths to project root to avoid CWD issues
-                $rootPath = dirname(__DIR__, 2);
-                $resolvePath = function ($path) use ($rootPath) {
-                    if (is_string($path) && str_starts_with($path, './')) {
-                        return $rootPath.substr($path, 1);
-                    }
-
-                    return $path;
-                };
-
-                foreach ($config as $chan => $chanConfig) {
-                    if (isset($chanConfig['token_path'])) {
-                        $config[$chan]['token_path'] = $resolvePath($chanConfig['token_path']);
-                    }
-                }
-
-                $resolvePlaceholders = function (&$item) use (&$resolvePlaceholders) {
-                    if (is_array($item)) {
-                        foreach ($item as &$value) {
-                            $resolvePlaceholders($value);
-                        }
-                    } elseif (is_string($item) && preg_match('/\${([^}]+)}/', $item, $matches)) {
-                        $envValue = getenv($matches[1]);
-                        if ($envValue !== false && $envValue !== '') {
-                            $item = $envValue;
+                        if (isset($yamlConfig['channels']) && is_array($yamlConfig['channels'])) {
+                            $config = array_replace_recursive($config, $yamlConfig['channels']);
                         } else {
-                            $item = ''; // Clear unresolved placeholders
-                        }
-                    }
-                };
-                $resolvePlaceholders($config);
-
-                // Dynamic config enrichment from Drivers and Registry (Decoupled implementation)
-                $registry = DriverFactory::getRegistry();
-
-                // 1. Inject credentials from environment variables using Driver-defined mappings
-                foreach ($registry as $chan => $chanDef) {
-                    $driverClass = $chanDef['driver'] ?? null;
-                    if ($driverClass && class_exists($driverClass) && method_exists($driverClass, 'getEnvMapping')) {
-                        $mapping = $driverClass::getEnvMapping();
-                        foreach ($mapping as $targetChan => $envMap) {
-                            if (!isset($config[$targetChan])) {
-                                $config[$targetChan] = [];
+                            // Filename used as channel name (taking the first part before any dots)
+                            $channelName = explode('.', $baseName)[0];
+                            if (!isset($config[$channelName])) {
+                                $config[$channelName] = [];
                             }
-                            foreach ($envMap as $envKey => $configKey) {
-                                $val = getenv($envKey);
-                                if ($val && empty($config[$targetChan][$configKey])) {
-                                    $config[$targetChan][$configKey] = $val;
-                                }
-                            }
+                            $config[$channelName] = array_replace_recursive($config[$channelName], $yamlConfig);
                         }
                     }
                 }
-
-                // 2. Generic Parental Inheritance (Backward Compatibility for common credentials)
-                foreach ($registry as $chan => $chanDef) {
-                    $parent = $chanDef['parent'] ?? null;
-                    if ($parent && !empty($config[$parent])) {
-                        if (isset($config[$chan])) {
-                            // Important: Merge parent into child preserving existing child values
-                            $config[$chan] = array_replace_recursive($config[$parent], $config[$chan]);
-                            // Maintain nested structure for backward compatibility
-                            if (!isset($config[$chan][$parent])) {
-                                $config[$chan][$parent] = $config[$parent];
-                            } else {
-                                $config[$chan][$parent] = array_replace_recursive($config[$parent], array_filter($config[$chan][$parent]));
-                            }
-                        }
-                    }
-                }
-
-                if (getenv('APP_ENV') === 'demo') {
-                    $placeholders = ['PAGE_ID', 'IG_ACCOUNT_ID', 'PAGE_URL', 'example.com', 'AD_ACCOUNT_ID'];
-                    $cleanEntityList = function ($entities) use ($placeholders) {
-                        return array_filter($entities, function ($item) use ($placeholders) {
-                            $asString = json_encode($item);
-                            foreach ($placeholders as $p) {
-                                if (str_contains($asString, $p)) {
-                                    return false;
-                                }
-                            }
-
-                            return true;
-                        });
-                    };
-
-                    $registry = DriverFactory::getRegistry();
-                    foreach ($registry as $chan => $rConfig) {
-                        $resourceKey = $rConfig['resource_key'] ?? null;
-                        if ($resourceKey && isset($config[$chan][$resourceKey])) {
-                            $config[$chan][$resourceKey] = $cleanEntityList($config[$chan][$resourceKey]);
-                        }
-                    }
-                }
-
-                return $config;
-            } catch (Exception $e) {
-                throw new RuntimeException("Failed to load channels configuration: ".$e->getMessage());
             }
+
+            // Override with environment variables if present
+            if ($envChannelsJson = getenv('CHANNELS_CONFIG')) {
+                $envChannels = json_decode($envChannelsJson, true);
+                if (is_array($envChannels)) {
+                    $config = array_replace_recursive($config, $envChannels);
+                }
+            }
+
+            // Normalize relative paths to project root to avoid CWD issues
+            $rootPath = dirname(__DIR__, 2);
+            $resolvePath = function ($path) use ($rootPath) {
+                if (is_string($path) && str_starts_with($path, './')) {
+                    return $rootPath.substr($path, 1);
+                }
+
+                return $path;
+            };
+
+            foreach ($config as $chan => $chanConfig) {
+                if (isset($chanConfig['token_path'])) {
+                    $config[$chan]['token_path'] = $resolvePath($chanConfig['token_path']);
+                }
+            }
+
+            $resolvePlaceholders = function (&$item) use (&$resolvePlaceholders) {
+                if (is_array($item)) {
+                    foreach ($item as &$value) {
+                        $resolvePlaceholders($value);
+                    }
+                } elseif (is_string($item) && preg_match('/\${([^}]+)}/', $item, $matches)) {
+                    $envValue = getenv($matches[1]);
+                    if ($envValue !== false && $envValue !== '') {
+                        $item = $envValue;
+                    } else {
+                        $item = ''; // Clear unresolved placeholders
+                    }
+                }
+            };
+            $resolvePlaceholders($config);
+
+            // Dynamic config enrichment from Drivers and Registry (Decoupled implementation)
+            $registry = DriverFactory::getRegistry();
+
+            // 1. Inject credentials from environment variables using Driver-defined mappings
+            foreach ($registry as $chan => $chanDef) {
+                $driverClass = $chanDef['driver'] ?? null;
+                if ($driverClass && class_exists($driverClass) && method_exists($driverClass, 'getEnvMapping')) {
+                    $mapping = $driverClass::getEnvMapping();
+                    foreach ($mapping as $targetChan => $envMap) {
+                        if (!isset($config[$targetChan])) {
+                            $config[$targetChan] = [];
+                        }
+                        foreach ($envMap as $envKey => $configKey) {
+                            $val = getenv($envKey);
+                            if ($val && empty($config[$targetChan][$configKey])) {
+                                $config[$targetChan][$configKey] = $val;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Generic Parental Inheritance (Backward Compatibility for common credentials)
+            foreach ($registry as $chan => $chanDef) {
+                $parent = $chanDef['parent'] ?? null;
+                if ($parent && !empty($config[$parent])) {
+                    if (isset($config[$chan])) {
+                        // Important: Merge parent into child preserving existing child values
+                        $config[$chan] = array_replace_recursive($config[$parent], $config[$chan]);
+                        // Maintain nested structure for backward compatibility
+                        if (!isset($config[$chan][$parent])) {
+                            $config[$chan][$parent] = $config[$parent];
+                        } else {
+                            $config[$chan][$parent] = array_replace_recursive($config[$parent], array_filter($config[$chan][$parent]));
+                        }
+                    }
+                }
+            }
+
+            if (getenv('APP_ENV') === 'demo') {
+                $placeholders = ['PAGE_ID', 'IG_ACCOUNT_ID', 'PAGE_URL', 'example.com', 'AD_ACCOUNT_ID'];
+                $cleanEntityList = function ($entities) use ($placeholders) {
+                    return array_filter($entities, function ($item) use ($placeholders) {
+                        $asString = json_encode($item);
+                        foreach ($placeholders as $p) {
+                            if (str_contains($asString, $p)) {
+                                return false;
+                            }
+                        }
+
+                        return true;
+                    });
+                };
+
+                $registry = DriverFactory::getRegistry();
+                foreach ($registry as $chan => $rConfig) {
+                    $resourceKey = $rConfig['resource_key'] ?? null;
+                    if ($resourceKey && isset($config[$chan][$resourceKey])) {
+                        $config[$chan][$resourceKey] = $cleanEntityList($config[$chan][$resourceKey]);
+                    }
+                }
+            }
+
+            return self::$channelsConfig = $config;
         }
 
         /**
@@ -859,7 +873,7 @@
 
         public static function getAllSubsets($elements): array
         {
-            $subsets = [[]]; // Include the emtpy subset
+            $subsets = [[]]; // Include the empty subset
             foreach ($elements as $element) {
                 $newSubsets = [];
                 foreach ($subsets as $subset) {
@@ -1094,7 +1108,6 @@
         /**
          * @param int|null $jobId
          * @return void
-         * @throws NotSupported
          * @throws NoResultException
          * @throws NonUniqueResultException
          * @throws JobCancelledException
@@ -1106,7 +1119,8 @@
                 return;
             }
 
-            $jobRepo = self::getManager()->getRepository(Job::class);
+            $manager = self::getManager();
+            $jobRepo = $manager->getRepository(Job::class);
             $status = $jobRepo->createQueryBuilder('j')
                 ->select('j.status')
                 ->where('j.id = :id')
@@ -1114,8 +1128,64 @@
                 ->getQuery()
                 ->getSingleScalarResult();
 
-            if ($status == JobStatus::failed->value || $status == JobStatus::cancelled->value) {
-                throw new JobCancelledException("El Job #{$jobId} fue interrumpido o cancelado manualmente.");
+            if ($status !== JobStatus::processing->value) {
+                throw new JobCancelledException("El Job #{$jobId} no está en estado PROCESSING (Estado actual: {$status}). Fue interrumpido, reseteado o cancelado.");
+            }
+
+            // Update the updatedAt timestamp to act as a heartbeat
+            $manager->createQueryBuilder()
+                ->update(Job::class, 'j')
+                ->set('j.updatedAt', ':now')
+                ->where('j.id = :id')
+                ->setParameter('now', new \DateTime())
+                ->setParameter('id', $jobId)
+                ->getQuery()
+                ->execute();
+        }
+
+        /**
+         * Checks if an exception indicates a revoked OAuth token that requires user re-authentication.
+         * This is specifically for "invalid_grant" type errors where the refresh token is no longer valid.
+         *
+         * @param Throwable $e The exception to inspect.
+         * @return bool True if the exception is determined to be an authentication revocation error.
+         */
+        public static function isAuthenticationRevokedException(Throwable $e): bool
+        {
+            $message = $e->getMessage();
+
+            // Google's "invalid_grant" is a strong indicator of a revoked refresh token.
+            if (str_contains($message, 'invalid_grant')) {
+                // The error description can vary slightly, but "Token has been expired or revoked" is the key.
+                if (str_contains($message, 'Token has been expired or revoked') || str_contains($message, 'Bad Request')) {
+                    return true;
+                }
+            }
+
+            // This can be expanded to include patterns from other platforms (e.g., Meta)
+            // if they have distinct messages for revoked credentials vs. temporary issues.
+
+            return false;
+        }
+
+        /**
+         * Cancels a job in the database, typically after a non-retriable error like auth revocation.
+         *
+         * @param int $jobId The ID of the job to cancel.
+         * @return void
+         * @throws \Doctrine\DBAL\Exception
+         * @throws ORMException
+         * @throws OptimisticLockException
+         */
+        public static function cancelJob(int $jobId): void
+        {
+            $em = self::getManager();
+            /** @var Job|null $job */
+            $job = $em->find(Job::class, $jobId);
+
+            if ($job) {
+                $job->addStatus(JobStatus::cancelled->value);
+                $em->flush();
             }
         }
 

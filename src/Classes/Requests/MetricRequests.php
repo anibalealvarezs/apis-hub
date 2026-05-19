@@ -54,6 +54,7 @@ class MetricRequests implements RequestInterface
 
         return (new SyncService($logger))->execute($chanKey, $start, $end, [
             'jobId' => $jobId,
+            'account_id' => $filters->account_id ?? null,
             'resume' => $filters->resume ?? true,
             'filters' => $filters,
             'entity' => $filters->entity ?? 'metrics',
@@ -130,6 +131,7 @@ class MetricRequests implements RequestInterface
             );
 
             $manager->getConnection()->commit();
+            $manager->clear();
 
             return [
                 'metrics' => $collection->count(),
@@ -137,11 +139,14 @@ class MetricRequests implements RequestInterface
                 'duplicates' => 0,
             ];
 
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             if ($manager->getConnection()->isTransactionActive()) {
                 $manager->getConnection()->rollback();
             }
-            $logger->error("Error in MetricRequests::persist: " . $e->getMessage());
+            $logger->error("Error in MetricRequests::persist: " . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
 
             throw $e;
         }

@@ -4,6 +4,7 @@
 
     require_once __DIR__."/../vendor/autoload.php";
 
+    use Commands\Analytics\InvalidateSyncCacheCommand;
     use Commands\Analytics\ScaleDownCommand;
     use Commands\Analytics\ScheduleInitialJobsCommand;
     use Commands\Analytics\CacheEntityCommand;
@@ -25,6 +26,7 @@
     use Commands\Crud\ReadEntityCommand;
     use Commands\Crud\UpdateEntityCommand;
     use Commands\GenerateEntitiesConfigCommand;
+    use Commands\Infrastructure\ScaleWorkersCommand;
     use Commands\InitializeEntitiesCommand;
     use Commands\RefreshInstancesCommand;
     use Commands\SetupDatabaseCommand;
@@ -72,9 +74,9 @@
             $cli->getHelperSet()->set(new QuestionHelper(), 'question');
         }
 
-
         // Register your own commands
         $commands = [
+            new InvalidateSyncCacheCommand(),
             new CreateEntityCommand(),
             new DeleteEntityCommand(),
             new ReadEntityCommand(),
@@ -102,12 +104,12 @@
             new ScaleDownCommand($entityManager),
             new MigratePagesCanonicalCommand(Helpers::getManager()),
             new InstallDriversCommand(),
-            new \Commands\Infrastructure\ScaleWorkersCommand($entityManager),
+            new ScaleWorkersCommand($entityManager),
         ];
 
         foreach ($commands as $command) {
-            if ($command instanceof SymfonyCommand && ! $command->getName()) {
-                $reflection = new \ReflectionClass($command);
+            if ($command instanceof SymfonyCommand && !$command->getName()) {
+                $reflection = new ReflectionClass($command);
                 if ($reflection->hasProperty('defaultName')) {
                     $prop = $reflection->getProperty('defaultName');
                     $prop->setAccessible(true);

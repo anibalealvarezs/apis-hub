@@ -12,7 +12,10 @@
     use Entities\Job;
     use Enums\JobStatus;
     use Exception;
+    use Exceptions\ConfigurationException;
     use Helpers\Helpers;
+    use Psr\Log\LoggerInterface;
+    use Repositories\JobRepository;
     use Services\DateResolver;
     use Symfony\Component\Console\Attribute\AsCommand;
     use Symfony\Component\Console\Command\Command;
@@ -29,10 +32,14 @@
     )]
     class ProcessJobsCommand extends Command
     {
-        protected static $defaultName = 'jobs:process';
+        protected static string $defaultName = 'jobs:process';
         private EntityManager $em;
-        private \Psr\Log\LoggerInterface $logger;
+        private LoggerInterface $logger;
 
+        /**
+         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
+         */
         public function __construct(?EntityManager $em = null)
         {
             $this->em = $em ?? Helpers::getManager();
@@ -47,6 +54,10 @@
                 ->addOption('job-id', 'j', InputOption::VALUE_REQUIRED, 'Process a specific job ID immediately regardless of status.');
         }
 
+        /**
+         * @throws ConfigurationException
+         * @throws \Doctrine\DBAL\Exception
+         */
         protected function execute(InputInterface $input, OutputInterface $output): int
         {
             Helpers::clearConfigCache();
@@ -65,12 +76,15 @@
             }
 
             Helpers::reconnectIfNeeded($this->em);
-            /** @var \Repositories\JobRepository $jobRepo */
+            /** @var JobRepository $jobRepo */
             $jobRepo = $this->em->getRepository(Job::class);
 
             $envChannel = getenv('API_SOURCE');
             $isGenericWorker = empty($envChannel) || $envChannel === 'none';
             $forceAll = $input->getOption('force-all');
+
+            $envWorkerTier = getenv('WORKER_TIER');
+            $workerTier = $envWorkerTier !== false && $envWorkerTier !== '' ? (int)$envWorkerTier : null;
 
             if (Helpers::isDebug() || $forceAll) {
                 $output->writeln("Querying scheduled and delayed jobs...");
@@ -122,6 +136,14 @@
                                     foreach ($container['Names'] as $name) {
                                         $cleanName = ltrim($name, '/');
                                         $activeIds[] = $cleanName;
+
+                                        // Dynamically support all suffix matches to avoid deployment prefix mismatches
+                                        $parts = explode('-', $cleanName);
+                                        $numParts = count($parts);
+                                        for ($i = 1; $i < $numParts; $i++) {
+                                            $suffix = implode('-', array_slice($parts, $i));
+                                            $activeIds[] = $suffix;
+                                        }
                                     }
                                 }
                             }
@@ -137,9 +159,6 @@
                     }
                 }
             }
-
-            $envStartDate = getenv('START_DATE');
-            $envEndDate = getenv('END_DATE');
 
             $stats = [
                 'completed' => 0,
@@ -158,302 +177,174 @@
 
                 $jobId = $input->getOption('job-id');
                 if ($jobId) {
-                    $specificJob = $jobRepo->find($jobId);
-                    $jobsList = $specificJob ? [$specificJob] : [];
+                    $job = $jobRepo->find($jobId);
                 } else {
-                    $jobs = $jobRepo->getJobsByStatus(
-                        status: JobStatus::scheduled->value,
+                    $job = $jobRepo->claimAvailableJob(
+                        status: [JobStatus::scheduled->value, JobStatus::delayed->value],
+                        workerId: $envInstance,
                         channel: ($forceAll || empty($envChannel) || $envChannel === 'none' ? null : $envChannel),
-                        instanceName: ($forceAll || $isGenericWorker ? null : $envInstance)
+                        instanceName: ($forceAll || $isGenericWorker ? null : $envInstance),
+                        workerTier: $workerTier
                     );
-                    $delayedJobs = $jobRepo->getJobsByStatus(
-                        status: JobStatus::delayed->value,
-                        channel: ($forceAll || empty($envChannel) || $envChannel === 'none' ? null : $envChannel),
-                        instanceName: ($forceAll || $isGenericWorker ? null : $envInstance)
-                    );
-                    $jobsList = array_merge($jobs, $delayedJobs);
                 }
 
-                if (empty($jobsList)) {
+                if (!$job) {
                     break;
                 }
 
-                /** @var Job $job */
-                foreach ($jobsList as $job) {
-                    Helpers::reconnectIfNeeded($this->em);
-                    $jobRepo = $this->em->getRepository(Job::class);
+                $payload = $job->getPayload() ?? [];
+                $params = $payload['params'] ?? [];
+                error_log("DEBUG PROCESS: Params for job ".$job->getUuid()." are: ".json_encode($params));
 
-                    $payload = $job->getPayload() ?? [];
-                    $params = $payload['params'] ?? [];
-
-                    // 1. Instance Name Match (Primary Filter)
-                    $jobInstance = $payload['instance_name'] ?? null;
-                    if (!$jobId && !$forceAll && $envInstance && $jobInstance && $envInstance !== $jobInstance && !$isGenericWorker) {
-                        $stats['skipped']++;
-
-                        continue;
-                    }
-
-                    // 2. Date Range Filters (Fallback/Secondary)
-                    if (!$jobId && $envStartDate !== false && $envStartDate !== '') {
-                        $jobStart = $params['startDate'] ?? $params['start_date'] ?? null;
-                        if ($jobStart !== $envStartDate) {
-                            $stats['skipped']++;
-
-                            continue;
+                // Dependency check
+                $requires = $params['requires'] ?? null;
+                if (!$jobId && !$forceAll && $requires) {
+                    $requiredInstances = array_map('trim', explode(',', $requires));
+                    $allMet = true;
+                    foreach ($requiredInstances as $requiredInstance) {
+                        if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
+                            $allMet = false;
+                            break;
                         }
                     }
-                    if (!$jobId && $envEndDate !== false && $envEndDate !== '') {
-                        $jobEnd = $params['endDate'] ?? $params['end_date'] ?? null;
-                        if ($jobEnd !== $envEndDate) {
-                            $stats['skipped']++;
-
-                            continue;
-                        }
-                    }
-
-                    if (!$jobId && $job->getStatus() !== JobStatus::scheduled->value && $job->getStatus() !== JobStatus::delayed->value) {
-                        $stats['skipped']++;
-
-                        continue;
-                    }
-
-                    // Global filters from env
-                    if (!$jobId && ($envChannel = getenv('API_SOURCE')) && $envChannel !== 'none') {
-                        if ($job->getChannel() !== $envChannel) {
-                            $stats['skipped']++;
-
-                            continue;
-                        }
-                    }
-                    if (!$jobId && ($envEntity = getenv('API_ENTITY')) && $envEntity !== 'none') {
-                        if ($job->getEntity() !== $envEntity) {
-                            $stats['skipped']++;
-
-                            continue;
-                        }
-                    }
-
-                    // Cooldown check for delayed jobs
-                    if (!$jobId && $job->getStatus() === JobStatus::delayed->value) {
-                        $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $job->getChannel()]);
-                        $cooldown = $channelEntity ? $channelEntity->getCooldown() : 600;
-                        $updatedAt = $job->getUpdatedAt();
-                        if ($updatedAt) {
-                            $elapsed = time() - $updatedAt->getTimestamp();
-                            if ($elapsed < $cooldown) {
-                                $stats['skipped']++;
-
-                                continue;
-                            }
-                        }
-                    }
-
-                    // Dependency check
-                    $requires = $params['requires'] ?? null;
-                    if (!$jobId && !$forceAll && $requires) {
-                        $requiredInstances = array_map('trim', explode(',', $requires));
-                        foreach ($requiredInstances as $requiredInstance) {
-                            if (!$jobRepo->hasSuccessfulRecentJob($requiredInstance)) {
-                                if (Helpers::isDebug() || $output->isVerbose()) {
-                                    $output->writeln("<comment>Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.</comment>");
-                                }
-                                $this->logger->info("Job {$job->getUuid()} depends on '{$requiredInstance}' which has no successful recent execution. Skipping.");
-                                $stats['skipped']++;
-
-                                continue 2; // Skip to next job
-                            }
-                        }
-                    }
-
-                    // Guard: Prevent another job for the same instance from running if one is already processing
-                    $instanceName = $payload['instance_name'] ?? null;
-                    if (!$jobId && $instanceName && $jobRepo->isAnotherJobProcessing($instanceName)) {
+                    if (!$allMet) {
                         if (Helpers::isDebug() || $output->isVerbose()) {
-                            $output->writeln("<comment>Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.</comment>");
+                            $output->writeln("<comment>Job {$job->getUuid()} dependencies not met. Moving to delayed.</comment>");
                         }
-                        $this->logger->info("Job {$job->getUuid()} skipped because another job for instance '{$instanceName}' is already processing.");
+                        $jobRepo->update($job->getId(), (object)['status' => JobStatus::delayed->value]);
                         $stats['skipped']++;
-
                         continue;
-                    }
-
-                    if (Helpers::isDebug()) {
-                        $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
-                    }
-                    $this->logger->info("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}", [
-                        'uuid'    => $job->getUuid(),
-                        'entity'  => $job->getEntity(),
-                        'channel' => $job->getChannel(),
-                    ]);
-                    $stats['total']++;
-
-                    try {
-                        // Atomic claim by repository
-                        // Even if we provide job-id, we must ensure it's not already being processed by another worker
-                        if (!$jobRepo->claimJob($job->getId(), $envInstance)) {
-                            if (Helpers::isDebug() || $jobId) {
-                                $output->writeln("<comment>Job {$job->getUuid()} already claimed or in progress. Skipping.</comment>");
-                            }
-                            $stats['skipped']++;
-                            $stats['total']--;
-
-                            continue;
-                        }
-
-                        $channelName = $job->getChannel();
-                        $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $channelName]);
-                        if (!$channelEntity) {
-                            throw new Exception("Invalid channel entity: ".$channelName);
-                        }
-
-                        // Load full channel configuration
-                        $channelsConfig = Helpers::getChannelsConfig();
-
-                        // Normalize channel key (handle common config keys)
-                        $chanKey = $channelName;
-
-                        try {
-                            $driver = DriverFactory::get($chanKey);
-                            $commonKey = $driver::getCommonConfigKey();
-                            if ($commonKey && !isset($channelsConfig[$chanKey])) {
-                                $chanKey = $commonKey;
-                            }
-                        } catch (Exception $e) {
-                        }
-
-                        $chanConfig = $channelsConfig[$chanKey] ?? null;
-
-                        $isEnabled = true;
-                        if ($chanConfig && isset($chanConfig['enabled'])) {
-                            $isEnabled = (bool)$chanConfig['enabled'];
-                        }
-
-                        // Check if channel is enabled
-                        if (!$isEnabled) {
-                            $output->writeln("<error>FAILURE: Channel '$chanKey' is disabled in configuration.</error>");
-
-                            $jobRepo->update($job->getId(), (object)[
-                                'status'  => JobStatus::failed->value,
-                                'message' => "Channel is disabled in configuration",
-                            ]);
-                            $stats['failed']++;
-                            continue;
-                        }
-
-                        // Resolve relative dates (e.g. 'yesterday' -> '2024-03-05')
-                        $resolvedParams = DateResolver::resolveParams($params);
-
-                        // Inject channel configuration into parameters
-                        if ($chanConfig) {
-                            $accountId = $params['account_id'] ?? null;
-                            if ($accountId) {
-                                $registryConfig = DriverFactory::getChannelConfig($chanKey);
-                                $resourceKey = $registryConfig['resource_key'] ?? null;
-                                if ($resourceKey && !empty($chanConfig[$resourceKey])) {
-                                    $filteredResources = [];
-                                    foreach ($chanConfig[$resourceKey] as $res) {
-                                        $resId = is_array($res) ? ($res['id'] ?? $res['identifier'] ?? null) : $res;
-                                        if ((string)$resId === (string)$accountId) {
-                                            $filteredResources[] = $res;
-                                            break;
-                                        }
-                                    }
-                                    $chanConfig[$resourceKey] = $filteredResources;
-                                }
-                            }
-                            $resolvedParams = array_merge($chanConfig, $resolvedParams);
-                        }
-
-                        // Intelligent incremental sync for entities
-                        $instanceName = $payload['instance_name'] ?? null;
-                        if ($instanceName && str_ends_with($instanceName, '-entities-sync')) {
-                            $smartResume = $params['smart_resume'] ?? $params['resume'] ?? false;
-                            if (filter_var($smartResume, FILTER_VALIDATE_BOOLEAN) && empty($resolvedParams['startDate'])) {
-                                $lastRun = $jobRepo->getLastSuccessfulJobTime($instanceName);
-                                if ($lastRun) {
-                                    // Fetch only what changed since the last successful sync
-                                    $resolvedParams['startDate'] = $lastRun->format('Y-m-d H:i:s');
-                                }
-                            }
-                        }
-
-                        $resolvedParams['jobId'] = $job->getId();
-                        $body = $payload['body'] ?? null;
-
-                        // Set long timeout for the session to avoid lock waits
-                        $connection = $this->em->getConnection();
-                        $platform = $connection->getDatabasePlatform();
-                        if ($platform instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
-                            // PostgreSQL uses milliseconds for lock_timeout
-                            $connection->executeStatement("SET lock_timeout = '300s'");
-                        } else {
-                            $connection->executeStatement("SET SESSION innodb_lock_wait_timeout = 300");
-                        }
-
-                        $result = $controller->fetchData($job->getEntity(), $channelEntity, $resolvedParams, $body);
-
-                        if ($result instanceof Response && $result->getStatusCode() >= 400) {
-                            $content = json_decode($result->getContent(), true);
-                            $errorMsg = $content['error'] ?? 'Unknown error from fetchData';
-
-                            // Handle Rate Limits in a generic way
-                            // The driver should throw RateLimitException
-                            // but if we have specific legacy exceptions we can handle them here for now
-                            throw new Exception($errorMsg);
-                        }
-
-                        // Update to completed
-                        $jobRepo->update($job->getId(), (object)[
-                            'status'  => JobStatus::completed->value,
-                            'message' => 'Success',
-                        ]);
-
-                        // Invalidate recent aggregation caches for this channel
-                        CacheStrategyService::clearRecent($job->getChannel());
-
-                        if (Helpers::isDebug()) {
-                            $output->writeln("<info>Successfully completed job {$job->getUuid()}</info>");
-                        }
-                        $this->logger->info("Successfully completed job {$job->getUuid()}");
-                        $stats['completed']++;
-                        $progressMade = true;
-
-                    } catch (RateLimitException $e) {
-                        if (Helpers::isDebug()) {
-                            $output->writeln("<comment>Rate limit reached for job {$job->getUuid()}. Job delayed for cooldown.</comment>");
-                        }
-                        $jobRepo->markAsDelayed($job->getId(), $e->getMessage());
-                        $stats['delayed']++;
-                        $progressMade = true;
-                    } catch (LockWaitTimeoutException $e) {
-                        if (Helpers::isDebug()) {
-                            $output->writeln("<comment>Lock timeout for job {$job->getUuid()}. Reset to scheduled for retry.</comment>");
-                        }
-                        $jobRepo->resetJob($job->getId());
-                        $stats['delayed']++;
-                        $progressMade = true;
-                    } catch (Throwable $e) {
-                        // Update to failed
-                        $jobRepo->update($job->getId(), (object)[
-                            'status'  => JobStatus::failed->value,
-                            'message' => $e->getMessage(),
-                        ]);
-                        $output->writeln("<error>Failed job {$job->getUuid()}: {$e->getMessage()}</error>");
-                        $this->logger->error("Failed job {$job->getUuid()}: {$e->getMessage()}", [
-                            'exception' => $e,
-                        ]);
-                        if (Helpers::isDebug()) {
-                            $output->writeln($e->getTraceAsString());
-                        }
-                        $stats['failed']++;
-                        $progressMade = true;
                     }
                 }
 
-                // Clear EM to avoid memory leaks
-                $this->em->clear();
+                if (Helpers::isDebug()) {
+                    $output->writeln("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}");
+                }
+                $this->logger->info("Processing job {$job->getUuid()} for entity {$job->getEntity()} and channel {$job->getChannel()}", [
+                    'uuid'    => $job->getUuid(),
+                    'entity'  => $job->getEntity(),
+                    'channel' => $job->getChannel(),
+                ]);
+                $stats['total']++;
 
+                try {
+                    $channelName = $job->getChannel();
+                    $channelEntity = $this->em->getRepository(ChannelEntity::class)->findOneBy(['name' => $channelName]);
+                    if (!$channelEntity) {
+                        throw new Exception("Invalid channel entity: ".$channelName);
+                    }
+
+                    // Load full channel configuration
+                    $channelsConfig = Helpers::getChannelsConfig();
+
+                    // Normalize channel key (handle common config keys)
+                    $chanKey = $channelName;
+                    try {
+                        $driver = DriverFactory::get($chanKey);
+                        $commonKey = $driver::getCommonConfigKey();
+                        if ($commonKey && !isset($channelsConfig[$chanKey])) {
+                            $chanKey = $commonKey;
+                        }
+                    } catch (Exception $e) {
+                    }
+
+                    $chanConfig = $channelsConfig[$chanKey] ?? null;
+                    $isEnabled = true;
+                    if ($chanConfig && isset($chanConfig['enabled'])) {
+                        $isEnabled = (bool)$chanConfig['enabled'];
+                    }
+
+                    // Check if channel is enabled
+                    if (!$isEnabled) {
+                        $output->writeln("<error>FAILURE: Channel '$chanKey' is disabled in configuration.</error>");
+                        $jobRepo->update($job->getId(), (object)[
+                            'status'  => JobStatus::failed->value,
+                            'message' => "Channel is disabled in configuration",
+                        ]);
+                        $stats['failed']++;
+                        continue;
+                    }
+
+                    // Resolve relative dates
+                    $resolvedParams = DateResolver::resolveParams($params);
+
+                    // Inject channel configuration
+                    if ($chanConfig) {
+                        $resolvedParams = array_merge($chanConfig, $resolvedParams);
+                    }
+
+                    // Incremental sync
+                    $instanceName = $payload['instance_name'] ?? null;
+                    if ($instanceName && str_ends_with($instanceName, '-entities-sync')) {
+                        $smartResume = $params['smart_resume'] ?? $params['resume'] ?? false;
+                        if (filter_var($smartResume, FILTER_VALIDATE_BOOLEAN) && empty($resolvedParams['startDate'])) {
+                            $lastRun = $jobRepo->getLastSuccessfulJobTime($instanceName);
+                            if ($lastRun) {
+                                $resolvedParams['startDate'] = $lastRun->format('Y-m-d H:i:s');
+                            }
+                        }
+                    }
+
+                    $resolvedParams['jobId'] = $job->getId();
+                    $body = $payload['body'] ?? null;
+
+                    // DB Lock Timeout
+                    $connection = $this->em->getConnection();
+                    $platform = $connection->getDatabasePlatform();
+                    if ($platform instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+                        $connection->executeStatement("SET lock_timeout = '300s'");
+                    } else {
+                        $connection->executeStatement("SET SESSION innodb_lock_wait_timeout = 300");
+                    }
+
+                    $result = $controller->fetchData($job->getEntity(), $channelEntity, $resolvedParams, $body);
+
+                    if ($result instanceof Response && $result->getStatusCode() >= 400) {
+                        $content = json_decode($result->getContent(), true);
+                        throw new Exception($content['error'] ?? 'Unknown error from fetchData');
+                    }
+
+                    // Success
+                    $jobRepo->update($job->getId(), (object)[
+                        'status'  => JobStatus::completed->value,
+                        'message' => 'Success',
+                    ]);
+                    CacheStrategyService::clearRecent($job->getChannel());
+                    if (Helpers::isDebug()) {
+                        $output->writeln("<info>Successfully completed job {$job->getUuid()}</info>");
+                    }
+                    $this->logger->info("Successfully completed job {$job->getUuid()}");
+                    $stats['completed']++;
+                    $progressMade = true;
+
+                } catch (RateLimitException $e) {
+                    if (Helpers::isDebug()) {
+                        $output->writeln("<comment>Rate limit reached for job {$job->getUuid()}. Job delayed for cooldown.</comment>");
+                    }
+                    $jobRepo->markAsDelayed($job->getId(), $e->getMessage());
+                    $stats['delayed']++;
+                    $progressMade = true;
+                } catch (LockWaitTimeoutException $e) {
+                    if (Helpers::isDebug()) {
+                        $output->writeln("<comment>Lock timeout for job {$job->getUuid()}. Reset to scheduled for retry.</comment>");
+                    }
+                    $jobRepo->resetJob($job->getId());
+                    $stats['delayed']++;
+                    $progressMade = true;
+                } catch (Throwable $e) {
+                    $jobRepo->update($job->getId(), (object)[
+                        'status'  => JobStatus::failed->value,
+                        'message' => $e->getMessage(),
+                    ]);
+                    $output->writeln("<error>Failed job {$job->getUuid()}: {$e->getMessage()}</error>");
+                    $this->logger->error("Failed job {$job->getUuid()}: {$e->getMessage()}", [
+                        'exception' => $e,
+                    ]);
+                    $stats['failed']++;
+                    $progressMade = true;
+                }
+
+                $this->em->clear();
             } while ($progressMade);
 
             if (Helpers::isDebug()) {
