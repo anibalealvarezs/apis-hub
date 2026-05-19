@@ -6,6 +6,22 @@
 // Global State
 let currentData = null;
 
+function formatAccountLabel(accountId) {
+    if (accountId === null || accountId === undefined || accountId === '') {
+        return 'All Accounts';
+    }
+    return `Account #${accountId}`;
+}
+
+function formatTimeframe(startDate, endDate) {
+    const hasStart = !!startDate;
+    const hasEnd = !!endDate;
+    if (!hasStart && !hasEnd) {
+        return 'Full Range';
+    }
+    return `${startDate || '...'} -> ${endDate || '...'}`;
+}
+
 // --- Initialization ---
 function initMonitoring() {
     lucide.createIcons();
@@ -63,7 +79,8 @@ async function fetchData() {
         currentData = data;
 
         updateDbTotals(data.dbTotals);
-        updateContainers(data.containers, data.groupedJobs);
+        updateContainers(data.containers);
+        fetchSyncTelemetry(); // Call separately
         if (data.groupedJobs) {
             // DEBUG: Inject Simulation Jobs to preview UI ONLY in Demo Mode
             const envMeta = document.querySelector('meta[name="app-env"]');
@@ -99,8 +116,7 @@ async function fetchData() {
             }
             updatePendingJobsDetailed(data.groupedJobs);
         }
-        updateContainers(data.containers, data.groupedJobs);
-        
+
         const elUpdated = document.getElementById('last-updated');
         if (elUpdated) {
             const now = new Date();
@@ -175,6 +191,236 @@ function updateDbTotals(totals) {
     });
 }
 
+async function fetchSyncTelemetry() {
+    try {
+        const headers = getAdminHeaders();
+        if (!headers.Authorization) return;
+
+        const response = await fetch('/api/sync/status', { headers });
+        const data = await response.json();
+        
+        // Handle both direct object and wrapped responses
+        const telemetry = data.channels ? data.channels : (data.data && data.data.channels ? data.data.channels : null);
+        
+        if (telemetry) {
+            updateSyncTelemetry(telemetry);
+        }
+    } catch (e) {
+        console.error('Sync Telemetry Fetch Error:', e);
+    }
+}
+
+function updateSyncTelemetry(telemetry) {
+    const grid = document.getElementById('sync-telemetry-grid');
+    if (!grid) return;
+    
+    if (!telemetry || Object.keys(telemetry).length === 0) {
+        grid.innerHTML = '<div class="empty-state">No synchronization activity detected</div>';
+        return;
+    }
+
+    grid.innerHTML = '';
+    Object.entries(telemetry).forEach(([channel, stats]) => {
+        const total = stats.total_jobs || 0;
+        if (total === 0) return;
+
+        const assetsArray = Object.entries(stats.assets || {}).map(([id, assetStats]) => ({
+            id,
+            name: assetStats.name || id,
+            completion: assetStats.total > 0 ? (assetStats.completed / assetStats.total) * 100 : 0
+        }));
+
+        const pCompleted = (stats.completed / total) * 100;
+        const pProcessing = (stats.processing / total) * 100;
+        const pFailed = (stats.failed / total) * 100;
+        const pScheduled = (stats.scheduled / total) * 100;
+
+        const card = document.createElement('div');
+        card.className = 'sync-channel-card';
+        card.id = `sync-card-${channel}`;
+        
+        const channelLabel = channel.replace(/_/g, ' ').toUpperCase();
+        
+        const fullySyncedP = stats.fully_synced_percentage || 0;
+        const fullySyncedCount = stats.fully_synced_count || 0;
+        const totalAssets = stats.total_assets || 0;
+
+        card.innerHTML = `
+            <div class="sync-card-header">
+                <div class="sync-channel-name">
+                    <i data-lucide="activity" size="16" style="color:var(--secondary)"></i>
+                    ${channelLabel}
+                </div>
+                <div style="text-align:right;">
+                    <div class="sync-percentage">${Math.round(stats.completion_percentage)}%</div>
+                    <div style="font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; font-weight:700; margin-top:2px;">GLOBAL DATA LOAD</div>
+                </div>
+            </div>
+
+            <div class="sync-business-kpi">
+                <div class="kpi-main">
+                    <span class="kpi-value ${fullySyncedP >= 100 ? 'fully-synced' : ''}">${fullySyncedP}%</span>
+                    <span class="kpi-label">ACCOUNTS FULLY SYNCED</span>
+                </div>
+                <div class="kpi-sub">
+                    <span style="color:#fff; font-weight:700;">${fullySyncedCount}</span> / ${totalAssets} ACCOUNTS READY
+                </div>
+            </div>
+            
+            <div class="sync-progress-container">
+                <div class="sync-progress-segment sync-segment-completed" style="width: ${pCompleted}%" title="Completed: ${stats.completed}"></div>
+                <div class="sync-progress-segment sync-segment-processing" style="width: ${pProcessing}%" title="Processing: ${stats.processing}"></div>
+                <div class="sync-progress-segment sync-segment-failed" style="width: ${pFailed}%" title="Failed: ${stats.failed}"></div>
+                <div class="sync-progress-segment sync-segment-scheduled" style="width: ${pScheduled}%" title="Scheduled: ${stats.scheduled}"></div>
+            </div>
+            
+            <div class="sync-assets-list">
+                ${assetsArray.sort((a,b) => b.completion - a.completion).slice(0, 10).map(asset => `
+                    <div class="sync-asset-item" onclick="toggleAccountStats('${channel}', '${asset.id}')">
+                        <div class="sync-asset-info">
+                            <span class="sync-asset-id">${asset.name || '#' + asset.id}</span>
+                            <span class="sync-asset-p">${Math.round(asset.completion)}%</span>
+                        </div>
+                        <div class="sync-asset-bar-bg">
+                            <div class="sync-asset-bar-fill" style="width: ${asset.completion}%"></div>
+                        </div>
+                    </div>
+                `).join('')}
+                ${assetsArray.length > 10 ? `<div style="font-size:0.6rem; color:var(--text-dim); text-align:center; padding-top:5px; border-top:1px solid rgba(255,255,255,0.03);">+ ${assetsArray.length - 10} more accounts</div>` : ''}
+            </div>
+
+            <div id="details-${channel}" class="sync-details-container" style="display:none;">
+                <div class="details-header">
+                    <span id="details-title-${channel}">Account Details</span>
+                    <button class="btn-close-details" onclick="this.parentElement.parentElement.style.display='none'">&times;</button>
+                </div>
+                <div id="chart-container-${channel}" class="contribution-chart-wrapper">
+                    <div class="empty-state"><i data-lucide="loader" class="spinner"></i> Loading sync history...</div>
+                </div>
+            </div>
+            
+            <div class="sync-stats-mini">
+                <div class="sync-stat-item">
+                    <div class="sync-stat-label">Total Jobs</div>
+                    <div class="sync-stat-val">${total}</div>
+                </div>
+                <div class="sync-stat-item">
+                    <div class="sync-stat-label">Done</div>
+                    <div class="sync-stat-val" style="color:#10b981">${stats.completed}</div>
+                </div>
+                <div class="sync-stat-item">
+                    <div class="sync-stat-label">Active</div>
+                    <div class="sync-stat-val" style="color:var(--secondary)">${stats.processing}</div>
+                </div>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+
+    lucide.createIcons();
+}
+
+async function toggleAccountStats(channel, accountId) {
+    const detailsContainer = document.getElementById(`details-${channel}`);
+    const chartContainer = document.getElementById(`chart-container-${channel}`);
+    const titleEl = document.getElementById(`details-title-${channel}`);
+    
+    if (!detailsContainer || !chartContainer) return;
+
+    // Show container
+    detailsContainer.style.display = 'block';
+    titleEl.textContent = `SYNC HISTORY: ACCOUNT #${accountId}`;
+    chartContainer.innerHTML = '<div class="empty-state"><i data-lucide="loader" class="spinner"></i> Expanding daily metrics...</div>';
+    lucide.createIcons();
+
+    // Scroll to it
+    detailsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    try {
+        const headers = getAdminHeaders();
+        const response = await fetch(`/api/sync/account-stats?channel=${channel}&account_id=${accountId}`, { headers });
+        const data = await response.json();
+        
+        if (data.name) {
+            titleEl.textContent = `SYNC HISTORY: ${data.name}`;
+        }
+
+        if (data.completed_days) {
+            renderContributionChart(chartContainer, data.completed_days);
+        } else {
+            chartContainer.innerHTML = '<div class="empty-state">No historical records found for this account</div>';
+        }
+    } catch (e) {
+        chartContainer.innerHTML = `<div class="empty-state" style="color:var(--danger)">Error: ${e.message}</div>`;
+    }
+}
+
+function renderContributionChart(container, completedDays) {
+    const today = new Date();
+    const daysToShow = 365;
+    const dayMap = new Set(completedDays);
+    
+    let html = '<div class="github-chart">';
+    
+    // Header with months
+    html += '<div class="chart-months">';
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (let i = 0; i < 12; i++) {
+        const d = new Date();
+        d.setMonth(today.getMonth() - (11 - i));
+        html += `<span>${monthNames[d.getMonth()]}</span>`;
+    }
+    html += '</div>';
+
+    html += '<div class="chart-grid">';
+    
+    // Labels for days of week
+    html += '<div class="chart-days"><span>Mon</span><span>Wed</span><span>Fri</span></div>';
+
+    html += '<div class="chart-cells">';
+    
+    // Generate 53 weeks
+    const startDate = new Date();
+    startDate.setDate(today.getDate() - daysToShow);
+    // Align to start of week (Sunday = 0)
+    while (startDate.getDay() !== 0) {
+        startDate.setDate(startDate.getDate() - 1);
+    }
+
+    for (let i = 0; i < (daysToShow + 7); i++) {
+        const current = new Date(startDate);
+        current.setDate(startDate.getDate() + i);
+        const dateStr = current.toISOString().split('T')[0];
+        const isCompleted = dayMap.has(dateStr);
+        const isFuture = current > today;
+        
+        let intensity = isCompleted ? 'level-4' : 'level-0';
+        if (isFuture) intensity = 'level-future';
+
+        html += `<div class="chart-cell ${intensity}" title="${dateStr}${isCompleted ? ': Synced' : ''}"></div>`;
+    }
+
+    html += '</div></div>';
+    
+    html += `
+        <div class="chart-footer">
+            <span>Learn how we track data integrity</span>
+            <div class="chart-legend">
+                <span>Less</span>
+                <div class="chart-cell level-0"></div>
+                <div class="chart-cell level-1"></div>
+                <div class="chart-cell level-2"></div>
+                <div class="chart-cell level-3"></div>
+                <div class="chart-cell level-4"></div>
+                <span>More</span>
+            </div>
+        </div>
+    `;
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
 function updateContainers(containers) {
     const grid = document.getElementById('container-grid');
     if (!grid) return;
@@ -219,6 +465,23 @@ function updateContainers(containers) {
             const stats = container.stats || { total: 0 };
             const completedCount = stats.completed || 0;
             const failedCount = stats.failed || 0;
+            const activeJob = container.active_job || null;
+
+            const activeJobHtml = activeJob ? `
+                <div class="monitoring-active-job">
+                    <div class="monitoring-active-job-title">Active Job</div>
+                    <div class="monitoring-active-job-grid">
+                        <div><span class="monitoring-muted-key">Flow:</span> ${activeJob.channel || 'n/a'} -> ${activeJob.entity || 'n/a'}</div>
+                        <div><span class="monitoring-muted-key">Scope:</span> ${formatAccountLabel(activeJob.account_id)}</div>
+                        <div><span class="monitoring-muted-key">Timeframe:</span> ${formatTimeframe(activeJob.start_date, activeJob.end_date)}</div>
+                        <div><span class="monitoring-muted-key">Priority:</span> ${activeJob.priority ?? 0}</div>
+                    </div>
+                </div>
+            ` : `
+                <div class="monitoring-active-job" style="font-size:0.72rem; color:var(--text-dim);">
+                    No active job assigned
+                </div>
+            `;
 
             card.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
@@ -261,6 +524,8 @@ function updateContainers(containers) {
                         <i data-lucide="play-circle" style="opacity:0.3" size="18"></i>
                     </button>
                 </div>
+
+                ${activeJobHtml}
             `;
             cardGrid.appendChild(card);
         });
@@ -277,9 +542,15 @@ function updatePendingJobsDetailed(groupedJobs) {
     list.innerHTML = '';
 
     if (!groupedJobs || Object.keys(groupedJobs).length === 0) {
+        const badge = document.getElementById('job-count-badge');
+        if (badge) badge.textContent = '0 Pending';
         list.innerHTML = '<div class="empty-state">No synchronization pipelines active</div>';
         return;
     }
+
+    const totalJobs = Object.values(groupedJobs).reduce((acc, jobs) => acc + (jobs?.length || 0), 0);
+    const badge = document.getElementById('job-count-badge');
+    if (badge) badge.textContent = `${totalJobs} Active`;
 
     // Sort group keys (Channels) to have specific ones first
     const groupKeys = Object.keys(groupedJobs).sort((a,b) => {
@@ -335,6 +606,7 @@ function updatePendingJobsDetailed(groupedJobs) {
                         <span class="job-summary-title">${job.instance_label || job.group} <span style="opacity:0.4; font-weight:400; font-size: 0.7rem; margin-left:5px;">» ${job.entity.toUpperCase()}</span></span>
                     </div>
                     <div class="job-summary-right">
+                        <span class="status-badge monitoring-priority-badge">P${job.priority ?? 0}</span>
                         <span class="job-id-tag">#${job.id}</span>
                         <div class="job-latest-activity">
                             <div style="font-size:0.6rem; text-transform:uppercase; font-weight:700;">Latest Activity</div>
@@ -370,6 +642,14 @@ function updatePendingJobsDetailed(groupedJobs) {
                             <span class="job-metric-label">UPDATED AT</span>
                             <div class="job-metric-value">${job.updated_at}</div>
                         </div>
+                        <div class="job-metric-item">
+                            <span class="job-metric-label">ACCOUNT SCOPE</span>
+                            <div class="job-metric-value">${formatAccountLabel(job.account_id)}</div>
+                        </div>
+                        <div class="job-metric-item">
+                            <span class="job-metric-label">TIMEFRAME</span>
+                            <div class="job-metric-value highlight">${formatTimeframe(job.start_date, job.end_date)}</div>
+                        </div>
                     </div>
 
                     <span class="job-section-label">STATUS MESSAGE</span>
@@ -395,7 +675,20 @@ function updatePendingJobsDetailed(groupedJobs) {
                            </div>
                        </div>
                         <div style="display:flex; gap:8px;">
-                           ${(job.status === 1 || job.status === 5) ? `
+                           <div class="monitoring-priority-controls">
+                               <button onclick="event.stopPropagation(); adjustJobPriority(${job.id}, -1)" 
+                                       class="btn btn-mini monitoring-priority-btn-down"
+                                       title="Lower queue priority">
+                                   <i data-lucide="arrow-down" size="14"></i>
+                               </button>
+                               <span class="monitoring-priority-value">${job.priority ?? 0}</span>
+                               <button onclick="event.stopPropagation(); adjustJobPriority(${job.id}, 1)" 
+                                       class="btn btn-mini monitoring-priority-btn-up"
+                                       title="Raise queue priority">
+                                   <i data-lucide="arrow-up" size="14"></i>
+                               </button>
+                           </div>
+                           ${(job.status === 1 || job.status === 4 || job.status === 5) ? `
                                <button onclick="event.stopPropagation(); runJobNow(${job.id})" 
                                        class="btn btn-mini" 
                                        style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 12px;" 
@@ -532,6 +825,26 @@ async function confirmCancelAction() {
             fetchData(); // Reload
         } else {
             alert('Error cancelling job: ' + (res.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    }
+}
+
+async function adjustJobPriority(id, delta) {
+    try {
+        const response = await fetch('/api/monitoring/jobs/action', {
+            method: 'POST',
+            headers: getAdminHeaders(),
+            body: JSON.stringify({ action: 'priority_adjust', id, delta })
+        });
+
+        const res = await response.json();
+        if (res.success || res.status === 'success') {
+            showToast(`Priority updated to ${res.priority ?? 'new value'}`, false);
+            fetchData();
+        } else {
+            alert('Error updating priority: ' + (res.error || 'Unknown error'));
         }
     } catch (e) {
         alert('Network error: ' + e.message);
@@ -676,6 +989,7 @@ async function confirmRunNowAction() {
 window.processJob = processJob;
 window.cancelJob = cancelJob;
 window.runJobNow = runJobNow;
+window.adjustJobPriority = adjustJobPriority;
 window.closeRunNowModal = closeRunNowModal;
 window.confirmRunNowAction = confirmRunNowAction;
 window.triggerSyncInstance = triggerSyncInstance;

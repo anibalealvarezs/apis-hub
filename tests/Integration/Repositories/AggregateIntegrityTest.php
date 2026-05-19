@@ -88,6 +88,38 @@ class AggregateIntegrityTest extends BaseIntegrationTestCase
         // with newly supported filters (country) is a good sign.
     }
 
+    public function testReelAverageWatchTimeUsesWeightedAverageAcrossDailyRows(): void
+    {
+        $avgConfigDayA = $this->createConfig('ig_reels_avg_watch_time_daily', 3, 1737, 117, 1);
+        $totConfigDayA = $this->createConfig('ig_reels_video_view_total_time_daily', 3, 1737, 117, 1);
+
+        $this->createMetric($avgConfigDayA, 5000.0, '2026-05-01');
+        $this->createMetric($totConfigDayA, 50000.0, '2026-05-01'); // 10 implied views
+        $this->createMetric($avgConfigDayA, 10000.0, '2026-05-02');
+        $this->createMetric($totConfigDayA, 10000.0, '2026-05-02'); // 1 implied view
+
+        // Parallel segment to ensure companion matching respects device segmentation.
+        $otherAvgConfig = $this->createConfig('ig_reels_avg_watch_time_daily', 3, 1737, 117, 2);
+        $otherTotConfig = $this->createConfig('ig_reels_video_view_total_time_daily', 3, 1737, 117, 2);
+        $this->createMetric($otherAvgConfig, 3000.0, '2026-05-01');
+        $this->createMetric($otherTotConfig, 30000.0, '2026-05-01');
+
+        $this->entityManager->flush();
+
+        $results = $this->repository->aggregate(
+            aggregations: ['reel_avg_watch_time' => 'ig_reels_avg_watch_time_daily'],
+            groupBy: ['page_id'],
+            startDate: '2026-05-01',
+            endDate: '2026-05-02',
+            filters: ['page' => 3, 'query' => 1737, 'country' => 117, 'device' => 1, 'channel' => 1]
+        );
+
+        $this->assertCount(1, $results);
+
+        $expected = 60000.0 / 11.0; // total watch time / implied total views
+        $this->assertEqualsWithDelta($expected, (float)$results[0]['reel_avg_watch_time'], 0.001);
+    }
+
     private function createConfig(string $name, int $pageId, int $queryId, int $countryId, int $deviceId): MetricConfig
     {
         $config = new MetricConfig();

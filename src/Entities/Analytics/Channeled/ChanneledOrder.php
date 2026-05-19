@@ -1,306 +1,306 @@
 <?php
 
-namespace Entities\Analytics\Channeled;
+    namespace Entities\Analytics\Channeled;
 
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-use Doctrine\ORM\Mapping as ORM;
-use Entities\Analytics\Order;
-use Repositories\Channeled\ChanneledOrderRepository;
+    use Doctrine\Common\Collections\ArrayCollection;
+    use Doctrine\Common\Collections\Collection;
+    use Doctrine\ORM\Mapping as ORM;
+    use Entities\Analytics\Order;
+    use Repositories\Channeled\ChanneledOrderRepository;
 
-#[ORM\Entity(repositoryClass: ChanneledOrderRepository::class)]
-#[ORM\Table(name: 'channeled_orders')]
-#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_orders_platform_id_channel_idx')]
-#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_orders_platform_id_idx')]
-#[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_orders_platform_created_at_idx')]
-#[ORM\HasLifecycleCallbacks]
-class ChanneledOrder extends ChanneledEntity
-{
-    // Relationships with channeled entities
-
-    #[ORM\ManyToOne(targetEntity:ChanneledCustomer::class, inversedBy: 'channeledOrders')]
-    #[ORM\JoinColumn(name: 'channeled_customer_id', onDelete: 'cascade')]
-    protected ChanneledCustomer $channeledCustomer;
-
-    #[ORM\ManyToMany(targetEntity: ChanneledProduct::class, inversedBy: 'channeledOrders')]
-    #[ORM\JoinTable(name: 'channeled_order_channeled_products')]
-    #[ORM\JoinColumn(name: 'channeled_order_id', referencedColumnName: 'id')]
-    #[ORM\InverseJoinColumn(name: 'channeled_product_id', referencedColumnName: 'id')]
-    protected Collection $channeledProducts;
-
-    #[ORM\ManyToMany(targetEntity: ChanneledProductVariant::class, inversedBy: 'channeledOrders')]
-    #[ORM\JoinTable(name: 'channeled_order_channeled_product_variants')]
-    #[ORM\JoinColumn(name: 'channeled_order_id', referencedColumnName: 'id')]
-    #[ORM\InverseJoinColumn(name: 'channeled_product_variant_id', referencedColumnName: 'id')]
-    protected Collection $channeledProductVariants;
-
-    #[ORM\ManyToMany(targetEntity: ChanneledDiscount::class, inversedBy: 'channeledOrders')]
-    #[ORM\JoinTable(name: 'channeled_order_channeled_discounts')]
-    #[ORM\JoinColumn(name: 'channeled_order_id', referencedColumnName: 'id')]
-    #[ORM\InverseJoinColumn(name: 'channeled_discount_id', referencedColumnName: 'id')]
-    protected Collection $channeledDiscounts;
-
-    // Relationships with non-channeled entities
-
-    #[ORM\ManyToOne(targetEntity: Order::class, inversedBy: 'channeledOrders')]
-    #[ORM\JoinColumn(name: 'order_id', onDelete: 'cascade')]
-    protected Order $order;
-
-    public function __construct()
+    #[ORM\Entity(repositoryClass: ChanneledOrderRepository::class)]
+    #[ORM\Table(name: 'channeled_orders')]
+    #[ORM\Index(name: 'idx_channeled_orders_platform_id_channel_idx', columns: ['platform_id', 'channel'])]
+    #[ORM\Index(name: 'idx_channeled_orders_platform_id_idx', columns: ['platform_id'])]
+    #[ORM\Index(name: 'idx_channeled_orders_platform_created_at_idx', columns: ['platform_created_at'])]
+    #[ORM\HasLifecycleCallbacks]
+    class ChanneledOrder extends ChanneledEntity
     {
-        $this->channeledProducts = new ArrayCollection();
-        $this->channeledProductVariants = new ArrayCollection();
-        $this->channeledDiscounts = new ArrayCollection();
-    }
+        // Relationships with channeled entities
 
-    /**
-     * @return ChanneledCustomer
-     */
-    public function getChanneledCustomer(): ChanneledCustomer
-    {
-        return $this->channeledCustomer;
-    }
+        #[ORM\ManyToOne(targetEntity: ChanneledCustomer::class, inversedBy: 'channeledOrders')]
+        #[ORM\JoinColumn(name: 'channeled_customer_id', onDelete: 'cascade')]
+        protected ChanneledCustomer $channeledCustomer;
 
-    /**
-     * @param ChanneledCustomer|null $channeledCustomer
-     * @return ChanneledOrder
-     */
-    public function addChanneledCustomer(?ChanneledCustomer $channeledCustomer): self
-    {
-        $this->channeledCustomer = $channeledCustomer;
+        #[ORM\ManyToMany(targetEntity: ChanneledProduct::class, inversedBy: 'channeledOrders')]
+        #[ORM\JoinTable(name: 'channeled_order_channeled_products')]
+        #[ORM\JoinColumn(name: 'channeled_order_id', referencedColumnName: 'id')]
+        #[ORM\InverseJoinColumn(name: 'channeled_product_id', referencedColumnName: 'id')]
+        protected Collection $channeledProducts;
 
-        return $this;
-    }
+        #[ORM\ManyToMany(targetEntity: ChanneledProductVariant::class, inversedBy: 'channeledOrders')]
+        #[ORM\JoinTable(name: 'channeled_order_channeled_product_variants')]
+        #[ORM\JoinColumn(name: 'channeled_order_id', referencedColumnName: 'id')]
+        #[ORM\InverseJoinColumn(name: 'channeled_product_variant_id', referencedColumnName: 'id')]
+        protected Collection $channeledProductVariants;
 
-    /**
-     * @return Collection|null
-     */
-    public function getChanneledProducts(): ?Collection
-    {
-        return $this->channeledProducts;
-    }
+        #[ORM\ManyToMany(targetEntity: ChanneledDiscount::class, inversedBy: 'channeledOrders')]
+        #[ORM\JoinTable(name: 'channeled_order_channeled_discounts')]
+        #[ORM\JoinColumn(name: 'channeled_order_id', referencedColumnName: 'id')]
+        #[ORM\InverseJoinColumn(name: 'channeled_discount_id', referencedColumnName: 'id')]
+        protected Collection $channeledDiscounts;
 
-    /**
-     * @param ChanneledProduct $channeledProduct
-     * @return ChanneledOrder
-     */
-    public function addChanneledProduct(ChanneledProduct $channeledProduct): self
-    {
-        if ($this->channeledProducts->contains($channeledProduct)) {
+        // Relationships with non-channeled entities
+
+        #[ORM\ManyToOne(targetEntity: Order::class, inversedBy: 'channeledOrders')]
+        #[ORM\JoinColumn(name: 'order_id', onDelete: 'cascade')]
+        protected Order $order;
+
+        public function __construct()
+        {
+            $this->channeledProducts = new ArrayCollection();
+            $this->channeledProductVariants = new ArrayCollection();
+            $this->channeledDiscounts = new ArrayCollection();
+        }
+
+        /**
+         * @return ChanneledCustomer
+         */
+        public function getChanneledCustomer(): ChanneledCustomer
+        {
+            return $this->channeledCustomer;
+        }
+
+        /**
+         * @param ChanneledCustomer|null $channeledCustomer
+         * @return ChanneledOrder
+         */
+        public function addChanneledCustomer(?ChanneledCustomer $channeledCustomer): self
+        {
+            $this->channeledCustomer = $channeledCustomer;
+
             return $this;
         }
 
-        $this->channeledProducts->add($channeledProduct);
-        $channeledProduct->addChanneledOrder($this);
-
-        return $this;
-    }
-
-    /**
-     * @param Collection $channeledProducts
-     * @return ChanneledOrder
-     */
-    public function addChanneledProducts(Collection $channeledProducts): self
-    {
-        foreach ($channeledProducts as $channeledProduct) {
-            $this->addChanneledProduct($channeledProduct);
+        /**
+         * @return Collection|null
+         */
+        public function getChanneledProducts(): ?Collection
+        {
+            return $this->channeledProducts;
         }
 
-        return $this;
-    }
+        /**
+         * @param ChanneledProduct $channeledProduct
+         * @return ChanneledOrder
+         */
+        public function addChanneledProduct(ChanneledProduct $channeledProduct): self
+        {
+            if ($this->channeledProducts->contains($channeledProduct)) {
+                return $this;
+            }
 
-    /**
-     * @param ChanneledProduct $channeledProduct
-     * @return ChanneledOrder
-     */
-    public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
-    {
-        if (!$this->channeledProducts->contains($channeledProduct)) {
+            $this->channeledProducts->add($channeledProduct);
+            $channeledProduct->addChanneledOrder($this);
+
             return $this;
         }
 
-        $this->channeledProducts->removeElement($channeledProduct);
+        /**
+         * @param Collection $channeledProducts
+         * @return ChanneledOrder
+         */
+        public function addChanneledProducts(Collection $channeledProducts): self
+        {
+            foreach ($channeledProducts as $channeledProduct) {
+                $this->addChanneledProduct($channeledProduct);
+            }
 
-        if (!$channeledProduct->getChanneledOrders()->contains($this)) {
             return $this;
         }
 
-        $channeledProduct->removeChanneledOrder($this);
+        /**
+         * @param ChanneledProduct $channeledProduct
+         * @return ChanneledOrder
+         */
+        public function removeChanneledProduct(ChanneledProduct $channeledProduct): self
+        {
+            if (!$this->channeledProducts->contains($channeledProduct)) {
+                return $this;
+            }
 
-        return $this;
-    }
+            $this->channeledProducts->removeElement($channeledProduct);
 
-    /**
-     * @param Collection $channeledProducts
-     * @return ChanneledOrder
-     */
-    public function removeChanneledProducts(Collection $channeledProducts): self
-    {
-        foreach ($channeledProducts as $channeledProduct) {
-            $this->removeChanneledProduct($channeledProduct);
-        }
+            if (!$channeledProduct->getChanneledOrders()->contains($this)) {
+                return $this;
+            }
 
-        return $this;
-    }
+            $channeledProduct->removeChanneledOrder($this);
 
-    /**
-     * @return Collection|null
-     */
-    public function getChanneledProductVariants(): ?Collection
-    {
-        return $this->channeledProductVariants;
-    }
-
-    /**
-     * @param ChanneledProductVariant $channeledProductVariant
-     * @return ChanneledOrder
-     */
-    public function addChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
-    {
-        if ($this->channeledProductVariants->contains($channeledProductVariant)) {
             return $this;
         }
 
-        $this->channeledProductVariants->add($channeledProductVariant);
-        $channeledProductVariant->addChanneledOrder($this);
+        /**
+         * @param Collection $channeledProducts
+         * @return ChanneledOrder
+         */
+        public function removeChanneledProducts(Collection $channeledProducts): self
+        {
+            foreach ($channeledProducts as $channeledProduct) {
+                $this->removeChanneledProduct($channeledProduct);
+            }
 
-        return $this;
-    }
-
-    /**
-     * @param Collection $channeledProductVariants
-     * @return ChanneledOrder
-     */
-    public function addChanneledProductVariants(Collection $channeledProductVariants): self
-    {
-        foreach ($channeledProductVariants as $channeledProductVariant) {
-            $this->addChanneledProductVariant($channeledProductVariant);
-        }
-
-        return $this;
-    }
-
-    /**
-     * @param ChanneledProductVariant $channeledProductVariant
-     * @return ChanneledOrder
-     */
-    public function removeChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
-    {
-        if (!$this->channeledProductVariants->contains($channeledProductVariant)) {
             return $this;
         }
 
-        $this->channeledProductVariants->removeElement($channeledProductVariant);
+        /**
+         * @return Collection|null
+         */
+        public function getChanneledProductVariants(): ?Collection
+        {
+            return $this->channeledProductVariants;
+        }
 
-        if (!$channeledProductVariant->getChanneledOrders()->contains($this)) {
+        /**
+         * @param ChanneledProductVariant $channeledProductVariant
+         * @return ChanneledOrder
+         */
+        public function addChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
+        {
+            if ($this->channeledProductVariants->contains($channeledProductVariant)) {
+                return $this;
+            }
+
+            $this->channeledProductVariants->add($channeledProductVariant);
+            $channeledProductVariant->addChanneledOrder($this);
+
             return $this;
         }
 
-        $channeledProductVariant->removeChanneledOrder($this);
+        /**
+         * @param Collection $channeledProductVariants
+         * @return ChanneledOrder
+         */
+        public function addChanneledProductVariants(Collection $channeledProductVariants): self
+        {
+            foreach ($channeledProductVariants as $channeledProductVariant) {
+                $this->addChanneledProductVariant($channeledProductVariant);
+            }
 
-        return $this;
-    }
-
-    /**
-     * @param Collection $channeledProductVariants
-     * @return ChanneledOrder
-     */
-    public function removeChanneledProductVariants(Collection $channeledProductVariants): self
-    {
-        foreach ($channeledProductVariants as $channeledProductVariant) {
-            $this->removeChanneledProductVariant($channeledProductVariant);
-        }
-
-        return $this;
-    }
-
-    /**
-     * @return Collection|null
-     */
-    public function getChanneledDiscounts(): ?Collection
-    {
-        return $this->channeledDiscounts;
-    }
-
-    /**
-     * @param ChanneledDiscount $channeledDiscount
-     * @return ChanneledOrder
-     */
-    public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
-    {
-        if ($this->channeledDiscounts->contains($channeledDiscount)) {
             return $this;
         }
 
-        $this->channeledDiscounts->add($channeledDiscount);
-        $channeledDiscount->addChanneledOrder($this);
+        /**
+         * @param ChanneledProductVariant $channeledProductVariant
+         * @return ChanneledOrder
+         */
+        public function removeChanneledProductVariant(ChanneledProductVariant $channeledProductVariant): self
+        {
+            if (!$this->channeledProductVariants->contains($channeledProductVariant)) {
+                return $this;
+            }
 
-        return $this;
-    }
+            $this->channeledProductVariants->removeElement($channeledProductVariant);
 
-    /**
-     * @param Collection $channeledDiscounts
-     * @return ChanneledOrder
-     */
-    public function addChanneledDiscounts(Collection $channeledDiscounts): self
-    {
-        foreach ($channeledDiscounts as $channeledDiscount) {
-            $this->addChanneledDiscount($channeledDiscount);
-        }
+            if (!$channeledProductVariant->getChanneledOrders()->contains($this)) {
+                return $this;
+            }
 
-        return $this;
-    }
+            $channeledProductVariant->removeChanneledOrder($this);
 
-    /**
-     * @param ChanneledDiscount $channeledDiscount
-     * @return ChanneledOrder
-     */
-    public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): self
-    {
-        if (!$this->channeledDiscounts->contains($channeledDiscount)) {
             return $this;
         }
 
-        $this->channeledDiscounts->removeElement($channeledDiscount);
+        /**
+         * @param Collection $channeledProductVariants
+         * @return ChanneledOrder
+         */
+        public function removeChanneledProductVariants(Collection $channeledProductVariants): self
+        {
+            foreach ($channeledProductVariants as $channeledProductVariant) {
+                $this->removeChanneledProductVariant($channeledProductVariant);
+            }
 
-        if (!$channeledDiscount->getChanneledOrders()->contains($this)) {
             return $this;
         }
 
-        $channeledDiscount->removeChanneledOrder($this);
-
-        return $this;
-    }
-
-    /**
-     * @param Collection $channeledDiscounts
-     * @return ChanneledOrder
-     */
-    public function removeDiscounts(Collection $channeledDiscounts): self
-    {
-        foreach ($channeledDiscounts as $channeledDiscount) {
-            $this->removeChanneledDiscount($channeledDiscount);
+        /**
+         * @return Collection|null
+         */
+        public function getChanneledDiscounts(): ?Collection
+        {
+            return $this->channeledDiscounts;
         }
 
-        return $this;
-    }
+        /**
+         * @param ChanneledDiscount $channeledDiscount
+         * @return ChanneledOrder
+         */
+        public function addChanneledDiscount(ChanneledDiscount $channeledDiscount): self
+        {
+            if ($this->channeledDiscounts->contains($channeledDiscount)) {
+                return $this;
+            }
 
-    /**
-     * @return Order
-     */
-    public function getOrder(): Order
-    {
-        return $this->order;
-    }
+            $this->channeledDiscounts->add($channeledDiscount);
+            $channeledDiscount->addChanneledOrder($this);
 
-    /**
-     * @param Order|null $order
-     * @return ChanneledOrder
-     */
-    public function addOrder(?Order $order): self
-    {
-        $this->order = $order;
+            return $this;
+        }
 
-        return $this;
+        /**
+         * @param Collection $channeledDiscounts
+         * @return ChanneledOrder
+         */
+        public function addChanneledDiscounts(Collection $channeledDiscounts): self
+        {
+            foreach ($channeledDiscounts as $channeledDiscount) {
+                $this->addChanneledDiscount($channeledDiscount);
+            }
+
+            return $this;
+        }
+
+        /**
+         * @param ChanneledDiscount $channeledDiscount
+         * @return ChanneledOrder
+         */
+        public function removeChanneledDiscount(ChanneledDiscount $channeledDiscount): self
+        {
+            if (!$this->channeledDiscounts->contains($channeledDiscount)) {
+                return $this;
+            }
+
+            $this->channeledDiscounts->removeElement($channeledDiscount);
+
+            if (!$channeledDiscount->getChanneledOrders()->contains($this)) {
+                return $this;
+            }
+
+            $channeledDiscount->removeChanneledOrder($this);
+
+            return $this;
+        }
+
+        /**
+         * @param Collection $channeledDiscounts
+         * @return ChanneledOrder
+         */
+        public function removeDiscounts(Collection $channeledDiscounts): self
+        {
+            foreach ($channeledDiscounts as $channeledDiscount) {
+                $this->removeChanneledDiscount($channeledDiscount);
+            }
+
+            return $this;
+        }
+
+        /**
+         * @return Order
+         */
+        public function getOrder(): Order
+        {
+            return $this->order;
+        }
+
+        /**
+         * @param Order|null $order
+         * @return ChanneledOrder
+         */
+        public function addOrder(?Order $order): self
+        {
+            $this->order = $order;
+
+            return $this;
+        }
     }
-}

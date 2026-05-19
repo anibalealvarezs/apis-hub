@@ -4,11 +4,22 @@ set -e
 # Ensure persistent log directory exists (mapped to host via volume)
 mkdir -p /app/logs /app/storage
 
+# Export environment variables for cron
+# We exclude proxy variables and other sensitive/volatile ones if needed
+printenv | grep -v "no_proxy" >> /etc/environment
+
+# Set Instance Name with uniqueness if it's a worker
+if [[ "$INSTANCE_NAME" == *"worker"* ]] || [[ -z "$INSTANCE_NAME" ]]; then
+    # Use hostname to ensure uniqueness in scaled environments
+    UNIQUE_ID=$(hostname)
+    export INSTANCE_NAME="${INSTANCE_NAME:-worker}-${UNIQUE_ID}"
+fi
+
 # Update database schema and seed entities (Single Master instance ONLY to avoid deadlocks)
 if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     # Ensure modular dependencies are registered (especially during refactoring with local paths)
     echo "Master Instance ($INSTANCE_NAME): Updating modular dependencies..."
-    composer update --no-scripts --no-interaction --ignore-platform-reqs || echo "Modular update failed, continuing..."
+    echo "Master Instance ($INSTANCE_NAME): Dependencies should be managed via Docker build."
 
     # Wait for DB host to be resolvable via DNS
     DB_HOST_TO_CHECK=${DB_HOST:-db}
@@ -34,7 +45,8 @@ if [[ "$INSTANCE_NAME" == *"master"* ]]; then
     if mkdir "$LOCK_DIR" 2>/dev/null; then
         echo "Master Instance ($INSTANCE_NAME): Acquired lock. Initializing database and entities..."
         if php bin/cli.php app:setup-db; then
-            echo "Database setup successful."
+            echo "Database setup successful. Scheduling initial jobs..."
+            php bin/cli.php app:schedule-initial-jobs --instance="global" || echo "Initial scheduling failed"
         else
             echo "Database setup failed. Removing lock to allow retries."
             rmdir "$LOCK_DIR"
@@ -48,30 +60,28 @@ fi
 
 if [[ "$INSTANCE_NAME" != *"master"* ]] || [[ "$INSTANCE_TYPE" == "waiting-master" ]]; then
 
-    # Wait for the database and jobs table to exist (up to 2 minutes)
-    MAX_RETRIES=60
-    RETRY_COUNT=0
-    
     # We use a robust PHP check that handles "Unknown database" error 
     # without crashing, treating it as "not ready".
-    CHECK_CMD="require 'app/bootstrap.php'; try { \Helpers\Helpers::getManager()->getConnection()->executeQuery('SELECT 1 FROM jobs LIMIT 1'); echo 'READY'; } catch (Exception \$e) { echo 'NOT_READY'; }"
+    # We use Throwable to catch fatal errors as well.
+    CHECK_CMD="require 'app/bootstrap.php'; try { \Helpers\Helpers::getManager()->getConnection()->executeQuery('SELECT 1 FROM jobs LIMIT 1'); echo 'READY'; } catch (\Throwable \$e) { echo 'NOT_READY: ' . \$e->getMessage(); }"
     
-    while [ "$(php -r "$CHECK_CMD" 2>/dev/null)" != "READY" ] && [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        echo "Waiting for database '$DB_NAME' and 'jobs' table... (Attempt $((RETRY_COUNT+1))/$MAX_RETRIES)"
+    while true; do
+        CHECK_RESULT=$(php -r "$CHECK_CMD" 2>&1)
+        if [[ "$CHECK_RESULT" == *"READY"* ]]; then
+            break
+        fi
+        
+        echo "Waiting for database '$DB_NAME' and 'jobs' table... (Attempt $((RETRY_COUNT+1))/$MAX_RETRIES) - Status: $CHECK_RESULT"
+        
+        if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+            echo "Warning: Database schema not ready after timeout. Proceeding anyway..."
+            break
+        fi
+        
         sleep 2
         RETRY_COUNT=$((RETRY_COUNT+1))
     done
-    
-    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-        echo "Warning: Database schema not ready after 2 minutes. Proceeding anyway..."
-    else
-        echo "Database schema detected and ready."
-    fi
 fi
-
-# Each instance only schedules its OWN initial job to prevent massive duplication
-echo "Scheduling initial job for $INSTANCE_NAME..."
-php bin/cli.php app:schedule-initial-jobs --instance="$INSTANCE_NAME" || echo "Initial scheduling failed"
 
 # Configure Cron based on project config
 if [ -n "$PROJECT_CONFIG_FILE" ]; then
@@ -135,9 +145,13 @@ if [[ "$INSTANCE_NAME" == *"mcp"* ]]; then
     exec node mcp-server/index.js
 fi
 
-# Start cron service
-echo "Starting cron service..."
-cron || service cron start || echo "Cron service startup failed"
+# Start cron service (Master instance ONLY)
+if [[ "$INSTANCE_NAME" == *"master"* ]]; then
+    echo "Master Instance ($INSTANCE_NAME): Starting cron service..."
+    cron || service cron start || echo "Cron service startup failed"
+else
+    echo "Worker Instance ($INSTANCE_NAME): Skipping cron service (not master)."
+fi
 
 # Automatic server detection based on INSTANCE_NAME
 if [[ "$INSTANCE_NAME" == *"master"* ]]; then
@@ -148,21 +162,26 @@ else
     USE_SWOOLE=${USE_SWOOLE:-false}
 fi
 
-# Start the web server
-if [ "$DISABLE_HTTP_SERVER" = "true" ]; then
-    echo "HTTP server disabled ($INSTANCE_NAME). Running as pure worker."
-    # We keep the container alive by waiting on the background processes or just tailing a log
-    # Since cron is running and potentially other background tasks, we tail the cron log
-    touch /app/logs/cron.log
-    exec tail -f /app/logs/cron.log
-elif [ "$USE_SWOOLE" = "true" ]; then
-    echo "Starting Swoole HTTP server on port $PORT..."
-    exec php bin/swoole-server.php
-elif [ $# -gt 0 ]; then
-    # If arguments are provided to the container (like 'vendor/bin/phpunit'), execute them instead of the web server
-    echo "Executing custom command: $@"
-    exec "$@"
+# Start the web server or worker process
+if [[ "$INSTANCE_NAME" == *"master"* ]]; then
+    if [ "$DISABLE_HTTP_SERVER" = "true" ]; then
+        echo "Master Instance ($INSTANCE_NAME): HTTP server disabled. Running as scheduler only."
+        exec tail -f /app/logs/cron.log
+    elif [ "$USE_SWOOLE" = "true" ]; then
+        echo "Master Instance ($INSTANCE_NAME): Starting Swoole HTTP server on port $PORT..."
+        exec php bin/swoole-server.php
+    else
+        echo "Master Instance ($INSTANCE_NAME): Starting PHP server on port $PORT..."
+        exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
+    fi
 else
-    echo "Starting PHP server on port $PORT with compression..."
-    exec php -d zlib.output_compression=On -S 0.0.0.0:${PORT} -t . bin/index.php
+    echo "Worker Instance ($INSTANCE_NAME): Running as persistent job processor."
+    # We disable the cron service for workers to prevent process accumulation.
+    # We use a while loop to keep the process alive even if jobs:process exits 
+    # when the queue is empty, avoiding continuous container restarts.
+    while true; do
+        php bin/cli.php jobs:process
+        echo "Worker Instance ($INSTANCE_NAME): Queue empty or process finished. Sleeping 5s..."
+        sleep 5
+    done
 fi

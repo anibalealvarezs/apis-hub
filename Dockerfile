@@ -39,19 +39,21 @@ COPY . /app
 # Ejecutar scripts de composer que faltaron
 RUN composer dump-autoload --optimize
 
-# Instalar dependencias del servidor MCP
-RUN cd mcp-server && npm install --omit=dev
+# Instalar dependencias del servidor MCP con pnpm (compatible con Node 20)
+RUN corepack enable && corepack prepare pnpm@10.19.0 --activate \
+    && cd mcp-server && pnpm install --prod --frozen-lockfile
 
 
 # Configurar el entrypoint
-RUN chmod +x /app/entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Cloud Run escucha por defecto en el puerto 8080 (o donde le mande la variable $PORT)
 ENV PORT=8080
 
 # Al levantar el contenedor, ejecutar el script de entrada usando bash
 # para evitar problemas de permisos de ejecución en volúmenes montados.
-ENTRYPOINT ["bash", "/app/entrypoint.sh"]
+ENTRYPOINT ["bash", "/usr/local/bin/entrypoint.sh"]
 
 # El servidor PHP se ejecuta en el entrypoint.sh final.
 CMD []

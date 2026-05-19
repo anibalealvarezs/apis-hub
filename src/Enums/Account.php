@@ -1,19 +1,21 @@
 <?php
 
-namespace Enums;
+    namespace Enums;
 
-/**
- * Constants for the different types of digital accounts that can be associated with a ChanneledAccount.
- */
-class Account
-{
+    use Anibalealvarezs\ApiDriverCore\Classes\AccountTypeRegistry;
+
     /**
-     * Get all registered types.
-     *
-     * @return array [key => label]
+     * Constants for the different types of digital accounts that can be associated with a ChanneledAccount.
      */
-    public static function getAll(): array
+    class Account
     {
-        return \Anibalealvarezs\ApiDriverCore\Classes\AccountTypeRegistry::getAll();
+        /**
+         * Get all registered types.
+         *
+         * @return array [key => label]
+         */
+        public static function getAll(): array
+        {
+            return AccountTypeRegistry::getAll();
+        }
     }
-}

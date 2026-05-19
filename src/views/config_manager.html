@@ -344,6 +344,31 @@
           >
             <div>
               <div
+                class="section-title small hierarchy-item-premium"
+                style="margin-bottom: 5px; border: none; padding: 0"
+              >
+                <i data-lucide="shield-check"></i> Account Isolation
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-dim)">
+                Enable Granular Sync (1 Job per Site)
+              </div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="gsc-granular-sync" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div
+            class="card compact-card"
+            style="
+              flex-direction: row;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <div>
+              <div
                 class="section-title small"
                 style="margin-bottom: 5px; border: none; padding: 0"
               >
@@ -417,6 +442,22 @@
                 <option value="12 months">Last 12 Months</option>
                 <option value="16 months" selected>Max (16 Months)</option>
               </select>
+            </div>
+          </div>
+          <div class="card compact-card">
+            <div class="section-title small">
+              <i data-lucide="users"></i> Max Workers
+            </div>
+            <div style="margin-top: auto">
+              <input
+                type="number"
+                id="gsc-max-workers"
+                min="1"
+                max="10"
+                placeholder="3"
+                class="control-select"
+                style="width: 100%"
+              />
             </div>
           </div>
         </div>
@@ -498,6 +539,31 @@
               <span class="slider"></span>
             </label>
           </div>
+
+          <div
+            class="card compact-card"
+            style="
+              flex-direction: row;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <div>
+              <div
+                class="section-title small hierarchy-item-premium"
+                style="margin-bottom: 5px; border: none; padding: 0"
+              >
+                <i data-lucide="shield-check"></i> Account Isolation
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-dim)">
+                Enable Granular Sync (1 Job per Page)
+              </div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="fb-organic-granular-sync" />
+              <span class="slider"></span>
+            </label>
+          </div>
           <div class="card compact-card">
             <div class="section-title small">
               <i data-lucide="calendar"></i> Sync Window
@@ -517,6 +583,21 @@
                 <option value="4 years">4 Years</option>
                 <option value="5 years">5 Years</option>
               </select>
+            </div>
+          </div>
+          <div class="card compact-card">
+            <div class="section-title small">
+              <i data-lucide="users"></i> Max Workers
+            </div>
+            <div style="margin-top: auto">
+              <input
+                type="number"
+                id="fb-organic-max-workers"
+                min="1"
+                max="10"
+                placeholder="3"
+                style="width: 100%; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); color: white; padding: 6px 10px;"
+              />
             </div>
           </div>
           <div class="card compact-card" style="flex: 1">
@@ -866,6 +947,31 @@
               <span class="slider"></span>
             </label>
           </div>
+
+          <div
+            class="card compact-card"
+            style="
+              flex-direction: row;
+              justify-content: space-between;
+              align-items: center;
+            "
+          >
+            <div>
+              <div
+                class="section-title small hierarchy-item-premium"
+                style="margin-bottom: 5px; border: none; padding: 0"
+              >
+                <i data-lucide="shield-check"></i> Account Isolation
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-dim)">
+                Enable Granular Sync (1 Job per Ad Account)
+              </div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="fb-marketing-granular-sync" />
+              <span class="slider"></span>
+            </label>
+          </div>
           <div class="card compact-card">
             <div class="section-title small">
               <i data-lucide="calendar"></i> Sync Window
@@ -1012,6 +1118,21 @@
               style="display: none; margin-top: 10px"
             >
               <i data-lucide="alert-triangle" size="12"></i> Deployment required
+            </div>
+          </div>
+          <div class="card compact-card">
+            <div class="section-title small">
+              <i data-lucide="users"></i> Max Workers
+            </div>
+            <div style="margin-top: auto">
+              <input
+                type="number"
+                id="fb-marketing-max-workers"
+                min="1"
+                max="10"
+                placeholder="3"
+                style="width: 100%; border-radius: 6px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); color: white; padding: 6px 10px;"
+              />
             </div>
           </div>
           <div class="card compact-card" style="flex: 2; grid-column: span 2">
@@ -1431,6 +1552,10 @@
       <script src="/driver-assets/core/footer.js"></script>
     </main>
 
+    <script>
+      window.ConfigHandlers = {};
+      /* [DRIVER_JS_INJECTION] */
+    </script>
     <script src="/assets/views/config-manager.js?v=3"></script>
   </body>
 </html>

@@ -51,15 +51,16 @@ class CheckCoverageCommand extends Command
             $conn = $em->getConnection();
 
             // SQL to find dates present in the channeled_metrics table for the specific channel
-            $sql = "SELECT DISTINCT DATE(platformCreatedAt) as date 
+            $limitDate = (new \DateTime())->modify("-$days days")->format('Y-m-d 00:00:00');
+            $sql = "SELECT DISTINCT CAST(platformCreatedAt AS DATE) as date 
                     FROM channeled_metrics 
                     WHERE channel = :channel 
-                    AND platformCreatedAt >= DATE_SUB(CURDATE(), INTERVAL :days DAY)
+                    AND platformCreatedAt >= :limit_date
                     ORDER BY date DESC";
 
             $stmt = $conn->prepare($sql);
             $stmt->bindValue('channel', $channel->value);
-            $stmt->bindValue('days', $days);
+            $stmt->bindValue('limit_date', $limitDate);
             $result = $stmt->executeQuery();
             $datesFound = $result->fetchFirstColumn();
 

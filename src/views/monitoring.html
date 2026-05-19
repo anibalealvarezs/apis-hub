@@ -29,6 +29,18 @@
             </div>
         </div>
 
+        <!-- Sync Telemetry Section -->
+        <div class="card card-monitoring-header" style="margin-bottom: 20px; border-color: var(--secondary);">
+            <div class="monitoring-section-label">
+                <i data-lucide="refresh-cw" size="14"></i> Real-Time Sync Telemetry
+            </div>
+            <div id="sync-telemetry-grid" class="sync-status-grid">
+                <div class="empty-state">
+                    <i data-lucide="loader" class="spinner"></i> Calculating completion metrics...
+                </div>
+            </div>
+        </div>
+
         <div class="card card-monitoring-header">
             <div class="monitoring-section-label">
                <i data-lucide="database" size="14"></i> Records Distribution
@@ -42,7 +54,7 @@
             <div class="col">
                 <div class="card">
                     <div class="monitoring-section-label">
-                        <i data-lucide="box" size="14"></i> Infrastructure Stack
+                        <i data-lucide="box" size="14"></i> Infrastructure Stack (Workers + Active Job Scope)
                     </div>
                     <div id="container-grid" class="container-grid">
                         <div class="empty-state">
@@ -58,6 +70,9 @@
                     <div class="monitoring-queue-header">
                         <div class="header-flex"><i data-lucide="clock" size="14"></i> Active Queue</div>
                         <span id="job-count-badge" class="monitoring-badge-mini">0 Pending</span>
+                    </div>
+                    <div class="monitoring-runtime-label" style="margin-bottom:10px;">
+                        Controls: Force Run, Re-schedule, Cancel, and Priority +/- for queue ordering.
                     </div>
                     <div id="jobs-detailed-list" class="monitoring-scroll-area">
                         <div class="empty-state"><i data-lucide="zap" class="spinner"></i> Optimizing queues...</div>

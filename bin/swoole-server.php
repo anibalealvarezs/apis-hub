@@ -71,6 +71,7 @@ require_once __DIR__ . "/../app/bootstrap.php";
 
 // 2. Pre-register routes
 $app = new RoutingCore();
+$app->multiMap(require __DIR__ . "/../src/Routes/sync.php");
 $app->multiMap(require __DIR__ . "/../src/Routes/cache.php");
 $app->multiMap(require __DIR__ . "/../src/Routes/crud.php");
 $app->multiMap(require __DIR__ . "/../src/Routes/page.php");

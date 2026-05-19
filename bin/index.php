@@ -29,6 +29,11 @@ $request = Request::createFromGlobals();
 
 $app = new RoutingCore();
 
+
+// Sync Telemetry routes
+$syncRoutes = require_once __DIR__ . "/../src/Routes/sync.php";
+$app->multiMap($syncRoutes);
+
 // Cache routes first
 $cacheRoutes = require_once __DIR__ . "/../src/Routes/cache.php";
 $app->multiMap($cacheRoutes);

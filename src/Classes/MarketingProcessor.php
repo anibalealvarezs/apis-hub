@@ -93,6 +93,18 @@ class MarketingProcessor
             }
         }
 
+        // 1.5 Fetch channeled account IDs map
+        $caPlatformIds = array_unique(array_filter(array_column($campaigns, 'channeledAccountId')));
+        $caMap = [];
+        if (!empty($caPlatformIds)) {
+            $sql = 'SELECT platform_id, id FROM channeled_accounts WHERE platform_id IN ('
+                . implode(', ', array_fill(0, count($caPlatformIds), '?')) . ')';
+            $fetched = $conn->executeQuery($sql, array_values($caPlatformIds))->fetchAllAssociative();
+            foreach ($fetched as $row) {
+                $caMap[$row['platform_id']] = $row['id'];
+            }
+        }
+
         if (!empty($campaigns)) {
             $cols = ['channel', 'platform_id', 'campaign_id', 'channeled_account_id', 'budget', 'status', 'objective', 'buying_type', 'data'];
             $numCols = count($cols);
@@ -106,7 +118,7 @@ class MarketingProcessor
                     $channeledParams[] = self::resolveChannelId($c->channel, $manager);
                     $channeledParams[] = $c->platformId;
                     $channeledParams[] = $campaignMap[$c->platformId] ?? null;
-                    $channeledParams[] = $c->channeledAccountId;
+                    $channeledParams[] = $caMap[$c->channeledAccountId] ?? (is_numeric($c->channeledAccountId) && $c->channeledAccountId <= 2147483647 ? (int)$c->channeledAccountId : null);
                     $channeledParams[] = (float)($c->budget ?? 0);
                     $channeledParams[] = $c->status ?? null;
                     $channeledParams[] = $c->objective ?? null;
@@ -158,6 +170,18 @@ class MarketingProcessor
             }
         }
 
+        // 1.5 Fetch channeled account IDs map
+        $caPlatformIds = array_unique(array_filter(array_column($adsets, 'channeledAccountId')));
+        $caMap = [];
+        if (!empty($caPlatformIds)) {
+            $sql = 'SELECT platform_id, id FROM channeled_accounts WHERE platform_id IN ('
+                . implode(', ', array_fill(0, count($caPlatformIds), '?')) . ')';
+            $fetched = $conn->executeQuery($sql, array_values($caPlatformIds))->fetchAllAssociative();
+            foreach ($fetched as $row) {
+                $caMap[$row['platform_id']] = $row['id'];
+            }
+        }
+
         // 2. Bulk Insert/Update channeled_ad_groups
         if (!empty($adsets)) {
             $cols = ['channel', 'platform_id', 'channeled_account_id', 'campaign_id', 'channeled_campaign_id', 'name', 'start_date', 'end_date', 'status', 'optimization_goal', 'billing_event', 'targeting', 'data'];
@@ -171,7 +195,7 @@ class MarketingProcessor
                     /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, channeledCampaignId: string|int, name: string, startDate: ?\Carbon\Carbon, endDate: ?\Carbon\Carbon, status: string, optimizationGoal: string, billingEvent: string, targeting: mixed, data: mixed} $a */
                     $params[] = self::resolveChannelId($a->channel, $manager);
                     $params[] = $a->platformId;
-                    $params[] = $a->channeledAccountId;
+                    $params[] = $caMap[$a->channeledAccountId] ?? (is_numeric($a->channeledAccountId) && $a->channeledAccountId <= 2147483647 ? (int)$a->channeledAccountId : null);
                     $params[] = $campaignMap[$a->channeledCampaignId]['global_id'] ?? null;
                     $params[] = $campaignMap[$a->channeledCampaignId]['channeled_id'] ?? null;
                     $params[] = $a->name;
@@ -246,6 +270,18 @@ class MarketingProcessor
             }
         }
 
+        // 1.5 Fetch channeled account IDs map
+        $caPlatformIds = array_unique(array_filter(array_column($ads, 'channeledAccountId')));
+        $caMap = [];
+        if (!empty($caPlatformIds)) {
+            $sql = 'SELECT platform_id, id FROM channeled_accounts WHERE platform_id IN ('
+                . implode(', ', array_fill(0, count($caPlatformIds), '?')) . ')';
+            $fetched = $conn->executeQuery($sql, array_values($caPlatformIds))->fetchAllAssociative();
+            foreach ($fetched as $row) {
+                $caMap[$row['platform_id']] = $row['id'];
+            }
+        }
+
         // 2. Bulk Insert/Update channeled_ads
         if (!empty($ads)) {
             $cols = ['channel', 'platform_id', 'channeled_account_id', 'channeled_campaign_id', 'channeled_ad_group_id', 'creative_id', 'name', 'status', 'data'];
@@ -259,7 +295,7 @@ class MarketingProcessor
                     /** @var object{channel: string, platformId: string|int, channeledAccountId: string|int, channeledCampaignId: string|int, channeledAdGroupId: string|int, channeledCreativeId: string|int, name: string, status: string, data: mixed} $a */
                     $params[] = self::resolveChannelId($a->channel, $manager);
                     $params[] = $a->platformId;
-                    $params[] = $a->channeledAccountId;
+                    $params[] = $caMap[$a->channeledAccountId] ?? (is_numeric($a->channeledAccountId) && $a->channeledAccountId <= 2147483647 ? (int)$a->channeledAccountId : null);
                     $params[] = $campaignMap[$a->channeledCampaignId] ?? null;
                     $params[] = $adGroupMap[$a->channeledAdGroupId] ?? null;
                     $params[] = $creativeMap[$a->channeledCreativeId] ?? null;

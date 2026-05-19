@@ -128,7 +128,9 @@
          */
         protected function initializeChannelEntities(OutputInterface $output): int
         {
+            $output->writeln("<info>TRACE: Fetching registry...</info>");
             $registry = DriverFactory::getRegistry();
+            $output->writeln("<info>TRACE: Fetching channels config...</info>");
             $channelsConfig = Helpers::getChannelsConfig();
 
             foreach ($registry as $channel => $driverCfg) {
@@ -137,8 +139,6 @@
 
                 $driverClass = $driverCfg['driver'] ?? null;
                 if (!$driverClass || !class_exists($driverClass)) {
-                    $this->logger->error("Driver class '$driverClass' not found for channel: $channel");
-
                     continue;
                 }
 
@@ -149,15 +149,15 @@
                 }
 
                 if (!($chanConfig['enabled'] ?? false)) {
-                    $this->logger->info("Channel '$channel' is disabled. Skipping.");
-
                     continue;
                 }
 
-                $this->logger->info("Initializing entities for channel: $channel...");
+                $output->writeln("<info>TRACE: [ACTIVE] Starting initialization for $channel...</info>");
 
                 try {
+                    $output->writeln("<info>TRACE: [$channel] Instantiating driver (DriverFactory::get)...</info>");
                     $driver = DriverFactory::get($channel, $this->logger);
+                    $output->writeln("<info>TRACE: [$channel] Driver instantiated successfully.</info>");
 
                     $dataProcessor = function ($collection) {
                         $stats = ['rows' => 0, 'metrics' => 0, 'duplicates' => 0];
@@ -186,8 +186,10 @@
                         return $stats;
                     };
 
+                    $output->writeln("<info>TRACE: [$channel] Fetching channel entity from DB...</info>");
                     /** @var Channel $channelEntity */
                     $channelEntity = $this->entityManager->getRepository(Channel::class)->findOneBy(['name' => $channel]);
+                    $output->writeln("<info>TRACE: [$channel] Channel entity fetched.</info>");
                     if (!$channelEntity) {
                         $this->logger->error("  - ERROR: Channel entity '$channel' NOT FOUND in database. Ensure 'app:install-drivers' ran correctly.");
 
@@ -242,16 +244,19 @@
                             }
                         } elseif ($type === 'channeled_accounts' && isset($params['platform_ids']) && $category) {
                             $ids = (array)$params['platform_ids'];
-                            if ($driverClass) {
-                                $searchValues = array_map(fn($id) => $driverClass::getPlatformId(['id' => $id], $category, $context), $ids);
-                            } else {
-                                $searchValues = $ids;
+                            $normalizedToOriginal = [];
+                            foreach ($ids as $id) {
+                                $normalized = $driverClass ? $driverClass::getPlatformId(['id' => $id], $category, $context) : (string)$id;
+                                $normalizedToOriginal[$normalized][] = (string)$id;
                             }
-                            $searchValues = array_unique($searchValues);
-                            error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'channeled_accounts' by platformId: ".json_encode($searchValues));
+                            $searchValues = array_unique(array_keys($normalizedToOriginal));
+                            error_log("DEBUG: InitializeEntitiesCommand - identityMapper: Looking up 'channeled_accounts' by platformId (normalized): ".json_encode($searchValues));
                             $entities = $repo->findBy(['platformId' => $searchValues, 'channel' => $channelEntity]);
                             foreach ($entities as $e) {
-                                $map[(string)$e->getPlatformId()] = $e;
+                                $dbId = (string)$e->getPlatformId();
+                                foreach (($normalizedToOriginal[$dbId] ?? []) as $origId) {
+                                    $map[$origId] = $e;
+                                }
                             }
                         } elseif ($type === 'accounts' && isset($params['names'])) {
                             $entities = $repo->findBy(['name' => $params['names']]);
@@ -263,6 +268,7 @@
                         return $map;
                     };
 
+                    $output->writeln("<info>TRACE: [$channel] Syncing YAML assets (ConfigManagerController logic)...</info>");
                     // 1. Sync Assets from YAML to Database (Ported from ConfigManagerController)
                     $commonKey = $driver::getCommonConfigKey();
                     $defaultGroupName = method_exists($driver, 'getChannelLabel') ? $driver::getChannelLabel() : "Default Group";
@@ -273,7 +279,7 @@
 
                     if (!$accountEntity) {
                         $accountEntity = new Account();
-                        $accountEntity->addName($groupName)->addDescription("Group Account for $channel");
+                        $accountEntity->addName($groupName);
                         $this->entityManager->persist($accountEntity);
                         $this->entityManager->flush();
                     }
@@ -295,6 +301,11 @@
                             }
                         }
                     }
+
+                    $output->writeln("<info>TRACE: [$channel] Persisting YAML assets...</info>");
+
+                    $pageCache = [];
+                    $channeledAccountCache = [];
 
                     foreach ($assets as $assetInfo) {
                         $asset = $assetInfo['data'];
@@ -338,7 +349,15 @@
                                 continue;
                             }
 
-                            $dbPage = $canonicalId ? ($this->entityManager->getRepository(Page::class)->findOneBy(['canonicalId' => $canonicalId])) : null;
+                            $dbPage = null;
+                            if ($canonicalId) {
+                                if (isset($pageCache[$canonicalId])) {
+                                    $dbPage = $pageCache[$canonicalId];
+                                } else {
+                                    $dbPage = $this->entityManager->getRepository(Page::class)->findOneBy(['canonicalId' => $canonicalId]);
+                                }
+                            }
+                            
                             if (!$dbPage && !$anyEnabled) {
                                 continue;
                             }
@@ -346,8 +365,14 @@
                                 $dbPage = new Page();
                                 if ($canonicalId) {
                                     $dbPage->addCanonicalId($canonicalId);
+                                    $pageCache[$canonicalId] = $dbPage; // Save to local cache
+                                }
+                            } else {
+                                if ($canonicalId) {
+                                    $pageCache[$canonicalId] = $dbPage; // Save to local cache
                                 }
                             }
+                            
                             $dbPage->addUrl($page['url'] ?? null)
                                 ->addTitle($page['title'] ?? null)
                                 ->addAccount($accountEntity)
@@ -363,17 +388,29 @@
                                 continue;
                             }
 
-                            $dbChanneledAccount = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy([
-                                'platformId' => (string)$pId,
-                                'channel'    => $channelEntity,
-                            ]);
+                            $cacheKey = (string)$pId . '_' . $channelEntity->getId();
+                            $dbChanneledAccount = null;
+                            
+                            if (isset($channeledAccountCache[$cacheKey])) {
+                                $dbChanneledAccount = $channeledAccountCache[$cacheKey];
+                            } else {
+                                $dbChanneledAccount = $this->entityManager->getRepository(ChanneledAccount::class)->findOneBy([
+                                    'platformId' => (string)$pId,
+                                    'channel'    => $channelEntity,
+                                ]);
+                            }
+
                             if (!$dbChanneledAccount && !$anyEnabled) {
                                 continue;
                             }
                             if (!$dbChanneledAccount) {
                                 $dbChanneledAccount = new ChanneledAccount();
                                 $dbChanneledAccount->addPlatformId($pId);
+                                $channeledAccountCache[$cacheKey] = $dbChanneledAccount;
+                            } else {
+                                $channeledAccountCache[$cacheKey] = $dbChanneledAccount;
                             }
+                            
                             $dbChanneledAccount->addAccount($accountEntity)
                                 ->addType($account['type'])
                                 ->addChannel($channelEntity)
@@ -387,6 +424,7 @@
                     $this->entityManager->flush();
                     $this->entityManager->flush();
 
+                    $output->writeln("<info>TRACE: [$channel] Executing Driver->initializeEntities() hook...</info>");
                     // 2. Initialize Channel-specific Entities via Driver hook
                     $results = $driver->initializeEntities(array_merge($chanConfig, [
                         'manager'        => $this->entityManager,
@@ -398,7 +436,7 @@
                     $skip = $results['skipped'] ?? 0;
 
                     $this->logger->info("  - $channel results: $init initialized, $skip skipped.");
-                } catch (Exception $e) {
+                } catch (\Throwable $e) {
                     $output->writeln("<error>  - FATAL ERROR initializing channel '$channel': ".$e->getMessage()."</error>");
                     error_log("FATAL ERROR initializing channel '$channel': ".$e->getMessage());
                     error_log($e->getTraceAsString());

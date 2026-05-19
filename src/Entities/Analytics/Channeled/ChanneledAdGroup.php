@@ -1,342 +1,356 @@
 <?php
 
-namespace Entities\Analytics\Channeled;
+    namespace Entities\Analytics\Channeled;
 
-use DateTime;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-use Doctrine\ORM\Mapping as ORM;
-use Entities\Analytics\Campaign;
-use Entities\Analytics\MetricConfig;
-use Enums\BillingEvent;
-use Enums\CampaignStatus;
-use Enums\OptimizationGoal;
-use Repositories\Channeled\ChanneledAdGroupRepository;
+    use DateTime;
+    use Doctrine\Common\Collections\ArrayCollection;
+    use Doctrine\Common\Collections\Collection;
+    use Doctrine\ORM\Mapping as ORM;
+    use Entities\Analytics\Campaign;
+    use Entities\Analytics\MetricConfig;
+    use Enums\BillingEvent;
+    use Enums\CampaignStatus;
+    use Enums\OptimizationGoal;
+    use Repositories\Channeled\ChanneledAdGroupRepository;
 
-#[ORM\Entity(repositoryClass: ChanneledAdGroupRepository::class)]
-#[ORM\Table(name: 'channeled_ad_groups')]
-#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_ad_groups_platform_id_idx')]
-#[ORM\Index(columns: ['channel'], name: 'idx_channeled_ad_groups_channel_idx')]
-#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_ad_groups_platform_id_channel_idx')]
-#[ORM\Index(columns: ['channeled_account_id'], name: 'idx_channeled_ad_groups_channeled_account_id_idx')]
-#[ORM\Index(columns: ['campaign_id'], name: 'idx_channeled_ad_groups_campaign_idx')]
-#[ORM\Index(columns: ['channeled_campaign_id'], name: 'idx_channeled_ad_groups_channeled_campaign_id_idx')]
-#[ORM\Index(columns: ['channeled_account_id', 'campaign_id'], name: 'idx_channeled_ad_groups_channeled_account_id_campaign_id_idx')]
-#[ORM\Index(columns: ['channeled_account_id', 'channeled_campaign_id'], name: 'idx_channeled_ad_groups_account_campaign_idx')]
-#[ORM\Index(columns: ['platform_id', 'channel', 'channeled_account_id', 'channeled_campaign_id'], name: 'idx_channeled_ad_groups_full_idx')]
-#[ORM\UniqueConstraint(name: 'channeled_ad_groups_platform_id_account_id_uidx', columns: ['platform_id', 'channeled_account_id'])]
-#[ORM\HasLifecycleCallbacks]
-class ChanneledAdGroup extends ChanneledEntity
-{
-    #[ORM\Column(type: 'string')]
-    protected string $name;
-
-    #[ORM\Column(name: 'start_date', type: 'datetime', nullable: true)]
-    protected ?DateTime $startDate = null;
-
-    #[ORM\Column(name: 'end_date', type: 'datetime', nullable: true)]
-    protected ?DateTime $endDate = null;
-
-    #[ORM\Column(name: 'optimization_goal', type: 'string', nullable: true, enumType: OptimizationGoal::class)]
-    protected ?OptimizationGoal $optimizationGoal = null;
-
-    #[ORM\Column(type: 'string', nullable: true, enumType: CampaignStatus::class)]
-    protected ?CampaignStatus $status = null;
-
-    #[ORM\Column(name: 'billing_event', type: 'string', nullable: true, enumType: BillingEvent::class)]
-    protected ?BillingEvent $billingEvent = null;
-
-    #[ORM\Column(type: 'json', nullable: true)]
-    protected ?array $targeting = null;
-
-    #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'channeledAdGroups')]
-    #[ORM\JoinColumn(name: 'channeled_account_id', onDelete: 'CASCADE')]
-    protected ChanneledAccount $channeledAccount;
-
-    #[ORM\ManyToOne(targetEntity: Campaign::class, inversedBy: 'channeledAdGroups')]
-    #[ORM\JoinColumn(name: 'campaign_id', onDelete: 'CASCADE')]
-    protected Campaign $campaign;
-
-    #[ORM\ManyToOne(targetEntity: ChanneledCampaign::class, inversedBy: 'channeledAdGroups')]
-    #[ORM\JoinColumn(name: 'channeled_campaign_id', onDelete: 'SET NULL')]
-    protected ?ChanneledCampaign $channeledCampaign = null;
-
-    #[ORM\OneToMany(mappedBy: 'channeledAdGroup', targetEntity: ChanneledAd::class)]
-    protected Collection $channeledAds;
-
-    #[ORM\OneToMany(mappedBy: 'channeledAdGroup', targetEntity: MetricConfig::class, orphanRemoval: true)]
-    protected Collection $metricConfigs;
-
-    public function __construct()
+    #[ORM\Entity(repositoryClass: ChanneledAdGroupRepository::class)]
+    #[ORM\Table(name: 'channeled_ad_groups')]
+    #[ORM\Index(name: 'idx_channeled_ad_groups_platform_id_idx', columns: ['platform_id'])]
+    #[ORM\Index(name: 'idx_channeled_ad_groups_channel_idx', columns: ['channel'])]
+    #[ORM\Index(name: 'idx_channeled_ad_groups_platform_id_channel_idx', columns: ['platform_id', 'channel'])]
+    #[ORM\Index(name: 'idx_channeled_ad_groups_channeled_account_id_idx', columns: ['channeled_account_id'])]
+    #[ORM\Index(name: 'idx_channeled_ad_groups_campaign_idx', columns: ['campaign_id'])]
+    #[ORM\Index(name: 'idx_channeled_ad_groups_channeled_campaign_id_idx', columns: ['channeled_campaign_id'])]
+    #[ORM\Index(name: 'idx_channeled_ad_groups_channeled_account_id_campaign_id_idx', columns: ['channeled_account_id', 'campaign_id'])]
+    #[ORM\Index(name: 'idx_channeled_ad_groups_account_campaign_idx', columns: ['channeled_account_id', 'channeled_campaign_id'])]
+    #[ORM\Index(name: 'idx_channeled_ad_groups_full_idx', columns: ['platform_id', 'channel', 'channeled_account_id', 'channeled_campaign_id'])]
+    #[ORM\UniqueConstraint(name: 'channeled_ad_groups_platform_id_account_id_uidx', columns: ['platform_id', 'channeled_account_id'])]
+    #[ORM\HasLifecycleCallbacks]
+    class ChanneledAdGroup extends ChanneledEntity
     {
-        $this->channeledAds = new ArrayCollection();
-        $this->metricConfigs = new ArrayCollection();
-    }
+        #[ORM\Column(type: 'string')]
+        protected string $name;
 
-    /**
-     * @return string
-     */
-    public function getName(): string
-    {
-        return $this->name;
-    }
+        #[ORM\Column(name: 'start_date', type: 'datetime', nullable: true)]
+        protected ?DateTime $startDate = null;
 
-    /**
-     * @param string $name
-     * @return ChanneledAdGroup
-     */
-    public function addName(string $name): self
-    {
-        $this->name = $name;
-        return $this;
-    }
+        #[ORM\Column(name: 'end_date', type: 'datetime', nullable: true)]
+        protected ?DateTime $endDate = null;
 
-    /**
-     * Gets the campaign start date.
-     * @return DateTime|null
-     */
-    public function getStartDate(): ?DateTime
-    {
-        return $this->startDate;
-    }
+        #[ORM\Column(name: 'optimization_goal', type: 'string', nullable: true, enumType: OptimizationGoal::class)]
+        protected ?OptimizationGoal $optimizationGoal = null;
 
-    /**
-     * Sets the campaign start date.
-     * @param DateTime|null $startDate
-     * @return self
-     */
-    public function addStartDate(?DateTime $startDate): self
-    {
-        $this->startDate = $startDate;
-        return $this;
-    }
+        #[ORM\Column(type: 'string', nullable: true, enumType: CampaignStatus::class)]
+        protected ?CampaignStatus $status = null;
 
-    /**
-     * Gets the campaign end date.
-     * @return DateTime|null
-     */
-    public function getEndDate(): ?DateTime
-    {
-        return $this->endDate;
-    }
+        #[ORM\Column(name: 'billing_event', type: 'string', nullable: true, enumType: BillingEvent::class)]
+        protected ?BillingEvent $billingEvent = null;
 
-    /**
-     * Sets the campaign end date.
-     * @param DateTime|null $endDate
-     * @return self
-     */
-    public function addEndDate(?DateTime $endDate): self
-    {
-        $this->endDate = $endDate;
-        return $this;
-    }
+        #[ORM\Column(type: 'json', nullable: true)]
+        protected ?array $targeting = null;
 
-    /**
-     * Gets the unique campaign identifier.
-     * @return OptimizationGoal|null
-     */
-    public function getOptimizationGoal(): ?OptimizationGoal
-    {
-        return $this->optimizationGoal;
-    }
+        #[ORM\ManyToOne(targetEntity: ChanneledAccount::class, inversedBy: 'channeledAdGroups')]
+        #[ORM\JoinColumn(name: 'channeled_account_id', onDelete: 'CASCADE')]
+        protected ChanneledAccount $channeledAccount;
 
-    /**
-     * Sets the unique campaign identifier.
-     * @param OptimizationGoal|null $optimizationGoal
-     * @return self
-     */
-    public function addOptimizationGoal(?OptimizationGoal $optimizationGoal): self
-    {
-        $this->optimizationGoal = $optimizationGoal;
-        return $this;
-    }
+        #[ORM\ManyToOne(targetEntity: Campaign::class, inversedBy: 'channeledAdGroups')]
+        #[ORM\JoinColumn(name: 'campaign_id', onDelete: 'CASCADE')]
+        protected Campaign $campaign;
 
-    /**
-     * Gets the unique campaign identifier.
-     * @return CampaignStatus|null
-     */
-    public function getStatus(): ?CampaignStatus
-    {
-        return $this->status;
-    }
+        #[ORM\ManyToOne(targetEntity: ChanneledCampaign::class, inversedBy: 'channeledAdGroups')]
+        #[ORM\JoinColumn(name: 'channeled_campaign_id', onDelete: 'SET NULL')]
+        protected ?ChanneledCampaign $channeledCampaign = null;
 
-    /**
-     * Sets the unique campaign identifier.
-     * @param CampaignStatus|null $status
-     * @return self
-     */
-    public function addStatus(?CampaignStatus $status): self
-    {
-        $this->status = $status;
-        return $this;
-    }
+        #[ORM\OneToMany(mappedBy: 'channeledAdGroup', targetEntity: ChanneledAd::class)]
+        protected Collection $channeledAds;
 
-    /**
-     * Gets the unique campaign identifier.
-     * @return BillingEvent|null
-     */
-    public function getBillingEvent(): ?BillingEvent
-    {
-        return $this->billingEvent;
-    }
+        #[ORM\OneToMany(mappedBy: 'channeledAdGroup', targetEntity: MetricConfig::class, orphanRemoval: true)]
+        protected Collection $metricConfigs;
 
-    /**
-     * Sets the unique campaign identifier.
-     * @param BillingEvent|null $billingEvent
-     * @return self
-     */
-    public function addBillingEvent(?BillingEvent $billingEvent): self
-    {
-        $this->billingEvent = $billingEvent;
-        return $this;
-    }
-
-    /**
-     * @return array|null
-     */
-    public function getTargeting(): ?array
-    {
-        return $this->targeting;
-    }
-
-    /**
-     * @param array|null $targeting
-     * @return self
-     */
-    public function addTargeting(?array $targeting): self
-    {
-        $this->targeting = $targeting;
-        return $this;
-    }
-
-    /**
-     * Gets the associated global campaign.
-     * @return ChanneledAccount
-     */
-    public function getChanneledAccount(): ChanneledAccount
-    {
-        return $this->channeledAccount;
-    }
-
-    /**
-     * Sets the associated global campaign.
-     * @param ChanneledAccount|null $channeledAccount
-     * @return self
-     */
-    public function addChanneledAccount(?ChanneledAccount $channeledAccount): self
-    {
-        $this->channeledAccount = $channeledAccount;
-        return $this;
-    }
-
-    /**
-     * @return Campaign|null
-     */
-    public function getCampaign(): ?Campaign
-    {
-        return $this->campaign;
-    }
-
-    /**
-     * @param Campaign|null $campaign
-     * @return ChanneledAdGroup
-     */
-    public function addCampaign(?Campaign $campaign): self
-    {
-        $this->campaign = $campaign;
-        return $this;
-    }
-
-    /**
-     * @return ChanneledCampaign|null
-     */
-    public function getChanneledCampaign(): ?ChanneledCampaign
-    {
-        return $this->channeledCampaign;
-    }
-
-    /**
-     * @param ChanneledCampaign|null $channeledCampaign
-     * @return ChanneledAdGroup
-     */
-    public function addChanneledCampaign(?ChanneledCampaign $channeledCampaign): self
-    {
-        $this->channeledCampaign = $channeledCampaign;
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, ChanneledAd>
-     */
-    public function getChanneledAds(): Collection
-    {
-        return $this->channeledAds;
-    }
-
-    /**
-     * @param ChanneledAd $channeledAd
-     * @return ChanneledAdGroup
-     */
-    public function addChanneledAd(ChanneledAd $channeledAd): self
-    {
-        if (!$this->channeledAds->contains($channeledAd)) {
-            $this->channeledAds->add($channeledAd);
-            $channeledAd->addChanneledAdGroup($this);
+        public function __construct()
+        {
+            $this->channeledAds = new ArrayCollection();
+            $this->metricConfigs = new ArrayCollection();
         }
-        return $this;
-    }
 
-    /**
-     * @param ChanneledAd $channeledAd
-     * @return ChanneledAdGroup
-     */
-    public function removeChanneledAd(ChanneledAd $channeledAd): self
-    {
-        if ($this->channeledAds->contains($channeledAd)) {
-            $this->channeledAds->removeElement($channeledAd);
-            if ($channeledAd->getChanneledAdGroup() === $this) {
-                $channeledAd->addChanneledAdGroup(null);
+        /**
+         * @return string
+         */
+        public function getName(): string
+        {
+            return $this->name;
+        }
+
+        /**
+         * @param string $name
+         * @return ChanneledAdGroup
+         */
+        public function addName(string $name): self
+        {
+            $this->name = $name;
+
+            return $this;
+        }
+
+        /**
+         * Gets the campaign start date.
+         * @return DateTime|null
+         */
+        public function getStartDate(): ?DateTime
+        {
+            return $this->startDate;
+        }
+
+        /**
+         * Sets the campaign start date.
+         * @param DateTime|null $startDate
+         * @return self
+         */
+        public function addStartDate(?DateTime $startDate): self
+        {
+            $this->startDate = $startDate;
+
+            return $this;
+        }
+
+        /**
+         * Gets the campaign end date.
+         * @return DateTime|null
+         */
+        public function getEndDate(): ?DateTime
+        {
+            return $this->endDate;
+        }
+
+        /**
+         * Sets the campaign end date.
+         * @param DateTime|null $endDate
+         * @return self
+         */
+        public function addEndDate(?DateTime $endDate): self
+        {
+            $this->endDate = $endDate;
+
+            return $this;
+        }
+
+        /**
+         * Gets the unique campaign identifier.
+         * @return OptimizationGoal|null
+         */
+        public function getOptimizationGoal(): ?OptimizationGoal
+        {
+            return $this->optimizationGoal;
+        }
+
+        /**
+         * Sets the unique campaign identifier.
+         * @param OptimizationGoal|null $optimizationGoal
+         * @return self
+         */
+        public function addOptimizationGoal(?OptimizationGoal $optimizationGoal): self
+        {
+            $this->optimizationGoal = $optimizationGoal;
+
+            return $this;
+        }
+
+        /**
+         * Gets the unique campaign identifier.
+         * @return CampaignStatus|null
+         */
+        public function getStatus(): ?CampaignStatus
+        {
+            return $this->status;
+        }
+
+        /**
+         * Sets the unique campaign identifier.
+         * @param CampaignStatus|null $status
+         * @return self
+         */
+        public function addStatus(?CampaignStatus $status): self
+        {
+            $this->status = $status;
+
+            return $this;
+        }
+
+        /**
+         * Gets the unique campaign identifier.
+         * @return BillingEvent|null
+         */
+        public function getBillingEvent(): ?BillingEvent
+        {
+            return $this->billingEvent;
+        }
+
+        /**
+         * Sets the unique campaign identifier.
+         * @param BillingEvent|null $billingEvent
+         * @return self
+         */
+        public function addBillingEvent(?BillingEvent $billingEvent): self
+        {
+            $this->billingEvent = $billingEvent;
+
+            return $this;
+        }
+
+        /**
+         * @return array|null
+         */
+        public function getTargeting(): ?array
+        {
+            return $this->targeting;
+        }
+
+        /**
+         * @param array|null $targeting
+         * @return self
+         */
+        public function addTargeting(?array $targeting): self
+        {
+            $this->targeting = $targeting;
+
+            return $this;
+        }
+
+        /**
+         * Gets the associated global campaign.
+         * @return ChanneledAccount
+         */
+        public function getChanneledAccount(): ChanneledAccount
+        {
+            return $this->channeledAccount;
+        }
+
+        /**
+         * Sets the associated global campaign.
+         * @param ChanneledAccount|null $channeledAccount
+         * @return self
+         */
+        public function addChanneledAccount(?ChanneledAccount $channeledAccount): self
+        {
+            $this->channeledAccount = $channeledAccount;
+
+            return $this;
+        }
+
+        /**
+         * @return Campaign|null
+         */
+        public function getCampaign(): ?Campaign
+        {
+            return $this->campaign;
+        }
+
+        /**
+         * @param Campaign|null $campaign
+         * @return ChanneledAdGroup
+         */
+        public function addCampaign(?Campaign $campaign): self
+        {
+            $this->campaign = $campaign;
+
+            return $this;
+        }
+
+        /**
+         * @return ChanneledCampaign|null
+         */
+        public function getChanneledCampaign(): ?ChanneledCampaign
+        {
+            return $this->channeledCampaign;
+        }
+
+        /**
+         * @param ChanneledCampaign|null $channeledCampaign
+         * @return ChanneledAdGroup
+         */
+        public function addChanneledCampaign(?ChanneledCampaign $channeledCampaign): self
+        {
+            $this->channeledCampaign = $channeledCampaign;
+
+            return $this;
+        }
+
+        /**
+         * @return Collection<int, ChanneledAd>
+         */
+        public function getChanneledAds(): Collection
+        {
+            return $this->channeledAds;
+        }
+
+        /**
+         * @param ChanneledAd $channeledAd
+         * @return ChanneledAdGroup
+         */
+        public function addChanneledAd(ChanneledAd $channeledAd): self
+        {
+            if (!$this->channeledAds->contains($channeledAd)) {
+                $this->channeledAds->add($channeledAd);
+                $channeledAd->addChanneledAdGroup($this);
             }
+
+            return $this;
         }
-        return $this;
-    }
 
-    /**
-     * Gets the collection of metric configs.
-     * @return Collection
-     */
-    public function getMetricConfigs(): Collection
-    {
-        return $this->metricConfigs;
-    }
-
-    /**
-     * Adds a metric config.
-     * @param MetricConfig $metricConfig
-     * @return self
-     */
-    public function addMetricConfig(MetricConfig $metricConfig): self
-    {
-        if (!$this->metricConfigs->contains($metricConfig)) {
-            $this->metricConfigs->add($metricConfig);
-            $metricConfig->addChanneledAdGroup($this);
-        }
-        return $this;
-    }
-
-    /**
-     * Removes a metric config.
-     * @param MetricConfig $metricConfig
-     * @return self
-     */
-    public function removeMetricConfig(MetricConfig $metricConfig): self
-    {
-        if ($this->metricConfigs->contains($metricConfig)) {
-            $this->metricConfigs->removeElement($metricConfig);
-            if ($metricConfig->getChanneledAdGroup() === $this) {
-                $metricConfig->addChanneledAdGroup(null);
+        /**
+         * @param ChanneledAd $channeledAd
+         * @return ChanneledAdGroup
+         */
+        public function removeChanneledAd(ChanneledAd $channeledAd): self
+        {
+            if ($this->channeledAds->contains($channeledAd)) {
+                $this->channeledAds->removeElement($channeledAd);
+                if ($channeledAd->getChanneledAdGroup() === $this) {
+                    $channeledAd->addChanneledAdGroup(null);
+                }
             }
+
+            return $this;
         }
-        return $this;
+
+        /**
+         * Gets the collection of metric configs.
+         * @return Collection
+         */
+        public function getMetricConfigs(): Collection
+        {
+            return $this->metricConfigs;
+        }
+
+        /**
+         * Adds a metric config.
+         * @param MetricConfig $metricConfig
+         * @return self
+         */
+        public function addMetricConfig(MetricConfig $metricConfig): self
+        {
+            if (!$this->metricConfigs->contains($metricConfig)) {
+                $this->metricConfigs->add($metricConfig);
+                $metricConfig->addChanneledAdGroup($this);
+            }
+
+            return $this;
+        }
+
+        /**
+         * Removes a metric config.
+         * @param MetricConfig $metricConfig
+         * @return self
+         */
+        public function removeMetricConfig(MetricConfig $metricConfig): self
+        {
+            if ($this->metricConfigs->contains($metricConfig)) {
+                $this->metricConfigs->removeElement($metricConfig);
+                if ($metricConfig->getChanneledAdGroup() === $this) {
+                    $metricConfig->addChanneledAdGroup(null);
+                }
+            }
+
+            return $this;
+        }
     }
-}

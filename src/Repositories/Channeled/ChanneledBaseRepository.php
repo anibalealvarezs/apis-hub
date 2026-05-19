@@ -142,10 +142,10 @@ class ChanneledBaseRepository extends BaseRepository
     }
 
     /**
-     * @param int|string|null $channel
+     * @param int|string|ChannelEntity|null $channel
      * @return int
      */
-    protected function validateChannel(int|string|null $channel): int
+    protected function validateChannel(int|string|ChannelEntity|null $channel): int
     {
         if ($channel === null || (is_string($channel) && empty($channel))) {
             throw new InvalidArgumentException('Invalid channel: channel cannot be null or empty');
@@ -153,7 +153,7 @@ class ChanneledBaseRepository extends BaseRepository
         
         $channelEntity = $this->resolveChannel($channel);
         if (!$channelEntity) {
-            throw new InvalidArgumentException('Invalid channel: ' . $channel);
+            throw new InvalidArgumentException('Invalid channel: ' . (is_object($channel) ? get_class($channel) : $channel));
         }
         
         return $channelEntity->getId();
@@ -169,11 +169,15 @@ class ChanneledBaseRepository extends BaseRepository
     }
 
     /**
-     * @param int|string $identity
+     * @param int|string|ChannelEntity $identity
      * @return ChannelEntity|null
      */
-    protected function resolveChannel(int|string $identity): ?ChannelEntity
+    protected function resolveChannel(int|string|ChannelEntity $identity): ?ChannelEntity
     {
+        if ($identity instanceof ChannelEntity) {
+            return $identity;
+        }
+
         if (isset(self::$channelCache[$identity])) {
             return self::$channelCache[$identity];
         }
@@ -228,5 +232,37 @@ class ChanneledBaseRepository extends BaseRepository
             ->getQuery()
             ->getOneOrNullResult(AbstractQuery::HYDRATE_ARRAY);
         return $data ? ['platformCreatedAt' => $data['platformCreatedAt']] : null;
+    }
+    /**
+     * @inheritdoc
+     */
+    public function findBy(array $criteria, ?array $orderBy = null, $limit = null, $offset = null): array
+    {
+        if (isset($criteria['channel'])) {
+            $criteria['channel'] = $this->resolveChannel($criteria['channel']);
+        }
+        return parent::findBy($criteria, $orderBy, $limit, $offset);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function findOneBy(array $criteria, ?array $orderBy = null): ?object
+    {
+        if (isset($criteria['channel'])) {
+            $criteria['channel'] = $this->resolveChannel($criteria['channel']);
+        }
+        return parent::findOneBy($criteria, $orderBy);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function count(array $criteria = []): int
+    {
+        if (isset($criteria['channel'])) {
+            $criteria['channel'] = $this->resolveChannel($criteria['channel']);
+        }
+        return parent::count($criteria);
     }
 }

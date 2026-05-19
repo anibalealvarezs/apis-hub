@@ -4,6 +4,7 @@
 
     require_once __DIR__."/../vendor/autoload.php";
 
+    use Commands\Analytics\InvalidateSyncCacheCommand;
     use Commands\Analytics\ScaleDownCommand;
     use Commands\Analytics\ScheduleInitialJobsCommand;
     use Commands\Analytics\CacheEntityCommand;
@@ -12,6 +13,7 @@
     use Commands\Analytics\CheckCoverageCommand;
     use Commands\Analytics\InspectJobsCommand;
     use Commands\Analytics\AnalyzeLogsCommand;
+    use Commands\Analytics\ReportAggregationTelemetryCommand;
     use Commands\Analytics\PlanMetricConfigIndexesCommand;
     use Commands\Analytics\ResetMetricsCommand;
     use Commands\Analytics\ResetEntitiesCommand;
@@ -24,6 +26,7 @@
     use Commands\Crud\ReadEntityCommand;
     use Commands\Crud\UpdateEntityCommand;
     use Commands\GenerateEntitiesConfigCommand;
+    use Commands\Infrastructure\ScaleWorkersCommand;
     use Commands\InitializeEntitiesCommand;
     use Commands\RefreshInstancesCommand;
     use Commands\SetupDatabaseCommand;
@@ -31,9 +34,11 @@
     use Commands\MigratePagesCanonicalCommand;
     use Commands\InstallDriversCommand;
     use Doctrine\ORM\Tools\Console\ConsoleRunner;
+    use Doctrine\ORM\Tools\Console\EntityManagerProvider\SingleManagerProvider;
     use Exceptions\ConfigurationException;
     use Helpers\Helpers;
     use Symfony\Component\Console\Application;
+    use Symfony\Component\Console\Command\Command as SymfonyCommand;
     use Monolog\ErrorHandler;
     use Symfony\Component\Console\Helper\QuestionHelper;
 
@@ -44,28 +49,34 @@
         ini_set('memory_limit', $cliConfig['memory_limit'] ?? '1G');
 
         $entityManager = require_once __DIR__."/../app/bootstrap.php";
-        $helperSet = require_once __DIR__."/../config/cli-config.php";
+        $helperSet = null;
 
         $cli = new Application(
             name: 'Doctrine Command Line Interface',
             version: '1.0.0'
         );
         $cli->setCatchExceptions(true);
-        // Register All Doctrine Helpers to the existing HelperSet
-        $cli->getHelperSet()->set($helperSet->get('em'), 'em');
-        if ($helperSet->has('db')) {
-            $cli->getHelperSet()->set($helperSet->get('db'), 'db');
+        // Doctrine ORM 3 removed EntityManagerHelper; prefer provider-based registration.
+        if (class_exists(SingleManagerProvider::class)) {
+            ConsoleRunner::addCommands($cli, new SingleManagerProvider($entityManager));
+        } else {
+            $helperSet = require_once __DIR__."/../config/cli-config.php";
+            // Register All Doctrine Helpers to the existing HelperSet (legacy ORM 2 path)
+            $cli->getHelperSet()->set($helperSet->get('em'), 'em');
+            if ($helperSet->has('db')) {
+                $cli->getHelperSet()->set($helperSet->get('db'), 'db');
+            }
+            // Register All Doctrine Commands
+            ConsoleRunner::addCommands($cli);
         }
         // Ensure default helpers are registered
         if (!$cli->getHelperSet()->has('question')) {
             $cli->getHelperSet()->set(new QuestionHelper(), 'question');
         }
 
-        // Register All Doctrine Commands
-        ConsoleRunner::addCommands($cli);
-
-        // Register your own command
-        $cli->addCommands([
+        // Register your own commands
+        $commands = [
+            new InvalidateSyncCacheCommand(),
             new CreateEntityCommand(),
             new DeleteEntityCommand(),
             new ReadEntityCommand(),
@@ -79,6 +90,7 @@
             new CheckCoverageCommand(),
             new InspectJobsCommand(),
             new AnalyzeLogsCommand(),
+            new ReportAggregationTelemetryCommand(),
             new PlanMetricConfigIndexesCommand(),
             new HealthCheckCommand(),
             new AggregateEntityCommand(),
@@ -92,7 +104,24 @@
             new ScaleDownCommand($entityManager),
             new MigratePagesCanonicalCommand(Helpers::getManager()),
             new InstallDriversCommand(),
-        ]);
+            new ScaleWorkersCommand($entityManager),
+        ];
+
+        foreach ($commands as $command) {
+            if ($command instanceof SymfonyCommand && !$command->getName()) {
+                $reflection = new ReflectionClass($command);
+                if ($reflection->hasProperty('defaultName')) {
+                    $prop = $reflection->getProperty('defaultName');
+                    $prop->setAccessible(true);
+                    $defaultName = $prop->getValue();
+                    if (is_string($defaultName) && $defaultName !== '') {
+                        $command->setName($defaultName);
+                    }
+                }
+            }
+        }
+
+        $cli->addCommands($commands);
 
         // Runs console application
         $cli->run();

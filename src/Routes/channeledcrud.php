@@ -14,7 +14,8 @@ return [
                 params: $params,
             );
         },
-        'admin' => false
+        'admin' => false,
+        'requirements' => ['channel' => '^(?!api$|api/).+']
     ],
     '/{channel}/{entity}/aggregate' => [
         'httpMethod' => 'POST',
@@ -27,7 +28,8 @@ return [
                 params: $params,
             );
         },
-        'admin' => false
+        'admin' => false,
+        'requirements' => ['channel' => '^(?!api$|api/).+']
     ],
     '/{channel}/{entity}/range' => [
         'httpMethod' => 'GET',
@@ -40,7 +42,8 @@ return [
                 params: $params,
             );
         },
-        'admin' => false
+        'admin' => false,
+        'requirements' => ['channel' => '^(?!api$|api/).+']
     ],
     '/{channel}/{entity}/{id}' => [
         'httpMethod' => 'GET',
@@ -52,7 +55,8 @@ return [
                 id: $id
             );
         },
-        'admin' => false
+        'admin' => false,
+        'requirements' => ['channel' => '^(?!api$|api/).+']
     ],
     '/{channel}/{entity}' => [
         'httpMethod' => 'GET',
@@ -65,6 +69,7 @@ return [
                 params: $params,
             );
         },
-        'admin' => false
+        'admin' => false,
+        'requirements' => ['channel' => '^(?!api$|api/).+']
     ],
 ];

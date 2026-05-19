@@ -431,8 +431,9 @@ if (MODE === "sse") {
   // Wait for PHP server to be ready before starting MCP (useful in Docker)
   const waitForPhp = async () => {
     if (process.env.INSTANCE_NAME) { // Simpler check for "inside docker"
-        console.error("Waiting for PHP server on port 8080...");
-        await waitPort({ host: "127.0.0.1", port: 8080, timeout: 60000 });
+        const phpHost = process.env.PHP_HOST || "master";
+        console.error(`Waiting for PHP server on ${phpHost}:8080...`);
+        await waitPort({ host: phpHost, port: 8080, timeout: 60000 });
     }
   };
 

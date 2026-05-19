@@ -1,166 +1,166 @@
 <?php
 
-namespace Entities\Analytics\Channeled;
+    namespace Entities\Analytics\Channeled;
 
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-use Doctrine\ORM\Mapping as ORM;
-use Entities\Analytics\Discount;
-use Repositories\Channeled\ChanneledDiscountRepository;
+    use Doctrine\Common\Collections\ArrayCollection;
+    use Doctrine\Common\Collections\Collection;
+    use Doctrine\ORM\Mapping as ORM;
+    use Entities\Analytics\Discount;
+    use Repositories\Channeled\ChanneledDiscountRepository;
 
-#[ORM\Entity(repositoryClass: ChanneledDiscountRepository::class)]
-#[ORM\Table(name: 'channeled_discounts')]
-#[ORM\Index(columns: ['code', 'platform_id', 'channel'], name: 'idx_channeled_discounts_full_idx')]
-#[ORM\Index(columns: ['platform_id', 'channel'], name: 'idx_channeled_discounts_pid_channel_idx')]
-#[ORM\Index(columns: ['code', 'channel'], name: 'idx_channeled_discounts_code_channel_idx')]
-#[ORM\Index(columns: ['platform_id'], name: 'idx_channeled_discounts_platform_id_idx')]
-#[ORM\Index(columns: ['platform_created_at'], name: 'idx_channeled_discounts_platform_created_at_idx')]
-#[ORM\Index(columns: ['code'], name: 'idx_channeled_discounts_code_idx')]
-#[ORM\UniqueConstraint(name: 'channeled_discounts_full_unique', columns: ['code', 'channel'])]
-#[ORM\HasLifecycleCallbacks]
-class ChanneledDiscount extends ChanneledEntity
-{
-    #[ORM\Column(type: 'string')]
-    protected string $code;
-
-    // Relationships with channeled entities
-
-    #[ORM\ManyToMany(targetEntity: ChanneledOrder::class, mappedBy: 'channeledDiscounts')]
-    protected Collection $channeledOrders;
-
-    #[ORM\ManyToOne(targetEntity: ChanneledPriceRule::class, inversedBy: 'channeledDiscounts')]
-    #[ORM\JoinColumn(name: 'channeled_price_rule_id', onDelete: 'cascade')]
-    protected ChanneledPriceRule $channeledPriceRule;
-
-    // Relationships with non-channeled entities
-
-    #[ORM\ManyToOne(targetEntity: Discount::class, inversedBy: 'channeledDiscounts')]
-    #[ORM\JoinColumn(name: 'discount_id', onDelete: 'cascade')]
-    protected Discount $discount;
-
-    public function __construct()
+    #[ORM\Entity(repositoryClass: ChanneledDiscountRepository::class)]
+    #[ORM\Table(name: 'channeled_discounts')]
+    #[ORM\Index(name: 'idx_channeled_discounts_full_idx', columns: ['code', 'platform_id', 'channel'])]
+    #[ORM\Index(name: 'idx_channeled_discounts_pid_channel_idx', columns: ['platform_id', 'channel'])]
+    #[ORM\Index(name: 'idx_channeled_discounts_code_channel_idx', columns: ['code', 'channel'])]
+    #[ORM\Index(name: 'idx_channeled_discounts_platform_id_idx', columns: ['platform_id'])]
+    #[ORM\Index(name: 'idx_channeled_discounts_platform_created_at_idx', columns: ['platform_created_at'])]
+    #[ORM\Index(name: 'idx_channeled_discounts_code_idx', columns: ['code'])]
+    #[ORM\UniqueConstraint(name: 'channeled_discounts_full_unique', columns: ['code', 'channel'])]
+    #[ORM\HasLifecycleCallbacks]
+    class ChanneledDiscount extends ChanneledEntity
     {
-        $this->channeledOrders = new ArrayCollection();
-    }
+        #[ORM\Column(type: 'string')]
+        protected string $code;
 
-    /**
-     * @return string
-     */
-    public function getCode(): string
-    {
-        return $this->code;
-    }
+        // Relationships with channeled entities
 
-    /**
-     * @param string $code
-     * @return ChanneledDiscount
-     */
-    public function addCode(string $code): self
-    {
-        $this->code = $code;
+        #[ORM\ManyToMany(targetEntity: ChanneledOrder::class, mappedBy: 'channeledDiscounts')]
+        protected Collection $channeledOrders;
 
-        return $this;
-    }
+        #[ORM\ManyToOne(targetEntity: ChanneledPriceRule::class, inversedBy: 'channeledDiscounts')]
+        #[ORM\JoinColumn(name: 'channeled_price_rule_id', onDelete: 'cascade')]
+        protected ChanneledPriceRule $channeledPriceRule;
 
-    /**
-     * @return Collection|null
-     */
-    public function getChanneledOrders(): ?Collection
-    {
-        return $this->channeledOrders;
-    }
+        // Relationships with non-channeled entities
 
-    /**
-     * @param ChanneledOrder $channeledOrder
-     * @return ChanneledDiscount
-     */
-    public function addChanneledOrder(ChanneledOrder $channeledOrder): self
-    {
-        if ($this->channeledOrders->contains($channeledOrder)) {
+        #[ORM\ManyToOne(targetEntity: Discount::class, inversedBy: 'channeledDiscounts')]
+        #[ORM\JoinColumn(name: 'discount_id', onDelete: 'cascade')]
+        protected Discount $discount;
+
+        public function __construct()
+        {
+            $this->channeledOrders = new ArrayCollection();
+        }
+
+        /**
+         * @return string
+         */
+        public function getCode(): string
+        {
+            return $this->code;
+        }
+
+        /**
+         * @param string $code
+         * @return ChanneledDiscount
+         */
+        public function addCode(string $code): self
+        {
+            $this->code = $code;
+
             return $this;
         }
 
-        $this->channeledOrders->add($channeledOrder);
-
-        return $this;
-    }
-
-    /**
-     * @param Collection $channeledOrders
-     * @return ChanneledDiscount
-     */
-    public function addChanneledOrders(Collection $channeledOrders): self
-    {
-        foreach ($channeledOrders as $channeledOrder) {
-            $this->addChanneledOrder($channeledOrder);
+        /**
+         * @return Collection|null
+         */
+        public function getChanneledOrders(): ?Collection
+        {
+            return $this->channeledOrders;
         }
 
-        return $this;
-    }
+        /**
+         * @param ChanneledOrder $channeledOrder
+         * @return ChanneledDiscount
+         */
+        public function addChanneledOrder(ChanneledOrder $channeledOrder): self
+        {
+            if ($this->channeledOrders->contains($channeledOrder)) {
+                return $this;
+            }
 
-    /**
-     * @param ChanneledOrder $channeledOrder
-     * @return ChanneledDiscount
-     */
-    public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
-    {
-        if (!$this->channeledOrders->contains($channeledOrder)) {
+            $this->channeledOrders->add($channeledOrder);
+
             return $this;
         }
 
-        $this->channeledOrders->removeElement($channeledOrder);
+        /**
+         * @param Collection $channeledOrders
+         * @return ChanneledDiscount
+         */
+        public function addChanneledOrders(Collection $channeledOrders): self
+        {
+            foreach ($channeledOrders as $channeledOrder) {
+                $this->addChanneledOrder($channeledOrder);
+            }
 
-        return $this;
-    }
-
-    /**
-     * @param Collection $channeledOrders
-     * @return ChanneledDiscount
-     */
-    public function removeChanneledOrders(Collection $channeledOrders): self
-    {
-        foreach ($channeledOrders as $channeledOrder) {
-            $this->removeChanneledOrder($channeledOrder);
+            return $this;
         }
 
-        return $this;
+        /**
+         * @param ChanneledOrder $channeledOrder
+         * @return ChanneledDiscount
+         */
+        public function removeChanneledOrder(ChanneledOrder $channeledOrder): self
+        {
+            if (!$this->channeledOrders->contains($channeledOrder)) {
+                return $this;
+            }
+
+            $this->channeledOrders->removeElement($channeledOrder);
+
+            return $this;
+        }
+
+        /**
+         * @param Collection $channeledOrders
+         * @return ChanneledDiscount
+         */
+        public function removeChanneledOrders(Collection $channeledOrders): self
+        {
+            foreach ($channeledOrders as $channeledOrder) {
+                $this->removeChanneledOrder($channeledOrder);
+            }
+
+            return $this;
+        }
+
+        /**
+         * @return ChanneledPriceRule
+         */
+        public function getChanneledPriceRule(): ChanneledPriceRule
+        {
+            return $this->channeledPriceRule;
+        }
+
+        /**
+         * @param ChanneledPriceRule|null $channeledPriceRule
+         * @return ChanneledDiscount
+         */
+        public function addChanneledPriceRule(?ChanneledPriceRule $channeledPriceRule): self
+        {
+            $this->channeledPriceRule = $channeledPriceRule;
+
+            return $this;
+        }
+
+        /**
+         * @return Discount
+         */
+        public function getDiscount(): Discount
+        {
+            return $this->discount;
+        }
+
+        /**
+         * @param Discount|null $discount
+         * @return ChanneledDiscount
+         */
+        public function addDiscount(?Discount $discount): self
+        {
+            $this->discount = $discount;
+
+            return $this;
+        }
     }
-
-    /**
-     * @return ChanneledPriceRule
-     */
-    public function getChanneledPriceRule(): ChanneledPriceRule
-    {
-        return $this->channeledPriceRule;
-    }
-
-    /**
-     * @param ChanneledPriceRule|null $channeledPriceRule
-     * @return ChanneledDiscount
-     */
-    public function addChanneledPriceRule(?ChanneledPriceRule $channeledPriceRule): self
-    {
-        $this->channeledPriceRule = $channeledPriceRule;
-
-        return $this;
-    }
-
-    /**
-     * @return Discount
-     */
-    public function getDiscount(): Discount
-    {
-        return $this->discount;
-    }
-
-    /**
-     * @param Discount|null $discount
-     * @return ChanneledDiscount
-     */
-    public function addDiscount(?Discount $discount): self
-    {
-        $this->discount = $discount;
-
-        return $this;
-    }
-}

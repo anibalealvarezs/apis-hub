@@ -30,6 +30,10 @@ foreach ($keep as $key) {
     }
 }
 
+// Master instances should NOT process jobs as part of standard cron, only workers should
+// BUT, they might be needed for scheduling initial jobs, so we only disable the general job processing
+$isMaster = str_contains(getenv('INSTANCE_NAME') ?: '', 'master');
+
 $cronLines = [];
 foreach ($envVars as $k => $v) {
     $cronLines[] = "{$k}=\"{$v}\"";
@@ -107,11 +111,9 @@ foreach ($instances as $instance) {
     $cronLines[] = "{$frequency} cd /app && /usr/local/bin/php bin/cli.php apis-hub:cache \"{$channel}\" \"{$entity}\"{$paramString} > /dev/null 2>&1";
 }
 
-// Also add the job processor cron (runs every minute)
-$cronLines[] = "* * * * * cd /app && /usr/local/bin/php bin/cli.php jobs:process > /dev/null 2>&1";
 
-// Add the scale-down cron (runs every 15 minutes)
-$cronLines[] = "*/15 * * * * cd /app && /usr/local/bin/php bin/cli.php app:scale-down > /dev/null 2>&1";
+// Add the worker scaling engine (runs every minute to adapt to demand)
+$cronLines[] = "* * * * * cd /app && /usr/local/bin/php bin/cli.php app:scale-workers > /dev/null 2>&1";
 
 
 $cronFile = '/tmp/apis-hub-cron';
