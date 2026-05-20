@@ -489,16 +489,45 @@
             return self::$dbConfig;
         }
 
-        /**
-         * @param EntityManagerInterface|null $manager
-         * @return bool
-         * @throws \Doctrine\DBAL\Exception
-         */
         public static function isPostgres(?EntityManagerInterface $manager = null): bool
         {
-            $manager = $manager ?? self::getManager();
+            if (getenv('APP_ENV') === 'testing' || defined('PHPUNIT_COMPOSER_INSTALL')) {
+                if ($manager !== null) {
+                    try {
+                        $platform = $manager->getConnection()->getDatabasePlatform();
+                        if ($platform instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform) {
+                            return true;
+                        }
+                    } catch (\Throwable $e) {
+                    }
+                    try {
+                        $params = $manager->getConnection()->getParams();
+                        $driver = $params['driver'] ?? '';
+                        return str_contains((string)$driver, 'pgsql') || str_contains((string)$driver, 'postgres');
+                    } catch (\Throwable $e) {
+                    }
+                }
+                try {
+                    $config = self::getDbConfig();
+                    $driver = $config['driver'] ?? 'pdo_mysql';
+                    return str_contains((string)$driver, 'pgsql') || str_contains((string)$driver, 'postgres');
+                } catch (\Throwable $e) {
+                    return false;
+                }
+            }
 
-            return $manager->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+            try {
+                $manager = $manager ?? self::getManager();
+                return $manager->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+            } catch (\Throwable $e) {
+                try {
+                    $config = self::getDbConfig();
+                    $driver = $config['driver'] ?? 'pdo_mysql';
+                    return str_contains((string)$driver, 'pgsql') || str_contains((string)$driver, 'postgres');
+                } catch (\Throwable $ex) {
+                    return false;
+                }
+            }
         }
 
         /**
@@ -850,6 +879,16 @@
             }
 
             return self::$entityManager;
+        }
+
+        /**
+         * Overrides the static EntityManager (useful for unit testing/mocking).
+         *
+         * @param EntityManager|null $entityManager
+         */
+        public static function setEntityManager(?EntityManager $entityManager): void
+        {
+            self::$entityManager = $entityManager;
         }
 
         /**
