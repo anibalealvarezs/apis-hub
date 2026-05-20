@@ -307,7 +307,7 @@ class MetricConfigRepository extends BaseRepository
      */
     protected function replaceChannelName(array $entity): array
     {
-        $entity['channel'] = Channel::from($entity['channel'])->getName();
+        $entity['channel'] = $this->resolveChannelName($entity['channel']);
         return $entity;
     }
 

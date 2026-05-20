@@ -113,7 +113,7 @@ class ProductVariantRepository extends BaseRepository
     protected function replaceChannelName(mixed $entity): mixed
     {
         $entity['channeledProductVariants'] = array_map(function ($channelProductVariant) {
-            $channelProductVariant['channel'] = Channel::from($channelProductVariant['channel'])->getName();
+            $channelProductVariant['channel'] = $this->resolveChannelName($channelProductVariant['channel']);
             unset($channelProductVariant['channeledProduct']['channel']);
             unset($channelProductVariant['channeledProduct']['channeledVendor']['channel']);
             $channelProductVariant['channeledProduct']['channeledProductCategories'] = array_map(function (

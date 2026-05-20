@@ -45,7 +45,7 @@ class PriceRuleRepository extends BaseRepository
     private function replaceChannelName(array $entity): array
     {
         $entity['channeledPriceRules'] = array_map(function ($channelPriceRule) {
-            $channelPriceRule['channel'] = Channel::from($channelPriceRule['channel'])->getName();
+            $channelPriceRule['channel'] = $this->resolveChannelName($channelPriceRule['channel']);
             $channelPriceRule['channeledDiscounts'] = array_map(function ($channeledDiscount) {
                 unset($channeledDiscount['channel']);
                 return $channeledDiscount;

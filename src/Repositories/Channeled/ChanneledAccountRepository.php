@@ -5,12 +5,9 @@ namespace Repositories\Channeled;
 use Doctrine\ORM\AbstractQuery;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\NoResultException;
-use Doctrine\ORM\QueryBuilder;
 use Entities\Entity;
 use Enums\Account;
-use Entities\Analytics\Channel;
 use Enums\QueryBuilderType;
-use Exception;
 
 class ChanneledAccountRepository extends ChanneledBaseRepository
 {
@@ -24,6 +21,7 @@ class ChanneledAccountRepository extends ChanneledBaseRepository
     public function getByNameAndType(string $name, int $channel, Account|string $type): ?Entity
     {
         $this->validateChannel($channel);
+
         return $this->createBaseQueryBuilder()
             ->where('e.name = :name')
             ->setParameter('name', $name)
@@ -46,6 +44,7 @@ class ChanneledAccountRepository extends ChanneledBaseRepository
     public function existsByNameAndType(string $name, int $channel, Account|string $type): bool
     {
         $this->validateChannel($channel);
+
         return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
                 ->where('e.name = :name')
                 ->setParameter('name', $name)

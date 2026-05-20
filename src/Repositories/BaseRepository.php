@@ -16,6 +16,7 @@
     use Doctrine\ORM\QueryBuilder;
     use Doctrine\Persistence\Mapping\MappingException;
     use Entities\Entity;
+    use Entities\Analytics\Channel as ChannelEntity;
     use Enums\QueryBuilderType;
     use Exception;
     use Exceptions\ConfigurationException;
@@ -69,9 +70,27 @@
          *
          * @return EntityManagerInterface
          */
-        protected function getEntityManager(): EntityManagerInterface
+        public function getEntityManager(): EntityManagerInterface
         {
             return $this->_em;
+        }
+
+        /**
+         * Resolve a channel integer ID to its name string.
+         * Uses the injected EntityManager so it works correctly in unit tests.
+         *
+         * @param int|string $channelId
+         * @return string
+         */
+        protected function resolveChannelName(int|string $channelId): string
+        {
+            $repo = $this->_em->getRepository(ChannelEntity::class);
+            if (is_int($channelId) || ctype_digit((string)$channelId)) {
+                $channel = $repo->find((int)$channelId);
+            } else {
+                $channel = $repo->findOneBy(['name' => $channelId]);
+            }
+            return $channel ? $channel->getName() : (string)$channelId;
         }
 
         /**

@@ -72,7 +72,7 @@ class ProductCategoryRepository extends BaseRepository
     private function replaceChannelName(array $entity): array
     {
         $entity['channeledProductCategories'] = array_map(function ($channeledProductCategory) {
-            $channeledProductCategory['channel'] = Channel::from($channeledProductCategory['channel'])->getName();
+            $channeledProductCategory['channel'] = $this->resolveChannelName($channeledProductCategory['channel']);
             return $channeledProductCategory;
         }, $entity['channeledProductCategories']);
         return $entity;

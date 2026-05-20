@@ -83,7 +83,7 @@ class OrderRepository extends BaseRepository
     protected function replaceChannelName(array $entity): array
     {
         $entity['channeledOrders'] = array_map(function ($channeledOrder) {
-            $channeledOrder['channel'] = Channel::from($channeledOrder['channel'])->getName();
+            $channeledOrder['channel'] = $this->resolveChannelName($channeledOrder['channel']);
             unset($channeledOrder['channeledCustomer']['channel']);
             $channeledOrder['channeledProducts'] = array_map(function ($channeledProduct) {
                 unset($channeledProduct['channel']);

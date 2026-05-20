@@ -3,11 +3,8 @@
 namespace Repositories\Channeled;
 
 use Doctrine\ORM\QueryBuilder;
-use Entities\Analytics\Channel;
 use Enums\QueryBuilderType;
 use Exception;
-use RuntimeException;
-use Repositories\RepositoryInterface;
 
 class ChanneledPriceRuleRepository extends ChanneledBaseRepository
 {
@@ -25,6 +22,7 @@ class ChanneledPriceRuleRepository extends ChanneledBaseRepository
             QueryBuilderType::LAST => $query->select('e, LENGTH(e.platformId) AS HIDDEN length'),
             QueryBuilderType::CUSTOM => null,
         };
+
         return $query
             ->addSelect('d')
             ->from($this->getEntityName(), 'e')
@@ -38,14 +36,16 @@ class ChanneledPriceRuleRepository extends ChanneledBaseRepository
     protected function replaceChannelName(array $entity): array
     {
         if (isset($entity['channel'])) {
-            $entity['channel'] = Channel::from($entity['channel'])->getName();
+            $entity['channel'] = $this->resolveChannelName($entity['channel']);
         }
         if (isset($entity['channeledDiscounts'])) {
             $entity['channeledDiscounts'] = array_map(function ($channeledDiscount) {
                 unset($channeledDiscount['channel']);
+
                 return $channeledDiscount;
             }, $entity['channeledDiscounts']);
         }
+
         return $entity;
     }
 }
