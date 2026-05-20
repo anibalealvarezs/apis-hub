@@ -26,7 +26,7 @@
          * @return Response
          */
         public static function getList(
-            Channel|string   $channel,
+            object|string    $channel,
             ?string          $startDate = null,
             ?string          $endDate = null,
             ?LoggerInterface $logger = null,
