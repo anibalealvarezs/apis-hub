@@ -84,7 +84,7 @@ class MetricRepository extends BaseRepository
      */
     protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
     {
-        $query = $this->_em->createQueryBuilder();
+        $query = $this->getEntityManager()->createQueryBuilder();
         match ($type) {
             QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('partial e.{id, value, metricDate, metadata}')
                 ->addSelect('partial mc.{id, channel, name, period}'),
@@ -221,6 +221,10 @@ class MetricRepository extends BaseRepository
         ?string $startDate = null,
         ?string $endDate = null
     ): int {
+        // Validate channel name if provided as string
+        if ($filters && property_exists($filters, 'channel') && !is_int($filters->channel)) {
+            $this->validateChannelName($filters->channel);
+        }
         $query = $this->createBaseQueryBuilder(QueryBuilderType::COUNT);
         if ($filters) {
             foreach ($filters as $key => $value) {
