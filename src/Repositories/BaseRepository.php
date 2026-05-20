@@ -65,6 +65,16 @@
         }
 
         /**
+         * Provide access to the EntityManager for legacy code and tests.
+         *
+         * @return EntityManagerInterface
+         */
+        protected function getEntityManager(): EntityManagerInterface
+        {
+            return $this->_em;
+        }
+
+        /**
          * List of top-level result fields to strip before returning the response.
          * Set via setHideFields() from the controller layer.
          */
