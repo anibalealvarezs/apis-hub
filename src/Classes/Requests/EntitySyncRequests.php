@@ -28,14 +28,14 @@ class EntitySyncRequests implements RequestInterface
      * @throws \Throwable
      */
     public static function getList(
-        Channel|string $channel,
+        object|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
     ): Response {
-        $chanKey = ($channel instanceof Channel) ? $channel->getName() : (string)$channel;
+        $chanKey = is_object($channel) ? ($channel->name ?? (method_exists($channel, 'getName') ? $channel->getName() : (string)$channel)) : (string)$channel;
 
         return (new SyncService($logger))->execute($chanKey, $startDate, $endDate, [
             'jobId'      => $jobId,

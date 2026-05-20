@@ -30,14 +30,14 @@ class ProductCategoryRequests implements RequestInterface
      * @throws \Exception
      */
     public static function getList(
-        Channel|string $channel,
+        object|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
     ): Response {
-        $chanKey = ($channel instanceof Channel) ? $channel->name : (string)$channel;
+        $chanKey = is_object($channel) ? ($channel->name ?? (method_exists($channel, 'getName') ? $channel->getName() : (string)$channel)) : (string)$channel;
 
         return (new \Core\Services\SyncService())->execute($chanKey, $startDate, $endDate, [
             'jobId' => $jobId,

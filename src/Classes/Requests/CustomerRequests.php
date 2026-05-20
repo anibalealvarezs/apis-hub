@@ -30,15 +30,16 @@ class CustomerRequests implements RequestInterface
      * @throws \Exception
      */
     public static function getList(
-        Channel|string $channel,
+        object|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
     ): Response {
-        $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName((string)$channel);
-        $chanKey = $chanEnum?->name ?? (string)$channel;
+        $rawKey = is_object($channel) ? ($channel->name ?? (method_exists($channel, 'getName') ? $channel->getName() : (string)$channel)) : (string)$channel;
+        $chanEnum = ($channel instanceof Channel) ? $channel : Channel::tryFromName($rawKey);
+        $chanKey = $chanEnum?->name ?? $rawKey;
         $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
         $mapping = $driver->getDateFilterMapping();
 

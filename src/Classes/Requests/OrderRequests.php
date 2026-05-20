@@ -28,14 +28,14 @@ class OrderRequests implements RequestInterface
      * @return \Symfony\Component\HttpFoundation\Response
      */
     public static function getList(
-        Channel|string $channel,
+        object|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
     ): Response {
-        $chanKey = ($channel instanceof Channel) ? $channel->name : (string)$channel;
+        $chanKey = is_object($channel) ? ($channel->name ?? (method_exists($channel, 'getName') ? $channel->getName() : (string)$channel)) : (string)$channel;
         $driver = \Anibalealvarezs\ApiDriverCore\Drivers\DriverFactory::get($chanKey);
         $mapping = $driver->getDateFilterMapping();
 

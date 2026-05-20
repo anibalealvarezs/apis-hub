@@ -33,14 +33,14 @@ class MetricRequests implements RequestInterface
      * @throws Throwable
      */
     public static function getList(
-        ChannelEntity|string $channel,
+        object|string $channel,
         ?string $startDate = null,
         ?string $endDate = null,
         ?LoggerInterface $logger = null,
         ?int $jobId = null,
         ?object $filters = null
     ): Response {
-        $chanKey = ($channel instanceof ChannelEntity) ? $channel->getName() : (string)$channel;
+        $chanKey = is_object($channel) ? ($channel->name ?? (method_exists($channel, 'getName') ? $channel->getName() : (string)$channel)) : (string)$channel;
         $driver = DriverFactory::get($chanKey);
         $mapping = $driver->getDateFilterMapping();
 
