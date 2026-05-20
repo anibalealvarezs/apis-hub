@@ -503,6 +503,7 @@
                     try {
                         $params = $manager->getConnection()->getParams();
                         $driver = $params['driver'] ?? '';
+
                         return str_contains((string)$driver, 'pgsql') || str_contains((string)$driver, 'postgres');
                     } catch (\Throwable $e) {
                     }
@@ -510,6 +511,7 @@
                 try {
                     $config = self::getDbConfig();
                     $driver = $config['driver'] ?? 'pdo_mysql';
+
                     return str_contains((string)$driver, 'pgsql') || str_contains((string)$driver, 'postgres');
                 } catch (\Throwable $e) {
                     return false;
@@ -518,11 +520,13 @@
 
             try {
                 $manager = $manager ?? self::getManager();
+
                 return $manager->getConnection()->getDatabasePlatform() instanceof \Doctrine\DBAL\Platforms\PostgreSQLPlatform;
             } catch (\Throwable $e) {
                 try {
                     $config = self::getDbConfig();
                     $driver = $config['driver'] ?? 'pdo_mysql';
+
                     return str_contains((string)$driver, 'pgsql') || str_contains((string)$driver, 'postgres');
                 } catch (\Throwable $ex) {
                     return false;
@@ -631,8 +635,8 @@
                         }
                         foreach ($envMap as $envKey => $configKey) {
                             $val = getenv($envKey);
-                            if ($val && empty($config[$targetChan][$configKey])) {
-                                $config[$targetChan][$configKey] = $val;
+                            if ($val && empty(self::getNestedValue($config[$targetChan], $configKey))) {
+                                self::setNestedValue($config[$targetChan], $configKey, $val);
                             }
                         }
                     }
@@ -681,6 +685,56 @@
             }
 
             return self::$channelsConfig = $config;
+        }
+
+        /**
+         * Sets a value in a nested array using dot notation.
+         *
+         * @param array $array The array to modify (passed by reference).
+         * @param string $key The dot-notation key (e.g., "parent.child.grandchild").
+         * @param mixed $value The value to set.
+         * @return void
+         */
+        public static function setNestedValue(array &$array, string $key, mixed $value): void
+        {
+            $keys = explode('.', $key);
+            $temp = &$array;
+
+            foreach ($keys as $i => $k) {
+                if (!is_array($temp)) {
+                    $temp = [];
+                }
+                if (!isset($temp[$k]) || !is_array($temp[$k])) {
+                    $temp[$k] = [];
+                }
+                if ($i === count($keys) - 1) {
+                    $temp[$k] = $value;
+                }
+                $temp = &$temp[$k];
+            }
+        }
+
+        /**
+         * Gets a value from a nested array using dot notation.
+         *
+         * @param array $array The array to search.
+         * @param string $key The dot-notation key (e.g., "parent.child.grandchild").
+         * @param mixed $default The default value to return if the key is not found.
+         * @return mixed
+         */
+        public static function getNestedValue(array $array, string $key, mixed $default = null): mixed
+        {
+            $keys = explode('.', $key);
+            $temp = $array;
+
+            foreach ($keys as $k) {
+                if (!is_array($temp) || !array_key_exists($k, $temp)) {
+                    return $default;
+                }
+                $temp = $temp[$k];
+            }
+
+            return $temp;
         }
 
         /**
