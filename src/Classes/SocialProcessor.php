@@ -267,7 +267,15 @@ class SocialProcessor
 
             $value = $context[$key];
             if ($value !== null && $value !== '') {
-                return $value;
+                // If it's a numeric string or integer, check if it fits in a 32-bit signed integer (PostgreSQL 'integer')
+                if (is_int($value) || ctype_digit((string)$value)) {
+                    $numValue = (float)$value;
+                    if ($numValue <= 2147483647) {
+                        return (int)$value;
+                    }
+                } else {
+                    return $value;
+                }
             }
         }
 
