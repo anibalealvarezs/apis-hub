@@ -85,7 +85,7 @@ class ChanneledMetricRepository extends ChanneledBaseRepository
 
         // Replace channel int with its name
         if (isset($result['channel'])) {
-            $result['channel'] = Channel::from($result['channel'])->getName();
+            $result['channel'] = $this->resolveChannelName($result['channel']);
         }
 
         // Format metricDate
