@@ -30,9 +30,14 @@ final class AggregationProfileResolver
             return is_array($profiles) ? $profiles : [];
         }
 
-        $registry = DriverFactory::getRegistry();
-        if ($registry === []) {
-            $registry = $this->resolveLocalDriverRegistry();
+        if ($this->driverRegistryResolver !== null) {
+            $registry = call_user_func($this->driverRegistryResolver);
+            $registry = is_array($registry) ? $registry : [];
+        } else {
+            $registry = DriverFactory::getRegistry();
+            if ($registry === []) {
+                $registry = $this->resolveLocalDriverRegistry();
+            }
         }
 
         $driverClass = $registry[$channel]['driver'] ?? null;

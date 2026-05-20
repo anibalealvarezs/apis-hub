@@ -583,9 +583,16 @@
                 }
             }
 
-            $registry = DriverFactory::getRegistry();
-            if ($registry === []) {
-                $registry = $this->resolveLocalDriverRegistry();
+            // Use injected registry resolver first (allows test overrides), then DriverFactory cache,
+            // then fall back to local YAML file
+            if ($this->driverRegistryResolver !== null) {
+                $registry = call_user_func($this->driverRegistryResolver);
+                $registry = is_array($registry) ? $registry : [];
+            } else {
+                $registry = DriverFactory::getRegistry();
+                if ($registry === []) {
+                    $registry = $this->resolveLocalDriverRegistry();
+                }
             }
 
             $driverClass = $registry[$channel]['driver'] ?? null;
