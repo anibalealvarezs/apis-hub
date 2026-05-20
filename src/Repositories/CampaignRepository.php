@@ -93,13 +93,25 @@ class CampaignRepository extends BaseRepository
      */
     protected function replaceChannelName(array $entity): array
     {
-        $entity['channeledCampaigns'] = array_map(function ($channelCustomer) {
-            $channelCustomer['channel'] = Channel::from($channelCustomer['channel'])->getName();
-            return $channelCustomer;
+        $entity['channeledCampaigns'] = array_map(function ($channelAccount) {
+            if (isset($channelAccount['channel']) && is_numeric($channelAccount['channel'])) {
+                /** @var Channel $channelEntity */
+                $channelEntity = $this->_em->find(Channel::class, $channelAccount['channel']);
+                if ($channelEntity) {
+                    $channelAccount['channel'] = $channelEntity->getName();
+                }
+            }
+            return $channelAccount;
         }, $entity['channeledCampaigns']);
-        $entity['channeledAdGroups'] = array_map(function ($channelCustomer) {
-            $channelCustomer['channel'] = Channel::from($channelCustomer['channel'])->getName();
-            return $channelCustomer;
+        $entity['channeledAdGroups'] = array_map(function ($channelAccount) {
+            if (isset($channelAccount['channel']) && is_numeric($channelAccount['channel'])) {
+                /** @var Channel $channelEntity */
+                $channelEntity = $this->_em->find(Channel::class, $channelAccount['channel']);
+                if ($channelEntity) {
+                    $channelAccount['channel'] = $channelEntity->getName();
+                }
+            }
+            return $channelAccount;
         }, $entity['channeledAdGroups']);
         return $entity;
     }

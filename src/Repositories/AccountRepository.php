@@ -76,7 +76,13 @@ class AccountRepository extends BaseRepository
     private function replaceChannelName(array $entity): array
     {
         $entity['channeledAccounts'] = array_map(function ($channelAccount) {
-            $channelAccount['channel'] = Channel::from($channelAccount['channel'])->getName();
+            if (isset($channelAccount['channel']) && is_numeric($channelAccount['channel'])) {
+                /** @var Channel $channelEntity */
+                $channelEntity = $this->_em->find(Channel::class, $channelAccount['channel']);
+                if ($channelEntity) {
+                    $channelAccount['channel'] = $channelEntity->getName();
+                }
+            }
             return $channelAccount;
         }, $entity['channeledAccounts']);
         return $entity;

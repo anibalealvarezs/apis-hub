@@ -1,58 +1,87 @@
 <?php
 
-namespace Repositories\Channeled;
+    namespace Repositories\Channeled;
 
-use Doctrine\ORM\NonUniqueResultException;
-use Doctrine\ORM\NoResultException;
-use Doctrine\ORM\QueryBuilder;
-use Entities\Entity;
-use Entities\Analytics\Channel;
-use Enums\QueryBuilderType;
-use Exception;
+    use Doctrine\ORM\Exception\ORMException;
+    use Doctrine\ORM\OptimisticLockException;
+    use Doctrine\ORM\QueryBuilder;
+    use Entities\Analytics\Channel;
+    use Enums\QueryBuilderType;
+    use Exception;
 
-class ChanneledOrderRepository extends ChanneledBaseRepository
-{
-    /**
-     * @param QueryBuilderType $type
-     * @return QueryBuilder
-     * @throws Exception
-     */
-    protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
+    class ChanneledOrderRepository extends ChanneledBaseRepository
     {
-        $query = $this->_em->createQueryBuilder();
-        match ($type) {
-            QueryBuilderType::SELECT => $query->select('e'),
-            QueryBuilderType::COUNT => $query->select('count(e.id)'),
-            QueryBuilderType::LAST => $query->select('e, LENGTH(e.platformId) AS HIDDEN length'),
-            QueryBuilderType::CUSTOM => null
-        };
+        /**
+         * @param QueryBuilderType $type
+         * @return QueryBuilder
+         * @throws Exception
+         */
+        protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
+        {
+            $query = $this->_em->createQueryBuilder();
+            match ($type) {
+                QueryBuilderType::SELECT => $query->select('e'),
+                QueryBuilderType::COUNT => $query->select('count(e.id)'),
+                QueryBuilderType::LAST => $query->select('e, LENGTH(e.platformId) AS HIDDEN length'),
+                QueryBuilderType::CUSTOM => null,
+                QueryBuilderType::AGGREGATE => throw new Exception('To be implemented')
+            };
 
-        return $query
-            ->addSelect('c')
-            ->addSelect('p')
-            ->addSelect('d')
-            ->from($this->getEntityName(), 'e')
-            ->leftJoin('e.channeledCustomer', 'c')
-            ->leftJoin('e.channeledProducts', 'p')
-            ->leftJoin('e.channeledDiscounts', 'd');
-    }
+            return $query
+                ->addSelect('c')
+                ->addSelect('p')
+                ->addSelect('d')
+                ->from($this->getEntityName(), 'e')
+                ->leftJoin('e.channeledCustomer', 'c')
+                ->leftJoin('e.channeledProducts', 'p')
+                ->leftJoin('e.channeledDiscounts', 'd');
+        }
 
-    /**
-     * @param array $entity
-     * @return array
-     */
-    protected function replaceChannelName(array $entity): array
-    {
-        $entity['channel'] = Channel::from($entity['channel'])->getName();
-        unset($entity['channeledCustomer']['channel']);
-        $entity['channeledProducts'] = array_map(function ($channeledProduct) {
-            $channeledProduct['channel'] = Channel::from($channeledProduct['channel'])->getName();
-            return $channeledProduct;
-        }, $entity['channeledProducts']);
-        $entity['channeledDiscounts'] = array_map(function ($channeledDiscount) {
-            $channeledDiscount['channel'] = Channel::from($channeledDiscount['channel'])->getName();
-            return $channeledDiscount;
-        }, $entity['channeledDiscounts']);
-        return $entity;
+        /**
+         * @param array $entity
+         * @return array
+         * @throws ORMException
+         * @throws OptimisticLockException
+         */
+        protected function replaceChannelName(array $entity): array
+        {
+            if (isset($entity['channel']) && is_numeric($entity['channel'])) {
+                $channelEntity = $this->_em->find(Channel::class, $entity['channel']);
+                if ($channelEntity) {
+                    $entity['channel'] = $channelEntity->getName();
+                }
+            }
+
+            if (isset($entity['channeledCustomer'])) {
+                unset($entity['channeledCustomer']['channel']);
+            }
+
+            if (isset($entity['channeledProducts'])) {
+                $entity['channeledProducts'] = array_map(function ($channeledProduct) {
+                    if (isset($channeledProduct['channel']) && is_numeric($channeledProduct['channel'])) {
+                        $channelEntity = $this->_em->find(Channel::class, $channeledProduct['channel']);
+                        if ($channelEntity) {
+                            $channeledProduct['channel'] = $channelEntity->getName();
+                        }
+                    }
+
+                    return $channeledProduct;
+                }, $entity['channeledProducts']);
+            }
+
+            if (isset($entity['channeledDiscounts'])) {
+                $entity['channeledDiscounts'] = array_map(function ($channeledDiscount) {
+                    if (isset($channeledDiscount['channel']) && is_numeric($channeledDiscount['channel'])) {
+                        $channelEntity = $this->_em->find(Channel::class, $channeledDiscount['channel']);
+                        if ($channelEntity) {
+                            $channeledDiscount['channel'] = $channelEntity->getName();
+                        }
+                    }
+
+                    return $channeledDiscount;
+                }, $entity['channeledDiscounts']);
+            }
+
+            return $entity;
+        }
     }
-}
