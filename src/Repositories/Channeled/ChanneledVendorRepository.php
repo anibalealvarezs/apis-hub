@@ -36,13 +36,13 @@ class ChanneledVendorRepository extends ChanneledBaseRepository
 
     /**
      * @param string $name
-     * @param int $channel
+     * @param mixed $channel
      * @return Entity|null
      * @throws NonUniqueResultException
      */
-    public function getByName(string $name, int $channel): ?Entity
+    public function getByName(string $name, mixed $channel): ?Entity
     {
-        $this->validateChannel($channel);
+        $channel = $this->validateChannel($channel);
         return $this->createBaseQueryBuilder()
             ->where('e.name = :name')
             ->setParameter('name', $name)
@@ -54,14 +54,14 @@ class ChanneledVendorRepository extends ChanneledBaseRepository
 
     /**
      * @param string $name
-     * @param int $channel
+     * @param mixed $channel
      * @return bool
      * @throws NonUniqueResultException
      * @throws NoResultException
      */
-    public function existsByName(string $name, int $channel): bool
+    public function existsByName(string $name, mixed $channel): bool
     {
-        $this->validateChannel($channel);
+        $channel = $this->validateChannel($channel);
         return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
                 ->where('e.name = :name')
                 ->setParameter('name', $name)

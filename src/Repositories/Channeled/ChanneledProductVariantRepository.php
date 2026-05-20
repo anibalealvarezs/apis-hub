@@ -40,13 +40,13 @@ class ChanneledProductVariantRepository extends ChanneledBaseRepository
 
     /**
      * @param string $sku
-     * @param int $channel
+     * @param mixed $channel
      * @return Entity|null
      * @throws NonUniqueResultException
      */
-    public function getBySku(string $sku, int $channel): ?Entity
+    public function getBySku(string $sku, mixed $channel): ?Entity
     {
-        $this->validateChannel($channel);
+        $channel = $this->validateChannel($channel);
         return $this->createBaseQueryBuilder()
             ->where('e.sku = :sku')
             ->setParameter('sku', $sku)
@@ -58,14 +58,14 @@ class ChanneledProductVariantRepository extends ChanneledBaseRepository
 
     /**
      * @param string $sku
-     * @param int $channel
+     * @param mixed $channel
      * @return bool
      * @throws NoResultException
      * @throws NonUniqueResultException
      */
-    public function existsBySku(string $sku, int $channel): bool
+    public function existsBySku(string $sku, mixed $channel): bool
     {
-        $this->validateChannel($channel);
+        $channel = $this->validateChannel($channel);
         return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
                 ->where('e.sku = :sku')
                 ->setParameter('sku', $sku)

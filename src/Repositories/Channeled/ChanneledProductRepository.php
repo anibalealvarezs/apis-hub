@@ -42,11 +42,11 @@ class ChanneledProductRepository extends ChanneledBaseRepository
 
     /**
      * @param string $sku
-     * @param int $channel
+     * @param mixed $channel
      * @return Entity|null
      * @throws NonUniqueResultException
      */
-    public function getBySku(string $sku, int $channel): ?Entity
+    public function getBySku(string $sku, mixed $channel): ?Entity
     {
         $channel = $this->validateChannel($channel);
 
@@ -61,12 +61,12 @@ class ChanneledProductRepository extends ChanneledBaseRepository
 
     /**
      * @param string $sku
-     * @param int $channel
+     * @param mixed $channel
      * @return bool
      * @throws NoResultException
      * @throws NonUniqueResultException
      */
-    public function existsBySku(string $sku, int $channel): bool
+    public function existsBySku(string $sku, mixed $channel): bool
     {
         $channel = $this->validateChannel($channel);
 

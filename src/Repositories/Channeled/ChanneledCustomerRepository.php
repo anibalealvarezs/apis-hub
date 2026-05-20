@@ -17,7 +17,7 @@ class ChanneledCustomerRepository extends ChanneledBaseRepository
      * @return Entity|null
      * @throws NonUniqueResultException
      */
-    public function getByEmail(string $email, Channel|int $channel /*, bool $useCached = false */): ?Entity
+    public function getByEmail(string $email, mixed $channel /*, bool $useCached = false */): ?Entity
     {
         $channelValue = $channel instanceof Channel ? $channel->value : $this->validateChannel($channel);
         return $this->createBaseQueryBuilder()
@@ -32,12 +32,12 @@ class ChanneledCustomerRepository extends ChanneledBaseRepository
 
     /**
      * @param string $email
-     * @param Channel|int $channel
+     * @param mixed $channel
      * @return bool
      * @throws NoResultException
      * @throws NonUniqueResultException
      */
-    public function existsByEmail(string $email, Channel|int $channel): bool
+    public function existsByEmail(string $email, mixed $channel): bool
     {
         $channelValue = $channel instanceof Channel ? $channel->value : $this->validateChannel($channel);
         return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)

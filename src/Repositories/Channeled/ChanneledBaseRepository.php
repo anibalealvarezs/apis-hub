@@ -51,7 +51,7 @@ class ChanneledBaseRepository extends BaseRepository
      * @throws NonUniqueResultException
      * @throws InvalidArgumentException
      */
-    public function getByPlatformId(int|string $platformId, int $channel): ?Entity
+    public function getByPlatformId(int|string $platformId, mixed $channel): ?Entity
     {
         $channelValue = $this->validateChannel($channel);
         return $this->createBaseQueryBuilder()
@@ -66,13 +66,13 @@ class ChanneledBaseRepository extends BaseRepository
 
     /**
      * @param int|string $platformId
-     * @param int $channel
+     * @param mixed $channel
      * @return bool
      * @throws NonUniqueResultException
      * @throws NoResultException
      * @throws InvalidArgumentException
      */
-    public function existsByPlatformId(int|string $platformId, int $channel): bool
+    public function existsByPlatformId(int|string $platformId, mixed $channel): bool
     {
         $channelValue = $this->validateChannel($channel);
         return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
@@ -145,8 +145,11 @@ class ChanneledBaseRepository extends BaseRepository
      * @param int|string|ChannelEntity|null $channel
      * @return int
      */
-    protected function validateChannel(int|string|ChannelEntity|null $channel): int
+    protected function validateChannel(mixed $channel): int
     {
+        if ($channel instanceof \BackedEnum) {
+            $channel = $channel->value;
+        }
         if ($channel === null || (is_string($channel) && empty($channel))) {
             throw new InvalidArgumentException('Invalid channel: channel cannot be null or empty');
         }
@@ -169,11 +172,14 @@ class ChanneledBaseRepository extends BaseRepository
     }
 
     /**
-     * @param int|string|ChannelEntity $identity
+     * @param mixed $identity
      * @return ChannelEntity|null
      */
-    protected function resolveChannel(int|string|ChannelEntity $identity): ?ChannelEntity
+    protected function resolveChannel(mixed $identity): ?ChannelEntity
     {
+        if ($identity instanceof \BackedEnum) {
+            $identity = $identity->value;
+        }
         if ($identity instanceof ChannelEntity) {
             return $identity;
         }
