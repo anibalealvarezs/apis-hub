@@ -274,7 +274,6 @@
                 // Include channel filter if available
                 $channelFilter = "";
                 if ($channel) {
-                    $channelFilter = " AND channel = ".(int)Channel::tryFromName($channel)->getId();
                     $enum = Channel::tryFromName($channel);
                     if ($enum) {
                         $channelFilter = " AND channel = ".(int)$enum->getId();
