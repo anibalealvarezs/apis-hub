@@ -6,7 +6,6 @@
 
     use Core\Services\SyncService;
     use Doctrine\Common\Collections\ArrayCollection;
-    use Entities\Analytics\Channel;
     use Interfaces\RequestInterface;
     use Psr\Log\LoggerInterface;
     use Symfony\Component\HttpFoundation\Response;
@@ -14,13 +13,6 @@
 
     class DiscountRequests implements RequestInterface
     {
-        private static ?SyncService $syncService = null;
-
-        public static function setSyncService(?SyncService $syncService): void
-        {
-            self::$syncService = $syncService;
-        }
-
         /**
          * @param object|string $channel
          * @param string|null $startDate
@@ -40,11 +32,9 @@
             ?object          $filters = null
         ): Response
         {
-            $chanKey = is_object($channel) ? ($channel->name ?? (method_exists($channel, 'getName') ? $channel->getName() : (string)$channel)) : (string)$channel;
+            $syncService = new SyncService();
 
-            $syncService = self::$syncService ?? new SyncService();
-
-            return $syncService->execute($chanKey, $startDate, $endDate, [
+            return $syncService->execute($channel, $startDate, $endDate, [
                 'jobId'   => $jobId,
                 'resume'  => $filters->resume ?? true,
                 'type'    => 'discounts',

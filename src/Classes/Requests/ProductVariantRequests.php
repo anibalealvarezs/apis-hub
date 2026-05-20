@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace Classes\Requests;
 
+use Core\Services\SyncService;
 use Doctrine\Common\Collections\ArrayCollection;
-use Entities\Analytics\Channel;
 use Interfaces\RequestInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 class ProductVariantRequests implements RequestInterface
 {
-    
-
     /**
-     * @param Channel|string $channel
+     * @param object|string $channel
      * @param string|null $startDate
      * @param string|null $endDate
      * @param \Psr\Log\LoggerInterface|null $logger
@@ -32,9 +30,7 @@ class ProductVariantRequests implements RequestInterface
         ?int $jobId = null,
         ?object $filters = null
     ): Response {
-        $chanKey = is_object($channel) ? ($channel->name ?? (method_exists($channel, 'getName') ? $channel->getName() : (string)$channel)) : (string)$channel;
-
-        return (new \Core\Services\SyncService())->execute($chanKey, $startDate, $endDate, [
+        return (new SyncService())->execute($channel, $startDate, $endDate, [
             'jobId' => $jobId,
             'resume' => $filters->resume ?? true,
             'type' => 'product_variants',
