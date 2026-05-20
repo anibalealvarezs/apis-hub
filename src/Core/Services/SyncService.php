@@ -42,7 +42,7 @@
         /**
          * Executes the sync process for a given channel.
          *
-         * @param string $channel
+         * @param Channel|string $channel
          * @param string|array|null $startDateOrConfig
          * @param string|null $endDateStr
          * @param array $config
@@ -52,7 +52,7 @@
          * @throws Throwable
          */
         public function execute(
-            string            $channel,
+            object|string     $channel,
             string|array|null $startDateOrConfig = null,
             string|null       $endDateStr = null,
             array             $config = [],
@@ -60,14 +60,16 @@
             ?string           $instanceName = null
         ): Response
         {
+            $channelName = is_object($channel) ? $channel->getName() : $channel;
+
             if ($logger) {
                 $this->logger = $logger;
             } elseif (!$this->logger) {
-                $this->logger = Helpers::setLogger("sync-$channel.log");
+                $this->logger = Helpers::setLogger("sync-$channelName.log");
             }
 
             try {
-                $this->logger->info("DEBUG: SyncService::execute - ENTRY", ['channel' => $channel]);
+                $this->logger->info("DEBUG: SyncService::execute - ENTRY", ['channel' => $channelName]);
 
                 $startDateStr = null;
                 if (is_array($startDateOrConfig)) {
@@ -78,12 +80,12 @@
 
                 // 1. Get official driver via Factory
                 $this->logger->info("DEBUG: SyncService::execute - RESOLVING DRIVER via Factory");
-                $driver = DriverFactory::get($channel, $this->logger, $config);
+                $driver = DriverFactory::get($channelName, $this->logger, $config);
                 $this->logger->info("DEBUG: SyncService::execute - DRIVER RESOLVED", ['class' => get_class($driver)]);
 
                 // 2. Build final configuration
-                $baseConfig = DriverInitializer::validateConfig($channel, $this->logger);
-                $this->logger->info("DEBUG: SyncService::execute - Channel", [$channel]);
+                $baseConfig = DriverInitializer::validateConfig($channelName, $this->logger);
+                $this->logger->info("DEBUG: SyncService::execute - Channel", [$channelName]);
 
                 // Extract job-specific config, potentially nested under 'filters'
                 $jobConfig = $config['filters'] ?? $config;
@@ -151,7 +153,7 @@
                     }
                 });
 
-                $this->logger->info("SyncService: Executing sync for channel '$channel'", [
+                $this->logger->info("SyncService: Executing sync for channel '$channelName'", [
                     'start_date' => $startDate->format('Y-m-d'),
                     'end_date'   => $endDate->format('Y-m-d'),
                     'instance'   => $instanceName,
@@ -160,7 +162,7 @@
 
                 $this->logger->info("DEBUG: SyncService::execute - INVOKING driver->sync");
 
-                $identityMapper = function (string $type, array $params) use ($finalConfig, $channel) {
+                $identityMapper = function (string $type, array $params) use ($finalConfig, $channelName) {
                     static $cache = [];
                     $manager = $finalConfig['manager'] ?? Helpers::getManager();
                     $repoMap = [
@@ -198,7 +200,7 @@
                         return null;
                     }
 
-                    $driverClass = DriverFactory::getRegistry()[$channel]['driver'] ?? null;
+                    $driverClass = DriverFactory::getRegistry()[$channelName]['driver'] ?? null;
                     $context = $driverClass ? $driverClass::getContextForCategory($category) : '';
 
                     if ($type === 'pages') {
@@ -210,12 +212,12 @@
                         if (isset($params['urls'])) {
                             $isUrlLookup = true;
                             $urls = (array)$params['urls'];
-                            $canonicalMap = array_combine($urls, array_map(function ($u) use ($driverClass, $category, $context, $channel) {
+                            $canonicalMap = array_combine($urls, array_map(function ($u) use ($driverClass, $category, $context, $channelName) {
                                 if ($driverClass) {
                                     return $driverClass::getCanonicalId(['url' => $u], $category, $context);
                                 }
 
-                                throw new RuntimeException("Driver not found for channel: ".$channel);
+                                throw new RuntimeException("Driver not found for channel: ".$channelName);
                             }, $urls));
                             $searchValues = array_values($canonicalMap);
                         } elseif (isset($params['platform_ids'])) {
@@ -270,11 +272,11 @@
                             $criteria[$idField] = array_unique($searchValues);
                         }
                         if (in_array($type, ['channeled_accounts', 'channeled_campaigns', 'channeled_ad_groups', 'channeled_ads'])) {
-                            $enum = Channel::tryFromName($channel);
+                            $enum = Channel::tryFromName($channelName);
                             if ($enum) {
                                 $criteria['channel'] = $enum->getId();
                             } else {
-                                $this->logger->warning("SyncService::identityMapper - Channel '$channel' not found in database channels table.");
+                                $this->logger->warning("SyncService::identityMapper - Channel '$channelName' not found in database channels table.");
                             }
                         }
                         $this->logger->info("SyncService::identityMapper - Lookup criteria for $type", ['criteria' => $criteria]);
@@ -331,7 +333,7 @@
                 if (isset($content['status'], $content['error_code']) && $content['status'] === 'error' && $content['error_code'] === 'auth_failure') {
                     if ($jobId) {
                         $this->logger->critical(
-                            "Authentication failure detected from driver response for channel '$channel'. Cancelling job #$jobId.",
+                            "Authentication failure detected from driver response for channel '$channelName'. Cancelling job #$jobId.",
                             ['response' => $content]
                         );
                         Helpers::cancelJob($jobId);
@@ -352,7 +354,7 @@
                     $jobId = $finalConfig['jobId'] ?? $config['jobId'] ?? null;
                     if ($jobId) {
                         $this->logger->critical(
-                            "A non-retriable authentication error occurred for channel '$channel'. Cancelling job #$jobId.",
+                            "A non-retriable authentication error occurred for channel '$channelName'. Cancelling job #$jobId.",
                             ['error' => $e->getMessage()]
                         );
                         Helpers::cancelJob($jobId);
@@ -366,7 +368,7 @@
                     }
                 }
 
-                $this->logger->error("SyncService Error [$channel]: ".$e->getMessage(), [
+                $this->logger->error("SyncService Error [$channelName]: ".$e->getMessage(), [
                     'trace' => $e->getTraceAsString(),
                 ]);
 
