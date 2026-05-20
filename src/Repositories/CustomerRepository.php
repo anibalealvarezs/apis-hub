@@ -1,104 +1,120 @@
 <?php
 
-namespace Repositories;
+    namespace Repositories;
 
-use Doctrine\ORM\AbstractQuery;
-use Doctrine\ORM\NonUniqueResultException;
-use Doctrine\ORM\NoResultException;
-use Doctrine\ORM\QueryBuilder;
-use Doctrine\Persistence\Mapping\MappingException;
-use Entities\Analytics\Channel;
-use Enums\QueryBuilderType;
-use Exception;
-use ReflectionException;
-use Entities\Entity;
+    use Doctrine\ORM\AbstractQuery;
+    use Doctrine\ORM\Exception\ORMException;
+    use Doctrine\ORM\NonUniqueResultException;
+    use Doctrine\ORM\NoResultException;
+    use Doctrine\ORM\OptimisticLockException;
+    use Doctrine\ORM\QueryBuilder;
+    use Doctrine\Persistence\Mapping\MappingException;
+    use Entities\Analytics\Channel;
+    use Enums\QueryBuilderType;
+    use Exception;
+    use ReflectionException;
+    use Entities\Entity;
 
-class CustomerRepository extends BaseRepository
-{
-    /**
-     * @param QueryBuilderType $type
-     * @return QueryBuilder
-     * @throws Exception
-     */
-    protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
+    class CustomerRepository extends BaseRepository
     {
-        $query = $this->_em->createQueryBuilder();
-        match ($type) {
-            QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
-            QueryBuilderType::COUNT => $query->select('count(e.id)'),
-            QueryBuilderType::CUSTOM => throw new Exception('To be implemented'),
-        };
+        /**
+         * @param QueryBuilderType $type
+         * @return QueryBuilder
+         * @throws Exception
+         */
+        protected function createBaseQueryBuilder(QueryBuilderType $type = QueryBuilderType::SELECT): QueryBuilder
+        {
+            $query = $this->_em->createQueryBuilder();
+            match ($type) {
+                QueryBuilderType::LAST, QueryBuilderType::SELECT => $query->select('e'),
+                QueryBuilderType::COUNT => $query->select('count(e.id)'),
+                QueryBuilderType::CUSTOM, QueryBuilderType::AGGREGATE => throw new Exception('To be implemented'),
+            };
 
-        return $query->addSelect('c')
-            ->from($this->getEntityName(), 'e')
-            ->leftJoin('e.channeledCustomers', 'c');
-    }
-
-    /**
-     * @param object|null $data
-     * @param bool $returnEntity
-     * @return Entity|array|null
-     * @throws MappingException
-     * @throws NonUniqueResultException
-     * @throws ReflectionException
-     */
-    public function create(?object $data = null, bool $returnEntity = false): Entity|array|null
-    {
-        if (!$data || !isset($data->email)) {
-            return null; // Or throw new \InvalidArgumentException('Email is required')
+            return $query->addSelect('c')
+                ->from($this->getEntityName(), 'e')
+                ->leftJoin('e.channeledCustomers', 'c');
         }
-        return parent::create(data: $data, returnEntity: $returnEntity);
-    }
 
-    /**
-     * @param string $email
-     * @return Entity|null
-     * @throws NonUniqueResultException
-     */
-    public function getByEmail(string $email /*, bool $useCached = false */): ?Entity
-    {
-        return $this->createBaseQueryBuilder()
-            ->where('e.email = :email')
-            ->setParameter('email', $email)
-            ->getQuery()
-            ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
-    }
+        /**
+         * @param object|null $data
+         * @param bool $returnEntity
+         * @return Entity|array|null
+         * @throws MappingException
+         * @throws NonUniqueResultException
+         * @throws ReflectionException|OptimisticLockException
+         */
+        public function create(?object $data = null, bool $returnEntity = false): Entity|array|null
+        {
+            if (!$data || !isset($data->email)) {
+                return null; // Or throw new \InvalidArgumentException('Email is required')
+            }
 
-    /**
-     * @param string $email
-     * @return bool
-     * @throws NonUniqueResultException
-     * @throws NoResultException
-     */
-    public function existsByEmail(string $email): bool
-    {
-        return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
-            ->where('e.email = :email')
-            ->setParameter('email', $email)
-            ->getQuery()
-            ->getSingleScalarResult() > 0;
-    }
+            return parent::create(data: $data, returnEntity: $returnEntity);
+        }
 
-    /**
-     * @param array $result
-     * @return array
-     */
-    protected function processResult(array $result): array
-    {
-        $result = $this->replaceChannelName($result);
-        return parent::processResult($result);
-    }
+        /**
+         * @param string $email
+         * @return Entity|null
+         * @throws NonUniqueResultException|Exception
+         */
+        public function getByEmail(string $email /*, bool $useCached = false */): ?Entity
+        {
+            return $this->createBaseQueryBuilder()
+                ->where('e.email = :email')
+                ->setParameter('email', $email)
+                ->getQuery()
+                ->getOneOrNullResult(AbstractQuery::HYDRATE_OBJECT);
+        }
 
-    /**
-     * @param array $entity
-     * @return array
-     */
-    protected function replaceChannelName(array $entity): array
-    {
-        $entity['channeledCustomers'] = array_map(function ($channelCustomer) {
-            $channelCustomer['channel'] = Channel::from($channelCustomer['channel'])->getName();
-            return $channelCustomer;
-        }, $entity['channeledCustomers']);
-        return $entity;
+        /**
+         * @param string $email
+         * @return bool
+         * @throws NonUniqueResultException
+         * @throws NoResultException|Exception
+         */
+        public function existsByEmail(string $email): bool
+        {
+            return $this->createBaseQueryBuilderNoJoins(QueryBuilderType::COUNT)
+                    ->where('e.email = :email')
+                    ->setParameter('email', $email)
+                    ->getQuery()
+                    ->getSingleScalarResult() > 0;
+        }
+
+        /**
+         * @param array $result
+         * @return array
+         * @throws ORMException
+         * @throws OptimisticLockException
+         */
+        protected function processResult(array $result): array
+        {
+            $result = $this->replaceChannelName($result);
+
+            return parent::processResult($result);
+        }
+
+        /**
+         * @param array $entity
+         * @return array
+         * @throws OptimisticLockException
+         * @throws ORMException
+         */
+        protected function replaceChannelName(array $entity): array
+        {
+            $entity['channeledCustomers'] = array_map(function ($channelCustomer) {
+                if (isset($channelCustomer['channel']) && is_numeric($channelCustomer['channel'])) {
+                    /** @var Channel $channelEntity */
+                    $channelEntity = $this->_em->find(Channel::class, $channelCustomer['channel']);
+                    if ($channelEntity) {
+                        $channelCustomer['channel'] = $channelEntity->getName();
+                    }
+                }
+
+                return $channelCustomer;
+            }, $entity['channeledCustomers']);
+
+            return $entity;
+        }
     }
-}
