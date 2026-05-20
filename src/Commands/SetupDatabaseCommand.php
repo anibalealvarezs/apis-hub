@@ -21,6 +21,7 @@
         protected function configure(): void
         {
             $this
+                ->setName('app:setup-db')
                 ->setDescription('Ensures the database exists, updates the schema, and seeds default entities.');
         }
 
