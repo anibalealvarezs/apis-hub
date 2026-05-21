@@ -61,18 +61,18 @@ The master worker daemon. It claims and executes jobs continuously.
 - **Usage**: `php bin/cli.php app:process-jobs [--force-all] [--job-id=<id>]`
 - **Use Case**: Runs automatically in containers, but can be triggered manually to process the queue or force a single job id.
 
-### 2. `app:jobs:schedule-initial`
+### 2. `app:schedule-initial-jobs`
 
 Scans the `project.yaml` instance configurations and injects initial synchronization jobs for any active channels that do not already have jobs.
 
-- **Usage**: `php bin/cli.php app:jobs:schedule-initial`
+- **Usage**: `php bin/cli.php app:schedule-initial-jobs`
 - **Use Case**: Run this after adding new integration channels to the project to instantly kickstart data fetching.
 
-### 3. `app:jobs:inspect`
+### 3. `app:jobs-stats`
 
 Provides a detailed visual statistical breakdown of the current job queue.
 
-- **Usage**: `php bin/cli.php app:jobs:inspect`
+- **Usage**: `php bin/cli.php app:jobs-stats`
 - **Use Case**: Use this to monitor queue health, see how many jobs have failed in the last 24 hours, and see the exact breakdown by channel (e.g., Facebook vs Google).
 
 ### 4. `app:jobs:reset`
@@ -90,7 +90,7 @@ Granular, surgical retry for a specific failed job.
 - **Usage**: `php bin/cli.php app:jobs:retry-failed <job_id>`
 - **Use Case**: If a specific job failed due to a temporary API timeout that you know is resolved, run this to copy its payload into a brand new job and schedule it for immediate execution.
 
-### 6. `app:jobs:retry-all-failed` (or `app:jobs-retry`)
+### 6. `app:jobs-retry`
 
 Bulk retry for all failed jobs in the queue.
 
@@ -101,7 +101,7 @@ Bulk retry for all failed jobs in the queue.
 
 ### Scenario A: A massive API outage caused 1,000 jobs to fail
 
-1. Run `php bin/cli.php app:jobs:inspect` to confirm exactly which channel is bleeding failed jobs.
+1. Run `php bin/cli.php app:jobs-stats` to confirm exactly which channel is bleeding failed jobs.
 2. Once the API provider resolves their outage, you do not need to retry them one by one.
 3. Run `php bin/cli.php app:jobs-retry --channel=the_failing_channel` to bulk-reschedule them. The workers will automatically pick them up on their next cycle.
 
@@ -114,7 +114,7 @@ Bulk retry for all failed jobs in the queue.
 ### Scenario C: I just deployed a brand new integration to `project.yaml`
 
 1. The integration is deployed, but the queue is empty.
-2. Run `php bin/cli.php app:jobs:schedule-initial`.
+2. Run `php bin/cli.php app:schedule-initial-jobs`.
 3. This command safely detects the new instances and automatically seeds the queue with the necessary start jobs.
 
 ### Scenario D: I need to gracefully restart a specific worker
