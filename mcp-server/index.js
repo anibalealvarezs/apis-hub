@@ -348,7 +348,6 @@ if (MODE === "sse") {
   const app = express();
   app.use(cors());
   app.set('trust proxy', true); // Permitir detección correcta tras proxies/docker
-  app.use(express.json()); // Parser para leer sessionId del cuerpo de la petición
   const PORT = process.env.MCP_PORT || 3000;
 
   // Track active sessions and their transports
